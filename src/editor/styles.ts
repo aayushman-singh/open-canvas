@@ -179,6 +179,19 @@ main {
 }
 .topbar .back:hover { color: var(--accent); border-bottom-color: var(--accent); }
 
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .editor-shell {
   background: var(--bg-panel);
   border: 1px solid var(--hairline-strong);
@@ -187,6 +200,204 @@ main {
     inset 0 1px 0 oklch(0.95 0.02 220 / 0.06),
     0 30px 70px -22px rgba(0,0,0,0.7);
   overflow: hidden;
+  min-width: 0;
+}
+
+.agent-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 1px 0 oklch(0.95 0.02 220 / 0.06),
+    0 30px 70px -22px rgba(0,0,0,0.7);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+}
+
+.agent-panel .titlebar {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--fg-faint);
+  background: var(--bg-titlebar);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.agent-panel .titlebar .glyphs { display: inline-flex; gap: 6px; }
+.agent-panel .titlebar .glyph {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: oklch(0.45 0.04 245);
+}
+.agent-panel .titlebar .glyph.close { background: oklch(0.6 0.18 25); }
+.agent-panel .titlebar .glyph.min { background: oklch(0.78 0.14 80); }
+.agent-panel .titlebar .glyph.max { background: oklch(0.72 0.15 150); }
+.agent-panel .titlebar .path .accent { color: var(--accent); }
+.agent-panel .titlebar .right { margin-left: auto; color: var(--warn); }
+
+.agent-log {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.agent-bubble {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+  background: oklch(0.13 0.03 245 / 0.55);
+}
+
+.agent-bubble .who {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-right: 0.5rem;
+  padding: 0 0.35rem;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  background: var(--bg-panel-strong);
+}
+
+.agent-bubble .text { color: var(--fg); }
+
+.agent-bubble.agent-meta {
+  border-style: dashed;
+  color: var(--fg-mute);
+}
+.agent-bubble.agent-meta .who { color: var(--accent); }
+
+.agent-bubble.agent-user {
+  background: oklch(0.2 0.04 220 / 0.55);
+  border-color: var(--accent-glow);
+}
+.agent-bubble.agent-user .who { color: var(--accent); border-color: var(--accent-glow); }
+
+.agent-bubble.agent-reply { background: oklch(0.16 0.03 245 / 0.7); }
+.agent-bubble.agent-reply .who { color: var(--warn); border-color: oklch(0.85 0.18 70 / 0.4); }
+
+.agent-bubble.agent-tool {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--fg-mute);
+  background: oklch(0.13 0.03 245 / 0.7);
+}
+.agent-bubble.agent-tool .when { color: var(--fg-faint); margin-right: 0.4rem; }
+.agent-bubble.agent-tool .arrow { color: var(--accent); margin-right: 0.35rem; }
+.agent-bubble.agent-tool .label { color: var(--fg); }
+.agent-bubble.agent-tool .detail { color: var(--fg-faint); margin-left: 0.4rem; }
+.agent-bubble.agent-tool.agent-tool-ok { border-color: oklch(0.82 0.18 145 / 0.4); }
+.agent-bubble.agent-tool.agent-tool-ok .label { color: var(--ok); }
+.agent-bubble.agent-tool.agent-tool-err { border-color: oklch(0.6 0.18 25 / 0.4); }
+.agent-bubble.agent-tool.agent-tool-err .label { color: oklch(0.7 0.17 30); }
+.agent-bubble.agent-tool.agent-tool-done .label { color: var(--accent); }
+
+.agent-bubble.agent-error {
+  background: oklch(0.18 0.04 25 / 0.5);
+  border-color: oklch(0.6 0.18 25 / 0.5);
+}
+.agent-bubble.agent-error .who {
+  color: oklch(0.7 0.17 30);
+  border-color: oklch(0.6 0.18 25 / 0.5);
+}
+
+.agent-input {
+  border-top: 1px solid var(--hairline);
+  padding: 0.6rem 0.7rem 0.7rem;
+  background: oklch(0.13 0.03 245 / 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.agent-input textarea {
+  resize: vertical;
+  min-height: 40px;
+  max-height: 160px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 4px;
+  background: oklch(0.1 0.025 245 / 0.85);
+  color: var(--fg);
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.agent-input textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.agent-input textarea:disabled {
+  opacity: 0.5;
+}
+
+.agent-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.agent-status {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+}
+
+.agent-input button {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.85rem;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--bg-deep);
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.agent-input button:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+.agent-input button:disabled {
+  background: oklch(0.4 0.04 240);
+  border-color: oklch(0.4 0.04 240);
+  cursor: not-allowed;
+  color: var(--fg-faint);
+}
+
+/* <agent> avatar chip — distinct warm-amber treatment vs. cool-cyan editors. */
+.topbar .avatars .avatar.agent {
+  background: var(--warn);
+  outline: 1.5px dashed oklch(0.85 0.18 70 / 0.7);
+  outline-offset: 1px;
+  position: relative;
+}
+.topbar .avatars .avatar.agent::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  box-shadow: 0 0 12px oklch(0.85 0.18 70 / 0.55);
+  pointer-events: none;
 }
 
 .editor-shell .titlebar {

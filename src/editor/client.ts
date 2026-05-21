@@ -21,6 +21,7 @@ export interface ClientScriptParams {
   userInitial: string;
   userColor: string;
   yFragmentName: string;
+  agentEndpoint: string;
 }
 
 // Versions pinned for cache stability across deploys. Bumping these is a
@@ -75,6 +76,7 @@ const params = {
   userInitial: ${jsString(params.userInitial)},
   userColor: ${jsString(params.userColor)},
   yFragmentName: ${jsString(params.yFragmentName)},
+  agentEndpoint: ${jsString(params.agentEndpoint)},
 };
 
 // Enum allow-lists — kept in sync with src/document/schema.ts. Embedded here
@@ -643,12 +645,14 @@ function renderAvatars() {
   avatarsEl.innerHTML = '';
   for (const [clientID, user] of seen) {
     const a = document.createElement('span');
-    a.className = 'avatar' + (clientID === localClientID ? ' me' : '');
+    const isMe = clientID === localClientID;
+    const isAgent = user && user.kind === 'agent';
+    a.className = 'avatar' + (isMe ? ' me' : '') + (isAgent ? ' agent' : '');
     a.style.background = user.color || 'oklch(0.78 0.15 200)';
-    a.textContent = (user.initial || '?').slice(0, 1);
+    a.textContent = isAgent ? 'A' : ((user.initial || '?').slice(0, 1));
     const tip = document.createElement('span');
     tip.className = 'tip';
-    tip.textContent = user.name + (clientID === localClientID ? ' (you)' : '');
+    tip.textContent = isAgent ? '<agent>' : (user.name + (isMe ? ' (you)' : ''));
     a.appendChild(tip);
     avatarsEl.appendChild(a);
   }
@@ -694,5 +698,216 @@ const editor = new Editor({
 });
 
 window.__rev01Editor = { editor, ydoc, provider };
+
+// -------------------------------------------------------------------------
+// Agent chat panel — POSTs to /api/agent/edit, streams NDJSON, renders each
+// event in #agent-log. Edits arrive in the editor via the existing Yjs
+// WebSocket (the DO broadcasts updates from clientID=1 to all WS clients).
+// -------------------------------------------------------------------------
+
+const agentForm = document.getElementById('agent-form');
+const agentLog = document.getElementById('agent-log');
+const agentTextarea = document.getElementById('agent-message');
+const agentSend = document.getElementById('agent-send');
+const agentStatus = document.getElementById('agent-status');
+
+function escapeText(s) {
+  return String(s).replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case "'": return '&#39;';
+    }
+    return ch;
+  });
+}
+
+function fmtTime() {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return hh + ':' + mm + ':' + ss;
+}
+
+function appendBubble(kind, body) {
+  if (!agentLog) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'agent-bubble ' + kind;
+  wrap.innerHTML = body;
+  agentLog.appendChild(wrap);
+  agentLog.scrollTop = agentLog.scrollHeight;
+  return wrap;
+}
+
+function appendUser(msg) {
+  appendBubble(
+    'agent-user',
+    '<span class="who">you</span><span class="text">' + escapeText(msg) + '</span>',
+  );
+}
+
+function appendAgentText() {
+  // Returns the text span so the caller can append streamed text into it.
+  if (!agentLog) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'agent-bubble agent-reply';
+  const who = document.createElement('span');
+  who.className = 'who';
+  who.textContent = 'agent';
+  const text = document.createElement('span');
+  text.className = 'text';
+  wrap.appendChild(who);
+  wrap.appendChild(text);
+  agentLog.appendChild(wrap);
+  agentLog.scrollTop = agentLog.scrollHeight;
+  return text;
+}
+
+function appendToolEvent(label, detail, kind) {
+  appendBubble(
+    'agent-tool ' + (kind || ''),
+    '<span class="when">[' + fmtTime() + ']</span> ' +
+      '<span class="arrow">→</span> ' +
+      '<span class="label">' + escapeText(label) + '</span>' +
+      (detail ? ' <span class="detail">' + escapeText(detail) + '</span>' : ''),
+  );
+}
+
+function appendErr(message) {
+  appendBubble(
+    'agent-error',
+    '<span class="who">err</span><span class="text">' + escapeText(message) + '</span>',
+  );
+}
+
+function setAgentStatus(label) {
+  if (agentStatus) agentStatus.textContent = label;
+}
+
+async function runAgentRequest(message) {
+  if (!agentSend || !agentTextarea) return;
+  agentSend.disabled = true;
+  agentTextarea.disabled = true;
+  setAgentStatus('thinking…');
+
+  let currentTextSpan = null;
+  try {
+    const res = await fetch(params.agentEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ pageId: params.pageId, message }),
+    });
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => '');
+      throw new Error('agent endpoint ' + String(res.status) + ': ' + errText);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\\n')) >= 0) {
+        const line = buffer.slice(0, nl);
+        buffer = buffer.slice(nl + 1);
+        if (!line.trim()) continue;
+        let event;
+        try {
+          event = JSON.parse(line);
+        } catch (parseErr) {
+          appendErr('bad ndjson line: ' + line);
+          continue;
+        }
+        renderAgentEvent(event);
+        if (event.type === 'text') {
+          if (!currentTextSpan) currentTextSpan = appendAgentText();
+          if (currentTextSpan) currentTextSpan.textContent += event.text;
+        } else if (event.type !== 'text') {
+          currentTextSpan = null;
+        }
+      }
+    }
+  } catch (err) {
+    appendErr(err && err.message ? err.message : String(err));
+  } finally {
+    agentSend.disabled = false;
+    agentTextarea.disabled = false;
+    agentTextarea.value = '';
+    setAgentStatus('idle');
+    agentTextarea.focus();
+  }
+}
+
+function renderAgentEvent(event) {
+  if (!event || typeof event !== 'object') return;
+  switch (event.type) {
+    case 'thinking':
+      setAgentStatus('turn ' + String(event.turn));
+      break;
+    case 'tool_call':
+      appendToolEvent(
+        event.name + '(' + summariseArgs(event.arguments) + ')',
+        '',
+        'agent-tool-call',
+      );
+      break;
+    case 'tool_result':
+      if (event.ok) {
+        appendToolEvent('ok', event.opKind, 'agent-tool-ok');
+      } else {
+        appendToolEvent('err', event.error || '', 'agent-tool-err');
+      }
+      break;
+    case 'done':
+      appendToolEvent('done', String(event.reason) + ' (' + String(event.turns) + ' turns)', 'agent-tool-done');
+      break;
+    case 'error':
+      appendErr(event.message || 'agent error');
+      break;
+    case 'text':
+      // Streamed into the bubble by runAgentRequest.
+      break;
+    default:
+      break;
+  }
+}
+
+function summariseArgs(args) {
+  if (!args || typeof args !== 'object') return '';
+  const parts = [];
+  for (const [k, v] of Object.entries(args)) {
+    const display = typeof v === 'string' && v.length > 30 ? v.slice(0, 27) + '...' : v;
+    parts.push(k + ': ' + JSON.stringify(display));
+  }
+  return parts.join(', ');
+}
+
+if (agentForm) {
+  agentForm.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    if (!agentTextarea) return;
+    const message = agentTextarea.value.trim();
+    if (message.length === 0) return;
+    appendUser(message);
+    void runAgentRequest(message);
+  });
+}
+
+if (agentTextarea) {
+  agentTextarea.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && !ev.shiftKey) {
+      ev.preventDefault();
+      if (agentForm) {
+        const event = new Event('submit', { cancelable: true });
+        agentForm.dispatchEvent(event);
+      }
+    }
+  });
+}
 `;
 }
