@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { db } from '../../db/client';
-import { customer, page, site, template, type NewPage } from '../../db/schema';
+import { customer, page, site, type NewPage } from '../../db/schema';
 import { getTemplate } from '../../templates/registry';
 
 type Bindings = {
@@ -88,40 +88,29 @@ sites.post('/', async (c) => {
     );
   }
 
-  const newSiteId = await database.transaction(async (tx) => {
-    const templateRow = await tx
-      .select({ id: template.id })
-      .from(template)
-      .where(eq(template.id, input.templateId))
-      .limit(1);
-    if (!templateRow[0]) {
-      throw new Error(`template row missing for ${input.templateId}`);
-    }
+  // Pre-generate the site id client-side so the site insert and the page inserts
+  // can ship together in one db.batch() — neon-http executes a batch as a single
+  // transaction, so partial failure rolls back, but it cannot consume RETURNING
+  // values from earlier statements in the same batch.
+  const newSiteId = crypto.randomUUID();
+  const pageRows: NewPage[] = descriptor.pages.map((p, i) => ({
+    siteId: newSiteId,
+    slug: p.slug,
+    title: p.title,
+    doc: structuredClone(p.doc),
+    position: i,
+  }));
 
-    const inserted = await tx
-      .insert(site)
-      .values({
-        customerId,
-        name: trimmedName,
-        templateId: input.templateId,
-        tokens: descriptor.tokens,
-      })
-      .returning({ id: site.id });
-
-    const siteId = inserted[0]?.id;
-    if (!siteId) throw new Error('site insert returned no id');
-
-    const pageRows: NewPage[] = descriptor.pages.map((p, i) => ({
-      siteId,
-      slug: p.slug,
-      title: p.title,
-      doc: structuredClone(p.doc),
-      position: i,
-    }));
-    await tx.insert(page).values(pageRows);
-
-    return siteId;
-  });
+  await database.batch([
+    database.insert(site).values({
+      id: newSiteId,
+      customerId,
+      name: trimmedName,
+      templateId: input.templateId,
+      tokens: descriptor.tokens,
+    }),
+    database.insert(page).values(pageRows),
+  ]);
 
   if (wantsJson(c)) {
     return c.json({ siteId: newSiteId }, 201);
