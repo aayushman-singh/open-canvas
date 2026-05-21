@@ -246,6 +246,8 @@ function validateAction(node: unknown, path: string, ctx: Ctx): void {
 
   if (typeof attrs.href !== 'string' || attrs.href.length === 0) {
     pushErr(ctx, `${path}.attrs.href`, 'must be a non-empty string');
+  } else {
+    checkHref(attrs.href, `${path}.attrs.href`, ctx);
   }
   if (typeof attrs.label !== 'string' || attrs.label.length === 0) {
     pushErr(ctx, `${path}.attrs.label`, 'must be a non-empty string');
@@ -404,6 +406,8 @@ function validateMark(mark: unknown, path: string, ctx: Ctx): void {
       }
       if (typeof attrs.href !== 'string' || attrs.href.length === 0) {
         pushErr(ctx, `${path}.attrs.href`, 'must be a non-empty string');
+      } else {
+        checkHref(attrs.href, `${path}.attrs.href`, ctx);
       }
       if (attrs.target !== undefined && !isOneOf(attrs.target, LINK_TARGETS)) {
         pushErr(ctx, `${path}.attrs.target`, `must be one of ${LINK_TARGETS.join(', ')}`);
@@ -618,5 +622,24 @@ function checkMediaSrc(src: string, mediaType: string, path: string, ctx: Ctx): 
         `iframe host ${JSON.stringify(host)} not in embed allowlist (${EMBED_ALLOWLIST.join(', ')})`,
       );
     }
+  }
+}
+
+const ALLOWED_HREF_PROTOCOLS = ['http:', 'https:', 'mailto:'] as const;
+
+function checkHref(href: string, path: string, ctx: Ctx): void {
+  if (href.startsWith('//')) {
+    pushErr(ctx, path, 'protocol-relative urls are not allowed');
+    return;
+  }
+
+  const protocolMatch = /^[A-Za-z][A-Za-z0-9+.-]*:/.exec(href);
+  if (!protocolMatch) {
+    return;
+  }
+
+  const protocol = protocolMatch[0].toLowerCase();
+  if (!(ALLOWED_HREF_PROTOCOLS as readonly string[]).includes(protocol)) {
+    pushErr(ctx, path, `href protocol must be one of ${ALLOWED_HREF_PROTOCOLS.join(', ')}`);
   }
 }
