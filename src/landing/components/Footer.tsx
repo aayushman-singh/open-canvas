@@ -1,10 +1,4 @@
-function todayStamp(): string {
-  const d = new Date();
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
+const BUILD_STAMP = '2026-05-21';
 
 export function Footer() {
   return (
@@ -19,7 +13,7 @@ export function Footer() {
         </a>
       </span>
       <span>license: MIT</span>
-      <span class="when">{todayStamp()}</span>
+      <span class="when">{BUILD_STAMP}</span>
     </footer>
   );
 }

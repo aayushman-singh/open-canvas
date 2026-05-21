@@ -24,6 +24,20 @@ assert(
   'expected landing copy not to claim simulated editors are online',
 );
 
+const OriginalDate = Date;
+(globalThis as { Date: DateConstructor }).Date = class extends OriginalDate {
+  constructor() {
+    super('2030-01-02T00:00:00.000Z');
+  }
+
+  static override now(): number {
+    return new OriginalDate('2030-01-02T00:00:00.000Z').getTime();
+  }
+} as DateConstructor;
+const shiftedClockRoot = await responseText('/');
+(globalThis as { Date: DateConstructor }).Date = OriginalDate;
+assert(root.body === shiftedClockRoot.body, 'expected landing HTML not to depend on request time');
+
 const health = await responseText('/health');
 assert(health.status === 200, `expected public /health to return 200, got ${health.status}`);
 assert(health.body.includes('"ok":true'), 'expected /health to return ok heartbeat JSON');
