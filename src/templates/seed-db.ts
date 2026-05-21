@@ -10,12 +10,6 @@ declare const process: {
   exit: (code: number) => never;
 };
 
-declare global {
-  interface ImportMeta {
-    main?: boolean;
-  }
-}
-
 type SeedDb = ReturnType<typeof drizzle<typeof schema>>;
 
 export async function seedTemplates(db: SeedDb): Promise<{ inserted: number; updated: number }> {
@@ -61,7 +55,7 @@ export async function seedTemplates(db: SeedDb): Promise<{ inserted: number; upd
   return { inserted, updated };
 }
 
-if (import.meta.main) {
+if ((import.meta as { main?: boolean }).main) {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error('DATABASE_URL is required');
