@@ -43,17 +43,14 @@ See [ADR 0001](docs/architecture/0001-architecture.md) for the full reasoning, d
 
 ## Run locally
 
-Wiring lands in task #2 (see [`RECON.md`](RECON.md)). Once that PR is merged:
-
 ```bash
 git clone git@github.com:aayushman-singh/rev01.git
 cd rev01
 bun install
-cp .env.example .env   # fill in CF + Neon creds
 bun run dev            # wrangler dev
 ```
 
-Open http://localhost:8787 — you'll see the placeholder `rev01` route. `/health` returns a JSON heartbeat.
+Open http://localhost:8787. `/` returns the placeholder `rev01` route; `/health` returns a JSON heartbeat.
 
 ## Documents
 

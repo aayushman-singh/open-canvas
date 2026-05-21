@@ -12,10 +12,10 @@ rev01 is a **multiplayer, AI-native site builder** — one ProseMirror document 
 
 ## Live state
 
-- **Build:** none — repo scaffolded only (LICENSE, README, .gitignore, ADR 0001, specs).
-- **Local dev:** none.
-- **Deployed URL:** none. Placeholder host: `rev01.aayushman.dev`.
-- **Deployed state:** none.
+- **Build:** Bun + Wrangler + Hono scaffold with strict TypeScript, ESLint, Prettier, and a Worker dry-run build.
+- **Local dev:** `bun install` then `bun run dev`; `/` returns `rev01`, `/health` returns a JSON heartbeat.
+- **Deployed URL:** <https://rev01.aayushman.dev>.
+- **Deployed state:** Cloudflare Pages coming-soon page deployed from `coming-soon/` by the `deploy-coming-soon` workflow.
 
 ---
 
@@ -94,12 +94,12 @@ All accounts must be **personal**, with no overlap with any prior employer's inf
 
 | Cred | Status |
 |---|---|
-| Cloudflare account ID + API token (Workers, KV, R2, DO, Analytics Engine, DNS edit) | Pending |
-| `aayushman.dev` zone present in personal CF account | Pending |
-| Neon API key OR connection string | Pending |
-| Clerk publishable + secret keys (Development instance) | Pending |
-| Anthropic API key | Pending |
-| GitHub remote location + auth | Pending |
+| Cloudflare account ID + API token (Workers, KV, R2, DO, Analytics Engine, DNS edit) | Configured for Pages deploy; feature bindings still land with their tasks |
+| `aayushman.dev` zone present in personal CF account | Configured for `rev01.aayushman.dev` |
+| Neon API key OR connection string | Not wired into app code yet |
+| Clerk publishable + secret keys (Development instance) | Not wired into app code yet |
+| Anthropic API key | Not wired into app code yet |
+| GitHub remote location + auth | Configured |
 
 ---
 
@@ -109,4 +109,4 @@ None — all locked 2026-05-21.
 
 ---
 
-*Ready to dispatch once creds arrive. Tasks #1, #2, #4-draft are unblocked by infra. Tasks #5, #6, #3 follow once #2 lands.*
+*Tasks #1, #2, and #4-draft have landed. Next hire-impact pass: task #3, then #5 and #6.*
