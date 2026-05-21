@@ -41,6 +41,32 @@ function escapeAttr(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => ATTR_ESCAPES[ch] ?? ch);
 }
 
+// Defense-in-depth for pinnedStyle values. Validator already rejects dangerous
+// payloads, but the renderer refuses to emit anything that could break out of
+// the current CSS declaration. Returns '' when the value contains any
+// structural CSS character or control character — the caller treats '' as a
+// signal to drop the property entirely.
+function escapeCssValue(value: string): string {
+  // Reject structural CSS characters that would let a value introduce extra
+  // declarations, escape the style="" attribute context, or smuggle in
+  // comment/url tricks. Control characters (U+0000..U+001F) are rejected so
+  // a NUL or newline cannot split the value.
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code < 0x20) return '';
+    const ch = value[i];
+    if (ch === ';' || ch === '{' || ch === '}' || ch === '\\' || ch === '/') return '';
+  }
+  return escapeAttr(value);
+}
+
+// CSS property names are restricted to ASCII letters and hyphen. Anything
+// outside that set is stripped; if nothing remains, the caller drops the
+// entry.
+function sanitiseCssKey(key: string): string {
+  return key.replace(/[^a-zA-Z-]/g, '');
+}
+
 function styleFromEntries(entries: ReadonlyArray<readonly [string, string]>): string {
   return entries.map(([k, v]) => `${k}:${v}`).join(';');
 }
@@ -61,7 +87,11 @@ function buildElementWrapperStyle(element: CanvasElement): string {
   if (element.pinnedStyle) {
     // Pinned style wins — append after defaults so its keys override duplicates.
     for (const [k, v] of Object.entries(element.pinnedStyle)) {
-      entries.push([escapeAttr(k), escapeAttr(v)]);
+      const safeKey = sanitiseCssKey(k);
+      if (safeKey === '') continue;
+      const safeValue = escapeCssValue(v);
+      if (safeValue === '') continue;
+      entries.push([safeKey, safeValue]);
     }
   }
   return styleFromEntries(entries);

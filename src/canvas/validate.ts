@@ -140,6 +140,25 @@ function validateMotion(motion: unknown, basePath: string, errors: string[]): vo
   }
 }
 
+// Keys must be plain CSS property names (ASCII letters + hyphen). Anything
+// else risks smuggling characters that break out of the style="" attribute.
+const CSS_KEY_RE = /^[a-zA-Z-]+$/;
+
+// Values may not contain characters that introduce a new CSS declaration
+// (`;`), open/close a block (`{`/`}`), or terminate the surrounding HTML tag
+// via a leaked `</style>` sequence. Control characters are rejected outright
+// — a NUL or newline can split the value in unexpected ways.
+function pinnedStyleValueIssue(val: string): string | null {
+  for (let i = 0; i < val.length; i++) {
+    const code = val.charCodeAt(i);
+    if (code < 0x20) return 'control character';
+    const ch = val[i];
+    if (ch === ';' || ch === '{' || ch === '}') return `forbidden character "${ch}"`;
+  }
+  if (/<\//i.test(val)) return 'forbidden sequence "</"';
+  return null;
+}
+
 function validatePinnedStyle(value: unknown, basePath: string, errors: string[]): void {
   if (value === undefined) return;
   if (!isRecord(value)) {
@@ -147,8 +166,20 @@ function validatePinnedStyle(value: unknown, basePath: string, errors: string[])
     return;
   }
   for (const [key, val] of Object.entries(value)) {
+    if (!CSS_KEY_RE.test(key)) {
+      errors.push(
+        `${basePath}.pinnedStyle key "${key}" must match /^[a-zA-Z-]+$/ (CSS property names only)`,
+      );
+    }
     if (typeof val !== 'string') {
       errors.push(`${basePath}.pinnedStyle["${key}"] must be a string`);
+      continue;
+    }
+    const issue = pinnedStyleValueIssue(val);
+    if (issue !== null) {
+      errors.push(
+        `${basePath}.pinnedStyle["${key}"] value ${JSON.stringify(val)} contains ${issue}`,
+      );
     }
   }
 }
@@ -211,9 +242,7 @@ function validateElement(
       if (element.posterAssetId !== undefined && !isNonEmptyString(element.posterAssetId)) {
         errors.push(`${basePath}.posterAssetId must be a non-empty string when present`);
       }
-      if (!isNonEmptyString(element.alt) && element.alt !== '') {
-        errors.push(`${basePath}.alt must be a string`);
-      } else if (typeof element.alt !== 'string') {
+      if (typeof element.alt !== 'string') {
         errors.push(`${basePath}.alt must be a string`);
       }
       if (!isOneOf(element.fit, ['cover', 'contain'] as const)) {
