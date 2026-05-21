@@ -6,7 +6,7 @@
       "name": "rev01",
       "dependencies": {
         "@clerk/backend": "^3.4.11",
-        "@google/genai": "^2.5.0",
+        "@google/genai": "2.5.0",
         "@neondatabase/serverless": "^1.1.0",
         "drizzle-orm": "^0.45.2",
         "hono": "^4.12.21",
