@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "document:smoke": "bun run src/document/smoke.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
