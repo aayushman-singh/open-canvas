@@ -1,31 +1,73 @@
 # rev01
 
-> Multiplayer, AI-native site builder. Describe a site in one sentence, get an editable, multiplayer, edge-rendered site back.
+> A site builder where you, your collaborators, and a Claude agent edit the same ProseMirror document live over Yjs CRDT — served end-to-end by one Cloudflare Worker.
 
-**Status:** pre-alpha, scaffolding in progress. Live URL coming soon at `rev01.aayushman.dev`.
+[![Status](https://img.shields.io/badge/status-scaffolding-orange)](https://github.com/aayushman-singh/rev01)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Live](https://img.shields.io/badge/live-rev01.aayushman.dev-cyan)](https://rev01.aayushman.dev)
 
-## Why
+## Demo
 
-Existing builders gatekeep the editing surface behind subscription tiers and ship templates that all look the same. rev01 collapses site creation into a single ProseMirror document per page, edits it with multiplayer presence and a Claude-powered agent, and renders it from one Cloudflare Worker — no per-template build, no separate frontend service, no field-by-field editor surface.
+> Demo video pending — will land with task #4-final after the multiplayer editor and AI agent ship.
 
-## Stack
+[Live coming-soon page →](https://rev01.aayushman.dev)
 
-- **Runtime:** Single Cloudflare Worker — dashboard, API, customer-site render, agent, all in one bundle
-- **Router + UI:** Hono + `hono/jsx` (no Next.js, no Pages)
-- **Editor:** TipTap v3 + Yjs CRDT + Durable Object per page
-- **Renderer:** pure JSON → HTML in the Worker
-- **DB:** Drizzle + Neon (HTTP driver, edge-callable)
-- **Auth:** Clerk
-- **AI:** Anthropic Claude (tool use over document schema, streamed Yjs ops)
-- **Storage:** R2 (assets), KV (hot config), DO (per-page editor state)
-- **Design language:** Post-Aero (Vista-glass × terminal × live data chrome) — see [docs/specs/design-variants.md](docs/specs/design-variants.md) §D
+## What it is
 
-Architectural rationale + ADRs: [`docs/architecture/`](docs/architecture/). Document schema spec: [`docs/specs/template-schema.md`](docs/specs/template-schema.md).
+Pick a template from the dashboard, name your site, and you land in an editor where every paragraph, heading, and section is editable inline. Invite a teammate and you see their cursor next to yours; ask the agent for a hero rewrite and a new collaborator avatar appears, streaming edits into the same page. Publish, and the site is live at a shareable URL — no build step, no deploy queue.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Editor["Browser (editor)"]
+    Visitor["Customer visitor (browser)"]
+    Worker["Cloudflare Worker (Hono)<br/>dashboard · API · renderer · agent"]
+    DO["Durable Object (per page)<br/>live Yjs document"]
+    Claude["Anthropic Claude (tool use)"]
+    PG[("Neon Postgres")]
+
+    Editor -- "HTTP" --> Worker
+    Editor -- "WebSocket (Yjs)" --> DO
+    Visitor -- "GET /s/:siteId/*" --> Worker
+    Claude -- "tool calls -> doc ops" --> Worker
+    Worker --> PG
+    DO -- "snapshot every 50 ops / 10s" --> PG
+```
+
+- One edge bundle hosts dashboard, API, customer-site renderer, agent endpoints, and per-page Durable Objects.
+- One ProseMirror document per page, edited live via Yjs CRDT.
+- Anthropic Claude as a first-class collaborator with a reserved Yjs client id.
+
+See [ADR 0001](docs/architecture/0001-architecture.md) for the full reasoning, decisions 1–14.
 
 ## Run locally
 
-TBD — scaffolding pending.
+Wiring lands in task #2 (see [`RECON.md`](RECON.md)). Once that PR is merged:
+
+```bash
+git clone git@github.com:aayushman-singh/rev01.git
+cd rev01
+bun install
+cp .env.example .env   # fill in CF + Neon creds
+bun run dev            # wrangler dev
+```
+
+Open http://localhost:8787 — you'll see the placeholder `rev01` route. `/health` returns a JSON heartbeat.
+
+## Documents
+
+- [ADR 0001 — Architecture](docs/architecture/0001-architecture.md) — the 14 decisions that pin the stack down.
+- [Template schema](docs/specs/template-schema.md) — ProseMirror node and mark vocabulary; template descriptor; seed-to-site flow.
+- [Design language — variants](docs/specs/design-variants.md) — four explored variants; **Post-Aero (D)** is selected for v0.
+- [RECON.md](RECON.md) — backlog ranked by hire-impact-per-hour; dispatch order; locked decisions.
+
+## Status
+
+Scaffolding. v0 LOC target: under 5,000. See [RECON.md](RECON.md) for the current backlog.
+
+The project is built in public — every backlog row ships as a PR.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE) © 2026 Aayushman Singh
