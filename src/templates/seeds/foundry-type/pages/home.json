@@ -1,0 +1,154 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "section",
+      "attrs": { "kind": "hero", "padding": "lg" },
+      "content": [
+        {
+          "type": "heading",
+          "attrs": { "level": 1, "align": "center" },
+          "content": [{ "type": "text", "text": "Halcyon Type Foundry" }]
+        },
+        {
+          "type": "paragraph",
+          "attrs": { "align": "center" },
+          "content": [
+            { "type": "text", "text": "An independent foundry shipping " },
+            { "type": "text", "text": "three typeface families", "marks": [{ "type": "bold" }] },
+            { "type": "text", "text": " for screen and print." }
+          ]
+        },
+        {
+          "type": "media",
+          "attrs": {
+            "src": "https://images.unsplash.com/photo-1495511167051-13bb07bde85b.jpg",
+            "mediaType": "image",
+            "alt": "Type specimen sheet laid out on a desk",
+            "aspectRatio": "16/9",
+            "loading": "eager"
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "attrs": { "kind": "feature", "padding": "md" },
+      "content": [
+        {
+          "type": "heading",
+          "attrs": { "level": 2 },
+          "content": [{ "type": "text", "text": "Halcyon Display" }]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "A high-contrast didone built for editorial headlines. Twelve weights, two optical sizes, tight kerning at every cut."
+            }
+          ]
+        },
+        {
+          "type": "media",
+          "attrs": {
+            "src": "https://images.unsplash.com/photo-1465101046530-73398c7f28ca.jpg",
+            "mediaType": "image",
+            "alt": "Halcyon Display specimen",
+            "aspectRatio": "16/9",
+            "loading": "lazy"
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "attrs": { "kind": "feature", "padding": "md" },
+      "content": [
+        {
+          "type": "heading",
+          "attrs": { "level": 2 },
+          "content": [{ "type": "text", "text": "Halcyon Text" }]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "A neutral grotesque tuned for long-form reading. Generous x-height, true italics, low-distraction figures."
+            }
+          ]
+        },
+        {
+          "type": "media",
+          "attrs": {
+            "src": "https://images.unsplash.com/photo-1457369804613-52c61a468e7d.jpg",
+            "mediaType": "image",
+            "alt": "Halcyon Text in a book",
+            "aspectRatio": "16/9",
+            "loading": "lazy"
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "attrs": { "kind": "feature", "padding": "md" },
+      "content": [
+        {
+          "type": "heading",
+          "attrs": { "level": 2 },
+          "content": [{ "type": "text", "text": "Halcyon Mono" }]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "A fixed-width companion for code and tabular data. Six weights, programming ligatures, dotted zero."
+            }
+          ]
+        },
+        {
+          "type": "media",
+          "attrs": {
+            "src": "https://images.unsplash.com/photo-1517694712202-14dd9538aa97.jpg",
+            "mediaType": "image",
+            "alt": "Code editor in Halcyon Mono",
+            "aspectRatio": "16/9",
+            "loading": "lazy"
+          }
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "attrs": { "kind": "footer", "padding": "sm" },
+      "content": [
+        {
+          "type": "actions",
+          "attrs": { "align": "center" },
+          "content": [
+            {
+              "type": "action",
+              "attrs": { "href": "#trial", "label": "Trial fonts", "variant": "primary" }
+            },
+            {
+              "type": "action",
+              "attrs": { "href": "#license", "label": "Licensing", "variant": "secondary" }
+            },
+            {
+              "type": "action",
+              "attrs": { "href": "#contact", "label": "Contact", "variant": "ghost" }
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "attrs": { "align": "center" },
+          "content": [{ "type": "text", "text": "© Halcyon Type Foundry" }]
+        }
+      ]
+    }
+  ]
+}
