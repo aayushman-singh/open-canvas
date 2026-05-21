@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer } from '../../db/schema';
+import { clerkAuth } from '../../auth/middleware';
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 
@@ -13,6 +14,7 @@ type Bindings = {
 
 export const dashboard = new Hono<{ Bindings: Bindings; Variables: ClerkAuthVariables }>();
 
+dashboard.use('*', clerkAuth());
 dashboard.use('*', requireAuth());
 
 dashboard.get('/', async (c) => {
