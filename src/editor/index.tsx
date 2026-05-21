@@ -92,6 +92,7 @@ editor.get('/sites/:siteId/pages/:pageId/edit', async (c) => {
     userInitial,
     userColor,
     yFragmentName: Y_XML_FRAGMENT_NAME,
+    agentEndpoint: '/api/agent/edit',
   };
   const inlineScript = editorClientScript(scriptParams);
   const importMap = buildImportMap();
@@ -135,22 +136,65 @@ editor.get('/sites/:siteId/pages/:pageId/edit', async (c) => {
             </a>
           </div>
 
-          <section class="editor-shell">
-            <div class="titlebar">
-              <span class="glyphs">
-                <span class="glyph close" />
-                <span class="glyph min" />
-                <span class="glyph max" />
-              </span>
-              <span class="path">
-                <span class="accent">~/rev01</span>/sites/{owned.siteName}/{owned.pageTitle}
-              </span>
-              <span class="right">collab // yjs / DO</span>
-            </div>
-            <div class="editor-body">
-              <div id="editor" />
-            </div>
-          </section>
+          <div class="workspace">
+            <section class="editor-shell">
+              <div class="titlebar">
+                <span class="glyphs">
+                  <span class="glyph close" />
+                  <span class="glyph min" />
+                  <span class="glyph max" />
+                </span>
+                <span class="path">
+                  <span class="accent">~/rev01</span>/sites/{owned.siteName}/{owned.pageTitle}
+                </span>
+                <span class="right">collab // yjs / DO</span>
+              </div>
+              <div class="editor-body">
+                <div id="editor" />
+              </div>
+            </section>
+
+            <aside class="agent-panel" aria-label="rev01 agent chat">
+              <div class="titlebar">
+                <span class="glyphs">
+                  <span class="glyph close" />
+                  <span class="glyph min" />
+                  <span class="glyph max" />
+                </span>
+                <span class="path">
+                  <span class="accent">~/rev01</span>/agent
+                </span>
+                <span class="right">gemini // 2.5-pro</span>
+              </div>
+              <div class="agent-log" id="agent-log" role="log" aria-live="polite">
+                <div class="agent-bubble agent-meta">
+                  <span class="who">agent</span>
+                  <span class="text">
+                    Ask me to change the headline, add a new section, or rename a button. I edit
+                    your page over the same multiplayer wire — all collaborators see the changes
+                    live.
+                  </span>
+                </div>
+              </div>
+              <form class="agent-input" id="agent-form" autocomplete="off">
+                <textarea
+                  id="agent-message"
+                  name="message"
+                  rows={2}
+                  placeholder="Tell the agent what to change…"
+                  required
+                />
+                <div class="agent-input-row">
+                  <span class="agent-status" id="agent-status">
+                    idle
+                  </span>
+                  <button type="submit" id="agent-send">
+                    send
+                  </button>
+                </div>
+              </form>
+            </aside>
+          </div>
 
           <div class="statusline">
             <span class="k">page</span>
