@@ -11,7 +11,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "document:smoke": "bun run src/document/smoke.ts"
+    "document:smoke": "bun run src/document/smoke.ts",
+    "landing:preview": "bun run src/landing/build-preview.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.4.11",
