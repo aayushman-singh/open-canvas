@@ -233,12 +233,42 @@ main {
   min-height: 480px;
 }
 
-#editor section {
-  margin-bottom: 1.6rem;
-  padding-bottom: 1.4rem;
-  border-bottom: 1px dashed var(--hairline);
+/* rev01 vocabulary — every node + mark in src/document/schema.ts gets a
+ * visual treatment so authors can tell sections, columns, media frames,
+ * action rows, and divider variants apart inside the editor. Visualisation
+ * only — the rendered output is the renderer's responsibility. */
+
+#editor section[data-kind] {
+  position: relative;
+  margin: 0 0 1.4rem;
+  padding: 0.95rem 1rem 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: oklch(0.16 0.03 245 / 0.35);
 }
-#editor section:last-child { border-bottom: none; }
+#editor section[data-kind]::before {
+  content: attr(data-kind);
+  position: absolute;
+  top: -0.55rem;
+  left: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--bg-panel-strong);
+  padding: 0 0.4rem;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+}
+#editor section[data-padding='sm'] { padding: 0.6rem 0.8rem; }
+#editor section[data-padding='lg'] { padding: 1.4rem 1.2rem 1.2rem; }
+#editor section[data-kind='hero'] {
+  background: linear-gradient(180deg, oklch(0.18 0.05 220 / 0.55), oklch(0.13 0.03 245 / 0.35));
+}
+#editor section[data-kind='cta'] { border-color: var(--accent-glow); }
+#editor section[data-kind='footer'] { opacity: 0.85; }
+#editor section:last-child { margin-bottom: 0; }
 
 #editor h1, #editor h2, #editor h3, #editor h4, #editor h5, #editor h6 {
   font-family: var(--font-sans);
@@ -250,14 +280,20 @@ main {
 #editor h1 { font-size: 2.1rem; line-height: 1.15; }
 #editor h2 { font-size: 1.55rem; line-height: 1.2; }
 #editor h3 { font-size: 1.2rem; line-height: 1.3; }
+#editor h4 { font-size: 1.05rem; line-height: 1.35; }
+#editor h5, #editor h6 { font-size: 0.95rem; line-height: 1.4; color: var(--fg-mute); }
+#editor [data-align='start']  { text-align: left; }
+#editor [data-align='center'] { text-align: center; }
+#editor [data-align='end']    { text-align: right; }
 
 #editor p {
   margin: 0.45rem 0;
   color: var(--fg-mute);
 }
 
-#editor strong { color: var(--fg); }
+#editor strong { color: var(--fg); font-weight: 600; }
 #editor em { color: var(--fg); font-style: italic; }
+#editor u { text-decoration-color: var(--accent); text-underline-offset: 2px; }
 #editor code {
   font-family: var(--font-mono);
   font-size: 0.9em;
@@ -274,8 +310,163 @@ main {
   text-decoration: none;
 }
 
-#editor ul, #editor ol { padding-left: 1.4rem; margin: 0.45rem 0; }
-#editor li { margin: 0.2rem 0; color: var(--fg-mute); }
+/* Lists — data-list-style picks the marker. */
+#editor ul[data-list-style], #editor ol[data-list-style] {
+  padding-left: 1.4rem;
+  margin: 0.55rem 0;
+  list-style: none;
+}
+#editor li { margin: 0.2rem 0; color: var(--fg-mute); position: relative; }
+#editor ul[data-list-style='bullet'] li::before {
+  content: '•';
+  position: absolute;
+  left: -1rem;
+  color: var(--accent);
+}
+#editor ol[data-list-style='numbered'] {
+  list-style: decimal;
+  list-style-position: outside;
+}
+#editor ol[data-list-style='numbered'] li::marker { color: var(--accent); font-family: var(--font-mono); }
+#editor ul[data-list-style='check'] li::before {
+  content: '✓';
+  position: absolute;
+  left: -1rem;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* Media — placeholder frames so authors see the slot without a real asset. */
+#editor figure[data-media-type] {
+  margin: 0.9rem 0;
+  padding: 0.6rem 0.75rem;
+  border: 1px dashed var(--hairline-strong);
+  border-radius: var(--radius);
+  background: oklch(0.13 0.03 245 / 0.55);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-faint);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+#editor figure[data-media-type]::before {
+  content: attr(data-media-type);
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--bg-panel-strong);
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+}
+#editor figure[data-media-type]::after {
+  content: attr(data-src);
+  color: var(--fg-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 32ch;
+}
+
+/* Actions row — horizontal layout of action atoms. */
+#editor div[data-actions] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+#editor div[data-actions][data-align='center'] { justify-content: center; }
+#editor div[data-actions][data-align='end']    { justify-content: flex-end; }
+#editor a[data-action] {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.85rem;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid var(--hairline-strong);
+  color: var(--fg);
+  background: oklch(0.16 0.03 245 / 0.7);
+}
+#editor a[data-action][data-variant='primary'] {
+  background: var(--accent);
+  color: var(--bg-deep);
+  border-color: var(--accent);
+}
+#editor a[data-action][data-variant='secondary'] {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent-glow);
+}
+#editor a[data-action][data-variant='ghost'] {
+  background: transparent;
+  color: var(--fg-mute);
+  border-color: transparent;
+}
+#editor a[data-action].ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Columns — flex layout with gap variants. */
+#editor div[data-columns] {
+  display: flex;
+  gap: 0.85rem;
+  margin: 0.85rem 0;
+}
+#editor div[data-columns][data-gap='sm'] { gap: 0.45rem; }
+#editor div[data-columns][data-gap='lg'] { gap: 1.4rem; }
+#editor div[data-column] {
+  flex: 1 1 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius);
+  background: oklch(0.13 0.03 245 / 0.35);
+}
+#editor div[data-column][data-width='1/2']  { flex-basis: 50%; }
+#editor div[data-column][data-width='1/3']  { flex-basis: 33.33%; }
+#editor div[data-column][data-width='2/3']  { flex-basis: 66.66%; }
+#editor div[data-column][data-width='1/4']  { flex-basis: 25%; }
+#editor div[data-column][data-width='3/4']  { flex-basis: 75%; }
+#editor div[data-column][data-width='auto'] { flex: 0 1 auto; }
+
+/* Dividers — three visual variants. */
+#editor hr[data-divider] {
+  border: none;
+  margin: 1.1rem 0;
+  height: 1px;
+  background: var(--hairline-strong);
+}
+#editor hr[data-divider='line']  { background: var(--hairline-strong); }
+#editor hr[data-divider='dot']   {
+  background: none;
+  border-top: 2px dotted var(--hairline-strong);
+  height: 0;
+}
+#editor hr[data-divider='space'] {
+  background: none;
+  height: 1.4rem;
+}
+
+/* Selected atoms (media, action, divider). */
+#editor .ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Highlight + color marks. */
+#editor mark[data-highlight] {
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+#editor span[data-color] {
+  /* inline color set by attribute style */
+}
 
 /* CollaborationCaret remote-cursor decorations */
 .collaboration-caret__caret {
