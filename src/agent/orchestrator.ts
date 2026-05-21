@@ -23,7 +23,7 @@ import type { LlmAdapter, LlmAssistantToolCall, LlmMessage } from './llm';
 import { applyDocOp, type DocOp } from './ops';
 import { AGENT_TOOLS, parseToolCall } from './tools';
 
-export const DEFAULT_AGENT_MODEL = 'gemini-2.5-pro';
+export const DEFAULT_AGENT_MODEL = 'gemini-2.5-flash';
 export const MAX_TURNS = 6;
 
 export interface RunAgentInput {
