@@ -3,7 +3,7 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['dist/', '.wrangler/', 'node_modules/', 'worker-configuration.d.ts'],
+    ignores: ['dist/', '.wrangler/', '.worktrees/', 'node_modules/', 'worker-configuration.d.ts'],
   },
   {
     files: ['src/**/*.ts', 'src/**/*.tsx'],
