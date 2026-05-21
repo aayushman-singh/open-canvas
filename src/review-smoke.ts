@@ -1,4 +1,5 @@
 import app from './index';
+import { validateDocument } from './document/validate';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -21,5 +22,48 @@ assert(
 const health = await responseText('/health');
 assert(health.status === 200, `expected public /health to return 200, got ${health.status}`);
 assert(health.body.includes('"ok":true'), 'expected /health to return ok heartbeat JSON');
+
+const executableActionHref = validateDocument({
+  type: 'doc',
+  content: [
+    {
+      type: 'section',
+      attrs: { kind: 'hero' },
+      content: [
+        {
+          type: 'actions',
+          content: [{ type: 'action', attrs: { href: 'javascript:alert(1)', label: 'Run' } }],
+        },
+      ],
+    },
+  ],
+});
+assert(
+  !executableActionHref.valid,
+  'expected document validator to reject executable action hrefs',
+);
+
+const executableLinkHref = validateDocument({
+  type: 'doc',
+  content: [
+    {
+      type: 'section',
+      attrs: { kind: 'hero' },
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'text',
+              text: 'Run',
+              marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+assert(!executableLinkHref.valid, 'expected document validator to reject executable link hrefs');
 
 console.log('[review-smoke] OK');
