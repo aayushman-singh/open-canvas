@@ -59,6 +59,9 @@ dashboard.get('/', async (c) => {
       </head>
       <body>
         <main>
+          <nav>
+            <a href="/dashboard">Dashboard</a> · <a href="/dashboard/templates">Templates</a>
+          </nav>
           <h1>rev01</h1>
           <p>Signed in as {primaryEmail}.</p>
           <p>
