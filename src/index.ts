@@ -5,6 +5,7 @@ import { templatesRoute } from './routes/dashboard/templates';
 import themeStudio from './routes/dashboard/theme';
 import sites from './routes/api/sites';
 import pages from './routes/api/pages';
+import agent from './routes/api/agent';
 import editor from './editor';
 
 const app = new Hono();
@@ -18,6 +19,7 @@ app.route('/dashboard', editor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);
 app.route('/api/pages', pages);
+app.route('/api/agent', agent);
 
 export { PageDocument } from './multiplayer/page-document';
 export default app;
