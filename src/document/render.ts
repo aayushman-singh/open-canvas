@@ -9,6 +9,7 @@
 //
 // Spec: docs/specs/template-schema.md §1 + ADR 0001 decision 10.
 
+import { deriveTokens, tokensToCssDecls } from '../theme/derive.js';
 import type {
   ActionNode,
   ActionsNode,
@@ -44,19 +45,23 @@ export function renderDoc(doc: DocumentJSON, theme: ThemeTokenSet): string {
 // ---------------------------------------------------------------------------
 // Theme injection.
 //
-// v0 emits seed colour + the two font families as CSS custom properties on
-// the article. Full OKLCH derivation lands in task #10.
+// Derives the twelve-token OKLCH graph from the palette seed at render time
+// (see src/theme/derive.ts) and emits all of them as CSS custom properties on
+// `.rev01-doc`, alongside the literal font/radius/density values from the
+// stored ThemeTokenSet. The seed itself is also surfaced so callers can read
+// it back from the DOM.
 // ---------------------------------------------------------------------------
 
 function renderThemeStyle(theme: ThemeTokenSet): string {
-  const decls = [
+  const derived = tokensToCssDecls(deriveTokens(theme.paletteSeed));
+  const literal = [
     `--rev01-palette-seed: ${cssValue(theme.paletteSeed)};`,
     `--rev01-font-heading: ${cssValue(theme.font.heading)};`,
     `--rev01-font-body: ${cssValue(theme.font.body)};`,
     `--rev01-radius: ${cssValue(theme.radius)};`,
     `--rev01-density: ${cssValue(theme.density)};`,
   ].join(' ');
-  return `<style>.rev01-doc{${decls}}</style>`;
+  return `<style>.rev01-doc{${derived} ${literal}}</style>`;
 }
 
 // ---------------------------------------------------------------------------
