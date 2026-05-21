@@ -245,8 +245,8 @@ export class PageDocument extends DurableObject<PageDocumentEnv> {
     if (!expected) {
       return new Response('agent rpc secret not configured', { status: 500 });
     }
-    const got = request.headers.get('x-agent-secret');
-    if (got !== expected) {
+    const got = request.headers.get('x-agent-secret') ?? '';
+    if (!timingSafeEqual(got, expected)) {
       return new Response('unauthorized', { status: 401 });
     }
 
@@ -466,6 +466,13 @@ export class PageDocument extends DurableObject<PageDocumentEnv> {
     }
     return this.awareness;
   }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 function errMsg(err: unknown): string {
