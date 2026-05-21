@@ -1,15 +1,17 @@
-name: deploy-coming-soon
+name: deploy-landing
 
 on:
   push:
     branches: [main]
     paths:
-      - 'coming-soon/**'
+      - 'src/landing/**'
+      - 'package.json'
+      - 'bun.lock'
       - '.github/workflows/deploy-coming-soon.yml'
   workflow_dispatch:
 
 concurrency:
-  group: deploy-coming-soon
+  group: deploy-landing
   cancel-in-progress: true
 
 permissions:
@@ -29,9 +31,18 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Deploy to Cloudflare Pages
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build landing artifact
+        run: |
+          bun run landing:preview
+          mkdir -p .pages
+          cp src/landing/PREVIEW.html .pages/index.html
+
+      - name: Deploy landing to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy coming-soon --project-name rev01-coming-soon --branch main
+          command: pages deploy .pages --project-name rev01-coming-soon --branch main
