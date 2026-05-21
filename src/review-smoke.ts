@@ -18,6 +18,11 @@ assert(
   root.body.includes('multiplayer site builder'),
   'expected public / to render the Post-Aero landing',
 );
+assert(!root.body.includes('Math.random'), 'expected landing counters not to fake live activity');
+assert(
+  !root.body.includes('editors online'),
+  'expected landing copy not to claim simulated editors are online',
+);
 
 const health = await responseText('/health');
 assert(health.status === 200, `expected public /health to return 200, got ${health.status}`);

@@ -7,7 +7,6 @@ import { raw } from 'hono/html';
 import { Footer } from './components/Footer';
 import { FeatureGrid } from './components/FeatureGrid';
 import { Hero } from './components/Hero';
-import { LiveScript } from './components/LiveScript';
 import { StatLine } from './components/StatLine';
 import { StatusBar } from './components/StatusBar';
 import { Tagline } from './components/Tagline';
@@ -45,7 +44,6 @@ function Page() {
           <StatLine />
           <Footer />
         </main>
-        <LiveScript />
       </body>
     </html>
   );
