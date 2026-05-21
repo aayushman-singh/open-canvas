@@ -8,9 +8,13 @@ compatibility_flags = ["nodejs_compat"]
 # pattern = "rev01.aayushman.dev/*"
 # zone_name = "aayushman.dev"
 
-# [[durable_objects.bindings]]
-# name = "PAGE_DO"
-# class_name = "PageDocument"
+[[durable_objects.bindings]]
+name = "PAGE_DO"
+class_name = "PageDocument"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PageDocument"]
 
 # [[kv_namespaces]]
 # binding = "KV"
