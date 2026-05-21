@@ -50,7 +50,7 @@ bun install
 bun run dev            # wrangler dev
 ```
 
-Open http://localhost:8787. `/` returns the placeholder `rev01` route; `/health` returns a JSON heartbeat.
+Open http://localhost:8787. `/` renders the Post-Aero landing; `/health` returns a JSON heartbeat.
 
 ## Documents
 

@@ -13,9 +13,9 @@ rev01 is a **multiplayer, AI-native site builder** — one ProseMirror document 
 ## Live state
 
 - **Build:** Bun + Wrangler + Hono scaffold with strict TypeScript, ESLint, Prettier, and a Worker dry-run build.
-- **Local dev:** `bun install` then `bun run dev`; `/` returns `rev01`, `/health` returns a JSON heartbeat.
+- **Local dev:** `bun install` then `bun run dev`; `/` renders the Post-Aero landing, `/health` returns a JSON heartbeat.
 - **Deployed URL:** <https://rev01.aayushman.dev>.
-- **Deployed state:** Cloudflare Pages coming-soon page deployed from `coming-soon/` by the `deploy-coming-soon` workflow.
+- **Deployed state:** Cloudflare Pages serves the generated Post-Aero landing from `src/landing/` via the `deploy-landing` workflow.
 
 ---
 
