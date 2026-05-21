@@ -12,7 +12,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "document:smoke": "bun run src/document/smoke.ts",
-    "landing:preview": "bun run src/landing/build-preview.ts"
+    "landing:preview": "bun run src/landing/build-preview.ts",
+    "review:smoke": "bun run src/review-smoke.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.4.11",
