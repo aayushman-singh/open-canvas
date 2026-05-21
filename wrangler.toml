@@ -1,0 +1,17 @@
+name = "rev01"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain wiring comes in a later task — placeholder route only for now.
+# [[routes]]
+# pattern = "rev01.aayushman.dev/*"
+# zone_name = "aayushman.dev"
+
+# [[durable_objects.bindings]]
+# name = "PAGE_DO"
+# class_name = "PageDocument"
+
+# [[kv_namespaces]]
+# binding = "KV"
+# id = "to-be-created"
