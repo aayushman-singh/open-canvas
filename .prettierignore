@@ -1,0 +1,11 @@
+dist/
+.wrangler/
+node_modules/
+bun.lock
+
+# Out of scope for this task — owned elsewhere, not formatted by this repo.
+README.md
+RECON.md
+LICENSE
+docs/architecture/
+docs/specs/
