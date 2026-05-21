@@ -6,13 +6,13 @@ type ClerkBindings = {
   CLERK_SECRET_KEY: string;
 };
 
-/**
- * Returns the Clerk Account Portal sign-in URL for the instance encoded in the
- * publishable key. The publishable key has shape `pk_(test|live)_<base64>` where
- * the base64 body decodes to `<frontend-api-host>$`. The frontend API host is
- * `<slug>.clerk.<root>`; the Account Portal lives at `<slug>.<root>` — i.e. the
- * `clerk.` segment is dropped.
- */
+// Derives the Account Portal origin from the publishable key.
+//
+// pk_test_: frontend host shape is `<slug>.clerk.accounts.dev` — portal is at
+// `<slug>.accounts.dev` (drop the `.clerk.` segment).
+//
+// pk_live_: frontend host shape is `clerk.<root>` (Clerk's CNAME on your zone)
+// — portal is at `accounts.<root>` (swap the `clerk.` prefix for `accounts.`).
 function accountPortalOrigin(publishableKey: string): string {
   const marker = publishableKey.startsWith('pk_test_')
     ? 'pk_test_'
@@ -28,11 +28,15 @@ function accountPortalOrigin(publishableKey: string): string {
   const decoded = atob(encoded);
   const frontendApi = decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
 
-  if (!frontendApi.includes('.clerk.')) {
+  let accountPortalHost: string;
+  if (frontendApi.startsWith('clerk.')) {
+    accountPortalHost = 'accounts.' + frontendApi.slice('clerk.'.length);
+  } else if (frontendApi.includes('.clerk.')) {
+    accountPortalHost = frontendApi.replace('.clerk.', '.');
+  } else {
     throw new Error(`unexpected Clerk frontend API shape: ${frontendApi}`);
   }
 
-  const accountPortalHost = frontendApi.replace('.clerk.', '.');
   return `https://${accountPortalHost}`;
 }
 
