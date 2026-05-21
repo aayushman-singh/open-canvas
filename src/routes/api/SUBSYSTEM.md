@@ -3,14 +3,17 @@
 ## Definition
 
 Programmatic surface for the dashboard, the editor, and the agent. Receives
-mutation requests and live-collaboration upgrade requests from signed-in
-callers, validates them against the document and catalog vocabulary,
-verifies ownership of the targeted resource, and either applies the change
-transactionally or hands the connection off to the live-collaboration owner.
-Returns either a structured response (for JSON callers), a redirect back
-into the dashboard (for plain HTML form callers), or a protocol-upgraded
-WebSocket. Anonymous callers are bounced to the identity gate before any
-handler runs.
+mutation requests, live-collaboration upgrade requests, and agent-driven
+edit requests from signed-in callers, validates them against the document
+and catalog vocabulary, verifies ownership of the targeted resource, and
+either applies the change transactionally, hands the connection off to the
+live-collaboration owner, or streams agent events while routing each agent
+tool call to the live-collaboration owner so all connected editors see the
+edits arrive over the same Yjs wire as a human keystroke. Returns either a
+structured response (for JSON callers), a redirect back into the dashboard
+(for plain HTML form callers), a protocol-upgraded WebSocket (for the
+multiplayer transport), or an NDJSON stream (for the agent endpoint).
+Anonymous callers are bounced to the identity gate before any handler runs.
 
 ## Inputs
 
@@ -18,6 +21,9 @@ handler runs.
   template, carrying the template id and a user-supplied site name
 - **editor caller** -> request to upgrade the connection to a live
   collaboration session for a specific page, carrying the page identity
+- **agent caller (editor chat panel)** -> request to drive the AI agent
+  over the page document with a natural-language message, carrying the
+  page identity and the user's message
 - **request context** -> the resolved Clerk user, supplied by the identity
   gate, used to resolve the owning customer row and to verify page ownership
 - **catalog store** -> existing template row, looked up by id to confirm
@@ -34,8 +40,10 @@ handler runs.
   one transaction so partial failure rolls back
 - **live-collaboration owner (one per page)** -> a forwarded WebSocket
   upgrade for the targeted page, keyed by page identity, after the ownership
-  check passes
+  check passes; plus, for each agent tool call, an authenticated internal
+  POST applying the typed document operation at the reserved agent identity
 - **caller** -> JSON site id (when the caller asked for JSON), a redirect
   back to the dashboard (otherwise), a 101 protocol-upgrade response (for
-  live-collaboration callers), or a 4xx with an error body for missing,
-  invalid, or unauthorised input
+  live-collaboration callers), an NDJSON stream of agent events (for the
+  agent endpoint), or a 4xx with an error body for missing, invalid, or
+  unauthorised input
