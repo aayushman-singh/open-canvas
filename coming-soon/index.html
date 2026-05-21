@@ -41,7 +41,7 @@
         padding: 0;
         background: var(--bg-deep);
         color: var(--fg);
-        font-family: "IBM Plex Sans", system-ui, sans-serif;
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
         font-size: 16px;
         line-height: 1.55;
         min-height: 100vh;
@@ -50,16 +50,8 @@
 
       body {
         background:
-          radial-gradient(
-            ellipse at 20% 0%,
-            oklch(0.3 0.1 220 / 0.18),
-            transparent 55%
-          ),
-          radial-gradient(
-            ellipse at 80% 100%,
-            oklch(0.28 0.12 280 / 0.16),
-            transparent 60%
-          ),
+          radial-gradient(ellipse at 20% 0%, oklch(0.3 0.1 220 / 0.18), transparent 55%),
+          radial-gradient(ellipse at 80% 100%, oklch(0.28 0.12 280 / 0.16), transparent 60%),
           linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
         background-attachment: fixed;
         position: relative;
@@ -67,7 +59,7 @@
       }
 
       body::before {
-        content: "";
+        content: '';
         position: fixed;
         inset: 0;
         pointer-events: none;
@@ -75,11 +67,7 @@
           linear-gradient(var(--grid) 1px, transparent 1px),
           linear-gradient(90deg, var(--grid) 1px, transparent 1px);
         background-size: 64px 64px;
-        mask-image: radial-gradient(
-          ellipse at center,
-          rgba(0, 0, 0, 0.6),
-          transparent 70%
-        );
+        mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.6), transparent 70%);
         z-index: 0;
       }
 
@@ -91,7 +79,7 @@
         align-items: center;
         gap: 1.25rem;
         padding: 0.5rem 1.25rem;
-        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-family: 'IBM Plex Mono', ui-monospace, monospace;
         font-size: 12px;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -158,7 +146,7 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.45rem 0.75rem;
-        font-family: "IBM Plex Mono", monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-size: 11px;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -198,7 +186,7 @@
       }
 
       .label {
-        font-family: "IBM Plex Mono", monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-size: 11px;
         letter-spacing: 0.18em;
         text-transform: uppercase;
@@ -206,7 +194,7 @@
       }
 
       h1 {
-        font-family: "IBM Plex Mono", monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-weight: 500;
         font-size: clamp(4rem, 14vw, 9rem);
         line-height: 0.95;
@@ -260,7 +248,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 1rem 1.5rem;
-        font-family: "IBM Plex Mono", monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-size: 12px;
         color: var(--fg-dim);
       }
@@ -287,7 +275,7 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 0.75rem 1.25rem;
-        font-family: "IBM Plex Mono", monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-size: 12px;
         color: var(--fg-faint);
         padding-top: 1.5rem;
@@ -403,13 +391,10 @@
         </div>
         <div class="body">
           <span class="label">// coming soon</span>
-          <h1 id="rev01-headline">
-            rev<span class="accent">01</span>
-          </h1>
+          <h1 id="rev01-headline">rev<span class="accent">01</span></h1>
           <p class="sub">
-            A <strong>multiplayer site builder</strong> with an
-            <strong>AI collaborator</strong> at the cursor. One document, many
-            hands, streamed from the edge.
+            A <strong>multiplayer site builder</strong> with an <strong>AI collaborator</strong> at
+            the cursor. One document, many hands, streamed from the edge.
           </p>
 
           <dl class="meta">
@@ -436,10 +421,7 @@
               ><span class="pip" aria-hidden="true"></span>shipping in public</span
             >
             <span>source:</span>
-            <a
-              href="https://github.com/aayushman-singh/rev01"
-              rel="noopener"
-              target="_blank"
+            <a href="https://github.com/aayushman-singh/rev01" rel="noopener" target="_blank"
               >github.com/aayushman-singh/rev01</a
             >
           </div>
@@ -451,13 +433,12 @@
       // Tiny self-running ticker — nudges the "scaffolding" label so the page
       // feels live without pulling in any framework.
       (function () {
-        var phases = ["scaffolding", "wiring", "rendering", "syncing"];
+        var phases = ['scaffolding', 'wiring', 'rendering', 'syncing'];
         var i = 0;
-        var el = document.querySelector(".status-bar .seg .v");
+        var el = document.querySelector('.status-bar .seg .v');
         if (!el) return;
-        var cursor = el.querySelector(".cursor");
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-          return;
+        var cursor = el.querySelector('.cursor');
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         setInterval(function () {
           i = (i + 1) % phases.length;
           el.firstChild.nodeValue = phases[i];

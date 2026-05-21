@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "coming-soon/**"
-      - ".github/workflows/deploy-coming-soon.yml"
+      - 'coming-soon/**'
+      - '.github/workflows/deploy-coming-soon.yml'
   workflow_dispatch:
 
 concurrency:
