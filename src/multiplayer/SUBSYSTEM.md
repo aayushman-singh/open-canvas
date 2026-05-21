@@ -16,3 +16,15 @@
 - **editor (browser)** → the merged document state on first connect, plus the live stream of every other participant's operations and presence updates.
 - **page store** → a periodic snapshot of the page contents written back at a fixed cadence (op-count or wall-clock, whichever fires first), so the durable record never drifts more than a small window behind the live state.
 - **operator / logs** → loud diagnostics on protocol violations, snapshot failures, and ownership-check rejections; no silent fallbacks.
+
+## Schema
+
+The ProseMirror schema in `pm-schema.ts` is the rev01 document vocabulary — every node and mark in `src/document/schema.ts` (`NODE_SCHEMA` + `MARK_TYPES`) is mirrored with matching attrs, content groups, parseDOM, and toDOM. The editor (`src/editor/client.ts`) declares the same set via `Node.create` / `Mark.create`, so both sides of the wire produce identical Y.XmlFragments. No StarterKit derivation: that vocabulary doesn't cover sections, columns, actions, media or dividers and would silently truncate every save.
+
+Optional attrs default to `null` at the PM layer; `y-prosemirror` therefore skips writing them to the Y.XmlElement. On the way back out, `snapshot.ts` strips null-valued attrs, empty `attrs` objects, empty `marks` arrays, and empty `content` arrays so the serialised `DocumentJSON` matches the seed shape byte-for-byte after `JSON.stringify`.
+
+Round-trip guarantee is enforced by `bun run multiplayer:smoke`, which hydrates a Y.Doc from each of the three seed pages (`maple-coffee`, `foundry-type`, `lighthouse-launch`), serialises back, asserts string equality with the seed, and replays the binary Yjs update on a second client to confirm convergence.
+
+## Cold-start hydration
+
+`PageDocument.ensureHydrated` reads the `page.doc` JSONB column from Postgres on first WS upgrade for a given pageId, runs it through `hydrateYDoc` to produce the initial Y.Doc, and persists subsequent updates back via `persistSnapshot`. `persistSnapshot` calls `validateDocument` before writing — a malformed snapshot throws loudly instead of poisoning the column. Once a DO has hydrated for a pageId it refuses requests for any other pageId on the same instance (DOs are keyed by pageId via `idFromName`, so a mismatch indicates an upstream routing bug).

@@ -14,3 +14,9 @@
 
 - **multiplayer** → a stream of local document operations and presence updates expressing what this editor is doing.
 - **page owner** → a continuously updated rich-text view of the page, the participant list of everyone currently editing it, and a connection-health indicator.
+
+## Schema coverage
+
+The editor's ProseMirror schema is hand-rolled from the rev01 document vocabulary in `src/document/schema.ts`. Every node from `NODE_SCHEMA` (`doc`, `section`, `heading`, `paragraph`, `media`, `actions`, `action`, `columns`, `column`, `divider`, `list`, `listItem`, `text`) and every mark from `MARK_TYPES` (`bold`, `italic`, `underline`, `code`, `link`, `color`, `highlight`) is declared via `Node.create` / `Mark.create` from `@tiptap/core`. No `@tiptap/starter-kit`: that vocabulary covers only the StarterKit subset (basic headings + paragraphs + lists), which would silently truncate any save of a real rev01 page.
+
+Names, attr keys, content groups, and defaults match `src/multiplayer/pm-schema.ts` exactly, so the Y.XmlFragments produced on either side of the wire decode losslessly on the other. Optional attrs default to `null`, atom nodes (`media`, `action`, `divider`) declare `atom: true`, and `code` marks declare `excludes: '_'` to satisfy spec §1.3. `parseHTML` selectors mirror the `data-*` attributes emitted by `src/document/render.ts` so server-rendered HTML rehydrates cleanly when pasted in.
