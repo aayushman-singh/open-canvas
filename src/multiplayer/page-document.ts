@@ -35,6 +35,7 @@ import * as decoding from 'lib0/decoding';
 import { db } from '../db/client';
 import { page } from '../db/schema';
 import { hydrateYDoc, persistSnapshot, serializeYDoc } from './snapshot';
+import { applyDocOpToYDoc, type DocOp } from '../agent/ops';
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
@@ -44,7 +45,19 @@ const TIME_FENCE_MS = 10_000;
 
 interface PageDocumentEnv {
   DATABASE_URL: string;
+  AGENT_RPC_SECRET?: string;
 }
+
+// Reserved clientID for agent-originated edits. ADR 0001 §5. Yjs assigns each
+// connecting client a random clientID — collision with 1 is 1/2^32 so we don't
+// enforce; the agent owns "the slot named 1" semantically, not exclusively.
+const AGENT_CLIENT_ID = 1;
+
+// How long to keep the <agent> awareness chip visible after the last agent op
+// lands. The orchestrator drives many ops in tight succession; we don't want
+// the chip to flicker between every op, so the DO keeps it on for a few
+// seconds after the most recent agent edit.
+const AGENT_AWARENESS_LINGER_MS = 5_000;
 
 interface ConnectionAttachment {
   pageId: string;
@@ -67,8 +80,17 @@ export class PageDocument extends DurableObject<PageDocumentEnv> {
       ) => void)
     | null = null;
 
+  // Tracks the timestamp of the most recent agent op. Used to clear the
+  // <agent> awareness chip after AGENT_AWARENESS_LINGER_MS of inactivity.
+  private agentLastSeenAt = 0;
+  private agentClearTimer: ReturnType<typeof setTimeout> | null = null;
+
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/__agent/apply') {
+      return this.handleAgentApply(request);
+    }
+
     const pageId = url.searchParams.get('pageId');
     if (!pageId) {
       return new Response('missing pageId', { status: 400 });
@@ -201,6 +223,104 @@ export class PageDocument extends DurableObject<PageDocumentEnv> {
   override webSocketError(ws: WebSocket, error: unknown): void {
     console.error('PageDocument WS error', error);
     this.removeAwarenessForSocket(ws);
+  }
+
+  // -------------------------------------------------------------------------
+  // Agent RPC — POST /__agent/apply
+  //
+  // Worker -> DO internal call. Body: { pageId, op }. Auth: X-Agent-Secret
+  // header equals env.AGENT_RPC_SECRET. Applies the op inside a Y.transact
+  // tagged origin='agent' so the broadcast handler can distinguish agent
+  // edits; the resulting Y update is broadcast to every connected WS client
+  // by the existing update listener. Also publishes an <agent> presence chip
+  // via awareness for AGENT_CLIENT_ID and clears it after the configured
+  // linger window.
+  // -------------------------------------------------------------------------
+
+  private async handleAgentApply(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return new Response('method not allowed', { status: 405 });
+    }
+    const expected = this.env.AGENT_RPC_SECRET;
+    if (!expected) {
+      return new Response('agent rpc secret not configured', { status: 500 });
+    }
+    const got = request.headers.get('x-agent-secret');
+    if (got !== expected) {
+      return new Response('unauthorized', { status: 401 });
+    }
+
+    let body: { pageId?: string; op?: DocOp };
+    try {
+      body = await request.json<{ pageId?: string; op?: DocOp }>();
+    } catch {
+      return new Response('invalid json', { status: 400 });
+    }
+    const pageId = body.pageId;
+    const op = body.op;
+    if (!pageId || !op) {
+      return new Response('missing pageId or op', { status: 400 });
+    }
+
+    try {
+      await this.ensureHydrated(pageId);
+    } catch (err) {
+      console.error('PageDocument agent apply: hydrate failed', err);
+      return new Response(`hydrate failed: ${errMsg(err)}`, { status: 500 });
+    }
+
+    const ydoc = this.requireYDoc();
+    this.publishAgentAwareness();
+
+    try {
+      applyDocOpToYDoc(ydoc, op);
+    } catch (err) {
+      console.error('PageDocument agent apply: op failed', err);
+      return new Response(`op failed: ${errMsg(err)}`, { status: 422 });
+    }
+
+    this.opCount += 1;
+    await this.maybeSnapshot();
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
+  private publishAgentAwareness(): void {
+    const awareness = this.requireAwareness();
+    this.agentLastSeenAt = Date.now();
+    // Publish AGENT_CLIENT_ID's state via a synthesised awareness update.
+    // applyAwarenessUpdate is the canonical entry point for injecting state
+    // for any clientID, and it fires the `update` listener wired in
+    // wireBroadcast() so the new chip ships to every connected WS client.
+    const state = {
+      user: {
+        id: 'agent',
+        name: 'agent',
+        initial: 'A',
+        color: 'oklch(0.85 0.18 70)',
+        kind: 'agent',
+      },
+    };
+    const update = encodeSyntheticAwarenessUpdate(AGENT_CLIENT_ID, state, this.agentLastSeenAt);
+    applyAwarenessUpdate(awareness, update, 'agent');
+
+    if (this.agentClearTimer) {
+      clearTimeout(this.agentClearTimer);
+    }
+    this.agentClearTimer = setTimeout(() => {
+      const since = Date.now() - this.agentLastSeenAt;
+      if (since < AGENT_AWARENESS_LINGER_MS) return;
+      this.clearAgentAwareness();
+    }, AGENT_AWARENESS_LINGER_MS + 50);
+  }
+
+  private clearAgentAwareness(): void {
+    if (!this.awareness) return;
+    const states = this.awareness.getStates();
+    if (!states.has(AGENT_CLIENT_ID)) return;
+    removeAwarenessStates(this.awareness, [AGENT_CLIENT_ID], 'agent');
   }
 
   override async alarm(): Promise<void> {
@@ -346,4 +466,32 @@ export class PageDocument extends DurableObject<PageDocumentEnv> {
     }
     return this.awareness;
   }
+}
+
+function errMsg(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
+// Build a y-protocols awareness update for a single (clientID, state, clock).
+// The wire format matches encodeAwarenessUpdate exactly:
+//   varuint(numClients), [varuint(clientID), varuint(clock), varstring(stateJSON)]+
+// applyAwarenessUpdate parses this and fires the awareness 'update' listener
+// which the existing wireBroadcast() handler relays to all WS clients.
+function encodeSyntheticAwarenessUpdate(
+  clientID: number,
+  state: Record<string, unknown> | null,
+  clock: number,
+): Uint8Array {
+  const encoder = encoding.createEncoder();
+  encoding.writeVarUint(encoder, 1);
+  encoding.writeVarUint(encoder, clientID);
+  encoding.writeVarUint(encoder, clock);
+  encoding.writeVarString(encoder, JSON.stringify(state));
+  return encoding.toUint8Array(encoder);
 }

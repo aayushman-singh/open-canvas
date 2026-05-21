@@ -9,7 +9,7 @@
 - **editor (browser)** → a stream of document operations and per-editor presence updates (cursor position, identity, colour) for one specific page.
 - **page store** → the most recently durable version of the page contents, used to bootstrap the session when no editors are currently connected.
 - **environment clock** → ticks that drive the time-based durability fence even when no edits are happening.
-- **AI agent (future)** → document operations attributed to a reserved participant identity, indistinguishable on the wire from a human editor.
+- **AI agent (live)** → document operations attributed to the reserved participant identity (Yjs `clientID = 1`), arriving as JSON ops over an internal Worker→DO POST and applied inside `Y.transact(_, _, 'agent')`. Authorisation is a shared secret header; the DO refuses without it. The agent's awareness chip is published with `kind: 'agent'` for the linger window after the most recent op and removed when the window expires, so the chip appears alongside human editors during a turn and disappears after.
 
 ## Outputs
 
