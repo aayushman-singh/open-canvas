@@ -54,6 +54,8 @@ The agent's tools are document operations: `insertSection`, `editText`, `swapIma
 
 **Why:** Claude's tool-use surface maps cleanly to a constrained operation vocabulary, which keeps the agent's output well-formed by construction. Streaming a list of operations is also a better UX than streaming raw HTML — the user sees the document change incrementally as the agent reasons.
 
+**Update 2026-05-21:** swapped to **Google Gemini 2.5 Pro** with Functional Calling as the default LLM, behind a model-agnostic adapter (`src/agent/llm.ts`). The decision is driven by access constraint (no Anthropic API key available for this build), not architectural preference — the adapter pattern keeps the swap reversible. Future Anthropic Claude / OpenAI implementations land as additional adapter files implementing the same `LlmAdapter` interface; no caller changes required. The reserved Yjs `clientID = 1` for agent edits is unchanged. The v0 tool surface is intentionally narrow — `setHeadingText`, `setParagraphText`, `insertSection`, `removeSection`, `setActionLabel` — enough for the demo narrative; `swapImage` / `setTheme` / formatting marks land later as the same DocOp + tool def + parser triple per addition.
+
 ### 7. Drizzle ORM + Neon serverless Postgres
 
 Schema in `src/db/schema.ts`; queries via Drizzle; transport via Neon's HTTP driver.
