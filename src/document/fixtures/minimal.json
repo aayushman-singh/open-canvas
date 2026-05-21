@@ -1,0 +1,16 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "section",
+      "attrs": { "kind": "hero" },
+      "content": [
+        {
+          "type": "heading",
+          "attrs": { "level": 1 },
+          "content": [{ "type": "text", "text": "Hello, rev01." }]
+        }
+      ]
+    }
+  ]
+}
