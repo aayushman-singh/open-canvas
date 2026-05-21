@@ -15,6 +15,7 @@
 import * as Y from 'yjs';
 import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProsemirrorJSON } from 'y-prosemirror';
 import type { DocumentJSON, SectionKind, SectionNode } from '../document/schema';
+import { validateDocument } from '../document/validate';
 import { pmSchema, Y_XML_FRAGMENT_NAME } from '../multiplayer/pm-schema';
 
 export type DocOp =
@@ -230,18 +231,23 @@ export interface ApplyOpToYDocResult {
 
 export function applyDocOpToYDoc(ydoc: Y.Doc, op: DocOp): ApplyOpToYDocResult {
   const fragment = ydoc.getXmlFragment(Y_XML_FRAGMENT_NAME);
-  // Read out a snapshot of the current state in DocumentJSON shape.
   const currentPM = yXmlFragmentToProsemirrorJSON(fragment) as Record<string, unknown>;
   const current = stripPmNoise(currentPM) as DocumentJSON;
   const next = applyDocOp(current, op);
 
-  // Rewrite the fragment with the new doc, wrapped in a single transaction
-  // tagged as 'agent' so the broadcast handler can distinguish agent edits.
+  // Defense in depth: orchestrator dry-runs and validates against its view of
+  // the doc, but the DO may have a different live state (concurrent edits).
+  // Re-validate the computed `next` here before any Y.Doc mutation, so partial
+  // commits inside Y.transact are impossible and invalid docs never reach WS
+  // clients.
+  const validation = validateDocument(next);
+  if (!validation.valid) {
+    throw new Error(`agent op produced invalid document: ${validation.errors.join('; ')}`);
+  }
+
   Y.transact(
     ydoc,
     () => {
-      // Empty the fragment by deleting all children first; otherwise
-      // prosemirrorJSONToYXmlFragment would append to the existing tree.
       fragment.delete(0, fragment.length);
       prosemirrorJSONToYXmlFragment(pmSchema, next, fragment);
     },
