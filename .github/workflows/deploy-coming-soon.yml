@@ -1,0 +1,37 @@
+name: deploy-coming-soon
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "coming-soon/**"
+      - ".github/workflows/deploy-coming-soon.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-coming-soon
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: pages deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy coming-soon --project-name rev01-coming-soon --branch main
