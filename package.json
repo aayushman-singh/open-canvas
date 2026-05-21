@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "canvas:smoke": "bun.cmd run src/canvas/smoke.ts",
     "document:smoke": "bun run src/document/smoke.ts",
     "theme:smoke": "bun run src/theme/smoke.ts",
     "multiplayer:smoke": "bun run src/multiplayer/_smoke.ts",
