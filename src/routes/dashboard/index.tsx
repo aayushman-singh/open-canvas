@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { customer, page, site } from '../../db/schema';
+import { customer, site } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
@@ -57,8 +57,7 @@ dashboard.get('/', async (c) => {
     .limit(1);
   const customerId = customerRow[0]?.id;
 
-  let editorLink: { siteId: string; siteName: string; pageId: string; pageTitle: string } | null =
-    null;
+  let editorLink: { siteId: string; siteName: string } | null = null;
   if (customerId) {
     const latestSite = await database
       .select({ id: site.id, name: site.name })
@@ -68,21 +67,10 @@ dashboard.get('/', async (c) => {
       .limit(1);
     const siteRow = latestSite[0];
     if (siteRow) {
-      const firstPage = await database
-        .select({ id: page.id, title: page.title })
-        .from(page)
-        .where(and(eq(page.siteId, siteRow.id)))
-        .orderBy(asc(page.position))
-        .limit(1);
-      const pageRow = firstPage[0];
-      if (pageRow) {
-        editorLink = {
-          siteId: siteRow.id,
-          siteName: siteRow.name,
-          pageId: pageRow.id,
-          pageTitle: pageRow.title,
-        };
-      }
+      editorLink = {
+        siteId: siteRow.id,
+        siteName: siteRow.name,
+      };
     }
   }
 
@@ -107,10 +95,7 @@ dashboard.get('/', async (c) => {
           {editorLink ? (
             <p>
               Continue editing{' '}
-              <a href={`/dashboard/sites/${editorLink.siteId}/pages/${editorLink.pageId}/edit`}>
-                {editorLink.siteName} / {editorLink.pageTitle}
-              </a>{' '}
-              (open in two tabs to see the multiplayer demo).
+              <a href={`/dashboard/sites/${editorLink.siteId}/edit`}>{editorLink.siteName}</a>.
             </p>
           ) : (
             <p>
