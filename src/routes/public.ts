@@ -12,16 +12,16 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { html, raw } from 'hono/html';
-import { assetResponse, collectReferencedAssetIds } from '../assets/site-assets';
+import { assetResponse, collectReferencedAssetIds } from '../assets/owner-assets';
 import type { ClerkAuthVariables } from '../auth/middleware';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { db } from '../db/client';
-import { site, siteAsset } from '../db/schema';
+import { ownerAsset, site } from '../db/schema';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -280,12 +280,9 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     }
     const database = db(c.env);
     const rows = await database
-      .select({
-        mediaType: siteAsset.mediaType,
-        bytesBase64: siteAsset.bytesBase64,
-      })
-      .from(siteAsset)
-      .where(and(eq(siteAsset.id, assetId), eq(siteAsset.siteId, siteRow.id)))
+      .select({ mediaType: ownerAsset.mediaType, bytesBase64: ownerAsset.bytesBase64 })
+      .from(ownerAsset)
+      .where(eq(ownerAsset.id, assetId))
       .limit(1);
     const row = rows[0];
     if (!row) {
