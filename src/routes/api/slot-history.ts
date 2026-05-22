@@ -16,27 +16,30 @@ const slotHistoryApi = new Hono<OwnerEnv>();
 
 const realRequireAuth = requireAuth();
 
-// Auth middleware — scoped to slot-history paths (not '*') so it does not
-// intercept sibling routers that share the /api mount point.
+// Auth middleware — scoped to '/sites/*' so it covers every route this router
+// declares (all paths begin /sites/:siteId/…) without intercepting sibling
+// routers that share the /api mount point (e.g. assetsApi at /api/me/assets).
+//
+// Using a single path pattern instead of two specific patterns means any new
+// route added under /sites/ is automatically protected; only routes outside
+// /sites/ could slip through, and this router currently declares none.
 //
 // SMOKE bypass runs before clerkAuth so the Clerk SDK never reads (and
 // consumes) the request body when the smoke harness is driving requests.
 // Production paths cannot reach the bypass because env.SMOKE is unset.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const applyAuth: any = async (c: any, next: () => Promise<void>): Promise<Response | void> => {
+slotHistoryApi.use('/sites/*', clerkAuth());
+slotHistoryApi.use('/sites/*', async (c, next) => {
   if (c.env.SMOKE === '1') {
-    if ((c.req.header('x-smoke-customer-id') ?? '').length > 0) {
+    const id = c.req.header('x-smoke-customer-id');
+    if (id && id.length > 0) {
       await next();
       return;
     }
     return c.json({ error: 'unauthorized' }, 401);
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return clerkAuth()(c as any, async () => { await realRequireAuth(c as any, next); });
-};
-
-slotHistoryApi.use('/sites/:siteId/elements/:elementId/history', applyAuth);
-slotHistoryApi.use('/sites/:siteId/elements/:elementId/history/:assetId', applyAuth);
+  return realRequireAuth(c as any, next);
+});
 
 // GET — list last N history entries newest-first.
 slotHistoryApi.get('/sites/:siteId/elements/:elementId/history', async (c) => {
@@ -97,7 +100,7 @@ slotHistoryApi.put('/sites/:siteId/elements/:elementId/history/:assetId', async 
   await database
     .update(ownerAsset)
     .set({ lastUsedAt: now })
-    .where(eq(ownerAsset.id, assetId));
+    .where(and(eq(ownerAsset.id, assetId), eq(ownerAsset.customerId, ctx.customer.id)));
 
   return c.json({ ok: true });
 });
