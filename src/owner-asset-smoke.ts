@@ -286,7 +286,7 @@ try {
 
   // 6d. PUT same triplet again — MRU dedup: still one entry but lastUsedAt advances.
   // Introduce a short delay so the timestamp differs.
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await new Promise((resolve) => setTimeout(resolve, 50));
 
   const put2Resp = await app.request(
     `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history/${assetId}`,
