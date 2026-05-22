@@ -1,4 +1,8 @@
 import { eq, sql } from 'drizzle-orm';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import app from './index';
 import { applyCanvasAgentOp } from './agent/canvas-ops';
 import { CANVAS_AGENT_TOOLS } from './agent/canvas-tools';
@@ -379,19 +383,80 @@ assert(
   /async function publishSite[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
   'expected publish to flush pending local saves before snapshotting editable state',
 );
-const inlineCanvasClient = canvasClientScript({ siteId: 'site-smoke' });
-await import(
-  `data:text/javascript;charset=utf-8,${encodeURIComponent(`if (false) {\n${inlineCanvasClient}\n}`)}`
+assert(
+  canvasIndexSource.includes('id="canvas-sidebar"'),
+  'expected canvas editor shell to include the left add/style sidebar',
 );
 assert(
-  inlineCanvasClient.includes(
-    "querySelectorAll('.rev01-editor-topbar .style-kits button[data-style-kit]')",
+  canvasIndexSource.includes('data-sidebar-add-section="blank"'),
+  'expected canvas sidebar to expose a blank-section add button',
+);
+for (const component of ['text', 'image', 'video', 'action', 'shape', 'container']) {
+  assert(
+    canvasIndexSource.includes(`data-sidebar-add-component="${component}"`),
+    `expected canvas sidebar to expose ${component} component add button`,
+  );
+}
+assert(
+  canvasIndexSource.includes('data-sidebar-style-kit={kit}'),
+  'expected style-kit controls to live in the sidebar',
+);
+assert(
+  canvasIndexSource.includes('id="canvas-sidebar-selection"'),
+  'expected selected-element color controls to reserve a sidebar region',
+);
+assert(
+  !canvasIndexSource.includes('<span class="style-kits"'),
+  'expected style-kit controls to move out of the topbar',
+);
+assert(
+  canvasClientSource.includes('const sidebar = document.getElementById("canvas-sidebar")'),
+  'expected canvas client to look up #canvas-sidebar',
+);
+assert(
+  canvasClientSource.includes(
+    'const sidebarSelection = document.getElementById("canvas-sidebar-selection")',
   ),
-  'expected style-kit click handling to bind only to topbar style-kit buttons',
+  'expected canvas client to look up the sidebar selected-element region',
+);
+assert(
+  canvasClientSource.includes('function attachSidebarActions()'),
+  'expected canvas client to wire sidebar add/style actions',
+);
+assert(
+  canvasClientSource.includes('function renderSidebarSelection()'),
+  'expected canvas client to render selected-element color controls in the sidebar',
+);
+assert(
+  !canvasClientSource.includes('appendPinnedColor(element);'),
+  'expected text color control to move out of the right inspector',
+);
+assert(
+  canvasClientSource.includes('function addBlankSectionFromSidebar()'),
+  'expected canvas client to add blank sections from the sidebar',
+);
+assert(
+  canvasClientSource.includes("querySelectorAll('[data-sidebar-style-kit]')"),
+  'expected style-kit click handling to bind sidebar style-kit buttons',
+);
+const inlineCanvasClient = canvasClientScript({ siteId: 'site-smoke' });
+const inlineCanvasClientParseDir = await mkdtemp(join(tmpdir(), 'rev01-canvas-client-'));
+const inlineCanvasClientParsePath = join(inlineCanvasClientParseDir, 'client.mjs');
+try {
+  await writeFile(inlineCanvasClientParsePath, `if (false) {\n${inlineCanvasClient}\n}\n`);
+  await import(pathToFileURL(inlineCanvasClientParsePath).href);
+} finally {
+  await rm(inlineCanvasClientParseDir, { recursive: true, force: true });
+}
+assert(
+  inlineCanvasClient.includes(
+    "querySelectorAll('[data-sidebar-style-kit]')",
+  ),
+  'expected style-kit click handling to bind sidebar style-kit buttons',
 );
 assert(
   !inlineCanvasClient.includes("querySelectorAll('[data-style-kit]')"),
-  'expected style-kit click handling not to bind the whole editor shell',
+  'expected style-kit click handling not to bind generic data-style-kit nodes',
 );
 
 const tsconfigSource = await readSource('../tsconfig.json');
