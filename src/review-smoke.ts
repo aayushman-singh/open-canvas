@@ -16,6 +16,7 @@ import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
 import { customer, site, siteAsset } from './db/schema';
+import { canvasClientScript } from './editor/canvas-client';
 import {
   prepareSeedAssetsForSite,
   RESERVED_SUBDOMAINS,
@@ -378,6 +379,20 @@ assert(
   /async function publishSite[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
   'expected publish to flush pending local saves before snapshotting editable state',
 );
+const inlineCanvasClient = canvasClientScript({ siteId: 'site-smoke' });
+await import(
+  `data:text/javascript;charset=utf-8,${encodeURIComponent(`if (false) {\n${inlineCanvasClient}\n}`)}`
+);
+assert(
+  inlineCanvasClient.includes(
+    "querySelectorAll('.rev01-editor-topbar .style-kits button[data-style-kit]')",
+  ),
+  'expected style-kit click handling to bind only to topbar style-kit buttons',
+);
+assert(
+  !inlineCanvasClient.includes("querySelectorAll('[data-style-kit]')"),
+  'expected style-kit click handling not to bind the whole editor shell',
+);
 
 const tsconfigSource = await readSource('../tsconfig.json');
 const tsconfig = JSON.parse(tsconfigSource) as { exclude?: string[] };
@@ -670,6 +685,19 @@ for (const originalId of referencedSeedIds) {
   assert(
     !preparedAIds.has(originalId) && !preparedBIds.has(originalId),
     `expected materialised asset ids not to reuse global seed id "${originalId}"`,
+  );
+}
+const preparedAStateIds = collectReferencedAssetIds(preparedForSiteA.editableState.pages);
+for (const originalId of referencedSeedIds) {
+  assert(
+    !preparedAStateIds.has(originalId),
+    `expected editable state not to retain global seed asset id "${originalId}" after materialisation`,
+  );
+}
+for (const row of preparedForSiteA.seedRows) {
+  assert(
+    preparedAStateIds.has(row.id),
+    `expected editable state to reference materialised site asset id "${row.id}"`,
   );
 }
 for (const id of preparedAIds) {
