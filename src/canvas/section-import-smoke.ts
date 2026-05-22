@@ -28,7 +28,6 @@ for (const seed of allTemplateSeeds) {
     existingAssetIds,
   });
   assert(result.ok, `import failed for ${seed.id}: ${result.ok ? '' : result.errors.join('; ')}`);
-  if (!result.ok) continue;
 
   assert(
     result.section.id !== sourceSection.id,
@@ -89,6 +88,36 @@ if (firstImport.ok) {
       secondImport.newAssetRows.length === 0,
       `dedup failed: produced ${secondImport.newAssetRows.length} rows when all should be skipped`,
     );
+  }
+}
+
+// Verify rolePrefix preserves semantic names (regression guard for the
+// previous /^[a-z0-9]{4,}$/i bug that stripped words like "heading" and
+// "primary").
+{
+  const heroSeed = allTemplateSeeds[0]!;
+  const heroSection = heroSeed.state.pages[0]!.sections[0] as CanvasSection;
+  const out = importSectionIntoSite({
+    targetSiteId,
+    sourceSection: heroSection,
+    existingAssetIds: new Set<string>(),
+  });
+  assert(out.ok, 'hero import for regex regression test must succeed');
+  if (out.ok) {
+    const originalIds = heroSection.elements.map((e) => e.id);
+    const newIds = out.section.elements.map((e) => e.id);
+    for (let i = 0; i < originalIds.length; i += 1) {
+      const original = originalIds[i]!;
+      const fresh = newIds[i]!;
+      assert(
+        fresh !== original,
+        `element id ${original} must be regenerated`,
+      );
+      assert(
+        fresh.startsWith(original + '-'),
+        `element id ${original} must retain its full semantic prefix; got ${fresh}`,
+      );
+    }
   }
 }
 

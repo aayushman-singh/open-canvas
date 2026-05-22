@@ -39,7 +39,7 @@ function rolePrefix(originalId: string): string {
   const lastDash = originalId.lastIndexOf('-');
   if (lastDash <= 0) return originalId || 'el';
   const tail = originalId.slice(lastDash + 1);
-  if (/^[a-z0-9]{4,}$/i.test(tail)) return originalId.slice(0, lastDash);
+  if (/^[a-f0-9]{8}$/i.test(tail)) return originalId.slice(0, lastDash);
   return originalId;
 }
 
@@ -96,17 +96,9 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
   for (const element of cloned.elements) {
     if (element.type !== 'media') continue;
     const media = element as MediaElement;
-    const remapped = assetIdMap.get(media.assetId);
-    if (!remapped) {
-      return { ok: false, errors: [`internal: missing remap for ${media.assetId}`] };
-    }
-    media.assetId = remapped;
+    media.assetId = assetIdMap.get(media.assetId)!;
     if (media.posterAssetId !== undefined) {
-      const remappedPoster = assetIdMap.get(media.posterAssetId);
-      if (!remappedPoster) {
-        return { ok: false, errors: [`internal: missing remap for ${media.posterAssetId}`] };
-      }
-      media.posterAssetId = remappedPoster;
+      media.posterAssetId = assetIdMap.get(media.posterAssetId)!;
     }
   }
 
