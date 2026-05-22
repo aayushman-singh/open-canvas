@@ -9,7 +9,7 @@
 import { count, eq } from 'drizzle-orm';
 import app from './index';
 import { db } from './db/client';
-import { customer, ownerAsset } from './db/schema';
+import { customer, ownerAsset, site } from './db/schema';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
@@ -47,6 +47,7 @@ console.log('[owner-asset-smoke] setup');
 const SMOKE_CLERK_USER = 'smoke-asset-' + crypto.randomUUID().slice(0, 8);
 
 let customerId: string | undefined;
+let smokeSiteId: string | undefined;
 try {
   const inserted = await smokeDb
     .insert(customer)
@@ -228,7 +229,149 @@ try {
     console.log('[skip] generate (no REPLICATE_API_TOKEN)');
   }
 
-  // ── Step 6: Negative cases ────────────────────────────────────────────────
+  // ── Step 6: Slot history ──────────────────────────────────────────────────
+  console.log('[owner-asset-smoke] slot-history');
+
+  // 6a. Create a test site owned by the smoke customer.
+  smokeSiteId = crypto.randomUUID();
+  const smokeSubdomain = 'smoke-' + smokeSiteId.slice(0, 8);
+  const minimalState = { styleKit: 'charcoal' as const, pages: [] };
+
+  await smokeDb.insert(site).values({
+    id: smokeSiteId,
+    customerId,
+    name: 'Smoke Site',
+    subdomain: smokeSubdomain,
+    styleKit: 'charcoal',
+    editableState: minimalState,
+  });
+
+  // 6b. PUT — record first history entry.
+  const put1Resp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history/${assetId}`,
+    {
+      method: 'PUT',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    put1Resp.status === 200,
+    `expected PUT history to return 200, got ${put1Resp.status}`,
+  );
+
+  // 6c. GET — assert exactly one entry with the expected assetId.
+  const get1Resp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history`,
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    get1Resp.status === 200,
+    `expected GET history to return 200, got ${get1Resp.status}`,
+  );
+  const get1Body = (await get1Resp.json()) as { entries: Array<{ assetId: string; lastUsedAt: string }> };
+  assert(
+    get1Body.entries.length === 1,
+    `expected exactly 1 history entry, got ${get1Body.entries.length}`,
+  );
+  assert(
+    get1Body.entries[0]?.assetId === assetId,
+    `expected history entry assetId to be ${assetId}, got ${JSON.stringify(get1Body.entries[0]?.assetId)}`,
+  );
+  const firstLastUsedAt = get1Body.entries[0]?.lastUsedAt as string;
+
+  // 6d. PUT same triplet again — MRU dedup: still one entry but lastUsedAt advances.
+  // Introduce a short delay so the timestamp differs.
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const put2Resp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history/${assetId}`,
+    {
+      method: 'PUT',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    put2Resp.status === 200,
+    `expected second PUT history to return 200, got ${put2Resp.status}`,
+  );
+
+  const get2Resp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history`,
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    get2Resp.status === 200,
+    `expected GET history (after second PUT) to return 200, got ${get2Resp.status}`,
+  );
+  const get2Body = (await get2Resp.json()) as { entries: Array<{ assetId: string; lastUsedAt: string }> };
+  assert(
+    get2Body.entries.length === 1,
+    `expected still exactly 1 history entry after MRU dedup, got ${get2Body.entries.length}`,
+  );
+  assert(
+    get2Body.entries[0]?.lastUsedAt !== firstLastUsedAt,
+    `expected lastUsedAt to advance after second PUT (was ${firstLastUsedAt}, got ${String(get2Body.entries[0]?.lastUsedAt)})`,
+  );
+
+  // 6e. PUT with an asset id that does NOT belong to this customer → 403.
+  const put403Resp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history/up-does-not-belong`,
+    {
+      method: 'PUT',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    put403Resp.status === 403,
+    `expected PUT with foreign assetId to return 403, got ${put403Resp.status}`,
+  );
+
+  // 6f. DELETE — purge history; GET returns 0 entries.
+  const deleteResp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history`,
+    {
+      method: 'DELETE',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    deleteResp.status === 200,
+    `expected DELETE history to return 200, got ${deleteResp.status}`,
+  );
+
+  const get3Resp = await app.request(
+    `http://rev01.test/api/sites/${smokeSiteId}/elements/test-element-1/history`,
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    get3Resp.status === 200,
+    `expected GET history after DELETE to return 200, got ${get3Resp.status}`,
+  );
+  const get3Body = (await get3Resp.json()) as { entries: unknown[] };
+  assert(
+    get3Body.entries.length === 0,
+    `expected 0 history entries after DELETE, got ${get3Body.entries.length}`,
+  );
+
+  console.log('[owner-asset-smoke] slot-history ok');
+
+  // ── Step 7: Negative cases ────────────────────────────────────────────────
   console.log('[owner-asset-smoke] negative-cases');
 
   // 6a. GET a non-existent asset → 404
@@ -285,7 +428,11 @@ try {
 
   console.log('[owner-asset-smoke] negative-cases ok');
 } finally {
-  // ── Step 7: Cleanup ───────────────────────────────────────────────────────
+  // ── Cleanup ───────────────────────────────────────────────────────────────
+  // Delete site first; slot_history rows cascade via FK.
+  if (smokeSiteId) {
+    await smokeDb.delete(site).where(eq(site.id, smokeSiteId));
+  }
   if (customerId) {
     await smokeDb.delete(ownerAsset).where(eq(ownerAsset.customerId, customerId));
     await smokeDb.delete(customer).where(eq(customer.id, customerId));
