@@ -100,6 +100,25 @@ canvasApi.put('/sites/:siteId', async (c) => {
     return c.json({ error: 'editable state invalid', errors: ['body must be a JSON object'] }, 400);
   }
   const editableState = body.editableState;
+  // Single-page POC guardrail: reject multi-page payloads loudly before
+  // dropping into the full validator. The validator still runs below as the
+  // comprehensive check — this pre-check is an additional defence so the
+  // wire-level error is specific even when the rest of the state is broken.
+  if (
+    !isRecord(editableState) ||
+    !Array.isArray(editableState.pages) ||
+    editableState.pages.length !== 1
+  ) {
+    return c.json(
+      {
+        error: 'editable state invalid',
+        errors: [
+          'state.pages must contain exactly one canvas page (POC enforces single-page sites)',
+        ],
+      },
+      400,
+    );
+  }
   const validation = validateCanvasSiteState(editableState);
   if (!validation.valid) {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
@@ -109,7 +128,7 @@ canvasApi.put('/sites/:siteId', async (c) => {
   await database
     .update(site)
     .set({
-      editableState: editableState as CanvasSiteState,
+      editableState: editableState as unknown as CanvasSiteState,
       updatedAt: sql`now()`,
     })
     .where(and(eq(site.id, siteId), eq(site.customerId, result.customerId)));

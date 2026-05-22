@@ -6,7 +6,7 @@
 
 import fixture from './fixtures/home.json';
 import { renderCanvasSnapshot } from './render.js';
-import type { CanvasSiteState, PublishedSnapshot, TextElement } from './schema.js';
+import type { CanvasPage, CanvasSiteState, PublishedSnapshot, TextElement } from './schema.js';
 import { validateCanvasSiteState, validatePublishedSnapshot } from './validate.js';
 
 function assert(condition: boolean, message: string): void {
@@ -95,6 +95,66 @@ assert(
   !javascriptLinkResult.valid &&
     javascriptLinkResult.errors.some((m) => m.includes('javascript:alert(1)')),
   'expected javascript: link rejection to mention the offending href',
+);
+
+// -- Task 5.6: single-page invariant + accessibility -----------------------
+// The hero section contains a shape (`hero-orb`) and a surface (`hero-card`),
+// both decorative-by-default. The rendered HTML for the hero section must
+// include at least one element wrapper with `aria-hidden="true"`. Anchor the
+// search to the hero section so we do not accept an aria-hidden somewhere
+// further down the page.
+const heroSectionMarker = 'data-rev01-section="section-hero"';
+const heroSectionIdx = html.indexOf(heroSectionMarker);
+assert(heroSectionIdx >= 0, 'expected section-hero marker present in rendered HTML');
+const heroSectionEnd = html.indexOf('</section>', heroSectionIdx);
+assert(heroSectionEnd > heroSectionIdx, 'expected section-hero to close after its marker');
+const heroSectionBlock = html.slice(heroSectionIdx, heroSectionEnd);
+assert(
+  heroSectionBlock.includes('aria-hidden="true"'),
+  'expected at least one aria-hidden="true" inside section-hero (shape or surface)',
+);
+
+// The hero heading text element must NOT carry aria-hidden — text speaks for
+// itself. Find the hero-heading wrapper opening tag and check it.
+const headingWrapperIdx = html.indexOf('data-rev01-element="hero-heading"');
+assert(headingWrapperIdx >= 0, 'expected hero-heading element wrapper in rendered HTML');
+const headingWrapperOpenEnd = html.indexOf('>', headingWrapperIdx);
+assert(
+  headingWrapperOpenEnd > headingWrapperIdx,
+  'expected hero-heading wrapper opening tag to close with >',
+);
+const headingWrapperOpenTag = html.slice(headingWrapperIdx, headingWrapperOpenEnd);
+assert(
+  !headingWrapperOpenTag.includes('aria-hidden'),
+  'expected hero-heading wrapper NOT to carry aria-hidden (text is semantic content)',
+);
+
+// Validator: a two-page state must be rejected with the single-page message.
+// Build it from the fixture so the second page is otherwise valid — the only
+// reason for rejection is the length rule.
+const fixtureClone = structuredClone(editable);
+const secondPage: CanvasPage = structuredClone(fixtureClone.pages[0] as CanvasPage);
+const twoPageState: CanvasSiteState = {
+  ...fixtureClone,
+  pages: [fixtureClone.pages[0] as CanvasPage, secondPage],
+};
+const twoPageResult = validateCanvasSiteState(twoPageState);
+assert(
+  !twoPageResult.valid,
+  'expected validator to reject a two-page state (single-page POC invariant)',
+);
+assert(
+  !twoPageResult.valid &&
+    twoPageResult.errors.some((m) => m.includes('exactly one canvas page')),
+  'expected two-page rejection to mention "exactly one canvas page"',
+);
+
+// Validator: the existing empty-pages case must still reject (the new length
+// rule does not displace the non-empty-array check).
+const noPagesResult = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
+assert(
+  !noPagesResult.valid,
+  'expected validator to still reject pages: [] (non-empty array required)',
 );
 
 console.log('[canvas:smoke] OK');

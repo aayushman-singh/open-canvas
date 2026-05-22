@@ -506,6 +506,14 @@ function validateEditableShape(state: unknown, errors: string[]): void {
     errors.push('pages must be a non-empty array');
     return;
   }
+  // Single-page POC invariant: the validator pins state.pages to length 1.
+  // Applies to both editable and published states because
+  // validatePublishedSnapshot calls back into validateEditableShape.
+  if (state.pages.length !== 1) {
+    errors.push(
+      'state.pages must contain exactly one canvas page (POC enforces single-page sites)',
+    );
+  }
   state.pages.forEach((page, idx) => {
     validatePage(page, `pages[${String(idx)}]`, errors);
   });
