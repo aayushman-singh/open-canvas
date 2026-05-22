@@ -108,11 +108,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const publishButton = document.getElementById("canvas-publish");
 
   // -- Viewport + zoom ---------------------------------------------------
-  // The route ships #canvas-root directly inside the grid. We wrap it in a
-  // .rev01-viewport at boot so the viewport gets the scroll + dark
-  // background + grid placement, while #canvas-root receives the CSS
-  // transform that implements zoom. The wrap is purely client-side so the
-  // route shell stays untouched.
+  // The route ships #canvas-root directly inside the editor shell. We wrap
+  // it in a .rev01-viewport at boot so the viewport owns the dark
+  // background, horizontal centering, and dock-clearing margins, while
+  // #canvas-root receives the CSS transform that implements zoom. The
+  // viewport no longer scrolls — the browser's native body scroll handles
+  // vertical overflow when zoomed in. The wrap is purely client-side so
+  // the route shell stays untouched.
   let viewport = null;
   let zoomToolbar = null;
   let zoomReadout = null;
@@ -181,7 +183,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // Insert viewport in place of #canvas-root, then move #canvas-root in.
     parent.insertBefore(viewport, root);
     viewport.appendChild(root);
-    // Build the zoom toolbar inside the viewport so it sticks to the top-left.
+    // Build the zoom toolbar and append directly to document.body — the
+    // CSS pins it via position: fixed at the top-left of the canvas area,
+    // so it must NOT live inside the viewport (which now uses flex
+    // centering and has no scroll of its own).
     zoomToolbar = document.createElement("div");
     zoomToolbar.className = "rev01-zoom-toolbar";
     zoomToolbar.setAttribute("role", "toolbar");
@@ -203,8 +208,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     zoomReadout.className = "zoom-readout";
     zoomReadout.textContent = "100%";
     zoomToolbar.appendChild(zoomReadout);
-    // Insert the toolbar BEFORE #canvas-root so it sits above the page.
-    viewport.insertBefore(zoomToolbar, root);
+    document.body.appendChild(zoomToolbar);
     zoomToolbar.addEventListener("click", (ev) => {
       const target = ev.target instanceof Element ? ev.target.closest("button[data-zoom-action]") : null;
       if (!target) return;
@@ -352,6 +356,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove("rev01-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -383,6 +388,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ok.addEventListener("click", () => close(input.value));
       document.addEventListener("keydown", onKey, true);
 
+      document.body.classList.add("rev01-modal-open");
       document.body.appendChild(backdrop);
       // Autofocus after mount so the input is ready to type.
       input.focus();
@@ -453,6 +459,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove("rev01-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -476,6 +483,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ok.addEventListener("click", () => close(select.value));
       document.addEventListener("keydown", onKey, true);
 
+      document.body.classList.add("rev01-modal-open");
       document.body.appendChild(backdrop);
       select.focus();
     });
@@ -1592,30 +1600,42 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Inline mark toolbar ------------------------------------------------
 
+  // Anchor we re-position the toolbar against on scroll/resize. Set in
+  // buildMarkToolbar, cleared in removeMarkToolbar so the listeners
+  // become no-ops when no text element is in edit mode.
+  let markToolbarAnchor = null;
+
   function removeMarkToolbar() {
     if (markToolbar && markToolbar.parentNode) {
       markToolbar.parentNode.removeChild(markToolbar);
     }
     markToolbar = null;
+    markToolbarAnchor = null;
   }
 
   function positionMarkToolbar(anchor) {
-    if (!markToolbar || !anchor || !viewport) return;
-    // Anchor + viewport rects are both in viewport (post-transform) screen
-    // space, so subtracting them gives the anchor's offset inside the
-    // viewport. Adding scroll converts to the viewport's internal
-    // coordinate space, which is what "position: absolute" inside the
-    // viewport uses. The toolbar lives in unscaled DOM (the transform is
-    // on #canvas-root, not the viewport), so we anchor it 44px above the
-    // element's CURRENT screen-space top edge.
+    if (!markToolbar || !anchor) return;
+    // The toolbar is appended to document.body and uses position: fixed,
+    // so top/left are in viewport coordinates. getBoundingClientRect()
+    // already returns viewport-relative coords, so we just anchor 44px
+    // above the element's current top edge. Body scroll moves the anchor
+    // rect on each scroll event; the scroll/resize listeners installed in
+    // buildMarkToolbar call back into this function to keep the toolbar
+    // pinned above the element while the body scrolls.
     const rect = anchor.getBoundingClientRect();
-    const vpRect = viewport.getBoundingClientRect();
-    const top = rect.top - vpRect.top + viewport.scrollTop - 44;
-    const left = rect.left - vpRect.left + viewport.scrollLeft;
-    markToolbar.style.position = "absolute";
+    const top = rect.top - 44;
+    const left = rect.left;
     markToolbar.style.top = Math.max(0, top) + "px";
     markToolbar.style.left = Math.max(0, left) + "px";
   }
+
+  // Listeners are installed once and check markToolbarAnchor each call —
+  // they're cheap no-ops when no text is in edit mode.
+  function onMarkToolbarReflow() {
+    if (markToolbarAnchor) positionMarkToolbar(markToolbarAnchor);
+  }
+  window.addEventListener("scroll", onMarkToolbarReflow, { passive: true });
+  window.addEventListener("resize", onMarkToolbarReflow);
 
   function applyExecCommand(command) {
     // execCommand is deprecated but it is by far the simplest way to apply
@@ -1743,11 +1763,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bar.appendChild(btn);
     }
     markToolbar = bar;
-    // Append to the viewport (unscaled coord space) instead of #canvas-root
-    // (which is now CSS-transformed by zoom). Keeping the toolbar in
-    // unscaled space means its hit area matches what the Owner sees.
-    if (viewport) viewport.appendChild(bar);
-    else root.appendChild(bar);
+    markToolbarAnchor = anchor;
+    // Append to document.body (NOT viewport or #canvas-root) so the
+    // toolbar lives in viewport coordinate space and stays pinned via
+    // position: fixed while the body scrolls.
+    document.body.appendChild(bar);
     positionMarkToolbar(anchor);
   }
 
