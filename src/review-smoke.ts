@@ -10,7 +10,7 @@ import {
   collectReferencedAssetIds,
   collectReferencedAssets,
   findAssetReferenceErrors,
-} from './assets/site-assets';
+} from './assets/owner-assets';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
@@ -725,7 +725,7 @@ for (const [assetId, asset] of Object.entries(SEED_ASSET_REGISTRY)) {
 }
 
 // Site-creation materialisation: after creating a smoke site, the count of
-// `siteAsset` rows for that site MUST equal the count of seed asset ids
+// `ownerAsset` rows for that customer MUST equal the count of seed asset ids
 // referenced by `starterTemplate.state`. We bypass the Clerk-gated POST and
 // directly mirror the production materialiser's INSERTs so the smoke runs
 // without a Clerk session.
