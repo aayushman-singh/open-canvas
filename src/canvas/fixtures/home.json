@@ -60,8 +60,8 @@
               "type": "media",
               "box": { "x": 760, "y": 80, "w": 600, "h": 600, "z": 2 },
               "mediaKind": "video",
-              "assetId": "hero-loop.mp4",
-              "posterAssetId": "hero-loop-poster.jpg",
+              "assetId": "seed-hero-video-1",
+              "posterAssetId": "seed-hero-poster-1",
               "alt": "Editable site loop",
               "fit": "cover",
               "playback": { "autoplay": true, "muted": true, "loop": true, "controls": false }
@@ -107,7 +107,7 @@
               "type": "media",
               "box": { "x": 80, "y": 220, "w": 380, "h": 280, "z": 2 },
               "mediaKind": "image",
-              "assetId": "feature-canvas.png",
+              "assetId": "seed-feature-canvas-1",
               "alt": "Canvas editing surface",
               "fit": "cover"
             },

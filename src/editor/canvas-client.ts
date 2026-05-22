@@ -409,11 +409,58 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  // Build the editor-mode preview for a media element. The src points at the
+  // owner-gated preview route (/api/canvas/sites/:siteId/assets/:assetId),
+  // NOT the public /assets/:assetId path — visitors only see published assets,
+  // but the Owner can preview anything they have uploaded BEFORE publish.
+  //
+  // The placeholder assetId "__placeholder__" (added when the Owner inserts a
+  // new media element via the section toolbar) is rendered as a non-resolving
+  // hint until the Owner uploads. We keep the box visible so the Owner can
+  // drag/resize it before uploading.
   function buildMediaBody(element) {
     const node = document.createElement("div");
     node.className = "rev01-media";
     node.setAttribute("data-rev01-media-kind", element.mediaKind);
-    node.textContent = element.mediaKind === "image" ? "[image]" : "[video]";
+    const assetId = typeof element.assetId === "string" ? element.assetId : "";
+    if (assetId.length === 0 || assetId === "__placeholder__") {
+      node.textContent =
+        element.mediaKind === "image" ? "[image — upload to preview]" : "[video — upload to preview]";
+      return node;
+    }
+    const previewUrl = SITE_BASE + "/assets/" + encodeURIComponent(assetId);
+    if (element.mediaKind === "image") {
+      const img = document.createElement("img");
+      img.setAttribute("src", previewUrl);
+      img.setAttribute("alt", typeof element.alt === "string" ? element.alt : "");
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.objectFit = element.fit === "contain" ? "contain" : "cover";
+      img.style.display = "block";
+      node.appendChild(img);
+    } else {
+      const video = document.createElement("video");
+      video.setAttribute("src", previewUrl);
+      video.style.width = "100%";
+      video.style.height = "100%";
+      video.style.objectFit = element.fit === "contain" ? "contain" : "cover";
+      video.style.display = "block";
+      const playback = element.playback || {};
+      // Same enforcement as the public renderer + validator: autoplay forces
+      // muted. We set both attributes via setAttribute so the browser's
+      // autoplay policy treats the video as autoplay-eligible.
+      if (playback.autoplay) {
+        video.setAttribute("autoplay", "");
+        video.setAttribute("muted", "");
+        video.muted = true;
+      } else if (playback.muted) {
+        video.setAttribute("muted", "");
+        video.muted = true;
+      }
+      if (playback.loop) video.setAttribute("loop", "");
+      if (playback.controls) video.setAttribute("controls", "");
+      node.appendChild(video);
+    }
     return node;
   }
 
@@ -846,6 +893,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
 
     if (element.type === "media") {
+      // Upload control — separate input for image vs video mediaKinds so the
+      // file picker filters appropriately. POST to the owner upload route as
+      // a base64 data URL; on success, update the element's assetId / kind /
+      // alt from the response and re-render.
+      appendMediaUploader(element);
+
       const fit = selectInput(["cover", "contain"], element.fit);
       fit.addEventListener("change", () => {
         element.fit = fit.value;
@@ -943,6 +996,109 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       inspector.appendChild(field("Motion delay (ms)", delay));
     }
+  }
+
+  // -- Media upload helper -----------------------------------------------
+  //
+  // Reads a File via FileReader.readAsDataURL, POSTs to the owner asset
+  // upload route, and updates the selected media element with the freshly
+  // generated assetId. Uses an alt-text input so the Owner sets accessible
+  // text at upload time. The control is rendered inside the inspector for
+  // the currently selected media element; it lives there because uploads
+  // are scoped to the element being replaced.
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === "string") resolve(result);
+        else reject(new Error("FileReader did not return a string"));
+      };
+      reader.onerror = () => reject(reader.error || new Error("FileReader error"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadMediaForElement(element, file) {
+    setStatus("Uploading…");
+    let dataUrl;
+    try {
+      dataUrl = await fileToDataUrl(file);
+    } catch (err) {
+      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+    const altInputId = "media-upload-alt-" + element.id;
+    const altInput = document.getElementById(altInputId);
+    const altValue =
+      altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
+    try {
+      const response = await fetch(SITE_BASE + "/assets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dataUrl, alt: altValue }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (_) { /* ignore */ }
+        setStatus("Upload failed: " + detail, "error");
+        return;
+      }
+      const body = await response.json();
+      if (!body || typeof body.assetId !== "string" || typeof body.kind !== "string") {
+        setStatus("Upload failed: malformed server response", "error");
+        return;
+      }
+      element.assetId = body.assetId;
+      element.mediaKind = body.kind;
+      element.alt = altValue;
+      rebuildElement(element.id);
+      renderInspector();
+      scheduleSave();
+      setStatus("Uploaded", "ok");
+    } catch (err) {
+      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
+  function appendMediaUploader(element) {
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.textContent =
+      element.mediaKind === "image" ? "Replace image" : "Replace video";
+    wrap.appendChild(label);
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = element.mediaKind === "image" ? "image/*" : "video/*";
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      uploadMediaForElement(element, file);
+    });
+    wrap.appendChild(fileInput);
+    inspector.appendChild(wrap);
+
+    const altWrap = document.createElement("div");
+    altWrap.className = "field";
+    const altLabel = document.createElement("label");
+    altLabel.textContent = "Alt text";
+    const altInput = document.createElement("input");
+    altInput.type = "text";
+    altInput.id = "media-upload-alt-" + element.id;
+    altInput.value = typeof element.alt === "string" ? element.alt : "";
+    altInput.addEventListener("change", () => {
+      element.alt = altInput.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    altWrap.appendChild(altLabel);
+    altWrap.appendChild(altInput);
+    inspector.appendChild(altWrap);
   }
 
   function appendPinnedColor(element) {

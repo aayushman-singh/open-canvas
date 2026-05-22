@@ -4,6 +4,7 @@
 // errors encountered rather than failing fast — the smoke and the editor want
 // the full picture so the Owner can fix every issue at once.
 
+import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
@@ -544,6 +545,54 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   }
   // Re-use the editable validator on the snapshot's pages + style kit.
   validateEditableShape({ styleKit: snapshot.styleKit, pages: snapshot.pages }, errors);
+  if (errors.length === 0) return { valid: true };
+  return { valid: false, errors };
+}
+
+/**
+ * Validate that every media element in a fixture references an `assetId` (and
+ * `posterAssetId` when present) that exists in {@link SEED_ASSET_REGISTRY}.
+ *
+ * This validator is INTENTIONALLY separate from `validateCanvasSiteState` /
+ * `validatePublishedSnapshot`. Customer-uploaded assets have ids the registry
+ * does not know about (they are generated on upload via crypto.randomUUID);
+ * only the bundled seed fixture is gated against the registry so a new site
+ * created from a Template Seed never points at media bytes the materialiser
+ * doesn't know about.
+ *
+ * Walks every page → section → element. Returns ALL errors at once so the
+ * fixture author sees every missing id in one pass.
+ */
+export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
+  const errors: string[] = [];
+  for (let pageIdx = 0; pageIdx < state.pages.length; pageIdx++) {
+    const page = state.pages[pageIdx];
+    if (!page) continue;
+    const pagePath = `pages[${String(pageIdx)}]`;
+    for (let sectionIdx = 0; sectionIdx < page.sections.length; sectionIdx++) {
+      const section = page.sections[sectionIdx];
+      if (!section) continue;
+      const sectionPath = `${pagePath}.sections[${String(sectionIdx)}]`;
+      for (let elIdx = 0; elIdx < section.elements.length; elIdx++) {
+        const element = section.elements[elIdx];
+        if (!element || element.type !== 'media') continue;
+        const elementPath = `${sectionPath}.elements[${String(elIdx)}]`;
+        const assetId = element.assetId;
+        if (!Object.prototype.hasOwnProperty.call(SEED_ASSET_REGISTRY, assetId)) {
+          errors.push(
+            `${elementPath}.assetId "${assetId}" is not registered in SEED_ASSET_REGISTRY`,
+          );
+        }
+        if (element.posterAssetId !== undefined) {
+          if (!Object.prototype.hasOwnProperty.call(SEED_ASSET_REGISTRY, element.posterAssetId)) {
+            errors.push(
+              `${elementPath}.posterAssetId "${element.posterAssetId}" is not registered in SEED_ASSET_REGISTRY`,
+            );
+          }
+        }
+      }
+    }
+  }
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }
