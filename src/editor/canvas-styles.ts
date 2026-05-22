@@ -2,11 +2,19 @@
 //
 // Stylesheet for the desktop Canvas Editor (T4). Inlined into the editor route
 // via raw(canvasEditorStyles). Dark theme, distinct from the legacy ProseMirror
-// editor (src/editor/styles.ts). Style-kit colour tokens are exposed as CSS
-// variables on <main class="rev01-editor" data-style-kit="…"> so that the
-// editor preview matches the published renderer's look.
+// editor (src/editor/styles.ts).
+//
+// The visitor renderer (src/canvas/public-styles.ts) and this editor preview
+// share a single source of truth for kit tokens, variants, and motion:
+// `buildAllStyleKitsCss` in src/canvas/style-kits.ts. The hard-coded
+// per-kit `--kit-*` table that used to live here was removed in T8 — the
+// editor and the visitor cannot drift because they read the same map.
 
-export const canvasEditorStyles = String.raw`
+import { buildAllStyleKitsCss } from '../canvas/style-kits.js';
+
+const kitCss = buildAllStyleKitsCss();
+
+const chromeCss = String.raw`
 :root {
   --rev01-bg: #0a0e1a;
   --rev01-bg-panel: oklch(0.2 0.04 245 / 0.82);
@@ -54,31 +62,12 @@ body {
     "status status";
   height: 100vh;
   width: 100%;
-  --kit-bg: #0c0c0d;
-  --kit-fg: #f6f6f6;
-  --kit-accent: oklch(0.78 0.15 200);
 }
-
-.rev01-editor[data-style-kit="charcoal"] {
-  --kit-bg: #0c0c0d;
-  --kit-fg: #f6f6f6;
-  --kit-accent: oklch(0.85 0.02 240);
-}
-.rev01-editor[data-style-kit="orange-editorial"] {
-  --kit-bg: #fff7ef;
-  --kit-fg: #221610;
-  --kit-accent: oklch(0.72 0.18 50);
-}
-.rev01-editor[data-style-kit="blue-saas"] {
-  --kit-bg: #0b1530;
-  --kit-fg: #e8efff;
-  --kit-accent: oklch(0.74 0.16 250);
-}
-.rev01-editor[data-style-kit="green-organic"] {
-  --kit-bg: #0f1a14;
-  --kit-fg: #e7f3ea;
-  --kit-accent: oklch(0.76 0.15 150);
-}
+/* Kit token blocks for the editor preview wrapper come from
+   buildAllStyleKitsCss() — see the bottom of this file. The
+   [data-style-kit="X"] selector matches both <main class="rev01-editor"> and
+   the inner <main class="rev01-site">, so the editor preview and the
+   published render share the same tokens. */
 
 .rev01-editor-topbar {
   grid-area: topbar;
@@ -605,4 +594,52 @@ body {
   filter: brightness(1.1);
 }
 [data-ai-button]:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Inspector kit summary — a small read-only readout of the active kit's
+   accent / display font / motion duration. Helps the Owner see at a glance
+   which kit they're editing without having to scroll the topbar. */
+.rev01-kit-summary {
+  margin: 12px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  color: var(--rev01-fg-mute);
+  display: grid;
+  gap: 4px;
+}
+.rev01-kit-summary .row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.rev01-kit-summary .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--rev01-hairline);
+}
+
+/* Presence indicator pill in the editor topbar. Hidden by default; the
+   client script unhides when count > 1. */
+.rev01-editor-topbar [data-rev01-presence] {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--rev01-hairline);
+  background: var(--rev01-bg-panel);
+  color: var(--rev01-fg-mute);
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+}
+.rev01-editor-topbar [data-rev01-presence][hidden] {
+  display: none;
+}
 `;
+
+// Concatenate chrome CSS + shared kit CSS. The kit CSS lives in
+// src/canvas/style-kits.ts and is the single source of truth shared with the
+// public renderer (src/canvas/public-styles.ts).
+export const canvasEditorStyles = `${chromeCss}\n${kitCss}`;

@@ -7,6 +7,7 @@
 // pure — no DOM access, no I/O. The caller passes an assetBasePath so the
 // renderer never has to know how Site Assets are addressed.
 
+import { getStyleKitPreset } from './style-kits.js';
 import type {
   ActionElement,
   CanvasElement,
@@ -232,6 +233,22 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
   }
 }
 
+// Mirror the element's `variant` onto the wrapper so kit CSS selectors of the
+// shape `[data-style-kit="X"] [data-element-type="action"][data-variant="Y"]`
+// match per-element. Text + media have no variants — emit nothing for them.
+function variantAttr(element: CanvasElement): string {
+  switch (element.type) {
+    case 'action':
+    case 'shape':
+    case 'container':
+      return ` data-variant="${escapeAttr(element.variant)}"`;
+    case 'text':
+      return ` data-role="${escapeAttr(element.role)}"`;
+    case 'media':
+      return '';
+  }
+}
+
 function renderElement(element: CanvasElement, assetBasePath: string): string {
   const inner = renderElementBody(element, assetBasePath);
   const wrapperStyle = buildElementWrapperStyle(element);
@@ -240,7 +257,8 @@ function renderElement(element: CanvasElement, assetBasePath: string): string {
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
       : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
-  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${motionAttrs}${ariaAttrs} style="${wrapperStyle}">${inner}</div>`;
+  const variant = variantAttr(element);
+  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
 function renderSection(
@@ -280,6 +298,10 @@ export function renderCanvasSnapshot(
   snapshot: PublishedSnapshot,
   assetBasePath: string,
 ): string {
+  // Belt-and-braces: even though the validator rejects unknown kits at the API
+  // boundary, the renderer refuses to emit HTML for a kit that has no preset
+  // — there is no default. A missing token must never silently degrade.
+  getStyleKitPreset(snapshot.styleKit);
   const pagesHtml = snapshot.pages.map((page) => renderPage(page, assetBasePath)).join('');
   // The outer wrapper always declares `lang="en"` for the POC. A future
   // owner-facing language picker would override this — out of POC scope.

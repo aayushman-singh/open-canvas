@@ -520,6 +520,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     wrapper.className = "rev01-element";
     wrapper.setAttribute("data-rev01-element", element.id);
     wrapper.setAttribute("data-element-type", element.type);
+    // Mirror the public renderer: stamp data-variant for action/shape/
+    // container and data-role for text so kit CSS selectors of the form
+    // [data-style-kit="X"] [data-element-type="action"][data-variant="Y"]
+    // match in the editor preview exactly like they do in the published HTML.
+    if (element.type === "action" || element.type === "shape" || element.type === "container") {
+      if (typeof element.variant === "string") {
+        wrapper.setAttribute("data-variant", element.variant);
+      }
+    } else if (element.type === "text") {
+      if (typeof element.role === "string") {
+        wrapper.setAttribute("data-role", element.role);
+      }
+    }
     if (element.motion) {
       wrapper.setAttribute("data-motion-preset", element.motion.preset);
       wrapper.setAttribute("data-motion-delay-ms", String(element.motion.delayMs || 0));
@@ -812,6 +825,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     meta.className = "meta";
     meta.textContent = "id: " + element.id;
     inspector.appendChild(meta);
+
+    // Active style-kit read-only summary. The token values are read directly
+    // off the editor wrapper's computed CSS so the summary stays in sync with
+    // whatever kit is active without the client having to ship a duplicate
+    // copy of STYLE_KIT_PRESETS. Hidden if the wrapper isn't there yet.
+    inspector.appendChild(buildKitSummary());
 
     // Reading-order group sits ABOVE the z-order group per the plan. The
     // caption is part of the group so it lives next to the buttons that
@@ -2032,6 +2051,48 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Style kit ----------------------------------------------------------
 
+  // Inspector summary of the active kit — reads computed CSS off the editor
+  // wrapper, so it stays in sync with whatever style-kits.ts emits. There is
+  // no duplicate copy of STYLE_KIT_PRESETS in the client bundle: the wrapper
+  // is the source of truth at runtime.
+  function buildKitSummary() {
+    const wrap = document.createElement("div");
+    wrap.className = "rev01-kit-summary";
+    if (!mainEl || !state || !state.styleKit) {
+      wrap.textContent = "kit: (unknown)";
+      return wrap;
+    }
+    const cs = window.getComputedStyle(mainEl);
+    function token(name, fallback) {
+      const value = cs.getPropertyValue(name);
+      return value && value.trim().length > 0 ? value.trim() : (fallback || "");
+    }
+    const accent = token("--rev01-kit-accent", "(unset)");
+    const display = token("--rev01-kit-font-display", "(unset)");
+    const duration = token("--rev01-kit-motion-duration", "(unset)");
+    const rows = [
+      ["kit", state.styleKit, null],
+      ["accent", accent, accent],
+      ["display", display.split(",")[0].replace(/['"]/g, "").trim(), null],
+      ["motion", duration, null],
+    ];
+    for (let i = 0; i < rows.length; i++) {
+      const row = document.createElement("div");
+      row.className = "row";
+      if (rows[i][2]) {
+        const sw = document.createElement("span");
+        sw.className = "swatch";
+        sw.style.background = rows[i][2];
+        row.appendChild(sw);
+      }
+      const label = document.createElement("span");
+      label.textContent = rows[i][0] + ": " + rows[i][1];
+      row.appendChild(label);
+      wrap.appendChild(row);
+    }
+    return wrap;
+  }
+
   function attachStyleKitButtons() {
     const buttons = document.querySelectorAll('[data-style-kit]');
     buttons.forEach((button) => {
@@ -2057,12 +2118,67 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             b.classList.toggle("active", isActive);
             b.setAttribute("aria-pressed", isActive ? "true" : "false");
           });
+          // Re-render the inspector so the kit summary picks up the new
+          // computed CSS values. Cheap because the inspector is a small DOM.
+          renderInspector();
           setStatus("Style kit: " + kit, "ok");
         } catch (err) {
           setStatus("Style kit change failed", "error");
         }
       });
     });
+  }
+
+  // -- Presence indicator ------------------------------------------------
+  //
+  // Opens a WebSocket to /__live?siteId=<id> on the app host. The DO is keyed
+  // by site.id and counts every connected socket (editors AND visitors). The
+  // pill in the topbar shows "N viewing" only when count > 1 — a lone "1
+  // viewing" pill is meaningless so we hide it.
+  //
+  // No auth on this socket: the public router already exposes /__live for
+  // visitors on the published host, and the editor's view of the same DO is
+  // a read-only signal (no message it could send would mutate state). The
+  // pattern mirrors the visitor live-update script in src/routes/public.ts.
+  function attachPresence() {
+    const pill = document.querySelector("[data-rev01-presence]");
+    const counter = document.querySelector("[data-rev01-presence-count]");
+    if (!pill || !counter) return;
+    const scheme = location.protocol === "https:" ? "wss:" : "ws:";
+    const url = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID);
+    const RECONNECT_DELAY_MS = 2000;
+    function connect() {
+      let ws;
+      try {
+        ws = new WebSocket(url);
+      } catch (_) {
+        // /__live not reachable yet (e.g. site never published, no DO route).
+        // We don't retry — the pill stays hidden and that's the correct UX.
+        return;
+      }
+      ws.addEventListener("message", (event) => {
+        let payload;
+        try { payload = JSON.parse(event.data); } catch (_) { return; }
+        if (!payload || typeof payload !== "object") return;
+        if (payload.type === "presence" && typeof payload.count === "number") {
+          const count = payload.count;
+          if (count > 1) {
+            counter.textContent = String(count);
+            pill.hidden = false;
+          } else {
+            pill.hidden = true;
+          }
+        }
+      });
+      ws.addEventListener("close", () => {
+        pill.hidden = true;
+        setTimeout(connect, RECONNECT_DELAY_MS);
+      });
+      ws.addEventListener("error", () => {
+        try { ws.close(); } catch (_) { /* noop */ }
+      });
+    }
+    connect();
   }
 
   // -- Save & keyboard ----------------------------------------------------
@@ -2108,6 +2224,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachPointerHandlers();
       attachStyleKitButtons();
       attachSaveButton();
+      attachPresence();
       setStatus("Ready", "ok");
     } catch (err) {
       setStatus("Failed to load site: " + (err && err.message ? err.message : String(err)), "error");
