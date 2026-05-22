@@ -83,10 +83,7 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
       if (!posterSeed) {
         errors.push(`unknown seed poster asset id: ${media.posterAssetId}`);
       } else if (!assetIdMap.has(media.posterAssetId)) {
-        assetIdMap.set(
-          media.posterAssetId,
-          materialisedAssetId(targetSiteId, media.posterAssetId),
-        );
+        assetIdMap.set(media.posterAssetId, materialisedAssetId(targetSiteId, media.posterAssetId));
       }
     }
   }

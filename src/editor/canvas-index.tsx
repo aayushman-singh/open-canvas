@@ -143,12 +143,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
               >
                 Add
               </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected="false"
-                data-sidebar-tab="sections"
-              >
+              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections">
                 Sections
               </button>
             </div>
