@@ -90,6 +90,145 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const mainEl = document.querySelector("main.rev01-editor");
   const saveButton = document.getElementById("canvas-save");
 
+  // -- Viewport + zoom ---------------------------------------------------
+  // The route ships #canvas-root directly inside the grid. We wrap it in a
+  // .rev01-viewport at boot so the viewport gets the scroll + dark
+  // background + grid placement, while #canvas-root receives the CSS
+  // transform that implements zoom. The wrap is purely client-side so the
+  // route shell stays untouched.
+  let viewport = null;
+  let zoomToolbar = null;
+  let zoomReadout = null;
+  let zoom = 1;
+  const ZOOM_MIN = 0.25;
+  const ZOOM_MAX_FIT = 1.0;     // "Fit" never auto-zooms past 100%
+  const ZOOM_MAX_MANUAL = 2.0;  // manual +/- and wheel clamp here
+  const ZOOM_STEP = 0.1;
+
+  function clampZoom(value, max) {
+    if (!Number.isFinite(value)) return 1;
+    const upper = typeof max === "number" ? max : ZOOM_MAX_MANUAL;
+    if (value < ZOOM_MIN) return ZOOM_MIN;
+    if (value > upper) return upper;
+    // Snap to one-decimal precision so repeated +/- stays predictable.
+    return Math.round(value * 10) / 10;
+  }
+
+  function applyZoom() {
+    if (!root) return;
+    root.style.transform = "scale(" + zoom + ")";
+    root.style.transformOrigin = "top left";
+    // CSS transform doesn't change layout, so the viewport scrollWidth/
+    // scrollHeight would stay unchanged from zoom=1. We need the viewport
+    // to scroll proportionally to the scaled content. Compute the page's
+    // logical extent and set #canvas-root's width/height to its post-scale
+    // size so the viewport's scrollbars match what the Owner sees.
+    const page = currentPage();
+    if (page) {
+      let logicalHeight = 0;
+      for (let i = 0; i < page.sections.length; i++) {
+        logicalHeight += page.sections[i].height || 0;
+      }
+      root.style.width = page.width * zoom + "px";
+      root.style.height = logicalHeight * zoom + "px";
+    }
+    if (zoomReadout) zoomReadout.textContent = Math.round(zoom * 100) + "%";
+  }
+
+  function setZoom(value, max) {
+    zoom = clampZoom(value, max);
+    applyZoom();
+  }
+
+  function fitZoom() {
+    if (!viewport) return;
+    const page = currentPage();
+    const pageWidth = page ? page.width : 1440;
+    if (pageWidth <= 0) return;
+    // Account for the viewport's horizontal padding so the fit zoom doesn't
+    // overflow into the scrollbar. clientWidth already excludes scrollbars.
+    const style = window.getComputedStyle(viewport);
+    const padX =
+      (parseFloat(style.paddingLeft) || 0) +
+      (parseFloat(style.paddingRight) || 0);
+    const available = Math.max(0, viewport.clientWidth - padX);
+    const raw = available / pageWidth;
+    setZoom(raw, ZOOM_MAX_FIT);
+  }
+
+  function mountViewport() {
+    if (!root || !root.parentNode) return;
+    const parent = root.parentNode;
+    viewport = document.createElement("div");
+    viewport.className = "rev01-viewport";
+    // Insert viewport in place of #canvas-root, then move #canvas-root in.
+    parent.insertBefore(viewport, root);
+    viewport.appendChild(root);
+    // Build the zoom toolbar inside the viewport so it sticks to the top-left.
+    zoomToolbar = document.createElement("div");
+    zoomToolbar.className = "rev01-zoom-toolbar";
+    zoomToolbar.setAttribute("role", "toolbar");
+    zoomToolbar.setAttribute("aria-label", "Zoom");
+    const defs = [
+      { label: "Fit", action: "fit" },
+      { label: "100%", action: "reset" },
+      { label: "-", action: "out" },
+      { label: "+", action: "in" },
+    ];
+    for (let i = 0; i < defs.length; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = defs[i].label;
+      btn.setAttribute("data-zoom-action", defs[i].action);
+      zoomToolbar.appendChild(btn);
+    }
+    zoomReadout = document.createElement("span");
+    zoomReadout.className = "zoom-readout";
+    zoomReadout.textContent = "100%";
+    zoomToolbar.appendChild(zoomReadout);
+    // Insert the toolbar BEFORE #canvas-root so it sits above the page.
+    viewport.insertBefore(zoomToolbar, root);
+    zoomToolbar.addEventListener("click", (ev) => {
+      const target = ev.target instanceof Element ? ev.target.closest("button[data-zoom-action]") : null;
+      if (!target) return;
+      const action = target.getAttribute("data-zoom-action");
+      if (action === "fit") fitZoom();
+      else if (action === "reset") setZoom(1, ZOOM_MAX_MANUAL);
+      else if (action === "in") setZoom(zoom + ZOOM_STEP, ZOOM_MAX_MANUAL);
+      else if (action === "out") setZoom(zoom - ZOOM_STEP, ZOOM_MAX_MANUAL);
+    });
+    // Ctrl/Cmd + wheel zooms; plain wheel scrolls naturally. We must call
+    // preventDefault inside the zoom branch so the page doesn't also scroll.
+    viewport.addEventListener(
+      "wheel",
+      (ev) => {
+        if (!ev.ctrlKey && !ev.metaKey) return;
+        ev.preventDefault();
+        const direction = ev.deltaY > 0 ? -1 : 1;
+        setZoom(zoom + direction * ZOOM_STEP, ZOOM_MAX_MANUAL);
+      },
+      { passive: false },
+    );
+    applyZoom();
+  }
+
+  // -- Pointer-to-canvas coordinate helper -------------------------------
+  // Single source of truth for converting a pointer event's clientX/clientY
+  // to coordinates inside the given section's local canvas space. The
+  // section element is the .rev01-section DOM node; its bounding rect
+  // already reflects the current CSS transform (zoom), so dividing the
+  // pointer delta by zoom yields native canvas units. Returning null on
+  // missing section is a loud signal — callers should bail out, not guess.
+  function pointerToCanvas(event, sectionEl) {
+    if (!sectionEl || typeof event.clientX !== "number") return null;
+    const rect = sectionEl.getBoundingClientRect();
+    const z = zoom || 1;
+    return {
+      x: (event.clientX - rect.left) / z,
+      y: (event.clientY - rect.top) / z,
+    };
+  }
+
   function setStatus(text, tone) {
     if (!statusEl) return;
     statusEl.textContent = text;
@@ -422,6 +561,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (mainEl && state.styleKit) {
       mainEl.setAttribute("data-style-kit", state.styleKit);
     }
+    // Re-apply zoom so #canvas-root's width/height reflect the (possibly
+    // changed) section heights or page width that this render produced.
+    applyZoom();
     renderInspector();
   }
 
@@ -449,6 +591,126 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return sel;
   }
 
+  // -- Z-order + reading-order helpers ----------------------------------
+  // Z-order operates on element.box.z (visual stacking); reading order
+  // operates on the section.elements[] index (DOM order). The two are
+  // intentionally independent — see CONTEXT / plan invariants.
+
+  function bringToFront(section, element) {
+    let maxZ = element.box.z;
+    for (let i = 0; i < section.elements.length; i++) {
+      const sibling = section.elements[i];
+      if (sibling.id === element.id) continue;
+      if (typeof sibling.box.z === "number" && sibling.box.z > maxZ) maxZ = sibling.box.z;
+    }
+    element.box.z = maxZ + 1;
+  }
+
+  function sendToBack(section, element) {
+    let minZ = element.box.z;
+    for (let i = 0; i < section.elements.length; i++) {
+      const sibling = section.elements[i];
+      if (sibling.id === element.id) continue;
+      if (typeof sibling.box.z === "number" && sibling.box.z < minZ) minZ = sibling.box.z;
+    }
+    element.box.z = minZ - 1;
+  }
+
+  // Swap z with the next-higher (forward) or next-lower (backward) sibling.
+  // No-op when already at the top/bottom of the stack.
+  function nudgeZ(section, element, direction) {
+    const elZ = element.box.z;
+    let target = null;
+    for (let i = 0; i < section.elements.length; i++) {
+      const sibling = section.elements[i];
+      if (sibling.id === element.id) continue;
+      if (typeof sibling.box.z !== "number") continue;
+      if (direction > 0) {
+        if (sibling.box.z > elZ && (target === null || sibling.box.z < target.box.z)) target = sibling;
+      } else {
+        if (sibling.box.z < elZ && (target === null || sibling.box.z > target.box.z)) target = sibling;
+      }
+    }
+    if (!target) return false;
+    const tmp = element.box.z;
+    element.box.z = target.box.z;
+    target.box.z = tmp;
+    return true;
+  }
+
+  function applyZOrderAction(section, element, action) {
+    if (action === "front") bringToFront(section, element);
+    else if (action === "back") sendToBack(section, element);
+    else if (action === "forward") nudgeZ(section, element, 1);
+    else if (action === "backward") nudgeZ(section, element, -1);
+    renderAll();
+    selectElement(element.id);
+    scheduleSave();
+  }
+
+  function moveInReadingOrder(section, element, direction) {
+    const idx = section.elements.indexOf(element);
+    if (idx < 0) return false;
+    const target = idx + direction;
+    if (target < 0 || target >= section.elements.length) return false;
+    section.elements.splice(idx, 1);
+    section.elements.splice(target, 0, element);
+    renderAll();
+    selectElement(element.id);
+    scheduleSave();
+    return true;
+  }
+
+  function buildReorderGroup(section, element) {
+    const group = document.createElement("div");
+    group.className = "rev01-reorder-buttons";
+    const idx = section.elements.indexOf(element);
+    const total = section.elements.length;
+    const caption = document.createElement("div");
+    caption.className = "rev01-reorder-caption";
+    caption.textContent = "Reading order: " + (idx + 1) + " of " + total;
+
+    const upBtn = document.createElement("button");
+    upBtn.type = "button";
+    upBtn.textContent = "Move up in reading order";
+    upBtn.disabled = idx <= 0;
+    upBtn.addEventListener("click", () => { moveInReadingOrder(section, element, -1); });
+
+    const downBtn = document.createElement("button");
+    downBtn.type = "button";
+    downBtn.textContent = "Move down in reading order";
+    downBtn.disabled = idx >= total - 1;
+    downBtn.addEventListener("click", () => { moveInReadingOrder(section, element, 1); });
+
+    group.appendChild(upBtn);
+    group.appendChild(downBtn);
+
+    const wrap = document.createElement("div");
+    wrap.appendChild(caption);
+    wrap.appendChild(group);
+    return wrap;
+  }
+
+  function buildZOrderGroup(section, element) {
+    const group = document.createElement("div");
+    group.className = "rev01-zorder-buttons";
+    const defs = [
+      { label: "Bring to front", action: "front" },
+      { label: "Send to back", action: "back" },
+      { label: "Forward", action: "forward" },
+      { label: "Backward", action: "backward" },
+    ];
+    for (let i = 0; i < defs.length; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = defs[i].label;
+      const action = defs[i].action;
+      btn.addEventListener("click", () => { applyZOrderAction(section, element, action); });
+      group.appendChild(btn);
+    }
+    return group;
+  }
+
   function renderInspector() {
     if (!inspector) return;
     if (!selectedElementId) {
@@ -463,7 +725,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
     inspector.hidden = false;
-    const { element } = found;
+    const { element, section } = found;
     inspector.replaceChildren();
 
     const heading = document.createElement("h3");
@@ -474,6 +736,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     meta.className = "meta";
     meta.textContent = "id: " + element.id;
     inspector.appendChild(meta);
+
+    // Reading-order group sits ABOVE the z-order group per the plan. The
+    // caption is part of the group so it lives next to the buttons that
+    // change it.
+    inspector.appendChild(buildReorderGroup(section, element));
+    inspector.appendChild(buildZOrderGroup(section, element));
 
     if (element.type === "text") {
       const role = selectInput(["heading", "body", "label"], element.role);
@@ -850,12 +1118,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function positionMarkToolbar(anchor) {
-    if (!markToolbar || !anchor) return;
+    if (!markToolbar || !anchor || !viewport) return;
+    // Anchor + viewport rects are both in viewport (post-transform) screen
+    // space, so subtracting them gives the anchor's offset inside the
+    // viewport. Adding scroll converts to the viewport's internal
+    // coordinate space, which is what "position: absolute" inside the
+    // viewport uses. The toolbar lives in unscaled DOM (the transform is
+    // on #canvas-root, not the viewport), so we anchor it 44px above the
+    // element's CURRENT screen-space top edge.
     const rect = anchor.getBoundingClientRect();
-    const rootRect = root.getBoundingClientRect();
-    // Anchor above the element, accounting for #canvas-root scroll position.
-    const top = rect.top - rootRect.top + root.scrollTop - 44;
-    const left = rect.left - rootRect.left + root.scrollLeft;
+    const vpRect = viewport.getBoundingClientRect();
+    const top = rect.top - vpRect.top + viewport.scrollTop - 44;
+    const left = rect.left - vpRect.left + viewport.scrollLeft;
     markToolbar.style.position = "absolute";
     markToolbar.style.top = Math.max(0, top) + "px";
     markToolbar.style.left = Math.max(0, left) + "px";
@@ -970,7 +1244,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bar.appendChild(btn);
     }
     markToolbar = bar;
-    root.appendChild(bar);
+    // Append to the viewport (unscaled coord space) instead of #canvas-root
+    // (which is now CSS-transformed by zoom). Keeping the toolbar in
+    // unscaled space means its hit area matches what the Owner sees.
+    if (viewport) viewport.appendChild(bar);
+    else root.appendChild(bar);
     positionMarkToolbar(anchor);
   }
 
@@ -1088,16 +1366,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!elementId) return;
     const found = findElement(elementId);
     if (!found) return;
-    const startX = startEv.clientX;
-    const startY = startEv.clientY;
+    const sectionEl = wrapper.closest('.rev01-section');
+    if (!sectionEl) return;
+    const start = pointerToCanvas(startEv, sectionEl);
+    if (!start) return;
     const originalBox = Object.assign({}, found.element.box);
     const page = currentPage();
     const pageWidth = page ? page.width : 1440;
     const sectionHeight = found.section.height;
 
     function onMove(ev) {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
+      const current = pointerToCanvas(ev, sectionEl);
+      if (!current) return;
+      const dx = current.x - start.x;
+      const dy = current.y - start.y;
       let nx = originalBox.x + dx;
       let ny = originalBox.y + dy;
       if (nx < 0) nx = 0;
@@ -1123,16 +1405,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!elementId) return;
     const found = findElement(elementId);
     if (!found) return;
-    const startX = startEv.clientX;
-    const startY = startEv.clientY;
+    const sectionEl = wrapper.closest('.rev01-section');
+    if (!sectionEl) return;
+    const start = pointerToCanvas(startEv, sectionEl);
+    if (!start) return;
     const originalBox = Object.assign({}, found.element.box);
     const page = currentPage();
     const pageWidth = page ? page.width : 1440;
     const sectionHeight = found.section.height;
 
     function onMove(ev) {
-      const dx = ev.clientX - startX;
-      const dy = ev.clientY - startY;
+      const current = pointerToCanvas(ev, sectionEl);
+      if (!current) return;
+      const dx = current.x - start.x;
+      const dy = current.y - start.y;
       let nw = originalBox.w + dx;
       let nh = originalBox.h + dy;
       if (nw < 24) nw = 24;
@@ -1385,6 +1671,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (mainEl && state && state.styleKit) {
         mainEl.setAttribute("data-style-kit", state.styleKit);
       }
+      // Mount the viewport BEFORE the first render so #canvas-root is in its
+      // final DOM position when sections render in. The transform set by
+      // applyZoom() then persists across subsequent renderAll() calls (which
+      // only mutate root's children).
+      mountViewport();
       renderAll();
       attachRootEvents();
       attachPointerHandlers();
