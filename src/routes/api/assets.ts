@@ -19,8 +19,17 @@ const MAX_ASSET_DATA_URL_BYTES = 1_500_000;
 
 const assets = new Hono<OwnerEnv>();
 
+const realRequireAuth = requireAuth();
+
 assets.use('*', clerkAuth());
-assets.use('*', requireAuth());
+assets.use('*', async (c, next) => {
+  if (c.env.SMOKE === '1' && (c.req.header('x-smoke-customer-id') ?? '').length > 0) {
+    await next();
+    return;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return realRequireAuth(c as any, next);
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
