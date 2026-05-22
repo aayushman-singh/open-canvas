@@ -80,86 +80,83 @@ a:focus-visible {
   border-radius: 2px;
 }
 
-/* ============ status bar ============ */
+/* ============ site header ============ */
 
-.statusbar {
+.site-header {
   position: sticky;
   top: 0;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 1.1rem;
-  padding: 0.55rem 1.25rem;
-  height: 36px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--fg-mute);
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.75rem clamp(1rem, 3vw, 2rem);
   background: oklch(0.1 0.03 245 / 0.85);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--hairline);
 }
 
-.statusbar .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow:
-    0 0 0 3px oklch(0.82 0.18 145 / 0.18),
-    0 0 10px oklch(0.82 0.18 145 / 0.55);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-.statusbar .seg {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  white-space: nowrap;
-}
-
-.statusbar .k {
-  color: var(--fg-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.statusbar .v {
+.site-header .wordmark {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--fg);
-}
-
-.statusbar .sep {
-  color: var(--fg-faint);
-  user-select: none;
-}
-
-.statusbar .nav {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.statusbar .nav a {
-  color: var(--fg-mute);
   border-bottom: none;
 }
 
-.statusbar .nav a:hover {
+.site-header .wordmark:hover {
+  color: var(--accent);
+}
+
+.site-header .nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.site-header .nav a:not(.button) {
+  color: var(--fg-mute);
+  font-size: 14px;
+  border-bottom: none;
+}
+
+.site-header .nav a:not(.button):hover {
   color: var(--fg);
 }
 
-.statusbar .nav a.cta {
-  color: var(--accent);
-  border: 1px solid oklch(0.78 0.15 200 / 0.4);
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--accent-soft);
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: oklch(0.18 0.03 245 / 0.95);
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: none;
+  text-decoration: none;
 }
 
-.statusbar .nav a.cta:hover {
-  background: oklch(0.78 0.15 200 / 0.28);
+.button:hover {
+  color: var(--fg);
+  border-color: var(--hairline-strong);
+}
+
+.button.primary {
+  border-color: oklch(0.78 0.15 200 / 0.48);
+  background: #7dd3fc;
+  color: #07111d;
+}
+
+.button.primary:hover {
+  background: oklch(0.82 0.12 200);
+  color: #07111d;
 }
 
 /* ============ shell ============ */
@@ -230,11 +227,6 @@ section {
 
 .panel .titlebar .path .accent {
   color: var(--accent);
-}
-
-.panel .titlebar .right {
-  margin-left: auto;
-  color: var(--fg-faint);
 }
 
 /* ============ hero — 3 panels ============ */
@@ -533,34 +525,6 @@ section {
   border-radius: 3px;
 }
 
-/* hero footer status strip */
-
-.hero-foot {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 0.85rem;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--fg-faint);
-  background: oklch(0.13 0.03 245 / 0.75);
-  border-top: 1px solid var(--hairline);
-}
-
-.hero-foot .ok {
-  color: var(--ok);
-}
-
-.hero-foot .sep {
-  color: var(--fg-faint);
-}
-
-.hero-foot .right {
-  margin-left: auto;
-  color: var(--fg-mute);
-}
-
 /* ============ tagline ============ */
 
 .tagline {
@@ -596,6 +560,13 @@ section {
   font-size: clamp(1rem, 1.4vw, 1.15rem);
   color: var(--fg-mute);
   max-width: 56ch;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1.5rem;
 }
 
 /* ============ feature grid ============ */
@@ -654,59 +625,6 @@ section {
   color: var(--fg-mute);
 }
 
-/* ============ stat line ============ */
-
-.statline {
-  margin-top: clamp(2rem, 5vh, 3rem);
-  padding: 0.85rem 1.1rem;
-  background: oklch(0.13 0.03 245 / 0.85);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--fg-mute);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem 1.4rem;
-}
-
-.statline .lead {
-  color: var(--accent);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.statline .lead .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-.statline .stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-
-.statline .stat .k {
-  color: var(--fg-faint);
-  text-transform: uppercase;
-}
-
-.statline .stat .v {
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-}
-
-.statline .stat .v.tick {
-  color: var(--accent);
-}
-
 /* ============ footer ============ */
 
 footer {
@@ -722,29 +640,7 @@ footer {
   color: var(--fg-faint);
 }
 
-footer .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.18rem 0.55rem;
-  border: 1px solid var(--hairline-strong);
-  border-radius: 999px;
-  background: oklch(0.78 0.15 200 / 0.06);
-  color: var(--accent);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-footer .badge .pip {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
-}
-
-footer .when {
+footer .year {
   margin-left: auto;
   color: var(--fg-faint);
 }
@@ -762,20 +658,7 @@ footer .when {
   }
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.8;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .statusbar .dot,
   .cursor-token .bar {
     animation: none;
   }
@@ -814,14 +697,7 @@ footer .when {
   .features {
     grid-template-columns: 1fr;
   }
-  .statusbar {
-    gap: 0.6rem;
-    padding: 0.45rem 0.8rem;
-  }
-  .statusbar .nav a:not(.cta) {
-    display: none;
-  }
-  .statusbar .seg.optional {
+  .site-header .nav a:not(.button) {
     display: none;
   }
   .tagline h1 {

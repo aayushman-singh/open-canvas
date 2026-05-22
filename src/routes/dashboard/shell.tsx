@@ -26,22 +26,41 @@ const shellStyles = `
     margin: 0 auto;
     padding: 32px 0 48px;
   }
-  nav.crumbs {
+  nav.tabs {
     display: flex;
-    gap: 10px;
+    gap: 4px;
     align-items: center;
+    width: fit-content;
     margin-bottom: 28px;
-    color: var(--faint);
-    font-size: 13px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
   }
-  nav.crumbs a {
-    color: inherit;
+  nav.tabs a,
+  nav.tabs span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
     text-decoration: none;
-    border-bottom: 1px solid transparent;
-    padding-bottom: 1px;
+    border: 1px solid transparent;
   }
-  nav.crumbs a:hover { color: var(--text); border-bottom-color: var(--line); }
-  nav.crumbs .here { color: var(--text); }
+  nav.tabs a {
+    color: var(--muted);
+  }
+  nav.tabs a:hover {
+    color: var(--text);
+  }
+  nav.tabs span.active {
+    background: var(--panel-strong);
+    color: var(--text);
+    border-color: var(--line);
+  }
   a { color: var(--accent); }
   h1 {
     margin: 0 0 12px;
@@ -52,16 +71,16 @@ const shellStyles = `
   p { color: var(--muted); line-height: 1.55; }
 `;
 
-export type Crumb = { href?: string; label: string };
+export type Tab = { href: string; label: string; active: boolean };
 
 type Props = {
   title: string;
-  crumbs: Crumb[];
+  tabs: Tab[];
   pageStyles?: string;
   children?: Child;
 };
 
-export function DashboardShell({ title, crumbs, pageStyles, children }: Props) {
+export function DashboardShell({ title, tabs, pageStyles, children }: Props) {
   const css = pageStyles ? `${shellStyles}\n${pageStyles}` : shellStyles;
   return (
     <html lang="en">
@@ -73,17 +92,16 @@ export function DashboardShell({ title, crumbs, pageStyles, children }: Props) {
       </head>
       <body>
         <main>
-          <nav class="crumbs">
-            {crumbs.map((crumb, i) => (
-              <>
-                {i > 0 && <span>/</span>}
-                {crumb.href ? (
-                  <a href={crumb.href}>{crumb.label}</a>
-                ) : (
-                  <span class="here">{crumb.label}</span>
-                )}
-              </>
-            ))}
+          <nav class="tabs" aria-label="Dashboard">
+            {tabs.map((tab) =>
+              tab.active ? (
+                <span class="active" aria-current="page">
+                  {tab.label}
+                </span>
+              ) : (
+                <a href={tab.href}>{tab.label}</a>
+              ),
+            )}
           </nav>
           {children}
         </main>

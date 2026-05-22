@@ -72,7 +72,7 @@ function PreviewPanel() {
     <div class="hero-panel" aria-label="live preview pane">
       <div class="heading">
         <span class="kind">preview</span>
-        <span>maple-coffee.rev01.dev</span>
+        <span>maple-coffee.rev01.aayushman.dev</span>
       </div>
       <div class="body">
         <div class="preview-frame" aria-hidden="true">

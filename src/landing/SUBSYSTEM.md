@@ -10,5 +10,5 @@ The first-impression surface of rev01. Renders a single server-side page that te
 
 ## Outputs
 
-- **HTTP client** → the rendered HTML document (status bar, three-panel hero, tagline, feature grid, terminal stat line, footer), inlined CSS, and a single inlined live-counter script. Two outbound font requests to `fonts.googleapis.com` / `fonts.gstatic.com`.
+- **HTTP client** → the rendered HTML document (site header, three-panel hero, tagline with CTAs, feature grid, footer), inlined CSS. Two outbound font requests to `fonts.googleapis.com` / `fonts.gstatic.com`.
 - **Reviewer / preview script** → a checked-in `PREVIEW.html` produced by `bun run landing:preview` (or `bun run src/landing/build-preview.ts`), holding the same byte-for-byte rendering used at request time so the page can be inspected without booting Wrangler.

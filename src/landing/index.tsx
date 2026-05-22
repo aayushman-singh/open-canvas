@@ -7,8 +7,7 @@ import { raw } from 'hono/html';
 import { Footer } from './components/Footer';
 import { FeatureGrid } from './components/FeatureGrid';
 import { Hero } from './components/Hero';
-import { StatLine } from './components/StatLine';
-import { StatusBar } from './components/StatusBar';
+import { SiteHeader } from './components/SiteHeader';
 import { Tagline } from './components/Tagline';
 import { styles } from './styles';
 
@@ -36,12 +35,11 @@ function Page() {
         <style>{raw(styles)}</style>
       </head>
       <body>
-        <StatusBar />
+        <SiteHeader />
         <main>
           <Hero />
           <Tagline />
           <FeatureGrid />
-          <StatLine />
           <Footer />
         </main>
       </body>

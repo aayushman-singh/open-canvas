@@ -151,7 +151,10 @@ function Page() {
   return (
     <DashboardShell
       title="rev01 — create site"
-      crumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: 'Create site' }]}
+      tabs={[
+        { href: '/dashboard', label: 'Sites', active: false },
+        { href: '/dashboard/templates', label: 'Templates', active: true },
+      ]}
       pageStyles={pageStyles}
     >
       <h1>Choose a starting point</h1>

@@ -81,86 +81,83 @@ a:focus-visible {
   border-radius: 2px;
 }
 
-/* ============ status bar ============ */
+/* ============ site header ============ */
 
-.statusbar {
+.site-header {
   position: sticky;
   top: 0;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 1.1rem;
-  padding: 0.55rem 1.25rem;
-  height: 36px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--fg-mute);
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 0.75rem clamp(1rem, 3vw, 2rem);
   background: oklch(0.1 0.03 245 / 0.85);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--hairline);
 }
 
-.statusbar .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow:
-    0 0 0 3px oklch(0.82 0.18 145 / 0.18),
-    0 0 10px oklch(0.82 0.18 145 / 0.55);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-.statusbar .seg {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  white-space: nowrap;
-}
-
-.statusbar .k {
-  color: var(--fg-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.statusbar .v {
+.site-header .wordmark {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--fg);
-}
-
-.statusbar .sep {
-  color: var(--fg-faint);
-  user-select: none;
-}
-
-.statusbar .nav {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.statusbar .nav a {
-  color: var(--fg-mute);
   border-bottom: none;
 }
 
-.statusbar .nav a:hover {
+.site-header .wordmark:hover {
+  color: var(--accent);
+}
+
+.site-header .nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.site-header .nav a:not(.button) {
+  color: var(--fg-mute);
+  font-size: 14px;
+  border-bottom: none;
+}
+
+.site-header .nav a:not(.button):hover {
   color: var(--fg);
 }
 
-.statusbar .nav a.cta {
-  color: var(--accent);
-  border: 1px solid oklch(0.78 0.15 200 / 0.4);
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--accent-soft);
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: oklch(0.18 0.03 245 / 0.95);
+  color: var(--fg);
+  font-weight: 700;
+  font-size: 14px;
+  border-bottom: none;
+  text-decoration: none;
 }
 
-.statusbar .nav a.cta:hover {
-  background: oklch(0.78 0.15 200 / 0.28);
+.button:hover {
+  color: var(--fg);
+  border-color: var(--hairline-strong);
+}
+
+.button.primary {
+  border-color: oklch(0.78 0.15 200 / 0.48);
+  background: #7dd3fc;
+  color: #07111d;
+}
+
+.button.primary:hover {
+  background: oklch(0.82 0.12 200);
+  color: #07111d;
 }
 
 /* ============ shell ============ */
@@ -231,11 +228,6 @@ section {
 
 .panel .titlebar .path .accent {
   color: var(--accent);
-}
-
-.panel .titlebar .right {
-  margin-left: auto;
-  color: var(--fg-faint);
 }
 
 /* ============ hero — 3 panels ============ */
@@ -534,34 +526,6 @@ section {
   border-radius: 3px;
 }
 
-/* hero footer status strip */
-
-.hero-foot {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 0.85rem;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--fg-faint);
-  background: oklch(0.13 0.03 245 / 0.75);
-  border-top: 1px solid var(--hairline);
-}
-
-.hero-foot .ok {
-  color: var(--ok);
-}
-
-.hero-foot .sep {
-  color: var(--fg-faint);
-}
-
-.hero-foot .right {
-  margin-left: auto;
-  color: var(--fg-mute);
-}
-
 /* ============ tagline ============ */
 
 .tagline {
@@ -597,6 +561,13 @@ section {
   font-size: clamp(1rem, 1.4vw, 1.15rem);
   color: var(--fg-mute);
   max-width: 56ch;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1.5rem;
 }
 
 /* ============ feature grid ============ */
@@ -655,59 +626,6 @@ section {
   color: var(--fg-mute);
 }
 
-/* ============ stat line ============ */
-
-.statline {
-  margin-top: clamp(2rem, 5vh, 3rem);
-  padding: 0.85rem 1.1rem;
-  background: oklch(0.13 0.03 245 / 0.85);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--fg-mute);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.65rem 1.4rem;
-}
-
-.statline .lead {
-  color: var(--accent);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.statline .lead .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-.statline .stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-}
-
-.statline .stat .k {
-  color: var(--fg-faint);
-  text-transform: uppercase;
-}
-
-.statline .stat .v {
-  color: var(--fg);
-  font-variant-numeric: tabular-nums;
-}
-
-.statline .stat .v.tick {
-  color: var(--accent);
-}
-
 /* ============ footer ============ */
 
 footer {
@@ -723,29 +641,7 @@ footer {
   color: var(--fg-faint);
 }
 
-footer .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.18rem 0.55rem;
-  border: 1px solid var(--hairline-strong);
-  border-radius: 999px;
-  background: oklch(0.78 0.15 200 / 0.06);
-  color: var(--accent);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-footer .badge .pip {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
-}
-
-footer .when {
+footer .year {
   margin-left: auto;
   color: var(--fg-faint);
 }
@@ -763,20 +659,7 @@ footer .when {
   }
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.8;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .statusbar .dot,
   .cursor-token .bar {
     animation: none;
   }
@@ -815,18 +698,11 @@ footer .when {
   .features {
     grid-template-columns: 1fr;
   }
-  .statusbar {
-    gap: 0.6rem;
-    padding: 0.45rem 0.8rem;
-  }
-  .statusbar .nav a:not(.cta) {
-    display: none;
-  }
-  .statusbar .seg.optional {
+  .site-header .nav a:not(.button) {
     display: none;
   }
   .tagline h1 {
     font-size: clamp(1.7rem, 8vw, 2.4rem);
   }
 }
-</style></head><body><header class="statusbar" role="banner" aria-label="rev01 build status"><span class="dot" aria-hidden="true"></span><span class="seg"><span class="k">build</span><span class="v">scaffolding</span></span><span class="sep">/</span><span class="seg optional"><span class="k">commits today</span><span class="v">6</span></span><span class="sep">/</span><span class="seg optional"><span class="k">demo editors</span><span class="v">3</span></span><nav class="nav" aria-label="primary"><a href="https://github.com/aayushman-singh/rev01/tree/main/docs" rel="noopener">docs/</a><a href="https://github.com/aayushman-singh/rev01" rel="noopener">github/</a><a class="cta" href="https://github.com/aayushman-singh/rev01" rel="noopener">launch -&gt;</a></nav></header><main><section class="hero" aria-label="hero — live editor, preview, agent"><div class="panel"><div class="titlebar" aria-hidden="true"><span class="glyphs"><span class="glyph close"></span><span class="glyph min"></span><span class="glyph max"></span></span><span class="path">rev01/<span class="accent">dashboard</span>/sites/maple-coffee/pages/home</span><span class="right">demo workspace · local replay</span></div><div class="hero-grid"><div class="hero-panel" aria-label="editor pane"><div class="heading"><span class="kind">editor</span><span>home.canvas.json</span></div><div class="body"><div class="editor-layout"><aside class="editor-tree" aria-hidden="true"><div class="row"><span class="icon">&gt;</span><span>pages/</span></div><div class="row active" style="margin-left: 0.6rem;"><span class="icon">·</span><span>home</span></div><div class="row" style="margin-left: 0.6rem;"><span class="icon">·</span><span>menu</span></div><div class="row" style="margin-left: 0.6rem;"><span class="icon">·</span><span>about</span></div><div class="row"><span class="icon">&gt;</span><span>theme/</span></div><div class="row"><span class="icon">&gt;</span><span>assets/</span></div></aside><div class="editor-doc"><h3>Brewed in small batches.<span class="cursor-token" aria-hidden="true"><span class="bar"></span><span class="chip">you</span></span></h3><p>A neighbourhood roastery turning single-origin beans into a daily ritual. Open seven days, walk-ins welcome.</p><p class="agent-line">Pour-over flights every Saturday morning—reservations encouraged<span class="cursor-token agent" aria-hidden="true"><span class="bar"></span><span class="chip">&lt;agent: drafting hero...&gt;</span></span></p></div></div></div></div><div class="hero-panel" aria-label="live preview pane"><div class="heading"><span class="kind">preview</span><span>maple-coffee.rev01.dev</span></div><div class="body"><div class="preview-frame" aria-hidden="true"><div class="pheader"><span class="brand">maple coffee.</span><span class="pnav"><span>menu</span><span>about</span><span>visit</span></span></div><div class="pbody"><div class="phero">Brewed in small batches.</div><div class="pcopy">A neighbourhood roastery turning single-origin beans into a daily ritual. Open seven days, walk-ins welcome.</div><div class="pcard"><span class="swatch"></span><span><strong>Saturday flight</strong><br/>three pour-overs, side by side</span><span class="price">$14</span></div></div></div></div></div><div class="hero-panel" aria-label="agent operations log"><div class="heading"><span class="kind">agent</span><span>ops.log</span></div><div class="body"><div class="agent-feed"><div class="row"><span class="ts">[12:04:28]</span><span class="op"><span class="add">+section</span> <span class="ref">hero</span></span></div><div class="row"><span class="ts">[12:04:29]</span><span class="op"><span class="add">+heading</span> &quot;Brewed in small batches.&quot;</span></div><div class="row"><span class="ts">[12:04:30]</span><span class="op"><span class="edit">editText</span> &quot;Brewed near…&quot; -&gt; &quot;Brewed in…&quot;</span></div><div class="row"><span class="ts">[12:04:31]</span><span class="op"><span class="add">+card</span> <span class="ref">menu/saturday-flight</span></span></div><div class="row"><span class="ts">[12:04:32]</span><span class="op"><span class="edit">setTheme</span> palette -&gt; <span class="ref">amber-oak</span></span></div><div class="row now"><span class="ts">[12:04:33]</span><span class="op"><span class="edit">draftText</span> hero.subtitle…</span></div></div></div></div></div><div class="hero-foot" aria-hidden="true"><span><span class="ok">●</span> demo trace</span><span class="sep">/</span><span>3 collaborators</span><span class="sep">/</span><span>local replay</span><span class="right">124 ops in scenario</span></div></div></section><section class="tagline" aria-label="product tagline"><span class="eyebrow">// rev01</span><h1>multiplayer site builder with an <span class="accent">agent</span> at the cursor.</h1><p>One canvas model, one Style Kit graph, one Published Address. The agent proposes concrete canvas edits you can preview, accept, and publish.</p></section><section class="features" aria-label="differentiators"><article class="feature"><span class="num">01</span><h2>One canvas, not a tree of widgets.</h2><p>Every page is a positioned canvas of text, media, actions, shapes, and surfaces. The editor speaks the same primitive model that publishing renders.</p></article><article class="feature"><span class="num">02</span><h2>Style Kits change the whole surface.</h2><p>Typography, colour, surfaces, actions, and motion move together as one deterministic kit, so a site can shift language without rewriting its content.</p></article><article class="feature"><span class="num">03</span><h2>The agent proposes, the owner accepts.</h2><p>AI edits travel through a small canvas tool vocabulary, preview against the current state, and only land after the Owner accepts the concrete op list.</p></article></section><section class="statline" aria-label="demo scenario counters"><span class="lead"><span class="dot" aria-hidden="true"></span><span>RUNTIME</span></span><span class="stat"><span class="k">LOC</span><span class="v" data-stat="loc">1247</span></span><span class="stat"><span class="k">demo edit ops</span><span class="v tick">42</span></span><span class="stat"><span class="k">demo agent ops</span><span class="v">12</span></span><span class="stat"><span class="k">published sites</span><span class="v">0</span></span></section><footer aria-label="footer"><span class="badge"><span class="pip" aria-hidden="true"></span>shipping in public</span><span>source: <a href="https://github.com/aayushman-singh/rev01" rel="noopener">github.com/aayushman-singh/rev01</a></span><span>license: MIT</span><span class="when">2026-05-21</span></footer></main></body></html>
+</style></head><body><header class="site-header" role="banner" aria-label="rev01"><a class="wordmark" href="/">rev01</a><nav class="nav" aria-label="primary"><a href="https://github.com/aayushman-singh/rev01/tree/main/docs" rel="noopener">Docs</a><a href="https://github.com/aayushman-singh/rev01" rel="noopener">GitHub</a><a class="button primary" href="/dashboard">Open dashboard</a></nav></header><main><section class="hero" aria-label="hero — live editor, preview, agent"><div class="panel"><div class="titlebar" aria-hidden="true"><span class="glyphs"><span class="glyph close"></span><span class="glyph min"></span><span class="glyph max"></span></span><span class="path"><span class="accent">Editor</span> · Preview · Agent</span></div><div class="hero-grid"><div class="hero-panel" aria-label="editor pane"><div class="heading"><span class="kind">editor</span><span>home.canvas.json</span></div><div class="body"><div class="editor-layout"><aside class="editor-tree" aria-hidden="true"><div class="row"><span class="icon">&gt;</span><span>pages/</span></div><div class="row active" style="margin-left: 0.6rem;"><span class="icon">·</span><span>home</span></div><div class="row" style="margin-left: 0.6rem;"><span class="icon">·</span><span>menu</span></div><div class="row" style="margin-left: 0.6rem;"><span class="icon">·</span><span>about</span></div><div class="row"><span class="icon">&gt;</span><span>theme/</span></div><div class="row"><span class="icon">&gt;</span><span>assets/</span></div></aside><div class="editor-doc"><h3>Brewed in small batches.<span class="cursor-token" aria-hidden="true"><span class="bar"></span><span class="chip">you</span></span></h3><p>A neighbourhood roastery turning single-origin beans into a daily ritual. Open seven days, walk-ins welcome.</p><p class="agent-line">Pour-over flights every Saturday morning—reservations encouraged<span class="cursor-token agent" aria-hidden="true"><span class="bar"></span><span class="chip">&lt;agent: drafting hero...&gt;</span></span></p></div></div></div></div><div class="hero-panel" aria-label="live preview pane"><div class="heading"><span class="kind">preview</span><span>maple-coffee.rev01.aayushman.dev</span></div><div class="body"><div class="preview-frame" aria-hidden="true"><div class="pheader"><span class="brand">maple coffee.</span><span class="pnav"><span>menu</span><span>about</span><span>visit</span></span></div><div class="pbody"><div class="phero">Brewed in small batches.</div><div class="pcopy">A neighbourhood roastery turning single-origin beans into a daily ritual. Open seven days, walk-ins welcome.</div><div class="pcard"><span class="swatch"></span><span><strong>Saturday flight</strong><br/>three pour-overs, side by side</span><span class="price">$14</span></div></div></div></div></div><div class="hero-panel" aria-label="agent operations log"><div class="heading"><span class="kind">agent</span><span>ops.log</span></div><div class="body"><div class="agent-feed"><div class="row"><span class="ts">[12:04:28]</span><span class="op"><span class="add">+section</span> <span class="ref">hero</span></span></div><div class="row"><span class="ts">[12:04:29]</span><span class="op"><span class="add">+heading</span> &quot;Brewed in small batches.&quot;</span></div><div class="row"><span class="ts">[12:04:30]</span><span class="op"><span class="edit">editText</span> &quot;Brewed near…&quot; -&gt; &quot;Brewed in…&quot;</span></div><div class="row"><span class="ts">[12:04:31]</span><span class="op"><span class="add">+card</span> <span class="ref">menu/saturday-flight</span></span></div><div class="row"><span class="ts">[12:04:32]</span><span class="op"><span class="edit">setTheme</span> palette -&gt; <span class="ref">amber-oak</span></span></div><div class="row now"><span class="ts">[12:04:33]</span><span class="op"><span class="edit">draftText</span> hero.subtitle…</span></div></div></div></div></div></div></section><section class="tagline" aria-label="product tagline"><span class="eyebrow">// rev01</span><h1>multiplayer site builder with an <span class="accent">agent</span> at the cursor.</h1><p>One canvas model, one Style Kit graph, one Published Address. The agent proposes concrete canvas edits you can preview, accept, and publish.</p><div class="cta-row"><a class="button primary" href="/dashboard">Get started</a><a class="button" href="https://github.com/aayushman-singh/rev01/tree/main/docs" rel="noopener">Documentation</a></div></section><section class="features" aria-label="differentiators"><article class="feature"><span class="num">01</span><h2>One canvas, not a tree of widgets.</h2><p>Every page is a positioned canvas of text, media, actions, shapes, and surfaces. The editor speaks the same primitive model that publishing renders.</p></article><article class="feature"><span class="num">02</span><h2>Style Kits change the whole surface.</h2><p>Typography, colour, surfaces, actions, and motion move together as one deterministic kit, so a site can shift language without rewriting its content.</p></article><article class="feature"><span class="num">03</span><h2>The agent proposes, the owner accepts.</h2><p>AI edits travel through a small canvas tool vocabulary, preview against the current state, and only land after the Owner accepts the concrete op list.</p></article></section><footer aria-label="footer"><span>© rev01</span><span><a href="https://github.com/aayushman-singh/rev01" rel="noopener">GitHub</a></span><span>MIT</span><span class="year">2026</span></footer></main></body></html>

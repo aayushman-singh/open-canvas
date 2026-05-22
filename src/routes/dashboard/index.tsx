@@ -83,7 +83,10 @@ dashboard.get('/', async (c) => {
   return c.html(
     <DashboardShell
       title="rev01 — dashboard"
-      crumbs={[{ label: 'Dashboard' }, { href: '/dashboard/templates', label: 'Templates' }]}
+      tabs={[
+        { href: '/dashboard', label: 'Sites', active: true },
+        { href: '/dashboard/templates', label: 'Templates', active: false },
+      ]}
     >
       <h1>rev01</h1>
       <p>Signed in as {primaryEmail}.</p>
