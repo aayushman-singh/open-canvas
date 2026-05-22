@@ -2527,8 +2527,154 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
-  function ensureSectionsPanelLoaded() {
-    // Populated in Task 5.
+  // -- Sections picker (cross-template catalog) --------------------------
+  // sectionsCatalog: null = unloaded; [] = loaded-empty; [...] = loaded.
+  // pendingImport stays null until the Owner clicks "Use" on a card —
+  // Task 6 will read it to render drop slots on the canvas.
+  let sectionsCatalog = null;
+  let pendingImport = null;
+  let activeTemplateFilter = 'all';
+  let activeSearchQuery = '';
+
+  // Local HTML/attr escapers. The canvas/render.ts helpers aren't reachable
+  // from this script body (it's a string-emitted IIFE), so we inline minimal
+  // versions matching the same character set.
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => {
+      if (ch === '&') return '&amp;';
+      if (ch === '<') return '&lt;';
+      if (ch === '>') return '&gt;';
+      if (ch === '"') return '&quot;';
+      return '&#39;';
+    });
+  }
+  function escapeAttr(value) {
+    return escapeHtml(value);
+  }
+
+  async function ensureSectionsPanelLoaded() {
+    const root = document.querySelector('[data-section-picker-root]');
+    if (!root) return;
+    if (sectionsCatalog === null) {
+      try {
+        const response = await authFetch('/api/templates/sections');
+        if (!response.ok) {
+          root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
+          return;
+        }
+        const body = await response.json();
+        sectionsCatalog = Array.isArray(body && body.sections) ? body.sections : [];
+      } catch (err) {
+        root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
+        return;
+      }
+    }
+    renderSectionsPanel();
+  }
+
+  function renderSectionsPanel() {
+    const root = document.querySelector('[data-section-picker-root]');
+    if (!root || sectionsCatalog === null) return;
+
+    const templateIds = Array.from(new Set(sectionsCatalog.map((e) => e.templateId)));
+    const templateNames = new Map(sectionsCatalog.map((e) => [e.templateId, e.templateName]));
+
+    const filtered = sectionsCatalog.filter((entry) => {
+      if (activeTemplateFilter !== 'all' && entry.templateId !== activeTemplateFilter) return false;
+      if (activeSearchQuery.length > 0) {
+        const haystack = (entry.sectionName + ' ' + entry.headingPreview + ' ' + entry.templateName).toLowerCase();
+        if (!haystack.includes(activeSearchQuery.toLowerCase())) return false;
+      }
+      return true;
+    });
+
+    const filterOptions = ['<option value="all">All templates</option>']
+      .concat(templateIds.map((id) => '<option value="' + escapeAttr(id) + '">' + escapeHtml(templateNames.get(id) || id) + '</option>'))
+      .join('');
+
+    const cards = filtered.map((entry) => {
+      const isPending = pendingImport
+        && pendingImport.templateId === entry.templateId
+        && pendingImport.sectionId === entry.sectionId;
+      return (
+        '<li class="rev01-section-card' + (isPending ? ' is-pending' : '') + '">' +
+          '<div class="rev01-section-card-head">' +
+            '<span class="rev01-section-card-name">' + escapeHtml(entry.sectionName) + '</span>' +
+            '<span class="rev01-section-card-recipe">' + escapeHtml(entry.recipeId) + '</span>' +
+          '</div>' +
+          '<p class="rev01-section-card-preview">' + escapeHtml(entry.headingPreview) + '</p>' +
+          '<div class="rev01-section-card-foot">' +
+            '<span class="rev01-section-card-template">' + escapeHtml(entry.templateName) + '</span>' +
+            '<button type="button" class="rev01-section-card-use" data-section-card-use ' +
+              'data-template-id="' + escapeAttr(entry.templateId) + '" ' +
+              'data-section-id="' + escapeAttr(entry.sectionId) + '" ' +
+              'data-template-name="' + escapeAttr(entry.templateName) + '">' +
+              (isPending ? 'Cancel' : 'Use') +
+            '</button>' +
+          '</div>' +
+        '</li>'
+      );
+    }).join('');
+
+    root.innerHTML =
+      '<div class="rev01-section-picker-controls">' +
+        '<input type="search" class="rev01-section-picker-search" placeholder="Search sections" ' +
+          'value="' + escapeAttr(activeSearchQuery) + '" data-section-picker-search />' +
+        '<select class="rev01-section-picker-filter" data-section-picker-filter>' + filterOptions + '</select>' +
+      '</div>' +
+      (filtered.length === 0
+        ? '<p class="rev01-section-picker-empty">No sections match.</p>'
+        : '<ul class="rev01-section-picker-grid">' + cards + '</ul>');
+
+    const filter = root.querySelector('[data-section-picker-filter]');
+    if (filter) {
+      filter.value = activeTemplateFilter;
+      filter.addEventListener('change', () => {
+        activeTemplateFilter = filter.value;
+        renderSectionsPanel();
+      });
+    }
+    const search = root.querySelector('[data-section-picker-search]');
+    if (search) {
+      search.addEventListener('input', () => {
+        activeSearchQuery = search.value;
+        renderSectionsPanel();
+      });
+    }
+    root.querySelectorAll('[data-section-card-use]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const templateId = button.getAttribute('data-template-id') || '';
+        const sectionId = button.getAttribute('data-section-id') || '';
+        const templateName = button.getAttribute('data-template-name') || '';
+        if (pendingImport
+            && pendingImport.templateId === templateId
+            && pendingImport.sectionId === sectionId) {
+          exitPlacementMode();
+        } else {
+          enterPlacementMode({ templateId, sectionId, templateName });
+        }
+      });
+    });
+  }
+
+  function enterPlacementMode(target) {
+    pendingImport = target;
+    // setStatus only recognises "error" / "ok" tones in this codebase;
+    // "info" would silently fall through. Use "ok" for the pending banner.
+    setStatus('Click a slot to insert "' + target.templateName + '" section', 'ok');
+    renderSectionsPanel();
+    renderPlacementSlots();
+  }
+
+  function exitPlacementMode() {
+    pendingImport = null;
+    setStatus('Cancelled', 'ok');
+    renderSectionsPanel();
+    renderPlacementSlots();
+  }
+
+  function renderPlacementSlots() {
+    // Implemented in Task 6.
   }
 
   function attachSidebarActions() {

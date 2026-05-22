@@ -190,6 +190,101 @@ body.rev01-modal-open {
   font-size: 13px;
 }
 
+.rev01-section-picker-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.rev01-section-picker-search {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  background: var(--rev01-bg);
+  color: var(--rev01-fg);
+  font: inherit;
+}
+.rev01-section-picker-filter {
+  padding: 6px 10px;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  background: var(--rev01-bg);
+  color: var(--rev01-fg);
+  font: inherit;
+}
+.rev01-section-picker-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rev01-section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 8px;
+  background: var(--rev01-bg-panel);
+}
+.rev01-section-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.rev01-section-card-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--rev01-fg);
+}
+.rev01-section-card-recipe {
+  font-size: 11px;
+  color: var(--rev01-fg-mute);
+  font-family: var(--rev01-font-mono);
+}
+.rev01-section-card-preview {
+  margin: 0;
+  font-size: 12px;
+  color: var(--rev01-fg-mute);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rev01-section-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.rev01-section-card-template {
+  font-size: 11px;
+  color: var(--rev01-fg-mute);
+}
+.rev01-section-card-use {
+  padding: 4px 10px;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rev01-fg);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rev01-section-card-use:hover,
+.rev01-section-card-use:focus-visible {
+  background: var(--rev01-bg-panel-strong);
+}
+.rev01-section-card.is-pending .rev01-section-card-use {
+  background: var(--rev01-accent);
+  color: var(--rev01-bg);
+  border-color: transparent;
+}
+
 .rev01-sidebar-group {
   display: grid;
   gap: 8px;
