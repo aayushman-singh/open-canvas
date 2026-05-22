@@ -46,23 +46,24 @@ console.log('[owner-asset-smoke] setup');
 
 const SMOKE_CLERK_USER = 'smoke-asset-' + crypto.randomUUID().slice(0, 8);
 
-const insertedCustomers = await smokeDb
-  .insert(customer)
-  .values({
-    clerkUserId: SMOKE_CLERK_USER,
-    email: `${SMOKE_CLERK_USER}@example.invalid`,
-  })
-  .returning({ id: customer.id });
-
-const customerId = insertedCustomers[0]?.id;
-assert(
-  typeof customerId === 'string' && customerId.length > 0,
-  'expected smoke customer insert to return an id',
-);
-
-console.log('[owner-asset-smoke] setup ok');
-
+let customerId: string | undefined;
 try {
+  const inserted = await smokeDb
+    .insert(customer)
+    .values({
+      clerkUserId: SMOKE_CLERK_USER,
+      email: `${SMOKE_CLERK_USER}@example.invalid`,
+    })
+    .returning({ id: customer.id });
+
+  customerId = inserted[0]?.id;
+  assert(
+    typeof customerId === 'string' && customerId.length > 0,
+    'expected customer insert to return an id',
+  );
+
+  console.log('[owner-asset-smoke] setup ok');
+
   // ── Step 2: Upload PNG ─────────────────────────────────────────────────────
   console.log('[owner-asset-smoke] upload');
 
@@ -285,8 +286,10 @@ try {
   console.log('[owner-asset-smoke] negative-cases ok');
 } finally {
   // ── Step 7: Cleanup ───────────────────────────────────────────────────────
-  await smokeDb.delete(ownerAsset).where(eq(ownerAsset.customerId, customerId));
-  await smokeDb.delete(customer).where(eq(customer.clerkUserId, SMOKE_CLERK_USER));
+  if (customerId) {
+    await smokeDb.delete(ownerAsset).where(eq(ownerAsset.customerId, customerId));
+    await smokeDb.delete(customer).where(eq(customer.id, customerId));
+  }
 }
 
 // ── Step 8: Done ──────────────────────────────────────────────────────────────
