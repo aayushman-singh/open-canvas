@@ -2766,11 +2766,34 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         setStatus("Can't delete the last section", "error");
         return;
       }
+      // Collect media element ids before mutating — slot_history rows are
+      // keyed by elementId and have no FK back to the section, so removing
+      // the section would leave orphan rows unless we clean them up here.
+      const mediaElementIds = section.elements
+        .filter((el) => el.type === "media")
+        .map((el) => el.id);
       page.sections.splice(idx, 1);
       selectedSectionId = null;
       selectedElementId = null;
       renderAll();
       scheduleSave();
+      // Fire-and-forget: purge slot_history rows for every media element that
+      // just left the canvas. Failure is logged but does NOT block the UI —
+      // the orphan rows carry no user-facing weight, but we still want the
+      // cleanup attempt recorded.
+      for (const elementId of mediaElementIds) {
+        fetch(
+          "/api/sites/" + encodeURIComponent(SITE_ID) +
+          "/elements/" + encodeURIComponent(elementId) + "/history",
+          { method: "DELETE", credentials: "include" },
+        )
+          .then((r) => {
+            if (!r.ok) {
+              console.error("slot-history cleanup failed", elementId, r.status);
+            }
+          })
+          .catch((err) => console.error("slot-history cleanup failed", elementId, err));
+      }
     } else if (action === "move-up") {
       if (idx === 0) return;
       const prev = page.sections[idx - 1];
