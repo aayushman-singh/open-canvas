@@ -1,10 +1,10 @@
 import { Hono } from 'hono';
-import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { allTemplateSeeds } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
+import { DashboardShell } from './shell';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -19,46 +19,7 @@ templatesRoute.use('*', requireAuth());
 
 const PUBLISHED_SUFFIX = '.rev01.aayushman.dev';
 
-const styles = `
-  :root {
-    color-scheme: dark;
-    --bg: #080b13;
-    --panel: #111827;
-    --panel-strong: #182235;
-    --text: #f6f7fb;
-    --muted: #aeb7c8;
-    --faint: #738096;
-    --line: rgba(255, 255, 255, 0.12);
-    --accent: #7dd3fc;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: var(--bg);
-    color: var(--text);
-  }
-  main {
-    width: min(1120px, calc(100vw - 32px));
-    margin: 0 auto;
-    padding: 32px 0 48px;
-  }
-  nav {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 28px;
-    color: var(--faint);
-    font-size: 13px;
-  }
-  a { color: inherit; }
-  h1 {
-    margin: 0;
-    font-size: 32px;
-    line-height: 1.1;
-    letter-spacing: 0;
-  }
+const pageStyles = `
   .lede {
     margin: 10px 0 24px;
     max-width: 640px;
@@ -188,80 +149,68 @@ const styles = `
 function Page() {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
-    <html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>rev01 - create site</title>
-        <style>{raw(styles)}</style>
-      </head>
-      <body>
-        <main>
-          <nav>
-            <a href="/dashboard">Dashboard</a>
-            <span>/</span>
-            <span>Create site</span>
-          </nav>
+    <DashboardShell
+      title="rev01 — create site"
+      crumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: 'Create site' }]}
+      pageStyles={pageStyles}
+    >
+      <h1>Choose a starting point</h1>
+      <p class="lede">
+        Pick the canvas seed closest to what you want. You can still move every primitive,
+        rewrite the rich text, swap the Style Kit, and publish when it feels right.
+      </p>
 
-          <h1>Choose a starting point</h1>
-          <p class="lede">
-            Pick the canvas seed closest to what you want. You can still move every primitive,
-            rewrite the rich text, swap the Style Kit, and publish when it feels right.
-          </p>
-
-          <form method="post" action="/api/sites">
-            <fieldset>
-              <legend>Template</legend>
-              <div class="templates">
-                {allTemplateSeeds.map((template, idx) => (
-                  <label class="template">
-                    <input
-                      type="radio"
-                      name="templateId"
-                      value={template.id}
-                      required
-                      checked={idx === 0}
-                    />
-                    <span class="template-body">
-                      <span>
-                        <h2>{template.name}</h2>
-                        <p>{template.tagline}</p>
-                      </span>
-                      <span class="kit">{template.state.styleKit}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-
-            <div class="fields">
-              <label class="field">
-                <span>Site name</span>
-                <input type="text" name="siteName" maxlength={80} required placeholder="My site" />
-              </label>
-
-              <label class="field">
-                <span>Subdomain</span>
-                <span class="subdomain">
-                  <input
-                    type="text"
-                    name="subdomain"
-                    maxlength={63}
-                    required
-                    pattern={subdomainPattern}
-                    placeholder="my-site"
-                  />
-                  <span class="suffix">{PUBLISHED_SUFFIX}</span>
+      <form method="post" action="/api/sites">
+        <fieldset>
+          <legend>Template</legend>
+          <div class="templates">
+            {allTemplateSeeds.map((template, idx) => (
+              <label class="template">
+                <input
+                  type="radio"
+                  name="templateId"
+                  value={template.id}
+                  required
+                  checked={idx === 0}
+                />
+                <span class="template-body">
+                  <span>
+                    <h2>{template.name}</h2>
+                    <p>{template.tagline}</p>
+                  </span>
+                  <span class="kit">{template.state.styleKit}</span>
                 </span>
-                <small>Lowercase letters, numbers, and hyphens. 2 to 63 characters.</small>
               </label>
-            </div>
+            ))}
+          </div>
+        </fieldset>
 
-            <button type="submit">Create site</button>
-          </form>
-        </main>
-      </body>
-    </html>
+        <div class="fields">
+          <label class="field">
+            <span>Site name</span>
+            <input type="text" name="siteName" maxlength={80} required placeholder="My site" />
+          </label>
+
+          <label class="field">
+            <span>Subdomain</span>
+            <span class="subdomain">
+              <input
+                type="text"
+                name="subdomain"
+                maxlength={63}
+                required
+                pattern={subdomainPattern}
+                placeholder="my-site"
+              />
+              <span class="suffix">{PUBLISHED_SUFFIX}</span>
+            </span>
+            <small>Lowercase letters, numbers, and hyphens. 2 to 63 characters.</small>
+          </label>
+        </div>
+
+        <button type="submit">Create site</button>
+      </form>
+    </DashboardShell>
   );
 }
 

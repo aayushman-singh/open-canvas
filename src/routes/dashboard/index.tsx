@@ -5,6 +5,7 @@ import { customer, site } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
+import { DashboardShell } from './shell';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -80,33 +81,25 @@ dashboard.get('/', async (c) => {
   );
 
   return c.html(
-    <html lang="en">
-      <head>
-        <meta charset="utf-8" />
-        <title>rev01 — dashboard</title>
-      </head>
-      <body>
-        <main>
-          <nav>
-            <a href="/dashboard">Dashboard</a> · <a href="/dashboard/templates">Templates</a>
-          </nav>
-          <h1>rev01</h1>
-          <p>Signed in as {primaryEmail}.</p>
-          {editorLink ? (
-            <p>
-              Continue editing{' '}
-              <a href={`/dashboard/sites/${editorLink.siteId}/edit`}>{editorLink.siteName}</a>.
-            </p>
-          ) : (
-            <p>
-              No sites yet — <a href="/dashboard/templates">pick a template</a> to start.
-            </p>
-          )}
-          <p>
-            <a href={signOutUrl}>Sign out</a>
-          </p>
-        </main>
-      </body>
-    </html>,
+    <DashboardShell
+      title="rev01 — dashboard"
+      crumbs={[{ label: 'Dashboard' }, { href: '/dashboard/templates', label: 'Templates' }]}
+    >
+      <h1>rev01</h1>
+      <p>Signed in as {primaryEmail}.</p>
+      {editorLink ? (
+        <p>
+          Continue editing{' '}
+          <a href={`/dashboard/sites/${editorLink.siteId}/edit`}>{editorLink.siteName}</a>.
+        </p>
+      ) : (
+        <p>
+          No sites yet — <a href="/dashboard/templates">pick a template</a> to start.
+        </p>
+      )}
+      <p>
+        <a href={signOutUrl}>Sign out</a>
+      </p>
+    </DashboardShell>,
   );
 });
