@@ -96,6 +96,27 @@ assert(RESERVED_SUBDOMAINS.has('admin'), 'expected RESERVED_SUBDOMAINS to includ
 const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
 assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');
 
+// Task 5.6 invariant: a two-page state must be rejected. Clone the starter
+// template's single page and push another copy so the only reason for
+// rejection is the length rule itself.
+const twoPageStarter = {
+  ...starterTemplate.state,
+  pages: [
+    structuredClone(starterTemplate.state.pages[0]),
+    structuredClone(starterTemplate.state.pages[0]),
+  ],
+};
+const twoPageResult = validateCanvasSiteState(twoPageStarter);
+assert(
+  !twoPageResult.valid,
+  'expected validator to reject a two-page state (single-page POC invariant)',
+);
+assert(
+  !twoPageResult.valid &&
+    twoPageResult.errors.some((message) => message.includes('exactly one canvas page')),
+  'expected two-page rejection to mention "exactly one canvas page"',
+);
+
 const overWidePage = validateCanvasSiteState({
   styleKit: 'charcoal',
   pages: [

@@ -191,6 +191,9 @@ function renderShapeElement(element: ShapeElement): string {
 }
 
 function renderContainerElement(element: ContainerElement): string {
+  // "Container" is the legacy schema name; conceptually this is a Surface
+  // primitive (card/panel/frame). The class name `rev01-surface` is the
+  // canonical one. Decorative-by-default: ARIA is applied on the wrapper.
   return `<div class="rev01-surface" data-variant="${escapeAttr(element.variant)}"></div>`;
 }
 
@@ -209,6 +212,26 @@ function renderElementBody(element: CanvasElement, assetBasePath: string): strin
   }
 }
 
+// Decorative-by-default invariant: shape and surface (container) wrappers are
+// always emitted with `aria-hidden="true" role="presentation"` so assistive
+// tech skips them. Media gets `aria-hidden="true"` only when `alt === ''`
+// (the canonical decorative-image signal); when alt is non-empty, the native
+// `<img alt>` attribute does the work and we do NOT also hide the wrapper.
+// Text and action elements never get ARIA overrides — their defaults are
+// semantically correct (headings/paragraphs, anchor tags).
+function buildAriaWrapperAttrs(element: CanvasElement): string {
+  switch (element.type) {
+    case 'shape':
+    case 'container':
+      return ' aria-hidden="true" role="presentation"';
+    case 'media':
+      return element.alt === '' ? ' aria-hidden="true"' : '';
+    case 'text':
+    case 'action':
+      return '';
+  }
+}
+
 function renderElement(element: CanvasElement, assetBasePath: string): string {
   const inner = renderElementBody(element, assetBasePath);
   const wrapperStyle = buildElementWrapperStyle(element);
@@ -216,7 +239,8 @@ function renderElement(element: CanvasElement, assetBasePath: string): string {
     element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
       : '';
-  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${motionAttrs} style="${wrapperStyle}">${inner}</div>`;
+  const ariaAttrs = buildAriaWrapperAttrs(element);
+  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${motionAttrs}${ariaAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
 function renderSection(
@@ -231,6 +255,10 @@ function renderSection(
     ['width', `${String(pageWidth)}px`],
     ['height', `${String(section.height)}px`],
   ]);
+  // Reading order = `section.elements[]` storage order. The renderer is the
+  // contract: whatever order elements appear in the array is the order DOM
+  // emits them, which is what assistive tech reads. Owner-side reorder tools
+  // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
   const elementsHtml = section.elements
     .map((element) => renderElement(element, assetBasePath))
     .join('');
@@ -253,5 +281,7 @@ export function renderCanvasSnapshot(
   assetBasePath: string,
 ): string {
   const pagesHtml = snapshot.pages.map((page) => renderPage(page, assetBasePath)).join('');
-  return `<main class="rev01-site" data-style-kit="${escapeAttr(snapshot.styleKit)}">${pagesHtml}</main>`;
+  // The outer wrapper always declares `lang="en"` for the POC. A future
+  // owner-facing language picker would override this — out of POC scope.
+  return `<main class="rev01-site" lang="en" data-style-kit="${escapeAttr(snapshot.styleKit)}">${pagesHtml}</main>`;
 }
