@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "canvas:smoke": "bun run src/canvas/smoke.ts",
     "canvas-agent:smoke": "bun run src/agent/canvas-agent-smoke.ts",
+    "section-import:smoke": "bun run src/canvas/section-import-smoke.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts"
   },
