@@ -463,6 +463,233 @@ try {
 
   console.log('[owner-asset-smoke] gallery ok');
 
+  // ── Step 8: Delete-cascade ────────────────────────────────────────────────
+  console.log('[owner-asset-smoke] delete-cascade');
+
+  // 8a. Upload a fresh asset to use as the delete target.
+  const deleteUploadResp = await app.request(
+    'http://rev01.test/api/me/assets',
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-smoke-customer-id': customerId,
+      },
+      body: JSON.stringify({ dataUrl: TRANSPARENT_PNG_DATA_URL, alt: 'delete-cascade target' }),
+    },
+    smokeEnv,
+  );
+  assert(
+    deleteUploadResp.status === 200,
+    `expected POST /api/me/assets (delete target) to return 200, got ${deleteUploadResp.status}`,
+  );
+  const deleteUploadJson = (await deleteUploadResp.json()) as Record<string, unknown>;
+  const deleteAssetId = deleteUploadJson.assetId as string;
+  assert(
+    typeof deleteAssetId === 'string' && deleteAssetId.startsWith('up-'),
+    `expected deleteAssetId to start with "up-", got ${JSON.stringify(deleteAssetId)}`,
+  );
+
+  // 8b. Inject the new assetId into the test site's editableState by reading
+  //     the current state, adding a media element that references deleteAssetId,
+  //     and writing it back directly via the DB.
+  assert(
+    typeof smokeSiteId === 'string',
+    'expected smokeSiteId to be set from step 6',
+  );
+  const stateRows = await smokeDb
+    .select({ editableState: site.editableState })
+    .from(site)
+    .where(eq(site.id, smokeSiteId))
+    .limit(1);
+  const stateRow = stateRows[0];
+  assert(stateRow !== undefined, 'expected smoke site row to exist for editableState injection');
+
+  // Clone state and inject a media element containing deleteAssetId. Build a
+  // complete MediaElement so clearAssetReferences can find and clear it.
+  const injectedElementId = 'smoke-media-' + crypto.randomUUID().slice(0, 8);
+  const currentState = stateRow.editableState;
+  const injectedMediaElement = {
+    id: injectedElementId,
+    type: 'media' as const,
+    box: { x: 0, y: 0, w: 100, h: 100, z: 0 },
+    mediaKind: 'image' as const,
+    assetId: deleteAssetId,
+    alt: 'cascade test image',
+    fit: 'cover' as const,
+  };
+  let injectedState;
+  if (currentState.pages.length > 0 && currentState.pages[0] !== undefined) {
+    // Inject into the first section of the first page if one exists.
+    const firstPage = currentState.pages[0];
+    if (firstPage.sections.length > 0 && firstPage.sections[0] !== undefined) {
+      injectedState = {
+        ...currentState,
+        pages: [
+          {
+            ...firstPage,
+            sections: [
+              {
+                ...firstPage.sections[0],
+                elements: [...firstPage.sections[0].elements, injectedMediaElement],
+              },
+              ...firstPage.sections.slice(1),
+            ],
+          },
+          ...currentState.pages.slice(1),
+        ],
+      };
+    } else {
+      // First page has no sections — add a section with the media element.
+      injectedState = {
+        ...currentState,
+        pages: [
+          {
+            ...firstPage,
+            sections: [
+              {
+                id: 'smoke-section-' + crypto.randomUUID().slice(0, 8),
+                recipeId: 'hero-split' as const,
+                name: 'Smoke Section',
+                height: 400,
+                elements: [injectedMediaElement],
+              },
+            ],
+          },
+          ...currentState.pages.slice(1),
+        ],
+      };
+    }
+  } else {
+    // No pages yet — add a full page with a section containing the media element.
+    injectedState = {
+      ...currentState,
+      pages: [
+        {
+          id: 'smoke-page-' + crypto.randomUUID().slice(0, 8),
+          slug: 'home',
+          title: 'Home',
+          width: 1200,
+          sections: [
+            {
+              id: 'smoke-section-' + crypto.randomUUID().slice(0, 8),
+              recipeId: 'hero-split' as const,
+              name: 'Smoke Section',
+              height: 400,
+              elements: [injectedMediaElement],
+            },
+          ],
+        },
+      ],
+    };
+  }
+  await smokeDb
+    .update(site)
+    .set({ editableState: injectedState })
+    .where(eq(site.id, smokeSiteId));
+
+  // 8c. GET /api/me/assets/:assetId/usage — assert exactly one entry with source 'editable'.
+  const usageBeforeResp = await app.request(
+    `http://rev01.test/api/me/assets/${deleteAssetId}/usage`,
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    usageBeforeResp.status === 200,
+    `expected GET /api/me/assets/${deleteAssetId}/usage to return 200, got ${usageBeforeResp.status}`,
+  );
+  const usageBeforeBody = (await usageBeforeResp.json()) as { usage: Array<{ source: string; siteId: string }> };
+  assert(
+    usageBeforeBody.usage.length === 1,
+    `expected exactly 1 usage entry before delete, got ${usageBeforeBody.usage.length}`,
+  );
+  assert(
+    usageBeforeBody.usage[0]?.source === 'editable',
+    `expected usage source to be "editable", got ${JSON.stringify(usageBeforeBody.usage[0]?.source)}`,
+  );
+
+  // 8d. DELETE without ?confirm=cascade → 400 with cascade confirmation required.
+  const deleteNoConfirmResp = await app.request(
+    `http://rev01.test/api/me/assets/${deleteAssetId}`,
+    {
+      method: 'DELETE',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    deleteNoConfirmResp.status === 400,
+    `expected DELETE without confirm to return 400, got ${deleteNoConfirmResp.status}`,
+  );
+  const deleteNoConfirmBody = (await deleteNoConfirmResp.json()) as Record<string, unknown>;
+  assert(
+    typeof deleteNoConfirmBody.error === 'string' &&
+      deleteNoConfirmBody.error.includes('cascade confirmation required'),
+    `expected error "cascade confirmation required", got ${JSON.stringify(deleteNoConfirmBody.error)}`,
+  );
+
+  // 8e. DELETE with ?confirm=cascade → 200 { ok: true }.
+  const deleteCascadeResp = await app.request(
+    `http://rev01.test/api/me/assets/${deleteAssetId}?confirm=cascade`,
+    {
+      method: 'DELETE',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    deleteCascadeResp.status === 200,
+    `expected DELETE ?confirm=cascade to return 200, got ${deleteCascadeResp.status}`,
+  );
+  const deleteCascadeBody = (await deleteCascadeResp.json()) as Record<string, unknown>;
+  assert(
+    deleteCascadeBody.ok === true,
+    `expected DELETE response to be { ok: true }, got ${JSON.stringify(deleteCascadeBody)}`,
+  );
+
+  // 8f. Re-query owner_asset — assert 0 rows for deleteAssetId.
+  const assetAfterDelete = await smokeDb
+    .select({ id: ownerAsset.id })
+    .from(ownerAsset)
+    .where(eq(ownerAsset.id, deleteAssetId));
+  assert(
+    assetAfterDelete.length === 0,
+    `expected owner_asset row for ${deleteAssetId} to be gone after DELETE, got ${assetAfterDelete.length} rows`,
+  );
+
+  // 8g. Re-query site editableState — assert the injected element's assetId is now ''.
+  const stateAfterRows = await smokeDb
+    .select({ editableState: site.editableState })
+    .from(site)
+    .where(eq(site.id, smokeSiteId))
+    .limit(1);
+  const stateAfterRow = stateAfterRows[0];
+  assert(stateAfterRow !== undefined, 'expected smoke site row to exist after delete');
+  const afterState = stateAfterRow.editableState;
+  let foundElement: { type: string; assetId?: string } | undefined;
+  for (const page of afterState.pages) {
+    for (const section of page.sections) {
+      for (const element of section.elements) {
+        if (element.id === injectedElementId) {
+          foundElement = element as { type: string; assetId?: string };
+        }
+      }
+    }
+  }
+  assert(
+    foundElement !== undefined,
+    `expected injected media element ${injectedElementId} to still be present in editableState after cascade`,
+  );
+  assert(
+    (foundElement as Record<string, unknown>).assetId === '',
+    `expected injected element assetId to be cleared to "", got ${JSON.stringify((foundElement as Record<string, unknown>).assetId)}`,
+  );
+
+  console.log('[owner-asset-smoke] delete-cascade ok');
+
   // ── Step 9: Negative cases ────────────────────────────────────────────────
   console.log('[owner-asset-smoke] negative-cases');
 
