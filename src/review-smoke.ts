@@ -16,10 +16,15 @@ import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
 import { customer, site, siteAsset } from './db/schema';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, validateSubdomain } from './routes/api/sites';
-import { starterTemplate } from './templates/registry';
+import {
+  prepareSeedAssetsForSite,
+  RESERVED_SUBDOMAINS,
+  SUBDOMAIN_RE,
+  validateSubdomain,
+} from './routes/api/sites';
+import { allTemplateSeeds, getTemplateSeed, starterTemplate } from './templates/registry';
 
-function assert(condition: boolean, message: string): void {
+function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
@@ -290,6 +295,54 @@ assert(
   'expected javascript-link rejection to mention the offending href',
 );
 
+// -- Template picker -------------------------------------------------------
+// Site creation must expose an actual user choice, not a hidden default. The
+// registry carries multiple canvas seeds, the dashboard renders them as a
+// visible radio group, and the API rejects missing templateId instead of
+// silently substituting starter-canvas.
+
+assert(allTemplateSeeds.length >= 3, 'expected at least three selectable template seeds');
+const templateIds = new Set<string>();
+for (const seed of allTemplateSeeds) {
+  assert(!templateIds.has(seed.id), `expected template id ${seed.id} to be unique`);
+  templateIds.add(seed.id);
+  assert(getTemplateSeed(seed.id) === seed, `expected getTemplateSeed to resolve ${seed.id}`);
+  const seedStateResult = validateCanvasSiteState(seed.state);
+  assert(
+    seedStateResult.valid,
+    seedStateResult.valid
+      ? ''
+      : `expected template ${seed.id} to pass canvas validation: ${seedStateResult.errors.join('; ')}`,
+  );
+  const seedAssetResult = validateSeedFixture(seed.state);
+  assert(
+    seedAssetResult.valid,
+    seedAssetResult.valid
+      ? ''
+      : `expected template ${seed.id} to pass seed asset validation: ${seedAssetResult.errors.join('; ')}`,
+  );
+}
+
+const templatesPageSource = await readSource('./routes/dashboard/templates.tsx');
+assert(
+  templatesPageSource.includes('allTemplateSeeds.map'),
+  'expected templates page to render every TemplateSeed',
+);
+assert(
+  templatesPageSource.includes('type="radio"') && templatesPageSource.includes('name="templateId"'),
+  'expected templates page to use visible templateId radio inputs',
+);
+assert(
+  !/<input\s+type="hidden"\s+name="templateId"/.test(templatesPageSource),
+  'expected templates page not to hide templateId in a single fixed input',
+);
+
+const sitesApiSource = await readSource('./routes/api/sites.ts');
+assert(
+  !sitesApiSource.includes("input.templateId.trim() === '' ? 'starter-canvas'"),
+  'expected site creation API not to silently default a missing templateId',
+);
+
 // -- Canvas-first review regressions --------------------------------------
 // These are source-level checks for the browser-only editor script. They keep
 // the POC's "Owner can save/publish/ask AI without losing local edits" flow
@@ -405,7 +458,7 @@ try {
   );
 
   await smokeDb.insert(site).values({
-    customerId: seededCustomerId as string,
+    customerId: seededCustomerId,
     name: 'smoke',
     subdomain: SMOKE_SUB,
     styleKit: starterTemplate.state.styleKit,
@@ -603,6 +656,25 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
+const preparedForSiteA = prepareSeedAssetsForSite('site-a', starterTemplate.state);
+const preparedForSiteB = prepareSeedAssetsForSite('site-b', starterTemplate.state);
+assert(preparedForSiteA.ok, 'expected seed asset preparation for site-a to succeed');
+assert(preparedForSiteB.ok, 'expected seed asset preparation for site-b to succeed');
+const preparedAIds = new Set(
+  preparedForSiteA.ok ? preparedForSiteA.seedRows.map((row) => row.id) : [],
+);
+const preparedBIds = new Set(
+  preparedForSiteB.ok ? preparedForSiteB.seedRows.map((row) => row.id) : [],
+);
+for (const originalId of referencedSeedIds) {
+  assert(
+    !preparedAIds.has(originalId) && !preparedBIds.has(originalId),
+    `expected materialised asset ids not to reuse global seed id "${originalId}"`,
+  );
+}
+for (const id of preparedAIds) {
+  assert(!preparedBIds.has(id), `expected per-site materialised asset id ${id} not to collide`);
+}
 let t6SiteId: string | null = null;
 try {
   const inserted = await smokeDb
@@ -618,54 +690,35 @@ try {
     'expected T6 smoke customer insert to return an id',
   );
 
-  const t6SiteInserted = await smokeDb
-    .insert(site)
-    .values({
-      customerId: t6CustomerId as string,
-      name: 'smoke-t6',
-      subdomain: T6_SUB,
-      styleKit: starterTemplate.state.styleKit,
-      editableState: starterTemplate.state,
-      publishedSnapshot: null,
-      publishedVersion: 0,
-    })
-    .returning({ id: site.id });
-  t6SiteId = t6SiteInserted[0]?.id ?? null;
-  assert(
-    typeof t6SiteId === 'string' && t6SiteId.length > 0,
-    'expected T6 site insert to return an id',
-  );
-
-  // Mirror src/routes/api/sites.ts: one siteAsset row per seed id referenced.
-  const seedRows = referencedSeedIds.map((id) => {
-    const seed = SEED_ASSET_REGISTRY[id];
-    if (!seed) {
-      throw new Error(`T6 smoke: starterTemplate references unregistered seed id "${id}"`);
-    }
-    return {
-      id,
-      siteId: t6SiteId as string,
-      mediaType: seed.mediaType,
-      bytesBase64: seed.bytesBase64,
-      kind: seed.kind,
-      alt: seed.alt,
-    };
+  t6SiteId = crypto.randomUUID();
+  const preparedT6 = prepareSeedAssetsForSite(t6SiteId, starterTemplate.state);
+  assert(preparedT6.ok, 'expected T6 seed asset preparation to succeed');
+  await smokeDb.insert(site).values({
+    id: t6SiteId,
+    customerId: t6CustomerId,
+    name: 'smoke-t6',
+    subdomain: T6_SUB,
+    styleKit: preparedT6.editableState.styleKit,
+    editableState: preparedT6.editableState,
+    publishedSnapshot: null,
+    publishedVersion: 0,
   });
+  const seedRows = preparedT6.seedRows;
   await smokeDb.insert(siteAsset).values(seedRows);
 
   const assetRows = await smokeDb
     .select({ id: siteAsset.id })
     .from(siteAsset)
-    .where(eq(siteAsset.siteId, t6SiteId as string));
+    .where(eq(siteAsset.siteId, t6SiteId));
   assert(
-    assetRows.length === referencedSeedIds.length,
-    `expected site_asset row count (${assetRows.length}) to equal referenced seed id count (${referencedSeedIds.length})`,
+    assetRows.length === seedRows.length,
+    `expected site_asset row count (${assetRows.length}) to equal prepared seed row count (${seedRows.length})`,
   );
   const presentIds = new Set(assetRows.map((r) => r.id));
-  for (const id of referencedSeedIds) {
+  for (const row of seedRows) {
     assert(
-      presentIds.has(id),
-      `expected materialised site_asset row for seed id "${id}" but it was missing`,
+      presentIds.has(row.id),
+      `expected materialised site_asset row "${row.id}" but it was missing`,
     );
   }
 } finally {

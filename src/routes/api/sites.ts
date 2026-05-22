@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
-import { collectReferencedAssetIds } from '../../assets/site-assets';
+import { collectReferencedAssets } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
+import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, site, siteAsset } from '../../db/schema';
@@ -22,17 +23,27 @@ export const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 // Reserved subdomains under *.rev01.aayushman.dev:
 // - www/api/app/admin: standard reservations.
 // - dashboard/health: overlap with the app's own routes.
-export const RESERVED_SUBDOMAINS = new Set([
-  'www',
-  'api',
-  'app',
-  'admin',
-  'dashboard',
-  'health',
-]);
+export const RESERVED_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'dashboard', 'health']);
 
 type ValidSubdomain = { valid: true };
 type InvalidSubdomain = { valid: false; error: string };
+
+export interface SeedSiteAssetRow {
+  id: string;
+  siteId: string;
+  mediaType: string;
+  bytesBase64: string;
+  kind: MediaKind;
+  alt: string;
+}
+
+type PreparedSeedAssets =
+  | { ok: true; editableState: CanvasSiteState; seedRows: SeedSiteAssetRow[] }
+  | {
+      ok: false;
+      unknownSeedIds: string[];
+      assetKindErrors: Array<{ assetId: string; expectedKind: MediaKind; actualKind: MediaKind }>;
+    };
 
 export function validateSubdomain(value: string): ValidSubdomain | InvalidSubdomain {
   if (value.length === 0) {
@@ -102,6 +113,78 @@ function isUniqueViolation(err: unknown): boolean {
   return false;
 }
 
+function siteSeedAssetId(siteId: string, seedAssetId: string): string {
+  return `seed-${siteId}-${seedAssetId}`;
+}
+
+export function prepareSeedAssetsForSite(
+  siteId: string,
+  state: CanvasSiteState,
+): PreparedSeedAssets {
+  const editableState = structuredClone(state);
+  const mappedIds = new Map<string, string>();
+  const seedRows: SeedSiteAssetRow[] = [];
+  const unknownSeedIds = new Set<string>();
+  const assetKindErrors: Array<{
+    assetId: string;
+    expectedKind: MediaKind;
+    actualKind: MediaKind;
+  }> = [];
+
+  for (const reference of collectReferencedAssets(editableState.pages)) {
+    const seed = SEED_ASSET_REGISTRY[reference.assetId];
+    if (!seed) {
+      unknownSeedIds.add(reference.assetId);
+      continue;
+    }
+    if (seed.kind !== reference.expectedKind) {
+      assetKindErrors.push({
+        assetId: reference.assetId,
+        expectedKind: reference.expectedKind,
+        actualKind: seed.kind,
+      });
+      continue;
+    }
+    if (mappedIds.has(reference.assetId)) continue;
+    const materializedId = siteSeedAssetId(siteId, reference.assetId);
+    mappedIds.set(reference.assetId, materializedId);
+    seedRows.push({
+      id: materializedId,
+      siteId,
+      mediaType: seed.mediaType,
+      bytesBase64: seed.bytesBase64,
+      kind: seed.kind,
+      alt: seed.alt,
+    });
+  }
+
+  if (unknownSeedIds.size > 0 || assetKindErrors.length > 0) {
+    return { ok: false, unknownSeedIds: [...unknownSeedIds], assetKindErrors };
+  }
+
+  for (const page of editableState.pages) {
+    for (const section of page.sections) {
+      for (const element of section.elements) {
+        if (element.type !== 'media') continue;
+        const materializedAssetId = mappedIds.get(element.assetId);
+        if (!materializedAssetId) {
+          return { ok: false, unknownSeedIds: [element.assetId], assetKindErrors: [] };
+        }
+        element.assetId = materializedAssetId;
+        if (element.posterAssetId !== undefined) {
+          const materializedPosterAssetId = mappedIds.get(element.posterAssetId);
+          if (!materializedPosterAssetId) {
+            return { ok: false, unknownSeedIds: [element.posterAssetId], assetKindErrors: [] };
+          }
+          element.posterAssetId = materializedPosterAssetId;
+        }
+      }
+    }
+  }
+
+  return { ok: true, editableState, seedRows };
+}
+
 sites.post('/', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) {
@@ -111,7 +194,7 @@ sites.post('/', async (c) => {
   const input = await parseInput(c);
   const trimmedName = input.siteName.trim();
   const trimmedSubdomain = input.subdomain.trim().toLowerCase();
-  const templateId = input.templateId.trim() === '' ? 'starter-canvas' : input.templateId.trim();
+  const templateId = input.templateId.trim();
 
   if (trimmedName.length === 0) {
     return c.json({ error: 'siteName is required' }, 400);
@@ -124,22 +207,13 @@ sites.post('/', async (c) => {
   if (!subdomainCheck.valid) {
     return c.json({ error: subdomainCheck.error }, 400);
   }
+  if (templateId.length === 0) {
+    return c.json({ error: 'templateId is required' }, 400);
+  }
 
   const seed = getTemplateSeed(templateId);
   if (!seed) {
     return c.json({ error: `unknown templateId: ${templateId}` }, 404);
-  }
-
-  const editableState = structuredClone(seed.state);
-  const validation = validateCanvasSiteState(editableState);
-  if (!validation.valid) {
-    return c.json(
-      {
-        error: 'template seed failed canvas validation',
-        details: validation.errors,
-      },
-      500,
-    );
   }
 
   const database = db(c.env);
@@ -152,52 +226,30 @@ sites.post('/', async (c) => {
   const customerId = customerRow[0]?.id;
   if (!customerId) {
     return c.json(
-      { error: 'no customer row for current user — visit /dashboard first to materialise it' },
+      { error: 'no customer row for current user - visit /dashboard first to materialise it' },
       409,
     );
   }
 
   const newSiteId = crypto.randomUUID();
-
-  // Materialise one `siteAsset` row per seed asset id referenced by the
-  // template's pages. Every referenced id MUST exist in SEED_ASSET_REGISTRY
-  // (the seed fixture is gated by `validateSeedFixture` at smoke time). The
-  // insert runs in the SAME batch as the `site` row so site creation is
-  // atomic: if either fails, neither lands.
-  const referencedAssetIds = collectReferencedAssetIds(editableState.pages);
-  const seedRows: Array<{
-    id: string;
-    siteId: string;
-    mediaType: string;
-    bytesBase64: string;
-    kind: 'image' | 'video';
-    alt: string;
-  }> = [];
-  const unknownSeedIds: string[] = [];
-  for (const assetId of referencedAssetIds) {
-    const seed = SEED_ASSET_REGISTRY[assetId];
-    if (!seed) {
-      unknownSeedIds.push(assetId);
-      continue;
-    }
-    seedRows.push({
-      id: assetId,
-      siteId: newSiteId,
-      mediaType: seed.mediaType,
-      bytesBase64: seed.bytesBase64,
-      kind: seed.kind,
-      alt: seed.alt,
-    });
-  }
-  if (unknownSeedIds.length > 0) {
-    // Defence in depth: validateSeedFixture would have caught this in the
-    // smoke. If it ever fires here the template author has shipped a fixture
-    // referencing an unregistered id — fail loudly with the full list so the
-    // fix is obvious.
+  const preparedSeedAssets = prepareSeedAssetsForSite(newSiteId, seed.state);
+  if (!preparedSeedAssets.ok) {
     return c.json(
       {
-        error: 'template seed references unregistered asset ids',
-        unknownSeedIds,
+        error: 'template seed references invalid asset ids',
+        unknownSeedIds: preparedSeedAssets.unknownSeedIds,
+        assetKindErrors: preparedSeedAssets.assetKindErrors,
+      },
+      500,
+    );
+  }
+  const { editableState, seedRows } = preparedSeedAssets;
+  const validation = validateCanvasSiteState(editableState);
+  if (!validation.valid) {
+    return c.json(
+      {
+        error: 'template seed failed canvas validation',
+        details: validation.errors,
       },
       500,
     );
