@@ -16,12 +16,33 @@ interface BroadcastPayload {
   html: string;
 }
 
+// Runtime check for the /broadcast body. The publish endpoint is the only
+// caller, but the DO HTTP boundary is treated as untrusted: if a malformed
+// payload ever reaches this point (test harness mistake, future internal
+// caller drift, etc.), we reject loudly rather than letting unvalidated
+// data flow into every visitor's `innerHTML` swap.
+function isBroadcastPayload(value: unknown): value is BroadcastPayload {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  const version = candidate.version;
+  if (typeof version !== 'number') return false;
+  if (!Number.isFinite(version)) return false;
+  if (!Number.isInteger(version)) return false;
+  if (version < 1) return false;
+  if (typeof candidate.html !== 'string') return false;
+  return true;
+}
+
 export class SiteRoom extends DurableObject<unknown> {
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === '/broadcast' && request.method === 'POST') {
-      const payload = await request.json<BroadcastPayload>();
+      const payload: unknown = await request.json();
+      if (!isBroadcastPayload(payload)) {
+        console.error('[SiteRoom] rejected malformed broadcast', payload);
+        return new Response('invalid broadcast payload', { status: 400 });
+      }
       const message = JSON.stringify(payload);
       for (const ws of this.ctx.getWebSockets()) {
         try {

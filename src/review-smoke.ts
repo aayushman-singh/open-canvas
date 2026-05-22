@@ -1,6 +1,10 @@
+import { eq, sql } from 'drizzle-orm';
 import app from './index';
 import { validateCanvasSiteState } from './canvas/validate';
+import { db } from './db/client';
+import { customer, site } from './db/schema';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, validateSubdomain } from './routes/api/sites';
+import { starterTemplate } from './templates/registry';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -276,5 +280,121 @@ assert(
   appHostLanding.body.includes('multiplayer site builder'),
   'expected rev01.aayushman.dev / to render the Post-Aero landing copy',
 );
+
+// -- Task 5.5: publish smoke + broadcast payload hardening ----------------
+// These assertions sit behind a real DB write — seed a customer + site row
+// with a unique subdomain, exercise the unpublished/published/__live paths,
+// and clean up in `finally` regardless of outcome. The publish endpoint is
+// auth-gated by Clerk so the smoke shortcuts it by writing the snapshot
+// directly; the public render path is the thing under test here.
+
+if (!smokeEnv.DATABASE_URL) {
+  throw new Error(
+    '[review-smoke] DATABASE_URL is required for the Task 5.5 publish smoke (no fallback — set process.env.DATABASE_URL)',
+  );
+}
+
+const smokeDb = db({ DATABASE_URL: smokeEnv.DATABASE_URL });
+const SMOKE_CLERK_USER = 'smoke-user-' + crypto.randomUUID().slice(0, 8);
+const SMOKE_SUB = 'smoke-' + crypto.randomUUID().slice(0, 8).toLowerCase();
+const SMOKE_HOST = `${SMOKE_SUB}.rev01.aayushman.dev`;
+
+try {
+  const insertedCustomer = await smokeDb
+    .insert(customer)
+    .values({
+      clerkUserId: SMOKE_CLERK_USER,
+      email: `${SMOKE_CLERK_USER}@example.invalid`,
+    })
+    .returning({ id: customer.id });
+  const seededCustomerId = insertedCustomer[0]?.id;
+  assert(
+    typeof seededCustomerId === 'string' && seededCustomerId.length > 0,
+    'expected seeded customer insert to return an id',
+  );
+
+  await smokeDb.insert(site).values({
+    customerId: seededCustomerId as string,
+    name: 'smoke',
+    subdomain: SMOKE_SUB,
+    styleKit: starterTemplate.state.styleKit,
+    editableState: starterTemplate.state,
+    publishedSnapshot: null,
+    publishedVersion: 0,
+  });
+
+  // 1. Unpublished site → 404 with "not yet published".
+  const unpubResp = await responseFromHost(SMOKE_HOST, '/');
+  assert(
+    unpubResp.status === 404,
+    `expected unpublished site to 404, got ${unpubResp.status}`,
+  );
+  assert(
+    /not yet published|not found/i.test(unpubResp.body),
+    `expected unpublished body to mention "not yet published" or "not found" (got ${JSON.stringify(unpubResp.body)})`,
+  );
+
+  // 2. Insert a Published Snapshot directly. The publish endpoint requires
+  // Clerk auth, so the smoke writes the same shape the endpoint would.
+  const publishedSnapshot = {
+    version: 1,
+    publishedAt: new Date().toISOString(),
+    styleKit: starterTemplate.state.styleKit,
+    pages: starterTemplate.state.pages,
+  };
+  await smokeDb
+    .update(site)
+    .set({
+      publishedSnapshot,
+      publishedVersion: 1,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(site.subdomain, SMOKE_SUB));
+
+  // 3. Published site → 200 with the public root, page id, and version stamp.
+  const pubResp = await responseFromHost(SMOKE_HOST, '/');
+  assert(
+    pubResp.status === 200,
+    `expected published site to 200, got ${pubResp.status}`,
+  );
+  assert(
+    pubResp.body.includes('data-rev01-public-root'),
+    'expected published body to contain data-rev01-public-root',
+  );
+  assert(
+    pubResp.body.includes('data-rev01-page="page-home"'),
+    'expected published body to contain data-rev01-page="page-home"',
+  );
+  assert(
+    pubResp.body.includes('currentVersion = 1'),
+    'expected published body to inject currentVersion = 1 in the visitor script',
+  );
+
+  // 4. /__live without an Upgrade header → 426 with the canonical message.
+  const liveResp = await responseFromHost(SMOKE_HOST, '/__live');
+  assert(
+    liveResp.status === 426,
+    `expected /__live without upgrade to 426, got ${liveResp.status}`,
+  );
+  assert(
+    /expected websocket/i.test(liveResp.body),
+    `expected /__live 426 body to mention "expected websocket" (got ${JSON.stringify(liveResp.body)})`,
+  );
+
+  // 5. App host /__live → NOT a 426 (public router returns null, app routes
+  // take over). The exact status doesn't matter as long as the public router
+  // did not handle it as a Published Address.
+  const appLive = await responseFromHost('rev01.aayushman.dev', '/__live');
+  assert(
+    appLive.status !== 426,
+    `expected app host /__live not to be a 426 (public router should ignore the app host), got ${appLive.status}`,
+  );
+} finally {
+  // Clean up regardless of assertion outcome. site is FK-cascade-deleted
+  // by customer, but we delete in dependency order anyway so the smoke
+  // does not rely on the cascade contract.
+  await smokeDb.delete(site).where(eq(site.subdomain, SMOKE_SUB));
+  await smokeDb.delete(customer).where(eq(customer.clerkUserId, SMOKE_CLERK_USER));
+}
 
 console.log('[review-smoke] OK');
