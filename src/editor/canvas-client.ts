@@ -2160,7 +2160,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         let payload;
         try { payload = JSON.parse(event.data); } catch (_) { return; }
         if (!payload || typeof payload !== "object") return;
-        if (payload.type === "presence" && typeof payload.count === "number") {
+        if (payload.type === "presence" && typeof payload.count === "number" && Number.isFinite(payload.count)) {
           const count = payload.count;
           if (count > 1) {
             counter.textContent = String(count);
