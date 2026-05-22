@@ -9,7 +9,6 @@
 import { allTemplateSeeds } from '../templates/registry.js';
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { importSectionIntoSite } from './section-import.js';
-import type { CanvasSection, MediaElement } from './schema.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -24,7 +23,7 @@ for (const seed of allTemplateSeeds) {
 
   const result = importSectionIntoSite({
     targetSiteId,
-    sourceSection: sourceSection as CanvasSection,
+    sourceSection: sourceSection,
     existingAssetIds,
   });
   assert(result.ok, `import failed for ${seed.id}: ${result.ok ? '' : result.errors.join('; ')}`);
@@ -35,7 +34,7 @@ for (const seed of allTemplateSeeds) {
   );
   for (const element of result.section.elements) {
     if (element.type !== 'media') continue;
-    const media = element as MediaElement;
+    const media = element;
     const expectedPrefix = `seed-${targetSiteId}-`;
     assert(
       media.assetId.startsWith(expectedPrefix),
@@ -67,8 +66,8 @@ for (const seed of allTemplateSeeds) {
 
 // Dedup check: same registry asset referenced from a fresh import after
 // existingAssetIds is primed should not produce a duplicate row.
-const seed = allTemplateSeeds[0]!;
-const firstSection = seed.state.pages[0]!.sections[0] as CanvasSection;
+const seed = allTemplateSeeds[0];
+const firstSection = seed.state.pages[0]!.sections[0]!;
 const firstImport = importSectionIntoSite({
   targetSiteId,
   sourceSection: firstSection,
@@ -95,8 +94,8 @@ if (firstImport.ok) {
 // previous /^[a-z0-9]{4,}$/i bug that stripped words like "heading" and
 // "primary").
 {
-  const heroSeed = allTemplateSeeds[0]!;
-  const heroSection = heroSeed.state.pages[0]!.sections[0] as CanvasSection;
+  const heroSeed = allTemplateSeeds[0];
+  const heroSection = heroSeed.state.pages[0]!.sections[0]!;
   const out = importSectionIntoSite({
     targetSiteId,
     sourceSection: heroSection,

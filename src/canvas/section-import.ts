@@ -14,7 +14,7 @@
 // `{ ok: false, errors }`. No silent skip. No fallback bytes.
 
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
-import type { CanvasSection, MediaElement } from './schema.js';
+import type { CanvasSection } from './schema.js';
 
 export interface ImportSectionInput {
   targetSiteId: string;
@@ -54,7 +54,7 @@ function materialisedAssetId(targetSiteId: string, rawSeedId: string): string {
 
 export function importSectionIntoSite(input: ImportSectionInput): ImportSectionResult {
   const { targetSiteId, sourceSection, existingAssetIds } = input;
-  const cloned = structuredClone(sourceSection) as CanvasSection;
+  const cloned = structuredClone(sourceSection);
   const errors: string[] = [];
 
   const idMap = new Map<string, string>();
@@ -71,7 +71,7 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
   const assetIdMap = new Map<string, string>();
   for (const element of cloned.elements) {
     if (element.type !== 'media') continue;
-    const media = element as MediaElement;
+    const media = element;
     const seed = SEED_ASSET_REGISTRY[media.assetId];
     if (!seed) {
       errors.push(`unknown seed asset id: ${media.assetId}`);
@@ -95,7 +95,7 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
 
   for (const element of cloned.elements) {
     if (element.type !== 'media') continue;
-    const media = element as MediaElement;
+    const media = element;
     media.assetId = assetIdMap.get(media.assetId)!;
     if (media.posterAssetId !== undefined) {
       media.posterAssetId = assetIdMap.get(media.posterAssetId)!;
