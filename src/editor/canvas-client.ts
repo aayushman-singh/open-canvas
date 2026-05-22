@@ -41,8 +41,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
   const MOTION_PRESETS = ["none", "fade-up", "slide-left", "scale-in", "blur-in", "stagger-children", "slow-drift", "parallax-soft"];
   const INLINE_MARK_TYPES = ["bold", "italic", "underline", "strike", "code", "highlight", "link"];
-  const SAFE_CSS_KEYS = ["color", "background", "borderColor"];
-
   // -- href allowlist (mirrors src/canvas/validate.ts isAllowedHref) -------
   // Centralised so the inline-link mark toolbar uses the SAME rules as the
   // server validator. If you change one, change the other.
@@ -1329,7 +1327,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       for (let m = 0; m < trimmed[i].marks.length; m++) {
         const mark = trimmed[i].marks[m];
         if (mark.type === "link" && !isAllowedHref(mark.href)) {
-          const reason = "href \"" + mark.href + "\" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)";
+          const reason = "href " + JSON.stringify(mark.href) + " is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)";
           throw new Error(reason);
         }
       }
@@ -1616,7 +1614,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           ? op.content.map((r) => (r && typeof r.text === "string" ? r.text : "")).join("")
           : "";
       const shortened = preview.length > 80 ? preview.slice(0, 77) + "…" : preview;
-      return "Rewrite text " + op.elementId + ": \"" + shortened + "\"";
+      return "Rewrite text " + op.elementId + ": " + JSON.stringify(shortened);
     }
     if (op.kind === "replaceMedia") {
       return "Replace media " + op.elementId + " with asset " + op.assetId + " (" + op.mediaKind + ")";
@@ -1624,7 +1622,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (op.kind === "insertSection") {
       const after = op.afterSectionId ? " after " + op.afterSectionId : " at end";
       const brief = op.input && typeof op.input.brief === "string" ? op.input.brief : "";
-      return "Insert section recipe=" + op.recipeId + after + (brief.length > 0 ? " — \"" + brief + "\"" : "");
+      return "Insert section recipe=" + op.recipeId + after + (brief.length > 0 ? " — " + JSON.stringify(brief) : "");
     }
     return "Unknown op";
   }
@@ -2127,9 +2125,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function attachStyleKitButtons() {
-    const buttons = document.querySelectorAll('[data-style-kit]');
+    const buttons = document.querySelectorAll('.rev01-editor-topbar .style-kits button[data-style-kit]');
     buttons.forEach((button) => {
-      button.addEventListener("click", async () => {
+      button.addEventListener("click", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
         const kit = button.getAttribute('data-style-kit');
         if (!kit || STYLE_KITS.indexOf(kit) < 0) return;
         try {
