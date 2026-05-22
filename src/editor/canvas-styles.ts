@@ -275,9 +275,12 @@ body.rev01-modal-open {
   font-size: 12px;
   cursor: pointer;
 }
-.rev01-section-card-use:hover,
-.rev01-section-card-use:focus-visible {
+.rev01-section-card-use:hover {
   background: var(--rev01-bg-panel-strong);
+}
+.rev01-section-card-use:focus-visible {
+  outline: 2px solid var(--rev01-accent);
+  outline-offset: 2px;
 }
 .rev01-section-card.is-pending .rev01-section-card-use {
   background: var(--rev01-accent);

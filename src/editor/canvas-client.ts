@@ -2548,6 +2548,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return '&#39;';
     });
   }
+  // HTML-encoding all 5 chars is over-escaping for attributes but correct;
+  // matches src/canvas/render.ts ATTR_ESCAPES.
   function escapeAttr(value) {
     return escapeHtml(value);
   }
@@ -2576,8 +2578,53 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const root = document.querySelector('[data-section-picker-root]');
     if (!root || sectionsCatalog === null) return;
 
+    let gridContainer = root.querySelector('[data-section-picker-grid-container]');
+    if (!gridContainer) {
+      // First paint: build the persistent shell (controls + empty grid container).
+      // Subsequent calls skip this branch so the search input keeps focus across
+      // keystroke-triggered re-renders.
+      renderSectionsPickerShell(root);
+      gridContainer = root.querySelector('[data-section-picker-grid-container]');
+    }
+
+    renderSectionsPickerGrid(gridContainer);
+  }
+
+  function renderSectionsPickerShell(root) {
     const templateIds = Array.from(new Set(sectionsCatalog.map((e) => e.templateId)));
     const templateNames = new Map(sectionsCatalog.map((e) => [e.templateId, e.templateName]));
+
+    const filterOptions = ['<option value="all">All templates</option>']
+      .concat(templateIds.map((id) => '<option value="' + escapeAttr(id) + '">' + escapeHtml(templateNames.get(id) || id) + '</option>'))
+      .join('');
+
+    root.innerHTML =
+      '<div class="rev01-section-picker-controls">' +
+        '<input type="search" class="rev01-section-picker-search" placeholder="Search sections" ' +
+          'value="' + escapeAttr(activeSearchQuery) + '" data-section-picker-search />' +
+        '<select class="rev01-section-picker-filter" data-section-picker-filter>' + filterOptions + '</select>' +
+      '</div>' +
+      '<div data-section-picker-grid-container></div>';
+
+    const filter = root.querySelector('[data-section-picker-filter]');
+    if (filter) {
+      filter.value = activeTemplateFilter;
+      filter.addEventListener('change', () => {
+        activeTemplateFilter = filter.value;
+        renderSectionsPickerGrid(root.querySelector('[data-section-picker-grid-container]'));
+      });
+    }
+    const search = root.querySelector('[data-section-picker-search]');
+    if (search) {
+      search.addEventListener('input', () => {
+        activeSearchQuery = search.value;
+        renderSectionsPickerGrid(root.querySelector('[data-section-picker-grid-container]'));
+      });
+    }
+  }
+
+  function renderSectionsPickerGrid(gridContainer) {
+    if (!gridContainer || sectionsCatalog === null) return;
 
     const filtered = sectionsCatalog.filter((entry) => {
       if (activeTemplateFilter !== 'all' && entry.templateId !== activeTemplateFilter) return false;
@@ -2587,10 +2634,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       return true;
     });
-
-    const filterOptions = ['<option value="all">All templates</option>']
-      .concat(templateIds.map((id) => '<option value="' + escapeAttr(id) + '">' + escapeHtml(templateNames.get(id) || id) + '</option>'))
-      .join('');
 
     const cards = filtered.map((entry) => {
       const isPending = pendingImport
@@ -2616,32 +2659,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       );
     }).join('');
 
-    root.innerHTML =
-      '<div class="rev01-section-picker-controls">' +
-        '<input type="search" class="rev01-section-picker-search" placeholder="Search sections" ' +
-          'value="' + escapeAttr(activeSearchQuery) + '" data-section-picker-search />' +
-        '<select class="rev01-section-picker-filter" data-section-picker-filter>' + filterOptions + '</select>' +
-      '</div>' +
-      (filtered.length === 0
-        ? '<p class="rev01-section-picker-empty">No sections match.</p>'
-        : '<ul class="rev01-section-picker-grid">' + cards + '</ul>');
+    gridContainer.innerHTML = filtered.length === 0
+      ? '<p class="rev01-section-picker-empty">No sections match.</p>'
+      : '<ul class="rev01-section-picker-grid">' + cards + '</ul>';
 
-    const filter = root.querySelector('[data-section-picker-filter]');
-    if (filter) {
-      filter.value = activeTemplateFilter;
-      filter.addEventListener('change', () => {
-        activeTemplateFilter = filter.value;
-        renderSectionsPanel();
-      });
-    }
-    const search = root.querySelector('[data-section-picker-search]');
-    if (search) {
-      search.addEventListener('input', () => {
-        activeSearchQuery = search.value;
-        renderSectionsPanel();
-      });
-    }
-    root.querySelectorAll('[data-section-card-use]').forEach((button) => {
+    gridContainer.querySelectorAll('[data-section-card-use]').forEach((button) => {
       button.addEventListener('click', () => {
         const templateId = button.getAttribute('data-template-id') || '';
         const sectionId = button.getAttribute('data-section-id') || '';
