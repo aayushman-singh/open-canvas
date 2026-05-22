@@ -288,6 +288,33 @@ body.rev01-modal-open {
   border-color: transparent;
 }
 
+/* Placement-mode drop slots — drawn between sections while pendingImport is
+   set. Slots are invisible until hover/focus by default; while
+   data-placement-active is set on <body> they stay fully visible so the
+   Owner can clearly see every available insert position. */
+.rev01-section-slot {
+  display: block;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 1px dashed var(--rev01-accent);
+  background: transparent;
+  color: var(--rev01-accent);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease;
+}
+.rev01-section-slot:hover,
+.rev01-section-slot:focus-visible {
+  opacity: 1;
+  background-color: var(--rev01-bg-panel-strong);
+}
+body[data-placement-active="true"] .rev01-section-slot {
+  opacity: 1;
+}
+
 .rev01-sidebar-group {
   display: grid;
   gap: 8px;
