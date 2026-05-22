@@ -3,10 +3,12 @@ import app from './index';
 import { applyCanvasAgentOp } from './agent/canvas-ops';
 import { CANVAS_AGENT_TOOLS } from './agent/canvas-tools';
 import { collectReferencedAssetIds } from './assets/site-assets';
+import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
 import { SECTION_RECIPE_IDS } from './canvas/schema';
 import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
+import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
 import { customer, site, siteAsset } from './db/schema';
@@ -646,6 +648,41 @@ const t7ApplyProbe = await app.request(
 assert(
   t7ApplyProbe.status === 302 || t7ApplyProbe.status === 401,
   `expected canvas-agent apply without auth to redirect or 401, got ${t7ApplyProbe.status}`,
+);
+
+// -- Task 8: public stylesheet must differ across kits -------------------
+// The same `canvasPublishedStyles` string ships to every Published Site; we
+// assert it contains a distinct `[data-style-kit="charcoal"] { ... }` block
+// vs `[data-style-kit="orange-editorial"] { ... }` block and their accent
+// declarations differ. This is the visitor-facing equivalent of the
+// canvas:smoke kit-distinctness check.
+const charcoalAnchor = '[data-style-kit="charcoal"] {';
+const orangeAnchor = '[data-style-kit="orange-editorial"] {';
+const charcoalStart = canvasPublishedStyles.indexOf(charcoalAnchor);
+const orangeStart = canvasPublishedStyles.indexOf(orangeAnchor);
+assert(
+  charcoalStart >= 0,
+  'expected public stylesheet to include a [data-style-kit="charcoal"] block',
+);
+assert(
+  orangeStart >= 0,
+  'expected public stylesheet to include a [data-style-kit="orange-editorial"] block',
+);
+const charcoalBlock = canvasPublishedStyles.slice(charcoalStart, charcoalStart + 600);
+const orangeBlock = canvasPublishedStyles.slice(orangeStart, orangeStart + 600);
+assert(
+  charcoalBlock !== orangeBlock,
+  'expected charcoal and orange-editorial blocks in public stylesheet to differ verbatim',
+);
+const charcoalAccent = STYLE_KIT_PRESETS.charcoal.accent;
+const orangeAccent = STYLE_KIT_PRESETS['orange-editorial'].accent;
+assert(
+  charcoalAccent !== orangeAccent,
+  'expected charcoal and orange-editorial kit accents to differ',
+);
+assert(
+  canvasPublishedStyles.includes(charcoalAccent) && canvasPublishedStyles.includes(orangeAccent),
+  'expected public stylesheet to reference both charcoal and orange-editorial accent values',
 );
 
 console.log('[review-smoke] OK');

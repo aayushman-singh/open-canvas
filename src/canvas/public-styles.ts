@@ -1,18 +1,22 @@
 // src/canvas/public-styles.ts
 //
-// Minimal CSS shipped on the visitor-facing Published Site. Holds:
-//   - the style-kit colour token block (mirrors the editor's token mapping so
-//     visitor and editor previews land on the same palette)
+// Minimal CSS shipped on the visitor-facing Published Site. Composed of:
+//   - the shared style-kit CSS produced by `buildAllStyleKitsCss()` so visitor
+//     and editor previews always agree on tokens, variants, and motion
 //   - a small container reset that lets the absolute-positioned canvas
 //     elements (built by renderCanvasSnapshot) lay out correctly.
 //
-// The editor's full chrome stylesheet (canvasEditorStyles in
-// src/editor/canvas-styles.ts) is intentionally NOT reused here: visitors get
-// no editor topbar, inspector, or selection outlines. T8 may extract a deeper
-// shared base if the editor preview drifts from the public renderer; for now
-// the kit tokens are the only overlap.
+// The kit token table USED to live here as hand-maintained selectors. As of
+// T8 the source of truth is `src/canvas/style-kits.ts` — a single
+// `STYLE_KIT_PRESETS` map consumed by both the editor preview and this
+// visitor stylesheet. There is exactly one place that knows how to translate
+// a preset into CSS.
 
-export const canvasPublishedStyles = String.raw`
+import { buildAllStyleKitsCss } from './style-kits.js';
+
+const kitCss = buildAllStyleKitsCss();
+
+const baseCss = String.raw`
 * { box-sizing: border-box; }
 
 html, body {
@@ -34,47 +38,20 @@ html, body {
 
 .rev01-site {
   display: block;
-  --kit-bg: #0c0c0d;
-  --kit-fg: #f6f6f6;
-  --kit-accent: oklch(0.78 0.15 200);
-  background: var(--kit-bg);
-  color: var(--kit-fg);
-}
-
-.rev01-site[data-style-kit="charcoal"] {
-  --kit-bg: #0c0c0d;
-  --kit-fg: #f6f6f6;
-  --kit-accent: oklch(0.85 0.02 240);
-}
-.rev01-site[data-style-kit="orange-editorial"] {
-  --kit-bg: #fff7ef;
-  --kit-fg: #221610;
-  --kit-accent: oklch(0.72 0.18 50);
-}
-.rev01-site[data-style-kit="blue-saas"] {
-  --kit-bg: #0b1530;
-  --kit-fg: #e8efff;
-  --kit-accent: oklch(0.74 0.16 250);
-}
-.rev01-site[data-style-kit="green-organic"] {
-  --kit-bg: #0f1a14;
-  --kit-fg: #e7f3ea;
-  --kit-accent: oklch(0.76 0.15 150);
+  background: var(--rev01-kit-bg, var(--kit-bg, #0c0c0d));
+  color: var(--rev01-kit-text, var(--kit-fg, #f6f6f6));
+  font-family: var(--rev01-kit-font-body, 'IBM Plex Sans', system-ui, sans-serif);
+  line-height: var(--rev01-kit-line-height, 1.5);
 }
 
 .rev01-page {
   margin: 0 auto;
-  background: var(--kit-bg);
-  color: var(--kit-fg);
+  background: var(--rev01-kit-bg, var(--kit-bg, #0c0c0d));
+  color: var(--rev01-kit-text, var(--kit-fg, #f6f6f6));
 }
 
 .rev01-section {
   position: relative;
-}
-
-.rev01-element {
-  /* Wrapper styles (position, dimensions, z-index) come from inline style
-     emitted by the renderer; this class just keeps a stable selector. */
 }
 
 .rev01-text { color: inherit; }
@@ -85,28 +62,19 @@ html, body {
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: 0 16px;
-  border-radius: 999px;
-  background: var(--kit-accent);
-  color: var(--kit-bg);
+  padding: var(--rev01-kit-action-padding, 0 16px);
+  border-radius: var(--rev01-kit-action-radius, 999px);
+  background: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+  color: var(--rev01-kit-accent-text, var(--kit-bg, #fff));
   text-decoration: none;
   font-weight: 600;
-}
-.rev01-action[data-variant="outline"] {
-  background: transparent;
-  border: 1px solid var(--kit-accent);
-  color: var(--kit-fg);
-}
-.rev01-action[data-variant="ghost"] {
-  background: transparent;
-  color: var(--kit-fg);
 }
 
 .rev01-shape {
   width: 100%;
   height: 100%;
-  background: var(--kit-accent);
-  opacity: 0.6;
+  background: var(--rev01-kit-shape-fill, var(--rev01-kit-accent, var(--kit-accent, currentColor)));
+  opacity: 0.85;
 }
 .rev01-shape[data-variant="circle"] { border-radius: 50%; }
 .rev01-shape[data-variant="pill"] { border-radius: 999px; }
@@ -116,9 +84,9 @@ html, body {
 .rev01-surface {
   width: 100%;
   height: 100%;
-  background: oklch(0.95 0 0 / 0.06);
-  border: 1px solid oklch(0.6 0.02 240 / 0.25);
-  border-radius: 8px;
+  background: var(--rev01-kit-panel, rgba(255, 255, 255, 0.06));
+  border-radius: var(--rev01-kit-radius, 8px);
+  box-shadow: var(--rev01-kit-shadow, none);
 }
 
 .rev01-media {
@@ -131,9 +99,32 @@ html, body {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: var(--kit-accent, currentColor);
+  text-decoration-color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
 }
 .rev01-inline-link:hover {
-  color: var(--kit-accent, currentColor);
+  color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+}
+
+/* Presence indicator — a tiny pill that lives in the top-right of the
+   published page. Hidden by default; the visitor script removes the
+   [hidden] attribute when more than one socket is connected. */
+[data-rev01-presence] {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 9999;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+}
+[data-rev01-presence][hidden] {
+  display: none;
 }
 `;
+
+export const canvasPublishedStyles = `${baseCss}\n${kitCss}`;

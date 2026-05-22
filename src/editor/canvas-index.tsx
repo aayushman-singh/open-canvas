@@ -132,6 +132,20 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
             <button id="canvas-publish" type="button" disabled>
               Publish
             </button>
+            {/* Presence indicator — visible only when count > 1. The DO
+                broadcasts `{ type: "presence", count }` over the same /__live
+                WebSocket used by the visitor live-update path. The client
+                script unhides this element when count > 1 and removes it
+                when count drops back to 1. */}
+            <span
+              data-rev01-presence
+              hidden
+              role="status"
+              aria-live="polite"
+              aria-label="People viewing"
+            >
+              <span data-rev01-presence-count>0</span> viewing
+            </span>
           </header>
           <div id="canvas-root" data-site-id={owned.id} />
           <aside id="canvas-inspector" hidden />

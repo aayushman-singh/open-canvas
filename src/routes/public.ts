@@ -114,7 +114,22 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
           return;
         }
         if (payload.type === 'presence') {
-          // Task 8 will surface the visitor count; ignored for now.
+          // Task 8: surface the visitor count in the corner pill. Show only
+          // when count > 1 — a lone "1 viewing" is meaningless and would
+          // just leak the fact that the visitor is alone.
+          const count = typeof payload.count === 'number' && Number.isFinite(payload.count)
+            ? payload.count
+            : 0;
+          const pill = document.querySelector('[data-rev01-presence]');
+          const counter = document.querySelector('[data-rev01-presence-count]');
+          if (pill && counter) {
+            if (count > 1) {
+              counter.textContent = String(count);
+              pill.hidden = false;
+            } else {
+              pill.hidden = true;
+            }
+          }
           return;
         }
       }
@@ -189,8 +204,39 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 ): Promise<Response | null> {
   const requestUrl = new URL(c.req.url);
   const host = requestUrl.host;
+  const path = requestUrl.pathname;
 
-  if (APP_HOSTS.has(host)) return null;
+  // Special case: the editor lives on the app host (rev01.aayushman.dev) but
+  // still wants to join the same SiteRoom DO that visitors join on the
+  // Published Address. We allow `/__live?siteId=<id>` on the app host to
+  // proxy through to the DO scoped to that site id. Everything else on the
+  // app host falls through to the app routes as usual.
+  //
+  // The editor passes its `siteId` (a UUID-shaped string already validated
+  // by the editor route and the canvas API) — we reject anything that does
+  // not match the strict id charset to avoid letting an attacker stuff
+  // garbage through to the DO namespace.
+  if (APP_HOSTS.has(host)) {
+    if (path === '/__live') {
+      const siteIdParam = requestUrl.searchParams.get('siteId');
+      if (siteIdParam === null || !/^[A-Za-z0-9-]+$/.test(siteIdParam)) {
+        // No siteId, or malformed — not our concern; let the app handle it.
+        return null;
+      }
+      const upgrade = c.req.header('upgrade');
+      if (upgrade !== 'websocket') {
+        return c.text('expected websocket upgrade', 426);
+      }
+      const id = c.env.SITE_ROOM.idFromName(siteIdParam);
+      const stub = c.env.SITE_ROOM.get(id);
+      const doRequest = new Request('https://do.invalid/socket', {
+        method: 'GET',
+        headers: c.req.raw.headers,
+      });
+      return stub.fetch(doRequest);
+    }
+    return null;
+  }
   if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
 
   const subdomain = extractSubdomain(host);
@@ -203,8 +249,6 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   if (!siteRow.publishedSnapshot) {
     return c.text('site not yet published', 404);
   }
-
-  const path = requestUrl.pathname;
 
   if (path === '/__live') {
     const upgrade = c.req.header('upgrade');
@@ -268,6 +312,9 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   </head>
   <body>
     <div data-rev01-public-root>${raw(snapshotHtml)}</div>
+    <aside data-rev01-presence hidden role="status" aria-live="polite" aria-label="People viewing">
+      👀 <span data-rev01-presence-count>0</span> viewing
+    </aside>
     <script type="module">${raw(visitorScript)}</script>
   </body>
 </html>`,

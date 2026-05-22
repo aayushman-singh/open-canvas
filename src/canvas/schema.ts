@@ -206,3 +206,71 @@ export interface PublishedSnapshot {
   styleKit: StyleKit;
   pages: CanvasPage[];
 }
+
+// -- Style Kit token contract (Task 8) -------------------------------------
+//
+// A Style Kit is a curated visual system — colour, typography, surfaces,
+// shapes, actions, and motion — that the editor preview and the published
+// renderer translate into a block of `--rev01-*` CSS custom properties on the
+// page wrapper. The actual preset DATA lives in `src/canvas/style-kits.ts`
+// (one definition shared by editor + public renderer); the schema retains
+// only the TYPE so it stays free of runtime data and Cloudflare-bundle weight.
+//
+// `Record<X, ...>` is intentional: TypeScript enforces that every kit covers
+// every value of `SurfaceVariant`, `ActionVariant`, `MotionPreset`. A kit
+// that wants the default for a given variant uses `{}` — present, empty.
+
+export interface SurfaceVariantTokens {
+  background?: string;
+  border?: string;
+  shadow?: string;
+  radius?: string;
+}
+
+export interface ActionVariantTokens {
+  background?: string;
+  color?: string;
+  border?: string;
+  weight?: number;
+}
+
+export interface MotionPresetTokens {
+  delayMs?: number;
+  transform?: string;
+  opacity?: number;
+}
+
+export interface StyleKitPreset {
+  // Colour
+  bg: string;
+  panel: string;
+  text: string;
+  muted: string;
+  accent: string;
+  accentText: string;
+  // Typography
+  fontFamilyDisplay: string;
+  fontFamilyBody: string;
+  fontFamilyMono: string;
+  headingScale: number;
+  bodyScale: number;
+  labelScale: number;
+  lineHeight: number;
+  // Surfaces (containers)
+  radius: string;
+  borderWidth: string;
+  shadow: string;
+  surfaceVariants: Record<SurfaceVariant, SurfaceVariantTokens>;
+  // Shapes
+  shapeFill: string;
+  shapeStroke: string;
+  shapeStrokeWidth: string;
+  // Actions
+  actionRadius: string;
+  actionPadding: string;
+  actionVariants: Record<ActionVariant, ActionVariantTokens>;
+  // Motion
+  motionDurationMs: number;
+  motionEasing: string;
+  motionPresets: Record<MotionPreset, MotionPresetTokens>;
+}
