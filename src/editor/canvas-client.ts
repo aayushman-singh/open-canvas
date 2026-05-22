@@ -676,7 +676,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // Build the editor-mode preview for a media element. The src points at the
-  // owner-gated preview route (/api/canvas/sites/:siteId/assets/:assetId),
+  // owner-gated preview route (/api/me/assets/:assetId),
   // NOT the public /assets/:assetId path — visitors only see published assets,
   // but the Owner can preview anything they have uploaded BEFORE publish.
   //
@@ -694,7 +694,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         element.mediaKind === "image" ? "[image — upload to preview]" : "[video — upload to preview]";
       return node;
     }
-    const previewUrl = SITE_BASE + "/assets/" + encodeURIComponent(assetId);
+    const previewUrl = "/api/me/assets/" + encodeURIComponent(assetId);
     if (element.mediaKind === "image") {
       const img = document.createElement("img");
       img.setAttribute("src", previewUrl);
@@ -1535,7 +1535,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   async function postAssetUpload(dataUrl, altValue) {
-    const response = await authFetch(SITE_BASE + "/assets", {
+    const response = await authFetch("/api/me/assets", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ dataUrl: dataUrl, alt: altValue }),
