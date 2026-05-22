@@ -13,6 +13,7 @@
     "format:check": "prettier --check .",
     "canvas:smoke": "bun run src/canvas/smoke.ts",
     "canvas-agent:smoke": "bun run src/agent/canvas-agent-smoke.ts",
+    "yjs-projection:smoke": "bun run src/canvas/yjs-projection.smoke.ts",
     "section-import:smoke": "bun run src/canvas/section-import-smoke.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",
@@ -46,7 +47,9 @@
     "@google/genai": "2.5.0",
     "@neondatabase/serverless": "^1.1.0",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.21"
+    "hono": "^4.12.21",
+    "y-protocols": "^1.0.7",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260521.1",

@@ -23,6 +23,10 @@ interface SmokeEntry {
 // chain. Once a wave agent replaces its stub with a real smoke, the entry
 // below stays unchanged (script name + dir path stayed the same).
 const SMOKES: SmokeEntry[] = [
+  // Phase 0 — Yjs projection contract consumed by #3 (version history) and
+  // #4 (co-edit). Runs first so any drift in the projection module trips the
+  // chain before downstream feature smokes that depend on it execute.
+  { name: 'yjs-projection', script: 'yjs-projection:smoke' },
   { name: 'responsive', script: 'responsive:smoke' },
   { name: 'version', script: 'version:smoke' },
   { name: 'coedit', script: 'coedit:smoke' },
