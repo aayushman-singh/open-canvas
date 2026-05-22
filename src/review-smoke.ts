@@ -19,10 +19,10 @@ import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
-import { customer, site, siteAsset } from './db/schema';
+import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
 import {
-  prepareSeedAssetsForSite,
+  prepareSeedOwnerAssetsForSite,
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_RE,
   validateSubdomain,
@@ -736,8 +736,8 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
-const preparedForSiteA = prepareSeedAssetsForSite('site-a', starterTemplate.state);
-const preparedForSiteB = prepareSeedAssetsForSite('site-b', starterTemplate.state);
+const preparedForSiteA = prepareSeedOwnerAssetsForSite('site-a', 'cust-a', starterTemplate.state);
+const preparedForSiteB = prepareSeedOwnerAssetsForSite('site-b', 'cust-b', starterTemplate.state);
 assert(preparedForSiteA.ok, 'expected seed asset preparation for site-a to succeed');
 assert(preparedForSiteB.ok, 'expected seed asset preparation for site-b to succeed');
 const preparedAIds = new Set(
@@ -769,6 +769,7 @@ for (const id of preparedAIds) {
   assert(!preparedBIds.has(id), `expected per-site materialised asset id ${id} not to collide`);
 }
 let t6SiteId: string | null = null;
+let t6CustomerId: string | null = null;
 try {
   const inserted = await smokeDb
     .insert(customer)
@@ -777,14 +778,14 @@ try {
       email: `${T6_CLERK_USER}@example.invalid`,
     })
     .returning({ id: customer.id });
-  const t6CustomerId = inserted[0]?.id;
+  t6CustomerId = inserted[0]?.id ?? null;
   assert(
     typeof t6CustomerId === 'string' && t6CustomerId.length > 0,
     'expected T6 smoke customer insert to return an id',
   );
 
   t6SiteId = crypto.randomUUID();
-  const preparedT6 = prepareSeedAssetsForSite(t6SiteId, starterTemplate.state);
+  const preparedT6 = prepareSeedOwnerAssetsForSite(t6SiteId, t6CustomerId, starterTemplate.state);
   assert(preparedT6.ok, 'expected T6 seed asset preparation to succeed');
   await smokeDb.insert(site).values({
     id: t6SiteId,
@@ -797,27 +798,29 @@ try {
     publishedVersion: 0,
   });
   const seedRows = preparedT6.seedRows;
-  await smokeDb.insert(siteAsset).values(seedRows);
+  await smokeDb.insert(ownerAsset).values(seedRows);
 
   const assetRows = await smokeDb
-    .select({ id: siteAsset.id })
-    .from(siteAsset)
-    .where(eq(siteAsset.siteId, t6SiteId));
+    .select({ id: ownerAsset.id })
+    .from(ownerAsset)
+    .where(eq(ownerAsset.customerId, t6CustomerId));
   assert(
     assetRows.length === seedRows.length,
-    `expected site_asset row count (${assetRows.length}) to equal prepared seed row count (${seedRows.length})`,
+    `expected owner_asset row count (${assetRows.length}) to equal prepared seed row count (${seedRows.length})`,
   );
   const presentIds = new Set(assetRows.map((r) => r.id));
   for (const row of seedRows) {
     assert(
       presentIds.has(row.id),
-      `expected materialised site_asset row "${row.id}" but it was missing`,
+      `expected materialised owner_asset row "${row.id}" but it was missing`,
     );
   }
 } finally {
   if (t6SiteId) {
-    await smokeDb.delete(siteAsset).where(eq(siteAsset.siteId, t6SiteId));
     await smokeDb.delete(site).where(eq(site.id, t6SiteId));
+  }
+  if (t6CustomerId) {
+    await smokeDb.delete(ownerAsset).where(eq(ownerAsset.customerId, t6CustomerId));
   }
   await smokeDb.delete(customer).where(eq(customer.clerkUserId, T6_CLERK_USER));
 }

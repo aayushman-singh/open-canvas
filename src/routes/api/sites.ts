@@ -1,13 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
-import { collectReferencedAssets } from '../../assets/site-assets';
+import { collectReferencedAssets } from '../../assets/owner-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, siteAsset } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 import { getTemplateSeed } from '../../templates/registry';
 
 type Bindings = {
@@ -28,9 +28,9 @@ export const RESERVED_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'dashb
 type ValidSubdomain = { valid: true };
 type InvalidSubdomain = { valid: false; error: string };
 
-export interface SeedSiteAssetRow {
+export interface SeedOwnerAssetRow {
   id: string;
-  siteId: string;
+  customerId: string;
   mediaType: string;
   bytesBase64: string;
   kind: MediaKind;
@@ -38,7 +38,7 @@ export interface SeedSiteAssetRow {
 }
 
 type PreparedSeedAssets =
-  | { ok: true; editableState: CanvasSiteState; seedRows: SeedSiteAssetRow[] }
+  | { ok: true; editableState: CanvasSiteState; seedRows: SeedOwnerAssetRow[] }
   | {
       ok: false;
       unknownSeedIds: string[];
@@ -117,13 +117,14 @@ function siteSeedAssetId(siteId: string, seedAssetId: string): string {
   return `seed-${siteId}-${seedAssetId}`;
 }
 
-export function prepareSeedAssetsForSite(
+export function prepareSeedOwnerAssetsForSite(
   siteId: string,
+  customerId: string,
   state: CanvasSiteState,
 ): PreparedSeedAssets {
   const editableState = structuredClone(state);
   const mappedIds = new Map<string, string>();
-  const seedRows: SeedSiteAssetRow[] = [];
+  const seedRows: SeedOwnerAssetRow[] = [];
   const unknownSeedIds = new Set<string>();
   const assetKindErrors: Array<{
     assetId: string;
@@ -150,7 +151,7 @@ export function prepareSeedAssetsForSite(
     mappedIds.set(reference.assetId, materializedId);
     seedRows.push({
       id: materializedId,
-      siteId,
+      customerId,
       mediaType: seed.mediaType,
       bytesBase64: seed.bytesBase64,
       kind: seed.kind,
@@ -232,7 +233,7 @@ sites.post('/', async (c) => {
   }
 
   const newSiteId = crypto.randomUUID();
-  const preparedSeedAssets = prepareSeedAssetsForSite(newSiteId, seed.state);
+  const preparedSeedAssets = prepareSeedOwnerAssetsForSite(newSiteId, customerId, seed.state);
   if (!preparedSeedAssets.ok) {
     return c.json(
       {
@@ -269,7 +270,7 @@ sites.post('/', async (c) => {
     if (seedRows.length === 0) {
       await siteInsert;
     } else {
-      const assetInsert = database.insert(siteAsset).values(seedRows);
+      const assetInsert = database.insert(ownerAsset).values(seedRows);
       await database.batch([siteInsert, assetInsert]);
     }
   } catch (err) {
