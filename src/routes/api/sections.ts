@@ -10,7 +10,6 @@ import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { importSectionIntoSite } from '../../canvas/section-import';
-import type { CanvasSiteState } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, site, siteAsset } from '../../db/schema';
@@ -143,7 +142,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
 
   const siteUpdate = database
     .update(site)
-    .set({ editableState: state as CanvasSiteState, updatedAt: sql`now()` })
+    .set({ editableState: state, updatedAt: sql`now()` })
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
   if (importResult.newAssetRows.length === 0) {
     await siteUpdate;
