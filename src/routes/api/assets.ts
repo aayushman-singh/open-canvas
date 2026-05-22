@@ -9,9 +9,10 @@ import { clerkAuth } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { requireOwnerContext, type OwnerEnv } from '../../auth/context.js';
 import { db } from '../../db/client.js';
-import { ownerAsset } from '../../db/schema.js';
+import { ownerAsset, site } from '../../db/schema.js';
 import {
   assetResponse,
+  clearAssetReferences,
   dataUrlToOwnerAsset,
   findAssetUsage,
   generateImageViaReplicate,
@@ -187,6 +188,64 @@ assets.post('/me/assets/generate', async (c) => {
     bytesBase64: image.bytesBase64,
     alt: parsed.alt,
   });
+});
+
+assets.delete('/me/assets/:assetId', async (c) => {
+  const ctx = await requireOwnerContext(c);
+  if (!ctx.ok) return ctx.response;
+  const assetId = c.req.param('assetId');
+
+  // Verify ownership BEFORE looking for references.
+  const owned = await db(c.env)
+    .select({ id: ownerAsset.id })
+    .from(ownerAsset)
+    .where(and(eq(ownerAsset.id, assetId), eq(ownerAsset.customerId, ctx.customer.id)))
+    .limit(1);
+  if (owned.length === 0) return c.json({ error: 'asset not found' }, 404);
+
+  // Require explicit cascade confirmation from the client. The UI must have
+  // rendered the impact modal and the owner must have confirmed before this
+  // handler is invoked. Anything else is rejected as a guard against
+  // accidental DELETEs (curl typo, replay attack, etc).
+  if (c.req.query('confirm') !== 'cascade') {
+    return c.json({ error: 'cascade confirmation required' }, 400);
+  }
+
+  const database = db(c.env);
+
+  // Best-effort cascade. neon-http does not provide ACID transactions; we
+  // sequence the writes so the user-visible state converges:
+  //   1. Compute usage to find every editable state that needs clearing.
+  //   2. For each affected site, rewrite editableState with assetId cleared.
+  //   3. Delete the asset row (slot_history rows cascade via FK).
+  //
+  // If step 2 fails partway, the asset row is still present and the owner can
+  // retry. If step 3 fails after step 2, the editable states are cleared but
+  // the asset row lingers — the next retry of DELETE finishes the job. No
+  // silent data loss on either path.
+  const usage = await findAssetUsage(database, ctx.customer.id, assetId);
+  const editableSites = new Set(
+    usage.filter((u) => u.source === 'editable').map((u) => u.siteId),
+  );
+  for (const siteId of editableSites) {
+    const rows = await database
+      .select({ editableState: site.editableState })
+      .from(site)
+      .where(and(eq(site.id, siteId), eq(site.customerId, ctx.customer.id)))
+      .limit(1);
+    const row = rows[0];
+    if (!row) continue;
+    const cleared = clearAssetReferences(row.editableState, assetId);
+    await database
+      .update(site)
+      .set({ editableState: cleared })
+      .where(and(eq(site.id, siteId), eq(site.customerId, ctx.customer.id)));
+  }
+  await database
+    .delete(ownerAsset)
+    .where(and(eq(ownerAsset.id, assetId), eq(ownerAsset.customerId, ctx.customer.id)));
+
+  return c.json({ ok: true });
 });
 
 export default assets;
