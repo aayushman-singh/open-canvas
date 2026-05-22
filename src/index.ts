@@ -35,4 +35,8 @@ app.route('/api/publish', publishApi);
 app.route('/api', sectionsApi);
 
 export { SiteRoom } from './live/site-room';
+// Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in
+// wrangler.toml; the implementation throws until Wave 2 lands. See
+// docs/superpowers/plans/2026-05-23-07-forms.md.
+export { FormRateLimiter } from './live/form-rate-limiter';
 export default app;
