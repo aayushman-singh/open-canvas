@@ -906,6 +906,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     applyZoom();
     renderInspector();
     renderSidebarSelection();
+    // If a cross-template import is pending, the article we just replaced
+    // wiped any previously-drawn slots; re-draw them now.
+    if (pendingImport) {
+      renderPlacementSlots();
+    }
   }
 
   // -- Inspector ----------------------------------------------------------
@@ -2696,7 +2701,99 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function renderPlacementSlots() {
-    // Implemented in Task 6.
+    const canvasRoot = document.getElementById('canvas-root');
+    if (!canvasRoot) return;
+
+    // Remove any previously-drawn slots so we never double-draw.
+    canvasRoot.querySelectorAll('.rev01-section-slot').forEach((node) => node.remove());
+
+    if (!pendingImport) {
+      document.body.removeAttribute('data-placement-active');
+      return;
+    }
+    document.body.setAttribute('data-placement-active', 'true');
+
+    const page = state && state.pages ? state.pages[0] : null;
+    if (!page) return;
+    const sections = Array.isArray(page.sections) ? page.sections : [];
+
+    function makeSlot(insertAt) {
+      const slot = document.createElement('button');
+      slot.type = 'button';
+      slot.className = 'rev01-section-slot';
+      slot.setAttribute('data-slot-index', String(insertAt));
+      slot.setAttribute('aria-label', 'Insert section here (position ' + insertAt + ')');
+      slot.textContent = '+ Insert here';
+      slot.addEventListener('click', () => {
+        void importPendingSectionAt(insertAt);
+      });
+      return slot;
+    }
+
+    if (sections.length === 0) {
+      canvasRoot.appendChild(makeSlot(0));
+      return;
+    }
+
+    // Section nodes carry data-rev01-section (see buildSectionNode); the
+    // [data-section-id] attribute is used by toolbar buttons, not the section
+    // DOM root.
+    const sectionNodes = Array.from(canvasRoot.querySelectorAll('[data-rev01-section]'));
+    for (let i = 0; i < sectionNodes.length; i += 1) {
+      const node = sectionNodes[i];
+      if (node.parentNode) node.parentNode.insertBefore(makeSlot(i), node);
+    }
+    const lastNode = sectionNodes[sectionNodes.length - 1];
+    if (lastNode && lastNode.parentNode) {
+      if (lastNode.nextSibling) {
+        lastNode.parentNode.insertBefore(makeSlot(sections.length), lastNode.nextSibling);
+      } else {
+        lastNode.parentNode.appendChild(makeSlot(sections.length));
+      }
+    }
+  }
+
+  async function importPendingSectionAt(insertAt) {
+    if (!pendingImport) return;
+    const target = pendingImport;
+    setStatus('Inserting section…', 'ok');
+    try {
+      const response = await authFetch('/api/sites/' + SITE_ID + '/sections/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          templateId: target.templateId,
+          sectionId: target.sectionId,
+          insertAt: insertAt,
+        }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (e2) { /* ignore */ }
+        setStatus('Insert failed: ' + detail, 'error');
+        return;
+      }
+      const body = await response.json();
+      if (!body || typeof body !== 'object' || !body.editableState) {
+        setStatus('Insert failed: malformed server response', 'error');
+        return;
+      }
+      state = body.editableState;
+      selectedSectionId = null;
+      selectedElementId = null;
+      pendingImport = null;
+      if (mainEl && state && state.styleKit) {
+        mainEl.setAttribute('data-style-kit', state.styleKit);
+      }
+      renderAll();
+      renderSectionsPanel();
+      setStatus('Inserted section from ' + target.templateName, 'ok');
+    } catch (err) {
+      setStatus('Insert failed: ' + (err && err.message ? err.message : String(err)), 'error');
+    }
   }
 
   function attachSidebarActions() {
@@ -2837,6 +2934,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
     }
     window.addEventListener("keydown", (ev) => {
+      // Placement-mode Escape takes priority — it cancels the pending import
+      // before any other Escape behaviour (e.g. inline-editing exits, which
+      // are scoped to their own targets and won't fire here anyway).
+      if (ev.key === "Escape" && pendingImport) {
+        ev.preventDefault();
+        exitPlacementMode();
+        return;
+      }
       const isSave = (ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S");
       if (isSave) {
         ev.preventDefault();
