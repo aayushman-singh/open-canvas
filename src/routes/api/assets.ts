@@ -22,14 +22,22 @@ const assets = new Hono<OwnerEnv>();
 
 const realRequireAuth = requireAuth();
 
-assets.use('*', clerkAuth());
+// SMOKE bypass runs before clerkAuth so the Clerk SDK never reads (and
+// consumes) the request body when the smoke harness is driving requests.
+// Production paths cannot reach the bypass because env.SMOKE is unset.
 assets.use('*', async (c, next) => {
-  if (c.env.SMOKE === '1' && (c.req.header('x-smoke-customer-id') ?? '').length > 0) {
-    await next();
-    return;
+  if (c.env.SMOKE === '1') {
+    if ((c.req.header('x-smoke-customer-id') ?? '').length > 0) {
+      await next();
+      return;
+    }
+    // SMOKE=1 but no customer-id header → 401. Do not run Clerk auth at all
+    // (no valid session exists in the smoke environment anyway).
+    return c.json({ error: 'unauthorized' }, 401);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return realRequireAuth(c as any, next);
+  // Non-smoke path: standard Clerk auth gate.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-explicit-any
+  return clerkAuth()(c as any, async () => { await realRequireAuth(c as any, next); });
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -14,7 +14,8 @@
     "canvas:smoke": "bun run src/canvas/smoke.ts",
     "canvas-agent:smoke": "bun run src/agent/canvas-agent-smoke.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
-    "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts"
+    "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",
+    "asset:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/owner-asset-smoke.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.4.11",
