@@ -30,7 +30,7 @@ import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
+import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/owner-assets';
 import type { RecipeFactoryInput } from '../../canvas/recipes';
 import {
   INLINE_MARK_TYPES,
@@ -45,7 +45,7 @@ import {
 } from '../../canvas/schema';
 import { validateCanvasSiteState, isAllowedHref } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, siteAsset } from '../../db/schema';
+import { customer, site, ownerAsset } from '../../db/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -346,15 +346,15 @@ async function runOpsPipeline(
   }
 
   // Verify every media asset reference in the resulting state belongs to this
-  // site and matches the media element's expected kind. This catches
+  // site's owner and matches the media element's expected kind. This catches
   // replaceMedia ops AND recipe-created sections that receive assetIds.
   const referencedAssetIds = collectReferencedAssetIds(next.pages);
   if (referencedAssetIds.size > 0) {
     const database = db(c.env);
     const rows = await database
-      .select({ id: siteAsset.id, kind: siteAsset.kind })
-      .from(siteAsset)
-      .where(and(eq(siteAsset.siteId, row.id), inArray(siteAsset.id, [...referencedAssetIds])));
+      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
+      .from(ownerAsset)
+      .where(and(eq(ownerAsset.customerId, row.customerId), inArray(ownerAsset.id, [...referencedAssetIds])));
     const referenceErrors = findAssetReferenceErrors(next.pages, rows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
