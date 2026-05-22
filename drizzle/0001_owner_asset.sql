@@ -4,6 +4,8 @@
 -- left in place; it is dropped in 0002 after the application code is fully
 -- switched over.
 
+BEGIN;
+
 CREATE TABLE owner_asset (
   id text PRIMARY KEY,
   customer_id text NOT NULL REFERENCES customer(id) ON DELETE CASCADE,
@@ -17,6 +19,17 @@ CREATE TABLE owner_asset (
 
 CREATE INDEX owner_asset_by_customer
   ON owner_asset (customer_id, last_used_at DESC);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM site_asset sa
+    LEFT JOIN site s ON s.id = sa.site_id
+    WHERE s.id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'orphaned site_asset rows detected (site_id has no matching site) — migration aborted';
+  END IF;
+END $$;
 
 INSERT INTO owner_asset (
   id, customer_id, media_type, bytes_base64, kind, alt, created_at, last_used_at
@@ -43,3 +56,5 @@ CREATE TABLE slot_history (
 
 CREATE INDEX slot_history_by_slot
   ON slot_history (site_id, element_id, last_used_at DESC);
+
+COMMIT;
