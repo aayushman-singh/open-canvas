@@ -62,7 +62,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     throw new Error('sections api reached without an authenticated user');
   }
   const siteId = c.req.param('siteId');
-  const raw = await c.req.json().catch(() => null);
+  const raw: unknown = await c.req.json().catch(() => null);
   const parsed = parseImportBody(raw);
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, 400);
