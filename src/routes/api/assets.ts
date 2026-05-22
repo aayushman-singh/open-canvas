@@ -12,10 +12,11 @@ import { ownerAsset } from '../../db/schema.js';
 import {
   assetResponse,
   dataUrlToOwnerAsset,
+  generateImageViaReplicate,
+  MAX_ASSET_DATA_URL_BYTES,
   readOwnerAsset,
+  snapToFluxAspectRatio,
 } from '../../assets/owner-assets.js';
-
-const MAX_ASSET_DATA_URL_BYTES = 1_500_000;
 
 const assets = new Hono<OwnerEnv>();
 
@@ -86,6 +87,58 @@ assets.get('/me/assets/:assetId', async (c) => {
   const row = await readOwnerAsset(db(c.env), ctx.customer.id, c.req.param('assetId'));
   if (!row) return c.json({ error: 'asset not found' }, 404);
   return assetResponse(row.mediaType, row.bytesBase64);
+});
+
+interface GenerateInput {
+  prompt: string;
+  alt: string;
+  boxW: number;
+  boxH: number;
+}
+
+function parseGenerateInput(body: unknown): GenerateInput | { error: string } {
+  if (!isRecord(body)) return { error: 'request body must be a JSON object' };
+  const { prompt, alt, boxW, boxH } = body;
+  if (typeof prompt !== 'string' || prompt.trim().length === 0)
+    return { error: 'prompt is required (non-empty string)' };
+  if (typeof alt !== 'string')
+    return { error: 'alt is required (string; "" is acceptable)' };
+  if (typeof boxW !== 'number' || !Number.isFinite(boxW) || boxW <= 0)
+    return { error: 'boxW is required (positive finite number)' };
+  if (typeof boxH !== 'number' || !Number.isFinite(boxH) || boxH <= 0)
+    return { error: 'boxH is required (positive finite number)' };
+  return { prompt, alt, boxW, boxH };
+}
+
+assets.post('/me/assets/generate', async (c) => {
+  const ctx = await requireOwnerContext(c);
+  if (!ctx.ok) return ctx.response;
+
+  const body: unknown = await c.req.json();
+  const parsed = parseGenerateInput(body);
+  if ('error' in parsed) return c.json({ error: parsed.error }, 400);
+
+  const token = c.env.REPLICATE_API_TOKEN;
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error('REPLICATE_API_TOKEN binding is missing');
+  }
+
+  const aspectRatio = snapToFluxAspectRatio(parsed.boxW, parsed.boxH);
+  const image = await generateImageViaReplicate(token, parsed.prompt, aspectRatio);
+
+  const dataUrlLength = `data:${image.mediaType};base64,`.length + image.bytesBase64.length;
+  if (dataUrlLength > MAX_ASSET_DATA_URL_BYTES) {
+    return c.json({ error: 'generated asset too large' }, 413);
+  }
+
+  // KEY DIFFERENCE FROM THE OLD ROUTE: no insert. Bytes return to the client;
+  // the browser POSTs them back to /me/assets on Apply.
+  return c.json({
+    kind: 'image' as const,
+    mediaType: image.mediaType,
+    bytesBase64: image.bytesBase64,
+    alt: parsed.alt,
+  });
 });
 
 export default assets;

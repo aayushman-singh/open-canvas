@@ -1321,8 +1321,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //   video upload   -> extract first-frame poster -> crop poster to slot ->
   //                     POST /assets (video) + POST /assets (image poster) ->
   //                     set element.assetId + element.posterAssetId
-  //   ai generation  -> POST /assets/generate with slot box; server snaps to
-  //                     flux-schnell's nearest preset aspect ratio
+  //   ai generation  -> POST /api/me/assets/generate with slot box (bytes returned,
+  //                     no row inserted) -> preview + Apply/Discard ->
+  //                     on Apply: POST /api/me/assets (creates Owner Asset row)
   //
   // Render-side fit:cover still handles any residual aspect drift (e.g.,
   // generated assets that snapped to a nearby preset rather than the exact
@@ -1631,8 +1632,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
     setStatus("Generating…");
+
+    // Step 1: POST to /api/me/assets/generate — returns bytes; nothing is
+    // persisted yet. The browser holds the preview; only Apply creates the
+    // Owner Asset row via /api/me/assets.
+    let generated;
     try {
-      const response = await authFetch(SITE_BASE + "/assets/generate", {
+      const response = await authFetch("/api/me/assets/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -1652,20 +1658,86 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       const body = await response.json();
-      if (!body || typeof body.assetId !== "string") {
+      if (
+        !body ||
+        typeof body.mediaType !== "string" ||
+        typeof body.bytesBase64 !== "string"
+      ) {
         setStatus("Generate failed: malformed server response", "error");
         return;
       }
-      element.assetId = body.assetId;
-      element.mediaKind = "image";
-      element.alt = altValue;
-      rebuildElement(element.id);
-      renderInspector();
-      scheduleSave();
-      setStatus("Generated", "ok");
+      generated = body;
     } catch (err) {
       setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
     }
+
+    const previewDataUrl = "data:" + generated.mediaType + ";base64," + generated.bytesBase64;
+    setStatus("Generated — preview ready. Apply or Discard.", "ok");
+
+    // Step 2: Show a preview panel with Apply and Discard buttons.
+    // The preview is injected beneath the generator section and removed on
+    // either action, keeping the rest of the inspector intact.
+    const previewWrap = document.createElement("div");
+    previewWrap.className = "field";
+    previewWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;";
+
+    const img = document.createElement("img");
+    img.src = previewDataUrl;
+    img.alt = altValue || "Generated preview";
+    img.style.cssText = "width:100%;border-radius:4px;display:block;";
+    previewWrap.appendChild(img);
+
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:flex;gap:6px;";
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.textContent = "Apply";
+    applyBtn.style.cssText = "flex:1;";
+
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.textContent = "Discard";
+    discardBtn.style.cssText = "flex:1;";
+
+    btnRow.appendChild(applyBtn);
+    btnRow.appendChild(discardBtn);
+    previewWrap.appendChild(btnRow);
+    inspector.appendChild(previewWrap);
+
+    function removePreview() {
+      if (previewWrap.parentNode) previewWrap.parentNode.removeChild(previewWrap);
+    }
+
+    // Step 3: On Discard — throw bytes away, close preview.
+    discardBtn.addEventListener("click", () => {
+      removePreview();
+      setStatus("Discarded");
+    });
+
+    // Step 4: On Apply — POST the data URL to /api/me/assets which creates
+    // the actual Owner Asset row, then wire the element to it.
+    applyBtn.addEventListener("click", async () => {
+      applyBtn.disabled = true;
+      discardBtn.disabled = true;
+      setStatus("Saving…");
+      try {
+        const uploaded = await postAssetUpload(previewDataUrl, altValue);
+        removePreview();
+        element.assetId = uploaded.assetId;
+        element.mediaKind = "image";
+        element.alt = altValue;
+        rebuildElement(element.id);
+        renderInspector();
+        scheduleSave();
+        setStatus("Applied", "ok");
+      } catch (err) {
+        applyBtn.disabled = false;
+        discardBtn.disabled = false;
+        setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      }
+    });
   }
 
   function appendMediaUploader(element) {
