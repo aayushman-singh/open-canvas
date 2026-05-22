@@ -161,13 +161,69 @@ body {
   cursor: not-allowed;
 }
 
-#canvas-root {
+/* Viewport wraps #canvas-root so we can apply CSS transform scale on the
+   page wrapper while the viewport scrolls naturally. The viewport owns the
+   dark background + outer padding so the zoomed page sits on the editor
+   chrome instead of breaking out of it. */
+.rev01-viewport {
   grid-area: canvas;
+  position: relative;
   overflow: auto;
   background:
     radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
     linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
   padding: 32px;
+}
+
+#canvas-root {
+  /* When the script wraps #canvas-root in .rev01-viewport, the wrapper owns
+     grid-area / scroll / background. #canvas-root itself just hosts the
+     transformed page. Keep transform-origin top-left so zoom math is
+     predictable. */
+  transform-origin: top left;
+  display: block;
+}
+
+/* Floating zoom toolbar pinned to the viewport's top-left. Stays anchored
+   while the viewport scrolls so the controls are always reachable. */
+.rev01-zoom-toolbar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 10002;
+  width: max-content;
+  display: inline-flex;
+  gap: 4px;
+  margin: -16px 0 8px 0;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--rev01-bg-titlebar);
+  border: 1px solid var(--rev01-hairline-strong);
+  box-shadow: 0 6px 18px oklch(0 0 0 / 0.35);
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+}
+.rev01-zoom-toolbar button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  font: inherit;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 28px;
+}
+.rev01-zoom-toolbar button:hover {
+  border-color: var(--rev01-accent);
+}
+.rev01-zoom-toolbar .zoom-readout {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--rev01-fg-mute);
+  min-width: 44px;
+  justify-content: center;
 }
 
 .rev01-page {
@@ -413,6 +469,59 @@ body {
 .rev01-mark-toolbar button:hover {
   border-color: var(--rev01-accent);
   color: var(--rev01-fg);
+}
+
+/* Inspector reading-order group (above the z-order group). Two compact
+   buttons plus a "Reading order: N of M" caption. The caption is the only
+   place owners see the section.elements[] index, which is what visitors
+   hear via assistive tech. */
+.rev01-reorder-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.rev01-reorder-buttons button {
+  appearance: none;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex: 1 1 auto;
+}
+.rev01-reorder-buttons button:hover {
+  border-color: var(--rev01-accent);
+}
+.rev01-reorder-caption {
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  color: var(--rev01-fg-mute);
+  margin-bottom: 4px;
+}
+
+/* Inspector z-order group: four buttons that mutate element.box.z. */
+.rev01-zorder-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.rev01-zorder-buttons button {
+  appearance: none;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  font: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex: 1 1 calc(50% - 4px);
+}
+.rev01-zorder-buttons button:hover {
+  border-color: var(--rev01-accent);
 }
 
 /* Inline link mark — both editor preview and published renderer use this
