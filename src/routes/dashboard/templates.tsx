@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
@@ -10,6 +13,26 @@ import type { PublishedSnapshot } from '../../canvas/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
+
+// The dashboard template preview iframe fetches seed assets through this
+// route (NOT through the public R2 read path) so the preview works before
+// the Owner has chosen a template. The seed bytes live as base64 text
+// files under `src/assets/seed-source/`; we read them at module load and
+// cache the decoded bytes so the preview asset serve is a pure-memory op.
+const seedSourceDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'seed-source');
+const seedBytesCache = new Map<string, Uint8Array>();
+function readSeedBytes(sourcePath: string): Uint8Array {
+  const cached = seedBytesCache.get(sourcePath);
+  if (cached) return cached;
+  const text = readFileSync(join(seedSourceDir, sourcePath), 'utf8').replace(/\s+/g, '');
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  seedBytesCache.set(sourcePath, bytes);
+  return bytes;
+}
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -220,15 +243,6 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
   );
 }
 
-function decodeBase64(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
 function Page() {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
@@ -325,7 +339,13 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
   if (!asset) {
     return c.text('template asset not found', 404);
   }
-  return new Response(decodeBase64(asset.bytesBase64), {
+  // The preview path reads bytes directly from the seed-source files so it
+  // works in dev without the R2 binding being populated. The R2-backed
+  // read path (`/assets/:contentHash` on the public host) is the canonical
+  // surface for live sites; this dashboard-side route is a build-time
+  // preview affordance only.
+  const bytes = readSeedBytes(asset.sourcePath);
+  return new Response(bytes, {
     headers: {
       'content-type': asset.mediaType,
       'cache-control': 'public, max-age=31536000, immutable',

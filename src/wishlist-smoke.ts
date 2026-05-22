@@ -27,6 +27,10 @@ const SMOKES: SmokeEntry[] = [
   // #4 (co-edit). Runs first so any drift in the projection module trips the
   // chain before downstream feature smokes that depend on it execute.
   { name: 'yjs-projection', script: 'yjs-projection:smoke' },
+  // Phase 0 — asset pipeline (#2). Owner-rooted upload, content-hash read,
+  // confirm-cascade delete. Runs early because every wave-1 agent that
+  // touches media consumes this contract.
+  { name: 'assets', script: 'assets:smoke' },
   { name: 'responsive', script: 'responsive:smoke' },
   { name: 'version', script: 'version:smoke' },
   { name: 'coedit', script: 'coedit:smoke' },

@@ -14,7 +14,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-const targetSiteId = 'test-target-site-id';
+const targetCustomerId = 'test-target-customer-id';
 const existingAssetIds = new Set<string>();
 
 for (const seed of allTemplateSeeds) {
@@ -22,7 +22,7 @@ for (const seed of allTemplateSeeds) {
   assert(sourceSection !== undefined, `${seed.id} missing page[0].sections[0]`);
 
   const result = importSectionIntoSite({
-    targetSiteId,
+    targetCustomerId,
     sourceSection: sourceSection,
     existingAssetIds,
   });
@@ -32,7 +32,7 @@ for (const seed of allTemplateSeeds) {
   for (const element of result.section.elements) {
     if (element.type !== 'media') continue;
     const media = element;
-    const expectedPrefix = `seed-${targetSiteId}-`;
+    const expectedPrefix = `seed-${targetCustomerId}-`;
     assert(
       media.assetId.startsWith(expectedPrefix),
       `${seed.id}: media.assetId "${media.assetId}" not remapped`,
@@ -46,14 +46,25 @@ for (const seed of allTemplateSeeds) {
   }
 
   for (const row of result.newAssetRows) {
-    assert(row.siteId === targetSiteId, `${seed.id}: asset row siteId mismatch`);
-    assert(row.id.startsWith(`seed-${targetSiteId}-`), `${seed.id}: asset row id shape wrong`);
-    const rawSeedId = row.id.slice(`seed-${targetSiteId}-`.length);
+    assert(
+      row.customerId === targetCustomerId,
+      `${seed.id}: asset row customerId mismatch`,
+    );
+    assert(
+      row.id.startsWith(`seed-${targetCustomerId}-`),
+      `${seed.id}: asset row id shape wrong`,
+    );
+    const rawSeedId = row.id.slice(`seed-${targetCustomerId}-`.length);
     const registryEntry = SEED_ASSET_REGISTRY[rawSeedId];
     assert(registryEntry !== undefined, `${seed.id}: row references unknown raw seed ${rawSeedId}`);
     if (registryEntry !== undefined) {
       assert(row.kind === registryEntry.kind, `${seed.id}: row kind mismatch`);
-      assert(row.bytesBase64 === registryEntry.bytesBase64, `${seed.id}: row bytes mismatch`);
+      assert(
+        row.contentHash === registryEntry.contentHash,
+        `${seed.id}: row contentHash mismatch`,
+      );
+      assert(row.r2Key === registryEntry.r2Key, `${seed.id}: row r2Key mismatch`);
+      assert(row.byteSize === registryEntry.byteSize, `${seed.id}: row byteSize mismatch`);
     }
   }
 }
@@ -63,7 +74,7 @@ for (const seed of allTemplateSeeds) {
 const seed = allTemplateSeeds[0];
 const firstSection = seed.state.pages[0]!.sections[0]!;
 const firstImport = importSectionIntoSite({
-  targetSiteId,
+  targetCustomerId,
   sourceSection: firstSection,
   existingAssetIds: new Set<string>(),
 });
@@ -71,7 +82,7 @@ assert(firstImport.ok, 'first import must succeed');
 if (firstImport.ok) {
   const seenSet = new Set(firstImport.newAssetRows.map((r) => r.id));
   const secondImport = importSectionIntoSite({
-    targetSiteId,
+    targetCustomerId,
     sourceSection: firstSection,
     existingAssetIds: seenSet,
   });
@@ -91,7 +102,7 @@ if (firstImport.ok) {
   const heroSeed = allTemplateSeeds[0];
   const heroSection = heroSeed.state.pages[0]!.sections[0]!;
   const out = importSectionIntoSite({
-    targetSiteId,
+    targetCustomerId,
     sourceSection: heroSection,
     existingAssetIds: new Set<string>(),
   });

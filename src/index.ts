@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import ownerAssetsApi from './assets/route';
 import landing from './landing';
 import { dashboard } from './routes/dashboard';
 import { templatesRoute } from './routes/dashboard/templates';
@@ -32,6 +33,10 @@ app.route('/api/sites', sites);
 app.route('/api/canvas', canvasApi);
 app.route('/api/canvas-agent', canvasAgentApi);
 app.route('/api/publish', publishApi);
+// Owner-rooted asset endpoints per ADR 0004 + ADR 0006. Mounted alongside
+// the legacy `/api/canvas/sites/:siteId/assets` bridge in canvas.ts; the
+// editor still calls the legacy path during this Phase 0 cutover.
+app.route('/api/owner/assets', ownerAssetsApi);
 app.route('/api', sectionsApi);
 
 export { SiteRoom } from './live/site-room';

@@ -12,7 +12,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { importSectionIntoSite } from '../../canvas/section-import';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, siteAsset } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 import { allTemplateSeeds } from '../../templates/registry';
 import { SECTION_CATALOG } from '../../templates/section-catalog';
 
@@ -115,14 +115,18 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     );
   }
 
+  // Owner Asset rows are scoped to the customer per ADR 0004, not the site.
+  // The dedup set checks against every asset the Owner already owns so the
+  // section import does not re-insert a row that another site under this
+  // Owner already has.
   const existingAssetRows = await database
-    .select({ id: siteAsset.id })
-    .from(siteAsset)
-    .where(eq(siteAsset.siteId, siteId));
+    .select({ id: ownerAsset.id })
+    .from(ownerAsset)
+    .where(eq(ownerAsset.customerId, customerId));
   const existingAssetIds = new Set(existingAssetRows.map((r) => r.id));
 
   const importResult = importSectionIntoSite({
-    targetSiteId: siteId,
+    targetCustomerId: customerId,
     sourceSection,
     existingAssetIds,
   });
@@ -147,7 +151,14 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   if (importResult.newAssetRows.length === 0) {
     await siteUpdate;
   } else {
-    const assetInsert = database.insert(siteAsset).values(importResult.newAssetRows);
+    // Same conflict-skip story as the site-creation materialiser: per-Owner
+    // deterministic ids mean a re-import after the same Owner already owns
+    // these seed rows is a noop on the asset side, while the editable state
+    // still gets the new section.
+    const assetInsert = database
+      .insert(ownerAsset)
+      .values(importResult.newAssetRows)
+      .onConflictDoNothing();
     await database.batch([siteUpdate, assetInsert]);
   }
 

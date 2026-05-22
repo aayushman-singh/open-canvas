@@ -2,33 +2,50 @@
 //
 // Pure util for cloning a CanvasSection into a target site: regenerates all
 // IDs, walks media elements to collect seed-asset references, materialises
-// each raw SEED_ASSET_REGISTRY entry into a siteAsset row scoped to the
-// target site (id = seed-<siteId>-<rawSeedId>), and rewrites every assetId
-// and posterAssetId on the cloned section to point at the materialised ids.
+// each raw SEED_ASSET_REGISTRY entry into an ownerAsset row scoped to the
+// target Owner (id = seed-<customerId>-<rawSeedId>), and rewrites every
+// assetId and posterAssetId on the cloned section to point at the
+// materialised ids.
 //
 // Dedup: a raw seed id appearing in N elements produces exactly 1 row, and
 // rows whose target id is already in `existingAssetIds` are omitted from
 // newAssetRows (the element refs are still rewritten so they resolve).
 //
+// Re-rooted per ADR 0004: section-import now keys materialised seed asset
+// ids by `customerId` rather than `siteId`. Two sites under the same Owner
+// share the materialised asset id; the canvas state's MediaElement.assetId
+// resolves through the Owner Asset table regardless of which site owns the
+// site.
+//
 // Fail loud: an element whose assetId is not in SEED_ASSET_REGISTRY produces
 // `{ ok: false, errors }`. No silent skip. No fallback bytes.
 
+import { contentHashToR2Key, extFromMediaType } from '../assets/hash.js';
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import type { CanvasSection } from './schema.js';
 
 export interface ImportSectionInput {
-  targetSiteId: string;
+  /**
+   * The Owner the cloned section's assets are rooted under (per ADR 0004).
+   * Previously this was the target site id; the parameter is renamed to
+   * make the re-rooting loud at every caller.
+   */
+  targetCustomerId: string;
   sourceSection: CanvasSection;
   existingAssetIds: Set<string>;
 }
 
 export interface ImportedAssetRow {
   id: string;
-  siteId: string;
+  customerId: string;
+  contentHash: string;
+  r2Key: string;
   mediaType: string;
-  bytesBase64: string;
   kind: 'image' | 'video';
   alt: string;
+  width: number | null;
+  height: number | null;
+  byteSize: number;
 }
 
 export type ImportSectionResult =
@@ -48,12 +65,12 @@ function newId(prefix: string): string {
   return `${prefix}-${random}`;
 }
 
-function materialisedAssetId(targetSiteId: string, rawSeedId: string): string {
-  return `seed-${targetSiteId}-${rawSeedId}`;
+function materialisedAssetId(targetCustomerId: string, rawSeedId: string): string {
+  return `seed-${targetCustomerId}-${rawSeedId}`;
 }
 
 export function importSectionIntoSite(input: ImportSectionInput): ImportSectionResult {
-  const { targetSiteId, sourceSection, existingAssetIds } = input;
+  const { targetCustomerId, sourceSection, existingAssetIds } = input;
   const cloned = structuredClone(sourceSection);
   const errors: string[] = [];
 
@@ -76,14 +93,17 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
     if (!seed) {
       errors.push(`unknown seed asset id: ${media.assetId}`);
     } else if (!assetIdMap.has(media.assetId)) {
-      assetIdMap.set(media.assetId, materialisedAssetId(targetSiteId, media.assetId));
+      assetIdMap.set(media.assetId, materialisedAssetId(targetCustomerId, media.assetId));
     }
     if (media.posterAssetId !== undefined) {
       const posterSeed = SEED_ASSET_REGISTRY[media.posterAssetId];
       if (!posterSeed) {
         errors.push(`unknown seed poster asset id: ${media.posterAssetId}`);
       } else if (!assetIdMap.has(media.posterAssetId)) {
-        assetIdMap.set(media.posterAssetId, materialisedAssetId(targetSiteId, media.posterAssetId));
+        assetIdMap.set(
+          media.posterAssetId,
+          materialisedAssetId(targetCustomerId, media.posterAssetId),
+        );
       }
     }
   }
@@ -105,11 +125,18 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
     const seed = SEED_ASSET_REGISTRY[rawSeedId]!;
     newAssetRows.push({
       id: materialisedId,
-      siteId: targetSiteId,
+      customerId: targetCustomerId,
+      contentHash: seed.contentHash,
+      // Recompute r2Key from contentHash + mediaType so a registry typo on
+      // r2Key surfaces as a section-import error rather than a stale row
+      // shipped into the DB.
+      r2Key: contentHashToR2Key(seed.contentHash, extFromMediaType(seed.mediaType)),
       mediaType: seed.mediaType,
-      bytesBase64: seed.bytesBase64,
       kind: seed.kind,
       alt: seed.alt,
+      width: seed.width,
+      height: seed.height,
+      byteSize: seed.byteSize,
     });
   }
 

@@ -4,6 +4,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -125,22 +126,65 @@ export const page = pgTable(
 export type Page = typeof page.$inferSelect;
 export type NewPage = typeof page.$inferInsert;
 
-export const siteAsset = pgTable('site_asset', {
+// -- ownerAsset (ADR 0004 + ADR 0006 + plan #2 asset pipeline) --------------
+//
+// The Owner Asset table re-roots media from `site` to `customer` per ADR 0004.
+// Bytes live in Cloudflare R2 keyed by `r2Key` (a content-addressed key
+// derived from `contentHash`). The `id` column is a UUID — canvas state JSON
+// references this id via `MediaElement.assetId`, and the rendering path
+// resolves the UUID through this table to the `r2Key` that fetches the actual
+// bytes. Re-uploading the same bytes for the same Owner deduplicates at the
+// (customerId, contentHash) pair: the existing row is returned and no new R2
+// object is written. Two Owners uploading the same bytes share the R2 object
+// (one set of bytes on disk) but each get their own ownerAsset row.
+export const ownerAsset = pgTable('owner_asset', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
+  customerId: text('customer_id')
     .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
+    .references(() => customer.id, { onDelete: 'cascade' }),
+  contentHash: text('content_hash').notNull(),
+  r2Key: text('r2_key').notNull(),
   mediaType: text('media_type').notNull(),
-  bytesBase64: text('bytes_base64').notNull(),
   kind: text('kind').notNull().$type<'image' | 'video'>(),
   alt: text('alt').notNull().default(''),
+  width: integer('width'),
+  height: integer('height'),
+  byteSize: integer('byte_size').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type SiteAsset = typeof siteAsset.$inferSelect;
-export type NewSiteAsset = typeof siteAsset.$inferInsert;
+export type OwnerAsset = typeof ownerAsset.$inferSelect;
+export type NewOwnerAsset = typeof ownerAsset.$inferInsert;
+
+// -- slotHistory (ADR 0004 decision 4) --------------------------------------
+//
+// Per-(site, mediaElement) MRU list of which Owner Assets have lived in each
+// slot. Keys are `(site_id, element_id, owner_asset_id)` — composite primary
+// key, so re-applying the same asset to the same slot is a noop. Rows are
+// dropped by cascade when either the site or the owner asset is deleted. The
+// editor reads this table to show "previous occupants of this slot" in the
+// gallery picker per ADR 0004.
+export const slotHistory = pgTable(
+  'slot_history',
+  {
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    elementId: text('element_id').notNull(),
+    ownerAssetId: text('owner_asset_id')
+      .notNull()
+      .references(() => ownerAsset.id, { onDelete: 'cascade' }),
+    usedAt: timestamp('used_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.siteId, t.elementId, t.ownerAssetId] }),
+  }),
+);
+
+export type SlotHistory = typeof slotHistory.$inferSelect;
+export type NewSlotHistory = typeof slotHistory.$inferInsert;
 
 // ===========================================================================
 // Phase 0 scaffold tables — declared here, unused until the owning wave

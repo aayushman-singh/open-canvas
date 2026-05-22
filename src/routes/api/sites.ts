@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
+import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { collectReferencedAssets } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
@@ -7,7 +8,7 @@ import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, siteAsset } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 import { getTemplateSeed } from '../../templates/registry';
 
 type Bindings = {
@@ -28,17 +29,25 @@ export const RESERVED_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'dashb
 type ValidSubdomain = { valid: true };
 type InvalidSubdomain = { valid: false; error: string };
 
-export interface SeedSiteAssetRow {
+// Row shape inserted into `owner_asset` when materialising a Template Seed
+// for a new site. After ADR 0004 the asset root is the Owner, not the site
+// — the materialised id is keyed on `customerId` so two sites under the
+// same Owner share the same seed asset rows.
+export interface SeedOwnerAssetRow {
   id: string;
-  siteId: string;
+  customerId: string;
+  contentHash: string;
+  r2Key: string;
   mediaType: string;
-  bytesBase64: string;
   kind: MediaKind;
   alt: string;
+  width: number | null;
+  height: number | null;
+  byteSize: number;
 }
 
 type PreparedSeedAssets =
-  | { ok: true; editableState: CanvasSiteState; seedRows: SeedSiteAssetRow[] }
+  | { ok: true; editableState: CanvasSiteState; seedRows: SeedOwnerAssetRow[] }
   | {
       ok: false;
       unknownSeedIds: string[];
@@ -113,17 +122,26 @@ function isUniqueViolation(err: unknown): boolean {
   return false;
 }
 
-function siteSeedAssetId(siteId: string, seedAssetId: string): string {
-  return `seed-${siteId}-${seedAssetId}`;
+function customerSeedAssetId(customerId: string, seedAssetId: string): string {
+  return `seed-${customerId}-${seedAssetId}`;
 }
 
-export function prepareSeedAssetsForSite(
-  siteId: string,
+/**
+ * Materialise the Owner Asset rows a new site needs from a Template Seed.
+ *
+ * Re-rooted per ADR 0004: the materialised asset id is now keyed on
+ * `customerId`, not `siteId`. Two sites under the same Owner share the
+ * materialised seed rows; deleting one site does NOT cascade-drop the
+ * shared Owner Asset. The function still rewrites the editable state's
+ * MediaElement.assetId references to point at the materialised ids.
+ */
+export function prepareSeedAssetsForCustomer(
+  customerId: string,
   state: CanvasSiteState,
 ): PreparedSeedAssets {
   const editableState = structuredClone(state);
   const mappedIds = new Map<string, string>();
-  const seedRows: SeedSiteAssetRow[] = [];
+  const seedRows: SeedOwnerAssetRow[] = [];
   const unknownSeedIds = new Set<string>();
   const assetKindErrors: Array<{
     assetId: string;
@@ -146,15 +164,19 @@ export function prepareSeedAssetsForSite(
       continue;
     }
     if (mappedIds.has(reference.assetId)) continue;
-    const materializedId = siteSeedAssetId(siteId, reference.assetId);
+    const materializedId = customerSeedAssetId(customerId, reference.assetId);
     mappedIds.set(reference.assetId, materializedId);
     seedRows.push({
       id: materializedId,
-      siteId,
+      customerId,
+      contentHash: seed.contentHash,
+      r2Key: contentHashToR2Key(seed.contentHash, extFromMediaType(seed.mediaType)),
       mediaType: seed.mediaType,
-      bytesBase64: seed.bytesBase64,
       kind: seed.kind,
       alt: seed.alt,
+      width: seed.width,
+      height: seed.height,
+      byteSize: seed.byteSize,
     });
   }
 
@@ -232,7 +254,7 @@ sites.post('/', async (c) => {
   }
 
   const newSiteId = crypto.randomUUID();
-  const preparedSeedAssets = prepareSeedAssetsForSite(newSiteId, seed.state);
+  const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seed.state);
   if (!preparedSeedAssets.ok) {
     return c.json(
       {
@@ -269,7 +291,13 @@ sites.post('/', async (c) => {
     if (seedRows.length === 0) {
       await siteInsert;
     } else {
-      const assetInsert = database.insert(siteAsset).values(seedRows);
+      // The materialised seed asset id is deterministic per-customer (per
+      // ADR 0004 re-rooting). If this Owner already created a site from the
+      // same template, the rows are already present — skip the duplicates
+      // rather than failing the site insert. This is NOT a fallback: the
+      // Owner Asset row IS what we want to exist after the call, and
+      // ON CONFLICT DO NOTHING is the deterministic upsert primitive.
+      const assetInsert = database.insert(ownerAsset).values(seedRows).onConflictDoNothing();
       await database.batch([siteInsert, assetInsert]);
     }
   } catch (err) {
