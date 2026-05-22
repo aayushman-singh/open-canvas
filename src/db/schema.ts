@@ -1,4 +1,13 @@
-import { integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 import type { CanvasSiteState, PublishedSnapshot, StyleKit } from '../canvas/schema';
 
 type LegacyDocumentJSON = Record<string, unknown>;
@@ -110,3 +119,46 @@ export const siteAsset = pgTable('site_asset', {
 
 export type SiteAsset = typeof siteAsset.$inferSelect;
 export type NewSiteAsset = typeof siteAsset.$inferInsert;
+
+export const ownerAsset = pgTable(
+  'owner_asset',
+  {
+    id: text('id').primaryKey(),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    mediaType: text('media_type').notNull(),
+    bytesBase64: text('bytes_base64').notNull(),
+    kind: text('kind').notNull().$type<'image' | 'video'>(),
+    alt: text('alt').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    ownerAssetByCustomer: index('owner_asset_by_customer').on(t.customerId, t.lastUsedAt),
+  }),
+);
+
+export type OwnerAsset = typeof ownerAsset.$inferSelect;
+export type NewOwnerAsset = typeof ownerAsset.$inferInsert;
+
+export const slotHistory = pgTable(
+  'slot_history',
+  {
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    elementId: text('element_id').notNull(),
+    assetId: text('asset_id')
+      .notNull()
+      .references(() => ownerAsset.id, { onDelete: 'cascade' }),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.siteId, t.elementId, t.assetId] }),
+    bySlot: index('slot_history_by_slot').on(t.siteId, t.elementId, t.lastUsedAt),
+  }),
+);
+
+export type SlotHistory = typeof slotHistory.$inferSelect;
+export type NewSlotHistory = typeof slotHistory.$inferInsert;
