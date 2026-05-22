@@ -49,12 +49,36 @@ const APP_HOSTS = new Set([
 // safe here because the publish endpoint is the only writer and it always
 // runs the snapshot through validate + renderCanvasSnapshot before broadcast
 // — there is no path from visitor input to this innerHTML assignment.
-const VISITOR_LIVE_SCRIPT = String.raw`
+//
+// The script is built per-request with the server-rendered snapshot version
+// baked in as an integer literal (see `buildVisitorLiveScript`). Stale or
+// duplicate broadcasts (payload.version <= currentVersion) are ignored, so a
+// late-arriving republish from before a full page reload cannot overwrite a
+// freshly-loaded snapshot.
+function buildVisitorLiveScript(snapshotVersion: number): string {
+  // Refuse non-integer/non-finite versions loudly — the caller is supposed to
+  // have already validated the snapshot, but the visitor script's stale
+  // filter is the only thing standing between a corrupt version stamp and an
+  // innerHTML swap, so we double-check.
+  if (!Number.isFinite(snapshotVersion)) {
+    throw new Error(
+      `buildVisitorLiveScript: snapshotVersion must be a finite number, got ${String(snapshotVersion)}`,
+    );
+  }
+  const versionInt = Math.floor(Number(snapshotVersion));
+  if (!Number.isInteger(versionInt) || versionInt < 0) {
+    throw new Error(
+      `buildVisitorLiveScript: snapshotVersion must be a non-negative integer, got ${String(snapshotVersion)}`,
+    );
+  }
+  const versionLiteral = String(versionInt);
+  return String.raw`
 (() => {
   const ROOT_SELECTOR = '[data-rev01-public-root]';
   const RECONNECT_DELAY_MS = 1000;
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = scheme + '//' + location.host + '/__live';
+  let currentVersion = ${versionLiteral};
 
   function connect() {
     const ws = new WebSocket(url);
@@ -68,6 +92,16 @@ const VISITOR_LIVE_SCRIPT = String.raw`
       }
       if (payload && typeof payload === 'object') {
         if (typeof payload.html === 'string') {
+          // Stale-version filter: strict > comparison. An equal version is
+          // also stale (the visitor has already rendered it on first load
+          // or via a previous broadcast).
+          if (typeof payload.version !== 'number' || !Number.isFinite(payload.version)) {
+            console.error('[rev01-visitor] broadcast missing valid version', payload);
+            return;
+          }
+          if (payload.version <= currentVersion) {
+            return;
+          }
           const root = document.querySelector(ROOT_SELECTOR);
           if (root) {
             // The server-rendered HTML is the only writer. The publish
@@ -75,6 +109,7 @@ const VISITOR_LIVE_SCRIPT = String.raw`
             // visitor-controlled path into this assignment.
             root.innerHTML = payload.html;
           }
+          currentVersion = payload.version;
           return;
         }
         if (payload.type === 'presence') {
@@ -95,6 +130,7 @@ const VISITOR_LIVE_SCRIPT = String.raw`
   connect();
 })();
 `;
+}
 
 const HTML_ESCAPES: Record<string, string> = {
   '&': '&amp;',
@@ -194,6 +230,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const canonicalUrl = `https://${siteRow.subdomain}${PUBLIC_HOST_SUFFIX}/`;
   const titleEscaped = escapeText(siteRow.name);
   const canonicalEscaped = escapeAttr(canonicalUrl);
+  const visitorScript = buildVisitorLiveScript(siteRow.publishedSnapshot.version);
 
   return c.html(
     html`<!doctype html>
@@ -207,7 +244,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   </head>
   <body>
     <div data-rev01-public-root>${raw(snapshotHtml)}</div>
-    <script type="module">${raw(VISITOR_LIVE_SCRIPT)}</script>
+    <script type="module">${raw(visitorScript)}</script>
   </body>
 </html>`,
   );
