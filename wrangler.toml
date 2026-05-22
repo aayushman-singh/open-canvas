@@ -7,13 +7,29 @@ compatibility_flags = ["nodejs_compat"]
 pattern = "rev01.aayushman.dev"
 custom_domain = true
 
+# Wildcard for Published Addresses. Workers Custom Domains do not support
+# wildcards, so this is a Workers Route on the aayushman.dev zone (no
+# `custom_domain = true`). The wildcard CNAME for *.rev01.aayushman.dev is
+# already provisioned in Cloudflare DNS.
+[[routes]]
+pattern = "*.rev01.aayushman.dev/*"
+zone_name = "aayushman.dev"
+
 [[durable_objects.bindings]]
 name = "PAGE_DO"
 class_name = "PageDocument"
 
+[[durable_objects.bindings]]
+name = "SITE_ROOM"
+class_name = "SiteRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PageDocument"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["SiteRoom"]
 
 # [[kv_namespaces]]
 # binding = "KV"
