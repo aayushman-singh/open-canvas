@@ -6,6 +6,7 @@ import sites from './routes/api/sites';
 import canvasApi from './routes/api/canvas';
 import canvasAgentApi from './routes/api/canvas-agent';
 import publishApi from './routes/api/publish';
+import sectionsApi from './routes/api/sections';
 import canvasEditor from './editor/canvas-index';
 import { handlePublicRequest, type PublicEnv } from './routes/public';
 
@@ -31,6 +32,7 @@ app.route('/api/sites', sites);
 app.route('/api/canvas', canvasApi);
 app.route('/api/canvas-agent', canvasAgentApi);
 app.route('/api/publish', publishApi);
+app.route('/api', sectionsApi);
 
 export { SiteRoom } from './live/site-room';
 export default app;
