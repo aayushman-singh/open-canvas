@@ -25,3 +25,4 @@ RECON_AGENT.md
 PARALLEL_AGENT.md
 .bun/
 .playwright-mcp/
+package-lock.json
