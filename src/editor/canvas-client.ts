@@ -1621,6 +1621,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   async function generateImageForElement(element, prompt) {
+    // Guard: discard any stacked preview for this element before starting.
+    document.getElementById("media-gen-preview-" + element.id)?.remove();
+
+    const genBtn = document.getElementById("media-gen-btn-" + element.id);
+    if (genBtn) genBtn.disabled = true;
+
     const altInputId = "media-upload-alt-" + element.id;
     const altInput = document.getElementById(altInputId);
     const altValue =
@@ -1628,6 +1634,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
     const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
     if (boxW <= 0 || boxH <= 0) {
+      if (genBtn) genBtn.disabled = false;
       setStatus("Cannot generate: slot has no size yet — resize the element first", "error");
       return;
     }
@@ -1654,6 +1661,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           const body = await response.json();
           if (body && body.error) detail = body.error;
         } catch (_) { /* ignore */ }
+        if (genBtn) genBtn.disabled = false;
         setStatus("Generate failed: " + detail, "error");
         return;
       }
@@ -1663,11 +1671,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         typeof body.mediaType !== "string" ||
         typeof body.bytesBase64 !== "string"
       ) {
+        if (genBtn) genBtn.disabled = false;
         setStatus("Generate failed: malformed server response", "error");
         return;
       }
       generated = body;
     } catch (err) {
+      if (genBtn) genBtn.disabled = false;
       setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
       return;
     }
@@ -1679,6 +1689,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // The preview is injected beneath the generator section and removed on
     // either action, keeping the rest of the inspector intact.
     const previewWrap = document.createElement("div");
+    previewWrap.id = "media-gen-preview-" + element.id;
     previewWrap.className = "field";
     previewWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;";
 
@@ -1713,6 +1724,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // Step 3: On Discard — throw bytes away, close preview.
     discardBtn.addEventListener("click", () => {
       removePreview();
+      if (genBtn) genBtn.disabled = false;
       setStatus("Discarded");
     });
 
@@ -1725,6 +1737,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       try {
         const uploaded = await postAssetUpload(previewDataUrl, altValue);
         removePreview();
+        if (genBtn) genBtn.disabled = false;
         element.assetId = uploaded.assetId;
         element.mediaKind = "image";
         element.alt = altValue;
@@ -1796,6 +1809,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     const btn = document.createElement("button");
     btn.type = "button";
+    btn.id = "media-gen-btn-" + element.id;
     btn.textContent = "Generate";
     btn.style.cssText = "margin-top:6px;";
     btn.addEventListener("click", () => {
