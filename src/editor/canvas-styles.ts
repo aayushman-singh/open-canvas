@@ -51,16 +51,20 @@ body {
   min-height: 100vh;
 }
 
+/* Body-scroll editor shell: the editor chrome (topbar / left dock / right
+   dock / status bar / zoom toolbar / AI panel / modal) is fixed-positioned
+   so the canvas area sits in normal document flow. The browser's native
+   body scrollbar is the ONLY scrollbar — no inner cells scroll. This means
+   the canvas page is horizontally centered between the docks and vertical
+   overflow (when zoomed in) scrolls at the browser viewport edge. */
 .rev01-editor {
-  display: grid;
-  grid-template-rows: 56px 1fr 28px;
-  grid-template-columns: 248px 1fr 320px;
-  grid-template-areas:
-    "topbar topbar topbar"
-    "sidebar canvas inspector"
-    "status status status";
-  height: 100vh;
+  display: block;
+  min-height: 100vh;
   width: 100%;
+}
+
+body.rev01-modal-open {
+  overflow: hidden;
 }
 /* Kit token blocks for the editor preview wrapper come from
    buildAllStyleKitsCss() — see the bottom of this file. The
@@ -69,7 +73,10 @@ body {
    published render share the same tokens. */
 
 .rev01-editor-topbar {
-  grid-area: topbar;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 56px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -126,7 +133,12 @@ body {
 }
 
 .rev01-editor-sidebar {
-  grid-area: sidebar;
+  position: fixed;
+  top: 56px;
+  left: 0;
+  bottom: 28px;
+  width: 248px;
+  z-index: 150;
   min-width: 0;
   border-right: 1px solid var(--rev01-hairline);
   background: linear-gradient(180deg, var(--rev01-bg-titlebar), var(--rev01-bg-panel-strong));
@@ -215,18 +227,25 @@ body {
   color: var(--rev01-fg);
 }
 
-/* Viewport wraps #canvas-root so we can apply CSS transform scale on the
-   page wrapper while the viewport scrolls naturally. The viewport owns the
-   dark background + outer padding so the zoomed page sits on the editor
-   chrome instead of breaking out of it. */
+/* Viewport wraps #canvas-root. We apply CSS transform scale on #canvas-root
+   to implement zoom; the viewport itself no longer scrolls — the browser's
+   native body scroll handles vertical overflow. The viewport owns the dark
+   background and centers the canvas horizontally between the fixed docks
+   via flex. Top/bottom padding clears the sticky topbar and fixed status
+   bar; left/right margins clear the fixed sidebar + inspector docks. */
 .rev01-viewport {
-  grid-area: canvas;
   position: relative;
-  overflow: auto;
   background:
     radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
     linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
+  margin-left: 248px;
+  margin-right: 320px;
   padding: 32px;
+  padding-bottom: 60px;
+  min-height: calc(100vh - 56px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
 #canvas-root {
@@ -238,17 +257,17 @@ body {
   display: block;
 }
 
-/* Floating zoom toolbar pinned to the viewport's top-left. Stays anchored
-   while the viewport scrolls so the controls are always reachable. */
+/* Floating zoom toolbar pinned to the top-left of the canvas area, just
+   inside the sidebar dock and below the topbar. Fixed so it stays visible
+   while the body scrolls; sits above the canvas via z-index. */
 .rev01-zoom-toolbar {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 10002;
+  position: fixed;
+  top: 64px;
+  left: 268px;
+  z-index: 160;
   width: max-content;
   display: inline-flex;
   gap: 4px;
-  margin: -16px 0 8px 0;
   padding: 6px;
   border-radius: 8px;
   background: var(--rev01-bg-titlebar);
@@ -425,7 +444,12 @@ body {
 }
 
 #canvas-inspector {
-  grid-area: inspector;
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 28px;
+  width: 320px;
+  z-index: 150;
   border-left: 1px solid var(--rev01-hairline);
   background: var(--rev01-bg-panel-strong);
   padding: 16px;
@@ -478,7 +502,12 @@ body {
 }
 
 .rev01-editor-status {
-  grid-area: status;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  z-index: 150;
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -496,11 +525,14 @@ body {
 }
 
 /* Inline mark toolbar — only present in the DOM while a text element is in
-   edit mode. Positioned absolutely inside #canvas-root by the client. */
+   edit mode. Appended to document.body and pinned via position: fixed by
+   the client so it stays anchored above the text element regardless of
+   body scroll. */
 .rev01-mark-toolbar {
+  position: fixed;
   display: inline-flex;
   gap: 2px;
-  z-index: 10001;
+  z-index: 180;
   padding: 4px;
   border-radius: 6px;
   background: var(--rev01-bg-titlebar);
@@ -597,7 +629,7 @@ body {
 .rev01-ai-panel {
   position: fixed;
   top: 80px;
-  right: 16px;
+  right: 336px;
   width: 360px;
   max-height: calc(100vh - 120px);
   overflow: auto;
@@ -605,7 +637,7 @@ body {
   border: 1px solid var(--rev01-hairline-strong);
   border-radius: var(--rev01-radius);
   padding: 16px;
-  z-index: 50;
+  z-index: 170;
   box-shadow: 0 12px 32px oklch(0 0 0 / 0.4);
 }
 .rev01-ai-panel h3 {
