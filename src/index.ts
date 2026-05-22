@@ -7,6 +7,7 @@ import canvasApi from './routes/api/canvas';
 import canvasAgentApi from './routes/api/canvas-agent';
 import publishApi from './routes/api/publish';
 import assetsApi from './routes/api/assets';
+import slotHistoryApi from './routes/api/slot-history';
 import canvasEditor from './editor/canvas-index';
 import { handlePublicRequest, type PublicEnv } from './routes/public';
 
@@ -28,6 +29,7 @@ app.route('/', landing);
 app.route('/dashboard/templates', templatesRoute);
 app.route('/dashboard', canvasEditor);
 app.route('/dashboard', dashboard);
+app.route('/api', slotHistoryApi);
 app.route('/api/sites', sites);
 app.route('/api/canvas', canvasApi);
 app.route('/api/canvas-agent', canvasAgentApi);
