@@ -12,6 +12,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 |--------|-------|--------|----------|
 | 0001 | rev01 architecture | Accepted | [`docs/architecture/0001-architecture.md`](../architecture/0001-architecture.md) |
 | 0002 | Published address routing | Accepted | [`docs/adr/0002-published-address.md`](0002-published-address.md) |
+| 0003 | Canvas-first reset | Accepted | [`docs/adr/0003-canvas-first-reset.md`](0003-canvas-first-reset.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
