@@ -8,6 +8,8 @@ on:
       - 'LICENSE'
       - 'docs/**'
       - '**/*.md'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -15,7 +17,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint
+      - run: bun run canvas:smoke
+      - run: bun run canvas-agent:smoke
+      - run: bun run build
+
   deploy:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
