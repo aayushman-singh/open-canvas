@@ -18,15 +18,16 @@
 //      publish — the row is already updated and the next visitor page-load
 //      will read the new snapshot.
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { collectReferencedAssetIds } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { customer, site, siteAsset } from '../../db/schema';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -84,6 +85,27 @@ publishApi.post('/sites/:siteId', async (c) => {
   const validation = validateCanvasSiteState(row.editableState);
   if (!validation.valid) {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
+  }
+
+  // Asset reachability guard: every media `assetId` and `posterAssetId`
+  // referenced by the editable state must exist as a `siteAsset` row for
+  // this site. We refuse to publish a snapshot that would point at missing
+  // media — no auto-fix, no placeholder substitution.
+  const referenced = collectReferencedAssetIds(row.editableState.pages);
+  if (referenced.size > 0) {
+    const referencedList = [...referenced];
+    const presentRows = await database
+      .select({ id: siteAsset.id })
+      .from(siteAsset)
+      .where(and(eq(siteAsset.siteId, row.id), inArray(siteAsset.id, referencedList)));
+    const present = new Set(presentRows.map((r) => r.id));
+    if (present.size !== referenced.size) {
+      const missing = referencedList.filter((id) => !present.has(id));
+      return c.json(
+        { error: 'cannot publish: missing assets', missingAssetIds: missing },
+        400,
+      );
+    }
   }
 
   const snapshot: PublishedSnapshot = {

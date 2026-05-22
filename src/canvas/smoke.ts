@@ -7,7 +7,11 @@
 import fixture from './fixtures/home.json';
 import { renderCanvasSnapshot } from './render.js';
 import type { CanvasPage, CanvasSiteState, PublishedSnapshot, TextElement } from './schema.js';
-import { validateCanvasSiteState, validatePublishedSnapshot } from './validate.js';
+import {
+  validateCanvasSiteState,
+  validatePublishedSnapshot,
+  validateSeedFixture,
+} from './validate.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -155,6 +159,41 @@ const noPagesResult = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] 
 assert(
   !noPagesResult.valid,
   'expected validator to still reject pages: [] (non-empty array required)',
+);
+
+// -- Task 6: seed-asset registry gating -----------------------------------
+// The bundled fixture's media `assetId` and `posterAssetId` values must all
+// resolve in SEED_ASSET_REGISTRY. Production validators stay registry-free;
+// only validateSeedFixture consults the registry.
+const seedResult = validateSeedFixture(editable);
+assert(
+  seedResult.valid,
+  seedResult.valid
+    ? ''
+    : `expected validateSeedFixture(starterTemplate.state) to pass: ${seedResult.errors.join('; ')}`,
+);
+
+// And a hand-built fixture whose media references an unregistered assetId
+// must be rejected, with the rejection message mentioning the offending id.
+const bogusAssetId = 'not-a-real-seed-id-xyz';
+const fixtureWithBogusAsset: CanvasSiteState = structuredClone(editable);
+const firstPage = fixtureWithBogusAsset.pages[0];
+if (!firstPage) throw new Error('fixture must have at least one page');
+const heroSection = firstPage.sections.find((s) => s.id === 'section-hero');
+if (!heroSection) throw new Error('fixture must have a hero section');
+const heroMedia = heroSection.elements.find((el) => el.id === 'hero-media');
+if (!heroMedia || heroMedia.type !== 'media') {
+  throw new Error('fixture hero section must contain a media element with id hero-media');
+}
+heroMedia.assetId = bogusAssetId;
+const bogusSeedResult = validateSeedFixture(fixtureWithBogusAsset);
+assert(
+  !bogusSeedResult.valid,
+  'expected validateSeedFixture to reject a fixture with an unregistered assetId',
+);
+assert(
+  !bogusSeedResult.valid && bogusSeedResult.errors.some((m) => m.includes(bogusAssetId)),
+  `expected validateSeedFixture rejection to mention the offending id ${bogusAssetId}`,
 );
 
 console.log('[canvas:smoke] OK');

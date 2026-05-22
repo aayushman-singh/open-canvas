@@ -1,11 +1,12 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
+import { assetResponse, dataUrlToAsset } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { STYLE_KITS, type CanvasSiteState, type StyleKit } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { customer, site, siteAsset } from '../../db/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -134,6 +135,103 @@ canvasApi.put('/sites/:siteId', async (c) => {
     .where(and(eq(site.id, siteId), eq(site.customerId, result.customerId)));
 
   return c.json({ ok: true });
+});
+
+// Maximum payload size for owner asset uploads. The base64 data URL itself
+// must not exceed this — atob inflates by ~4/3 so a 2 MB base64 payload
+// decodes to ~1.5 MB binary. Past this point we 413 loudly; no silent
+// truncation. T9 may move large assets to R2.
+const MAX_ASSET_DATA_URL_BYTES = 2 * 1024 * 1024;
+
+interface UploadAssetInput {
+  dataUrl: string;
+  alt: string;
+}
+
+function parseUploadInput(body: unknown): UploadAssetInput | { error: string } {
+  if (!isRecord(body)) return { error: 'request body must be a JSON object' };
+  const { dataUrl, alt } = body;
+  if (typeof dataUrl !== 'string' || dataUrl.length === 0) {
+    return { error: 'dataUrl is required (base64 data URL)' };
+  }
+  if (typeof alt !== 'string') {
+    return { error: 'alt is required (string; "" is acceptable)' };
+  }
+  return { dataUrl, alt };
+}
+
+canvasApi.post('/sites/:siteId/assets', async (c) => {
+  const siteId = c.req.param('siteId');
+  const result = await loadOwnedSite(c, siteId);
+  if (!result.found) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const body: unknown = await c.req.json();
+  const parsed = parseUploadInput(body);
+  if ('error' in parsed) {
+    return c.json({ error: parsed.error }, 400);
+  }
+
+  // Refuse oversized payloads up front — atob would happily decode them, but
+  // we don't want to land >1.5 MB binary into Postgres for a POC and we don't
+  // silently truncate.
+  if (parsed.dataUrl.length > MAX_ASSET_DATA_URL_BYTES) {
+    return c.json({ error: 'asset too large' }, 413);
+  }
+
+  let blob;
+  try {
+    blob = dataUrlToAsset(parsed.dataUrl);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: message }, 400);
+  }
+
+  // Always generate a fresh asset id. Seed asset ids are NEVER overwritten —
+  // an Owner who wants to replace seed media uploads a new asset and points
+  // their MediaElement.assetId at the new id.
+  const newAssetId = `up-${crypto.randomUUID()}`;
+
+  const database = db(c.env);
+  await database.insert(siteAsset).values({
+    id: newAssetId,
+    siteId: result.site.id,
+    mediaType: blob.mediaType,
+    bytesBase64: blob.bytesBase64,
+    kind: blob.kind,
+    alt: parsed.alt,
+  });
+
+  return c.json({
+    assetId: newAssetId,
+    kind: blob.kind,
+    mediaType: blob.mediaType,
+  });
+});
+
+canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
+  const siteId = c.req.param('siteId');
+  const assetId = c.req.param('assetId');
+  const result = await loadOwnedSite(c, siteId);
+  if (!result.found) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const database = db(c.env);
+  const rows = await database
+    .select({
+      mediaType: siteAsset.mediaType,
+      bytesBase64: siteAsset.bytesBase64,
+    })
+    .from(siteAsset)
+    .where(and(eq(siteAsset.id, assetId), eq(siteAsset.siteId, result.site.id)))
+    .limit(1);
+  const row = rows[0];
+  if (!row) {
+    return c.json({ error: 'asset not found' }, 404);
+  }
+  return assetResponse(row.mediaType, row.bytesBase64);
 });
 
 canvasApi.post('/sites/:siteId/style-kit', async (c) => {

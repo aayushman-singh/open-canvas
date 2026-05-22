@@ -1,8 +1,11 @@
 import { eq, sql } from 'drizzle-orm';
 import app from './index';
-import { validateCanvasSiteState } from './canvas/validate';
+import { collectReferencedAssetIds } from './assets/site-assets';
+import type { CanvasSiteState } from './canvas/schema';
+import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
+import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
-import { customer, site } from './db/schema';
+import { customer, site, siteAsset } from './db/schema';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, validateSubdomain } from './routes/api/sites';
 import { starterTemplate } from './templates/registry';
 
@@ -416,6 +419,122 @@ try {
   // does not rely on the cascade contract.
   await smokeDb.delete(site).where(eq(site.subdomain, SMOKE_SUB));
   await smokeDb.delete(customer).where(eq(customer.clerkUserId, SMOKE_CLERK_USER));
+}
+
+// -- Task 6: seed-asset registry + site-creation materialisation ----------
+// Positive case: the bundled fixture passes validateSeedFixture (every media
+// `assetId` and `posterAssetId` resolves in SEED_ASSET_REGISTRY).
+const seedOk = validateSeedFixture(starterTemplate.state);
+assert(
+  seedOk.valid,
+  seedOk.valid
+    ? ''
+    : `expected validateSeedFixture(starterTemplate.state) to pass: ${seedOk.errors.join('; ')}`,
+);
+
+// Negative case: a fixture whose media references an unregistered assetId is
+// rejected, with the rejection message mentioning the offending id.
+const T6_BOGUS_ID = 't6-bogus-asset-id';
+const bogusFixture: CanvasSiteState = structuredClone(starterTemplate.state);
+const bogusPage = bogusFixture.pages[0];
+if (!bogusPage) throw new Error('starterTemplate must have at least one page');
+const bogusSection = bogusPage.sections.find((s) => s.id === 'section-hero');
+if (!bogusSection) throw new Error('starterTemplate must have a hero section');
+const bogusMedia = bogusSection.elements.find((el) => el.id === 'hero-media');
+if (!bogusMedia || bogusMedia.type !== 'media') {
+  throw new Error('starterTemplate hero must contain media element hero-media');
+}
+bogusMedia.assetId = T6_BOGUS_ID;
+const bogusSeed = validateSeedFixture(bogusFixture);
+assert(
+  !bogusSeed.valid,
+  'expected validateSeedFixture to reject a fixture with an unregistered assetId',
+);
+assert(
+  !bogusSeed.valid && bogusSeed.errors.some((m) => m.includes(T6_BOGUS_ID)),
+  `expected validateSeedFixture rejection to mention the offending id ${T6_BOGUS_ID}`,
+);
+
+// Site-creation materialisation: after creating a smoke site, the count of
+// `siteAsset` rows for that site MUST equal the count of seed asset ids
+// referenced by `starterTemplate.state`. We bypass the Clerk-gated POST and
+// directly mirror the production materialiser's INSERTs so the smoke runs
+// without a Clerk session.
+const T6_CLERK_USER = 'smoke-t6-' + crypto.randomUUID().slice(0, 8);
+const T6_SUB = 't6-' + crypto.randomUUID().slice(0, 8).toLowerCase();
+const referencedSeedIds = [...collectReferencedAssetIds(starterTemplate.state.pages)];
+assert(
+  referencedSeedIds.length > 0,
+  'expected starterTemplate to reference at least one seed asset id',
+);
+let t6SiteId: string | null = null;
+try {
+  const inserted = await smokeDb
+    .insert(customer)
+    .values({
+      clerkUserId: T6_CLERK_USER,
+      email: `${T6_CLERK_USER}@example.invalid`,
+    })
+    .returning({ id: customer.id });
+  const t6CustomerId = inserted[0]?.id;
+  assert(
+    typeof t6CustomerId === 'string' && t6CustomerId.length > 0,
+    'expected T6 smoke customer insert to return an id',
+  );
+
+  const t6SiteInserted = await smokeDb
+    .insert(site)
+    .values({
+      customerId: t6CustomerId as string,
+      name: 'smoke-t6',
+      subdomain: T6_SUB,
+      styleKit: starterTemplate.state.styleKit,
+      editableState: starterTemplate.state,
+      publishedSnapshot: null,
+      publishedVersion: 0,
+    })
+    .returning({ id: site.id });
+  t6SiteId = t6SiteInserted[0]?.id ?? null;
+  assert(typeof t6SiteId === 'string' && t6SiteId.length > 0, 'expected T6 site insert to return an id');
+
+  // Mirror src/routes/api/sites.ts: one siteAsset row per seed id referenced.
+  const seedRows = referencedSeedIds.map((id) => {
+    const seed = SEED_ASSET_REGISTRY[id];
+    if (!seed) {
+      throw new Error(`T6 smoke: starterTemplate references unregistered seed id "${id}"`);
+    }
+    return {
+      id,
+      siteId: t6SiteId as string,
+      mediaType: seed.mediaType,
+      bytesBase64: seed.bytesBase64,
+      kind: seed.kind,
+      alt: seed.alt,
+    };
+  });
+  await smokeDb.insert(siteAsset).values(seedRows);
+
+  const assetRows = await smokeDb
+    .select({ id: siteAsset.id })
+    .from(siteAsset)
+    .where(eq(siteAsset.siteId, t6SiteId as string));
+  assert(
+    assetRows.length === referencedSeedIds.length,
+    `expected site_asset row count (${assetRows.length}) to equal referenced seed id count (${referencedSeedIds.length})`,
+  );
+  const presentIds = new Set(assetRows.map((r) => r.id));
+  for (const id of referencedSeedIds) {
+    assert(
+      presentIds.has(id),
+      `expected materialised site_asset row for seed id "${id}" but it was missing`,
+    );
+  }
+} finally {
+  if (t6SiteId) {
+    await smokeDb.delete(siteAsset).where(eq(siteAsset.siteId, t6SiteId));
+    await smokeDb.delete(site).where(eq(site.id, t6SiteId));
+  }
+  await smokeDb.delete(customer).where(eq(customer.clerkUserId, T6_CLERK_USER));
 }
 
 console.log('[review-smoke] OK');

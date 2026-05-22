@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
+import { collectReferencedAssetIds } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { customer, site, siteAsset } from '../../db/schema';
 import { getTemplateSeed } from '../../templates/registry';
 
 type Bindings = {
@@ -157,8 +159,52 @@ sites.post('/', async (c) => {
 
   const newSiteId = crypto.randomUUID();
 
+  // Materialise one `siteAsset` row per seed asset id referenced by the
+  // template's pages. Every referenced id MUST exist in SEED_ASSET_REGISTRY
+  // (the seed fixture is gated by `validateSeedFixture` at smoke time). The
+  // insert runs in the SAME batch as the `site` row so site creation is
+  // atomic: if either fails, neither lands.
+  const referencedAssetIds = collectReferencedAssetIds(editableState.pages);
+  const seedRows: Array<{
+    id: string;
+    siteId: string;
+    mediaType: string;
+    bytesBase64: string;
+    kind: 'image' | 'video';
+    alt: string;
+  }> = [];
+  const unknownSeedIds: string[] = [];
+  for (const assetId of referencedAssetIds) {
+    const seed = SEED_ASSET_REGISTRY[assetId];
+    if (!seed) {
+      unknownSeedIds.push(assetId);
+      continue;
+    }
+    seedRows.push({
+      id: assetId,
+      siteId: newSiteId,
+      mediaType: seed.mediaType,
+      bytesBase64: seed.bytesBase64,
+      kind: seed.kind,
+      alt: seed.alt,
+    });
+  }
+  if (unknownSeedIds.length > 0) {
+    // Defence in depth: validateSeedFixture would have caught this in the
+    // smoke. If it ever fires here the template author has shipped a fixture
+    // referencing an unregistered id — fail loudly with the full list so the
+    // fix is obvious.
+    return c.json(
+      {
+        error: 'template seed references unregistered asset ids',
+        unknownSeedIds,
+      },
+      500,
+    );
+  }
+
   try {
-    await database.insert(site).values({
+    const siteInsert = database.insert(site).values({
       id: newSiteId,
       customerId,
       name: trimmedName,
@@ -168,6 +214,12 @@ sites.post('/', async (c) => {
       publishedSnapshot: null,
       publishedVersion: 0,
     });
+    if (seedRows.length === 0) {
+      await siteInsert;
+    } else {
+      const assetInsert = database.insert(siteAsset).values(seedRows);
+      await database.batch([siteInsert, assetInsert]);
+    }
   } catch (err) {
     if (isUniqueViolation(err)) {
       return c.json({ error: 'subdomain is already taken' }, 409);

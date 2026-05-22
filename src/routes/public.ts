@@ -12,15 +12,16 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { html, raw } from 'hono/html';
+import { assetResponse, collectReferencedAssetIds } from '../assets/site-assets';
 import type { ClerkAuthVariables } from '../auth/middleware';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { db } from '../db/client';
-import { site } from '../db/schema';
+import { site, siteAsset } from '../db/schema';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -220,10 +221,33 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   }
 
   if (path.startsWith('/assets/')) {
-    // Task 6 owns asset serving. Return null so the asset route can handle
-    // it once mounted. For Task 5, this means media references will 404
-    // until Task 6 lands — that is expected.
-    return null;
+    // Visitor-facing asset surface. We serve ONLY assets that the current
+    // publishedSnapshot.pages reference. Editable-only assets (uploaded but
+    // never published) are 404 — the public surface is constrained by the
+    // published snapshot, not the editable library. Missing rows are also
+    // 404; we never leak existence by status code.
+    const assetId = path.slice('/assets/'.length);
+    if (assetId.length === 0 || assetId.includes('/')) {
+      return c.text('asset not found', 404);
+    }
+    const referenced = collectReferencedAssetIds(siteRow.publishedSnapshot.pages);
+    if (!referenced.has(assetId)) {
+      return c.text('asset not found', 404);
+    }
+    const database = db(c.env);
+    const rows = await database
+      .select({
+        mediaType: siteAsset.mediaType,
+        bytesBase64: siteAsset.bytesBase64,
+      })
+      .from(siteAsset)
+      .where(and(eq(siteAsset.id, assetId), eq(siteAsset.siteId, siteRow.id)))
+      .limit(1);
+    const row = rows[0];
+    if (!row) {
+      return c.text('asset not found', 404);
+    }
+    return assetResponse(row.mediaType, row.bytesBase64);
   }
 
   const snapshotHtml = renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets');
