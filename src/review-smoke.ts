@@ -152,4 +152,80 @@ assert(
   'expected unmuted-autoplay video error to mention "muted"',
 );
 
+// -- Rich text content (Task 4.5) ----------------------------------------
+// Build a minimum CanvasSiteState around each broken text element so the
+// rejection comes from the rich-text path specifically — not from missing
+// pages, sections, or other surrounding shape.
+
+function richTextStateWith(content: unknown): unknown {
+  return {
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-home',
+        slug: 'home',
+        title: 'Home',
+        width: 1440,
+        sections: [
+          {
+            id: 'section-hero',
+            recipeId: 'hero-split',
+            name: 'Hero',
+            height: 400,
+            elements: [
+              {
+                id: 'broken-text',
+                type: 'text',
+                box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+                content,
+                role: 'body',
+                fontSize: 16,
+                fontWeight: 400,
+                align: 'left',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+const emptyContent = validateCanvasSiteState(richTextStateWith([]));
+assert(
+  !emptyContent.valid,
+  'expected text element with content: [] to be rejected (non-empty array required)',
+);
+assert(
+  !emptyContent.valid &&
+    emptyContent.errors.some((message) => message.includes('non-empty array')),
+  'expected empty-content rejection to mention "non-empty array"',
+);
+
+const unknownMarkType = validateCanvasSiteState(
+  richTextStateWith([{ text: 'shiny', marks: [{ type: 'rainbow' }] }]),
+);
+assert(
+  !unknownMarkType.valid,
+  'expected text element with mark type "rainbow" to be rejected (unknown mark type)',
+);
+assert(
+  !unknownMarkType.valid &&
+    unknownMarkType.errors.some((message) => message.includes('rainbow')),
+  'expected unknown-mark rejection to mention the offending type "rainbow"',
+);
+
+const javascriptLink = validateCanvasSiteState(
+  richTextStateWith([{ text: 'go', marks: [{ type: 'link', href: 'javascript:alert(1)' }] }]),
+);
+assert(
+  !javascriptLink.valid,
+  'expected text element with javascript:alert(1) link mark to be rejected',
+);
+assert(
+  !javascriptLink.valid &&
+    javascriptLink.errors.some((message) => message.includes('javascript:alert(1)')),
+  'expected javascript-link rejection to mention the offending href',
+);
+
 console.log('[review-smoke] OK');

@@ -19,7 +19,11 @@
               "id": "hero-heading",
               "type": "text",
               "box": { "x": 80, "y": 120, "w": 600, "h": 180, "z": 3 },
-              "text": "Ship a site that feels lived-in.",
+              "content": [
+                { "text": "Ship a site that feels " },
+                { "text": "lived-in", "marks": [{ "type": "bold" }] },
+                { "text": "." }
+              ],
               "role": "heading",
               "fontSize": 64,
               "fontWeight": 700,
@@ -30,7 +34,14 @@
               "id": "hero-body",
               "type": "text",
               "box": { "x": 80, "y": 320, "w": 540, "h": 120, "z": 3 },
-              "text": "Position elements freely. Pick a style kit. Publish.",
+              "content": [
+                { "text": "Position elements freely. Pick a style kit. " },
+                {
+                  "text": "Publish to rev01.aayushman.dev",
+                  "marks": [{ "type": "link", "href": "https://rev01.aayushman.dev" }]
+                },
+                { "text": "." }
+              ],
               "role": "body",
               "fontSize": 20,
               "fontWeight": 400,
@@ -81,7 +92,11 @@
               "id": "features-heading",
               "type": "text",
               "box": { "x": 80, "y": 80, "w": 800, "h": 90, "z": 2 },
-              "text": "Everything an Owner needs, nothing they do not.",
+              "content": [
+                { "text": "Everything an Owner needs, " },
+                { "text": "nothing they do not", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
               "role": "heading",
               "fontSize": 44,
               "fontWeight": 600,
@@ -100,7 +115,7 @@
               "id": "feature-1-label",
               "type": "text",
               "box": { "x": 80, "y": 520, "w": 380, "h": 60, "z": 2 },
-              "text": "Position freely",
+              "content": [{ "text": "Position freely" }],
               "role": "label",
               "fontSize": 16,
               "fontWeight": 500,
@@ -132,7 +147,7 @@
               "id": "cta-heading",
               "type": "text",
               "box": { "x": 220, "y": 160, "w": 1000, "h": 160, "z": 2 },
-              "text": "Publish when it feels right.",
+              "content": [{ "text": "Publish when it feels right." }],
               "role": "heading",
               "fontSize": 56,
               "fontWeight": 700,

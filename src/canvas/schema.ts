@@ -64,6 +64,37 @@ export const SECTION_RECIPE_IDS = [
 ] as const;
 export type SectionRecipeId = (typeof SECTION_RECIPE_IDS)[number];
 
+// Inline rich-text marks for the rich text inside a TextElement. The set is
+// intentionally small: bold/italic/underline/strike/code/highlight/link. There
+// are no block-level nodes — a TextElement is always a single visual paragraph
+// whose box, alignment, font size, and role come from the surrounding fields.
+export const INLINE_MARK_TYPES = [
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  'code',
+  'highlight',
+  'link',
+] as const;
+export type InlineMarkType = (typeof INLINE_MARK_TYPES)[number];
+
+export type InlineMark =
+  | { type: 'bold' }
+  | { type: 'italic' }
+  | { type: 'underline' }
+  | { type: 'strike' }
+  | { type: 'code' }
+  | { type: 'highlight' }
+  | { type: 'link'; href: string };
+
+export interface InlineRun {
+  // raw text, no HTML; newlines are literal U+000A
+  text: string;
+  // 0..N marks; order is style-irrelevant but must be deduplicated by type
+  marks?: InlineMark[];
+}
+
 export const BACKGROUND_EFFECTS = [
   'none',
   'grain',
@@ -97,7 +128,10 @@ export interface BaseElement {
 
 export interface TextElement extends BaseElement {
   type: 'text';
-  text: string;
+  // 1..N inline runs; the concatenation of run.text is the plain-text
+  // projection. Replaces the prior `text: string` field — there is no
+  // backwards-compat shim, the dev DB is empty.
+  content: InlineRun[];
   role: 'heading' | 'body' | 'label';
   fontSize: number;
   fontWeight: 400 | 500 | 600 | 700;
