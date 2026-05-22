@@ -1705,7 +1705,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (type === "strike") return applyExecCommand("strikeThrough");
     if (type === "code") return wrapSelectionWith("code");
     if (type === "highlight") return wrapSelectionWith("mark");
-    if (type === "link") { void applyLinkMark(); return; }
+    if (type === "link") {
+      applyLinkMark().catch((err) => {
+        setStatus("Link failed: " + (err && err.message ? err.message : String(err)), "error");
+      });
+      return;
+    }
   }
 
   function buildMarkToolbar(anchor) {
