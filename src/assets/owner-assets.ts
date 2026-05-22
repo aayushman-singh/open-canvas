@@ -157,10 +157,18 @@ export async function findAssetUsage(
     .where(eq(site.customerId, customerId));
 
   const out: AssetUsageElement[] = [];
+  const seen = new Set<string>();
+  function pushUnique(entry: AssetUsageElement) {
+    const key = entry.siteId + '|' + entry.elementId + '|' + entry.source;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(entry);
+  }
+
   for (const s of sites) {
     for (const ref of collectReferencedAssets(s.editableState.pages)) {
       if (ref.assetId !== assetId) continue;
-      out.push({
+      pushUnique({
         siteId: s.id,
         siteName: s.name,
         publishedAddress: s.publishedVersion > 0 ? s.subdomain : null,
@@ -171,10 +179,10 @@ export async function findAssetUsage(
     if (s.publishedSnapshot) {
       for (const ref of collectReferencedAssets(s.publishedSnapshot.pages)) {
         if (ref.assetId !== assetId) continue;
-        out.push({
+        pushUnique({
           siteId: s.id,
           siteName: s.name,
-          publishedAddress: s.subdomain,
+          publishedAddress: s.publishedVersion > 0 ? s.subdomain : null,
           elementId: ref.mediaElementId,
           source: 'published',
         });
