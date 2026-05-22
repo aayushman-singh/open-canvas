@@ -1,26 +1,21 @@
-import type {
-  TemplateCategory,
-  TemplateDesignLanguage,
-  TemplatePageDescriptor,
-} from '../db/schema';
-import type { ThemeTokenSet } from '../document/schema';
-import mapleCoffee from './seeds/maple-coffee/template';
-import foundryType from './seeds/foundry-type/template';
-import lighthouseLaunch from './seeds/lighthouse-launch/template';
+import seed from '../canvas/fixtures/home.json';
+import type { CanvasSiteState } from '../canvas/schema';
 
-export interface TemplateDescriptor {
-  id: string;
+export interface TemplateSeed {
+  id: 'starter-canvas';
   name: string;
   tagline: string;
-  category: TemplateCategory;
-  thumbnail: string | null;
-  designLanguage: TemplateDesignLanguage;
-  tokens: ThemeTokenSet;
-  pages: TemplatePageDescriptor[];
+  state: CanvasSiteState;
 }
 
-export const templates: TemplateDescriptor[] = [mapleCoffee, foundryType, lighthouseLaunch];
+export const starterTemplate: TemplateSeed = {
+  id: 'starter-canvas',
+  name: 'Starter Canvas',
+  tagline:
+    'A desktop canvas site with editable sections, text, media, actions, shapes, containers, style kits, and motion.',
+  state: seed as CanvasSiteState,
+};
 
-export function getTemplate(id: string): TemplateDescriptor | undefined {
-  return templates.find((t) => t.id === id);
+export function getTemplateSeed(id: string): TemplateSeed | null {
+  return id === starterTemplate.id ? starterTemplate : null;
 }
