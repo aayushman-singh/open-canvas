@@ -2,20 +2,18 @@
 
 ## Definition
 
-The seed-document catalog. Holds the hand-built starting points a customer
-picks from when creating a new site; exposes them as a typed, in-process
-list and as rows in the catalog store. Site creation copies a seed's pages
-and tokens — once copied, the seed and the site evolve independently.
+The canvas Template Seed catalog. It exposes the canonical in-process starting
+point used by site creation: seed metadata plus a validated `CanvasSiteState`
+whose media ids are materialised from `src/canvas/seed-assets.ts`.
 
 ## Inputs
 
-- **catalog store** -> existing template rows, keyed by template id, so the
-  seed script can upsert without losing rows
-- **environment** -> database connection string used by the seed script
+- **template author** -> checked-in canvas fixture and metadata.
+- **site creation API** -> requested template id.
 
 ## Outputs
 
-- **catalog store** -> upserts of every shipped seed (id, name, tagline,
-  category, thumbnail ref, design language, theme tokens, pages array)
-- **site-creation flow** -> typed descriptors and a `getTemplate(id)` lookup
-  so a new site can be materialised from a chosen seed
+- **site creation API** -> a `TemplateSeed` whose state can be cloned into
+  `site.editableState`.
+- **seed validator** -> media ids that must exist in the seed asset registry
+  and match each media element's expected kind.

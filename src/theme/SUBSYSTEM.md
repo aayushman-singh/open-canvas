@@ -22,7 +22,7 @@ Pure functions, zero runtime deps. The math is auditable and small. Nothing here
 
 ## Name
 
-`theme` — not `colour`, not `tokens`. The subsystem owns the **theme** in the design-system sense: the named slots and their relationships, not the underlying colour math (an implementation detail) or the data shape (`ThemeTokenSet` lives in `src/document/schema.ts`, which is the wire format).
+`theme` — not `colour`, not `tokens`. The subsystem owns the **theme** in the design-system sense: the named slots and their relationships, not the underlying colour math (an implementation detail). The active canvas Style Kit wire format lives in `src/canvas/schema.ts` and `src/canvas/style-kits.ts`.
 
 ## Derivation rules
 

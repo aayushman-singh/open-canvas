@@ -20,7 +20,7 @@
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { collectReferencedAssetIds } from '../../assets/site-assets';
+import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { renderCanvasSnapshot } from '../../canvas/render';
@@ -89,20 +89,39 @@ publishApi.post('/sites/:siteId', async (c) => {
 
   // Asset reachability guard: every media `assetId` and `posterAssetId`
   // referenced by the editable state must exist as a `siteAsset` row for
-  // this site. We refuse to publish a snapshot that would point at missing
-  // media — no auto-fix, no placeholder substitution.
+  // this site and match the element's expected kind. We refuse to publish a
+  // snapshot that would point at missing or mismatched media: no auto-fix, no
+  // placeholder substitution.
   const referenced = collectReferencedAssetIds(row.editableState.pages);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
     const presentRows = await database
-      .select({ id: siteAsset.id })
+      .select({ id: siteAsset.id, kind: siteAsset.kind })
       .from(siteAsset)
       .where(and(eq(siteAsset.siteId, row.id), inArray(siteAsset.id, referencedList)));
-    const present = new Set(presentRows.map((r) => r.id));
-    if (present.size !== referenced.size) {
-      const missing = referencedList.filter((id) => !present.has(id));
+    const referenceErrors = findAssetReferenceErrors(row.editableState.pages, presentRows);
+    const missing = referenceErrors.filter((error) => error.reason === 'missing');
+    if (missing.length > 0) {
       return c.json(
-        { error: 'cannot publish: missing assets', missingAssetIds: missing },
+        {
+          error: 'cannot publish: missing assets',
+          missingAssetIds: missing.map((error) => error.assetId),
+        },
+        400,
+      );
+    }
+    const mismatched = referenceErrors.filter((error) => error.reason === 'kind-mismatch');
+    if (mismatched.length > 0) {
+      return c.json(
+        {
+          error: 'cannot publish: asset kind mismatch',
+          assetKindErrors: mismatched.map((error) => ({
+            assetId: error.assetId,
+            expectedKind: error.expectedKind,
+            actualKind: error.actualKind,
+            path: error.path,
+          })),
+        },
         400,
       );
     }
@@ -120,10 +139,7 @@ publishApi.post('/sites/:siteId', async (c) => {
     // Defence in depth: editableState validated above so this should never
     // fire, but if it does the editable contract has diverged from the
     // published contract and we want to know loudly.
-    return c.json(
-      { error: 'published snapshot invalid', errors: snapshotValidation.errors },
-      500,
-    );
+    return c.json({ error: 'published snapshot invalid', errors: snapshotValidation.errors }, 500);
   }
 
   await database

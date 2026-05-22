@@ -25,15 +25,12 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { GeminiAdapter } from '../../agent/llm-gemini';
-import type {
-  LlmAssistantToolCall,
-  LlmMessage,
-  LlmTool,
-} from '../../agent/llm';
+import type { LlmAssistantToolCall, LlmMessage, LlmTool } from '../../agent/llm';
 import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import type { RecipeFactoryInput } from '../../canvas/recipes';
 import {
   INLINE_MARK_TYPES,
@@ -142,7 +139,9 @@ function parseInlineMark(value: unknown, runIdx: number, markIdx: number): Inlin
   return { type: value.type };
 }
 
-function parseInlineRuns(value: unknown): { ok: true; runs: InlineRun[] } | { ok: false; error: string } {
+function parseInlineRuns(
+  value: unknown,
+): { ok: true; runs: InlineRun[] } | { ok: false; error: string } {
   if (!Array.isArray(value)) {
     return { ok: false, error: 'content must be an array of InlineRun objects (not a string)' };
   }
@@ -346,25 +345,36 @@ async function runOpsPipeline(
     };
   }
 
-  // Verify each replaceMedia op's assetId belongs to this site. Collect the
-  // ids first, then do one DB lookup. An unknown id fails the whole batch.
-  const referencedAssetIds = new Set<string>();
-  for (const op of ops) {
-    if (op.kind === 'replaceMedia') referencedAssetIds.add(op.assetId);
-  }
+  // Verify every media asset reference in the resulting state belongs to this
+  // site and matches the media element's expected kind. This catches
+  // replaceMedia ops AND recipe-created sections that receive assetIds.
+  const referencedAssetIds = collectReferencedAssetIds(next.pages);
   if (referencedAssetIds.size > 0) {
     const database = db(c.env);
     const rows = await database
-      .select({ id: siteAsset.id })
+      .select({ id: siteAsset.id, kind: siteAsset.kind })
       .from(siteAsset)
       .where(and(eq(siteAsset.siteId, row.id), inArray(siteAsset.id, [...referencedAssetIds])));
-    const known = new Set(rows.map((r) => r.id));
-    const unknown = [...referencedAssetIds].filter((id) => !known.has(id));
-    if (unknown.length > 0) {
+    const referenceErrors = findAssetReferenceErrors(next.pages, rows);
+    const missing = referenceErrors.filter((error) => error.reason === 'missing');
+    if (missing.length > 0) {
       return {
         ok: false,
         status: 400,
-        error: `replaceMedia references unknown asset id(s): ${unknown.join(', ')}`,
+        error: `canvas agent references unknown asset id(s): ${missing.map((error) => error.assetId).join(', ')}`,
+      };
+    }
+    const mismatched = referenceErrors.filter((error) => error.reason === 'kind-mismatch');
+    if (mismatched.length > 0) {
+      return {
+        ok: false,
+        status: 400,
+        error: `canvas agent asset kind mismatch: ${mismatched
+          .map(
+            (error) =>
+              `${error.assetId} expected ${error.expectedKind} but row is ${error.actualKind}`,
+          )
+          .join('; ')}`,
       };
     }
   }
@@ -387,9 +397,13 @@ function buildSystemPrompt(state: CanvasSiteState): string {
   lines.push(`Current style kit: ${state.styleKit}.`);
   const page = state.pages[0];
   if (page) {
-    lines.push(`Page id: ${page.id} (slug=${page.slug}, title=${JSON.stringify(page.title)}, width=${String(page.width)}).`);
+    lines.push(
+      `Page id: ${page.id} (slug=${page.slug}, title=${JSON.stringify(page.title)}, width=${String(page.width)}).`,
+    );
     for (const section of page.sections) {
-      lines.push(`Section ${section.id} (recipe=${section.recipeId}, name=${JSON.stringify(section.name)}, height=${String(section.height)}):`);
+      lines.push(
+        `Section ${section.id} (recipe=${section.recipeId}, name=${JSON.stringify(section.name)}, height=${String(section.height)}):`,
+      );
       for (const element of section.elements) {
         lines.push(`  - element ${element.id} type=${element.type}`);
       }

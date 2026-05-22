@@ -11,7 +11,7 @@ function EditorPanel() {
     <div class="hero-panel" aria-label="editor pane">
       <div class="heading">
         <span class="kind">editor</span>
-        <span>home.doc.json</span>
+        <span>home.canvas.json</span>
       </div>
       <div class="body">
         <div class="editor-layout">

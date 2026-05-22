@@ -53,11 +53,11 @@ export interface RecipeFactoryInput {
    * - `cards` — gallery / grid recipes consume the first N from this array.
    * - `gallery` — alias for `cards` when the brief mentions a gallery shape.
    *
-   * When omitted, recipes that need media fall back to the bundled seed
-   * registry ids (`seed-hero-poster-1`, `seed-feature-canvas-1`). The
-   * fall-through is intentionally narrow: the agent route is expected to
-   * pass real ids in production; the seed-id default only kicks in for
-   * smokes and for the very first preview against an unseeded site.
+   * When omitted, recipes that need media fall back to bundled seed registry
+   * ids (`seed-hero-poster-1`, `seed-feature-canvas-1`). The agent route still
+   * verifies those ids exist as `siteAsset` rows before returning a preview,
+   * so an unmaterialised site fails loudly instead of silently publishing a
+   * dangling reference.
    */
   assetIds?: { hero?: string; cards?: string[]; gallery?: string[] };
 }

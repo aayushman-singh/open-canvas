@@ -129,7 +129,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
             <button id="canvas-save" type="button">
               Save
             </button>
-            <button id="canvas-publish" type="button" disabled>
+            <button id="canvas-publish" type="button">
               Publish
             </button>
             {/* Presence indicator — visible only when count > 1. The DO

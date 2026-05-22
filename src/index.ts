@@ -25,10 +25,6 @@ app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
 app.route('/', landing);
 
 app.route('/dashboard/templates', templatesRoute);
-// The legacy ProseMirror editor (src/editor/{index,client,styles}.{ts,tsx})
-// and theme studio (src/routes/dashboard/theme.tsx) are retired by the
-// canvas-first POC (T9). Their files remain on disk (excluded from typecheck,
-// lint, and bundle) so the option to revive lives in commit history.
 app.route('/dashboard', canvasEditor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);

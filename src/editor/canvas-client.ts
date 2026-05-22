@@ -77,6 +77,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let selectedSectionId = null;
   let selectedElementId = null;
   let saveTimer = null;
+  let saveQueue = Promise.resolve(true);
   let statusTimer = null;
   let editingElementId = null;
   // Deep clone of the InlineRun[] pre-edit — Escape/Cancel restore from this.
@@ -104,6 +105,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const statusEl = document.getElementById("canvas-status");
   const mainEl = document.querySelector("main.rev01-editor");
   const saveButton = document.getElementById("canvas-save");
+  const publishButton = document.getElementById("canvas-publish");
 
   // -- Viewport + zoom ---------------------------------------------------
   // The route ships #canvas-root directly inside the grid. We wrap it in a
@@ -294,14 +296,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return null;
   }
 
-  async function saveStateNow() {
-    if (!state) return;
-    setStatus("Saving…");
+  async function persistStateSnapshot(snapshot) {
+    setStatus("Saving...");
     try {
       const response = await fetch(SITE_BASE, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ editableState: state }),
+        body: JSON.stringify({ editableState: snapshot }),
       });
       if (!response.ok) {
         let detail = response.statusText;
@@ -314,19 +315,41 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           }
         } catch (_) { /* ignore */ }
         setStatus("Save failed: " + detail, "error");
-        return;
+        return false;
       }
       setStatus("Saved", "ok");
+      return true;
     } catch (err) {
       setStatus("Save failed: " + (err && err.message ? err.message : String(err)), "error");
+      return false;
     }
+  }
+
+  async function saveStateNow() {
+    if (!state) return true;
+    const snapshot = structuredClone(state);
+    const task = saveQueue.catch(() => false).then(() => persistStateSnapshot(snapshot));
+    saveQueue = task;
+    return task;
+  }
+
+  async function flushPendingSave() {
+    if (saveTimer) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    const saved = await saveStateNow();
+    if (!saved) {
+      setStatus("Save failed; action stopped", "error");
+    }
+    return saved;
   }
 
   function scheduleSave() {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      saveStateNow();
+      void saveStateNow();
     }, 500);
   }
 
@@ -1611,6 +1634,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // the preview <aside> mounted, every [data-ai-button] stays disabled and
     // the Owner sees a frozen editor after the first failed apply.
     try {
+      const saved = await flushPendingSave();
+      if (!saved) {
+        closeAiPanel();
+        return;
+      }
       const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/apply", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -1702,7 +1730,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   async function runAiPreview(prompt) {
     setAiBusy(true);
-    setStatus("Asking the assistant…");
+    const saved = await flushPendingSave();
+    if (!saved) {
+      setAiBusy(false);
+      return;
+    }
+    setStatus("Asking the assistant...");
     try {
       const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/preview", {
         method: "POST",
@@ -2100,6 +2133,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         const kit = button.getAttribute('data-style-kit');
         if (!kit || STYLE_KITS.indexOf(kit) < 0) return;
         try {
+          const saved = await flushPendingSave();
+          if (!saved) return;
           const response = await fetch(SITE_BASE + "/style-kit", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -2181,13 +2216,58 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     connect();
   }
 
+  // -- Publish ------------------------------------------------------------
+
+  async function publishSite() {
+    if (!publishButton) return;
+    publishButton.disabled = true;
+    try {
+      const saved = await flushPendingSave();
+      if (!saved) return;
+      setStatus("Publishing...");
+      const response = await fetch("/api/publish/sites/" + SITE_ID, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) {
+        let detail = response.statusText;
+        if (body && Array.isArray(body.errors) && body.errors.length > 0) {
+          detail = body.errors[0];
+        } else if (body && Array.isArray(body.missingAssetIds) && body.missingAssetIds.length > 0) {
+          detail = "missing assets: " + body.missingAssetIds.join(", ");
+        } else if (body && body.error) {
+          detail = body.error;
+        }
+        setStatus("Publish failed: " + detail, "error");
+        return;
+      }
+      const version =
+        body && typeof body.version === "number" && Number.isFinite(body.version)
+          ? " v" + body.version
+          : "";
+      setStatus("Published" + version, "ok");
+    } catch (err) {
+      setStatus("Publish failed: " + (err && err.message ? err.message : String(err)), "error");
+    } finally {
+      publishButton.disabled = false;
+    }
+  }
+
+  function attachPublishButton() {
+    if (!publishButton) return;
+    publishButton.addEventListener("click", () => {
+      void publishSite();
+    });
+  }
+
   // -- Save & keyboard ----------------------------------------------------
 
   function attachSaveButton() {
     if (saveButton) {
       saveButton.addEventListener("click", () => {
         if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-        saveStateNow();
+        void saveStateNow();
       });
     }
     window.addEventListener("keydown", (ev) => {
@@ -2195,7 +2275,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (isSave) {
         ev.preventDefault();
         if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-        saveStateNow();
+        void saveStateNow();
       }
     });
   }
@@ -2224,6 +2304,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachPointerHandlers();
       attachStyleKitButtons();
       attachSaveButton();
+      attachPublishButton();
       attachPresence();
       setStatus("Ready", "ok");
     } catch (err) {

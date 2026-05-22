@@ -1,8 +1,7 @@
 // src/editor/canvas-styles.ts
 //
 // Stylesheet for the desktop Canvas Editor (T4). Inlined into the editor route
-// via raw(canvasEditorStyles). Dark theme, distinct from the legacy ProseMirror
-// editor (src/editor/styles.ts).
+// via raw(canvasEditorStyles). Dark theme tuned for dense desktop editing.
 //
 // The visitor renderer (src/canvas/public-styles.ts) and this editor preview
 // share a single source of truth for kit tokens, variants, and motion:

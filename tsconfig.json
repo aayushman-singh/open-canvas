@@ -20,20 +20,5 @@
     "allowSyntheticDefaultImports": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/multiplayer/**",
-    "src/editor/client.ts",
-    "src/editor/index.tsx",
-    "src/editor/styles.ts",
-    "src/agent/ops.ts",
-    "src/agent/orchestrator.ts",
-    "src/agent/smoke.ts",
-    "src/agent/tools.ts",
-    "src/agent/_live-smoke.ts",
-    "src/routes/api/pages.ts",
-    "src/routes/api/agent.ts",
-    "src/routes/dashboard/theme.tsx"
-  ]
+  "exclude": ["node_modules", "dist"]
 }

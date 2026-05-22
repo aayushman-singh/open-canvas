@@ -1,6 +1,8 @@
 import { integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
-import type { DocumentJSON, ThemeTokenSet } from '../document/schema';
 import type { CanvasSiteState, PublishedSnapshot, StyleKit } from '../canvas/schema';
+
+type LegacyDocumentJSON = Record<string, unknown>;
+type LegacyThemeTokenSet = Record<string, unknown>;
 
 export const customer = pgTable('customer', {
   id: text('id')
@@ -15,8 +17,9 @@ export const customer = pgTable('customer', {
 export type Customer = typeof customer.$inferSelect;
 export type NewCustomer = typeof customer.$inferInsert;
 
-// The legacy template table is retained while the old POC routes (pages.ts,
-// dashboard/index.tsx, templates seed scripts) still reference it. T9 retires it.
+// The legacy template table remains in the database for existing migrations,
+// but the active canvas-first creation flow reads Template Seeds from
+// src/templates/registry.ts instead of this table.
 
 export const TEMPLATE_CATEGORIES = ['business', 'portfolio', 'landing', 'product', 'blog'] as const;
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
@@ -27,7 +30,7 @@ export type TemplateDesignLanguage = (typeof TEMPLATE_DESIGN_LANGUAGES)[number];
 export type TemplatePageDescriptor = {
   slug: string;
   title: string;
-  doc: DocumentJSON;
+  doc: LegacyDocumentJSON;
 };
 
 export const template = pgTable('template', {
@@ -39,7 +42,7 @@ export const template = pgTable('template', {
   category: text('category').notNull().$type<TemplateCategory>(),
   thumbnail: text('thumbnail'),
   designLanguage: text('design_language').notNull().$type<TemplateDesignLanguage>(),
-  tokens: jsonb('tokens').notNull().$type<ThemeTokenSet>(),
+  tokens: jsonb('tokens').notNull().$type<LegacyThemeTokenSet>(),
   pages: jsonb('pages').notNull().$type<TemplatePageDescriptor[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -78,7 +81,7 @@ export const page = pgTable(
       .references(() => site.id, { onDelete: 'cascade' }),
     slug: text('slug').notNull(),
     title: text('title').notNull(),
-    doc: jsonb('doc').notNull().$type<DocumentJSON>(),
+    doc: jsonb('doc').notNull().$type<LegacyDocumentJSON>(),
     position: integer('position').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
