@@ -7,6 +7,7 @@ import canvasApi from './routes/api/canvas';
 import pages from './routes/api/pages';
 import agent from './routes/api/agent';
 import editor from './editor';
+import canvasEditor from './editor/canvas-index';
 
 const app = new Hono();
 
@@ -17,6 +18,7 @@ app.route('/dashboard/templates', templatesRoute);
 // The legacy theme studio (src/routes/dashboard/theme.tsx) reads removed site
 // columns (tokens, templateId) and is retired by T9; leaving it unmounted
 // keeps the file from breaking typecheck.
+app.route('/dashboard', canvasEditor);
 app.route('/dashboard', editor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);
