@@ -1,5 +1,6 @@
 import app from './index';
-import { validateDocument } from './document/validate';
+import { validateCanvasSiteState } from './canvas/validate';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, validateSubdomain } from './routes/api/sites';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -42,47 +43,35 @@ const health = await responseText('/health');
 assert(health.status === 200, `expected public /health to return 200, got ${health.status}`);
 assert(health.body.includes('"ok":true'), 'expected /health to return ok heartbeat JSON');
 
-const executableActionHref = validateDocument({
-  type: 'doc',
-  content: [
-    {
-      type: 'section',
-      attrs: { kind: 'hero' },
-      content: [
-        {
-          type: 'actions',
-          content: [{ type: 'action', attrs: { href: 'javascript:alert(1)', label: 'Run' } }],
-        },
-      ],
-    },
-  ],
-});
+const emptySubdomain = validateSubdomain('');
+assert(!emptySubdomain.valid, 'expected empty subdomain to be invalid');
 assert(
-  !executableActionHref.valid,
-  'expected document validator to reject executable action hrefs',
+  !emptySubdomain.valid && emptySubdomain.error.includes('required'),
+  'expected empty subdomain error to mention "required"',
 );
 
-const executableLinkHref = validateDocument({
-  type: 'doc',
-  content: [
-    {
-      type: 'section',
-      attrs: { kind: 'hero' },
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            {
-              type: 'text',
-              text: 'Run',
-              marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }],
-            },
-          ],
-        },
-      ],
-    },
-  ],
-});
-assert(!executableLinkHref.valid, 'expected document validator to reject executable link hrefs');
+const oneCharSubdomain = validateSubdomain('a');
+assert(!oneCharSubdomain.valid, 'expected single-character subdomain to be invalid (too short)');
+
+const upperCaseSubdomain = validateSubdomain('Bad');
+assert(!upperCaseSubdomain.valid, 'expected uppercase subdomain to be invalid');
+
+const leadingHyphen = validateSubdomain('-bad');
+assert(!leadingHyphen.valid, 'expected leading-hyphen subdomain to be invalid');
+
+const trailingHyphen = validateSubdomain('bad-');
+assert(!trailingHyphen.valid, 'expected trailing-hyphen subdomain to be invalid');
+
+const reservedSubdomain = validateSubdomain('www');
+assert(!reservedSubdomain.valid, 'expected reserved subdomain "www" to be invalid');
+
+const validSubdomain = validateSubdomain('my-site-1');
+assert(validSubdomain.valid, 'expected "my-site-1" to be a valid subdomain');
+
+assert(SUBDOMAIN_RE instanceof RegExp, 'expected SUBDOMAIN_RE to be exported as a RegExp');
+assert(RESERVED_SUBDOMAINS.has('admin'), 'expected RESERVED_SUBDOMAINS to include "admin"');
+
+const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
+assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');
 
 console.log('[review-smoke] OK');

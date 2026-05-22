@@ -17,9 +17,7 @@
     "multiplayer:smoke": "bun run src/multiplayer/_smoke.ts",
     "agent:smoke": "bun run src/agent/smoke.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
-    "review:smoke": "bun run src/review-smoke.ts",
-    "seed:templates": "bun run src/templates/seed-db.ts",
-    "validate:seeds": "bun run src/templates/_validate-seeds.ts"
+    "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.4.11",

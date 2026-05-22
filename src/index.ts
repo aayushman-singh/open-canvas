@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import landing from './landing';
 import { dashboard } from './routes/dashboard';
 import { templatesRoute } from './routes/dashboard/templates';
-import themeStudio from './routes/dashboard/theme';
 import sites from './routes/api/sites';
 import pages from './routes/api/pages';
 import agent from './routes/api/agent';
@@ -14,7 +13,9 @@ app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
 app.route('/', landing);
 
 app.route('/dashboard/templates', templatesRoute);
-app.route('/dashboard/sites/:siteId/theme', themeStudio);
+// The legacy theme studio (src/routes/dashboard/theme.tsx) reads removed site
+// columns (tokens, templateId) and is retired by T9; leaving it unmounted
+// keeps the file from breaking typecheck.
 app.route('/dashboard', editor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);

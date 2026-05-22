@@ -1,5 +1,6 @@
 import { integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import type { DocumentJSON, ThemeTokenSet } from '../document/schema';
+import type { CanvasSiteState, PublishedSnapshot, StyleKit } from '../canvas/schema';
 
 export const customer = pgTable('customer', {
   id: text('id')
@@ -14,7 +15,8 @@ export const customer = pgTable('customer', {
 export type Customer = typeof customer.$inferSelect;
 export type NewCustomer = typeof customer.$inferInsert;
 
-// Templates are seed documents (ADR 0001 decision 11); creating a site copies pages + tokens.
+// The legacy template table is retained while the old POC routes (pages.ts,
+// dashboard/index.tsx, templates seed scripts) still reference it. T9 retires it.
 
 export const TEMPLATE_CATEGORIES = ['business', 'portfolio', 'landing', 'product', 'blog'] as const;
 export type TemplateCategory = (typeof TEMPLATE_CATEGORIES)[number];
@@ -53,8 +55,11 @@ export const site = pgTable('site', {
     .notNull()
     .references(() => customer.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  templateId: text('template_id').references(() => template.id, { onDelete: 'set null' }),
-  tokens: jsonb('tokens').notNull().$type<ThemeTokenSet>(),
+  subdomain: text('subdomain').notNull().unique(),
+  styleKit: text('style_kit').notNull().$type<StyleKit>(),
+  editableState: jsonb('editable_state').notNull().$type<CanvasSiteState>(),
+  publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
+  publishedVersion: integer('published_version').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -85,3 +90,20 @@ export const page = pgTable(
 
 export type Page = typeof page.$inferSelect;
 export type NewPage = typeof page.$inferInsert;
+
+export const siteAsset = pgTable('site_asset', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  siteId: text('site_id')
+    .notNull()
+    .references(() => site.id, { onDelete: 'cascade' }),
+  mediaType: text('media_type').notNull(),
+  bytesBase64: text('bytes_base64').notNull(),
+  kind: text('kind').notNull().$type<'image' | 'video'>(),
+  alt: text('alt').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type SiteAsset = typeof siteAsset.$inferSelect;
+export type NewSiteAsset = typeof siteAsset.$inferInsert;

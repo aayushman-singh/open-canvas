@@ -94,12 +94,14 @@ async function lookupOwnedSite(
   clerkUserId: string,
   siteId: string,
 ): Promise<OwnedSite | null> {
+  // T2 dropped site.tokens from the schema; this route is unmounted from
+  // src/index.ts and will be removed entirely in T9. The stub keeps the file
+  // compiling until then without preserving any behaviour.
   const database = db(env);
   const rows = await database
     .select({
       id: site.id,
       name: site.name,
-      tokens: site.tokens,
     })
     .from(site)
     .innerJoin(customer, eq(customer.id, site.customerId))
@@ -107,7 +109,7 @@ async function lookupOwnedSite(
     .limit(1);
   const row = rows[0];
   if (!row) return null;
-  return { id: row.id, name: row.name, tokens: row.tokens };
+  return { id: row.id, name: row.name, tokens: DEFAULT_TOKENS };
 }
 
 // ---------------------------------------------------------------------------
@@ -565,8 +567,9 @@ theme.post('/', async (c) => {
   if (!parsed.ok) {
     return c.text(`bad theme form: ${parsed.message}`, 400);
   }
-  const database = db(c.env);
-  await database.update(site).set({ tokens: parsed.tokens }).where(eq(site.id, owned.id));
+  // site.tokens was removed in T2; this route is unmounted in src/index.ts.
+  // The early return keeps the file compiling without resurrecting the column.
+  void parsed;
   return c.redirect(`/dashboard/sites/${owned.id}/theme?saved=1`, 303);
 });
 
