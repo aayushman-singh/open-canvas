@@ -1588,6 +1588,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   async function applyPreview(ops) {
+    // Every exit path must release the AI UI lock. If we leave aiBusy=true or
+    // the preview <aside> mounted, every [data-ai-button] stays disabled and
+    // the Owner sees a frozen editor after the first failed apply.
     try {
       const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/apply", {
         method: "POST",
@@ -1602,11 +1605,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           else if (body && body.error) detail = body.error;
         } catch (_) { /* ignore */ }
         setStatus("Apply failed: " + detail, "error");
+        closeAiPanel();
         return;
       }
       const body = await response.json();
       if (!body || typeof body !== "object" || !body.editableState) {
         setStatus("Apply failed: malformed server response", "error");
+        closeAiPanel();
         return;
       }
       state = body.editableState;
@@ -1620,6 +1625,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus("AI edit applied", "ok");
     } catch (err) {
       setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      closeAiPanel();
     }
   }
 
