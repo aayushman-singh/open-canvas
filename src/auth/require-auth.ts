@@ -63,7 +63,20 @@ export function requireAuth() {
       return;
     }
 
+    // API requests get JSON 401 — never a cross-origin redirect to Clerk's
+    // hosted sign-in. Browser fetch() with credentials cannot follow such a
+    // redirect (CORS preflight fails), so a 302 here silently breaks the
+    // editor's save/publish flow when Clerk rotates the session mid-edit.
+    // Pages still redirect so an Owner who navigated stale tab lands on
+    // sign-in instead of seeing raw JSON.
     const requestUrl = new URL(c.req.url);
+    const isApiRequest =
+      requestUrl.pathname.startsWith('/api/') ||
+      (c.req.header('accept') ?? '').includes('application/json');
+    if (isApiRequest) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
     const signInUrl = buildSignInUrl(c.env.CLERK_PUBLISHABLE_KEY, requestUrl.toString());
     return c.redirect(signInUrl, 302);
   });
