@@ -1207,12 +1207,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
       inspector.appendChild(aiBtn);
 
-      // Upload control — separate input for image vs video mediaKinds so the
-      // file picker filters appropriately. POST to the owner upload route as
-      // a base64 data URL; on success, update the element's assetId / kind /
-      // alt from the response and re-render.
-      appendMediaUploader(element);
-      appendImageGenerator(element);
+      // Three-row media picker: current thumb + upload + AI generate + alt,
+      // history row (slot MRU), gallery grid (all owner assets by kind).
+      mountMediaPicker(element, inspector);
 
       const fit = selectInput(["cover", "contain"], element.fit);
       fit.addEventListener("change", () => {
@@ -1753,76 +1750,523 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
-  function appendMediaUploader(element) {
-    const wrap = document.createElement("div");
-    wrap.className = "field";
-    const label = document.createElement("label");
-    label.textContent =
-      element.mediaKind === "image" ? "Replace image" : "Replace video";
-    wrap.appendChild(label);
+  // -------------------------------------------------------------------------
+  // Media Picker — replaces the old appendMediaUploader + appendImageGenerator
+  // pair with a unified three-row widget:
+  //
+  //   Row 1 (current): thumbnail of current asset, Upload button, AI Generate
+  //                    button (images only), and alt-text input.
+  //   Row 2 (history): "Recent in this slot" — up to 4 MRU thumbs from the
+  //                    slot_history table.
+  //   Row 3 (gallery): "Your gallery" — all owner assets matching the element's
+  //                    mediaKind, with per-thumb delete controls.
+  //
+  // The two legacy helpers (appendMediaUploader, appendImageGenerator) are
+  // retained as thin wrappers that delegate to the picker; they are no longer
+  // called directly from renderInspector but the names are kept to avoid
+  // breaking anything that might reference them.
+  // -------------------------------------------------------------------------
 
+  // Shared apply function: updates element.assetId, rebuilds the preview,
+  // schedules a save, fires the MRU upsert, then refreshes both history and
+  // gallery rows. Called by Upload (post-upload), AI Apply, history thumbs,
+  // and gallery thumbs.
+  async function applyAssetIdToElement(element, nextAssetId, refreshFn) {
+    element.assetId = nextAssetId;
+    rebuildElement(element.id);
+    scheduleSave();
+    if (nextAssetId && nextAssetId !== "__placeholder__") {
+      fetch(
+        "/api/sites/" + encodeURIComponent(SITE_ID) +
+        "/elements/" + encodeURIComponent(element.id) +
+        "/history/" + encodeURIComponent(nextAssetId),
+        { method: "PUT", credentials: "include" },
+      )
+        .then((r) => {
+          if (!r.ok) console.error("slot-history upsert failed", r.status);
+        })
+        .catch((err) => console.error("slot-history upsert failed", err));
+    }
+    if (typeof refreshFn === "function") {
+      await refreshFn();
+    }
+  }
+
+  // Build a small thumbnail element. If assetId is empty / placeholder, renders
+  // an "empty slot" cell with a dashed border. Otherwise renders an <img>.
+  function buildPickerThumb(assetId, selectedAssetId, onClick) {
+    const isEmpty = !assetId || assetId === "__placeholder__";
+    if (isEmpty) {
+      const cell = document.createElement("div");
+      cell.className = "picker-thumb empty";
+      cell.textContent = "—";
+      cell.setAttribute("title", "No asset selected");
+      return cell;
+    }
+    const img = document.createElement("img");
+    img.className = "picker-thumb" + (assetId === selectedAssetId ? " selected" : "");
+    img.src = "/api/me/assets/" + encodeURIComponent(assetId);
+    img.alt = "";
+    img.title = assetId;
+    img.addEventListener("click", () => onClick(assetId));
+    return img;
+  }
+
+  // Mount the three-row media picker into the given host element. The picker
+  // is self-contained: it stores references to its own DOM nodes and refreshes
+  // them in place without triggering a full renderInspector().
+  function mountMediaPicker(element, host) {
+    const pickerWrap = document.createElement("div");
+    pickerWrap.className = "media-picker";
+
+    // -- Row 1: Current asset + controls ------------------------------------
+    const currentRowLabel = document.createElement("div");
+    currentRowLabel.className = "picker-row-label";
+    currentRowLabel.textContent = "Current";
+    pickerWrap.appendChild(currentRowLabel);
+
+    const currentRow = document.createElement("div");
+    currentRow.className = "picker-current-row";
+
+    // Thumbnail area — updated in place by refreshCurrentThumb()
+    const thumbCell = document.createElement("div");
+    thumbCell.style.cssText = "flex-shrink:0;";
+    function refreshCurrentThumb() {
+      thumbCell.replaceChildren();
+      thumbCell.appendChild(buildPickerThumb(element.assetId, element.assetId, () => {}));
+    }
+    refreshCurrentThumb();
+    currentRow.appendChild(thumbCell);
+
+    // Action controls
+    const actionsCol = document.createElement("div");
+    actionsCol.className = "picker-current-actions";
+
+    // Hidden file input — triggered by the Upload button
     const fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = element.mediaKind === "image" ? "image/*" : "video/*";
+
+    const uploadBtn = document.createElement("button");
+    uploadBtn.type = "button";
+    uploadBtn.textContent = element.mediaKind === "image" ? "Upload image" : "Upload video";
+    uploadBtn.addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+
     fileInput.addEventListener("change", () => {
       const file = fileInput.files && fileInput.files[0];
       if (!file) return;
-      uploadMediaForElement(element, file);
+      // Run the full crop+upload pipeline, then hook result through applyAssetIdToElement.
+      runUploadAndApply(element, file, altInput, refreshAll);
     });
-    wrap.appendChild(fileInput);
-    inspector.appendChild(wrap);
 
-    const altWrap = document.createElement("div");
-    altWrap.className = "field";
-    const altLabel = document.createElement("label");
-    altLabel.textContent = "Alt text";
+    actionsCol.appendChild(uploadBtn);
+    actionsCol.appendChild(fileInput);
+
+    // AI Generate button — images only
+    if (element.mediaKind === "image") {
+      const genRow = document.createElement("div");
+      genRow.style.cssText = "display:flex;gap:4px;";
+
+      const promptInput = document.createElement("textarea");
+      promptInput.rows = 1;
+      promptInput.placeholder = "Describe image…";
+      promptInput.style.cssText = "flex:1;min-width:0;font-size:11px;resize:none;box-sizing:border-box;" +
+        "appearance:none;background:var(--rev01-bg-panel);border:1px solid var(--rev01-hairline);" +
+        "color:var(--rev01-fg);border-radius:4px;padding:4px 6px;font-family:inherit;";
+
+      const genBtn = document.createElement("button");
+      genBtn.type = "button";
+      genBtn.id = "media-gen-btn-" + element.id;
+      genBtn.textContent = "AI";
+      genBtn.addEventListener("click", () => {
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+          setStatus("Enter a prompt first", "error");
+          return;
+        }
+        runGenerateAndApply(element, prompt, altInput, genBtn, refreshAll);
+      });
+
+      genRow.appendChild(promptInput);
+      genRow.appendChild(genBtn);
+      actionsCol.appendChild(genRow);
+    }
+
+    // Alt text input
     const altInput = document.createElement("input");
     altInput.type = "text";
     altInput.id = "media-upload-alt-" + element.id;
     altInput.value = typeof element.alt === "string" ? element.alt : "";
+    altInput.placeholder = "Alt text";
     altInput.addEventListener("change", () => {
       element.alt = altInput.value;
       rebuildElement(element.id);
       scheduleSave();
     });
-    altWrap.appendChild(altLabel);
-    altWrap.appendChild(altInput);
-    inspector.appendChild(altWrap);
+    actionsCol.appendChild(altInput);
+
+    currentRow.appendChild(actionsCol);
+    pickerWrap.appendChild(currentRow);
+
+    // -- Row 2: History ("Recent in this slot") ----------------------------
+    const historyLabel = document.createElement("div");
+    historyLabel.className = "picker-row-label";
+    historyLabel.textContent = "Recent in this slot";
+    pickerWrap.appendChild(historyLabel);
+
+    const historyRow = document.createElement("div");
+    historyRow.className = "picker-history-row";
+    pickerWrap.appendChild(historyRow);
+
+    // -- Row 3: Gallery ("Your gallery") -----------------------------------
+    const galleryLabel = document.createElement("div");
+    galleryLabel.className = "picker-row-label";
+    galleryLabel.textContent = "Your gallery";
+    pickerWrap.appendChild(galleryLabel);
+
+    const galleryGrid = document.createElement("div");
+    galleryGrid.className = "picker-gallery-grid";
+    pickerWrap.appendChild(galleryGrid);
+
+    host.appendChild(pickerWrap);
+
+    // -- Refresh functions --------------------------------------------------
+
+    function refreshAll() {
+      refreshCurrentThumb();
+      return Promise.all([refreshHistoryRow(), refreshGalleryGrid()]);
+    }
+
+    async function refreshHistoryRow() {
+      historyRow.replaceChildren();
+      let entries;
+      try {
+        const resp = await fetch(
+          "/api/sites/" + encodeURIComponent(SITE_ID) +
+          "/elements/" + encodeURIComponent(element.id) + "/history?limit=4",
+          { credentials: "include" },
+        );
+        if (!resp.ok) {
+          console.error("slot-history fetch failed", resp.status);
+          return;
+        }
+        const body = await resp.json();
+        entries = Array.isArray(body.entries) ? body.entries : [];
+      } catch (err) {
+        console.error("slot-history fetch failed", err);
+        return;
+      }
+      for (const entry of entries) {
+        const assetId = entry.assetId;
+        const thumb = buildPickerThumb(assetId, element.assetId, (id) => {
+          void applyAssetIdToElement(element, id, refreshAll);
+        });
+        historyRow.appendChild(thumb);
+      }
+      if (entries.length === 0) {
+        const hint = document.createElement("span");
+        hint.style.cssText = "font-size:11px;color:var(--rev01-fg-faint);font-family:var(--rev01-font-mono);";
+        hint.textContent = "None yet";
+        historyRow.appendChild(hint);
+      }
+    }
+
+    async function refreshGalleryGrid() {
+      galleryGrid.replaceChildren();
+      let entries;
+      try {
+        const resp = await fetch(
+          "/api/me/assets?kind=" + encodeURIComponent(element.mediaKind),
+          { credentials: "include" },
+        );
+        if (!resp.ok) {
+          console.error("gallery fetch failed", resp.status);
+          return;
+        }
+        const body = await resp.json();
+        entries = Array.isArray(body.entries) ? body.entries : [];
+      } catch (err) {
+        console.error("gallery fetch failed", err);
+        return;
+      }
+      for (const entry of entries) {
+        const assetId = entry.assetId;
+        const cell = document.createElement("div");
+        cell.className = "picker-gallery-cell";
+
+        const thumb = buildPickerThumb(assetId, element.assetId, (id) => {
+          void applyAssetIdToElement(element, id, refreshAll);
+        });
+        cell.appendChild(thumb);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "picker-delete";
+        delBtn.type = "button";
+        delBtn.textContent = "×";
+        delBtn.title = "Delete asset";
+        delBtn.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          await runDeleteAsset(element, assetId, refreshAll);
+        });
+        cell.appendChild(delBtn);
+
+        galleryGrid.appendChild(cell);
+      }
+      if (entries.length === 0) {
+        const hint = document.createElement("span");
+        hint.style.cssText = "font-size:11px;color:var(--rev01-fg-faint);font-family:var(--rev01-font-mono);grid-column:1/-1;";
+        hint.textContent = "No assets yet";
+        galleryGrid.appendChild(hint);
+      }
+    }
+
+    // Initial load
+    void refreshHistoryRow();
+    void refreshGalleryGrid();
+  }
+
+  // Upload pipeline shared between old appendMediaUploader and the picker.
+  // On success, calls applyAssetIdToElement with the new assetId.
+  async function runUploadAndApply(element, file, altInputEl, refreshFn) {
+    const altValue =
+      altInputEl && typeof altInputEl.value === "string" ? altInputEl.value : (element.alt || "");
+    const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
+    const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
+    if (boxW <= 0 || boxH <= 0) {
+      setStatus("Cannot upload: slot has no size yet — resize the element first", "error");
+      return;
+    }
+    try {
+      if (element.mediaKind === "image") {
+        setStatus("Loading cropper…");
+        const cropped = await cropFileToSlotAspect(file, boxW, boxH);
+        setStatus("Uploading…");
+        const dataUrl = await blobToDataUrl(cropped.blob);
+        const uploaded = await postAssetUpload(dataUrl, altValue);
+        element.alt = altValue;
+        await applyAssetIdToElement(element, uploaded.assetId, refreshFn);
+        setStatus("Uploaded", "ok");
+        return;
+      }
+      // Video path
+      setStatus("Reading video…");
+      const videoDataUrl = await fileToDataUrl(file);
+      setStatus("Extracting poster…");
+      const posterBlob = await extractVideoFirstFrame(file);
+      const posterFile = new File([posterBlob], "poster.png", { type: "image/png" });
+      setStatus("Loading cropper…");
+      const croppedPoster = await cropFileToSlotAspect(posterFile, boxW, boxH);
+      setStatus("Uploading video…");
+      const uploadedVideo = await postAssetUpload(videoDataUrl, altValue);
+      setStatus("Uploading poster…");
+      const posterDataUrl = await blobToDataUrl(croppedPoster.blob);
+      const uploadedPoster = await postAssetUpload(posterDataUrl, altValue);
+      element.mediaKind = "video";
+      element.posterAssetId = uploadedPoster.assetId;
+      element.alt = altValue;
+      await applyAssetIdToElement(element, uploadedVideo.assetId, refreshFn);
+      setStatus("Uploaded", "ok");
+    } catch (err) {
+      if (err && err.message === "crop cancelled") {
+        setStatus("Cancelled");
+        return;
+      }
+      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
+  // Generate-and-apply pipeline for the picker's AI button. Shows an inline
+  // preview below the generate button; on Apply calls applyAssetIdToElement.
+  async function runGenerateAndApply(element, prompt, altInputEl, genBtnEl, refreshFn) {
+    // Remove any stale preview for this element
+    const stalePreview = document.getElementById("media-gen-preview-" + element.id);
+    if (stalePreview) stalePreview.remove();
+
+    if (genBtnEl) genBtnEl.disabled = true;
+
+    const altValue =
+      altInputEl && typeof altInputEl.value === "string" ? altInputEl.value : (element.alt || "");
+    const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
+    const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
+    if (boxW <= 0 || boxH <= 0) {
+      if (genBtnEl) genBtnEl.disabled = false;
+      setStatus("Cannot generate: slot has no size yet — resize the element first", "error");
+      return;
+    }
+    setStatus("Generating…");
+
+    let generated;
+    try {
+      const response = await authFetch("/api/me/assets/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: prompt, alt: altValue, boxW: boxW, boxH: boxH }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (_) { /* ignore */ }
+        if (genBtnEl) genBtnEl.disabled = false;
+        setStatus("Generate failed: " + detail, "error");
+        return;
+      }
+      const body = await response.json();
+      if (!body || typeof body.mediaType !== "string" || typeof body.bytesBase64 !== "string") {
+        if (genBtnEl) genBtnEl.disabled = false;
+        setStatus("Generate failed: malformed server response", "error");
+        return;
+      }
+      generated = body;
+    } catch (err) {
+      if (genBtnEl) genBtnEl.disabled = false;
+      setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+
+    const previewDataUrl = "data:" + generated.mediaType + ";base64," + generated.bytesBase64;
+    setStatus("Generated — preview ready. Apply or Discard.", "ok");
+
+    // Show inline preview below the picker
+    const previewWrap = document.createElement("div");
+    previewWrap.id = "media-gen-preview-" + element.id;
+    previewWrap.className = "field";
+    previewWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;";
+
+    const img = document.createElement("img");
+    img.src = previewDataUrl;
+    img.alt = altValue || "Generated preview";
+    img.style.cssText = "width:100%;border-radius:4px;display:block;";
+    previewWrap.appendChild(img);
+
+    const btnRow = document.createElement("div");
+    btnRow.style.cssText = "display:flex;gap:6px;";
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.textContent = "Apply";
+    applyBtn.style.cssText = "flex:1;";
+
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.textContent = "Discard";
+    discardBtn.style.cssText = "flex:1;";
+
+    btnRow.appendChild(applyBtn);
+    btnRow.appendChild(discardBtn);
+    previewWrap.appendChild(btnRow);
+    inspector.appendChild(previewWrap);
+
+    function removePreview() {
+      if (previewWrap.parentNode) previewWrap.parentNode.removeChild(previewWrap);
+    }
+
+    discardBtn.addEventListener("click", () => {
+      removePreview();
+      if (genBtnEl) genBtnEl.disabled = false;
+      setStatus("Discarded");
+    });
+
+    applyBtn.addEventListener("click", async () => {
+      applyBtn.disabled = true;
+      discardBtn.disabled = true;
+      setStatus("Saving…");
+      try {
+        const uploaded = await postAssetUpload(previewDataUrl, altValue);
+        removePreview();
+        if (genBtnEl) genBtnEl.disabled = false;
+        element.alt = altValue;
+        element.mediaKind = "image";
+        await applyAssetIdToElement(element, uploaded.assetId, refreshFn);
+        setStatus("Applied", "ok");
+      } catch (err) {
+        applyBtn.disabled = false;
+        discardBtn.disabled = false;
+        setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      }
+    });
+  }
+
+  // Cascade-confirm delete for gallery assets.
+  async function runDeleteAsset(element, assetId, refreshFn) {
+    // 1. Probe usage
+    let usage = [];
+    try {
+      const resp = await fetch("/api/me/assets/" + encodeURIComponent(assetId) + "/usage", {
+        credentials: "include",
+      });
+      if (!resp.ok) {
+        setStatus("Delete failed: could not fetch usage (" + resp.status + ")", "error");
+        return;
+      }
+      const body = await resp.json();
+      usage = Array.isArray(body.usage) ? body.usage : [];
+    } catch (err) {
+      setStatus("Delete failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+
+    // 2. Build confirm message
+    let message = "Delete asset " + assetId + "?";
+    if (usage.length > 0) {
+      const lines = ["This asset is used in:"];
+      for (const u of usage) {
+        const addr = u.publishedAddress ? " (live: " + u.publishedAddress + ")" : "";
+        lines.push("  • " + (u.siteName || u.siteId) + addr + " — element " + u.elementId + " (" + u.source + ")");
+      }
+      lines.push("Deleting it will clear those references. Continue?");
+      message = lines.join("\\n");
+    }
+
+    if (!confirm(message)) return;
+
+    // 3. DELETE with cascade confirm
+    try {
+      const resp = await fetch(
+        "/api/me/assets/" + encodeURIComponent(assetId) + "?confirm=cascade",
+        { method: "DELETE", credentials: "include" },
+      );
+      if (!resp.ok) {
+        let detail = resp.statusText;
+        try { const b = await resp.json(); if (b && b.error) detail = b.error; } catch (_) {}
+        setStatus("Delete failed: " + detail, "error");
+        return;
+      }
+    } catch (err) {
+      setStatus("Delete failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+
+    // 4. If the deleted asset was the current one, clear element.assetId
+    if (element.assetId === assetId) {
+      element.assetId = "";
+      rebuildElement(element.id);
+      scheduleSave();
+    }
+
+    setStatus("Asset deleted", "ok");
+    if (typeof refreshFn === "function") {
+      await refreshFn();
+    }
+  }
+
+  // Legacy wrappers — kept for backward compatibility but now unused by
+  // renderInspector (which calls mountMediaPicker instead).
+  function appendMediaUploader(element) {
+    // No-op: functionality is now inside mountMediaPicker.
+    void element;
   }
 
   // Direct image generation via the Replicate-backed /assets/generate route.
   // Distinct from the agent-driven "AI media" button: this one creates a
   // brand-new asset shaped to the slot's aspect ratio without an LLM round-trip.
   function appendImageGenerator(element) {
-    if (element.mediaKind !== "image") return;
-    const wrap = document.createElement("div");
-    wrap.className = "field";
-    const label = document.createElement("label");
-    label.textContent = "Generate image (AI)";
-    wrap.appendChild(label);
-
-    const promptInput = document.createElement("textarea");
-    promptInput.rows = 2;
-    promptInput.placeholder = "Describe the image…";
-    promptInput.style.cssText = "width:100%;box-sizing:border-box;";
-    wrap.appendChild(promptInput);
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = "media-gen-btn-" + element.id;
-    btn.textContent = "Generate";
-    btn.style.cssText = "margin-top:6px;";
-    btn.addEventListener("click", () => {
-      const prompt = promptInput.value.trim();
-      if (!prompt) {
-        setStatus("Enter a prompt first", "error");
-        return;
-      }
-      generateImageForElement(element, prompt);
-    });
-    wrap.appendChild(btn);
-
-    inspector.appendChild(wrap);
+    // No-op: functionality is now inside mountMediaPicker.
+    void element;
   }
 
   function buildPinnedColorField(element) {
