@@ -54,11 +54,11 @@ body {
 .rev01-editor {
   display: grid;
   grid-template-rows: 56px 1fr 28px;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 248px 1fr 320px;
   grid-template-areas:
-    "topbar topbar"
-    "canvas inspector"
-    "status status";
+    "topbar topbar topbar"
+    "sidebar canvas inspector"
+    "status status status";
   height: 100vh;
   width: 100%;
 }
@@ -106,30 +106,6 @@ body {
   flex: 1 1 auto;
 }
 
-.rev01-editor-topbar .style-kits {
-  display: flex;
-  gap: 4px;
-}
-.rev01-editor-topbar .style-kits button {
-  appearance: none;
-  background: transparent;
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg-mute);
-  font: inherit;
-  padding: 4px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.rev01-editor-topbar .style-kits button:hover {
-  border-color: var(--rev01-hairline-strong);
-  color: var(--rev01-fg);
-}
-.rev01-editor-topbar .style-kits button.active {
-  border-color: var(--rev01-accent);
-  color: var(--rev01-fg);
-  background: var(--rev01-accent-soft);
-}
-
 .rev01-editor-topbar #canvas-save,
 .rev01-editor-topbar #canvas-publish {
   appearance: none;
@@ -147,6 +123,96 @@ body {
 .rev01-editor-topbar #canvas-publish[disabled] {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.rev01-editor-sidebar {
+  grid-area: sidebar;
+  min-width: 0;
+  border-right: 1px solid var(--rev01-hairline);
+  background: linear-gradient(180deg, var(--rev01-bg-titlebar), var(--rev01-bg-panel-strong));
+  overflow-y: auto;
+}
+
+.rev01-sidebar-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 12px 8px;
+  border-bottom: 1px solid var(--rev01-hairline);
+}
+
+.rev01-sidebar-tabs button {
+  appearance: none;
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: 6px;
+  background: var(--rev01-bg-panel);
+  color: var(--rev01-fg);
+  cursor: pointer;
+  font: 600 12px/1 var(--rev01-font-mono);
+  padding: 7px 10px;
+}
+
+.rev01-sidebar-tabs button.active {
+  border-color: var(--rev01-accent);
+  background: var(--rev01-accent-soft);
+}
+
+.rev01-sidebar-panel {
+  display: grid;
+  gap: 18px;
+  padding: 14px 12px 20px;
+}
+
+.rev01-sidebar-group {
+  display: grid;
+  gap: 8px;
+}
+
+.rev01-sidebar-group[hidden] {
+  display: none;
+}
+
+.rev01-sidebar-group h2 {
+  margin: 0;
+  color: var(--rev01-fg-mute);
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rev01-sidebar-command-grid,
+.rev01-sidebar-kit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rev01-sidebar-command,
+.rev01-sidebar-kit-grid button {
+  appearance: none;
+  min-width: 0;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  background: oklch(0.18 0.035 245 / 0.78);
+  color: var(--rev01-fg);
+  cursor: pointer;
+  font: 12px/1.25 var(--rev01-font-mono);
+  min-height: 34px;
+  padding: 8px 9px;
+  text-align: left;
+}
+
+.rev01-sidebar-command:hover,
+.rev01-sidebar-kit-grid button:hover {
+  border-color: var(--rev01-accent);
+  background: var(--rev01-bg-panel);
+}
+
+.rev01-sidebar-kit-grid button.active {
+  border-color: var(--rev01-accent);
+  background: var(--rev01-accent-soft);
+  color: var(--rev01-fg);
 }
 
 /* Viewport wraps #canvas-root so we can apply CSS transform scale on the
@@ -574,6 +640,89 @@ body {
 }
 .rev01-ai-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .rev01-ai-actions button:first-child {
+  background: var(--rev01-accent-soft);
+  border-color: var(--rev01-accent);
+}
+
+/* Modal overlay — replaces window.prompt() for the link/AI dialogs. Single
+   modal stack only; the JS throws if two are opened at once. Visual
+   language mirrors the AI preview panel so the editor reads as one
+   surface. */
+.rev01-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rev01-modal {
+  min-width: 360px;
+  max-width: 480px;
+  background: var(--rev01-bg-panel-strong);
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: var(--rev01-radius);
+  padding: 18px 18px 16px;
+  box-shadow: 0 16px 40px oklch(0 0 0 / 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--rev01-fg);
+  font: inherit;
+}
+.rev01-modal h3 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--rev01-fg-mute);
+}
+.rev01-modal label {
+  font-size: 12px;
+  color: var(--rev01-fg-mute);
+}
+.rev01-modal input[type="text"],
+.rev01-modal textarea,
+.rev01-modal select {
+  appearance: none;
+  font: inherit;
+  background: var(--rev01-bg-panel);
+  color: var(--rev01-fg);
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 4px;
+  padding: 8px 10px;
+  outline: none;
+  width: 100%;
+}
+.rev01-modal textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: var(--rev01-font-sans);
+}
+.rev01-modal input[type="text"]:focus,
+.rev01-modal textarea:focus,
+.rev01-modal select:focus {
+  border-color: var(--rev01-accent);
+}
+.rev01-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.rev01-modal-actions button {
+  appearance: none;
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+}
+.rev01-modal-actions button:hover { border-color: var(--rev01-accent); }
+.rev01-modal-actions button:last-child {
   background: var(--rev01-accent-soft);
   border-color: var(--rev01-accent);
 }

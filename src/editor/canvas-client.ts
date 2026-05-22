@@ -102,6 +102,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const inspector = document.getElementById("canvas-inspector");
   const statusEl = document.getElementById("canvas-status");
   const mainEl = document.querySelector("main.rev01-editor");
+  const sidebar = document.getElementById("canvas-sidebar");
+  const sidebarSelection = document.getElementById("canvas-sidebar-selection");
   const saveButton = document.getElementById("canvas-save");
   const publishButton = document.getElementById("canvas-publish");
 
@@ -259,6 +261,226 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }, 4000);
   }
 
+  // -- Save-busy + session-expired handling ------------------------------
+  // The server returns 401 JSON for every /api/* path when the Clerk session
+  // expires mid-edit (see src/auth/require-auth.ts). authFetch is the single
+  // place we detect that — every Owner-gated /api/* call routes through it
+  // and a 401 trips handleSessionExpired once, locks the editor, and reloads
+  // the page after a short grace so Clerk's handshake fires fresh.
+  let saveBusy = false;
+  let sessionExpired = false;
+  function setSaveBusy(busy) {
+    saveBusy = busy;
+    if (saveButton) saveButton.disabled = busy;
+  }
+  function handleSessionExpired() {
+    if (sessionExpired) return;
+    sessionExpired = true;
+    setStatus("Session expired — reloading…", "error");
+    // Lock every mutating control. Reload happens in ~1.5s; idempotent so
+    // multiple in-flight 401s collapse into a single reload.
+    setSaveBusy(true);
+    setAiBusy(true);
+    if (publishButton) publishButton.disabled = true;
+    setTimeout(() => { location.reload(); }, 1500);
+  }
+  async function authFetch(input, init) {
+    const response = await fetch(input, init);
+    if (response.status === 401) {
+      handleSessionExpired();
+      throw new Error("session expired");
+    }
+    return response;
+  }
+
+  // -- Modal overlay (text + select) -------------------------------------
+  // Replaces the five window.prompt sites. Single-modal stack — calling
+  // openTextModal/openSelectModal while another is open throws loud so we
+  // don't silently hide one behind another. Escape and backdrop click
+  // resolve to null; Enter submits single-line; Ctrl/Cmd+Enter submits
+  // multiline.
+  let modalOpen = false;
+  function openTextModal(opts) {
+    if (modalOpen) {
+      throw new Error("openTextModal: another modal is already open");
+    }
+    const title = typeof opts.title === "string" ? opts.title : "";
+    const label = typeof opts.label === "string" ? opts.label : "";
+    const defaultValue = typeof opts.defaultValue === "string" ? opts.defaultValue : "";
+    const placeholder = typeof opts.placeholder === "string" ? opts.placeholder : "";
+    const multiline = opts.multiline === true;
+    modalOpen = true;
+    return new Promise((resolve) => {
+      const backdrop = document.createElement("div");
+      backdrop.className = "rev01-modal-backdrop";
+      const panel = document.createElement("div");
+      panel.className = "rev01-modal";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      if (title) panel.setAttribute("aria-label", title);
+
+      if (title) {
+        const h = document.createElement("h3");
+        h.textContent = title;
+        panel.appendChild(h);
+      }
+      const lbl = document.createElement("label");
+      lbl.textContent = label;
+      panel.appendChild(lbl);
+
+      const input = multiline ? document.createElement("textarea") : document.createElement("input");
+      if (!multiline) input.type = "text";
+      input.value = defaultValue;
+      input.placeholder = placeholder;
+      if (multiline) input.rows = 4;
+      panel.appendChild(input);
+
+      const actions = document.createElement("div");
+      actions.className = "rev01-modal-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "OK";
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      panel.appendChild(actions);
+
+      backdrop.appendChild(panel);
+
+      function close(value) {
+        document.removeEventListener("keydown", onKey, true);
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        modalOpen = false;
+        resolve(value);
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          ev.stopPropagation();
+          close(null);
+          return;
+        }
+        if (ev.key === "Enter") {
+          if (multiline) {
+            if (ev.ctrlKey || ev.metaKey) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              close(input.value);
+            }
+            return;
+          }
+          ev.preventDefault();
+          ev.stopPropagation();
+          close(input.value);
+        }
+      }
+      backdrop.addEventListener("click", (ev) => {
+        if (ev.target === backdrop) close(null);
+      });
+      cancel.addEventListener("click", () => close(null));
+      ok.addEventListener("click", () => close(input.value));
+      document.addEventListener("keydown", onKey, true);
+
+      document.body.appendChild(backdrop);
+      // Autofocus after mount so the input is ready to type.
+      input.focus();
+      if (typeof input.select === "function") input.select();
+    });
+  }
+
+  function openSelectModal(opts) {
+    if (modalOpen) {
+      throw new Error("openSelectModal: another modal is already open");
+    }
+    const title = typeof opts.title === "string" ? opts.title : "";
+    const label = typeof opts.label === "string" ? opts.label : "";
+    const options = Array.isArray(opts.options) ? opts.options : [];
+    const defaultValue = typeof opts.defaultValue === "string" ? opts.defaultValue : "";
+    modalOpen = true;
+    return new Promise((resolve) => {
+      const backdrop = document.createElement("div");
+      backdrop.className = "rev01-modal-backdrop";
+      const panel = document.createElement("div");
+      panel.className = "rev01-modal";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      if (title) panel.setAttribute("aria-label", title);
+
+      if (title) {
+        const h = document.createElement("h3");
+        h.textContent = title;
+        panel.appendChild(h);
+      }
+      const lbl = document.createElement("label");
+      lbl.textContent = label;
+      panel.appendChild(lbl);
+
+      const select = document.createElement("select");
+      let matched = false;
+      for (let i = 0; i < options.length; i++) {
+        const opt = options[i];
+        if (!opt || typeof opt.value !== "string") continue;
+        const optEl = document.createElement("option");
+        optEl.value = opt.value;
+        optEl.textContent = typeof opt.label === "string" ? opt.label : opt.value;
+        if (opt.value === defaultValue) {
+          optEl.selected = true;
+          matched = true;
+        }
+        select.appendChild(optEl);
+      }
+      if (!matched && options.length > 0) {
+        select.selectedIndex = 0;
+      }
+      panel.appendChild(select);
+
+      const actions = document.createElement("div");
+      actions.className = "rev01-modal-actions";
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      const ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "OK";
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      panel.appendChild(actions);
+
+      backdrop.appendChild(panel);
+
+      function close(value) {
+        document.removeEventListener("keydown", onKey, true);
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        modalOpen = false;
+        resolve(value);
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          ev.stopPropagation();
+          close(null);
+          return;
+        }
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          ev.stopPropagation();
+          close(select.value);
+        }
+      }
+      backdrop.addEventListener("click", (ev) => {
+        if (ev.target === backdrop) close(null);
+      });
+      cancel.addEventListener("click", () => close(null));
+      ok.addEventListener("click", () => close(select.value));
+      document.addEventListener("keydown", onKey, true);
+
+      document.body.appendChild(backdrop);
+      select.focus();
+    });
+  }
+
   function uuid() {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
@@ -297,7 +519,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   async function persistStateSnapshot(snapshot) {
     setStatus("Saving...");
     try {
-      const response = await fetch(SITE_BASE, {
+      const response = await authFetch(SITE_BASE, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ editableState: snapshot }),
@@ -675,6 +897,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // changed) section heights or page width that this render produced.
     applyZoom();
     renderInspector();
+    renderSidebarSelection();
   }
 
   // -- Inspector ----------------------------------------------------------
@@ -905,8 +1128,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         scheduleSave();
       });
       inspector.appendChild(field("Align", align));
-
-      appendPinnedColor(element);
     }
 
     if (element.type === "action") {
@@ -1118,7 +1339,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const altValue =
       altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
     try {
-      const response = await fetch(SITE_BASE + "/assets", {
+      const response = await authFetch(SITE_BASE + "/assets", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ dataUrl, alt: altValue }),
@@ -1186,7 +1407,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(altWrap);
   }
 
-  function appendPinnedColor(element) {
+  function buildPinnedColorField(element) {
     // Curated colour pinning. Restricted to safe property names and values
     // without ';' or ':' (defence-in-depth — validator also enforces this).
     const wrap = document.createElement("div");
@@ -1218,7 +1439,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
     wrap.appendChild(label);
     wrap.appendChild(input);
-    inspector.appendChild(wrap);
+    return wrap;
+  }
+
+  function renderSidebarSelection() {
+    if (!sidebarSelection) return;
+    sidebarSelection.replaceChildren();
+    if (!selectedElementId) {
+      sidebarSelection.hidden = true;
+      return;
+    }
+    const found = findElement(selectedElementId);
+    if (!found || found.element.type !== "text") {
+      sidebarSelection.hidden = true;
+      return;
+    }
+    sidebarSelection.hidden = false;
+    const heading = document.createElement("h2");
+    heading.textContent = "Selection";
+    sidebarSelection.appendChild(heading);
+    sidebarSelection.appendChild(buildPinnedColorField(found.element));
   }
 
   // -- Selection & inline edit -------------------------------------------
@@ -1237,6 +1477,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (found) selectSection(found.section.id);
     }
     renderInspector();
+    renderSidebarSelection();
   }
 
   function selectSection(sectionId) {
@@ -1406,9 +1647,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     sel.addRange(next);
   }
 
-  function promptForLinkHref(current) {
+  async function promptForLinkHref(current) {
     const initial = typeof current === "string" ? current : "https://";
-    const raw = window.prompt("Link URL", initial);
+    const raw = await openTextModal({
+      title: "Add link",
+      label: "URL",
+      defaultValue: initial,
+      placeholder: "https://...",
+    });
     if (raw === null) return null; // cancelled
     const href = raw.trim();
     if (href.length === 0) return null;
@@ -1419,7 +1665,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return href;
   }
 
-  function applyLinkMark() {
+  async function applyLinkMark() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
@@ -1427,17 +1673,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus("Select some text first to add a link", "error");
       return;
     }
-    const href = promptForLinkHref("");
+    // Snapshot the Range before opening the modal — focusing the modal
+    // input would otherwise collapse the editor's Selection, leaving us
+    // with nothing to wrap when the user clicks OK.
+    const savedRange = range.cloneRange();
+    const href = await promptForLinkHref("");
     if (href === null) return;
+    // Restore the Selection so surroundContents wraps the original text.
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
     const a = document.createElement("a");
     a.className = "rev01-inline-link";
     a.setAttribute("href", href);
     try {
-      range.surroundContents(a);
+      savedRange.surroundContents(a);
     } catch (_) {
-      const fragment = range.extractContents();
+      const fragment = savedRange.extractContents();
       a.appendChild(fragment);
-      range.insertNode(a);
+      savedRange.insertNode(a);
     }
     sel.removeAllRanges();
     const next = document.createRange();
@@ -1452,7 +1705,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (type === "strike") return applyExecCommand("strikeThrough");
     if (type === "code") return wrapSelectionWith("code");
     if (type === "highlight") return wrapSelectionWith("mark");
-    if (type === "link") return applyLinkMark();
+    if (type === "link") { void applyLinkMark(); return; }
   }
 
   function buildMarkToolbar(anchor) {
@@ -1637,7 +1890,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         closeAiPanel();
         return;
       }
-      const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/apply", {
+      const response = await authFetch("/api/canvas-agent/sites/" + SITE_ID + "/apply", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ops }),
@@ -1735,7 +1988,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     setStatus("Asking the assistant...");
     try {
-      const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/preview", {
+      const response = await authFetch("/api/canvas-agent/sites/" + SITE_ID + "/preview", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -1760,12 +2013,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
-  function aiRewriteText(elementId) {
+  async function aiRewriteText(elementId) {
     if (aiBusy) return;
-    const brief = window.prompt(
-      "What should this text say? (free text — the assistant rewrites the run array)",
-      "",
-    );
+    const brief = await openTextModal({
+      title: "AI rewrite",
+      label: "How should this text change?",
+      placeholder: "Make it punchier",
+      multiline: true,
+    });
     if (brief === null || brief.trim().length === 0) return;
     const prompt =
       "Rewrite the text element with id=" + elementId + " using the rewriteText tool. " +
@@ -1773,12 +2028,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     runAiPreview(prompt);
   }
 
-  function aiReplaceMedia(elementId) {
+  async function aiReplaceMedia(elementId) {
     if (aiBusy) return;
-    const brief = window.prompt(
-      "Describe the replacement asset. The assistant picks from already-uploaded site assets.",
-      "",
-    );
+    const brief = await openTextModal({
+      title: "AI media",
+      label: "Describe the asset",
+      placeholder: "Sunset over ocean",
+      multiline: true,
+    });
     if (brief === null || brief.trim().length === 0) return;
     const prompt =
       "Replace the media element with id=" + elementId +
@@ -1787,23 +2044,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     runAiPreview(prompt);
   }
 
-  function aiCreateSection(afterSectionId) {
+  async function aiCreateSection(afterSectionId) {
     if (aiBusy) return;
-    const recipeListing = SECTION_RECIPE_IDS.join(", ");
-    const recipeId = window.prompt(
-      "Which section recipe? Choose one of: " + recipeListing,
-      "feature-grid",
-    );
+    const recipeId = await openSelectModal({
+      title: "AI section",
+      label: "Recipe",
+      options: SECTION_RECIPE_IDS.map((id) => ({ value: id, label: id })),
+      defaultValue: "feature-grid",
+    });
     if (recipeId === null) return;
     const normalised = recipeId.trim();
     if (SECTION_RECIPE_IDS.indexOf(normalised) < 0) {
       setStatus("Unknown recipe id: " + normalised, "error");
       return;
     }
-    const brief = window.prompt(
-      "Section brief — what should the new " + normalised + " say?",
-      "",
-    );
+    const brief = await openTextModal({
+      title: "Section brief",
+      label: "What goes in this section?",
+      placeholder: "three reasons to migrate",
+      multiline: true,
+    });
     if (brief === null || brief.trim().length === 0) return;
     const afterClause = afterSectionId
       ? "Insert it after section id=" + afterSectionId + "."
@@ -1937,6 +2197,62 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderAll();
     selectElement(element.id);
     scheduleSave();
+  }
+
+  function targetSectionForSidebar() {
+    const page = currentPage();
+    if (!page || !Array.isArray(page.sections) || page.sections.length === 0) return null;
+    if (selectedSectionId) {
+      const selected = findSection(selectedSectionId);
+      if (selected) return selected;
+    }
+    return page.sections[page.sections.length - 1] || null;
+  }
+
+  function addBlankSectionFromSidebar() {
+    const page = currentPage();
+    if (!page) return;
+    const section = {
+      id: newSectionId(),
+      recipeId: "feature-grid",
+      name: "Blank section",
+      height: 640,
+      elements: [],
+    };
+    const selectedIndex = selectedSectionId
+      ? page.sections.findIndex((candidate) => candidate.id === selectedSectionId)
+      : -1;
+    const insertAt = selectedIndex >= 0 ? selectedIndex + 1 : page.sections.length;
+    page.sections.splice(insertAt, 0, section);
+    selectedSectionId = section.id;
+    selectedElementId = null;
+    renderAll();
+    scheduleSave();
+    setStatus("Section added", "ok");
+  }
+
+  function componentActionForSidebar(component) {
+    if (component === "text") return "add-text";
+    if (component === "image") return "add-image";
+    if (component === "video") return "add-video";
+    if (component === "action") return "add-action";
+    if (component === "shape") return "add-shape";
+    if (component === "container") return "add-container";
+    return null;
+  }
+
+  function addComponentFromSidebar(component) {
+    const section = targetSectionForSidebar();
+    if (!section) {
+      setStatus("Add a section first", "error");
+      return;
+    }
+    const action = componentActionForSidebar(component);
+    if (!action) {
+      setStatus("Unknown component: " + component, "error");
+      return;
+    }
+    handleSectionAction(action, section.id);
   }
 
   function handleSectionAction(action, sectionId) {
@@ -2124,42 +2440,69 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return wrap;
   }
 
-  function attachStyleKitButtons() {
-    const buttons = document.querySelectorAll('.rev01-editor-topbar .style-kits button[data-style-kit]');
-    buttons.forEach((button) => {
-      button.addEventListener("click", async (ev) => {
+  function syncSidebarStyleKitButtons(buttons) {
+    buttons.forEach((b) => {
+      const isActive = !!state && b.getAttribute('data-sidebar-style-kit') === state.styleKit;
+      b.classList.toggle("active", isActive);
+      b.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+
+  async function applySidebarStyleKit(kit, buttons) {
+    if (!kit || STYLE_KITS.indexOf(kit) < 0) return;
+    try {
+      const saved = await flushPendingSave();
+      if (!saved) return;
+      const response = await authFetch(SITE_BASE + "/style-kit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ styleKit: kit }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
+        setStatus(detail, "error");
+        return;
+      }
+      state.styleKit = kit;
+      if (mainEl) mainEl.setAttribute("data-style-kit", kit);
+      syncSidebarStyleKitButtons(buttons);
+      // Re-render the inspector so the kit summary picks up the new
+      // computed CSS values. Cheap because the inspector is a small DOM.
+      renderInspector();
+      setStatus("Style kit: " + kit, "ok");
+    } catch (err) {
+      setStatus("Style kit change failed", "error");
+    }
+  }
+
+  function attachSidebarActions() {
+    if (!sidebar) return;
+    const sectionButtons = sidebar.querySelectorAll('[data-sidebar-add-section]');
+    sectionButtons.forEach((button) => {
+      button.addEventListener("click", (ev) => {
         ev.preventDefault();
-        ev.stopPropagation();
-        const kit = button.getAttribute('data-style-kit');
-        if (!kit || STYLE_KITS.indexOf(kit) < 0) return;
-        try {
-          const saved = await flushPendingSave();
-          if (!saved) return;
-          const response = await fetch(SITE_BASE + "/style-kit", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ styleKit: kit }),
-          });
-          if (!response.ok) {
-            let detail = response.statusText;
-            try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
-            setStatus(detail, "error");
-            return;
-          }
-          state.styleKit = kit;
-          if (mainEl) mainEl.setAttribute("data-style-kit", kit);
-          buttons.forEach((b) => {
-            const isActive = b.getAttribute('data-style-kit') === kit;
-            b.classList.toggle("active", isActive);
-            b.setAttribute("aria-pressed", isActive ? "true" : "false");
-          });
-          // Re-render the inspector so the kit summary picks up the new
-          // computed CSS values. Cheap because the inspector is a small DOM.
-          renderInspector();
-          setStatus("Style kit: " + kit, "ok");
-        } catch (err) {
-          setStatus("Style kit change failed", "error");
-        }
+        const kind = button.getAttribute('data-sidebar-add-section');
+        if (kind === "blank") addBlankSectionFromSidebar();
+      });
+    });
+
+    const componentButtons = sidebar.querySelectorAll('[data-sidebar-add-component]');
+    componentButtons.forEach((button) => {
+      button.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const component = button.getAttribute('data-sidebar-add-component');
+        if (component) addComponentFromSidebar(component);
+      });
+    });
+
+    const styleButtons = sidebar.querySelectorAll('[data-sidebar-style-kit]');
+    syncSidebarStyleKitButtons(styleButtons);
+    styleButtons.forEach((button) => {
+      button.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const kit = button.getAttribute('data-sidebar-style-kit');
+        void applySidebarStyleKit(kit, styleButtons);
       });
     });
   }
@@ -2225,7 +2568,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const saved = await flushPendingSave();
       if (!saved) return;
       setStatus("Publishing...");
-      const response = await fetch("/api/publish/sites/" + SITE_ID, {
+      const response = await authFetch("/api/publish/sites/" + SITE_ID, {
         method: "POST",
         headers: { "content-type": "application/json" },
       });
@@ -2284,7 +2627,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   (async () => {
     try {
-      const response = await fetch(SITE_BASE);
+      const response = await authFetch(SITE_BASE);
       if (!response.ok) {
         setStatus("Failed to load site (" + response.status + ")", "error");
         return;
@@ -2302,7 +2645,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderAll();
       attachRootEvents();
       attachPointerHandlers();
-      attachStyleKitButtons();
+      attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
       attachPresence();
