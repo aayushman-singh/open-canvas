@@ -2756,8 +2756,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   async function importPendingSectionAt(insertAt) {
     if (!pendingImport) return;
     const target = pendingImport;
-    setStatus('Inserting section…', 'ok');
     try {
+      const saved = await flushPendingSave();
+      if (!saved) return;
+      setStatus('Inserting section…', 'ok');
       const response = await authFetch('/api/sites/' + SITE_ID + '/sections/import', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
