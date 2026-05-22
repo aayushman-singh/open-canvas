@@ -3008,10 +3008,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // the orphan rows carry no user-facing weight, but we still want the
       // cleanup attempt recorded.
       for (const elementId of mediaElementIds) {
-        fetch(
+        authFetch(
           "/api/sites/" + encodeURIComponent(SITE_ID) +
           "/elements/" + encodeURIComponent(elementId) + "/history",
-          { method: "DELETE", credentials: "include" },
+          { method: "DELETE" },
         )
           .then((r) => {
             if (!r.ok) {
