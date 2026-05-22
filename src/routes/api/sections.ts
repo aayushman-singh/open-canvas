@@ -94,16 +94,13 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   }
 
   const siteRow = await database
-    .select({ id: site.id, customerId: site.customerId, editableState: site.editableState })
+    .select({ id: site.id, editableState: site.editableState })
     .from(site)
-    .where(eq(site.id, siteId))
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
   const siteRecord = siteRow[0];
   if (!siteRecord) {
     return c.json({ error: 'site not found' }, 404);
-  }
-  if (siteRecord.customerId !== customerId) {
-    return c.json({ error: 'forbidden' }, 403);
   }
 
   const state = siteRecord.editableState;

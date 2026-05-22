@@ -347,6 +347,15 @@ assert(
   !sitesApiSource.includes("input.templateId.trim() === '' ? 'starter-canvas'"),
   'expected site creation API not to silently default a missing templateId',
 );
+const sectionsApiSource = await readSource('./routes/api/sections.ts');
+assert(
+  sectionsApiSource.includes('.where(and(eq(site.id, siteId), eq(site.customerId, customerId)))'),
+  'expected section import site lookup to be scoped by both site id and owner customer',
+);
+assert(
+  !sectionsApiSource.includes("return c.json({ error: 'forbidden' }, 403)"),
+  'expected section import to hide unowned site ids behind the same 404 contract as canvas APIs',
+);
 
 // -- Canvas-first review regressions --------------------------------------
 // These are source-level checks for the browser-only editor script. They keep
@@ -382,6 +391,12 @@ assert(
 assert(
   /async function publishSite[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
   'expected publish to flush pending local saves before snapshotting editable state',
+);
+assert(
+  /async function importPendingSectionAt[\s\S]*const saved = await flushPendingSave\(\);[\s\S]*if \(!saved\) return;/.test(
+    canvasClientSource,
+  ),
+  'expected section import to flush pending local saves before asking the server',
 );
 assert(
   canvasIndexSource.includes('id="canvas-sidebar"'),
@@ -449,9 +464,7 @@ try {
   await rm(inlineCanvasClientParseDir, { recursive: true, force: true });
 }
 assert(
-  inlineCanvasClient.includes(
-    "querySelectorAll('[data-sidebar-style-kit]')",
-  ),
+  inlineCanvasClient.includes("querySelectorAll('[data-sidebar-style-kit]')"),
   'expected style-kit click handling to bind sidebar style-kit buttons',
 );
 assert(
