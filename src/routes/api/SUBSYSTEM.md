@@ -2,48 +2,59 @@
 
 ## Definition
 
-Programmatic surface for the dashboard, the editor, and the agent. Receives
-mutation requests, live-collaboration upgrade requests, and agent-driven
-edit requests from signed-in callers, validates them against the document
-and catalog vocabulary, verifies ownership of the targeted resource, and
-either applies the change transactionally, hands the connection off to the
-live-collaboration owner, or streams agent events while routing each agent
-tool call to the live-collaboration owner so all connected editors see the
-edits arrive over the same Yjs wire as a human keystroke. Returns either a
-structured response (for JSON callers), a redirect back into the dashboard
-(for plain HTML form callers), a protocol-upgraded WebSocket (for the
-multiplayer transport), or an NDJSON stream (for the agent endpoint).
-Anonymous callers are bounced to the identity gate before any handler runs.
+Programmatic surface for the dashboard, the canvas editor, the AI agent, and
+the publish pipeline. Receives mutation requests from signed-in callers,
+verifies ownership of the targeted site, validates the proposed canvas state
+against `src/canvas/schema.ts` + `src/canvas/validate.ts`, either applies the
+change transactionally to Postgres, snapshots the editable state to the
+Published Address, or streams agent events while routing each agent op
+through the same validator so previews + applies cannot drift. Anonymous
+callers are bounced to the identity gate before any handler runs.
+
+## Active endpoints (canvas-first POC)
+
+- **`canvas.ts`** — `GET/PATCH /api/canvas/:siteId` (load + mutate
+  `CanvasSiteState`), `POST /api/canvas/:siteId/assets` (upload media as a
+  data URL, persist to `site_asset`).
+- **`canvas-agent.ts`** — `POST /api/canvas-agent/:siteId` — NDJSON stream of
+  agent events (thinking / tool-call / preview / applied / error). Previewed
+  edits are returned to the editor for accept/reject; on accept, the op is
+  applied and the canvas state is updated.
+- **`publish.ts`** — `POST /api/publish/:siteId` — snapshot the editable
+  state, write it to `site.publishedSnapshot`, bump `publishedVersion`, and
+  broadcast the new version through the site's `SiteRoom` Durable Object so
+  open Visitor tabs swap in the new bytes.
+- **`sites.ts`** — `POST /api/sites` (create a site from the canonical
+  Template Seed + seed media assets), `GET /api/sites/:siteId` (owner-side
+  metadata), `DELETE /api/sites/:siteId`.
 
 ## Inputs
 
-- **dashboard caller** -> request to create a new site from a chosen
-  template, carrying the template id and a user-supplied site name
-- **editor caller** -> request to upgrade the connection to a live
-  collaboration session for a specific page, carrying the page identity
-- **agent caller (editor chat panel)** -> request to drive the AI agent
-  over the page document with a natural-language message, carrying the
-  page identity and the user's message
-- **request context** -> the resolved Clerk user, supplied by the identity
-  gate, used to resolve the owning customer row and to verify page ownership
-- **catalog store** -> existing template row, looked up by id to confirm
-  the chosen template still exists before materialising a site
-- **page store** -> page-and-site ownership chain used to gate
-  live-collaboration upgrades
-- **environment** -> database connection string and the live-collaboration
-  binding
+- **dashboard caller** — request to create a site from the Template Seed,
+  carrying a user-supplied site name + subdomain.
+- **editor caller** — request to mutate the canvas, upload media, accept an
+  AI-previewed edit, or publish.
+- **agent caller (editor chat panel)** — request to drive the AI agent over
+  the canvas with a natural-language prompt.
+- **request context** — the resolved Clerk user, supplied by the identity
+  gate, used to resolve the owning customer row and to verify site
+  ownership.
+- **environment** — Neon database URL, Gemini API key, `SITE_ROOM` Durable
+  Object binding.
 
 ## Outputs
 
-- **site store** -> a new site row owned by the resolved customer, plus one
-  page row per template page (copied document, copied position), all inside
-  one transaction so partial failure rolls back
-- **live-collaboration owner (one per page)** -> a forwarded WebSocket
-  upgrade for the targeted page, keyed by page identity, after the ownership
-  check passes; plus, for each agent tool call, an authenticated internal
-  POST applying the typed document operation at the reserved agent identity
-- **caller** -> JSON site id (when the caller asked for JSON), a redirect
-  back to the dashboard (otherwise), a 101 protocol-upgrade response (for
-  live-collaboration callers), an NDJSON stream of agent events (for the
-  agent endpoint), or a 4xx with an error body for missing, invalid, or
-  unauthorised input
+- **site store** — site, page, and site-asset rows; transactional so partial
+  failure rolls back.
+- **`SiteRoom` Durable Object** — a publish-broadcast message keyed by site
+  id when a publish lands.
+- **caller** — JSON for programmatic callers, NDJSON for the agent stream, a
+  4xx with an error body for missing / invalid / unauthorised input.
+
+## Retired endpoints
+
+`pages.ts` (legacy per-page mutation) and `agent.ts` (legacy agent over Yjs)
+are **superseded** by the canvas pair above. The files remain on disk for
+reference but are unmounted from `src/index.ts`, excluded from typecheck +
+lint, and unreachable from the bundler. See [ADR
+0003](../../../docs/adr/0003-canvas-first-reset.md) for the reset rationale.

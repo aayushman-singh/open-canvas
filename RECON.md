@@ -1,112 +1,85 @@
 # Recon — rev01
 
-> Greenfield, clean-room multiplayer + AI-native site builder. Architecture is reasoned from product requirements; see [docs/architecture/0001-architecture.md](docs/architecture/0001-architecture.md) and [docs/specs/](docs/specs/).
+> Canvas-first POC. Architecture is reasoned from the lived Owner / Visitor experience; see [docs/adr/0003-canvas-first-reset.md](docs/adr/0003-canvas-first-reset.md) and the implementation plan in [docs/superpowers/plans/2026-05-22-canvas-first-poc.md](docs/superpowers/plans/2026-05-22-canvas-first-poc.md).
 
 ---
 
 ## Elevator pitch
 
-rev01 is a **multiplayer, AI-native site builder** — one ProseMirror document per page, edited live with Yjs CRDT, rendered by one Cloudflare Worker, driven by a Claude agent that streams document operations. Recruiter hook: *"Webflow's editor plus Figma's multiplayer plus Cursor's agent, deployed as one edge binary."*
+rev01 is a **desktop canvas site builder** — one Template Seed, positioned design primitives, deterministic Style Kits, an AI agent that previews edits before applying them, and a Published Address that updates open Visitor tabs immediately. Single Cloudflare Worker, single bundle, single Durable Object (`SiteRoom`) per site for publish broadcasts and presence.
 
 ---
 
 ## Live state
 
 - **Build:** Bun + Wrangler + Hono scaffold with strict TypeScript, ESLint, Prettier, and a Worker dry-run build.
-- **Local dev:** `bun install` then `bun run dev`; `/` renders the Post-Aero landing, `/health` returns a JSON heartbeat.
+- **Local dev:** `bun install` then `bun.cmd run dev`; `/` renders the Post-Aero landing, `/health` returns a JSON heartbeat, `/dashboard` is Clerk-gated.
 - **Deployed URL:** <https://rev01.aayushman.dev>.
-- **Deployed state:** Cloudflare Pages serves the generated Post-Aero landing from `src/landing/` via the `deploy-landing` workflow.
+- **Published Addresses:** `*.rev01.aayushman.dev` via wildcard CNAME + Workers Route on the `aayushman.dev` zone.
 
 ---
 
-## Locked decisions
+## Locked decisions (canvas-first POC)
 
 | Dim | Choice |
 |---|---|
 | Product name | `rev01` |
-| Design language | **D — Post-Aero** (Vista-glass × terminal × live data chrome). See [docs/specs/design-variants.md](docs/specs/design-variants.md) §D |
-| Runtime | Single Cloudflare Worker — dashboard, API, customer-site render, agent, all in one bundle |
+| Runtime | Single Cloudflare Worker — dashboard, API, editor, agent, public host |
 | Router + UI | Hono + `hono/jsx` |
-| Modules | Flat `src/`, no published packages, no monorepo workspaces |
-| Editor | TipTap v3 + ProseMirror, whole page = `document.json` |
-| Multiplayer | Yjs CRDT + one DO per page + WebSocket; top-bar avatars only; snapshot to Postgres every 50 ops / 10s |
-| Agent visibility | Reserved Yjs `clientId`; appears as `<agent>` chip in top bar + history attribution |
-| AI | Anthropic Claude w/ tool use over document schema; streamed Yjs ops |
-| Renderer | Pure JSON → HTML in Worker |
+| Modules | Flat `src/`, no monorepo |
+| Editor | Vanilla browser JS over a positioned canvas (`src/editor/canvas-*`) |
+| Document model | `CanvasSiteState` — positioned primitives + StyleKit selector (`src/canvas/schema.ts`) |
+| Style system | Deterministic Style Kits with typography / surfaces / shapes / actions / motion (`src/canvas/style-kits.ts`) |
+| Live | `SiteRoom` Durable Object per site — publish broadcasts + presence (`src/live/site-room.ts`) |
+| AI | Gemini adapter with previewed edits + recipe registry (`src/agent/canvas-{ops,tools,agent-smoke}.ts`, `src/canvas/recipes.ts`) |
+| Renderer | Pure JSON -> HTML (`src/canvas/render.ts`) |
 | DB | Drizzle + Neon (HTTP driver) |
-| Auth | Clerk, single origin, no token handoff |
-| Site routing | Path-based `/s/:siteId/*` on canonical host; custom domains post-MVP |
-| Templates | 3 hand-built seed documents in DB |
-| Billing / cron / admin / forms / bookings / scraping | Out of MVP |
+| Auth | Clerk, single origin |
+| Site routing | `*.rev01.aayushman.dev` wildcard for Visitors; `rev01.aayushman.dev` for the app |
+| Templates | One canonical Template Seed (`src/canvas/fixtures/home.json`) |
 | Persona | Indie creators / solo founders |
-| Demo data | Anon-editable "Acme Coffee" site |
-| Mobile editing | Desktop-only; mobile renders read-only |
-| i18n | Skip |
+| Mobile editing | Desktop-only; published sites render responsively |
 | License | MIT |
 | Default branch | `main` |
-| LOC target (v0) | < 5,000 |
 
 ---
 
-## Backlog — ranked by hire-impact-per-hour
+## What is retired (and where it still lives on disk)
 
-Effort: **S** (under 2h), **M** (half day), **L** (full day+). Impact: low / medium / high.
+The original ProseMirror + Yjs architecture has been **superseded** by the canvas-first POC. ADR 0003 records the reset. The legacy files are kept on disk as inert reference — excluded from typecheck (`tsconfig.json` `exclude`), excluded from lint (`eslint.config.js` `ignores`), and unreachable from `src/index.ts` so the bundler never pulls them in. The deps that powered them (`prosemirror-model`, `prosemirror-state`, `prosemirror-transform`, `y-prosemirror`, `y-protocols`, `yjs`) have been removed from `package.json`.
 
-| # | Task | Effort | Impact | Why hireable |
-|---|------|--------|--------|--------------|
-| 1 | Reserve subdomain DNS, deploy "coming soon" + waitlist via CI | S | high | Day-one live URL on resume |
-| 2 | Repo wiring: Bun + Wrangler + Hono + `hono/jsx` + Drizzle + strict TS + ESLint + Prettier + Conventional Commits + ADR convention + SUBSYSTEM.md convention. Single `wrangler.toml`, single entrypoint `src/index.ts` | S | high | Visible hygiene |
-| 3 | Post-Aero (D) landing replacing "coming soon" — hero = 3-panel live editor+preview+agent view, terminal status bar, IBM Plex, deep-navy + cyan accent | M | high | First impression |
-| 4 | README v1 — 3-sentence pitch, GIF/Loom of dramatic interaction, run-locally, mermaid arch diagram, ADR 0001 link | S | high | Engineer reviewer scan |
-| 5 | Clerk auth + magic-link + first Drizzle/Neon table (`Customer`) | S | medium | Signed-up users = live data |
-| 6 | `src/document/` — clean-room TypeScript ProseMirror schema per [template-schema.md](docs/specs/template-schema.md) + pure-function renderer (`renderDoc(doc, theme) → string`) | M | medium | Editor foundation |
-| 7 | 3 hand-built templates as seed `document.json` per template-schema spec; `templates` table + `POST /sites` flow | M | medium | Catalog + site-create end-to-end |
-| 8 | **Multiplayer editor MVP** — TipTap + Yjs + DO per page + WebSocket; top-bar avatar list | L | **high** | Headline differentiator |
-| 9 | **AI agent over doc.json** — Claude tool use, streaming ops applied via Yjs, agent appears as one of the avatars | L | **high** | Hiring trend + matches multiplayer surface |
-| 10 | **Live theme studio** — palette → OKLCH derivation of full token set, WCAG contrast pass/fail, hot-reload preview | M | high | Visible design-system depth |
-| 11 | Edge analytics dashboard via Workers Analytics Engine + custom chart | M | high | Live data badge |
+Retained files (read-only reference):
 
-**Hard-stop after #10. #11 only if time remains before outreach.**
+- `src/document/` — old ProseMirror document vocabulary + renderer. `src/db/schema.ts` still imports the pure types from here for the legacy `page` table.
+- `src/multiplayer/` — old Yjs DO + snapshot + pm-schema.
+- `src/editor/{client.ts,index.tsx,styles.ts}` — old multiplayer editor.
+- `src/agent/{ops.ts,orchestrator.ts,smoke.ts,tools.ts,_live-smoke.ts}` — old agent over Yjs ops.
+- `src/routes/api/{pages.ts,agent.ts}` — old per-page mutation + agent endpoints (unmounted).
+- `src/routes/dashboard/theme.tsx` — old theme studio (unmounted).
 
-Post-MVP (do not dispatch now): custom-domain support, forms, appointments, billing, admin console, scraping.
+Reviving any of these = restore the dep, un-exclude the path, re-import in `src/index.ts`. Nothing else has been deleted.
 
 ---
 
-## Recommended dispatch order
+## Current backlog
 
-1. Task #1 — DNS + coming-soon deploy.
-2. Task #2 — repo wiring.
-3. Task #4 (draft) — README v1.
-4. Task #3 — Post-Aero landing.
-5. Task #5 — Clerk + first DB row.
-6. Task #6 — `src/document/` schema + renderer.
-7. Task #7 — 3 templates + `POST /sites`.
-8. Task #8 — multiplayer.
-9. Task #9 — AI agent.
-10. Task #10 — theme studio.
-11. Task #4 (revisit) — README final with Loom + diagrams.
+| # | Task | Status |
+|---|------|--------|
+| 1 | Repo + landing | done |
+| 2 | Clerk + first DB row | done |
+| 3 | Canvas schema + validator + renderer | done |
+| 4 | Style Kit registry (depth pass) | done |
+| 5 | Editor canvas (positioned primitives + drag) | done |
+| 6 | Canvas API (load/save/publish) | done |
+| 7 | Published Address (wildcard host + snapshot serve) | done |
+| 8 | Live publish broadcast + presence (`SiteRoom`) + visitor-update smoke | done |
+| 9 | Previewed AI canvas edits + recipe registry | done (T6 in plan) |
+| 9-partial | Retire ProseMirror + Yjs deps, unwire legacy routes, refresh docs | this commit |
 
----
-
-## Cred prerequisites (gating dispatch)
-
-All accounts must be **personal**, with no overlap with any prior employer's infrastructure.
-
-| Cred | Status |
-|---|---|
-| Cloudflare account ID + API token (Workers, KV, R2, DO, Analytics Engine, DNS edit) | Configured for Pages deploy; feature bindings still land with their tasks |
-| `aayushman.dev` zone present in personal CF account | Configured for `rev01.aayushman.dev` |
-| Neon API key OR connection string | Not wired into app code yet |
-| Clerk publishable + secret keys (Development instance) | Not wired into app code yet |
-| Anthropic API key | Not wired into app code yet |
-| GitHub remote location + auth | Configured |
+See the plan at `docs/superpowers/plans/2026-05-22-canvas-first-poc.md` for the full task list.
 
 ---
 
 ## Open questions
 
-None — all locked 2026-05-21.
-
----
-
-*Tasks #1, #2, and #4-draft have landed. Next hire-impact pass: task #3, then #5 and #6.*
+None. Architecture reset captured in ADR 0003 (2026-05-22).
