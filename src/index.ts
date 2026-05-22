@@ -6,6 +6,7 @@ import sites from './routes/api/sites';
 import canvasApi from './routes/api/canvas';
 import pages from './routes/api/pages';
 import agent from './routes/api/agent';
+import canvasAgentApi from './routes/api/canvas-agent';
 import publishApi from './routes/api/publish';
 import editor from './editor';
 import canvasEditor from './editor/canvas-index';
@@ -37,6 +38,7 @@ app.route('/api/sites', sites);
 app.route('/api/canvas', canvasApi);
 app.route('/api/pages', pages);
 app.route('/api/agent', agent);
+app.route('/api/canvas-agent', canvasAgentApi);
 app.route('/api/publish', publishApi);
 
 export { PageDocument } from './multiplayer/page-document';

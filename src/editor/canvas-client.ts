@@ -83,6 +83,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let editingSnapshot = null;
   // The inline mark toolbar element, present in the DOM only while editing.
   let markToolbar = null;
+  // AI preview overlay state. Only one preview at a time; while a preview is
+  // open every AI button on the page is disabled. The overlay disappears on
+  // Accept (after the apply call lands) or Dismiss (no save).
+  let aiPanel = null;
+  let aiBusy = false;
+  // The recipe-id list mirrors src/canvas/schema.ts SECTION_RECIPE_IDS.
+  const SECTION_RECIPE_IDS = [
+    "hero-split",
+    "feature-grid",
+    "gallery-strip",
+    "cta-band",
+    "logo-strip",
+    "testimonial-row",
+    "video-hero",
+  ];
 
   const root = document.getElementById("canvas-root");
   const inspector = document.getElementById("canvas-inspector");
@@ -565,6 +580,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (def.danger) button.classList.add("danger");
       bar.appendChild(button);
     }
+    // AI section button \u2014 drives /api/canvas-agent/sites/.../preview with a
+    // createSection prompt. The button shares the disabled-while-busy
+    // contract with the other AI controls via data-ai-button.
+    const aiBtn = document.createElement("button");
+    aiBtn.type = "button";
+    aiBtn.textContent = "AI section";
+    aiBtn.setAttribute("data-ai-button", "create-section");
+    aiBtn.setAttribute("data-section-id", section.id);
+    if (aiBusy) aiBtn.disabled = true;
+    aiBtn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      aiCreateSection(section.id);
+    });
+    bar.appendChild(aiBtn);
     return bar;
   }
 
@@ -791,6 +820,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildZOrderGroup(section, element));
 
     if (element.type === "text") {
+      const aiBtn = document.createElement("button");
+      aiBtn.type = "button";
+      aiBtn.textContent = "AI rewrite";
+      aiBtn.setAttribute("data-ai-button", "rewrite-text");
+      if (aiBusy) aiBtn.disabled = true;
+      aiBtn.addEventListener("click", () => { aiRewriteText(element.id); });
+      inspector.appendChild(aiBtn);
+
       const role = selectInput(["heading", "body", "label"], element.role);
       role.addEventListener("change", () => {
         element.role = role.value;
@@ -893,6 +930,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
 
     if (element.type === "media") {
+      const aiBtn = document.createElement("button");
+      aiBtn.type = "button";
+      aiBtn.textContent = "AI media";
+      aiBtn.setAttribute("data-ai-button", "replace-media");
+      if (aiBusy) aiBtn.disabled = true;
+      aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
+      inspector.appendChild(aiBtn);
+
       // Upload control — separate input for image vs video mediaKinds so the
       // file picker filters appropriately. POST to the owner upload route as
       // a base64 data URL; on success, update the element's assetId / kind /
@@ -1491,6 +1536,226 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     inner.addEventListener("blur", onBlur);
     inner.addEventListener("keydown", onKey);
+  }
+
+  // -- AI preview panel ---------------------------------------------------
+  //
+  // Three entry points (AI rewrite, AI media, AI section) drive the same
+  // POST /api/canvas-agent/sites/:siteId/preview pipeline. The response
+  // carries an op list and a previewState; the editor renders a transient
+  // side panel describing the ops with Accept/Dismiss buttons. Accept calls
+  // /apply on the server (which re-validates from scratch) and replaces
+  // the editor state with the response's editableState. Dismiss closes the
+  // panel without saving — the local state never changed in the first place.
+  //
+  // While the panel is open, aiBusy=true disables every AI button so the
+  // Owner cannot stack previews on top of each other.
+
+  function setAiBusy(busy) {
+    aiBusy = busy;
+    const buttons = document.querySelectorAll("[data-ai-button]");
+    for (let i = 0; i < buttons.length; i++) {
+      buttons[i].disabled = busy;
+    }
+  }
+
+  function closeAiPanel() {
+    if (aiPanel && aiPanel.parentNode) {
+      aiPanel.parentNode.removeChild(aiPanel);
+    }
+    aiPanel = null;
+    setAiBusy(false);
+  }
+
+  function describeOp(op) {
+    if (op.kind === "rewriteText") {
+      const preview =
+        Array.isArray(op.content)
+          ? op.content.map((r) => (r && typeof r.text === "string" ? r.text : "")).join("")
+          : "";
+      const shortened = preview.length > 80 ? preview.slice(0, 77) + "…" : preview;
+      return "Rewrite text " + op.elementId + ": \"" + shortened + "\"";
+    }
+    if (op.kind === "replaceMedia") {
+      return "Replace media " + op.elementId + " with asset " + op.assetId + " (" + op.mediaKind + ")";
+    }
+    if (op.kind === "insertSection") {
+      const after = op.afterSectionId ? " after " + op.afterSectionId : " at end";
+      const brief = op.input && typeof op.input.brief === "string" ? op.input.brief : "";
+      return "Insert section recipe=" + op.recipeId + after + (brief.length > 0 ? " — \"" + brief + "\"" : "");
+    }
+    return "Unknown op";
+  }
+
+  async function applyPreview(ops) {
+    try {
+      const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ops }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && Array.isArray(body.errors) && body.errors.length > 0) detail = body.errors[0];
+          else if (body && body.error) detail = body.error;
+        } catch (_) { /* ignore */ }
+        setStatus("Apply failed: " + detail, "error");
+        return;
+      }
+      const body = await response.json();
+      if (!body || typeof body !== "object" || !body.editableState) {
+        setStatus("Apply failed: malformed server response", "error");
+        return;
+      }
+      state = body.editableState;
+      selectedSectionId = null;
+      selectedElementId = null;
+      if (mainEl && state && state.styleKit) {
+        mainEl.setAttribute("data-style-kit", state.styleKit);
+      }
+      renderAll();
+      closeAiPanel();
+      setStatus("AI edit applied", "ok");
+    } catch (err) {
+      setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
+  function buildAiPanel(payload) {
+    closeAiPanel();
+    const panel = document.createElement("aside");
+    panel.className = "rev01-ai-panel";
+    panel.setAttribute("aria-label", "AI preview");
+    const heading = document.createElement("h3");
+    heading.textContent = "AI preview";
+    panel.appendChild(heading);
+
+    const ops = Array.isArray(payload.ops) ? payload.ops : [];
+    if (typeof payload.text === "string" && payload.text.length > 0) {
+      const note = document.createElement("p");
+      note.className = "rev01-ai-note";
+      note.textContent = payload.text;
+      panel.appendChild(note);
+    }
+    if (ops.length === 0) {
+      const empty = document.createElement("p");
+      empty.textContent = "The assistant did not propose any changes.";
+      panel.appendChild(empty);
+    } else {
+      const list = document.createElement("ol");
+      for (let i = 0; i < ops.length; i++) {
+        const item = document.createElement("li");
+        item.textContent = describeOp(ops[i]);
+        list.appendChild(item);
+      }
+      panel.appendChild(list);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "rev01-ai-actions";
+    const accept = document.createElement("button");
+    accept.type = "button";
+    accept.textContent = "Accept";
+    accept.disabled = ops.length === 0;
+    accept.addEventListener("click", () => { applyPreview(ops); });
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.textContent = "Dismiss";
+    dismiss.addEventListener("click", () => {
+      closeAiPanel();
+      setStatus("AI preview dismissed", "ok");
+    });
+    actions.appendChild(accept);
+    actions.appendChild(dismiss);
+    panel.appendChild(actions);
+
+    document.body.appendChild(panel);
+    aiPanel = panel;
+  }
+
+  async function runAiPreview(prompt) {
+    setAiBusy(true);
+    setStatus("Asking the assistant…");
+    try {
+      const response = await fetch("/api/canvas-agent/sites/" + SITE_ID + "/preview", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && Array.isArray(body.errors) && body.errors.length > 0) detail = body.errors[0];
+          else if (body && body.error) detail = body.error;
+        } catch (_) { /* ignore */ }
+        setStatus("AI preview failed: " + detail, "error");
+        setAiBusy(false);
+        return;
+      }
+      const body = await response.json();
+      buildAiPanel(body || {});
+      setStatus("AI preview ready", "ok");
+    } catch (err) {
+      setStatus("AI preview failed: " + (err && err.message ? err.message : String(err)), "error");
+      setAiBusy(false);
+    }
+  }
+
+  function aiRewriteText(elementId) {
+    if (aiBusy) return;
+    const brief = window.prompt(
+      "What should this text say? (free text — the assistant rewrites the run array)",
+      "",
+    );
+    if (brief === null || brief.trim().length === 0) return;
+    const prompt =
+      "Rewrite the text element with id=" + elementId + " using the rewriteText tool. " +
+      "Owner brief: " + brief;
+    runAiPreview(prompt);
+  }
+
+  function aiReplaceMedia(elementId) {
+    if (aiBusy) return;
+    const brief = window.prompt(
+      "Describe the replacement asset. The assistant picks from already-uploaded site assets.",
+      "",
+    );
+    if (brief === null || brief.trim().length === 0) return;
+    const prompt =
+      "Replace the media element with id=" + elementId +
+      " by calling replaceMedia with an asset id that already exists on this site. " +
+      "Owner brief: " + brief;
+    runAiPreview(prompt);
+  }
+
+  function aiCreateSection(afterSectionId) {
+    if (aiBusy) return;
+    const recipeListing = SECTION_RECIPE_IDS.join(", ");
+    const recipeId = window.prompt(
+      "Which section recipe? Choose one of: " + recipeListing,
+      "feature-grid",
+    );
+    if (recipeId === null) return;
+    const normalised = recipeId.trim();
+    if (SECTION_RECIPE_IDS.indexOf(normalised) < 0) {
+      setStatus("Unknown recipe id: " + normalised, "error");
+      return;
+    }
+    const brief = window.prompt(
+      "Section brief — what should the new " + normalised + " say?",
+      "",
+    );
+    if (brief === null || brief.trim().length === 0) return;
+    const afterClause = afterSectionId
+      ? "Insert it after section id=" + afterSectionId + "."
+      : "Append it at the end of the page.";
+    const prompt =
+      "Create a new section using the createSection tool with recipeId=" + normalised + ". " +
+      afterClause + " Owner brief: " + brief;
+    runAiPreview(prompt);
   }
 
   // -- Drag & resize ------------------------------------------------------

@@ -535,4 +535,74 @@ body {
 .rev01-inline-link:hover {
   color: var(--kit-accent, currentColor);
 }
+
+/* AI preview panel — transient overlay that appears after the canvas-agent
+   preview endpoint returns. Anchored top-right; Accept/Dismiss buttons live
+   at the bottom. The panel does not persist across edits — it is rebuilt
+   fresh on every preview. */
+.rev01-ai-panel {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: 360px;
+  max-height: calc(100vh - 120px);
+  overflow: auto;
+  background: var(--rev01-bg-panel-strong);
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: var(--rev01-radius);
+  padding: 16px;
+  z-index: 50;
+  box-shadow: 0 12px 32px oklch(0 0 0 / 0.4);
+}
+.rev01-ai-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--rev01-fg-mute);
+}
+.rev01-ai-panel p { margin: 6px 0; color: var(--rev01-fg); font-size: 13px; }
+.rev01-ai-panel .rev01-ai-note {
+  color: var(--rev01-fg-mute);
+  font-style: italic;
+  border-left: 2px solid var(--rev01-hairline);
+  padding-left: 8px;
+}
+.rev01-ai-panel ol { padding-left: 18px; margin: 6px 0 14px; }
+.rev01-ai-panel li { margin: 4px 0; font-size: 13px; color: var(--rev01-fg); }
+.rev01-ai-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.rev01-ai-actions button {
+  appearance: none;
+  font: inherit;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+}
+.rev01-ai-actions button:hover:not(:disabled) {
+  border-color: var(--rev01-accent);
+}
+.rev01-ai-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.rev01-ai-actions button:first-child {
+  background: var(--rev01-accent-soft);
+  border-color: var(--rev01-accent);
+}
+
+/* AI trigger buttons — inspector + section toolbar both stamp these. */
+[data-ai-button] {
+  appearance: none;
+  font: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--rev01-accent-soft);
+  border: 1px solid var(--rev01-accent);
+  color: var(--rev01-fg);
+}
+[data-ai-button]:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+[data-ai-button]:disabled { opacity: 0.5; cursor: not-allowed; }
 `;
