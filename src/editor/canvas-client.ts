@@ -1776,7 +1776,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     rebuildElement(element.id);
     scheduleSave();
     if (nextAssetId && nextAssetId !== "__placeholder__") {
-      fetch(
+      authFetch(
         "/api/sites/" + encodeURIComponent(SITE_ID) +
         "/elements/" + encodeURIComponent(element.id) +
         "/history/" + encodeURIComponent(nextAssetId),
@@ -1887,7 +1887,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           setStatus("Enter a prompt first", "error");
           return;
         }
-        runGenerateAndApply(element, prompt, altInput, genBtn, refreshAll);
+        runGenerateAndApply(element, prompt, altInput, genBtn, refreshAll, host);
       });
 
       genRow.appendChild(promptInput);
@@ -1944,7 +1944,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       historyRow.replaceChildren();
       let entries;
       try {
-        const resp = await fetch(
+        const resp = await authFetch(
           "/api/sites/" + encodeURIComponent(SITE_ID) +
           "/elements/" + encodeURIComponent(element.id) + "/history?limit=4",
           { credentials: "include" },
@@ -1978,7 +1978,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       galleryGrid.replaceChildren();
       let entries;
       try {
-        const resp = await fetch(
+        const resp = await authFetch(
           "/api/me/assets?kind=" + encodeURIComponent(element.mediaKind),
           { credentials: "include" },
         );
@@ -2080,7 +2080,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // Generate-and-apply pipeline for the picker's AI button. Shows an inline
   // preview below the generate button; on Apply calls applyAssetIdToElement.
-  async function runGenerateAndApply(element, prompt, altInputEl, genBtnEl, refreshFn) {
+  async function runGenerateAndApply(element, prompt, altInputEl, genBtnEl, refreshFn, host) {
     // Remove any stale preview for this element
     const stalePreview = document.getElementById("media-gen-preview-" + element.id);
     if (stalePreview) stalePreview.remove();
@@ -2159,7 +2159,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     btnRow.appendChild(applyBtn);
     btnRow.appendChild(discardBtn);
     previewWrap.appendChild(btnRow);
-    inspector.appendChild(previewWrap);
+    host.appendChild(previewWrap);
 
     function removePreview() {
       if (previewWrap.parentNode) previewWrap.parentNode.removeChild(previewWrap);
@@ -2196,7 +2196,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // 1. Probe usage
     let usage = [];
     try {
-      const resp = await fetch("/api/me/assets/" + encodeURIComponent(assetId) + "/usage", {
+      const resp = await authFetch("/api/me/assets/" + encodeURIComponent(assetId) + "/usage", {
         credentials: "include",
       });
       if (!resp.ok) {
@@ -2226,7 +2226,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // 3. DELETE with cascade confirm
     try {
-      const resp = await fetch(
+      const resp = await authFetch(
         "/api/me/assets/" + encodeURIComponent(assetId) + "?confirm=cascade",
         { method: "DELETE", credentials: "include" },
       );
