@@ -42,7 +42,7 @@ const html = renderCanvasSnapshot(snapshot, '/assets');
 assert(html.includes('data-rev01-page="page-home"'), 'expected rendered home page marker');
 assert(html.includes('data-rev01-section="section-hero"'), 'expected rendered hero section marker');
 assert(html.includes('data-rev01-element="hero-heading"'), 'expected rendered heading marker');
-assert(html.includes('data-rev01-media-kind="video"'), 'expected rendered video media marker');
+assert(html.includes('data-rev01-media-kind="image"'), 'expected rendered image media marker');
 
 // Rich text: the hero heading must contain a <strong> tag (the "lived-in" run
 // in the fixture carries a `bold` mark). Anchor the search to the heading's
@@ -156,8 +156,7 @@ assert(
   'expected validator to reject a two-page state (single-page POC invariant)',
 );
 assert(
-  !twoPageResult.valid &&
-    twoPageResult.errors.some((m) => m.includes('exactly one canvas page')),
+  !twoPageResult.valid && twoPageResult.errors.some((m) => m.includes('exactly one canvas page')),
   'expected two-page rejection to mention "exactly one canvas page"',
 );
 
@@ -343,7 +342,8 @@ for (const kit of STYLE_KITS) {
   );
   const motionKeys = Object.keys(preset.motionPresets).sort().join(',');
   assert(
-    motionKeys === 'blur-in,fade-up,none,parallax-soft,scale-in,slide-left,slow-drift,stagger-children',
+    motionKeys ===
+      'blur-in,fade-up,none,parallax-soft,scale-in,slide-left,slow-drift,stagger-children',
     `expected kit ${kit} to cover every motion preset (got ${motionKeys})`,
   );
 }
@@ -367,10 +367,7 @@ assert(
 // boundary) would normally have stopped — defence in depth.
 let rendererThrew = false;
 try {
-  renderCanvasSnapshot(
-    { ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit },
-    '/assets',
-  );
+  renderCanvasSnapshot({ ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit }, '/assets');
 } catch (err) {
   rendererThrew = true;
   assert(

@@ -5,15 +5,12 @@
 // `src/canvas/fixtures/home.json` MUST appear as a key here so a brand-new
 // site has no dangling media references.
 //
-// The bytes shipped here are intentionally minimal-but-real:
-//   - The image entries embed a 1x1 transparent PNG (33-byte minimum PNG
-//     payload encoded as base64). It renders as a fully transparent pixel; the
-//     Owner replaces it with real media via the upload route (T6 Step 4).
-//   - The video entry reuses the same 1x1 PNG bytes but declares
-//     `mediaType: 'video/mp4'`. This deliberately produces a file the browser
-//     cannot play; the smoke + validators + DB writes are the things being
-//     exercised here. The Owner replaces it via upload, exactly like the
-//     image entries. Real video bytes ship in a follow-up.
+// The bytes shipped here are intentionally minimal-but-real image bytes: each
+// entry embeds a 1x1 transparent PNG. It renders as a fully transparent pixel;
+// the Owner replaces it with real media via the upload route (T6 Step 4).
+// Video primitives are supported by the schema and upload path, but the seed
+// fixture does not claim to ship a playable video asset until real video bytes
+// exist in this registry.
 //
 // Once shipped, these ids and bytes are STABLE — Owners materialise sites
 // against them and cannot rely on us swapping bytes underneath. If we need to
@@ -39,16 +36,6 @@ const TRANSPARENT_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=';
 
 export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
-  'seed-hero-video-1': {
-    kind: 'video',
-    // POC placeholder: bytes are a 1x1 PNG with the wrong mediaType so the
-    // browser will refuse to play it. The Owner replaces it via the asset
-    // upload route; the validator + renderer + DB write end-to-end paths
-    // exercise correctly against this placeholder.
-    mediaType: 'video/mp4',
-    alt: 'Editable site loop',
-    bytesBase64: TRANSPARENT_PNG_BASE64,
-  },
   'seed-hero-poster-1': {
     kind: 'image',
     mediaType: 'image/png',
@@ -71,6 +58,6 @@ export function isSeedAssetId(id: string): boolean {
 
 export function getSeedAsset(id: string): SeedAsset | null {
   return Object.prototype.hasOwnProperty.call(SEED_ASSET_REGISTRY, id)
-    ? SEED_ASSET_REGISTRY[id] ?? null
+    ? (SEED_ASSET_REGISTRY[id] ?? null)
     : null;
 }

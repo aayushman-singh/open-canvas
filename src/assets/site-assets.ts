@@ -11,12 +11,30 @@
 // the new public route serves that path scoped to the current
 // `publishedSnapshot.pages`.
 
-import type { CanvasPage } from '../canvas/schema.js';
+import type { CanvasPage, MediaKind } from '../canvas/schema.js';
 
 export interface AssetBlob {
   kind: 'image' | 'video';
   mediaType: string;
   bytesBase64: string;
+}
+
+export interface ReferencedAsset {
+  assetId: string;
+  expectedKind: MediaKind;
+  role: 'asset' | 'poster';
+  path: string;
+  mediaElementId: string;
+}
+
+export interface AssetKindRow {
+  id: string;
+  kind: MediaKind;
+}
+
+export interface AssetReferenceError extends ReferencedAsset {
+  reason: 'missing' | 'kind-mismatch';
+  actualKind?: MediaKind;
 }
 
 /**
@@ -67,23 +85,55 @@ export function assetResponse(mediaType: string, bytesBase64: string): Response 
  * Returns a fresh `Set<string>` so callers can mutate it without affecting
  * the source pages.
  */
-export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> {
-  const out = new Set<string>();
-  for (const page of pages) {
-    for (const section of page.sections) {
-      for (const element of section.elements) {
+export function collectReferencedAssets(pages: CanvasPage[]): ReferencedAsset[] {
+  const out: ReferencedAsset[] = [];
+  for (const [pageIdx, page] of pages.entries()) {
+    for (const [sectionIdx, section] of page.sections.entries()) {
+      for (const [elementIdx, element] of section.elements.entries()) {
         if (element.type !== 'media') continue;
         if (typeof element.assetId === 'string' && element.assetId.length > 0) {
-          out.add(element.assetId);
+          out.push({
+            assetId: element.assetId,
+            expectedKind: element.mediaKind,
+            role: 'asset',
+            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].assetId`,
+            mediaElementId: element.id,
+          });
         }
-        if (
-          typeof element.posterAssetId === 'string' &&
-          element.posterAssetId.length > 0
-        ) {
-          out.add(element.posterAssetId);
+        if (typeof element.posterAssetId === 'string' && element.posterAssetId.length > 0) {
+          out.push({
+            assetId: element.posterAssetId,
+            expectedKind: 'image',
+            role: 'poster',
+            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].posterAssetId`,
+            mediaElementId: element.id,
+          });
         }
       }
     }
   }
   return out;
+}
+
+export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> {
+  return new Set(collectReferencedAssets(pages).map((ref) => ref.assetId));
+}
+
+export function findAssetReferenceErrors(
+  pages: CanvasPage[],
+  assets: AssetKindRow[],
+): AssetReferenceError[] {
+  const kindsById = new Map(assets.map((asset) => [asset.id, asset.kind]));
+  const errors: AssetReferenceError[] = [];
+  for (const reference of collectReferencedAssets(pages)) {
+    const actualKind = kindsById.get(reference.assetId);
+    if (!actualKind) {
+      errors.push({ ...reference, reason: 'missing' });
+      continue;
+    }
+    if (actualKind !== reference.expectedKind) {
+      errors.push({ ...reference, reason: 'kind-mismatch', actualKind });
+    }
+  }
+  return errors;
 }

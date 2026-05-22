@@ -59,12 +59,10 @@
               "id": "hero-media",
               "type": "media",
               "box": { "x": 760, "y": 80, "w": 600, "h": 600, "z": 2 },
-              "mediaKind": "video",
-              "assetId": "seed-hero-video-1",
-              "posterAssetId": "seed-hero-poster-1",
+              "mediaKind": "image",
+              "assetId": "seed-hero-poster-1",
               "alt": "Editable site loop",
-              "fit": "cover",
-              "playback": { "autoplay": true, "muted": true, "loop": true, "controls": false }
+              "fit": "cover"
             },
             {
               "id": "hero-orb",

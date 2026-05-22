@@ -6,8 +6,8 @@ export function Tagline() {
         multiplayer site builder with an <span class="accent">agent</span> at the cursor.
       </h1>
       <p>
-        One document model, one CRDT, one Worker. The agent edits in the same timeline you do
-        &mdash; no save buttons, no chat-panel sidebar, no "AI mode" toggle.
+        One canvas model, one Style Kit graph, one Published Address. The agent proposes concrete
+        canvas edits you can preview, accept, and publish.
       </p>
     </section>
   );

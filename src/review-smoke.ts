@@ -2,7 +2,11 @@ import { eq, sql } from 'drizzle-orm';
 import app from './index';
 import { applyCanvasAgentOp } from './agent/canvas-ops';
 import { CANVAS_AGENT_TOOLS } from './agent/canvas-tools';
-import { collectReferencedAssetIds } from './assets/site-assets';
+import {
+  collectReferencedAssetIds,
+  collectReferencedAssets,
+  findAssetReferenceErrors,
+} from './assets/site-assets';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
@@ -42,6 +46,14 @@ async function responseFromHost(
 ): Promise<{ status: number; body: string }> {
   const response = await app.request(`http://${host}${path}`, undefined, smokeEnv);
   return { status: response.status, body: await response.text() };
+}
+
+async function readSource(relativePath: string): Promise<string> {
+  const response = await fetch(new URL(relativePath, import.meta.url));
+  if (!response.ok) {
+    throw new Error(`failed to read ${relativePath}: ${String(response.status)}`);
+  }
+  return response.text();
 }
 
 const root = await responseText('/');
@@ -249,8 +261,7 @@ assert(
   'expected text element with content: [] to be rejected (non-empty array required)',
 );
 assert(
-  !emptyContent.valid &&
-    emptyContent.errors.some((message) => message.includes('non-empty array')),
+  !emptyContent.valid && emptyContent.errors.some((message) => message.includes('non-empty array')),
   'expected empty-content rejection to mention "non-empty array"',
 );
 
@@ -262,8 +273,7 @@ assert(
   'expected text element with mark type "rainbow" to be rejected (unknown mark type)',
 );
 assert(
-  !unknownMarkType.valid &&
-    unknownMarkType.errors.some((message) => message.includes('rainbow')),
+  !unknownMarkType.valid && unknownMarkType.errors.some((message) => message.includes('rainbow')),
   'expected unknown-mark rejection to mention the offending type "rainbow"',
 );
 
@@ -278,6 +288,57 @@ assert(
   !javascriptLink.valid &&
     javascriptLink.errors.some((message) => message.includes('javascript:alert(1)')),
   'expected javascript-link rejection to mention the offending href',
+);
+
+// -- Canvas-first review regressions --------------------------------------
+// These are source-level checks for the browser-only editor script. They keep
+// the POC's "Owner can save/publish/ask AI without losing local edits" flow
+// wired even though review-smoke does not boot a browser.
+
+const canvasIndexSource = await readSource('./editor/canvas-index.tsx');
+const canvasClientSource = await readSource('./editor/canvas-client.ts');
+assert(
+  !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
+  'expected Publish button to be enabled in the canvas editor shell',
+);
+assert(
+  canvasClientSource.includes('const publishButton = document.getElementById("canvas-publish")'),
+  'expected canvas client to look up #canvas-publish',
+);
+assert(
+  canvasClientSource.includes('"/api/publish/sites/" + SITE_ID'),
+  'expected canvas client to POST to /api/publish/sites/:siteId',
+);
+assert(
+  canvasClientSource.includes('async function flushPendingSave()'),
+  'expected canvas client to expose a flushPendingSave helper before server-derived edits',
+);
+assert(
+  /async function runAiPreview[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
+  'expected AI preview to flush pending local saves before asking the server',
+);
+assert(
+  /async function applyPreview[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
+  'expected AI apply to flush pending local saves before applying server ops',
+);
+assert(
+  /async function publishSite[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
+  'expected publish to flush pending local saves before snapshotting editable state',
+);
+
+const tsconfigSource = await readSource('../tsconfig.json');
+const tsconfig = JSON.parse(tsconfigSource) as { exclude?: string[] };
+assert(
+  !(tsconfig.exclude ?? []).some((entry) => entry.startsWith('src/')),
+  'expected tsconfig not to exclude legacy src code from typecheck; retired code should be removed',
+);
+const eslintConfigSource = await readSource('../eslint.config.js');
+assert(
+  !eslintConfigSource.includes("'src/multiplayer/**'") &&
+    !eslintConfigSource.includes("'src/editor/client.ts'") &&
+    !eslintConfigSource.includes("'src/agent/ops.ts'") &&
+    !eslintConfigSource.includes("'src/routes/api/pages.ts'"),
+  'expected eslint config not to hide retired src code from lint',
 );
 
 // -- Task 5: public host router -------------------------------------------
@@ -355,10 +416,7 @@ try {
 
   // 1. Unpublished site → 404 with "not yet published".
   const unpubResp = await responseFromHost(SMOKE_HOST, '/');
-  assert(
-    unpubResp.status === 404,
-    `expected unpublished site to 404, got ${unpubResp.status}`,
-  );
+  assert(unpubResp.status === 404, `expected unpublished site to 404, got ${unpubResp.status}`);
   assert(
     /not yet published|not found/i.test(unpubResp.body),
     `expected unpublished body to mention "not yet published" or "not found" (got ${JSON.stringify(unpubResp.body)})`,
@@ -383,10 +441,7 @@ try {
 
   // 3. Published site → 200 with the public root, page id, and version stamp.
   const pubResp = await responseFromHost(SMOKE_HOST, '/');
-  assert(
-    pubResp.status === 200,
-    `expected published site to 200, got ${pubResp.status}`,
-  );
+  assert(pubResp.status === 200, `expected published site to 200, got ${pubResp.status}`);
   assert(
     pubResp.body.includes('data-rev01-public-root'),
     'expected published body to contain data-rev01-public-root',
@@ -461,6 +516,81 @@ assert(
   `expected validateSeedFixture rejection to mention the offending id ${T6_BOGUS_ID}`,
 );
 
+const kindMismatchFixture: CanvasSiteState = structuredClone(starterTemplate.state);
+const kindMismatchPage = kindMismatchFixture.pages[0];
+if (!kindMismatchPage) throw new Error('starterTemplate must have at least one page');
+const kindMismatchSection = kindMismatchPage.sections.find((s) => s.id === 'section-hero');
+if (!kindMismatchSection) throw new Error('starterTemplate must have a hero section');
+const kindMismatchMedia = kindMismatchSection.elements.find((el) => el.id === 'hero-media');
+if (!kindMismatchMedia || kindMismatchMedia.type !== 'media') {
+  throw new Error('starterTemplate hero must contain media element hero-media');
+}
+kindMismatchMedia.mediaKind = 'video';
+kindMismatchMedia.assetId = 'seed-hero-poster-1';
+const kindMismatchSeed = validateSeedFixture(kindMismatchFixture);
+assert(
+  !kindMismatchSeed.valid,
+  'expected validateSeedFixture to reject mediaKind/seed asset kind mismatches',
+);
+assert(
+  !kindMismatchSeed.valid &&
+    kindMismatchSeed.errors.some((m) => m.includes('seed-hero-poster-1') && m.includes('image')),
+  'expected seed kind mismatch rejection to mention the image asset id',
+);
+
+const posterReferenceState: CanvasSiteState = structuredClone(starterTemplate.state);
+const posterReferencePage = posterReferenceState.pages[0];
+if (!posterReferencePage) throw new Error('starterTemplate must have at least one page');
+const posterReferenceSection = posterReferencePage.sections.find((s) => s.id === 'section-hero');
+if (!posterReferenceSection) throw new Error('starterTemplate must have a hero section');
+const posterReferenceMedia = posterReferenceSection.elements.find((el) => el.id === 'hero-media');
+if (!posterReferenceMedia || posterReferenceMedia.type !== 'media') {
+  throw new Error('starterTemplate hero must contain media element hero-media');
+}
+posterReferenceMedia.mediaKind = 'video';
+posterReferenceMedia.assetId = 'video-asset-id';
+posterReferenceMedia.posterAssetId = 'poster-asset-id';
+const referencedAssets = collectReferencedAssets(posterReferenceState.pages);
+assert(
+  referencedAssets.some(
+    (ref) =>
+      ref.assetId === 'poster-asset-id' && ref.expectedKind === 'image' && ref.role === 'poster',
+  ),
+  'expected collectReferencedAssets to include poster ids as image references',
+);
+const referenceErrors = findAssetReferenceErrors(posterReferenceState.pages, [
+  { id: 'video-asset-id', kind: 'image' },
+  { id: 'poster-asset-id', kind: 'image' },
+]);
+assert(
+  referenceErrors.some(
+    (error) =>
+      error.assetId === 'video-asset-id' &&
+      error.reason === 'kind-mismatch' &&
+      error.expectedKind === 'video' &&
+      error.actualKind === 'image',
+  ),
+  'expected findAssetReferenceErrors to reject a video element backed by an image asset row',
+);
+for (const [assetId, asset] of Object.entries(SEED_ASSET_REGISTRY)) {
+  if (asset.kind === 'image') {
+    assert(
+      asset.mediaType.startsWith('image/'),
+      `expected seed image ${assetId} to use an image/* mediaType`,
+    );
+  } else {
+    assert(
+      asset.mediaType.startsWith('video/'),
+      `expected seed video ${assetId} to use a video/* mediaType`,
+    );
+    const decoded = atob(asset.bytesBase64);
+    assert(
+      !decoded.startsWith('\x89PNG\r\n\x1A\n'),
+      `expected seed video ${assetId} to contain video bytes, not a PNG payload`,
+    );
+  }
+}
+
 // Site-creation materialisation: after creating a smoke site, the count of
 // `siteAsset` rows for that site MUST equal the count of seed asset ids
 // referenced by `starterTemplate.state`. We bypass the Clerk-gated POST and
@@ -501,7 +631,10 @@ try {
     })
     .returning({ id: site.id });
   t6SiteId = t6SiteInserted[0]?.id ?? null;
-  assert(typeof t6SiteId === 'string' && t6SiteId.length > 0, 'expected T6 site insert to return an id');
+  assert(
+    typeof t6SiteId === 'string' && t6SiteId.length > 0,
+    'expected T6 site insert to return an id',
+  );
 
   // Mirror src/routes/api/sites.ts: one siteAsset row per seed id referenced.
   const seedRows = referencedSeedIds.map((id) => {
@@ -605,8 +738,7 @@ assert(
 );
 const t7InsertedPage = t7Insert.pages[0];
 assert(
-  t7InsertedPage !== undefined &&
-    t7InsertedPage.sections.length === baseT7Page.sections.length + 1,
+  t7InsertedPage !== undefined && t7InsertedPage.sections.length === baseT7Page.sections.length + 1,
   'expected T7 insertSection to add exactly one section',
 );
 
@@ -615,8 +747,7 @@ assert(
 // LLM cannot reach for a missing factory.
 const t7ToolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
 assert(
-  JSON.stringify(t7ToolNames) ===
-    JSON.stringify(['createSection', 'replaceMedia', 'rewriteText']),
+  JSON.stringify(t7ToolNames) === JSON.stringify(['createSection', 'replaceMedia', 'rewriteText']),
   `expected CANVAS_AGENT_TOOLS to expose three tools (got [${t7ToolNames.join(', ')}])`,
 );
 for (const recipeId of SECTION_RECIPE_IDS as readonly SectionRecipeId[]) {

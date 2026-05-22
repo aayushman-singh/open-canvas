@@ -1,30 +1,31 @@
 # editor
 
-> Status: **canvas-first POC** as of T9-partial (2026-05-22).
-> The active editor is the canvas editor: `canvas-index.tsx` (server render), `canvas-client.ts` (browser runtime), `canvas-styles.ts` (CSS). The previous ProseMirror + Yjs editor (`index.tsx`, `client.ts`, `styles.ts`) is **superseded** — those files remain on disk for reference but are out of typecheck, lint, and bundle scope. See [ADR 0003](../../docs/adr/0003-canvas-first-reset.md).
+## Definition
 
-## Definition (current — canvas editor)
+`editor` owns the authenticated Owner experience for changing a canvas site.
+Given a site id that belongs to the signed-in customer, it renders a desktop
+canvas where positioned primitives can be selected, dragged, resized,
+restyled, reordered, edited as rich text, handed to the AI preview flow, and
+published to the public address.
 
-`editor` owns the experience an authenticated Owner has when they want to change one of their sites. Its contract: given a site identity and a signed-in customer who owns it, present a desktop canvas where positioned design primitives can be dragged, sized, restyled, and reordered; expose a Style Kit picker that swaps the deterministic palette + typography + surfaces + shapes + actions + motion in one click; offer a chat panel where the AI agent proposes a previewed edit the Owner accepts or rejects; surface a Publish button that promotes the editable state to the Published Address and updates open Visitor tabs immediately via `SiteRoom`.
-
-The subsystem makes no decisions about how state is persisted (canvas API), how the public host serves a snapshot (`src/routes/public.ts`), how the AI agent reasons (`src/agent/canvas-*`), or how primitives map to HTML (`src/canvas/render.ts`). It is purely the human-facing edge.
+The subsystem makes no decisions about persistence (`src/routes/api/canvas.ts`),
+public snapshot serving (`src/routes/public.ts`), AI reasoning
+(`src/routes/api/canvas-agent.ts` + `src/agent/canvas-*`), or primitive-to-HTML
+rendering (`src/canvas/render.ts`). It is the human-facing control surface.
 
 ## Inputs
 
-- **site owner (signed-in customer)** — the intent to mutate the site (drag, resize, type, switch kit, ask the agent, publish), identified by site id in the URL.
-- **canvas API** — the current `CanvasSiteState` for the site and the response to each mutation.
-- **`SiteRoom` DO** — live presence + publish-success broadcasts for the site.
-- **canvas-agent API** — NDJSON stream of agent events for the chat panel.
+- **site owner** -> drag, resize, type, switch kit, ask the agent, accept or
+  dismiss a preview, save, and publish.
+- **canvas API** -> current `CanvasSiteState` plus mutation results.
+- **canvas-agent API** -> previewed op lists and accepted edit results.
+- **SiteRoom** -> live presence counts shared with visitor tabs.
 
 ## Outputs
 
-- **canvas API** — mutation requests (`PATCH /api/canvas/:siteId` etc.) and publish requests.
-- **page owner** — a continuously updated canvas view, a Style Kit picker, a chat panel that streams the agent's reasoning + a previewed-edit accept/reject, a presence indicator, and a Publish button with its current state.
-
-## Retired files
-
-- `index.tsx` — old ProseMirror server-rendered editor shell.
-- `client.ts` — old browser runtime (TipTap + Yjs WebSocket provider).
-- `styles.ts` — old editor CSS.
-
-Reviving them = un-exclude the three files in `tsconfig.json` and `eslint.config.js`, restore the `prosemirror-*` / `y-*` deps in `package.json`, restore the `editor` import + `app.route('/dashboard', editor)` mount in `src/index.ts`, and restore the `PAGE_DO` binding + a fresh migration tag in `wrangler.toml`.
+- **canvas API** -> full editable-state saves, media uploads, and style-kit
+  changes.
+- **canvas-agent API** -> natural-language edit prompts and accepted op lists.
+- **publish API** -> explicit publish requests after pending local saves flush.
+- **Owner UI** -> the canvas, inspector, style kit controls, AI preview panel,
+  presence indicator, and Save/Publish status.

@@ -1,18 +1,18 @@
 const features = [
   {
     num: '01',
-    title: 'One document, not a tree of editor widgets.',
-    body: 'Every page is a single ProseMirror document. Selection spans sections; edits live in one timeline; there is no per-block conditional editor to maintain.',
+    title: 'One canvas, not a tree of widgets.',
+    body: 'Every page is a positioned canvas of text, media, actions, shapes, and surfaces. The editor speaks the same primitive model that publishing renders.',
   },
   {
     num: '02',
-    title: 'CRDT runtime means no save button.',
-    body: 'Yjs converges every keystroke from every editor in the room. Conflict resolution is the runtime — the question of "whose change wins" never reaches the UI.',
+    title: 'Style Kits change the whole surface.',
+    body: 'Typography, colour, surfaces, actions, and motion move together as one deterministic kit, so a site can shift language without rewriting its content.',
   },
   {
     num: '03',
-    title: 'The agent is a collaborator, not a chat panel.',
-    body: 'Claude holds a reserved client id, edits show up in the same revision history with everyone else, and its cursor moves through the document while it thinks.',
+    title: 'The agent proposes, the owner accepts.',
+    body: 'AI edits travel through a small canvas tool vocabulary, preview against the current state, and only land after the Owner accepts the concrete op list.',
   },
 ];
 

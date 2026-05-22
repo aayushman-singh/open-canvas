@@ -307,8 +307,15 @@ function validateElement(
       if (!isFiniteNumber(element.fontSize) || element.fontSize <= 0) {
         errors.push(`${basePath}.fontSize must be a positive number`);
       }
-      if (element.fontWeight !== 400 && element.fontWeight !== 500 && element.fontWeight !== 600 && element.fontWeight !== 700) {
-        errors.push(`${basePath}.fontWeight must be 400|500|600|700 (got ${describe(element.fontWeight)})`);
+      if (
+        element.fontWeight !== 400 &&
+        element.fontWeight !== 500 &&
+        element.fontWeight !== 600 &&
+        element.fontWeight !== 700
+      ) {
+        errors.push(
+          `${basePath}.fontWeight must be 400|500|600|700 (got ${describe(element.fontWeight)})`,
+        );
       }
       if (!isOneOf(element.align, ['left', 'center', 'right'] as const)) {
         errors.push(`${basePath}.align must be left|center|right (got ${describe(element.align)})`);
@@ -430,10 +437,7 @@ function validateSection(
       `${basePath}.backgroundEffect must be one of [${BACKGROUND_EFFECTS.join(', ')}] (got ${describe(section.backgroundEffect)})`,
     );
   }
-  if (
-    section.entrance !== undefined &&
-    !isOneOf<MotionPreset>(section.entrance, MOTION_PRESETS)
-  ) {
+  if (section.entrance !== undefined && !isOneOf<MotionPreset>(section.entrance, MOTION_PRESETS)) {
     errors.push(
       `${basePath}.entrance must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(section.entrance)})`,
     );
@@ -578,15 +582,25 @@ export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
         if (!element || element.type !== 'media') continue;
         const elementPath = `${sectionPath}.elements[${String(elIdx)}]`;
         const assetId = element.assetId;
-        if (!Object.prototype.hasOwnProperty.call(SEED_ASSET_REGISTRY, assetId)) {
+        const seedAsset = SEED_ASSET_REGISTRY[assetId];
+        if (!seedAsset) {
           errors.push(
             `${elementPath}.assetId "${assetId}" is not registered in SEED_ASSET_REGISTRY`,
           );
+        } else if (seedAsset.kind !== element.mediaKind) {
+          errors.push(
+            `${elementPath}.assetId "${assetId}" is registered as ${seedAsset.kind}, but mediaKind is ${element.mediaKind}`,
+          );
         }
         if (element.posterAssetId !== undefined) {
-          if (!Object.prototype.hasOwnProperty.call(SEED_ASSET_REGISTRY, element.posterAssetId)) {
+          const posterSeedAsset = SEED_ASSET_REGISTRY[element.posterAssetId];
+          if (!posterSeedAsset) {
             errors.push(
               `${elementPath}.posterAssetId "${element.posterAssetId}" is not registered in SEED_ASSET_REGISTRY`,
+            );
+          } else if (posterSeedAsset.kind !== 'image') {
+            errors.push(
+              `${elementPath}.posterAssetId "${element.posterAssetId}" is registered as ${posterSeedAsset.kind}, but posters must be image assets`,
             );
           }
         }
@@ -598,10 +612,4 @@ export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
 }
 
 // Re-exported types for downstream callers that only depend on validate.ts.
-export type {
-  CanvasElement,
-  CanvasPage,
-  CanvasSection,
-  CanvasSiteState,
-  PublishedSnapshot,
-};
+export type { CanvasElement, CanvasPage, CanvasSection, CanvasSiteState, PublishedSnapshot };
