@@ -3,6 +3,7 @@
 // Owner-scoped asset surface. Replaces the per-site /api/canvas/sites/:siteId/assets
 // flow with /api/me/assets — assets belong to the Owner, not to a single Site.
 
+import { and, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { clerkAuth } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
@@ -12,6 +13,7 @@ import { ownerAsset } from '../../db/schema.js';
 import {
   assetResponse,
   dataUrlToOwnerAsset,
+  findAssetUsage,
   generateImageViaReplicate,
   MAX_ASSET_DATA_URL_BYTES,
   readOwnerAsset,
@@ -87,6 +89,44 @@ assets.post('/me/assets', async (c) => {
     alt: blob.alt,
   });
   return c.json({ assetId: id, kind: blob.kind, mediaType: blob.mediaType });
+});
+
+// GET /me/assets — gallery list. Most-recently-used first.
+assets.get('/me/assets', async (c) => {
+  const ctx = await requireOwnerContext(c);
+  if (!ctx.ok) return ctx.response;
+
+  const kindFilter = c.req.query('kind');
+  const rawLimit = Number(c.req.query('limit') ?? '200');
+  const limit = Math.max(1, Math.min(500, Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 200));
+
+  const whereClause =
+    kindFilter === 'image' || kindFilter === 'video'
+      ? and(eq(ownerAsset.customerId, ctx.customer.id), eq(ownerAsset.kind, kindFilter))
+      : eq(ownerAsset.customerId, ctx.customer.id);
+
+  const entries = await db(c.env)
+    .select({
+      assetId: ownerAsset.id,
+      kind: ownerAsset.kind,
+      mediaType: ownerAsset.mediaType,
+      alt: ownerAsset.alt,
+      lastUsedAt: ownerAsset.lastUsedAt,
+      createdAt: ownerAsset.createdAt,
+    })
+    .from(ownerAsset)
+    .where(whereClause)
+    .orderBy(desc(ownerAsset.lastUsedAt))
+    .limit(limit);
+  return c.json({ entries });
+});
+
+// GET /me/assets/:assetId/usage — cascade-impact probe for the delete modal.
+assets.get('/me/assets/:assetId/usage', async (c) => {
+  const ctx = await requireOwnerContext(c);
+  if (!ctx.ok) return ctx.response;
+  const usage = await findAssetUsage(db(c.env), ctx.customer.id, c.req.param('assetId'));
+  return c.json({ usage });
 });
 
 assets.get('/me/assets/:assetId', async (c) => {

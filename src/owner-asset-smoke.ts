@@ -371,7 +371,99 @@ try {
 
   console.log('[owner-asset-smoke] slot-history ok');
 
-  // ── Step 7: Negative cases ────────────────────────────────────────────────
+  // ── Step 7: Gallery ───────────────────────────────────────────────────────
+  console.log('[owner-asset-smoke] gallery');
+
+  // 7a. GET /api/me/assets — assert 200 and entries contains at least the uploaded assetId.
+  const galleryResp = await app.request(
+    'http://rev01.test/api/me/assets',
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    galleryResp.status === 200,
+    `expected GET /api/me/assets to return 200, got ${galleryResp.status}`,
+  );
+  const galleryBody = (await galleryResp.json()) as { entries: Array<{ assetId: string; kind: string }> };
+  assert(
+    Array.isArray(galleryBody.entries),
+    'expected GET /api/me/assets to return an object with an entries array',
+  );
+  assert(
+    galleryBody.entries.some((e) => e.assetId === assetId),
+    `expected gallery entries to contain uploaded assetId ${assetId}`,
+  );
+
+  // 7b. GET /api/me/assets?kind=image — all returned entries must be images.
+  const galleryImageResp = await app.request(
+    'http://rev01.test/api/me/assets?kind=image',
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    galleryImageResp.status === 200,
+    `expected GET /api/me/assets?kind=image to return 200, got ${galleryImageResp.status}`,
+  );
+  const galleryImageBody = (await galleryImageResp.json()) as { entries: Array<{ kind: string }> };
+  assert(
+    galleryImageBody.entries.every((e) => e.kind === 'image'),
+    'expected all entries from ?kind=image to have kind === "image"',
+  );
+
+  // 7c. GET /api/me/assets?kind=video — must not leak image entries.
+  const galleryVideoResp = await app.request(
+    'http://rev01.test/api/me/assets?kind=video',
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    galleryVideoResp.status === 200,
+    `expected GET /api/me/assets?kind=video to return 200, got ${galleryVideoResp.status}`,
+  );
+  const galleryVideoBody = (await galleryVideoResp.json()) as { entries: Array<{ kind: string }> };
+  assert(
+    galleryVideoBody.entries.every((e) => e.kind === 'video'),
+    'expected all entries from ?kind=video to have kind === "video" (no image leak)',
+  );
+
+  // 7d. GET /api/me/assets/:assetId/usage — skipping editable-state injection.
+  // The slot-history smoke step PUTs history records but does NOT write a media
+  // element into the site's editableState, so collectReferencedAssets would find
+  // zero references. Injecting a media element would require significant setup
+  // (building a valid CanvasSection/CanvasPage/MediaElement) for marginal value
+  // when the core path (DB query + JSON walk) is already tested by the helper's
+  // unit behaviour. We verify the endpoint is reachable and returns the correct
+  // shape instead.
+  const usageResp = await app.request(
+    `http://rev01.test/api/me/assets/${assetId}/usage`,
+    {
+      method: 'GET',
+      headers: { 'x-smoke-customer-id': customerId },
+    },
+    smokeEnv,
+  );
+  assert(
+    usageResp.status === 200,
+    `expected GET /api/me/assets/${assetId}/usage to return 200, got ${usageResp.status}`,
+  );
+  const usageBody = (await usageResp.json()) as { usage: unknown[] };
+  assert(
+    Array.isArray(usageBody.usage),
+    'expected GET /api/me/assets/:assetId/usage to return an object with a usage array',
+  );
+
+  console.log('[owner-asset-smoke] gallery ok');
+
+  // ── Step 9: Negative cases ────────────────────────────────────────────────
   console.log('[owner-asset-smoke] negative-cases');
 
   // 6a. GET a non-existent asset → 404
@@ -439,5 +531,5 @@ try {
   }
 }
 
-// ── Step 8: Done ──────────────────────────────────────────────────────────────
+// ── Step 10: Done ─────────────────────────────────────────────────────────────
 console.log('[owner-asset-smoke] OK');
