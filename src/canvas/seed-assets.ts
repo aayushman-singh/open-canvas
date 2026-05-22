@@ -1,6 +1,6 @@
 // src/canvas/seed-assets.ts
 //
-// Seed asset registry — the bytes that materialise as `siteAsset` rows when an
+// Seed asset registry — the bytes that materialise as `ownerAsset` rows when an
 // Owner creates a site from the Template Seed. Every `assetId` referenced by
 // `src/canvas/fixtures/home.json` MUST appear as a key here so a brand-new
 // site has no dangling media references.

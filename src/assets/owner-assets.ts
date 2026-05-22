@@ -1,15 +1,106 @@
 // src/assets/owner-assets.ts
 //
-// Owner Asset helpers — the post-rerooting replacement for site-assets.ts.
-// During the in-progress migration this file co-exists with site-assets.ts;
-// site-assets.ts will eventually be deleted in Phase 7. The pure walker
-// helpers are re-exported here so future callers only need to know about
-// owner-assets.ts.
+// Owner Asset helpers — pure walker functions, DB accessors, and upload
+// utilities. This is the single source of truth; the legacy site-assets.ts
+// module has been removed.
 
 import { and, eq } from 'drizzle-orm';
-import type { CanvasSiteState, MediaKind } from '../canvas/schema.js';
+import type { CanvasPage, CanvasSiteState, MediaKind } from '../canvas/schema.js';
 import { ownerAsset, site } from '../db/schema.js';
 import type { Db } from '../db/client.js';
+
+// ---------------------------------------------------------------------------
+// Shared asset types (formerly in site-assets.ts)
+// ---------------------------------------------------------------------------
+
+export interface ReferencedAsset {
+  assetId: string;
+  expectedKind: MediaKind;
+  role: 'asset' | 'poster';
+  path: string;
+  mediaElementId: string;
+}
+
+export interface AssetKindRow {
+  id: string;
+  kind: MediaKind;
+}
+
+export interface AssetReferenceError extends ReferencedAsset {
+  reason: 'missing' | 'kind-mismatch';
+  actualKind?: MediaKind;
+}
+
+// ---------------------------------------------------------------------------
+// Walker helpers (formerly in site-assets.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Walk a snapshot's (or editable site's) pages and return every assetId AND
+ * posterAssetId referenced by a media element. Used by:
+ *   - publish guard: reject if any referenced id is missing from `owner_asset`.
+ *   - public `/assets/:assetId` route: 404 if the request is for an id not
+ *     in the current snapshot's reachable set.
+ *
+ * Returns a fresh array so callers can mutate it without affecting the source
+ * pages.
+ */
+export function collectReferencedAssets(pages: CanvasPage[]): ReferencedAsset[] {
+  const out: ReferencedAsset[] = [];
+  for (const [pageIdx, page] of pages.entries()) {
+    for (const [sectionIdx, section] of page.sections.entries()) {
+      for (const [elementIdx, element] of section.elements.entries()) {
+        if (element.type !== 'media') continue;
+        if (typeof element.assetId === 'string' && element.assetId.length > 0) {
+          out.push({
+            assetId: element.assetId,
+            expectedKind: element.mediaKind,
+            role: 'asset',
+            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].assetId`,
+            mediaElementId: element.id,
+          });
+        }
+        if (typeof element.posterAssetId === 'string' && element.posterAssetId.length > 0) {
+          out.push({
+            assetId: element.posterAssetId,
+            expectedKind: 'image',
+            role: 'poster',
+            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].posterAssetId`,
+            mediaElementId: element.id,
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> {
+  return new Set(collectReferencedAssets(pages).map((ref) => ref.assetId));
+}
+
+export function findAssetReferenceErrors(
+  pages: CanvasPage[],
+  assets: AssetKindRow[],
+): AssetReferenceError[] {
+  const kindsById = new Map(assets.map((asset) => [asset.id, asset.kind]));
+  const errors: AssetReferenceError[] = [];
+  for (const reference of collectReferencedAssets(pages)) {
+    const actualKind = kindsById.get(reference.assetId);
+    if (!actualKind) {
+      errors.push({ ...reference, reason: 'missing' });
+      continue;
+    }
+    if (actualKind !== reference.expectedKind) {
+      errors.push({ ...reference, reason: 'kind-mismatch', actualKind });
+    }
+  }
+  return errors;
+}
+
+// ---------------------------------------------------------------------------
+// Owner-specific types and helpers
+// ---------------------------------------------------------------------------
 
 export interface OwnerAssetBlob {
   kind: MediaKind;
@@ -60,19 +151,6 @@ export function assetResponse(mediaType: string, bytesBase64: string): Response 
     },
   });
 }
-
-import { collectReferencedAssets } from './site-assets.js';
-
-export {
-  collectReferencedAssets,
-  collectReferencedAssetIds,
-  findAssetReferenceErrors,
-} from './site-assets.js';
-export type {
-  ReferencedAsset,
-  AssetReferenceError,
-  AssetKindRow,
-} from './site-assets.js';
 
 // ---------------------------------------------------------------------------
 // Replicate / Flux-schnell helpers

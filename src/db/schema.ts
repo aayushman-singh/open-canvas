@@ -103,23 +103,6 @@ export const page = pgTable(
 export type Page = typeof page.$inferSelect;
 export type NewPage = typeof page.$inferInsert;
 
-export const siteAsset = pgTable('site_asset', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  mediaType: text('media_type').notNull(),
-  bytesBase64: text('bytes_base64').notNull(),
-  kind: text('kind').notNull().$type<'image' | 'video'>(),
-  alt: text('alt').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-export type SiteAsset = typeof siteAsset.$inferSelect;
-export type NewSiteAsset = typeof siteAsset.$inferInsert;
-
 export const ownerAsset = pgTable(
   'owner_asset',
   {
