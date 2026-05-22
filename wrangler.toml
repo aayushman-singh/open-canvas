@@ -16,13 +16,13 @@ pattern = "*.rev01.aayushman.dev/*"
 zone_name = "aayushman.dev"
 
 [[durable_objects.bindings]]
-name = "PAGE_DO"
-class_name = "PageDocument"
-
-[[durable_objects.bindings]]
 name = "SITE_ROOM"
 class_name = "SiteRoom"
 
+# v1 introduced the legacy per-page PageDocument DO (ProseMirror + Yjs).
+# v3 drops it after the canvas-first POC (T9) replaced the live-collab
+# surface with SiteRoom. The v1 tag must remain so the migration ledger
+# stays linear; v3's `deleted_classes` removes the class on next deploy.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PageDocument"]
@@ -30,6 +30,10 @@ new_sqlite_classes = ["PageDocument"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["SiteRoom"]
+
+[[migrations]]
+tag = "v3"
+deleted_classes = ["PageDocument"]
 
 # [[kv_namespaces]]
 # binding = "KV"

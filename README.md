@@ -1,70 +1,55 @@
 # rev01
 
-> A site builder where you, your collaborators, and a Claude agent edit the same ProseMirror document live over Yjs CRDT — served end-to-end by one Cloudflare Worker.
+> A desktop canvas site builder where an Owner starts from one Template Seed, edits positioned design primitives with AI help, switches deterministic Style Kits, and publishes to a real Published Address that updates open Visitor tabs immediately.
 
-[![Status](https://img.shields.io/badge/status-scaffolding-orange)](https://github.com/aayushman-singh/rev01)
+[![Status](https://img.shields.io/badge/status-canvas--first--poc-orange)](https://github.com/aayushman-singh/rev01)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live](https://img.shields.io/badge/live-rev01.aayushman.dev-cyan)](https://rev01.aayushman.dev)
 
-## Demo
-
-> Demo video pending — will land with task #4-final after the multiplayer editor and AI agent ship.
-
-[Live coming-soon page →](https://rev01.aayushman.dev)
-
 ## What it is
 
-Pick a template from the dashboard, name your site, and you land in an editor where every paragraph, heading, and section is editable inline. Invite a teammate and you see their cursor next to yours; ask the agent for a hero rewrite and a new collaborator avatar appears, streaming edits into the same page. Publish, and the site is live at a shareable URL — no build step, no deploy queue.
+Open the dashboard, name a site, and drop into a canvas pre-populated from one Template Seed. Drag positioned design primitives, ask the AI agent for a previewed edit, swap deterministic Style Kits live, and click Publish — the Published Address (`<subdomain>.rev01.aayushman.dev`) updates in every open Visitor tab within a few hundred milliseconds. One Cloudflare Worker hosts the dashboard, the editor, the canvas API, the AI agent endpoint, the publish snapshot store, and the public host that serves Visitors.
 
-## Architecture
+## Stack
 
-```mermaid
-flowchart LR
-    Editor["Browser (editor)"]
-    Visitor["Customer visitor (browser)"]
-    Worker["Cloudflare Worker (Hono)<br/>dashboard · API · renderer · agent"]
-    DO["Durable Object (per page)<br/>live Yjs document"]
-    Claude["Anthropic Claude (tool use)"]
-    PG[("Neon Postgres")]
+- Cloudflare Workers + Hono JSX (single bundle)
+- Drizzle ORM + Neon serverless Postgres (HTTP driver)
+- Clerk auth (single origin, no token handoff)
+- Durable Object: `SiteRoom` — publish broadcasts + presence
+- Gemini adapter for previewed AI edits
+- Vanilla browser JS in the editor (no client framework)
 
-    Editor -- "HTTP" --> Worker
-    Editor -- "WebSocket (Yjs)" --> DO
-    Visitor -- "GET /s/:siteId/*" --> Worker
-    Claude -- "tool calls -> doc ops" --> Worker
-    Worker --> PG
-    DO -- "snapshot every 50 ops / 10s" --> PG
-```
-
-- One edge bundle hosts dashboard, API, customer-site renderer, agent endpoints, and per-page Durable Objects.
-- One ProseMirror document per page, edited live via Yjs CRDT.
-- Anthropic Claude as a first-class collaborator with a reserved Yjs client id.
-
-See [ADR 0001](docs/architecture/0001-architecture.md) for the full reasoning, decisions 1–14.
-
-## Run locally
+## Develop
 
 ```bash
-git clone git@github.com:aayushman-singh/rev01.git
-cd rev01
 bun install
-bun run dev            # wrangler dev
+bun.cmd run dev            # wrangler dev — http://localhost:8787
 ```
 
-Open http://localhost:8787. `/` renders the Post-Aero landing; `/health` returns a JSON heartbeat.
+`/` renders the Post-Aero landing. `/health` returns a JSON heartbeat. `/dashboard` is gated by Clerk.
 
-## Documents
+## Verify
 
-- [ADR 0001 — Architecture](docs/architecture/0001-architecture.md) — the 14 decisions that pin the stack down.
-- [Template schema](docs/specs/template-schema.md) — ProseMirror node and mark vocabulary; template descriptor; seed-to-site flow.
-- [Design language — variants](docs/specs/design-variants.md) — four explored variants; **Post-Aero (D)** is selected for v0.
-- [RECON.md](RECON.md) — backlog ranked by hire-impact-per-hour; dispatch order; locked decisions.
+```bash
+bun.cmd run typecheck       # tsc --noEmit
+bun.cmd run lint            # eslint .
+bun.cmd run canvas:smoke    # canvas schema + validator + renderer round-trip
+bun.cmd run canvas-agent:smoke   # canvas-agent tool surface + op application
+bun.cmd run review:smoke    # publish + visitor-update integration
+bun.cmd run build           # wrangler deploy --dry-run
+```
 
 ## Status
 
-Scaffolding. v0 LOC target: under 5,000. See [RECON.md](RECON.md) for the current backlog.
+Canvas-first POC. Implementation plan: [docs/superpowers/plans/2026-05-22-canvas-first-poc.md](docs/superpowers/plans/2026-05-22-canvas-first-poc.md). ADR for the architecture reset: [docs/adr/0003-canvas-first-reset.md](docs/adr/0003-canvas-first-reset.md). The earlier ProseMirror + Yjs implementation is preserved on disk as inert reference code — see [RECON.md](RECON.md) for what is retained where.
 
-The project is built in public — every backlog row ships as a PR.
+## Documents
+
+- [ADR 0001 — Original architecture](docs/architecture/0001-architecture.md) (superseded by 0003).
+- [ADR 0002 — Published Address](docs/adr/0002-published-address.md) — wildcard host + custom-domain hand-off.
+- [ADR 0003 — Canvas-first reset](docs/adr/0003-canvas-first-reset.md) — current architecture.
+- [RECON.md](RECON.md) — backlog, locked decisions, what is retired and why.
 
 ## License
 
-[MIT](LICENSE) © 2026 Aayushman Singh
+[MIT](LICENSE) (c) 2026 Aayushman Singh

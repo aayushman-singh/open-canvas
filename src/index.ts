@@ -4,11 +4,8 @@ import { dashboard } from './routes/dashboard';
 import { templatesRoute } from './routes/dashboard/templates';
 import sites from './routes/api/sites';
 import canvasApi from './routes/api/canvas';
-import pages from './routes/api/pages';
-import agent from './routes/api/agent';
 import canvasAgentApi from './routes/api/canvas-agent';
 import publishApi from './routes/api/publish';
-import editor from './editor';
 import canvasEditor from './editor/canvas-index';
 import { handlePublicRequest, type PublicEnv } from './routes/public';
 
@@ -28,19 +25,16 @@ app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
 app.route('/', landing);
 
 app.route('/dashboard/templates', templatesRoute);
-// The legacy theme studio (src/routes/dashboard/theme.tsx) reads removed site
-// columns (tokens, templateId) and is retired by T9; leaving it unmounted
-// keeps the file from breaking typecheck.
+// The legacy ProseMirror editor (src/editor/{index,client,styles}.{ts,tsx})
+// and theme studio (src/routes/dashboard/theme.tsx) are retired by the
+// canvas-first POC (T9). Their files remain on disk (excluded from typecheck,
+// lint, and bundle) so the option to revive lives in commit history.
 app.route('/dashboard', canvasEditor);
-app.route('/dashboard', editor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);
 app.route('/api/canvas', canvasApi);
-app.route('/api/pages', pages);
-app.route('/api/agent', agent);
 app.route('/api/canvas-agent', canvasAgentApi);
 app.route('/api/publish', publishApi);
 
-export { PageDocument } from './multiplayer/page-document';
 export { SiteRoom } from './live/site-room';
 export default app;

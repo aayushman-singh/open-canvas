@@ -1,25 +1,16 @@
-# document
+# document (legacy — superseded)
 
-## Definition
+> Status: **SUPERSEDED** by `src/canvas/` as of the canvas-first POC (T9-partial, 2026-05-22).
+> The current document vocabulary lives in `src/canvas/schema.ts` (positioned primitives + Style Kit selector) and the current renderer lives in `src/canvas/render.ts`. See [ADR 0003](../../docs/adr/0003-canvas-first-reset.md) and the implementation plan at `docs/superpowers/plans/2026-05-22-canvas-first-poc.md`.
 
-`document` owns the vocabulary of a page: the set of node and mark kinds, their attributes, the structural rules that say which children belong inside which parent, and the deterministic mapping from a document tree to an HTML string. It is the contract every other subsystem in rev01 either produces or consumes — the editor (multiplayer task) emits trees that conform here, the agent (tool-use task) constructs trees whose shape is constrained by the same registry, the template catalogue stores trees that satisfy this contract, and the public-facing renderer turns one of those trees plus a theme token set into the bytes a browser receives. It is the single point that decides what a "page" is allowed to contain and what a "page" looks like as HTML; everything downstream is bound by the answers given here. Schema versioning lands on the first breaking change to this vocabulary; until then, this is version unmarked.
+This directory is retained on disk so the option to revive a ProseMirror-shaped document model lives in commit history. It is **excluded from typecheck** (`tsconfig.json` `exclude`) and **excluded from lint** (`eslint.config.js` `ignores`); `src/index.ts` does not import it. The pure type aliases (`DocumentJSON`, `ThemeTokenSet`) are still imported by `src/db/schema.ts` for the legacy `page` and `template` tables, and the renderer + validator remain self-contained (no `prosemirror-*` or `yjs` dep).
 
-## Inputs
+---
 
-- **template catalogue** → seed document trees that conform to this vocabulary, validated on catalogue upload.
-- **editor** → a document tree as JSON whenever a page is saved; validated before persistence.
-- **agent** → a sequence of operations whose target shapes (insertSection, editText, swapImage, etc.) are derived from the node + mark vocabulary defined here.
-- **theme studio** → a token set (`paletteSeed`, fonts, radius, density) consumed by the renderer to derive runtime CSS custom properties.
+## Original definition (preserved for context)
 
-## Outputs
+`document` owned the vocabulary of a page: the set of node and mark kinds, their attributes, the structural rules that say which children belong inside which parent, and the deterministic mapping from a document tree to an HTML string. It was the contract every other subsystem in rev01 either produced or consumed — the editor (multiplayer task) emitted trees that conformed here, the agent (tool-use task) constructed trees whose shape was constrained by the same registry, the template catalogue stored trees that satisfied this contract, and the public-facing renderer turned one of those trees plus a theme token set into the bytes a browser received.
 
-- **renderer caller (the Worker request handler)** → an HTML string for a given `(document, theme)` pair, deterministic and pure.
-- **catalogue + editor + agent** → a validation verdict (`{ valid: true }` or `{ valid: false, errors }`) describing what is wrong with a candidate document.
-- **agent tool definitions (task #9)** → the typed node + mark + attr enumeration that constrains the agent's tool-use schemas.
-- **editor runtime schema (task #8)** → the typed node + mark vocabulary that TipTap binds to in the browser.
+## Why it was retired
 
-## Conventions
-
-- `bun run document:smoke` regenerates the fixture previews (`src/document/fixtures/*.preview.html`) and exits non-zero on any validation drift. Reviewers can open the preview HTMLs to eyeball the renderer's output without booting a Worker.
-- The preview HTMLs under `src/document/fixtures/*.preview.html` are generated and gitignored by Prettier — do not hand-edit.
-- Renderer throws on unknown node shapes (the only place a throw is acceptable in this codebase) because its input is supposed to be validated upstream; the validator never throws.
+The canvas-first reset replaced the flow-document model (sections containing blocks containing inlines) with a positioned-primitive canvas (free-positioned elements with explicit coordinates + a deterministic Style Kit), because the lived Owner experience of "drag this thing here" cannot be expressed cleanly in a ProseMirror-shaped tree. See ADR 0003 for the full reasoning.
