@@ -1553,206 +1553,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return body;
   }
 
-  async function uploadMediaForElement(element, file) {
-    const altInputId = "media-upload-alt-" + element.id;
-    const altInput = document.getElementById(altInputId);
-    const altValue =
-      altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
-    const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
-    const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
-    if (boxW <= 0 || boxH <= 0) {
-      setStatus("Cannot upload: slot has no size yet — resize the element first", "error");
-      return;
-    }
-
-    try {
-      if (element.mediaKind === "image") {
-        setStatus("Loading cropper…");
-        const cropped = await cropFileToSlotAspect(file, boxW, boxH);
-        setStatus("Uploading…");
-        const dataUrl = await blobToDataUrl(cropped.blob);
-        const uploaded = await postAssetUpload(dataUrl, altValue);
-        element.assetId = uploaded.assetId;
-        element.mediaKind = uploaded.kind;
-        element.alt = altValue;
-        rebuildElement(element.id);
-        renderInspector();
-        scheduleSave();
-        setStatus("Uploaded", "ok");
-        return;
-      }
-
-      // Video: upload original bytes; crop only the first-frame poster.
-      setStatus("Reading video…");
-      const videoDataUrl = await fileToDataUrl(file);
-
-      setStatus("Extracting poster…");
-      const posterBlob = await extractVideoFirstFrame(file);
-      const posterFile = new File([posterBlob], "poster.png", { type: "image/png" });
-
-      setStatus("Loading cropper…");
-      const croppedPoster = await cropFileToSlotAspect(posterFile, boxW, boxH);
-
-      setStatus("Uploading video…");
-      const uploadedVideo = await postAssetUpload(videoDataUrl, altValue);
-
-      setStatus("Uploading poster…");
-      const posterDataUrl = await blobToDataUrl(croppedPoster.blob);
-      const uploadedPoster = await postAssetUpload(posterDataUrl, altValue);
-
-      element.assetId = uploadedVideo.assetId;
-      element.mediaKind = "video";
-      element.posterAssetId = uploadedPoster.assetId;
-      element.alt = altValue;
-      rebuildElement(element.id);
-      renderInspector();
-      scheduleSave();
-      setStatus("Uploaded", "ok");
-    } catch (err) {
-      if (err && err.message === "crop cancelled") {
-        setStatus("Cancelled");
-        return;
-      }
-      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
-    }
-  }
-
-  async function generateImageForElement(element, prompt) {
-    // Guard: discard any stacked preview for this element before starting.
-    document.getElementById("media-gen-preview-" + element.id)?.remove();
-
-    const genBtn = document.getElementById("media-gen-btn-" + element.id);
-    if (genBtn) genBtn.disabled = true;
-
-    const altInputId = "media-upload-alt-" + element.id;
-    const altInput = document.getElementById(altInputId);
-    const altValue =
-      altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
-    const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
-    const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
-    if (boxW <= 0 || boxH <= 0) {
-      if (genBtn) genBtn.disabled = false;
-      setStatus("Cannot generate: slot has no size yet — resize the element first", "error");
-      return;
-    }
-    setStatus("Generating…");
-
-    // Step 1: POST to /api/me/assets/generate — returns bytes; nothing is
-    // persisted yet. The browser holds the preview; only Apply creates the
-    // Owner Asset row via /api/me/assets.
-    let generated;
-    try {
-      const response = await authFetch("/api/me/assets/generate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          prompt: prompt,
-          alt: altValue,
-          boxW: boxW,
-          boxH: boxH,
-        }),
-      });
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = await response.json();
-          if (body && body.error) detail = body.error;
-        } catch (_) { /* ignore */ }
-        if (genBtn) genBtn.disabled = false;
-        setStatus("Generate failed: " + detail, "error");
-        return;
-      }
-      const body = await response.json();
-      if (
-        !body ||
-        typeof body.mediaType !== "string" ||
-        typeof body.bytesBase64 !== "string"
-      ) {
-        if (genBtn) genBtn.disabled = false;
-        setStatus("Generate failed: malformed server response", "error");
-        return;
-      }
-      generated = body;
-    } catch (err) {
-      if (genBtn) genBtn.disabled = false;
-      setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
-      return;
-    }
-
-    const previewDataUrl = "data:" + generated.mediaType + ";base64," + generated.bytesBase64;
-    setStatus("Generated — preview ready. Apply or Discard.", "ok");
-
-    // Step 2: Show a preview panel with Apply and Discard buttons.
-    // The preview is injected beneath the generator section and removed on
-    // either action, keeping the rest of the inspector intact.
-    const previewWrap = document.createElement("div");
-    previewWrap.id = "media-gen-preview-" + element.id;
-    previewWrap.className = "field";
-    previewWrap.style.cssText = "display:flex;flex-direction:column;gap:6px;";
-
-    const img = document.createElement("img");
-    img.src = previewDataUrl;
-    img.alt = altValue || "Generated preview";
-    img.style.cssText = "width:100%;border-radius:4px;display:block;";
-    previewWrap.appendChild(img);
-
-    const btnRow = document.createElement("div");
-    btnRow.style.cssText = "display:flex;gap:6px;";
-
-    const applyBtn = document.createElement("button");
-    applyBtn.type = "button";
-    applyBtn.textContent = "Apply";
-    applyBtn.style.cssText = "flex:1;";
-
-    const discardBtn = document.createElement("button");
-    discardBtn.type = "button";
-    discardBtn.textContent = "Discard";
-    discardBtn.style.cssText = "flex:1;";
-
-    btnRow.appendChild(applyBtn);
-    btnRow.appendChild(discardBtn);
-    previewWrap.appendChild(btnRow);
-    inspector.appendChild(previewWrap);
-
-    function removePreview() {
-      if (previewWrap.parentNode) previewWrap.parentNode.removeChild(previewWrap);
-    }
-
-    // Step 3: On Discard — throw bytes away, close preview.
-    discardBtn.addEventListener("click", () => {
-      removePreview();
-      if (genBtn) genBtn.disabled = false;
-      setStatus("Discarded");
-    });
-
-    // Step 4: On Apply — POST the data URL to /api/me/assets which creates
-    // the actual Owner Asset row, then wire the element to it.
-    applyBtn.addEventListener("click", async () => {
-      applyBtn.disabled = true;
-      discardBtn.disabled = true;
-      setStatus("Saving…");
-      try {
-        const uploaded = await postAssetUpload(previewDataUrl, altValue);
-        removePreview();
-        if (genBtn) genBtn.disabled = false;
-        element.assetId = uploaded.assetId;
-        element.mediaKind = "image";
-        element.alt = altValue;
-        rebuildElement(element.id);
-        renderInspector();
-        scheduleSave();
-        setStatus("Applied", "ok");
-      } catch (err) {
-        applyBtn.disabled = false;
-        discardBtn.disabled = false;
-        setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
-      }
-    });
-  }
-
   // -------------------------------------------------------------------------
-  // Media Picker — replaces the old appendMediaUploader + appendImageGenerator
-  // pair with a unified three-row widget:
+  // Media Picker — a unified three-row widget:
   //
   //   Row 1 (current): thumbnail of current asset, Upload button, AI Generate
   //                    button (images only), and alt-text input.
@@ -1760,11 +1562,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //                    slot_history table.
   //   Row 3 (gallery): "Your gallery" — all owner assets matching the element's
   //                    mediaKind, with per-thumb delete controls.
-  //
-  // The two legacy helpers (appendMediaUploader, appendImageGenerator) are
-  // retained as thin wrappers that delegate to the picker; they are no longer
-  // called directly from renderInspector but the names are kept to avoid
-  // breaking anything that might reference them.
   // -------------------------------------------------------------------------
 
   // Shared apply function: updates element.assetId, rebuilds the preview,
@@ -2028,7 +1825,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     void refreshGalleryGrid();
   }
 
-  // Upload pipeline shared between old appendMediaUploader and the picker.
+  // Upload pipeline used by the media picker.
   // On success, calls applyAssetIdToElement with the new assetId.
   async function runUploadAndApply(element, file, altInputEl, refreshFn) {
     const altValue =
@@ -2252,21 +2049,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (typeof refreshFn === "function") {
       await refreshFn();
     }
-  }
-
-  // Legacy wrappers — kept for backward compatibility but now unused by
-  // renderInspector (which calls mountMediaPicker instead).
-  function appendMediaUploader(element) {
-    // No-op: functionality is now inside mountMediaPicker.
-    void element;
-  }
-
-  // Direct image generation via the Replicate-backed /assets/generate route.
-  // Distinct from the agent-driven "AI media" button: this one creates a
-  // brand-new asset shaped to the slot's aspect ratio without an LLM round-trip.
-  function appendImageGenerator(element) {
-    // No-op: functionality is now inside mountMediaPicker.
-    void element;
   }
 
   function buildPinnedColorField(element) {
