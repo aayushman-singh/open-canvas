@@ -14,6 +14,9 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0002 | Published address routing | Accepted | [`docs/adr/0002-published-address.md`](0002-published-address.md) |
 | 0003 | Canvas-first reset | Accepted | [`docs/adr/0003-canvas-first-reset.md`](0003-canvas-first-reset.md) |
 | 0004 | Owner-rooted assets and their lifecycle | Accepted | [`docs/adr/0004-owner-asset.md`](0004-owner-asset.md) |
+| 0005 | Custom domains via Cloudflare for SaaS Custom Hostnames | Accepted | [`docs/adr/0005-custom-domains.md`](0005-custom-domains.md) |
+| 0006 | Owner Asset storage backend: R2 originals + Cloudflare image transforms | Accepted | [`docs/adr/0006-asset-storage-backend.md`](0006-asset-storage-backend.md) |
+| 0007 | Yjs revival as canonical operation model for co-edit and version history | Accepted | [`docs/adr/0007-yjs-revival.md`](0007-yjs-revival.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
