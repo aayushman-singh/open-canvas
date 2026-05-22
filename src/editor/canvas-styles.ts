@@ -174,6 +174,22 @@ body.rev01-modal-open {
   padding: 14px 12px 20px;
 }
 
+.rev01-sidebar-panel[hidden] {
+  display: none;
+}
+
+.rev01-section-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.rev01-section-picker-empty {
+  color: var(--rev01-fg-mute);
+  font-size: 13px;
+}
+
 .rev01-sidebar-group {
   display: grid;
   gap: 8px;
