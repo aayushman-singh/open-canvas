@@ -688,6 +688,22 @@ try {
     `expected injected element assetId to be cleared to "", got ${JSON.stringify((foundElement as Record<string, unknown>).assetId)}`,
   );
 
+  // 8h. Regression lock for Fix 1: validateCanvasSiteState must accept assetId:''
+  //     (cascade-cleared slot). Before the fix, the validator rejected '' with
+  //     "assetId must be a non-empty string", which caused PUT /api/canvas/sites/:siteId
+  //     to 400 on every subsequent save — wedging the editor save loop.
+  //
+  //     The canvas PUT endpoint goes through Clerk auth and has no SMOKE bypass,
+  //     so we verify at the validator boundary directly. The DB-level round-trip
+  //     is already proven by 8b (DB inject) → 8e (cascade DELETE) → 8g (DB read-back
+  //     confirming assetId='').
+  const { validateCanvasSiteState } = await import('./canvas/validate.js');
+  const validationResult = validateCanvasSiteState(afterState);
+  assert(
+    validationResult.valid,
+    `expected validateCanvasSiteState to accept state with assetId:'' after cascade, errors: ${JSON.stringify(validationResult.valid ? [] : validationResult.errors)}`,
+  );
+
   console.log('[owner-asset-smoke] delete-cascade ok');
 
   // ── Step 9: Negative cases ────────────────────────────────────────────────

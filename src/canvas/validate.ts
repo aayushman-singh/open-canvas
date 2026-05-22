@@ -328,11 +328,11 @@ function validateElement(
           `${basePath}.mediaKind must be one of [${MEDIA_KINDS.join(', ')}] (got ${describe(element.mediaKind)})`,
         );
       }
-      if (!isNonEmptyString(element.assetId)) {
-        errors.push(`${basePath}.assetId must be a non-empty string`);
+      if (typeof element.assetId !== 'string') {
+        errors.push(`${basePath}.assetId must be a string (empty string allowed for unfilled slots)`);
       }
-      if (element.posterAssetId !== undefined && !isNonEmptyString(element.posterAssetId)) {
-        errors.push(`${basePath}.posterAssetId must be a non-empty string when present`);
+      if (element.posterAssetId !== undefined && typeof element.posterAssetId !== 'string') {
+        errors.push(`${basePath}.posterAssetId must be a string when present (empty string allowed for unfilled slots)`);
       }
       if (typeof element.alt !== 'string') {
         errors.push(`${basePath}.alt must be a string`);
