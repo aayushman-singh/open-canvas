@@ -8,8 +8,26 @@ function assert(condition: boolean, message: string): void {
   }
 }
 
+// The Worker env passed to app.request. The public router's DB lookup needs
+// DATABASE_URL even for the 404 path (we want a real "no row" answer, not a
+// crash from a missing env var). Pull from process.env so the smoke remains
+// deterministic against the empty dev DB.
+const smokeEnv: Record<string, string> = {
+  DATABASE_URL: process.env.DATABASE_URL ?? '',
+  CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY ?? '',
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
+};
+
 async function responseText(path: string): Promise<{ status: number; body: string }> {
-  const response = await app.request(`http://rev01.test${path}`);
+  const response = await app.request(`http://rev01.test${path}`, undefined, smokeEnv);
+  return { status: response.status, body: await response.text() };
+}
+
+async function responseFromHost(
+  host: string,
+  path: string,
+): Promise<{ status: number; body: string }> {
+  const response = await app.request(`http://${host}${path}`, undefined, smokeEnv);
   return { status: response.status, body: await response.text() };
 }
 
@@ -226,6 +244,37 @@ assert(
   !javascriptLink.valid &&
     javascriptLink.errors.some((message) => message.includes('javascript:alert(1)')),
   'expected javascript-link rejection to mention the offending href',
+);
+
+// -- Task 5: public host router -------------------------------------------
+// An unknown subdomain under *.rev01.aayushman.dev should be handled by the
+// public router (not the app's landing/health/etc.) and return 404 because
+// no site row matches.
+const unknownSubdomain = await responseFromHost('unknown-subdomain.rev01.aayushman.dev', '/');
+assert(
+  unknownSubdomain.status === 404,
+  `expected unknown Published Address to 404, got ${unknownSubdomain.status}`,
+);
+assert(
+  unknownSubdomain.body.length > 0,
+  'expected unknown-subdomain 404 body to be a non-empty string',
+);
+assert(
+  unknownSubdomain.body.toLowerCase().includes('not found') ||
+    unknownSubdomain.body.toLowerCase().includes('not yet published'),
+  `expected unknown-subdomain 404 body to mention "not found" or "not yet published" (got ${JSON.stringify(unknownSubdomain.body)})`,
+);
+
+// The app host (rev01.aayushman.dev) must still serve the landing page —
+// the public router has to return null on this host, not intercept it.
+const appHostLanding = await responseFromHost('rev01.aayushman.dev', '/');
+assert(
+  appHostLanding.status === 200,
+  `expected rev01.aayushman.dev / to still serve the landing page, got ${appHostLanding.status}`,
+);
+assert(
+  appHostLanding.body.includes('multiplayer site builder'),
+  'expected rev01.aayushman.dev / to render the Post-Aero landing copy',
 );
 
 console.log('[review-smoke] OK');
