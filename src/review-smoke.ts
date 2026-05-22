@@ -1,7 +1,11 @@
 import { eq, sql } from 'drizzle-orm';
 import app from './index';
+import { applyCanvasAgentOp } from './agent/canvas-ops';
+import { CANVAS_AGENT_TOOLS } from './agent/canvas-tools';
 import { collectReferencedAssetIds } from './assets/site-assets';
-import type { CanvasSiteState } from './canvas/schema';
+import { createSectionFromRecipe } from './canvas/recipes';
+import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
+import { SECTION_RECIPE_IDS } from './canvas/schema';
 import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
@@ -536,5 +540,112 @@ try {
   }
   await smokeDb.delete(customer).where(eq(customer.clerkUserId, T6_CLERK_USER));
 }
+
+// -- Task 7: canvas agent — apply function + route shell -----------------
+// Pure smoke for the apply function so review-smoke fails loudly if the op
+// translation regresses. We do not call the live LLM here — the canvas-agent
+// preview/apply LLM call is exercised only when GEMINI_API_KEY is set; the
+// route shell mount is what we verify below.
+
+const baseT7State: CanvasSiteState = structuredClone(starterTemplate.state);
+const baseT7Page = baseT7State.pages[0];
+if (!baseT7Page) throw new Error('starterTemplate must have at least one page');
+const baseT7Section = baseT7Page.sections[0];
+if (!baseT7Section) throw new Error('starterTemplate first page must have at least one section');
+const t7TextElement = baseT7Section.elements.find((e) => e.type === 'text');
+if (!t7TextElement) throw new Error('starterTemplate hero must have a text element');
+const t7MediaElement = baseT7Section.elements.find((e) => e.type === 'media');
+if (!t7MediaElement) throw new Error('starterTemplate hero must have a media element');
+
+// rewriteText: writes a new content array and revalidates clean.
+const t7Rewrite = applyCanvasAgentOp(baseT7State, {
+  kind: 'rewriteText',
+  elementId: t7TextElement.id,
+  content: [{ text: 'review-smoke ' }, { text: 'rewrite', marks: [{ type: 'bold' }] }],
+});
+const t7RewriteValidation = validateCanvasSiteState(t7Rewrite);
+assert(
+  t7RewriteValidation.valid,
+  t7RewriteValidation.valid
+    ? ''
+    : `T7 rewriteText apply produced invalid state: ${t7RewriteValidation.errors.join('; ')}`,
+);
+
+// replaceMedia: overwrites assetId/alt and keeps state valid.
+const t7Replace = applyCanvasAgentOp(baseT7State, {
+  kind: 'replaceMedia',
+  elementId: t7MediaElement.id,
+  mediaKind: 'image',
+  assetId: 'up-review-smoke-asset',
+  alt: 'review-smoke alt',
+});
+const t7ReplaceValidation = validateCanvasSiteState(t7Replace);
+assert(
+  t7ReplaceValidation.valid,
+  t7ReplaceValidation.valid
+    ? ''
+    : `T7 replaceMedia apply produced invalid state: ${t7ReplaceValidation.errors.join('; ')}`,
+);
+
+// insertSection: appends a feature-grid section via the registry factory.
+const t7Insert = applyCanvasAgentOp(baseT7State, {
+  kind: 'insertSection',
+  afterSectionId: baseT7Section.id,
+  recipeId: 'feature-grid',
+  input: { brief: 'Three reasons it works.', styleKit: baseT7State.styleKit },
+});
+const t7InsertValidation = validateCanvasSiteState(t7Insert);
+assert(
+  t7InsertValidation.valid,
+  t7InsertValidation.valid
+    ? ''
+    : `T7 insertSection apply produced invalid state: ${t7InsertValidation.errors.join('; ')}`,
+);
+const t7InsertedPage = t7Insert.pages[0];
+assert(
+  t7InsertedPage !== undefined &&
+    t7InsertedPage.sections.length === baseT7Page.sections.length + 1,
+  'expected T7 insertSection to add exactly one section',
+);
+
+// Every recipe in the registry is exercised by canvas-agent-smoke.ts; here we
+// only smoke that the entry point + tool set still names every recipe so the
+// LLM cannot reach for a missing factory.
+const t7ToolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
+assert(
+  JSON.stringify(t7ToolNames) ===
+    JSON.stringify(['createSection', 'replaceMedia', 'rewriteText']),
+  `expected CANVAS_AGENT_TOOLS to expose three tools (got [${t7ToolNames.join(', ')}])`,
+);
+for (const recipeId of SECTION_RECIPE_IDS as readonly SectionRecipeId[]) {
+  const section = createSectionFromRecipe(recipeId, {
+    brief: 'review smoke',
+    styleKit: baseT7State.styleKit,
+  });
+  assert(section.recipeId === recipeId, `expected recipe factory for ${recipeId} to set recipeId`);
+}
+
+// Route shell: hitting /api/canvas-agent/sites/:siteId/preview without auth
+// MUST redirect to the Clerk sign-in URL (clerkAuth + requireAuth gate). The
+// public host router only intercepts *.rev01.aayushman.dev; the app host
+// (rev01.test by default in review-smoke) falls through to the app routes.
+const t7PreviewProbe = await app.request(
+  'http://rev01.test/api/canvas-agent/sites/probe/preview',
+  { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"prompt":"x"}' },
+  smokeEnv,
+);
+assert(
+  t7PreviewProbe.status === 302 || t7PreviewProbe.status === 401,
+  `expected canvas-agent preview without auth to redirect or 401, got ${t7PreviewProbe.status}`,
+);
+const t7ApplyProbe = await app.request(
+  'http://rev01.test/api/canvas-agent/sites/probe/apply',
+  { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"ops":[]}' },
+  smokeEnv,
+);
+assert(
+  t7ApplyProbe.status === 302 || t7ApplyProbe.status === 401,
+  `expected canvas-agent apply without auth to redirect or 401, got ${t7ApplyProbe.status}`,
+);
 
 console.log('[review-smoke] OK');
