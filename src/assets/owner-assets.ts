@@ -7,8 +7,8 @@
 // owner-assets.ts.
 
 import { and, eq } from 'drizzle-orm';
-import type { MediaKind } from '../canvas/schema.js';
-import { ownerAsset } from '../db/schema.js';
+import type { CanvasSiteState, MediaKind } from '../canvas/schema.js';
+import { ownerAsset, site } from '../db/schema.js';
 import type { Db } from '../db/client.js';
 
 export interface OwnerAssetBlob {
@@ -60,6 +60,8 @@ export function assetResponse(mediaType: string, bytesBase64: string): Response 
     },
   });
 }
+
+import { collectReferencedAssets } from './site-assets.js';
 
 export {
   collectReferencedAssets,
@@ -121,6 +123,95 @@ interface ReplicatePrediction {
 //
 // No fallback path: if Replicate fails, the prediction does not succeed, or
 // the output is unrecognised, we throw with full context.
+export interface AssetUsageElement {
+  siteId: string;
+  siteName: string;
+  publishedAddress: string | null; // subdomain when site is published, null otherwise
+  elementId: string;
+  source: 'editable' | 'published';
+}
+
+/**
+ * Find every editable state and every published snapshot owned by this customer
+ * that references the given asset id. Used by the delete-confirm modal.
+ *
+ * Returns one entry per (siteId, elementId, source) tuple so the UI can render
+ * a precise impact list. An asset referenced by both the editable state and
+ * the published snapshot of the same site produces two entries.
+ */
+export async function findAssetUsage(
+  database: Db,
+  customerId: string,
+  assetId: string,
+): Promise<AssetUsageElement[]> {
+  const sites = await database
+    .select({
+      id: site.id,
+      name: site.name,
+      subdomain: site.subdomain,
+      editableState: site.editableState,
+      publishedSnapshot: site.publishedSnapshot,
+      publishedVersion: site.publishedVersion,
+    })
+    .from(site)
+    .where(eq(site.customerId, customerId));
+
+  const out: AssetUsageElement[] = [];
+  for (const s of sites) {
+    for (const ref of collectReferencedAssets(s.editableState.pages)) {
+      if (ref.assetId !== assetId) continue;
+      out.push({
+        siteId: s.id,
+        siteName: s.name,
+        publishedAddress: s.publishedVersion > 0 ? s.subdomain : null,
+        elementId: ref.mediaElementId,
+        source: 'editable',
+      });
+    }
+    if (s.publishedSnapshot) {
+      for (const ref of collectReferencedAssets(s.publishedSnapshot.pages)) {
+        if (ref.assetId !== assetId) continue;
+        out.push({
+          siteId: s.id,
+          siteName: s.name,
+          publishedAddress: s.subdomain,
+          elementId: ref.mediaElementId,
+          source: 'published',
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Return a NEW editable state with every reference to assetId (both assetId
+ * and posterAssetId on media elements) replaced with empty string. Used by the
+ * delete-cascade flow in Task 14 to leave broken slots visible to the owner
+ * rather than dangling references.
+ */
+export function clearAssetReferences(
+  state: CanvasSiteState,
+  assetId: string,
+): CanvasSiteState {
+  return {
+    ...state,
+    pages: state.pages.map((page) => ({
+      ...page,
+      sections: page.sections.map((section) => ({
+        ...section,
+        elements: section.elements.map((element) => {
+          if (element.type !== 'media') return element;
+          const cleared = { ...element };
+          if (element.assetId === assetId) cleared.assetId = '';
+          if (element.posterAssetId === assetId) cleared.posterAssetId = '';
+          return cleared;
+        }),
+      })),
+    })),
+  };
+}
+
 export async function generateImageViaReplicate(
   token: string,
   prompt: string,
