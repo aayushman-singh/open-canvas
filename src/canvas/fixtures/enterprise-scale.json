@@ -1,0 +1,1091 @@
+{
+  "styleKit": "charcoal",
+  "pages": [
+    {
+      "id": "page-enterprise-scale",
+      "slug": "home",
+      "title": "Enterprise Scale",
+      "width": 1440,
+      "sections": [
+        {
+          "id": "enterprise-hero",
+          "recipeId": "hero-split",
+          "name": "Enterprise hero",
+          "height": 840,
+          "backgroundEffect": "grid",
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "enterprise-hero-bg",
+              "type": "container",
+              "box": { "x": 0, "y": 0, "w": 1440, "h": 840, "z": 0 },
+              "variant": "soft-panel"
+            },
+            {
+              "id": "enterprise-hero-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 84, "w": 500, "h": 32, "z": 3 },
+              "content": [{ "text": "Enterprise website operations" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 600,
+              "align": "left",
+              "pinnedStyle": { "color": "#d8ff7a" }
+            },
+            {
+              "id": "enterprise-hero-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 142, "w": 700, "h": 260, "z": 3 },
+              "content": [
+                { "text": "Launch governed sites at " },
+                { "text": "market speed", "marks": [{ "type": "bold" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 76,
+              "fontWeight": 700,
+              "align": "left",
+              "motion": { "preset": "fade-up", "delayMs": 40 }
+            },
+            {
+              "id": "enterprise-hero-body",
+              "type": "text",
+              "box": { "x": 84, "y": 432, "w": 620, "h": 126, "z": 3 },
+              "content": [
+                { "text": "A native canvas template for large teams that need " },
+                { "text": "brand control", "marks": [{ "type": "highlight" }] },
+                {
+                  "text": ", faster publishing, and one clear system for campaigns, regions, and stakeholders."
+                }
+              ],
+              "role": "body",
+              "fontSize": 20,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-primary",
+              "type": "action",
+              "box": { "x": 80, "y": 608, "w": 180, "h": 56, "z": 3 },
+              "label": "Talk to sales",
+              "href": "/contact",
+              "variant": "solid"
+            },
+            {
+              "id": "enterprise-hero-secondary",
+              "type": "action",
+              "box": { "x": 284, "y": 608, "w": 190, "h": 56, "z": 3 },
+              "label": "View platform",
+              "href": "#enterprise-scale",
+              "variant": "outline"
+            },
+            {
+              "id": "enterprise-hero-proof",
+              "type": "text",
+              "box": { "x": 84, "y": 720, "w": 520, "h": 40, "z": 3 },
+              "content": [{ "text": "Built for global marketing, design, and operations teams." }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 500,
+              "align": "left",
+              "pinnedStyle": { "color": "#b8bdc8" }
+            },
+            {
+              "id": "enterprise-hero-panel",
+              "type": "container",
+              "box": { "x": 770, "y": 108, "w": 570, "h": 580, "z": 2 },
+              "variant": "raised",
+              "motion": { "preset": "slide-left", "delayMs": 120 }
+            },
+            {
+              "id": "enterprise-hero-panel-glass",
+              "type": "container",
+              "box": { "x": 814, "y": 150, "w": 482, "h": 88, "z": 4 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-hero-panel-title",
+              "type": "text",
+              "box": { "x": 844, "y": 170, "w": 360, "h": 40, "z": 5 },
+              "content": [{ "text": "Launch command center" }],
+              "role": "label",
+              "fontSize": 18,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-panel-status",
+              "type": "text",
+              "box": { "x": 1180, "y": 172, "w": 94, "h": 32, "z": 5 },
+              "content": [{ "text": "LIVE" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#d8ff7a" }
+            },
+            {
+              "id": "enterprise-hero-stat-one-card",
+              "type": "container",
+              "box": { "x": 814, "y": 274, "w": 220, "h": 150, "z": 4 },
+              "variant": "outlined"
+            },
+            {
+              "id": "enterprise-hero-stat-one",
+              "type": "text",
+              "box": { "x": 842, "y": 300, "w": 164, "h": 58, "z": 5 },
+              "content": [{ "text": "4.8x" }],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-stat-one-label",
+              "type": "text",
+              "box": { "x": 842, "y": 366, "w": 160, "h": 42, "z": 5 },
+              "content": [{ "text": "faster campaign launch cycles" }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 500,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-stat-two-card",
+              "type": "container",
+              "box": { "x": 1074, "y": 274, "w": 220, "h": 150, "z": 4 },
+              "variant": "outlined"
+            },
+            {
+              "id": "enterprise-hero-stat-two",
+              "type": "text",
+              "box": { "x": 1102, "y": 300, "w": 164, "h": 58, "z": 5 },
+              "content": [{ "text": "42%" }],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-stat-two-label",
+              "type": "text",
+              "box": { "x": 1102, "y": 366, "w": 160, "h": 42, "z": 5 },
+              "content": [{ "text": "fewer handoff loops before publish" }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 500,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-flow-card",
+              "type": "container",
+              "box": { "x": 814, "y": 466, "w": 480, "h": 150, "z": 4 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-hero-flow-copy",
+              "type": "text",
+              "box": { "x": 844, "y": 494, "w": 410, "h": 70, "z": 5 },
+              "content": [
+                { "text": "Brand system approved. Regional variants queued. Audit trail ready." }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 500,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-hero-accent",
+              "type": "shape",
+              "box": { "x": 1248, "y": 628, "w": 100, "h": 100, "z": 6, "rotation": 18 },
+              "variant": "badge"
+            }
+          ]
+        },
+        {
+          "id": "enterprise-proof",
+          "recipeId": "logo-strip",
+          "name": "Enterprise proof",
+          "height": 460,
+          "backgroundEffect": "none",
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "enterprise-proof-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 74, "w": 570, "h": 86, "z": 2 },
+              "content": [{ "text": "Trusted patterns for complex organizations." }],
+              "role": "heading",
+              "fontSize": 42,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-body",
+              "type": "text",
+              "box": { "x": 760, "y": 82, "w": 560, "h": 78, "z": 2 },
+              "content": [
+                {
+                  "text": "Use this as a starting point for sales-led SaaS, infrastructure, fintech, security, and operations pages."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-logo-one",
+              "type": "text",
+              "box": { "x": 80, "y": 216, "w": 210, "h": 44, "z": 2 },
+              "content": [{ "text": "Northstar Systems" }],
+              "role": "label",
+              "fontSize": 18,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-logo-two",
+              "type": "text",
+              "box": { "x": 330, "y": 216, "w": 190, "h": 44, "z": 2 },
+              "content": [{ "text": "Meridian Works" }],
+              "role": "label",
+              "fontSize": 18,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-logo-three",
+              "type": "text",
+              "box": { "x": 560, "y": 216, "w": 180, "h": 44, "z": 2 },
+              "content": [{ "text": "Orbit Grid" }],
+              "role": "label",
+              "fontSize": 18,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-logo-four",
+              "type": "text",
+              "box": { "x": 780, "y": 216, "w": 190, "h": 44, "z": 2 },
+              "content": [{ "text": "Civic Atlas" }],
+              "role": "label",
+              "fontSize": 18,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-logo-five",
+              "type": "text",
+              "box": { "x": 1010, "y": 216, "w": 210, "h": 44, "z": 2 },
+              "content": [{ "text": "Pattern Retail" }],
+              "role": "label",
+              "fontSize": 18,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-card-one",
+              "type": "container",
+              "box": { "x": 80, "y": 304, "w": 380, "h": 94, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-proof-card-one-text",
+              "type": "text",
+              "box": { "x": 108, "y": 330, "w": 316, "h": 46, "z": 2 },
+              "content": [
+                {
+                  "text": "Brand systems, regional launches, and content governance in one editable site."
+                }
+              ],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 500,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-card-two",
+              "type": "container",
+              "box": { "x": 530, "y": 304, "w": 380, "h": 94, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-proof-card-two-text",
+              "type": "text",
+              "box": { "x": 558, "y": 330, "w": 316, "h": 46, "z": 2 },
+              "content": [
+                {
+                  "text": "Proof-heavy sections give buyers the evidence they need without burying the CTA."
+                }
+              ],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 500,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-proof-card-three",
+              "type": "container",
+              "box": { "x": 980, "y": 304, "w": 360, "h": 94, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-proof-card-three-text",
+              "type": "text",
+              "box": { "x": 1008, "y": 330, "w": 300, "h": 46, "z": 2 },
+              "content": [
+                { "text": "Every line, stat, surface, and CTA is an editable canvas primitive." }
+              ],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 500,
+              "align": "left"
+            }
+          ]
+        },
+        {
+          "id": "enterprise-outcomes",
+          "recipeId": "testimonial-row",
+          "name": "Outcome cards",
+          "height": 780,
+          "backgroundEffect": "grain",
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "enterprise-outcomes-bg",
+              "type": "container",
+              "box": { "x": 0, "y": 0, "w": 1440, "h": 780, "z": 0 },
+              "variant": "flat"
+            },
+            {
+              "id": "enterprise-outcomes-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 82, "w": 420, "h": 32, "z": 2 },
+              "content": [{ "text": "Measurable impact" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#d8ff7a" }
+            },
+            {
+              "id": "enterprise-outcomes-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 132, "w": 760, "h": 118, "z": 2 },
+              "content": [{ "text": "Make the business case visible before the demo call." }],
+              "role": "heading",
+              "fontSize": 48,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcomes-body",
+              "type": "text",
+              "box": { "x": 880, "y": 142, "w": 440, "h": 92, "z": 2 },
+              "content": [
+                {
+                  "text": "Outcome cards are built for editable stats, short customer proof, and clear routes into longer stories."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-card-one",
+              "type": "container",
+              "box": { "x": 80, "y": 318, "w": 386, "h": 340, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-outcome-one-stat",
+              "type": "text",
+              "box": { "x": 118, "y": 356, "w": 220, "h": 76, "z": 2 },
+              "content": [{ "text": "3.2M" }],
+              "role": "heading",
+              "fontSize": 58,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-one-label",
+              "type": "text",
+              "box": { "x": 120, "y": 452, "w": 290, "h": 48, "z": 2 },
+              "content": [{ "text": "in tooling and agency spend avoided" }],
+              "role": "label",
+              "fontSize": 17,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-one-body",
+              "type": "text",
+              "box": { "x": 120, "y": 532, "w": 292, "h": 70, "z": 2 },
+              "content": [
+                {
+                  "text": "Consolidate launch surfaces while keeping brand review and publishing ownership close to the team."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-card-two",
+              "type": "container",
+              "box": { "x": 526, "y": 318, "w": 386, "h": 340, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-outcome-two-stat",
+              "type": "text",
+              "box": { "x": 564, "y": 356, "w": 220, "h": 76, "z": 2 },
+              "content": [{ "text": "68%" }],
+              "role": "heading",
+              "fontSize": 58,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-two-label",
+              "type": "text",
+              "box": { "x": 566, "y": 452, "w": 290, "h": 48, "z": 2 },
+              "content": [{ "text": "more pages shipped by non-engineering teams" }],
+              "role": "label",
+              "fontSize": 17,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-two-body",
+              "type": "text",
+              "box": { "x": 566, "y": 532, "w": 292, "h": 70, "z": 2 },
+              "content": [
+                {
+                  "text": "Give trusted operators a clear system for launching pages without creating hidden implementation drift."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-card-three",
+              "type": "container",
+              "box": { "x": 972, "y": 318, "w": 368, "h": 340, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-outcome-three-stat",
+              "type": "text",
+              "box": { "x": 1010, "y": 356, "w": 220, "h": 76, "z": 2 },
+              "content": [{ "text": "12d" }],
+              "role": "heading",
+              "fontSize": 58,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-three-label",
+              "type": "text",
+              "box": { "x": 1012, "y": 452, "w": 270, "h": 48, "z": 2 },
+              "content": [{ "text": "from signed brief to governed launch" }],
+              "role": "label",
+              "fontSize": 17,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-outcome-three-body",
+              "type": "text",
+              "box": { "x": 1012, "y": 532, "w": 268, "h": 70, "z": 2 },
+              "content": [
+                {
+                  "text": "Replace scattered launch checklists with a page structure built around decisions, evidence, and control."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            }
+          ]
+        },
+        {
+          "id": "enterprise-teams",
+          "recipeId": "feature-grid",
+          "name": "Team needs",
+          "height": 820,
+          "backgroundEffect": "soft-light",
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "enterprise-teams-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 660, "h": 128, "z": 2 },
+              "content": [
+                { "text": "Built for the teams that " },
+                { "text": "own growth", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 50,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-teams-body",
+              "type": "text",
+              "box": { "x": 810, "y": 92, "w": 500, "h": 92, "z": 2 },
+              "content": [
+                {
+                  "text": "Arrange the same page around marketing, design, engineering, agency, or operations buyers without changing the underlying primitives."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-team-pill-one",
+              "type": "container",
+              "box": { "x": 80, "y": 250, "w": 180, "h": 54, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-team-pill-one-text",
+              "type": "text",
+              "box": { "x": 104, "y": 266, "w": 130, "h": 24, "z": 2 },
+              "content": [{ "text": "Marketing" }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 700,
+              "align": "center"
+            },
+            {
+              "id": "enterprise-team-pill-two",
+              "type": "container",
+              "box": { "x": 282, "y": 250, "w": 160, "h": 54, "z": 1 },
+              "variant": "outlined"
+            },
+            {
+              "id": "enterprise-team-pill-two-text",
+              "type": "text",
+              "box": { "x": 304, "y": 266, "w": 116, "h": 24, "z": 2 },
+              "content": [{ "text": "Design" }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 700,
+              "align": "center"
+            },
+            {
+              "id": "enterprise-team-pill-three",
+              "type": "container",
+              "box": { "x": 462, "y": 250, "w": 190, "h": 54, "z": 1 },
+              "variant": "outlined"
+            },
+            {
+              "id": "enterprise-team-pill-three-text",
+              "type": "text",
+              "box": { "x": 486, "y": 266, "w": 142, "h": 24, "z": 2 },
+              "content": [{ "text": "Engineering" }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 700,
+              "align": "center"
+            },
+            {
+              "id": "enterprise-team-pill-four",
+              "type": "container",
+              "box": { "x": 674, "y": 250, "w": 150, "h": 54, "z": 1 },
+              "variant": "outlined"
+            },
+            {
+              "id": "enterprise-team-pill-four-text",
+              "type": "text",
+              "box": { "x": 696, "y": 266, "w": 106, "h": 24, "z": 2 },
+              "content": [{ "text": "Agency" }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 700,
+              "align": "center"
+            },
+            {
+              "id": "enterprise-team-feature-one",
+              "type": "container",
+              "box": { "x": 80, "y": 370, "w": 380, "h": 300, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-team-feature-one-title",
+              "type": "text",
+              "box": { "x": 116, "y": 412, "w": 300, "h": 68, "z": 2 },
+              "content": [{ "text": "Move quickly without losing review discipline" }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-team-feature-one-body",
+              "type": "text",
+              "box": { "x": 116, "y": 514, "w": 304, "h": 96, "z": 2 },
+              "content": [
+                {
+                  "text": "Give owners a page shape that already makes space for approvals, proof, metrics, and escalation paths."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-team-feature-two",
+              "type": "container",
+              "box": { "x": 530, "y": 370, "w": 380, "h": 300, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-team-feature-two-title",
+              "type": "text",
+              "box": { "x": 566, "y": 412, "w": 304, "h": 68, "z": 2 },
+              "content": [{ "text": "Turn traffic into qualified demand" }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-team-feature-two-body",
+              "type": "text",
+              "box": { "x": 566, "y": 514, "w": 304, "h": 96, "z": 2 },
+              "content": [
+                {
+                  "text": "Pair buyer proof with direct actions so visitors always know where the next conversation starts."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-team-feature-three",
+              "type": "container",
+              "box": { "x": 980, "y": 370, "w": 360, "h": 300, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-team-feature-three-title",
+              "type": "text",
+              "box": { "x": 1016, "y": 412, "w": 284, "h": 68, "z": 2 },
+              "content": [{ "text": "Reduce overhead with shared primitives" }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-team-feature-three-body",
+              "type": "text",
+              "box": { "x": 1016, "y": 514, "w": 276, "h": 96, "z": 2 },
+              "content": [
+                {
+                  "text": "The layout is rich, but every piece is still plain canvas state an owner can edit or replace."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            }
+          ]
+        },
+        {
+          "id": "enterprise-scale",
+          "recipeId": "gallery-strip",
+          "name": "Scale platform",
+          "height": 860,
+          "backgroundEffect": "paper",
+          "entrance": "slide-left",
+          "elements": [
+            {
+              "id": "enterprise-scale-panel",
+              "type": "container",
+              "box": { "x": 80, "y": 84, "w": 1280, "h": 660, "z": 1 },
+              "variant": "editorial-frame"
+            },
+            {
+              "id": "enterprise-scale-kicker",
+              "type": "text",
+              "box": { "x": 128, "y": 134, "w": 360, "h": 30, "z": 2 },
+              "content": [{ "text": "Scalability" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#d8ff7a" }
+            },
+            {
+              "id": "enterprise-scale-heading",
+              "type": "text",
+              "box": { "x": 128, "y": 190, "w": 600, "h": 178, "z": 2 },
+              "content": [
+                { "text": "Scale without turning every launch into an engineering project." }
+              ],
+              "role": "heading",
+              "fontSize": 46,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-body",
+              "type": "text",
+              "box": { "x": 128, "y": 408, "w": 500, "h": 100, "z": 2 },
+              "content": [
+                {
+                  "text": "The section structure leaves room for CMS scale, localization, analytics, optimization, integrations, and component governance."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-action",
+              "type": "action",
+              "box": { "x": 128, "y": 560, "w": 190, "h": 54, "z": 2 },
+              "label": "Explore scale",
+              "href": "#enterprise-governance",
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-scale-card-one",
+              "type": "container",
+              "box": { "x": 760, "y": 154, "w": 520, "h": 140, "z": 2 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-scale-card-one-title",
+              "type": "text",
+              "box": { "x": 796, "y": 188, "w": 300, "h": 32, "z": 3 },
+              "content": [{ "text": "Global content capacity" }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-card-one-body",
+              "type": "text",
+              "box": { "x": 796, "y": 238, "w": 420, "h": 42, "z": 3 },
+              "content": [
+                { "text": "Designed for many markets, campaigns, owners, and review paths." }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-card-two",
+              "type": "container",
+              "box": { "x": 760, "y": 334, "w": 520, "h": 140, "z": 2 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-scale-card-two-title",
+              "type": "text",
+              "box": { "x": 796, "y": 368, "w": 320, "h": 32, "z": 3 },
+              "content": [{ "text": "Optimization-ready surfaces" }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-card-two-body",
+              "type": "text",
+              "box": { "x": 796, "y": 418, "w": 420, "h": 42, "z": 3 },
+              "content": [
+                { "text": "Stats, claims, quotes, and actions can be swapped for experiments." }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-card-three",
+              "type": "container",
+              "box": { "x": 760, "y": 514, "w": 520, "h": 140, "z": 2 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-scale-card-three-title",
+              "type": "text",
+              "box": { "x": 796, "y": 548, "w": 320, "h": 32, "z": 3 },
+              "content": [{ "text": "Extensible by design" }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-card-three-body",
+              "type": "text",
+              "box": { "x": 796, "y": 598, "w": 420, "h": 42, "z": 3 },
+              "content": [
+                {
+                  "text": "Use the canvas as the contract; replace primitive content as the system matures."
+                }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-scale-accent",
+              "type": "shape",
+              "box": { "x": 1168, "y": 668, "w": 148, "h": 56, "z": 4, "rotation": -8 },
+              "variant": "pill"
+            }
+          ]
+        },
+        {
+          "id": "enterprise-governance",
+          "recipeId": "feature-grid",
+          "name": "Governance",
+          "height": 780,
+          "backgroundEffect": "glass",
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "enterprise-governance-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 96, "w": 560, "h": 150, "z": 2 },
+              "content": [{ "text": "Governance that keeps pace with creative work." }],
+              "role": "heading",
+              "fontSize": 48,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-body",
+              "type": "text",
+              "box": { "x": 84, "y": 292, "w": 520, "h": 102, "z": 2 },
+              "content": [
+                {
+                  "text": "Use this band for permissions, review workflows, audit trails, privacy posture, and the controls enterprise buyers expect before adoption."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-action",
+              "type": "action",
+              "box": { "x": 84, "y": 446, "w": 196, "h": 54, "z": 2 },
+              "label": "Review controls",
+              "href": "#enterprise-success",
+              "variant": "outline"
+            },
+            {
+              "id": "enterprise-governance-card-one",
+              "type": "container",
+              "box": { "x": 760, "y": 96, "w": 520, "h": 130, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-governance-card-one-title",
+              "type": "text",
+              "box": { "x": 798, "y": 128, "w": 330, "h": 32, "z": 2 },
+              "content": [{ "text": "Role-aware publishing" }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-card-one-body",
+              "type": "text",
+              "box": { "x": 798, "y": 176, "w": 420, "h": 34, "z": 2 },
+              "content": [{ "text": "Keep creation broad and final approval explicit." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-card-two",
+              "type": "container",
+              "box": { "x": 760, "y": 266, "w": 520, "h": 130, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-governance-card-two-title",
+              "type": "text",
+              "box": { "x": 798, "y": 298, "w": 330, "h": 32, "z": 2 },
+              "content": [{ "text": "Approvals and staging" }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-card-two-body",
+              "type": "text",
+              "box": { "x": 798, "y": 346, "w": 420, "h": 34, "z": 2 },
+              "content": [{ "text": "Make the process legible before it becomes a meeting." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-card-three",
+              "type": "container",
+              "box": { "x": 760, "y": 436, "w": 520, "h": 130, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-governance-card-three-title",
+              "type": "text",
+              "box": { "x": 798, "y": 468, "w": 330, "h": 32, "z": 2 },
+              "content": [{ "text": "Audit-ready history" }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-card-three-body",
+              "type": "text",
+              "box": { "x": 798, "y": 516, "w": 420, "h": 34, "z": 2 },
+              "content": [{ "text": "Show buyers how changes stay attributable and recoverable." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "enterprise-governance-line",
+              "type": "shape",
+              "box": { "x": 84, "y": 602, "w": 520, "h": 4, "z": 2 },
+              "variant": "line"
+            },
+            {
+              "id": "enterprise-governance-note",
+              "type": "text",
+              "box": { "x": 84, "y": 640, "w": 540, "h": 54, "z": 2 },
+              "content": [
+                {
+                  "text": "The visual language is controlled by a Style Kit; the exact claims and controls stay editable."
+                }
+              ],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 500,
+              "align": "left"
+            }
+          ]
+        },
+        {
+          "id": "enterprise-success",
+          "recipeId": "cta-band",
+          "name": "Success CTA",
+          "height": 660,
+          "backgroundEffect": "soft-light",
+          "entrance": "scale-in",
+          "elements": [
+            {
+              "id": "enterprise-success-frame",
+              "type": "container",
+              "box": { "x": 120, "y": 86, "w": 1200, "h": 488, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "enterprise-success-heading",
+              "type": "text",
+              "box": { "x": 250, "y": 146, "w": 940, "h": 130, "z": 2 },
+              "content": [
+                { "text": "A partner story, support offer, and sales CTA in one final frame." }
+              ],
+              "role": "heading",
+              "fontSize": 48,
+              "fontWeight": 700,
+              "align": "center"
+            },
+            {
+              "id": "enterprise-success-body",
+              "type": "text",
+              "box": { "x": 354, "y": 310, "w": 730, "h": 72, "z": 2 },
+              "content": [
+                {
+                  "text": "Close the page by naming the implementation help, migration support, and operating model buyers need to feel safe moving forward."
+                }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "center"
+            },
+            {
+              "id": "enterprise-success-primary",
+              "type": "action",
+              "box": { "x": 484, "y": 434, "w": 210, "h": 58, "z": 2 },
+              "label": "Contact sales",
+              "href": "/contact",
+              "variant": "solid"
+            },
+            {
+              "id": "enterprise-success-secondary",
+              "type": "action",
+              "box": { "x": 724, "y": 434, "w": 232, "h": 58, "z": 2 },
+              "label": "Read the guide",
+              "href": "#enterprise-hero",
+              "variant": "glass"
+            },
+            {
+              "id": "enterprise-success-badge",
+              "type": "shape",
+              "box": { "x": 222, "y": 422, "w": 94, "h": 94, "z": 3, "rotation": 12 },
+              "variant": "circle"
+            },
+            {
+              "id": "enterprise-success-badge-text",
+              "type": "text",
+              "box": { "x": 242, "y": 452, "w": 54, "h": 34, "z": 4 },
+              "content": [{ "text": "24/7" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#0c0c0d" }
+            },
+            {
+              "id": "enterprise-success-note",
+              "type": "text",
+              "box": { "x": 1036, "y": 430, "w": 180, "h": 58, "z": 2 },
+              "content": [{ "text": "Dedicated guidance for complex launches." }],
+              "role": "label",
+              "fontSize": 15,
+              "fontWeight": 600,
+              "align": "left"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
