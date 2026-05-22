@@ -20,14 +20,14 @@
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
+import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/owner-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, siteAsset } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -88,17 +88,17 @@ publishApi.post('/sites/:siteId', async (c) => {
   }
 
   // Asset reachability guard: every media `assetId` and `posterAssetId`
-  // referenced by the editable state must exist as a `siteAsset` row for
-  // this site and match the element's expected kind. We refuse to publish a
-  // snapshot that would point at missing or mismatched media: no auto-fix, no
-  // placeholder substitution.
+  // referenced by the editable state must exist as an `ownerAsset` row for
+  // this site's owner and match the element's expected kind. We refuse to
+  // publish a snapshot that would point at missing or mismatched media: no
+  // auto-fix, no placeholder substitution.
   const referenced = collectReferencedAssetIds(row.editableState.pages);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
     const presentRows = await database
-      .select({ id: siteAsset.id, kind: siteAsset.kind })
-      .from(siteAsset)
-      .where(and(eq(siteAsset.siteId, row.id), inArray(siteAsset.id, referencedList)));
+      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
+      .from(ownerAsset)
+      .where(and(eq(ownerAsset.customerId, customerId), inArray(ownerAsset.id, referencedList)));
     const referenceErrors = findAssetReferenceErrors(row.editableState.pages, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
