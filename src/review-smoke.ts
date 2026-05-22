@@ -341,6 +341,27 @@ assert(
   !/<input\s+type="hidden"\s+name="templateId"/.test(templatesPageSource),
   'expected templates page not to hide templateId in a single fixed input',
 );
+assert(
+  templatesPageSource.includes('<iframe') && templatesPageSource.includes('/preview'),
+  'expected templates page to render iframe previews for selectable templates',
+);
+assert(
+  templatesPageSource.includes('sandbox=""'),
+  'expected template preview iframes to be sandboxed without extra permissions',
+);
+assert(
+  templatesPageSource.includes("templatesRoute.get('/:templateId/preview'"),
+  'expected templates route to expose a per-template preview page',
+);
+assert(
+  templatesPageSource.includes("templatesRoute.get('/:templateId/assets/:assetId'"),
+  'expected templates route to serve seed assets used by template previews',
+);
+assert(
+  templatesPageSource.includes('renderCanvasSnapshot') &&
+    templatesPageSource.includes('canvasPublishedStyles'),
+  'expected template previews to use the real canvas renderer and published styles',
+);
 
 const sitesApiSource = await readSource('./routes/api/sites.ts');
 assert(
@@ -355,6 +376,49 @@ assert(
 assert(
   !sectionsApiSource.includes("return c.json({ error: 'forbidden' }, 403)"),
   'expected section import to hide unowned site ids behind the same 404 contract as canvas APIs',
+);
+
+const dashboardSource = await readSource('./routes/dashboard/index.tsx');
+assert(
+  dashboardSource.includes('ownedSites'),
+  'expected dashboard to model all owned sites, not only one editor link',
+);
+assert(
+  dashboardSource.includes('ownedSites.map'),
+  'expected dashboard to render every owned site in a list/grid',
+);
+assert(
+  !dashboardSource.includes('const latestSite'),
+  'expected dashboard not to query only the latest site',
+);
+assert(
+  !dashboardSource.includes('let editorLink'),
+  'expected dashboard not to collapse owned sites into a single editorLink',
+);
+
+const enterpriseTemplate = getTemplateSeed('enterprise-scale-canvas');
+assert(enterpriseTemplate !== null, 'expected enterprise-scale-canvas template seed to exist');
+assert(
+  enterpriseTemplate.name === 'Enterprise Scale',
+  `expected enterprise-scale-canvas name to be Enterprise Scale (got ${enterpriseTemplate.name})`,
+);
+const enterprisePage = enterpriseTemplate.state.pages[0];
+assert(enterprisePage !== undefined, 'expected enterprise template to contain one canvas page');
+assert(
+  enterprisePage.title === 'Enterprise Scale',
+  `expected enterprise page title to be Enterprise Scale (got ${enterprisePage.title})`,
+);
+assert(
+  enterprisePage.sections.length >= 6,
+  `expected enterprise template to carry a full multi-section page (got ${String(enterprisePage.sections.length)})`,
+);
+assert(
+  enterprisePage.sections.some((section) => section.id === 'enterprise-proof'),
+  'expected enterprise template to include a proof section',
+);
+assert(
+  enterprisePage.sections.some((section) => section.id === 'enterprise-governance'),
+  'expected enterprise template to include a governance section',
 );
 
 // -- Canvas-first review regressions --------------------------------------

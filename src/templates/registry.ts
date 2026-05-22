@@ -1,4 +1,5 @@
 import baseSeed from '../canvas/fixtures/home.json';
+import enterpriseScaleSeed from '../canvas/fixtures/enterprise-scale.json';
 import type { CanvasElement, CanvasSiteState, InlineRun, StyleKit } from '../canvas/schema';
 
 export interface TemplateSeed {
@@ -122,6 +123,14 @@ export const launchTemplate = buildTemplate({
   primaryAction: 'Join the launch',
 });
 
+export const enterpriseScaleTemplate: TemplateSeed = {
+  id: 'enterprise-scale-canvas',
+  name: 'Enterprise Scale',
+  tagline:
+    'A proof-heavy enterprise landing page seed with governed launch messaging, outcome cards, team sections, scalability, and sales CTAs.',
+  state: structuredClone(enterpriseScaleSeed) as CanvasSiteState,
+};
+
 export const studioTemplate = buildTemplate({
   id: 'studio-canvas',
   name: 'Studio Portfolio',
@@ -163,6 +172,7 @@ export const localTemplate = buildTemplate({
 export const allTemplateSeeds = [
   starterTemplate,
   launchTemplate,
+  enterpriseScaleTemplate,
   studioTemplate,
   localTemplate,
 ] as const satisfies readonly TemplateSeed[];
