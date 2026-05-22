@@ -2502,32 +2502,29 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function attachSidebarTabs() {
-    const tabButtons = Array.from(document.querySelectorAll('[data-sidebar-tab]'));
-    const panels = Array.from(document.querySelectorAll('[data-sidebar-panel]'));
+    const tabButtons = document.querySelectorAll('[data-sidebar-tab]');
+    const panels = document.querySelectorAll('[data-sidebar-panel]');
     if (tabButtons.length === 0 || panels.length === 0) return;
 
     function activate(tabName) {
-      for (const button of tabButtons) {
+      tabButtons.forEach((button) => {
         const isActive = button.getAttribute('data-sidebar-tab') === tabName;
         button.classList.toggle('active', isActive);
         button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      }
-      for (const panel of panels) {
-        const isActive = panel.getAttribute('data-sidebar-panel') === tabName;
-        if (isActive) panel.removeAttribute('hidden');
-        else panel.setAttribute('hidden', '');
-      }
+      });
+      panels.forEach((panel) => {
+        panel.hidden = panel.getAttribute('data-sidebar-panel') !== tabName;
+      });
       if (tabName === 'sections') {
         ensureSectionsPanelLoaded();
       }
     }
 
-    for (const button of tabButtons) {
+    tabButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        const tabName = button.getAttribute('data-sidebar-tab');
-        if (tabName) activate(tabName);
+        activate(button.getAttribute('data-sidebar-tab'));
       });
-    }
+    });
   }
 
   function ensureSectionsPanelLoaded() {
