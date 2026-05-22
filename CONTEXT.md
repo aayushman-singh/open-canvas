@@ -56,9 +56,9 @@ _Avoid_: Override, custom CSS, inline style
 A lightweight signal that someone is viewing or editing a site.
 _Avoid_: Multiplayer, collaborator list, cursor
 
-**Site Asset**:
-A media object owned by an editable site and available to its published snapshots.
-_Avoid_: Temporary URL, upload, blob
+**Owner Asset**:
+A media object owned by an owner and reusable across all of the owner's editable sites and their published snapshots.
+_Avoid_: Site asset, upload, blob, library item
 
 **Agent**:
 An AI collaborator that changes the editable site only from an owner request.
@@ -104,6 +104,10 @@ _Avoid_: Image block, video widget, embed
 A content element with a position and size inside a canvas section.
 _Avoid_: Flow block, DOM node, layer
 
+**Slot History**:
+The ordered record of owner assets that have previously occupied one media element, kept only for the editing experience.
+_Avoid_: Undo stack, version history, asset trail
+
 ## Relationships
 
 - An **Owner** creates an **Editable Site** from exactly one **Template Seed**
@@ -118,13 +122,20 @@ _Avoid_: Flow block, DOM node, layer
 - A **Theme Choice** applies to the whole **Editable Site** and is included in the **Published Snapshot**
 - A **Style Kit** controls the default look of **Design Primitives**
 - A **Pinned Style** belongs to one **Positioned Element** and survives **Theme Choice** changes
-- A **Media Element** references a **Site Asset**
+- A **Media Element** references an **Owner Asset**
+- An **Owner Asset** belongs to one **Owner** and may be referenced by media elements in any of that owner's editable sites
+- An **Owner Asset** survives deletion of any single editable site that references it
+- A **Media Element** has one **Slot History**
+- A **Slot History** is editor-only and is not included in the **Published Snapshot**
+- A **Slot History** is removed when its **Media Element** is deleted
 - A **Media Element** may display an image or a video
 - An **Owner** requests an **Agent Edit**
 - An **Agent Edit** changes the **Editable Site**, not the **Published Site**
 - An **Agent Edit** may rewrite a text element, replace a media element, or create a **Canvas Section** from a **Section Recipe**
 - An **Agent Edit** is previewed by the **Owner** before it changes the **Editable Site**
-- A media-producing **Agent Edit** creates a **Site Asset** before it can replace a media element
+- A media-producing **Agent Edit** creates an **Owner Asset** only when the owner applies the previewed media to a media element
+- Discarded media-edit previews and discarded direct-generation previews never become **Owner Assets**
+- An **Owner Asset** can only be deleted by its **Owner** after the owner confirms the named consequences for every editable site, every **Media Element**, and every **Published Site** that references it
 - A **Presence Indicator** may show that the editable or published site is being viewed without exposing full collaboration controls
 - A **Published Address** resolves to exactly one **Published Site**
 - An **Owned-Domain Subdomain** is the first **Published Address** adapter for the POC
