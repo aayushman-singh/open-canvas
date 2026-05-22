@@ -19,10 +19,10 @@ import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
 import { db } from './db/client';
-import { customer, site, siteAsset } from './db/schema';
+import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
 import {
-  prepareSeedAssetsForSite,
+  prepareSeedAssetsForCustomer,
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_RE,
   validateSubdomain,
@@ -793,19 +793,25 @@ for (const [assetId, asset] of Object.entries(SEED_ASSET_REGISTRY)) {
       asset.mediaType.startsWith('video/'),
       `expected seed video ${assetId} to use a video/* mediaType`,
     );
-    const decoded = atob(asset.bytesBase64);
+    // Post-ADR-0006 the seed registry does not carry bytes inline. The
+    // per-byte sanity check we used to run on `bytesBase64` is now
+    // performed at upload time by the `seed:assets` script (verifies
+    // contentHash matches the bytes file). The registry-level
+    // image/video kind discriminator is the only assertion the smoke
+    // can make here without re-decoding source bytes.
     assert(
-      !decoded.startsWith('\x89PNG\r\n\x1A\n'),
-      `expected seed video ${assetId} to contain video bytes, not a PNG payload`,
+      asset.contentHash.length === 64,
+      `expected seed ${assetId} to carry a sha256 contentHash (64 hex chars)`,
     );
   }
 }
 
 // Site-creation materialisation: after creating a smoke site, the count of
-// `siteAsset` rows for that site MUST equal the count of seed asset ids
-// referenced by `starterTemplate.state`. We bypass the Clerk-gated POST and
-// directly mirror the production materialiser's INSERTs so the smoke runs
-// without a Clerk session.
+// `ownerAsset` rows for that Owner MUST equal the count of seed asset ids
+// referenced by `starterTemplate.state`. Per ADR 0004 the asset root is
+// the Owner — two sites under the same Owner share seed rows; we exercise
+// only the single-Owner path here so the row count comparison stays
+// straightforward.
 const T6_CLERK_USER = 'smoke-t6-' + crypto.randomUUID().slice(0, 8);
 const T6_SUB = 't6-' + crypto.randomUUID().slice(0, 8).toLowerCase();
 const referencedSeedIds = [...collectReferencedAssetIds(starterTemplate.state.pages)];
@@ -813,15 +819,15 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
-const preparedForSiteA = prepareSeedAssetsForSite('site-a', starterTemplate.state);
-const preparedForSiteB = prepareSeedAssetsForSite('site-b', starterTemplate.state);
-assert(preparedForSiteA.ok, 'expected seed asset preparation for site-a to succeed');
-assert(preparedForSiteB.ok, 'expected seed asset preparation for site-b to succeed');
+const preparedForCustomerA = prepareSeedAssetsForCustomer('customer-a', starterTemplate.state);
+const preparedForCustomerB = prepareSeedAssetsForCustomer('customer-b', starterTemplate.state);
+assert(preparedForCustomerA.ok, 'expected seed asset preparation for customer-a to succeed');
+assert(preparedForCustomerB.ok, 'expected seed asset preparation for customer-b to succeed');
 const preparedAIds = new Set(
-  preparedForSiteA.ok ? preparedForSiteA.seedRows.map((row) => row.id) : [],
+  preparedForCustomerA.ok ? preparedForCustomerA.seedRows.map((row) => row.id) : [],
 );
 const preparedBIds = new Set(
-  preparedForSiteB.ok ? preparedForSiteB.seedRows.map((row) => row.id) : [],
+  preparedForCustomerB.ok ? preparedForCustomerB.seedRows.map((row) => row.id) : [],
 );
 for (const originalId of referencedSeedIds) {
   assert(
@@ -829,21 +835,24 @@ for (const originalId of referencedSeedIds) {
     `expected materialised asset ids not to reuse global seed id "${originalId}"`,
   );
 }
-const preparedAStateIds = collectReferencedAssetIds(preparedForSiteA.editableState.pages);
+const preparedAStateIds = collectReferencedAssetIds(preparedForCustomerA.editableState.pages);
 for (const originalId of referencedSeedIds) {
   assert(
     !preparedAStateIds.has(originalId),
     `expected editable state not to retain global seed asset id "${originalId}" after materialisation`,
   );
 }
-for (const row of preparedForSiteA.seedRows) {
+for (const row of preparedForCustomerA.seedRows) {
   assert(
     preparedAStateIds.has(row.id),
-    `expected editable state to reference materialised site asset id "${row.id}"`,
+    `expected editable state to reference materialised Owner Asset id "${row.id}"`,
   );
 }
 for (const id of preparedAIds) {
-  assert(!preparedBIds.has(id), `expected per-site materialised asset id ${id} not to collide`);
+  assert(
+    !preparedBIds.has(id),
+    `expected per-customer materialised asset id ${id} not to collide`,
+  );
 }
 let t6SiteId: string | null = null;
 try {
@@ -861,7 +870,7 @@ try {
   );
 
   t6SiteId = crypto.randomUUID();
-  const preparedT6 = prepareSeedAssetsForSite(t6SiteId, starterTemplate.state);
+  const preparedT6 = prepareSeedAssetsForCustomer(t6CustomerId, starterTemplate.state);
   assert(preparedT6.ok, 'expected T6 seed asset preparation to succeed');
   await smokeDb.insert(site).values({
     id: t6SiteId,
@@ -874,26 +883,25 @@ try {
     publishedVersion: 0,
   });
   const seedRows = preparedT6.seedRows;
-  await smokeDb.insert(siteAsset).values(seedRows);
+  await smokeDb.insert(ownerAsset).values(seedRows).onConflictDoNothing();
 
   const assetRows = await smokeDb
-    .select({ id: siteAsset.id })
-    .from(siteAsset)
-    .where(eq(siteAsset.siteId, t6SiteId));
+    .select({ id: ownerAsset.id })
+    .from(ownerAsset)
+    .where(eq(ownerAsset.customerId, t6CustomerId));
   assert(
     assetRows.length === seedRows.length,
-    `expected site_asset row count (${assetRows.length}) to equal prepared seed row count (${seedRows.length})`,
+    `expected owner_asset row count (${assetRows.length}) to equal prepared seed row count (${seedRows.length})`,
   );
   const presentIds = new Set(assetRows.map((r) => r.id));
   for (const row of seedRows) {
     assert(
       presentIds.has(row.id),
-      `expected materialised site_asset row "${row.id}" but it was missing`,
+      `expected materialised owner_asset row "${row.id}" but it was missing`,
     );
   }
 } finally {
   if (t6SiteId) {
-    await smokeDb.delete(siteAsset).where(eq(siteAsset.siteId, t6SiteId));
     await smokeDb.delete(site).where(eq(site.id, t6SiteId));
   }
   await smokeDb.delete(customer).where(eq(customer.clerkUserId, T6_CLERK_USER));

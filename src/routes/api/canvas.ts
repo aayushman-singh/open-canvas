@@ -1,18 +1,21 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
-import { assetResponse, dataUrlToAsset } from '../../assets/site-assets';
+import { createR2Client } from '../../assets/r2-client';
+import { readOwnerAsset, type CfImageFetcher } from '../../assets/read';
+import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { STYLE_KITS, type CanvasSiteState, type StyleKit } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, siteAsset } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   REPLICATE_API_TOKEN: string;
+  ASSETS_BUCKET: R2Bucket;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -138,18 +141,20 @@ canvasApi.put('/sites/:siteId', async (c) => {
   return c.json({ ok: true });
 });
 
-// Maximum payload size for owner asset uploads. The base64 data URL itself
-// must not exceed this — atob inflates by ~4/3 so a 2 MB base64 payload
-// decodes to ~1.5 MB binary. Past this point we 413 loudly; no silent
-// truncation. T9 may move large assets to R2.
+// Maximum payload size for the legacy data-URL upload bridge. The bridge
+// exists so the editor's existing JSON-shaped POST keeps working after the
+// asset re-root (ADR 0004 + 0006); the canonical new path is
+// `POST /api/owner/assets` (multipart, Owner-rooted). Per the original
+// constraint we cap at 2 MB of base64; atob inflates by ~4/3, so the binary
+// upper bound is ~1.5 MB. Past this point we 413 loudly.
 const MAX_ASSET_DATA_URL_BYTES = 2 * 1024 * 1024;
 
-interface UploadAssetInput {
+interface DataUrlUploadInput {
   dataUrl: string;
   alt: string;
 }
 
-function parseUploadInput(body: unknown): UploadAssetInput | { error: string } {
+function parseUploadInput(body: unknown): DataUrlUploadInput | { error: string } {
   if (!isRecord(body)) return { error: 'request body must be a JSON object' };
   const { dataUrl, alt } = body;
   if (typeof dataUrl !== 'string' || dataUrl.length === 0) {
@@ -161,6 +166,32 @@ function parseUploadInput(body: unknown): UploadAssetInput | { error: string } {
   return { dataUrl, alt };
 }
 
+interface DecodedDataUrl {
+  mediaType: string;
+  bytes: Uint8Array;
+}
+
+function decodeDataUrl(input: string): DecodedDataUrl {
+  const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/.exec(input);
+  if (!match) throw new Error('asset data must be a base64 data URL');
+  const mediaType = match[1] ?? '';
+  const base64 = match[2] ?? '';
+  if (!mediaType.startsWith('image/') && !mediaType.startsWith('video/')) {
+    throw new Error(`unsupported asset media type: ${mediaType}`);
+  }
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return { mediaType, bytes };
+}
+
+// Legacy upload bridge for the editor. Translates the editor's JSON shape
+// (`{ dataUrl, alt }`) into an Owner-rooted upload via the shared
+// `uploadOwnerAsset` primitive. Wave-1 consumers should migrate to
+// `POST /api/owner/assets` (multipart); this bridge keeps the editor green
+// during the cutover.
 canvasApi.post('/sites/:siteId/assets', async (c) => {
   const siteId = c.req.param('siteId');
   const result = await loadOwnedSite(c, siteId);
@@ -173,42 +204,40 @@ canvasApi.post('/sites/:siteId/assets', async (c) => {
   if ('error' in parsed) {
     return c.json({ error: parsed.error }, 400);
   }
-
-  // Refuse oversized payloads up front — atob would happily decode them, but
-  // we don't want to land >1.5 MB binary into Postgres for a POC and we don't
-  // silently truncate.
   if (parsed.dataUrl.length > MAX_ASSET_DATA_URL_BYTES) {
     return c.json({ error: 'asset too large' }, 413);
   }
-
-  let blob;
+  let decoded: DecodedDataUrl;
   try {
-    blob = dataUrlToAsset(parsed.dataUrl);
+    decoded = decodeDataUrl(parsed.dataUrl);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return c.json({ error: message }, 400);
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
   }
 
-  // Always generate a fresh asset id. Seed asset ids are NEVER overwritten —
-  // an Owner who wants to replace seed media uploads a new asset and points
-  // their MediaElement.assetId at the new id.
-  const newAssetId = `up-${crypto.randomUUID()}`;
-
   const database = db(c.env);
-  await database.insert(siteAsset).values({
-    id: newAssetId,
-    siteId: result.site.id,
-    mediaType: blob.mediaType,
-    bytesBase64: blob.bytesBase64,
-    kind: blob.kind,
-    alt: parsed.alt,
-  });
-
-  return c.json({
-    assetId: newAssetId,
-    kind: blob.kind,
-    mediaType: blob.mediaType,
-  });
+  const r2 = createR2Client(c.env.ASSETS_BUCKET);
+  try {
+    const uploaded = await uploadOwnerAsset(
+      { db: database, r2 },
+      {
+        customerId: result.customerId,
+        bytes: decoded.bytes,
+        mediaType: decoded.mediaType,
+        alt: parsed.alt,
+        siteId: result.site.id,
+      },
+    );
+    return c.json({
+      assetId: uploaded.id,
+      kind: uploaded.kind,
+      mediaType: uploaded.mediaType,
+    });
+  } catch (err) {
+    if (err instanceof UploadAssetError) {
+      return c.json({ error: err.message }, err.status as 400);
+    }
+    throw err;
+  }
 });
 
 interface GenerateAssetInput {
@@ -276,11 +305,12 @@ interface ReplicatePrediction {
   logs: unknown;
 }
 
-// Owner-driven Site Asset generation via Replicate's flux-schnell. Synchronous
-// wait (Replicate's `Prefer: wait`, max 60s) — flux-schnell typically returns
-// in ~2-5s. Output is fetched and stored as base64 in `site_asset`, matching
-// the upload flow so downstream code (renderer, publish guard, public asset
-// route) treats generated and uploaded assets identically.
+// Owner-driven Owner Asset generation via Replicate's flux-schnell.
+// Synchronous wait (Replicate's `Prefer: wait`, max 60s) — flux-schnell
+// typically returns in ~2-5s. Output bytes are uploaded through the shared
+// `uploadOwnerAsset` primitive so generated and uploaded assets land in the
+// same Owner-rooted ownerAsset table and the same R2 dedup behaviour
+// applies.
 //
 // No fallback path: if Replicate fails, the prediction does not succeed, or
 // the output is unrecognised, we throw with full context.
@@ -288,7 +318,7 @@ async function generateImageViaReplicate(
   token: string,
   prompt: string,
   aspectRatio: string,
-): Promise<{ bytesBase64: string; mediaType: string }> {
+): Promise<{ bytes: Uint8Array; mediaType: string }> {
   const replicateResponse = await fetch(
     'https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions',
     {
@@ -334,12 +364,7 @@ async function generateImageViaReplicate(
     throw new Error(`replicate output media type not an image: ${mediaType}`);
   }
   const buffer = new Uint8Array(await imageResponse.arrayBuffer());
-  let binary = '';
-  for (let i = 0; i < buffer.length; i++) {
-    binary += String.fromCharCode(buffer[i] as number);
-  }
-  const bytesBase64 = btoa(binary);
-  return { bytesBase64, mediaType };
+  return { bytes: buffer, mediaType };
 }
 
 canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
@@ -363,33 +388,36 @@ canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
   const aspectRatio = snapToFluxAspectRatio(parsed.boxW, parsed.boxH);
   const image = await generateImageViaReplicate(token, parsed.prompt, aspectRatio);
 
-  // Mirror the upload-path limit so generated assets cannot bypass the
-  // per-asset size budget that protects Postgres rows.
-  const dataUrlLength =
-    `data:${image.mediaType};base64,`.length + image.bytesBase64.length;
-  if (dataUrlLength > MAX_ASSET_DATA_URL_BYTES) {
+  // Mirror the upload-path size budget; an oversized generation is rejected
+  // before we touch R2 or the DB.
+  if (image.bytes.byteLength > MAX_ASSET_DATA_URL_BYTES) {
     return c.json({ error: 'generated asset too large' }, 413);
   }
 
-  const newAssetId = `gen-${crypto.randomUUID()}`;
-
   const database = db(c.env);
-  await database.insert(siteAsset).values({
-    id: newAssetId,
-    siteId: result.site.id,
-    mediaType: image.mediaType,
-    bytesBase64: image.bytesBase64,
-    kind: 'image',
-    alt: parsed.alt,
-  });
-
+  const r2 = createR2Client(c.env.ASSETS_BUCKET);
+  const uploaded = await uploadOwnerAsset(
+    { db: database, r2 },
+    {
+      customerId: result.customerId,
+      bytes: image.bytes,
+      mediaType: image.mediaType,
+      alt: parsed.alt,
+      siteId: result.site.id,
+    },
+  );
   return c.json({
-    assetId: newAssetId,
-    kind: 'image' as const,
-    mediaType: image.mediaType,
+    assetId: uploaded.id,
+    kind: uploaded.kind,
+    mediaType: uploaded.mediaType,
   });
 });
 
+// Owner-gated preview endpoint. The editor uses this for editable-state
+// previews of media the Owner has uploaded but not yet published. The
+// resolution is scoped to the current Owner (not the site) so the editor
+// can fetch any of the Owner's assets even when they were originally
+// uploaded against a different site under the same Owner.
 canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   const siteId = c.req.param('siteId');
   const assetId = c.req.param('assetId');
@@ -399,19 +427,55 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   }
 
   const database = db(c.env);
+  // The asset id may be a UUID (typical) or a content hash (when the
+  // caller already speaks the ADR 0006 URL shape). Match either; require
+  // Owner ownership in both branches.
   const rows = await database
     .select({
-      mediaType: siteAsset.mediaType,
-      bytesBase64: siteAsset.bytesBase64,
+      id: ownerAsset.id,
+      r2Key: ownerAsset.r2Key,
+      mediaType: ownerAsset.mediaType,
+      kind: ownerAsset.kind,
+      contentHash: ownerAsset.contentHash,
     })
-    .from(siteAsset)
-    .where(and(eq(siteAsset.id, assetId), eq(siteAsset.siteId, result.site.id)))
+    .from(ownerAsset)
+    .where(
+      and(
+        eq(ownerAsset.customerId, result.customerId),
+        or(eq(ownerAsset.id, assetId), eq(ownerAsset.contentHash, assetId)),
+      ),
+    )
     .limit(1);
   const row = rows[0];
   if (!row) {
     return c.json({ error: 'asset not found' }, 404);
   }
-  return assetResponse(row.mediaType, row.bytesBase64);
+  // Reuse the public readOwnerAsset helper for transform handling; we pass
+  // a one-row select shim so the lookup is skipped.
+  const shimDb = {
+    select: () => ({
+      from: () => ({
+        where: () => ({ limit: () => Promise.resolve([row]) }),
+      }),
+    }),
+  } as unknown as typeof database;
+  const r2 = createR2Client(c.env.ASSETS_BUCKET);
+  const cfImageFetch: CfImageFetcher | null =
+    typeof fetch === 'function' ? (url, options) => fetch(url, options as RequestInit) : null;
+  const requestUrl = new URL(c.req.url);
+  const response = await readOwnerAsset(
+    {
+      db: shimDb,
+      r2,
+      cfImageFetch,
+      publicOrigin: `${requestUrl.protocol}//${requestUrl.host}`,
+    },
+    { addr: assetId, url: requestUrl },
+  );
+  if (!response) {
+    return c.json({ error: 'asset not found' }, 404);
+  }
+  return response;
 });
 
 canvasApi.post('/sites/:siteId/style-kit', async (c) => {

@@ -55,7 +55,7 @@ export interface RecipeFactoryInput {
    *
    * When omitted, recipes that need media fall back to bundled seed registry
    * ids (`seed-hero-poster-1`, `seed-feature-canvas-1`). The agent route still
-   * verifies those ids exist as `siteAsset` rows before returning a preview,
+   * verifies those ids exist as `ownerAsset` rows before returning a preview,
    * so an unmaterialised site fails loudly instead of silently publishing a
    * dangling reference.
    */
