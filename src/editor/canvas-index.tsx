@@ -134,11 +134,25 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
           </header>
           <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
             <div class="rev01-sidebar-tabs" role="tablist" aria-label="Canvas tools">
-              <button type="button" class="active" role="tab" aria-selected="true">
+              <button
+                type="button"
+                class="active"
+                role="tab"
+                aria-selected="true"
+                data-sidebar-tab="add"
+              >
                 Add
               </button>
+              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections">
+                Sections
+              </button>
             </div>
-            <div class="rev01-sidebar-panel" role="tabpanel" aria-label="Add">
+            <div
+              class="rev01-sidebar-panel"
+              role="tabpanel"
+              aria-label="Add"
+              data-sidebar-panel="add"
+            >
               <section class="rev01-sidebar-group">
                 <h2>Sections</h2>
                 <button
@@ -215,6 +229,17 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
                 </div>
               </section>
               <section id="canvas-sidebar-selection" class="rev01-sidebar-group" hidden />
+            </div>
+            <div
+              class="rev01-sidebar-panel"
+              role="tabpanel"
+              aria-label="Sections"
+              data-sidebar-panel="sections"
+              hidden
+            >
+              <div class="rev01-section-picker" data-section-picker-root>
+                <p class="rev01-section-picker-empty">Loading sections…</p>
+              </div>
             </div>
           </aside>
           <div id="canvas-root" data-site-id={owned.id} />

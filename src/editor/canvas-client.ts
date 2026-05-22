@@ -906,6 +906,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     applyZoom();
     renderInspector();
     renderSidebarSelection();
+    // If a cross-template import is pending, the article we just replaced
+    // wiped any previously-drawn slots; re-draw them now.
+    if (pendingImport) {
+      renderPlacementSlots();
+    }
   }
 
   // -- Inspector ----------------------------------------------------------
@@ -2825,6 +2830,298 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  function attachSidebarTabs() {
+    const tabButtons = document.querySelectorAll('[data-sidebar-tab]');
+    const panels = document.querySelectorAll('[data-sidebar-panel]');
+    if (tabButtons.length === 0 || panels.length === 0) return;
+
+    function activate(tabName) {
+      tabButtons.forEach((button) => {
+        const isActive = button.getAttribute('data-sidebar-tab') === tabName;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      });
+      panels.forEach((panel) => {
+        panel.hidden = panel.getAttribute('data-sidebar-panel') !== tabName;
+      });
+      if (tabName === 'sections') {
+        ensureSectionsPanelLoaded();
+      }
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        activate(button.getAttribute('data-sidebar-tab'));
+      });
+    });
+  }
+
+  // -- Sections picker (cross-template catalog) --------------------------
+  // sectionsCatalog: null = unloaded; [] = loaded-empty; [...] = loaded.
+  // pendingImport stays null until the Owner clicks "Use" on a card —
+  // Task 6 will read it to render drop slots on the canvas.
+  let sectionsCatalog = null;
+  let pendingImport = null;
+  let activeTemplateFilter = 'all';
+  let activeSearchQuery = '';
+
+  // Local HTML/attr escapers. The canvas/render.ts helpers aren't reachable
+  // from this script body (it's a string-emitted IIFE), so we inline minimal
+  // versions matching the same character set.
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => {
+      if (ch === '&') return '&amp;';
+      if (ch === '<') return '&lt;';
+      if (ch === '>') return '&gt;';
+      if (ch === '"') return '&quot;';
+      return '&#39;';
+    });
+  }
+  // HTML-encoding all 5 chars is over-escaping for attributes but correct;
+  // matches src/canvas/render.ts ATTR_ESCAPES.
+  function escapeAttr(value) {
+    return escapeHtml(value);
+  }
+
+  async function ensureSectionsPanelLoaded() {
+    const root = document.querySelector('[data-section-picker-root]');
+    if (!root) return;
+    if (sectionsCatalog === null) {
+      try {
+        const response = await authFetch('/api/templates/sections');
+        if (!response.ok) {
+          root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
+          return;
+        }
+        const body = await response.json();
+        sectionsCatalog = Array.isArray(body && body.sections) ? body.sections : [];
+      } catch (err) {
+        root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
+        return;
+      }
+    }
+    renderSectionsPanel();
+  }
+
+  function renderSectionsPanel() {
+    const root = document.querySelector('[data-section-picker-root]');
+    if (!root || sectionsCatalog === null) return;
+
+    let gridContainer = root.querySelector('[data-section-picker-grid-container]');
+    if (!gridContainer) {
+      // First paint: build the persistent shell (controls + empty grid container).
+      // Subsequent calls skip this branch so the search input keeps focus across
+      // keystroke-triggered re-renders.
+      renderSectionsPickerShell(root);
+      gridContainer = root.querySelector('[data-section-picker-grid-container]');
+    }
+
+    renderSectionsPickerGrid(gridContainer);
+  }
+
+  function renderSectionsPickerShell(root) {
+    const templateIds = Array.from(new Set(sectionsCatalog.map((e) => e.templateId)));
+    const templateNames = new Map(sectionsCatalog.map((e) => [e.templateId, e.templateName]));
+
+    const filterOptions = ['<option value="all">All templates</option>']
+      .concat(templateIds.map((id) => '<option value="' + escapeAttr(id) + '">' + escapeHtml(templateNames.get(id) || id) + '</option>'))
+      .join('');
+
+    root.innerHTML =
+      '<div class="rev01-section-picker-controls">' +
+        '<input type="search" class="rev01-section-picker-search" placeholder="Search sections" ' +
+          'value="' + escapeAttr(activeSearchQuery) + '" data-section-picker-search />' +
+        '<select class="rev01-section-picker-filter" data-section-picker-filter>' + filterOptions + '</select>' +
+      '</div>' +
+      '<div data-section-picker-grid-container></div>';
+
+    const filter = root.querySelector('[data-section-picker-filter]');
+    if (filter) {
+      filter.value = activeTemplateFilter;
+      filter.addEventListener('change', () => {
+        activeTemplateFilter = filter.value;
+        renderSectionsPickerGrid(root.querySelector('[data-section-picker-grid-container]'));
+      });
+    }
+    const search = root.querySelector('[data-section-picker-search]');
+    if (search) {
+      search.addEventListener('input', () => {
+        activeSearchQuery = search.value;
+        renderSectionsPickerGrid(root.querySelector('[data-section-picker-grid-container]'));
+      });
+    }
+  }
+
+  function renderSectionsPickerGrid(gridContainer) {
+    if (!gridContainer || sectionsCatalog === null) return;
+
+    const filtered = sectionsCatalog.filter((entry) => {
+      if (activeTemplateFilter !== 'all' && entry.templateId !== activeTemplateFilter) return false;
+      if (activeSearchQuery.length > 0) {
+        const haystack = (entry.sectionName + ' ' + entry.headingPreview + ' ' + entry.templateName).toLowerCase();
+        if (!haystack.includes(activeSearchQuery.toLowerCase())) return false;
+      }
+      return true;
+    });
+
+    const cards = filtered.map((entry) => {
+      const isPending = pendingImport
+        && pendingImport.templateId === entry.templateId
+        && pendingImport.sectionId === entry.sectionId;
+      return (
+        '<li class="rev01-section-card' + (isPending ? ' is-pending' : '') + '">' +
+          '<div class="rev01-section-card-head">' +
+            '<span class="rev01-section-card-name">' + escapeHtml(entry.sectionName) + '</span>' +
+            '<span class="rev01-section-card-recipe">' + escapeHtml(entry.recipeId) + '</span>' +
+          '</div>' +
+          '<p class="rev01-section-card-preview">' + escapeHtml(entry.headingPreview) + '</p>' +
+          '<div class="rev01-section-card-foot">' +
+            '<span class="rev01-section-card-template">' + escapeHtml(entry.templateName) + '</span>' +
+            '<button type="button" class="rev01-section-card-use" data-section-card-use ' +
+              'data-template-id="' + escapeAttr(entry.templateId) + '" ' +
+              'data-section-id="' + escapeAttr(entry.sectionId) + '" ' +
+              'data-template-name="' + escapeAttr(entry.templateName) + '">' +
+              (isPending ? 'Cancel' : 'Use') +
+            '</button>' +
+          '</div>' +
+        '</li>'
+      );
+    }).join('');
+
+    gridContainer.innerHTML = filtered.length === 0
+      ? '<p class="rev01-section-picker-empty">No sections match.</p>'
+      : '<ul class="rev01-section-picker-grid">' + cards + '</ul>';
+
+    gridContainer.querySelectorAll('[data-section-card-use]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const templateId = button.getAttribute('data-template-id') || '';
+        const sectionId = button.getAttribute('data-section-id') || '';
+        const templateName = button.getAttribute('data-template-name') || '';
+        if (pendingImport
+            && pendingImport.templateId === templateId
+            && pendingImport.sectionId === sectionId) {
+          exitPlacementMode();
+        } else {
+          enterPlacementMode({ templateId, sectionId, templateName });
+        }
+      });
+    });
+  }
+
+  function enterPlacementMode(target) {
+    pendingImport = target;
+    // setStatus only recognises "error" / "ok" tones in this codebase;
+    // "info" would silently fall through. Use "ok" for the pending banner.
+    setStatus('Click a slot to insert "' + target.templateName + '" section', 'ok');
+    renderSectionsPanel();
+    renderPlacementSlots();
+  }
+
+  function exitPlacementMode() {
+    pendingImport = null;
+    setStatus('Cancelled', 'ok');
+    renderSectionsPanel();
+    renderPlacementSlots();
+  }
+
+  function renderPlacementSlots() {
+    const canvasRoot = document.getElementById('canvas-root');
+    if (!canvasRoot) return;
+
+    // Remove any previously-drawn slots so we never double-draw.
+    canvasRoot.querySelectorAll('.rev01-section-slot').forEach((node) => node.remove());
+
+    if (!pendingImport) {
+      document.body.removeAttribute('data-placement-active');
+      return;
+    }
+    document.body.setAttribute('data-placement-active', 'true');
+
+    const page = state && state.pages ? state.pages[0] : null;
+    if (!page) return;
+    const sections = Array.isArray(page.sections) ? page.sections : [];
+
+    function makeSlot(insertAt) {
+      const slot = document.createElement('button');
+      slot.type = 'button';
+      slot.className = 'rev01-section-slot';
+      slot.setAttribute('data-slot-index', String(insertAt));
+      slot.setAttribute('aria-label', 'Insert section here (position ' + insertAt + ')');
+      slot.textContent = '+ Insert here';
+      slot.addEventListener('click', () => {
+        void importPendingSectionAt(insertAt);
+      });
+      return slot;
+    }
+
+    if (sections.length === 0) {
+      canvasRoot.appendChild(makeSlot(0));
+      return;
+    }
+
+    // Section nodes carry data-rev01-section (see buildSectionNode); the
+    // [data-section-id] attribute is used by toolbar buttons, not the section
+    // DOM root.
+    const sectionNodes = Array.from(canvasRoot.querySelectorAll('[data-rev01-section]'));
+    for (let i = 0; i < sectionNodes.length; i += 1) {
+      const node = sectionNodes[i];
+      if (node.parentNode) node.parentNode.insertBefore(makeSlot(i), node);
+    }
+    const lastNode = sectionNodes[sectionNodes.length - 1];
+    if (lastNode && lastNode.parentNode) {
+      if (lastNode.nextSibling) {
+        lastNode.parentNode.insertBefore(makeSlot(sections.length), lastNode.nextSibling);
+      } else {
+        lastNode.parentNode.appendChild(makeSlot(sections.length));
+      }
+    }
+  }
+
+  async function importPendingSectionAt(insertAt) {
+    if (!pendingImport) return;
+    const target = pendingImport;
+    try {
+      const saved = await flushPendingSave();
+      if (!saved) return;
+      setStatus('Inserting section…', 'ok');
+      const response = await authFetch('/api/sites/' + SITE_ID + '/sections/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          templateId: target.templateId,
+          sectionId: target.sectionId,
+          insertAt: insertAt,
+        }),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (e2) { /* ignore */ }
+        setStatus('Insert failed: ' + detail, 'error');
+        return;
+      }
+      const body = await response.json();
+      if (!body || typeof body !== 'object' || !body.editableState) {
+        setStatus('Insert failed: malformed server response', 'error');
+        return;
+      }
+      state = body.editableState;
+      selectedSectionId = null;
+      selectedElementId = null;
+      pendingImport = null;
+      if (mainEl && state && state.styleKit) {
+        mainEl.setAttribute('data-style-kit', state.styleKit);
+      }
+      renderAll();
+      renderSectionsPanel();
+      setStatus('Inserted section from ' + target.templateName, 'ok');
+    } catch (err) {
+      setStatus('Insert failed: ' + (err && err.message ? err.message : String(err)), 'error');
+    }
+  }
+
   function attachSidebarActions() {
     if (!sidebar) return;
     const sectionButtons = sidebar.querySelectorAll('[data-sidebar-add-section]');
@@ -2963,6 +3260,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
     }
     window.addEventListener("keydown", (ev) => {
+      // Placement-mode Escape takes priority — it cancels the pending import
+      // before any other Escape behaviour (e.g. inline-editing exits, which
+      // are scoped to their own targets and won't fire here anyway).
+      if (ev.key === "Escape" && pendingImport) {
+        ev.preventDefault();
+        exitPlacementMode();
+        return;
+      }
       const isSave = (ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S");
       if (isSave) {
         ev.preventDefault();
@@ -2994,6 +3299,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderAll();
       attachRootEvents();
       attachPointerHandlers();
+      attachSidebarTabs();
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
