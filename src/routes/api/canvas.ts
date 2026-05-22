@@ -12,6 +12,7 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  REPLICATE_API_TOKEN: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -207,6 +208,185 @@ canvasApi.post('/sites/:siteId/assets', async (c) => {
     assetId: newAssetId,
     kind: blob.kind,
     mediaType: blob.mediaType,
+  });
+});
+
+interface GenerateAssetInput {
+  prompt: string;
+  alt: string;
+  boxW: number;
+  boxH: number;
+}
+
+function parseGenerateInput(body: unknown): GenerateAssetInput | { error: string } {
+  if (!isRecord(body)) return { error: 'request body must be a JSON object' };
+  const { prompt, alt, boxW, boxH } = body;
+  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+    return { error: 'prompt is required (non-empty string)' };
+  }
+  if (typeof alt !== 'string') {
+    return { error: 'alt is required (string; "" is acceptable)' };
+  }
+  if (typeof boxW !== 'number' || !Number.isFinite(boxW) || boxW <= 0) {
+    return { error: 'boxW is required (positive finite number)' };
+  }
+  if (typeof boxH !== 'number' || !Number.isFinite(boxH) || boxH <= 0) {
+    return { error: 'boxH is required (positive finite number)' };
+  }
+  return { prompt, alt, boxW, boxH };
+}
+
+// flux-schnell `aspect_ratio` only accepts a fixed preset set. Anything else
+// is rejected by the model server. The slot's exact w/h ratio is snapped to
+// the preset whose log-ratio is closest, so 2:1 and 1:2 are treated as equally
+// far from 1:1.
+const FLUX_ASPECT_PRESETS = [
+  { label: '1:1', value: 1 },
+  { label: '16:9', value: 16 / 9 },
+  { label: '21:9', value: 21 / 9 },
+  { label: '3:2', value: 3 / 2 },
+  { label: '2:3', value: 2 / 3 },
+  { label: '4:5', value: 4 / 5 },
+  { label: '5:4', value: 5 / 4 },
+  { label: '3:4', value: 3 / 4 },
+  { label: '4:3', value: 4 / 3 },
+  { label: '9:16', value: 9 / 16 },
+  { label: '9:21', value: 9 / 21 },
+] as const;
+
+function snapToFluxAspectRatio(boxW: number, boxH: number): string {
+  const target = boxW / boxH;
+  let bestLabel: string = FLUX_ASPECT_PRESETS[0].label;
+  let bestDiff = Math.abs(Math.log(FLUX_ASPECT_PRESETS[0].value / target));
+  for (const preset of FLUX_ASPECT_PRESETS) {
+    const diff = Math.abs(Math.log(preset.value / target));
+    if (diff < bestDiff) {
+      bestLabel = preset.label;
+      bestDiff = diff;
+    }
+  }
+  return bestLabel;
+}
+
+interface ReplicatePrediction {
+  id: string;
+  status: string;
+  output: unknown;
+  error: unknown;
+  logs: unknown;
+}
+
+// Owner-driven Site Asset generation via Replicate's flux-schnell. Synchronous
+// wait (Replicate's `Prefer: wait`, max 60s) — flux-schnell typically returns
+// in ~2-5s. Output is fetched and stored as base64 in `site_asset`, matching
+// the upload flow so downstream code (renderer, publish guard, public asset
+// route) treats generated and uploaded assets identically.
+//
+// No fallback path: if Replicate fails, the prediction does not succeed, or
+// the output is unrecognised, we throw with full context.
+async function generateImageViaReplicate(
+  token: string,
+  prompt: string,
+  aspectRatio: string,
+): Promise<{ bytesBase64: string; mediaType: string }> {
+  const replicateResponse = await fetch(
+    'https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'wait',
+      },
+      body: JSON.stringify({ input: { prompt, aspect_ratio: aspectRatio } }),
+    },
+  );
+  if (!replicateResponse.ok) {
+    const text = await replicateResponse.text();
+    throw new Error(
+      `replicate prediction request failed: status=${String(replicateResponse.status)} body=${text}`,
+    );
+  }
+  const prediction: ReplicatePrediction = await replicateResponse.json();
+  if (prediction.status !== 'succeeded') {
+    throw new Error(
+      `replicate prediction not succeeded: status=${prediction.status} id=${prediction.id} error=${JSON.stringify(prediction.error)} logs=${JSON.stringify(prediction.logs)}`,
+    );
+  }
+  const output = prediction.output;
+  const outputUrl =
+    typeof output === 'string'
+      ? output
+      : Array.isArray(output) && typeof output[0] === 'string'
+        ? output[0]
+        : null;
+  if (!outputUrl) {
+    throw new Error(`replicate prediction output unrecognised: ${JSON.stringify(output)}`);
+  }
+  const imageResponse = await fetch(outputUrl);
+  if (!imageResponse.ok) {
+    throw new Error(
+      `replicate output fetch failed: status=${String(imageResponse.status)} url=${outputUrl}`,
+    );
+  }
+  const mediaType = imageResponse.headers.get('content-type') ?? 'image/webp';
+  if (!mediaType.startsWith('image/')) {
+    throw new Error(`replicate output media type not an image: ${mediaType}`);
+  }
+  const buffer = new Uint8Array(await imageResponse.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < buffer.length; i++) {
+    binary += String.fromCharCode(buffer[i] as number);
+  }
+  const bytesBase64 = btoa(binary);
+  return { bytesBase64, mediaType };
+}
+
+canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
+  const siteId = c.req.param('siteId');
+  const result = await loadOwnedSite(c, siteId);
+  if (!result.found) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const body: unknown = await c.req.json();
+  const parsed = parseGenerateInput(body);
+  if ('error' in parsed) {
+    return c.json({ error: parsed.error }, 400);
+  }
+
+  const token = c.env.REPLICATE_API_TOKEN;
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error('REPLICATE_API_TOKEN binding is missing');
+  }
+
+  const aspectRatio = snapToFluxAspectRatio(parsed.boxW, parsed.boxH);
+  const image = await generateImageViaReplicate(token, parsed.prompt, aspectRatio);
+
+  // Mirror the upload-path limit so generated assets cannot bypass the
+  // per-asset size budget that protects Postgres rows.
+  const dataUrlLength =
+    `data:${image.mediaType};base64,`.length + image.bytesBase64.length;
+  if (dataUrlLength > MAX_ASSET_DATA_URL_BYTES) {
+    return c.json({ error: 'generated asset too large' }, 413);
+  }
+
+  const newAssetId = `gen-${crypto.randomUUID()}`;
+
+  const database = db(c.env);
+  await database.insert(siteAsset).values({
+    id: newAssetId,
+    siteId: result.site.id,
+    mediaType: image.mediaType,
+    bytesBase64: image.bytesBase64,
+    kind: 'image',
+    alt: parsed.alt,
+  });
+
+  return c.json({
+    assetId: newAssetId,
+    kind: 'image' as const,
+    mediaType: image.mediaType,
   });
 });
 

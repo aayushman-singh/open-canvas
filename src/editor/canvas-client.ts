@@ -1212,6 +1212,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // a base64 data URL; on success, update the element's assetId / kind /
       // alt from the response and re-render.
       appendMediaUploader(element);
+      appendImageGenerator(element);
 
       const fit = selectInput(["cover", "contain"], element.fit);
       fit.addEventListener("change", () => {
@@ -1314,12 +1315,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Media upload helper -----------------------------------------------
   //
-  // Reads a File via FileReader.readAsDataURL, POSTs to the owner asset
-  // upload route, and updates the selected media element with the freshly
-  // generated assetId. Uses an alt-text input so the Owner sets accessible
-  // text at upload time. The control is rendered inside the inspector for
-  // the currently selected media element; it lives there because uploads
-  // are scoped to the element being replaced.
+  // Pipeline:
+  //   image upload   -> crop bytes to slot aspect ratio via Cropper.js v2 ->
+  //                     POST /assets (image)
+  //   video upload   -> extract first-frame poster -> crop poster to slot ->
+  //                     POST /assets (video) + POST /assets (image poster) ->
+  //                     set element.assetId + element.posterAssetId
+  //   ai generation  -> POST /assets/generate with slot box; server snaps to
+  //                     flux-schnell's nearest preset aspect ratio
+  //
+  // Render-side fit:cover still handles any residual aspect drift (e.g.,
+  // generated assets that snapped to a nearby preset rather than the exact
+  // slot ratio).
   function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1333,24 +1340,307 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
-  async function uploadMediaForElement(element, file) {
-    setStatus("Uploading…");
-    let dataUrl;
-    try {
-      dataUrl = await fileToDataUrl(file);
-    } catch (err) {
-      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
-      return;
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === "string") resolve(result);
+        else reject(new Error("FileReader did not return a string"));
+      };
+      reader.onerror = () => reject(reader.error || new Error("FileReader error"));
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Cropper.js v2 is pulled on demand from jsDelivr the first time the Owner
+  // picks a file; import is cached so subsequent uploads are immediate. Pinned
+  // to a specific version so jsDelivr cache hits and the CDN side can't ship
+  // breaking changes silently. The library registers custom elements as a
+  // side-effect of the import, so we just need the module to evaluate.
+  const CROPPER_CDN = "https://cdn.jsdelivr.net/npm/cropperjs@2.1.1/dist/cropper.esm.js";
+  let cropperLoadPromise = null;
+  function loadCropper() {
+    if (!cropperLoadPromise) {
+      cropperLoadPromise = import(CROPPER_CDN);
     }
+    return cropperLoadPromise;
+  }
+
+  // Open a modal cropper locked to the given pixel aspect ratio. The Owner
+  // pans the image with drag and zooms with wheel; the crop selection itself
+  // is fixed in the centre at the requested aspect. Resolves with
+  // { blob, mediaType } of the cropped image; rejects with Error("crop cancelled")
+  // if the Owner backs out.
+  function runCropperModal(sourceUrl, boxW, boxH, sourceMediaType) {
+    return new Promise(function (resolve, reject) {
+      const overlay = document.createElement("div");
+      overlay.style.cssText =
+        "position:fixed;inset:0;background:rgba(0,0,0,0.78);z-index:9999;" +
+        "display:flex;align-items:center;justify-content:center;padding:24px;" +
+        "box-sizing:border-box;";
+
+      const card = document.createElement("div");
+      card.style.cssText =
+        "background:#111;border-radius:8px;padding:16px;display:flex;" +
+        "flex-direction:column;gap:12px;max-width:960px;width:100%;color:#fff;" +
+        "font:13px system-ui,sans-serif;";
+      overlay.appendChild(card);
+
+      const heading = document.createElement("div");
+      heading.style.cssText = "font-weight:600;";
+      heading.textContent =
+        "Crop to slot (" + Math.round(boxW) + "x" + Math.round(boxH) + ") — drag to pan, scroll to zoom";
+      card.appendChild(heading);
+
+      const canvasEl = document.createElement("cropper-canvas");
+      canvasEl.setAttribute("background", "");
+      canvasEl.style.cssText = "width:100%;height:60vh;background:#000;display:block;";
+      card.appendChild(canvasEl);
+
+      const img = document.createElement("cropper-image");
+      img.setAttribute("src", sourceUrl);
+      img.setAttribute("alt", "");
+      img.setAttribute("rotatable", "");
+      img.setAttribute("scalable", "");
+      img.setAttribute("translatable", "");
+      canvasEl.appendChild(img);
+
+      const shade = document.createElement("cropper-shade");
+      canvasEl.appendChild(shade);
+
+      // Pointer handle on the canvas drives image pan/zoom. The selection
+      // itself is not movable/resizable, so the image moves under a fixed
+      // frame — matches the pan+zoom UX the Owner chose.
+      const moveHandle = document.createElement("cropper-handle");
+      moveHandle.setAttribute("action", "move");
+      moveHandle.setAttribute("plain", "");
+      canvasEl.appendChild(moveHandle);
+
+      const selection = document.createElement("cropper-selection");
+      selection.setAttribute("aspect-ratio", String(boxW / boxH));
+      selection.setAttribute("initial-coverage", "0.85");
+      selection.setAttribute("outlined", "");
+      canvasEl.appendChild(selection);
+
+      const buttons = document.createElement("div");
+      buttons.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+      const cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.textContent = "Cancel";
+      cancelBtn.style.cssText = "padding:8px 14px;";
+      const confirmBtn = document.createElement("button");
+      confirmBtn.type = "button";
+      confirmBtn.textContent = "Use this crop";
+      confirmBtn.style.cssText = "padding:8px 14px;";
+      buttons.appendChild(cancelBtn);
+      buttons.appendChild(confirmBtn);
+      card.appendChild(buttons);
+
+      function teardown() {
+        overlay.remove();
+      }
+      cancelBtn.addEventListener("click", function () {
+        teardown();
+        reject(new Error("crop cancelled"));
+      });
+      confirmBtn.addEventListener("click", function () {
+        const outWidth = Math.max(1, Math.round(boxW));
+        const outHeight = Math.max(1, Math.round(boxH));
+        // GIF -> PNG because re-encoding a GIF through canvas loses
+        // animation; PNG keeps the still output lossless. Other browser-safe
+        // image types pass through unchanged.
+        const reEncodableTypes = ["image/jpeg", "image/png", "image/webp"];
+        const outType =
+          typeof sourceMediaType === "string" && reEncodableTypes.indexOf(sourceMediaType) >= 0
+            ? sourceMediaType
+            : "image/png";
+        selection
+          .$toCanvas({ width: outWidth, height: outHeight })
+          .then(function (cv) {
+            return new Promise(function (res, rej) {
+              cv.toBlob(
+                function (blob) {
+                  if (blob) res({ blob: blob, mediaType: outType });
+                  else rej(new Error("canvas toBlob returned null"));
+                },
+                outType,
+                0.92,
+              );
+            });
+          })
+          .then(function (out) {
+            teardown();
+            resolve(out);
+          })
+          .catch(function (err) {
+            teardown();
+            reject(err);
+          });
+      });
+
+      document.body.appendChild(overlay);
+    });
+  }
+
+  async function cropFileToSlotAspect(file, boxW, boxH) {
+    await loadCropper();
+    const url = URL.createObjectURL(file);
+    try {
+      return await runCropperModal(url, boxW, boxH, file.type);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  // Extracts a representative first frame from a video File as a PNG Blob,
+  // so the poster can be cropped to the slot's aspect ratio. Seeks slightly
+  // past t=0 because some codecs emit a black frame at exactly zero.
+  async function extractVideoFirstFrame(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const video = document.createElement("video");
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "auto";
+      await new Promise(function (res, rej) {
+        video.onloadeddata = function () { res(undefined); };
+        video.onerror = function () { rej(new Error("video failed to load for poster extraction")); };
+      });
+      await new Promise(function (res, rej) {
+        video.onseeked = function () { res(undefined); };
+        video.onerror = function () { rej(new Error("video seek failed")); };
+        const target = Math.min(0.05, (video.duration || 1) / 2);
+        try { video.currentTime = target; } catch (e) { rej(e); }
+      });
+      const cv = document.createElement("canvas");
+      cv.width = video.videoWidth || 1280;
+      cv.height = video.videoHeight || 720;
+      const ctx = cv.getContext("2d");
+      if (!ctx) throw new Error("2D context unavailable for poster extraction");
+      ctx.drawImage(video, 0, 0, cv.width, cv.height);
+      return await new Promise(function (res, rej) {
+        cv.toBlob(
+          function (blob) {
+            if (blob) res(blob);
+            else rej(new Error("poster toBlob returned null"));
+          },
+          "image/png",
+        );
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  async function postAssetUpload(dataUrl, altValue) {
+    const response = await authFetch(SITE_BASE + "/assets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dataUrl: dataUrl, alt: altValue }),
+    });
+    if (!response.ok) {
+      let detail = response.statusText;
+      try {
+        const body = await response.json();
+        if (body && body.error) detail = body.error;
+      } catch (_) { /* ignore */ }
+      throw new Error(detail);
+    }
+    const body = await response.json();
+    if (!body || typeof body.assetId !== "string" || typeof body.kind !== "string") {
+      throw new Error("malformed server response");
+    }
+    return body;
+  }
+
+  async function uploadMediaForElement(element, file) {
     const altInputId = "media-upload-alt-" + element.id;
     const altInput = document.getElementById(altInputId);
     const altValue =
       altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
+    const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
+    const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
+    if (boxW <= 0 || boxH <= 0) {
+      setStatus("Cannot upload: slot has no size yet — resize the element first", "error");
+      return;
+    }
+
     try {
-      const response = await authFetch(SITE_BASE + "/assets", {
+      if (element.mediaKind === "image") {
+        setStatus("Loading cropper…");
+        const cropped = await cropFileToSlotAspect(file, boxW, boxH);
+        setStatus("Uploading…");
+        const dataUrl = await blobToDataUrl(cropped.blob);
+        const uploaded = await postAssetUpload(dataUrl, altValue);
+        element.assetId = uploaded.assetId;
+        element.mediaKind = uploaded.kind;
+        element.alt = altValue;
+        rebuildElement(element.id);
+        renderInspector();
+        scheduleSave();
+        setStatus("Uploaded", "ok");
+        return;
+      }
+
+      // Video: upload original bytes; crop only the first-frame poster.
+      setStatus("Reading video…");
+      const videoDataUrl = await fileToDataUrl(file);
+
+      setStatus("Extracting poster…");
+      const posterBlob = await extractVideoFirstFrame(file);
+      const posterFile = new File([posterBlob], "poster.png", { type: "image/png" });
+
+      setStatus("Loading cropper…");
+      const croppedPoster = await cropFileToSlotAspect(posterFile, boxW, boxH);
+
+      setStatus("Uploading video…");
+      const uploadedVideo = await postAssetUpload(videoDataUrl, altValue);
+
+      setStatus("Uploading poster…");
+      const posterDataUrl = await blobToDataUrl(croppedPoster.blob);
+      const uploadedPoster = await postAssetUpload(posterDataUrl, altValue);
+
+      element.assetId = uploadedVideo.assetId;
+      element.mediaKind = "video";
+      element.posterAssetId = uploadedPoster.assetId;
+      element.alt = altValue;
+      rebuildElement(element.id);
+      renderInspector();
+      scheduleSave();
+      setStatus("Uploaded", "ok");
+    } catch (err) {
+      if (err && err.message === "crop cancelled") {
+        setStatus("Cancelled");
+        return;
+      }
+      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
+  async function generateImageForElement(element, prompt) {
+    const altInputId = "media-upload-alt-" + element.id;
+    const altInput = document.getElementById(altInputId);
+    const altValue =
+      altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
+    const boxW = element.box && typeof element.box.w === "number" ? element.box.w : 0;
+    const boxH = element.box && typeof element.box.h === "number" ? element.box.h : 0;
+    if (boxW <= 0 || boxH <= 0) {
+      setStatus("Cannot generate: slot has no size yet — resize the element first", "error");
+      return;
+    }
+    setStatus("Generating…");
+    try {
+      const response = await authFetch(SITE_BASE + "/assets/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ dataUrl, alt: altValue }),
+        body: JSON.stringify({
+          prompt: prompt,
+          alt: altValue,
+          boxW: boxW,
+          boxH: boxH,
+        }),
       });
       if (!response.ok) {
         let detail = response.statusText;
@@ -1358,23 +1648,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           const body = await response.json();
           if (body && body.error) detail = body.error;
         } catch (_) { /* ignore */ }
-        setStatus("Upload failed: " + detail, "error");
+        setStatus("Generate failed: " + detail, "error");
         return;
       }
       const body = await response.json();
-      if (!body || typeof body.assetId !== "string" || typeof body.kind !== "string") {
-        setStatus("Upload failed: malformed server response", "error");
+      if (!body || typeof body.assetId !== "string") {
+        setStatus("Generate failed: malformed server response", "error");
         return;
       }
       element.assetId = body.assetId;
-      element.mediaKind = body.kind;
+      element.mediaKind = "image";
       element.alt = altValue;
       rebuildElement(element.id);
       renderInspector();
       scheduleSave();
-      setStatus("Uploaded", "ok");
+      setStatus("Generated", "ok");
     } catch (err) {
-      setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
+      setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
     }
   }
 
@@ -1413,6 +1703,40 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     altWrap.appendChild(altLabel);
     altWrap.appendChild(altInput);
     inspector.appendChild(altWrap);
+  }
+
+  // Direct image generation via the Replicate-backed /assets/generate route.
+  // Distinct from the agent-driven "AI media" button: this one creates a
+  // brand-new asset shaped to the slot's aspect ratio, no LLM tool round-trip.
+  function appendImageGenerator(element) {
+    if (element.mediaKind !== "image") return;
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    const label = document.createElement("label");
+    label.textContent = "Generate image (AI)";
+    wrap.appendChild(label);
+
+    const promptInput = document.createElement("textarea");
+    promptInput.rows = 2;
+    promptInput.placeholder = "Describe the image…";
+    promptInput.style.cssText = "width:100%;box-sizing:border-box;";
+    wrap.appendChild(promptInput);
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Generate";
+    btn.style.cssText = "margin-top:6px;";
+    btn.addEventListener("click", () => {
+      const prompt = promptInput.value.trim();
+      if (!prompt) {
+        setStatus("Enter a prompt first", "error");
+        return;
+      }
+      generateImageForElement(element, prompt);
+    });
+    wrap.appendChild(btn);
+
+    inspector.appendChild(wrap);
   }
 
   function buildPinnedColorField(element) {
