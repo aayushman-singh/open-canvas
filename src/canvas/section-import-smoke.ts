@@ -28,10 +28,7 @@ for (const seed of allTemplateSeeds) {
   });
   assert(result.ok, `import failed for ${seed.id}: ${result.ok ? '' : result.errors.join('; ')}`);
 
-  assert(
-    result.section.id !== sourceSection.id,
-    `${seed.id}: section.id was not regenerated`,
-  );
+  assert(result.section.id !== sourceSection.id, `${seed.id}: section.id was not regenerated`);
   for (const element of result.section.elements) {
     if (element.type !== 'media') continue;
     const media = element;
@@ -56,10 +53,7 @@ for (const seed of allTemplateSeeds) {
     assert(registryEntry !== undefined, `${seed.id}: row references unknown raw seed ${rawSeedId}`);
     if (registryEntry !== undefined) {
       assert(row.kind === registryEntry.kind, `${seed.id}: row kind mismatch`);
-      assert(
-        row.bytesBase64 === registryEntry.bytesBase64,
-        `${seed.id}: row bytes mismatch`,
-      );
+      assert(row.bytesBase64 === registryEntry.bytesBase64, `${seed.id}: row bytes mismatch`);
     }
   }
 }
@@ -108,10 +102,7 @@ if (firstImport.ok) {
     for (let i = 0; i < originalIds.length; i += 1) {
       const original = originalIds[i]!;
       const fresh = newIds[i]!;
-      assert(
-        fresh !== original,
-        `element id ${original} must be regenerated`,
-      );
+      assert(fresh !== original, `element id ${original} must be regenerated`);
       assert(
         fresh.startsWith(original + '-'),
         `element id ${original} must retain its full semantic prefix; got ${fresh}`,

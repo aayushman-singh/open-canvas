@@ -53,7 +53,10 @@ function parseImportBody(value: unknown): ParsedBody {
   if (typeof v.insertAt !== 'number' || !Number.isInteger(v.insertAt) || v.insertAt < 0) {
     return { ok: false, error: 'insertAt must be a non-negative integer' };
   }
-  return { ok: true, body: { templateId: v.templateId, sectionId: v.sectionId, insertAt: v.insertAt } };
+  return {
+    ok: true,
+    body: { templateId: v.templateId, sectionId: v.sectionId, insertAt: v.insertAt },
+  };
 }
 
 sections.post('/sites/:siteId/sections/import', async (c) => {
