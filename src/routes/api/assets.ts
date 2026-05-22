@@ -234,7 +234,13 @@ assets.delete('/me/assets/:assetId', async (c) => {
       .where(and(eq(site.id, siteId), eq(site.customerId, ctx.customer.id)))
       .limit(1);
     const row = rows[0];
-    if (!row) continue;
+    if (!row) {
+      console.error(
+        '[delete-asset] site vanished between usage probe and clear-references loop',
+        { customerId: ctx.customer.id, assetId, siteId },
+      );
+      continue;
+    }
     const cleared = clearAssetReferences(row.editableState, assetId);
     await database
       .update(site)
