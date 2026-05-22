@@ -14,7 +14,7 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware';
 import { requireAuth } from '../auth/require-auth';
-import { STYLE_KITS, type StyleKit } from '../canvas/schema';
+import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
 import { db } from '../db/client';
@@ -213,7 +213,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
               <section class="rev01-sidebar-group">
                 <h2>Colors</h2>
                 <div class="rev01-sidebar-kit-grid" role="group" aria-label="Style kit">
-                  {STYLE_KITS.map((kit) => {
+                  {BUILT_IN_STYLE_KITS.map((kit) => {
                     const isActive = kit === owned.styleKit;
                     return (
                       <button

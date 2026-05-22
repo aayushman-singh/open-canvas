@@ -7,10 +7,49 @@
 // A Published Snapshot wraps the same Canvas Pages with publish metadata for
 // the visitor-facing site.
 
-export const STYLE_KITS = ['charcoal', 'orange-editorial', 'blue-saas', 'green-organic'] as const;
+/**
+ * The four deterministic built-in kits. Iterating over presets — emitting
+ * per-kit CSS, smoke-test loops, editor preview — uses this list.
+ */
+export const BUILT_IN_STYLE_KITS = [
+  'charcoal',
+  'orange-editorial',
+  'blue-saas',
+  'green-organic',
+] as const;
+export type BuiltInStyleKit = (typeof BUILT_IN_STYLE_KITS)[number];
+
+/**
+ * Full set of selector values an Owner may store on a site. Built-ins plus
+ * `'custom'` (Wave 2 #10 — the resolver pulls tokens from
+ * `CanvasSiteState.customStyleKit` instead of `STYLE_KIT_PRESETS`). The
+ * built-in presets do not include a `custom` row; resolvers must check the
+ * selector before looking up the preset.
+ *
+ * See docs/superpowers/plans/2026-05-23-10-custom-theme-editor.md.
+ */
+export const STYLE_KITS = [...BUILT_IN_STYLE_KITS, 'custom'] as const;
 export type StyleKit = (typeof STYLE_KITS)[number];
 
-export const ELEMENT_TYPES = ['text', 'media', 'action', 'shape', 'container'] as const;
+export const ELEMENT_TYPES = [
+  'text',
+  'media',
+  'action',
+  'shape',
+  'container',
+  // Phase 0 scaffold — element bodies defined in `src/canvas/elements/<type>.ts`
+  // and re-exported via `src/canvas/elements/index.ts`. Their render stubs
+  // throw until the owning wave agent fills them in.
+  'symbol-instance',
+  'form',
+  'embed',
+  'chart',
+  'accordion',
+  'carousel',
+  'table',
+  'code',
+  'nav',
+] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
 export const MEDIA_KINDS = ['image', 'video'] as const;
@@ -118,12 +157,46 @@ export interface PositionedBox extends CanvasPoint, CanvasSize {
   z: number;
 }
 
+// -- Responsive overrides (Wave 1 #1 — see plan 01-responsive-canvas) -------
+//
+// Owner-authored optional overrides per Positioned Element at named
+// breakpoints. The Phase 0 scaffold declares the types; the responsive
+// translator + CSS emitter live under `src/canvas/responsive/` and are filled
+// in by the Wave 1 agent. Both publishing and editor preview consume these.
+
+export const BREAKPOINTS = ['desktop', 'tablet', 'phone'] as const;
+export type Breakpoint = (typeof BREAKPOINTS)[number];
+
+/**
+ * Per-element override at a named breakpoint. Every field is optional — the
+ * translator falls back to the canonical desktop `box` for any unspecified
+ * dimension. `hidden: true` removes the element entirely at that breakpoint.
+ */
+export interface ResponsiveBoxOverride {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  hidden?: boolean;
+}
+
+export interface ResponsiveOverrides {
+  tablet?: ResponsiveBoxOverride;
+  phone?: ResponsiveBoxOverride;
+}
+
 export interface BaseElement {
   id: string;
   type: ElementType;
   box: PositionedBox;
   motion?: { preset: MotionPreset; delayMs?: number };
   pinnedStyle?: Record<string, string>;
+  /**
+   * Phase 0 scaffold — Wave 1 (#1) consumes. Omitted on every existing fixture
+   * element; the translator treats absence as "scale proportionally from
+   * desktop box at the smaller breakpoints."
+   */
+  responsive?: ResponsiveOverrides;
 }
 
 export interface TextElement extends BaseElement {
@@ -170,12 +243,41 @@ export interface ContainerElement extends BaseElement {
   variant: SurfaceVariant;
 }
 
+// -- CanvasElement discriminated union -------------------------------------
+//
+// The five originals (text, media, action, shape, container) are defined
+// inline above for historical reasons; the nine Phase 0 element interfaces
+// live in `src/canvas/elements/*.ts` and are re-exported through
+// `src/canvas/elements/index.ts`. Each element file imports `BaseElement` and
+// related primitives from this module — schema is the root of the dependency
+// tree. The `CanvasElement` union pulls each new interface in via a type-only
+// import; TypeScript handles the cycle between schema.ts and elements/*.ts
+// because the references are types, not runtime values.
+import type { AccordionElement } from './elements/accordion.js';
+import type { CarouselElement } from './elements/carousel.js';
+import type { ChartElement } from './elements/chart.js';
+import type { CodeElement } from './elements/code.js';
+import type { EmbedElement } from './elements/embed.js';
+import type { FormElement } from './elements/form.js';
+import type { NavElement } from './elements/nav.js';
+import type { SymbolInstanceElement } from './elements/symbol-instance.js';
+import type { TableElement } from './elements/table.js';
+
 export type CanvasElement =
   | TextElement
   | MediaElement
   | ActionElement
   | ShapeElement
-  | ContainerElement;
+  | ContainerElement
+  | SymbolInstanceElement
+  | FormElement
+  | EmbedElement
+  | ChartElement
+  | AccordionElement
+  | CarouselElement
+  | TableElement
+  | CodeElement
+  | NavElement;
 
 export interface CanvasSection {
   id: string;
@@ -187,17 +289,77 @@ export interface CanvasSection {
   elements: CanvasElement[];
 }
 
+// -- SymbolMaster (Wave 3 #14 — see plan 14-symbols) ------------------------
+//
+// A SymbolMaster is a site-level reusable section. Symbol Instances reference
+// it by id (see `SymbolInstanceElement` in `elements/symbol-instance.ts`) and
+// optionally override individual inner element fields. Editing the master
+// propagates to every instance; overrides survive master edits.
+//
+// Storage: lives in `CanvasSiteState.symbols[]` for the POC (Yjs-friendly).
+// A `siteSymbol` DB table is reserved in Phase 0 for future cross-site
+// sharing but is not the source of truth today.
+export interface SymbolMaster {
+  id: string;
+  name: string;
+  /** The master content — a complete CanvasSection rendered when an Instance resolves. */
+  section: CanvasSection;
+}
+
 export interface CanvasPage {
   id: string;
   slug: string;
+  /**
+   * Page display name AND SEO `<title>` source. Required and non-empty — the
+   * SEO plan (#21) treats this as the `<title>` value, falling back to the
+   * site name only when the field is missing at runtime (cannot happen given
+   * the type, but the renderer is defensive).
+   */
   title: string;
   width: number;
   sections: CanvasSection[];
+  // -- SEO metadata (Wave 3 #21 — see plan 21-seo-meta) ---------------------
+  // Optional everywhere. Renderer falls back to site-level defaults when
+  // absent; sitemap (#22) reads `noIndex` to exclude entries.
+  description?: string;
+  ogImageAssetId?: string;
+  canonical?: string;
+  noIndex?: boolean;
+  /** BCP-47 locale (e.g. 'en', 'ar') — drives `<html lang>` and i18n (Wave 5 #25). */
+  locale?: string;
 }
 
 export interface CanvasSiteState {
   styleKit: StyleKit;
   pages: CanvasPage[];
+  /**
+   * Wave 2 #10 — `styleKit === 'custom'` selects this preset. Required to be
+   * present when the selector is `'custom'`; ignored otherwise. The Phase 0
+   * scaffold leaves enforcement to the Wave 2 owner; until then the renderer
+   * still picks built-in presets.
+   */
+  customStyleKit?: StyleKitPreset;
+  /**
+   * Wave 3 #14 — site-level symbol masters. Empty array on every existing
+   * fixture; the Wave 3 owner adds CRUD that mutates this array.
+   */
+  symbols: SymbolMaster[];
+  /**
+   * Wave 5 #25 — default locale for pages with no explicit `locale`. Optional
+   * everywhere; `'en'` when absent.
+   */
+  defaultLocale?: string;
+  /**
+   * Wave 3 #21 — when true, renderer emits `<meta name="robots" content="noindex">`
+   * across every page regardless of per-page settings. Owner switch for
+   * "publish but don't expose yet."
+   */
+  siteNoIndex?: boolean;
+  /**
+   * Wave 3 #20 — when true, public renderer emits both light and dark token
+   * blocks plus the inline mode-setter script. Owner-controlled per site.
+   */
+  darkModeEnabled?: boolean;
 }
 
 export interface PublishedSnapshot {
@@ -205,6 +367,10 @@ export interface PublishedSnapshot {
   publishedAt: string;
   styleKit: StyleKit;
   pages: CanvasPage[];
+  /** Mirror of `CanvasSiteState.customStyleKit` carried through publish. */
+  customStyleKit?: StyleKitPreset;
+  /** Mirror of `CanvasSiteState.symbols`; the renderer needs masters to resolve instances. */
+  symbols?: SymbolMaster[];
 }
 
 // -- Style Kit token contract (Task 8) -------------------------------------
@@ -273,4 +439,11 @@ export interface StyleKitPreset {
   motionDurationMs: number;
   motionEasing: string;
   motionPresets: Record<MotionPreset, MotionPresetTokens>;
+  /**
+   * Wave 3 #20 — partial override applied in dark mode. Any field of the
+   * preset may be re-specified; the resolver merges over the light base.
+   * Optional everywhere; the existing four built-in kits leave it unset for
+   * now.
+   */
+  dark?: Partial<StyleKitPreset>;
 }

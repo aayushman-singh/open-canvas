@@ -522,6 +522,13 @@ function validateEditableShape(state: unknown, errors: string[]): void {
   state.pages.forEach((page, idx) => {
     validatePage(page, `pages[${String(idx)}]`, errors);
   });
+  // Phase 0 scaffold: `symbols` is the Wave 3 #14 entry point. Permissive
+  // here — missing is treated as empty; present must be an array. Inner
+  // shape validation lives in the Wave 3 owner's code (validation rules
+  // for SymbolMaster structure are out of scope for the scaffold).
+  if (state.symbols !== undefined && !Array.isArray(state.symbols)) {
+    errors.push(`symbols must be an array when present (got ${describe(state.symbols)})`);
+  }
 }
 
 export function validateCanvasSiteState(state: unknown): ValidationResult {

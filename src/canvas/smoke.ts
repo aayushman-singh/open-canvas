@@ -7,13 +7,14 @@
 import fixture from './fixtures/home.json';
 import { renderCanvasSnapshot } from './render.js';
 import type {
+  BuiltInStyleKit,
   CanvasPage,
   CanvasSiteState,
   PublishedSnapshot,
   StyleKit,
   TextElement,
 } from './schema.js';
-import { STYLE_KITS } from './schema.js';
+import { BUILT_IN_STYLE_KITS } from './schema.js';
 import { STYLE_KIT_PRESETS, buildAllStyleKitsCss, getStyleKitPreset } from './style-kits.js';
 import {
   validateCanvasSiteState,
@@ -80,6 +81,7 @@ const javascriptLinkText: TextElement = {
 };
 const javascriptLinkState: CanvasSiteState = {
   styleKit: 'charcoal',
+  symbols: [],
   pages: [
     {
       id: 'page-evil',
@@ -216,7 +218,7 @@ const allKitsCss = buildAllStyleKitsCss();
 
 // Every kit emits its own `[data-style-kit="<kit>"] {` block with the kit
 // accent token set. We extract per-kit blocks by simple anchor + slice.
-function extractKitTokenBlock(css: string, kit: StyleKit): string {
+function extractKitTokenBlock(css: string, kit: BuiltInStyleKit): string {
   const anchor = `[data-style-kit="${kit}"] {`;
   const start = css.indexOf(anchor);
   if (start < 0) {
@@ -229,9 +231,9 @@ function extractKitTokenBlock(css: string, kit: StyleKit): string {
   return css.slice(start, end + 1);
 }
 
-const accentByKit = new Map<StyleKit, string>();
-const motionByKit = new Map<StyleKit, string>();
-for (const kit of STYLE_KITS) {
+const accentByKit = new Map<BuiltInStyleKit, string>();
+const motionByKit = new Map<BuiltInStyleKit, string>();
+for (const kit of BUILT_IN_STYLE_KITS) {
   const block = extractKitTokenBlock(allKitsCss, kit);
   // Token block must declare the kit-namespaced accent.
   assert(
@@ -255,23 +257,23 @@ for (const kit of STYLE_KITS) {
 // The four kits must produce four DISTINCT accent values.
 const distinctAccents = new Set(accentByKit.values());
 assert(
-  distinctAccents.size === STYLE_KITS.length,
-  `expected ${String(STYLE_KITS.length)} distinct kit accents, got ${String(distinctAccents.size)} (${[...accentByKit.entries()].map(([k, v]) => `${k}=${v}`).join(', ')})`,
+  distinctAccents.size === BUILT_IN_STYLE_KITS.length,
+  `expected ${String(BUILT_IN_STYLE_KITS.length)} distinct kit accents, got ${String(distinctAccents.size)} (${[...accentByKit.entries()].map(([k, v]) => `${k}=${v}`).join(', ')})`,
 );
 
 // Four DISTINCT motion durations (or at least 3+ distinct ones — but the plan
 // asks each kit to feel different so we enforce all four are unique).
 const distinctMotion = new Set(motionByKit.values());
 assert(
-  distinctMotion.size === STYLE_KITS.length,
-  `expected ${String(STYLE_KITS.length)} distinct motion durations, got ${String(distinctMotion.size)}`,
+  distinctMotion.size === BUILT_IN_STYLE_KITS.length,
+  `expected ${String(BUILT_IN_STYLE_KITS.length)} distinct motion durations, got ${String(distinctMotion.size)}`,
 );
 
 // Each kit must emit its actionVariants.solid block — distinct background per
 // kit. The block selector is
 //   [data-style-kit="<kit>"] [data-element-type="action"][data-variant="solid"] .rev01-action
-const solidBackgrounds = new Map<StyleKit, string>();
-for (const kit of STYLE_KITS) {
+const solidBackgrounds = new Map<BuiltInStyleKit, string>();
+for (const kit of BUILT_IN_STYLE_KITS) {
   const anchor = `[data-style-kit="${kit}"] [data-element-type="action"][data-variant="solid"] .rev01-action {`;
   const start = allKitsCss.indexOf(anchor);
   assert(start >= 0, `expected solid action block for kit ${kit}`);
@@ -301,12 +303,12 @@ for (const kit of STYLE_KITS) {
 }
 const distinctSolidBackgrounds = new Set(solidBackgrounds.values());
 assert(
-  distinctSolidBackgrounds.size === STYLE_KITS.length,
-  `expected ${String(STYLE_KITS.length)} distinct solid action backgrounds across kits`,
+  distinctSolidBackgrounds.size === BUILT_IN_STYLE_KITS.length,
+  `expected ${String(BUILT_IN_STYLE_KITS.length)} distinct solid action backgrounds across kits`,
 );
 
 // Each kit must emit a surfaceVariants.raised block.
-for (const kit of STYLE_KITS) {
+for (const kit of BUILT_IN_STYLE_KITS) {
   const anchor = `[data-style-kit="${kit}"] [data-element-type="container"][data-variant="raised"] .rev01-surface {`;
   const start = allKitsCss.indexOf(anchor);
   assert(start >= 0, `expected raised surface block for kit ${kit}`);
@@ -328,7 +330,7 @@ assert(getThrew, 'expected getStyleKitPreset("not-a-kit") to throw');
 // Every kit defines every action variant, every surface variant, every
 // motion preset — the Record<X, ...> types are belt-and-braces here so we
 // add a runtime check for clarity.
-for (const kit of STYLE_KITS) {
+for (const kit of BUILT_IN_STYLE_KITS) {
   const preset = STYLE_KIT_PRESETS[kit];
   const actionKeys = Object.keys(preset.actionVariants).sort().join(',');
   assert(
