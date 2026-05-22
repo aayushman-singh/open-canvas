@@ -817,6 +817,148 @@ body.rev01-modal-open {
 .rev01-editor-topbar [data-rev01-presence][hidden] {
   display: none;
 }
+
+/* -------------------------------------------------------------------------
+   Media picker — inspector widget for media elements. Three rows:
+   current-row (thumb + upload + AI + alt), history-row (MRU thumbs),
+   gallery-grid (all owner assets of matching kind).
+   ------------------------------------------------------------------------- */
+
+.media-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.media-picker .picker-row-label {
+  font-family: var(--rev01-font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rev01-fg-faint);
+  margin-bottom: 2px;
+}
+
+.media-picker .picker-thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  background: var(--rev01-bg-panel);
+  display: block;
+}
+
+.media-picker .picker-thumb.selected {
+  border: 2px solid var(--rev01-accent);
+}
+
+.media-picker .picker-thumb.empty {
+  border: 1px dashed var(--rev01-hairline-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--rev01-font-mono);
+  font-size: 18px;
+  color: var(--rev01-fg-faint);
+  cursor: default;
+}
+
+.media-picker .picker-history-row {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.media-picker .picker-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.media-picker .picker-gallery-cell {
+  position: relative;
+}
+
+.media-picker .picker-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--rev01-danger, #c0392b);
+  color: #fff;
+  border: none;
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 1;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--rev01-font-mono);
+}
+
+.media-picker .picker-gallery-cell:hover .picker-delete {
+  display: flex;
+}
+
+.media-picker .picker-current-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.media-picker .picker-current-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.media-picker .picker-current-actions button {
+  appearance: none;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.media-picker .picker-current-actions button:hover {
+  border-color: var(--rev01-accent);
+}
+
+.media-picker .picker-current-actions input[type="text"] {
+  width: 100%;
+  appearance: none;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.media-picker .picker-current-actions input[type="file"] {
+  display: none;
+}
 `;
 
 // Concatenate chrome CSS + shared kit CSS. The kit CSS lives in
