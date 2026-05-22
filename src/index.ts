@@ -3,6 +3,7 @@ import landing from './landing';
 import { dashboard } from './routes/dashboard';
 import { templatesRoute } from './routes/dashboard/templates';
 import sites from './routes/api/sites';
+import canvasApi from './routes/api/canvas';
 import pages from './routes/api/pages';
 import agent from './routes/api/agent';
 import editor from './editor';
@@ -19,6 +20,7 @@ app.route('/dashboard/templates', templatesRoute);
 app.route('/dashboard', editor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);
+app.route('/api/canvas', canvasApi);
 app.route('/api/pages', pages);
 app.route('/api/agent', agent);
 

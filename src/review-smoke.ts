@@ -74,4 +74,82 @@ assert(RESERVED_SUBDOMAINS.has('admin'), 'expected RESERVED_SUBDOMAINS to includ
 const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
 assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');
 
+const overWidePage = validateCanvasSiteState({
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-home',
+      slug: 'home',
+      title: 'Home',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-hero',
+          recipeId: 'hero-split',
+          name: 'Hero',
+          height: 600,
+          elements: [
+            {
+              id: 'over-wide',
+              type: 'shape',
+              variant: 'rect',
+              box: { x: 100, y: 100, w: 2000, h: 200, z: 1 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+assert(
+  !overWidePage.valid,
+  'expected element wider than the page width to be rejected (extends beyond page width)',
+);
+assert(
+  !overWidePage.valid &&
+    overWidePage.errors.some((message) => message.includes('extends beyond page width')),
+  'expected over-wide element error to mention "extends beyond page width"',
+);
+
+const unmutedAutoplayVideo = validateCanvasSiteState({
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-home',
+      slug: 'home',
+      title: 'Home',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-hero',
+          recipeId: 'video-hero',
+          name: 'Hero',
+          height: 600,
+          elements: [
+            {
+              id: 'noisy-video',
+              type: 'media',
+              mediaKind: 'video',
+              assetId: 'loop.mp4',
+              alt: '',
+              fit: 'cover',
+              playback: { autoplay: true, muted: false },
+              box: { x: 0, y: 0, w: 800, h: 450, z: 1 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+assert(
+  !unmutedAutoplayVideo.valid,
+  'expected autoplay video without muted=true to be rejected (muted required for autoplay)',
+);
+assert(
+  !unmutedAutoplayVideo.valid &&
+    unmutedAutoplayVideo.errors.some((message) => message.includes('muted')),
+  'expected unmuted-autoplay video error to mention "muted"',
+);
+
 console.log('[review-smoke] OK');
