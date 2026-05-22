@@ -111,21 +111,6 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
             </span>
             <span class="address">{publicAddress}</span>
             <span class="spacer" />
-            <span class="style-kits" role="group" aria-label="Style kit">
-              {STYLE_KITS.map((kit) => {
-                const isActive = kit === owned.styleKit;
-                return (
-                  <button
-                    type="button"
-                    data-style-kit={kit}
-                    class={isActive ? 'active' : ''}
-                    aria-pressed={isActive ? 'true' : 'false'}
-                  >
-                    {kit}
-                  </button>
-                );
-              })}
-            </span>
             <button id="canvas-save" type="button">
               Save
             </button>
@@ -147,6 +132,91 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
               <span data-rev01-presence-count>0</span> viewing
             </span>
           </header>
+          <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
+            <div class="rev01-sidebar-tabs" role="tablist" aria-label="Canvas tools">
+              <button type="button" class="active" role="tab" aria-selected="true">
+                Add
+              </button>
+            </div>
+            <div class="rev01-sidebar-panel" role="tabpanel" aria-label="Add">
+              <section class="rev01-sidebar-group">
+                <h2>Sections</h2>
+                <button
+                  type="button"
+                  class="rev01-sidebar-command"
+                  data-sidebar-add-section="blank"
+                >
+                  Blank section
+                </button>
+              </section>
+              <section class="rev01-sidebar-group">
+                <h2>Components</h2>
+                <div class="rev01-sidebar-command-grid">
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="text"
+                  >
+                    Text
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="image"
+                  >
+                    Image
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="video"
+                  >
+                    Video
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="action"
+                  >
+                    Button
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="shape"
+                  >
+                    Shape
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="container"
+                  >
+                    Container
+                  </button>
+                </div>
+              </section>
+              <section class="rev01-sidebar-group">
+                <h2>Colors</h2>
+                <div class="rev01-sidebar-kit-grid" role="group" aria-label="Style kit">
+                  {STYLE_KITS.map((kit) => {
+                    const isActive = kit === owned.styleKit;
+                    return (
+                      <button
+                        type="button"
+                        data-sidebar-style-kit={kit}
+                        class={isActive ? 'active' : ''}
+                        aria-pressed={isActive ? 'true' : 'false'}
+                      >
+                        {kit}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+              <section id="canvas-sidebar-selection" class="rev01-sidebar-group" hidden />
+            </div>
+          </aside>
           <div id="canvas-root" data-site-id={owned.id} />
           <aside id="canvas-inspector" hidden />
           <footer class="rev01-editor-status">
