@@ -1707,7 +1707,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // Direct image generation via the Replicate-backed /assets/generate route.
   // Distinct from the agent-driven "AI media" button: this one creates a
-  // brand-new asset shaped to the slot's aspect ratio, no LLM tool round-trip.
+  // brand-new asset shaped to the slot's aspect ratio without an LLM round-trip.
   function appendImageGenerator(element) {
     if (element.mediaKind !== "image") return;
     const wrap = document.createElement("div");
