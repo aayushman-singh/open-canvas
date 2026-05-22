@@ -135,7 +135,7 @@ export const ownerAsset = pgTable(
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({
-    ownerAssetByCustomer: index('owner_asset_by_customer').on(t.customerId, t.lastUsedAt),
+    ownerAssetByCustomer: index('owner_asset_by_customer').on(t.customerId, t.lastUsedAt.desc()),
   }),
 );
 
@@ -156,7 +156,7 @@ export const slotHistory = pgTable(
   },
   (t) => ({
     pk: primaryKey({ columns: [t.siteId, t.elementId, t.assetId] }),
-    bySlot: index('slot_history_by_slot').on(t.siteId, t.elementId, t.lastUsedAt),
+    bySlot: index('slot_history_by_slot').on(t.siteId, t.elementId, t.lastUsedAt.desc()),
   }),
 );
 
