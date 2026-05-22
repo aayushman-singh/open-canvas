@@ -13,6 +13,8 @@ import type {
   CanvasPage,
   CanvasSection,
   ContainerElement,
+  InlineMark,
+  InlineRun,
   MediaElement,
   PublishedSnapshot,
   ShapeElement,
@@ -97,6 +99,51 @@ function buildElementWrapperStyle(element: CanvasElement): string {
   return styleFromEntries(entries);
 }
 
+// Find the link mark in a run (zero or one allowed by the validator).
+function findLinkMark(run: InlineRun): Extract<InlineMark, { type: 'link' }> | null {
+  if (!run.marks) return null;
+  for (const mark of run.marks) {
+    if (mark.type === 'link') return mark;
+  }
+  return null;
+}
+
+function hasMark(run: InlineRun, type: InlineMark['type']): boolean {
+  if (!run.marks) return false;
+  for (const mark of run.marks) {
+    if (mark.type === type) return true;
+  }
+  return false;
+}
+
+/**
+ * Build the nested-mark HTML for one inline run. Mark order is fixed:
+ *
+ *   <a> outermost (only when a link mark is present)
+ *   <strong>, <em>, <u>, <s>, <mark>, <code> (innermost wraps the text node)
+ *
+ * The order is deliberately stable so identical content arrays always
+ * produce byte-identical HTML — needed for diff stability, snapshot
+ * rendering, and the editor's round-trip serializer.
+ */
+function renderRun(run: InlineRun): string {
+  const escapedText = escapeHtml(run.text);
+  let inner = escapedText;
+  if (hasMark(run, 'code')) inner = `<code>${inner}</code>`;
+  if (hasMark(run, 'highlight')) inner = `<mark>${inner}</mark>`;
+  if (hasMark(run, 'strike')) inner = `<s>${inner}</s>`;
+  if (hasMark(run, 'underline')) inner = `<u>${inner}</u>`;
+  if (hasMark(run, 'italic')) inner = `<em>${inner}</em>`;
+  if (hasMark(run, 'bold')) inner = `<strong>${inner}</strong>`;
+  const link = findLinkMark(run);
+  if (link) {
+    inner = `<a class="rev01-inline-link" href="${escapeAttr(link.href)}">${inner}</a>`;
+  }
+  // The bare <span> wrapper is kept even for no-mark runs because it gives the
+  // editor a stable DOM addressing target per run.
+  return `<span>${inner}</span>`;
+}
+
 function renderTextElement(element: TextElement): string {
   const tag = element.role === 'heading' ? 'h1' : element.role === 'body' ? 'p' : 'span';
   const innerStyle = styleFromEntries([
@@ -105,7 +152,8 @@ function renderTextElement(element: TextElement): string {
     ['text-align', element.align],
     ['margin', '0'],
   ]);
-  return `<${tag} class="rev01-text" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${escapeHtml(element.text)}</${tag}>`;
+  const runsHtml = element.content.map((run) => renderRun(run)).join('');
+  return `<${tag} class="rev01-text" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${runsHtml}</${tag}>`;
 }
 
 function renderMediaElement(element: MediaElement, assetBasePath: string): string {

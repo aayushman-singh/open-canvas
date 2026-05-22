@@ -384,4 +384,46 @@ body {
 .rev01-editor-status .ok {
   color: var(--rev01-ok);
 }
+
+/* Inline mark toolbar — only present in the DOM while a text element is in
+   edit mode. Positioned absolutely inside #canvas-root by the client. */
+.rev01-mark-toolbar {
+  display: inline-flex;
+  gap: 2px;
+  z-index: 10001;
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--rev01-bg-titlebar);
+  border: 1px solid var(--rev01-hairline-strong);
+  box-shadow: 0 6px 18px oklch(0 0 0 / 0.35);
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+}
+.rev01-mark-toolbar button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  font: inherit;
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  min-width: 22px;
+}
+.rev01-mark-toolbar button:hover {
+  border-color: var(--rev01-accent);
+  color: var(--rev01-fg);
+}
+
+/* Inline link mark — both editor preview and published renderer use this
+   class so the visual treatment stays in sync. */
+.rev01-inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--kit-accent, currentColor);
+}
+.rev01-inline-link:hover {
+  color: var(--kit-accent, currentColor);
+}
 `;

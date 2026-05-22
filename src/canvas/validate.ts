@@ -8,6 +8,7 @@ import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
   ELEMENT_TYPES,
+  INLINE_MARK_TYPES,
   MEDIA_KINDS,
   MOTION_PRESETS,
   SECTION_RECIPE_IDS,
@@ -21,6 +22,7 @@ import {
   type CanvasSection,
   type CanvasSiteState,
   type ElementType,
+  type InlineMarkType,
   type MediaKind,
   type MotionPreset,
   type PublishedSnapshot,
@@ -72,7 +74,12 @@ function pathJoin(parent: string, child: string | number): string {
   return parent === '' ? child : `${parent}.${child}`;
 }
 
-function isAllowedHref(href: string): boolean {
+/**
+ * The single source of truth for href allowlisting. Used by both
+ * ActionElement.href and inline link marks inside TextElement.content so the
+ * two paths cannot drift.
+ */
+export function isAllowedHref(href: string): boolean {
   // In-page anchor or root-relative path are allowed without scheme.
   if (href.startsWith('#') || href.startsWith('/')) return true;
   // Reject the javascript: scheme explicitly even when oddly cased or padded.
@@ -184,6 +191,82 @@ function validatePinnedStyle(value: unknown, basePath: string, errors: string[])
   }
 }
 
+/**
+ * Validate the rich text payload of a TextElement: a non-empty array of
+ * inline runs whose marks are well-formed and whose concatenated text is not
+ * empty. Errors are appended to `errors` — never short-circuit, the Owner
+ * wants every issue listed at once.
+ *
+ * `idLabel` is the textual element id used in error messages so the Owner can
+ * find the broken element by id. If the element has no usable id we pass
+ * `'<unknown>'` so the message still reads.
+ */
+function validateTextContent(content: unknown, idLabel: string, errors: string[]): void {
+  if (!Array.isArray(content) || content.length === 0) {
+    errors.push(`text element ${idLabel}.content must be a non-empty array`);
+    return;
+  }
+  let concatenated = '';
+  content.forEach((run, runIdx) => {
+    if (!isRecord(run)) {
+      errors.push(`text element ${idLabel}.content[${String(runIdx)}] must be an object`);
+      return;
+    }
+    if (typeof run.text !== 'string') {
+      errors.push(
+        `text element ${idLabel}.content[${String(runIdx)}].text must be a string (got ${describe(run.text)})`,
+      );
+    } else {
+      concatenated += run.text;
+    }
+    if (run.marks === undefined) return;
+    if (!Array.isArray(run.marks)) {
+      errors.push(
+        `text element ${idLabel}.content[${String(runIdx)}].marks must be an array when present`,
+      );
+      return;
+    }
+    const seenTypes = new Set<string>();
+    run.marks.forEach((mark, markIdx) => {
+      if (!isRecord(mark)) {
+        errors.push(
+          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}] must be an object`,
+        );
+        return;
+      }
+      if (!isOneOf<InlineMarkType>(mark.type, INLINE_MARK_TYPES)) {
+        errors.push(
+          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type must be one of [${INLINE_MARK_TYPES.join(', ')}] (got ${describe(mark.type)})`,
+        );
+        return;
+      }
+      if (seenTypes.has(mark.type)) {
+        errors.push(
+          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type "${mark.type}" is duplicated within the same run`,
+        );
+      } else {
+        seenTypes.add(mark.type);
+      }
+      if (mark.type === 'link') {
+        if (typeof mark.href !== 'string' || mark.href.length === 0) {
+          errors.push(
+            `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].href must be a non-empty string for link marks (got ${describe(mark.href)})`,
+          );
+          return;
+        }
+        if (!isAllowedHref(mark.href)) {
+          errors.push(
+            `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].href "${mark.href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
+          );
+        }
+      }
+    });
+  });
+  if (concatenated.length === 0) {
+    errors.push(`text element ${idLabel} has empty concatenated plain text`);
+  }
+}
+
 function validateElement(
   element: unknown,
   pageWidth: number,
@@ -215,7 +298,8 @@ function validateElement(
 
   switch (element.type) {
     case 'text': {
-      if (!isNonEmptyString(element.text)) errors.push(`${basePath}.text must be a non-empty string`);
+      const idLabel = isNonEmptyString(element.id) ? element.id : '<unknown>';
+      validateTextContent(element.content, idLabel, errors);
       if (!isOneOf(element.role, ['heading', 'body', 'label'] as const)) {
         errors.push(`${basePath}.role must be heading|body|label (got ${describe(element.role)})`);
       }

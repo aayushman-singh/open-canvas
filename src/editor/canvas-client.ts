@@ -40,7 +40,37 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const SURFACE_VARIANTS = ["flat", "raised", "glass", "outlined", "sticker", "editorial-frame", "soft-panel"];
   const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
   const MOTION_PRESETS = ["none", "fade-up", "slide-left", "scale-in", "blur-in", "stagger-children", "slow-drift", "parallax-soft"];
+  const INLINE_MARK_TYPES = ["bold", "italic", "underline", "strike", "code", "highlight", "link"];
   const SAFE_CSS_KEYS = ["color", "background", "borderColor"];
+
+  // -- href allowlist (mirrors src/canvas/validate.ts isAllowedHref) -------
+  // Centralised so the inline-link mark toolbar uses the SAME rules as the
+  // server validator. If you change one, change the other.
+  const ALLOWED_HREF_SCHEMES = ["http:", "https:", "mailto:", "tel:"];
+  function isAllowedHref(href) {
+    if (typeof href !== "string" || href.length === 0) return false;
+    if (href.charAt(0) === "#" || href.charAt(0) === "/") return true;
+    const trimmed = href.trim().toLowerCase();
+    if (trimmed.indexOf("javascript:") === 0) return false;
+    try {
+      const url = new URL(href);
+      return ALLOWED_HREF_SCHEMES.indexOf(url.protocol) >= 0;
+    } catch (_) {
+      return false;
+    }
+  }
+  // Tag-name -> InlineMark factory used by the DOM-to-runs serializer.
+  const MARK_TAGS = {
+    STRONG: () => ({ type: "bold" }),
+    B: () => ({ type: "bold" }),
+    EM: () => ({ type: "italic" }),
+    I: () => ({ type: "italic" }),
+    U: () => ({ type: "underline" }),
+    S: () => ({ type: "strike" }),
+    STRIKE: () => ({ type: "strike" }),
+    MARK: () => ({ type: "highlight" }),
+    CODE: () => ({ type: "code" }),
+  };
 
   // Shared editor state.
   let state = null;
@@ -49,7 +79,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let saveTimer = null;
   let statusTimer = null;
   let editingElementId = null;
+  // Deep clone of the InlineRun[] pre-edit — Escape/Cancel restore from this.
   let editingSnapshot = null;
+  // The inline mark toolbar element, present in the DOM only while editing.
+  let markToolbar = null;
 
   const root = document.getElementById("canvas-root");
   const inspector = document.getElementById("canvas-inspector");
@@ -171,6 +204,56 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // Build the nested-mark DOM for one InlineRun. Mark nesting order must
+  // match the server renderer in src/canvas/render.ts so the editor preview
+  // and the published HTML agree visually:
+  //   <a> outermost (only when link mark present)
+  //   <strong>, <em>, <u>, <s>, <mark>, <code> innermost
+  function hasMark(run, type) {
+    if (!run.marks || !Array.isArray(run.marks)) return false;
+    for (let i = 0; i < run.marks.length; i++) {
+      if (run.marks[i] && run.marks[i].type === type) return true;
+    }
+    return false;
+  }
+  function findLinkMark(run) {
+    if (!run.marks || !Array.isArray(run.marks)) return null;
+    for (let i = 0; i < run.marks.length; i++) {
+      if (run.marks[i] && run.marks[i].type === "link") return run.marks[i];
+    }
+    return null;
+  }
+  function buildRunNode(run) {
+    // Innermost text node carries the raw run.text. wrapInTag wraps the
+    // current node in a new element of the given tag, returning the outer.
+    let inner = document.createTextNode(typeof run.text === "string" ? run.text : "");
+    function wrap(tag) {
+      const el = document.createElement(tag);
+      el.appendChild(inner);
+      inner = el;
+      return el;
+    }
+    if (hasMark(run, "code")) wrap("code");
+    if (hasMark(run, "highlight")) wrap("mark");
+    if (hasMark(run, "strike")) wrap("s");
+    if (hasMark(run, "underline")) wrap("u");
+    if (hasMark(run, "italic")) wrap("em");
+    if (hasMark(run, "bold")) wrap("strong");
+    const link = findLinkMark(run);
+    if (link) {
+      const a = document.createElement("a");
+      a.className = "rev01-inline-link";
+      a.setAttribute("href", link.href);
+      // Don't navigate from inside the editor when the Owner clicks a link.
+      a.addEventListener("click", (ev) => { ev.preventDefault(); });
+      a.appendChild(inner);
+      inner = a;
+    }
+    const span = document.createElement("span");
+    span.appendChild(inner);
+    return span;
+  }
+
   function buildTextBody(element) {
     const tag = element.role === "heading" ? "h1" : element.role === "body" ? "p" : "span";
     const node = document.createElement(tag);
@@ -180,7 +263,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     node.style.fontWeight = String(element.fontWeight);
     node.style.textAlign = element.align;
     node.style.margin = "0";
-    node.textContent = element.text;
+    const content = Array.isArray(element.content) ? element.content : [];
+    for (let i = 0; i < content.length; i++) {
+      node.appendChild(buildRunNode(content[i]));
+    }
     return node;
   }
 
@@ -657,6 +743,237 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // -- Rich text: DOM to InlineRun[] serializer -------------------------
+
+  // Walk up from node until we hit stopAt (exclusive). Collect each
+  // ancestor whose tag is a mark tag - STRONG/B, EM/I, U, S/STRIKE, MARK,
+  // CODE, A (link). Returns a freshly-built InlineMark[] in canonical order
+  // (link first, then bold, italic, underline, strike, highlight, code) and
+  // deduped by type. Adjacent runs with byte-identical marks are merged
+  // later - at this stage we only care that the mark set is well-formed.
+  function activeMarksFor(node, stopAt) {
+    const seen = new Set();
+    const marks = [];
+    let cur = node.parentNode;
+    while (cur && cur !== stopAt) {
+      if (cur.nodeType === 1) {
+        const tag = cur.tagName;
+        if (tag === "A" && !seen.has("link")) {
+          seen.add("link");
+          marks.push({ type: "link", href: cur.getAttribute("href") || "" });
+        } else if (MARK_TAGS[tag]) {
+          const built = MARK_TAGS[tag]();
+          if (!seen.has(built.type)) {
+            seen.add(built.type);
+            marks.push(built);
+          }
+        }
+      }
+      cur = cur.parentNode;
+    }
+    // Order the marks deterministically so adjacent-run dedupe by JSON
+    // string is reliable.
+    const order = { link: 0, bold: 1, italic: 2, underline: 3, strike: 4, highlight: 5, code: 6 };
+    marks.sort((a, b) => order[a.type] - order[b.type]);
+    return marks;
+  }
+
+  function marksEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i].type !== b[i].type) return false;
+      if (a[i].type === "link" && a[i].href !== b[i].href) return false;
+    }
+    return true;
+  }
+
+  // Serialize the contenteditable subtree into an InlineRun[]. The result is
+  // deduped (adjacent identical-mark runs merge) and trimmed (empty
+  // marks-only placeholders dropped). Throws if any link mark href fails the
+  // allowlist — the caller treats that as "do not commit".
+  function serializeContentToRuns(rootNode) {
+    const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_TEXT);
+    const raw = [];
+    let textNode = walker.nextNode();
+    while (textNode) {
+      const marks = activeMarksFor(textNode, rootNode);
+      raw.push({ text: textNode.nodeValue || "", marks });
+      textNode = walker.nextNode();
+    }
+    // Merge adjacent runs whose mark sets are byte-identical.
+    const merged = [];
+    for (let i = 0; i < raw.length; i++) {
+      const run = raw[i];
+      const prev = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (prev && marksEqual(prev.marks, run.marks)) {
+        prev.text += run.text;
+      } else {
+        merged.push({ text: run.text, marks: run.marks });
+      }
+    }
+    // Drop runs that are empty AND have no marks — they carry no signal.
+    const trimmed = merged.filter((r) => r.text.length > 0 || r.marks.length > 0);
+    // Validate link hrefs (fail loud — no silent rewrite).
+    for (let i = 0; i < trimmed.length; i++) {
+      for (let m = 0; m < trimmed[i].marks.length; m++) {
+        const mark = trimmed[i].marks[m];
+        if (mark.type === "link" && !isAllowedHref(mark.href)) {
+          const reason = "href \"" + mark.href + "\" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)";
+          throw new Error(reason);
+        }
+      }
+    }
+    // Final shape: drop empty marks arrays so the JSON is minimal and equal
+    // to what hand-written fixtures look like.
+    return trimmed.map((r) => {
+      if (r.marks.length === 0) return { text: r.text };
+      return { text: r.text, marks: r.marks };
+    });
+  }
+
+  // Concatenate the plain text projection of a content array — used to
+  // enforce the "concatenated plain text must not be empty" rule client-side
+  // before saving so the server doesn't see a doomed payload.
+  function plainTextOf(content) {
+    let out = "";
+    for (let i = 0; i < content.length; i++) out += content[i].text;
+    return out;
+  }
+
+  // -- Inline mark toolbar ------------------------------------------------
+
+  function removeMarkToolbar() {
+    if (markToolbar && markToolbar.parentNode) {
+      markToolbar.parentNode.removeChild(markToolbar);
+    }
+    markToolbar = null;
+  }
+
+  function positionMarkToolbar(anchor) {
+    if (!markToolbar || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const rootRect = root.getBoundingClientRect();
+    // Anchor above the element, accounting for #canvas-root scroll position.
+    const top = rect.top - rootRect.top + root.scrollTop - 44;
+    const left = rect.left - rootRect.left + root.scrollLeft;
+    markToolbar.style.position = "absolute";
+    markToolbar.style.top = Math.max(0, top) + "px";
+    markToolbar.style.left = Math.max(0, left) + "px";
+  }
+
+  function applyExecCommand(command) {
+    // execCommand is deprecated but it is by far the simplest way to apply
+    // bold/italic/underline/strike to the current Selection inside a
+    // contenteditable. Once browsers drop it we will rewrite this with the
+    // Range APIs. For the POC we lean on it.
+    document.execCommand(command, false, "");
+  }
+
+  function wrapSelectionWith(tagName) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+    const el = document.createElement(tagName);
+    try {
+      range.surroundContents(el);
+    } catch (_) {
+      // surroundContents throws if the Range crosses an element boundary.
+      // Fall back to insertHTML with a stringified fragment so the Owner
+      // doesn't lose the action.
+      const fragment = range.extractContents();
+      el.appendChild(fragment);
+      range.insertNode(el);
+    }
+    sel.removeAllRanges();
+    const next = document.createRange();
+    next.selectNode(el);
+    sel.addRange(next);
+  }
+
+  function promptForLinkHref(current) {
+    const initial = typeof current === "string" ? current : "https://";
+    const raw = window.prompt("Link URL", initial);
+    if (raw === null) return null; // cancelled
+    const href = raw.trim();
+    if (href.length === 0) return null;
+    if (!isAllowedHref(href)) {
+      setStatus("Link rejected: " + href + " is not http/https/mailto/tel/anchor/relative", "error");
+      return null;
+    }
+    return href;
+  }
+
+  function applyLinkMark() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) {
+      setStatus("Select some text first to add a link", "error");
+      return;
+    }
+    const href = promptForLinkHref("");
+    if (href === null) return;
+    const a = document.createElement("a");
+    a.className = "rev01-inline-link";
+    a.setAttribute("href", href);
+    try {
+      range.surroundContents(a);
+    } catch (_) {
+      const fragment = range.extractContents();
+      a.appendChild(fragment);
+      range.insertNode(a);
+    }
+    sel.removeAllRanges();
+    const next = document.createRange();
+    next.selectNode(a);
+    sel.addRange(next);
+  }
+
+  function applyMark(type) {
+    if (type === "bold") return applyExecCommand("bold");
+    if (type === "italic") return applyExecCommand("italic");
+    if (type === "underline") return applyExecCommand("underline");
+    if (type === "strike") return applyExecCommand("strikeThrough");
+    if (type === "code") return wrapSelectionWith("code");
+    if (type === "highlight") return wrapSelectionWith("mark");
+    if (type === "link") return applyLinkMark();
+  }
+
+  function buildMarkToolbar(anchor) {
+    removeMarkToolbar();
+    const bar = document.createElement("div");
+    bar.className = "rev01-mark-toolbar";
+    bar.setAttribute("role", "toolbar");
+    bar.setAttribute("aria-label", "Inline formatting");
+    const labels = {
+      bold: "B",
+      italic: "I",
+      underline: "U",
+      strike: "S",
+      code: "</>",
+      highlight: "HL",
+      link: "Link",
+    };
+    for (let i = 0; i < INLINE_MARK_TYPES.length; i++) {
+      const type = INLINE_MARK_TYPES[i];
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = labels[type];
+      btn.setAttribute("data-mark", type);
+      // Keep focus inside the contenteditable so the Selection survives the click.
+      btn.addEventListener("mousedown", (ev) => { ev.preventDefault(); });
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        applyMark(type);
+      });
+      bar.appendChild(btn);
+    }
+    markToolbar = bar;
+    root.appendChild(bar);
+    positionMarkToolbar(anchor);
+  }
+
   function beginTextEdit(elementId) {
     const found = findElement(elementId);
     if (!found || found.element.type !== "text") return;
@@ -665,7 +982,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const inner = wrapper.querySelector(".rev01-text");
     if (!inner) return;
     editingElementId = elementId;
-    editingSnapshot = found.element.text;
+    // Deep-clone the pre-edit content so Escape/Cancel can restore exactly.
+    editingSnapshot = JSON.parse(JSON.stringify(found.element.content || []));
     inner.setAttribute("contenteditable", "true");
     inner.focus();
     const range = document.createRange();
@@ -673,29 +991,69 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const sel = window.getSelection();
     if (sel) { sel.removeAllRanges(); sel.addRange(range); }
 
+    buildMarkToolbar(wrapper);
+
+    function restoreFromSnapshot() {
+      found.element.content = JSON.parse(JSON.stringify(editingSnapshot));
+      rebuildElement(elementId);
+    }
+
     function finish(commit) {
       inner.removeAttribute("contenteditable");
-      const next = inner.textContent || "";
       inner.removeEventListener("blur", onBlur);
       inner.removeEventListener("keydown", onKey);
-      editingElementId = null;
+      removeMarkToolbar();
       const snapshot = editingSnapshot;
+      editingElementId = null;
       editingSnapshot = null;
-      if (commit && next.length > 0 && next !== snapshot) {
-        found.element.text = next;
-        scheduleSave();
-      } else if (commit && next.length === 0) {
-        found.element.text = snapshot;
-        inner.textContent = snapshot;
-        setStatus("Text can't be empty", "error");
-      } else if (!commit) {
-        found.element.text = snapshot;
-        inner.textContent = snapshot;
+      if (!commit) {
+        // Restore the visible DOM too — the user may have pressed marks.
+        found.element.content = JSON.parse(JSON.stringify(snapshot));
+        rebuildElement(elementId);
+        return;
       }
+      let runs;
+      try {
+        runs = serializeContentToRuns(inner);
+      } catch (err) {
+        setStatus("Link rejected: " + (err && err.message ? err.message : String(err)), "error");
+        // Loud failure — do not commit, restore pre-edit content.
+        found.element.content = JSON.parse(JSON.stringify(snapshot));
+        rebuildElement(elementId);
+        return;
+      }
+      if (runs.length === 0 || plainTextOf(runs).length === 0) {
+        setStatus("Text can't be empty", "error");
+        found.element.content = JSON.parse(JSON.stringify(snapshot));
+        rebuildElement(elementId);
+        return;
+      }
+      found.element.content = runs;
+      rebuildElement(elementId);
+      scheduleSave();
     }
-    function onBlur() { finish(true); }
+    function onBlur(ev) {
+      // Ignore blur events caused by clicks on the mark toolbar buttons —
+      // those keep the editor in edit mode by design.
+      const next = ev.relatedTarget;
+      if (next && markToolbar && markToolbar.contains(next)) return;
+      finish(true);
+    }
     function onKey(ev) {
-      if (ev.key === "Escape") { ev.preventDefault(); finish(false); inner.blur(); }
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        finish(false);
+        inner.blur();
+        return;
+      }
+      const mod = ev.ctrlKey || ev.metaKey;
+      if (!mod) return;
+      const key = (ev.key || "").toLowerCase();
+      if (key === "b") { ev.preventDefault(); applyMark("bold"); return; }
+      if (key === "i") { ev.preventDefault(); applyMark("italic"); return; }
+      if (key === "u") { ev.preventDefault(); applyMark("underline"); return; }
+      if (ev.shiftKey && key === "x") { ev.preventDefault(); applyMark("strike"); return; }
+      if (key === "k") { ev.preventDefault(); applyMark("link"); return; }
     }
     inner.addEventListener("blur", onBlur);
     inner.addEventListener("keydown", onKey);
@@ -829,7 +1187,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       addElementToSection(section, {
         id: newElementId(),
         type: "text",
-        text: "New text",
+        content: [{ text: "New text" }],
         role: "body",
         fontSize: 16,
         fontWeight: 400,
