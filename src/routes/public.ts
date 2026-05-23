@@ -31,6 +31,16 @@ import { buildEmbedCsp } from '../embed/csp';
 // site row is resolved; returns a gate Response when the visitor must unlock,
 // or null to continue serving the snapshot.
 import { requireUnlock } from '../password/middleware';
+// Wave 3 #14 — symbol-instance render needs the site's symbols table injected
+// before renderCanvasSnapshot runs. The configure call is per-render scope.
+import { configureSymbolInstanceRender } from '../canvas/elements/symbol-instance';
+// Wave 3 #21 — per-page <head> meta emission (title / description / OG / Twitter
+// / canonical / robots / lang).
+import { renderCanvasHead, resolveLang } from '../seo/meta-emit';
+// Wave 3 #20 — dual-palette CSS + inline data-mode setter for visitor toggle.
+import { emitDualModeCss } from '../themes/visitor-mode/css-emit';
+import { getModeSetterScript } from '../themes/visitor-mode/inline-script';
+import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -181,10 +191,6 @@ const HTML_ESCAPES: Record<string, string> = {
 
 function escapeAttr(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
-}
-
-function escapeText(value: string): string {
-  return value.replace(/[&<>]/g, (ch) => HTML_ESCAPES[ch] ?? ch);
 }
 
 interface PublicSiteRow {
@@ -398,32 +404,74 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return response;
   }
 
+  // Wave 3 #14 — inject the site's symbol-master table into the symbol-instance
+  // render fn before the snapshot is materialised. snapshot.symbols is the
+  // single source of truth; missing means the site has zero symbols.
+  configureSymbolInstanceRender({ symbols: siteRow.publishedSnapshot.symbols ?? [] });
+
   const snapshotHtml = renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets');
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
   // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe
   // sandbox can only load those origins. Header is set once per snapshot
   // response; the value is deterministic given the same snapshot.
   c.header('Content-Security-Policy', buildEmbedCsp(siteRow.publishedSnapshot));
-  // Canonical URL: when served via custom domain, canonical-ise to the
-  // hostname the visitor actually used so social/search crawlers index the
-  // Owner-facing address, not the rev01 subdomain. The subdomain arm keeps
-  // its existing canonical.
-  const canonicalUrl = customDomainHit
-    ? `https://${host}/`
-    : `https://${siteRow.subdomain}${PUBLIC_HOST_SUFFIX}/`;
-  const titleEscaped = escapeText(siteRow.name);
-  const canonicalEscaped = escapeAttr(canonicalUrl);
+  // Canonical URL is emitted by Wave 3 #21's `renderCanvasHead` (below). It
+  // derives the canonical from the visitor-hit host, which is the custom
+  // hostname when the visitor used one and the subdomain otherwise.
   const visitorScript = buildVisitorLiveScript(siteRow.publishedSnapshot.version);
+
+  // Wave 3 #21 — pick the page being served (root → first; otherwise first
+  // path segment matches a slug). The renderer concats every page into the
+  // body today; per-page metadata still uses the visitor-facing slug for
+  // canonical + OG context.
+  const pageSlug =
+    path === '/' || path === ''
+      ? (siteRow.publishedSnapshot.pages[0]?.slug ?? '')
+      : path.replace(/^\//, '').split('/')[0] ?? '';
+  const currentPage =
+    siteRow.publishedSnapshot.pages.find((p) => p.slug === pageSlug)
+      ?? siteRow.publishedSnapshot.pages[0]
+      ?? null;
+  const headMeta = renderCanvasHead(siteRow.publishedSnapshot, {
+    siteId: siteRow.id,
+    host,
+    protocol: requestUrl.protocol === 'http:' ? 'http' : 'https',
+    pageSlug,
+  });
+  const lang = currentPage
+    ? resolveLang(currentPage, siteRow.publishedSnapshot)
+    : 'en';
+
+  // Wave 3 #20 — light/dark visitor toggle. Only emit dual-palette CSS +
+  // early mode setter when the Owner has enabled dark mode for this site.
+  // The flag lives at the editable level and is mirrored into snapshots by a
+  // future Wave 5 patch; until then we read it off the snapshot defensively.
+  const darkModeEnabled =
+    (siteRow.publishedSnapshot as { darkModeEnabled?: boolean }).darkModeEnabled === true;
+  let dualModeCss = '';
+  let modeSetterScript = '';
+  if (darkModeEnabled) {
+    const kit = resolveStyleKitWithCustom(
+      siteRow.publishedSnapshot.customStyleKit
+        ? {
+            styleKit: siteRow.publishedSnapshot.styleKit,
+            customStyleKit: siteRow.publishedSnapshot.customStyleKit,
+          }
+        : { styleKit: siteRow.publishedSnapshot.styleKit },
+    );
+    dualModeCss = emitDualModeCss(kit, siteRow.publishedSnapshot.styleKit);
+    modeSetterScript = getModeSetterScript();
+  }
 
   return c.html(
     html`<!doctype html>
-<html lang="en">
+<html lang="${raw(escapeAttr(lang))}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${raw(titleEscaped)}</title>
-    <link rel="canonical" href="${raw(canonicalEscaped)}" />
-    <style>${raw(canvasPublishedStyles)}</style>
+    ${raw(headMeta)}
+    ${darkModeEnabled ? raw(`<script>${modeSetterScript}</script>`) : ''}
+    <style>${raw(canvasPublishedStyles)}${darkModeEnabled ? `\n${dualModeCss}` : ''}</style>
   </head>
   <body>
     <div data-rev01-public-root>${raw(snapshotHtml)}</div>

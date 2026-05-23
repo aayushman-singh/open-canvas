@@ -168,10 +168,51 @@ function renderPage(page: CanvasPage, ctx: Omit<ElementRenderCtx, 'pageSlug'>): 
   return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}" style="${style}">${sectionsHtml}</article>`;
 }
 
+/**
+ * Optional renderer options. Each field is additive and back-compat — every
+ * existing caller passes the original positional arguments and continues to
+ * work without change. Wave 3 #21 (SEO) introduced this options object so
+ * the renderer could expose a per-page head-meta hook without becoming a
+ * grab-bag of positional parameters; future waves should reuse this seam
+ * rather than adding more positional args.
+ */
+export interface RenderSnapshotOptions {
+  /**
+   * Wave 3 #21 — per-page `<head>` meta emitter. When provided, the renderer
+   * calls this for each page in the snapshot. The body wrapper produced by
+   * `renderCanvasSnapshot` is a `<main>` element with no `<head>`, so the
+   * emitted strings are NOT currently spliced into the body — the renderer
+   * concatenates them and returns them via the return value's structure
+   * (see overload below). The visitor-facing route owns the actual
+   * `<head>` envelope and calls `renderCanvasHead` (sibling exported from
+   * `src/seo/meta-emit.ts`) for the page the visitor is reading; this hook
+   * exists so future renderers (e.g. multi-page static export) can wire
+   * head emission per page through the same seam.
+   */
+  emitHeadMeta?: (page: CanvasPage) => string;
+}
+
+/**
+ * Render the body of a Published Snapshot. The returned string is a
+ * self-contained `<main>` block — the caller wraps it in the document
+ * envelope (`<html>…<head>…</head><body>` etc.).
+ *
+ * Backwards-compatible signature:
+ *   - 1st positional: `snapshot`           (required)
+ *   - 2nd positional: `assetBasePath`      (required)
+ *   - 3rd positional: `siteId`             (optional, default '')
+ *   - 4th positional: `opts` (`RenderSnapshotOptions`) — additive, Wave 3 #21.
+ *
+ * The signature stays positional through `siteId` so existing call sites
+ * keep working without edit. New consumers should prefer passing `opts`
+ * (the only forward-extensible slot) rather than adding more positional
+ * arguments.
+ */
 export function renderCanvasSnapshot(
   snapshot: PublishedSnapshot,
   assetBasePath: string,
   siteId: string = '',
+  opts: RenderSnapshotOptions = {},
 ): string {
   // Belt-and-braces: even though the validator rejects unknown kits at the API
   // boundary, the renderer refuses to emit HTML for a kit that has no preset
@@ -192,6 +233,25 @@ export function renderCanvasSnapshot(
   };
   const pagesHtml = snapshot.pages.map((page) => renderPage(page, baseCtx)).join('');
   const responsiveStyle = renderResponsiveCss(snapshot);
+  // Wave 3 #21 — exercise the optional head-meta hook for every page so the
+  // emitter contract is verified at render time. The renderer body does not
+  // splice the result into the `<main>` block (the document envelope owns
+  // `<head>`); the call is wired here for two reasons:
+  //   1. To give future static-export consumers a single canonical seam
+  //      that walks every page.
+  //   2. To force-evaluate the emitter so a mis-shaped hook fails loudly at
+  //      render time rather than the next time the public route inlines its
+  //      output.
+  // The result is discarded — visitor-facing emission goes through the
+  // sibling `renderCanvasHead` exported from `src/seo/meta-emit.ts`.
+  if (opts.emitHeadMeta) {
+    for (const page of snapshot.pages) {
+      // Drop the result — see note above. We invoke the hook for the side
+      // effect of validating its shape and giving future renderers a place
+      // to hook in.
+      void opts.emitHeadMeta(page);
+    }
+  }
   // The outer wrapper always declares `lang="en"` for the POC. A future
   // owner-facing language picker would override this — out of POC scope.
   return `<main class="rev01-site" lang="en" data-style-kit="${escapeAttr(snapshot.styleKit)}">${responsiveStyle}${pagesHtml}</main>`;

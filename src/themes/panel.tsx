@@ -321,6 +321,16 @@ export function ThemePanel(props: ThemePanelProps) {
         </div>
       </form>
 
+      {/* Wave 3 #20 — Dark variant authoring. Sibling block (NOT inside the
+          existing #10 form) so the byte-for-byte logic above is preserved.
+          The dark sub-form has its own state, its own client script, and its
+          own submit handler that posts to the same /custom-theme endpoint
+          with the dark partial merged onto the active custom kit. Renders
+          ONLY when the Owner is editing a custom theme — for a built-in kit,
+          dark variants come from the sibling built-in-darks table and are
+          not Owner-editable. */}
+      {editing ? <DarkVariantSection siteId={props.siteId} preset={props.activePreset} /> : null}
+
       <script type="module">
         {raw(themePanelClientScript(props.siteId, props.activePreset))}
       </script>
@@ -657,6 +667,184 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
       } catch (err) {
         setStatus('Network error: ' + (err && err.message ? err.message : String(err)));
       }
+    });
+  }
+})();
+`;
+}
+
+// --------------------------------------------------------------------------
+// Wave 3 #20 — Dark variant authoring. ADDITIVE: lives in its own subtree
+// outside the #10 form so the existing Save / Reset / Promote flow stays
+// byte-for-byte unchanged. The dark sub-form gathers the same six colour
+// tokens the light form gathers, posts a follow-up PUT with the merged kit
+// (light tokens unchanged + a `dark` partial), and lets the route's
+// validator catch any drift. Renders only when the Owner is editing a
+// custom theme.
+// --------------------------------------------------------------------------
+
+const DARK_COLOR_TOKENS: ReadonlyArray<{ name: keyof StyleKitPreset; label: string }> = [
+  { name: 'bg', label: 'Background' },
+  { name: 'panel', label: 'Panel' },
+  { name: 'text', label: 'Text' },
+  { name: 'muted', label: 'Muted text' },
+  { name: 'accent', label: 'Accent' },
+  { name: 'accentText', label: 'Accent text' },
+];
+
+function DarkVariantSection({ siteId, preset }: { siteId: string; preset: StyleKitPreset }) {
+  const dark = preset.dark ?? {};
+  return (
+    <section data-rev01-dark-variant class="rev01-theme-row">
+      <h3>Dark variant</h3>
+      <p class="rev01-theme-status">
+        Optional overrides applied when the visitor's mode is dark. Empty fields fall
+        through to the light value.
+      </p>
+      <div class="rev01-theme-grid">
+        {DARK_COLOR_TOKENS.map((tok) => (
+          <DarkColorField
+            name={String(tok.name)}
+            label={tok.label}
+            value={
+              typeof dark[tok.name] === 'string' ? (dark[tok.name] as string) : ''
+            }
+          />
+        ))}
+      </div>
+      <div class="rev01-theme-actions">
+        <button type="button" data-rev01-dark-save>
+          Save dark variant
+        </button>
+        <button type="button" data-variant="ghost" data-rev01-dark-clear>
+          Clear dark variant
+        </button>
+      </div>
+      <p class="rev01-theme-status" data-rev01-dark-status></p>
+      <script type="module">{raw(darkVariantClientScript(siteId, preset))}</script>
+    </section>
+  );
+}
+
+function DarkColorField({
+  name,
+  label,
+  value,
+}: {
+  name: string;
+  label: string;
+  value: string;
+}) {
+  // Mirrors `ColorField` but with empty-string as a valid "no override" value.
+  // The picker mirror is wired by the dark-variant client script (independent
+  // from the light form's client script — no shared selectors).
+  return (
+    <label>
+      <span>{label}</span>
+      <input
+        type="color"
+        name={`dark_${name}_picker`}
+        value={value.length > 0 ? normaliseHexForPicker(value) : '#000000'}
+        data-rev01-dark-picker={name}
+      />
+      <input
+        type="text"
+        name={`dark_${name}`}
+        value={value}
+        placeholder="(inherit from light)"
+        data-rev01-dark-hex={name}
+        inputmode="text"
+        autocomplete="off"
+        spellcheck={false}
+      />
+    </label>
+  );
+}
+
+function darkVariantClientScript(siteId: string, preset: StyleKitPreset): string {
+  // Same shape as the light form's client script: serialise the kit so the
+  // submit handler has the full base to project against. The script POSTs a
+  // PUT with the kit unchanged except for the `dark` partial built from the
+  // dark inputs. Empty inputs are omitted from the partial (the resolver
+  // treats absent keys as "inherit from light" by design).
+  const payload = { siteId, preset };
+  const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+  return String.raw`
+(() => {
+  const STATE = JSON.parse(${JSON.stringify(json)});
+  const root = document.querySelector('[data-rev01-dark-variant]');
+  if (!root) return;
+  const status = root.querySelector('[data-rev01-dark-status]');
+  function setStatus(msg) { if (status) status.textContent = msg; }
+  // Picker ↔ hex sync, independent from the light form's wiring.
+  root.querySelectorAll('[data-rev01-dark-picker]').forEach((picker) => {
+    const name = picker.getAttribute('data-rev01-dark-picker');
+    if (!name) return;
+    const hex = root.querySelector('[data-rev01-dark-hex="' + name + '"]');
+    if (!hex) return;
+    picker.addEventListener('input', () => { hex.value = picker.value; });
+    hex.addEventListener('input', () => {
+      const v = hex.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) picker.value = v;
+    });
+  });
+  function buildDarkPartial() {
+    const dark = {};
+    const TOKENS = ['bg', 'panel', 'text', 'muted', 'accent', 'accentText'];
+    for (const name of TOKENS) {
+      const hex = root.querySelector('[data-rev01-dark-hex="' + name + '"]');
+      if (!hex) continue;
+      const v = hex.value.trim();
+      if (v.length > 0) dark[name] = v;
+    }
+    return dark;
+  }
+  async function putKit(nextKit) {
+    setStatus('Saving dark variant…');
+    try {
+      const response = await fetch(
+        '/api/sites/' + encodeURIComponent(STATE.siteId) + '/custom-theme',
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json', accept: 'application/json' },
+          body: JSON.stringify({ customStyleKit: nextKit }),
+        },
+      );
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (_) { /* noop */ }
+        setStatus('Save failed: ' + detail);
+        return;
+      }
+      setStatus('Dark variant saved. Reloading…');
+      location.reload();
+    } catch (err) {
+      setStatus('Network error: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+  const saveBtn = root.querySelector('[data-rev01-dark-save]');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      const nextKit = JSON.parse(JSON.stringify(STATE.preset));
+      const dark = buildDarkPartial();
+      if (Object.keys(dark).length === 0) {
+        delete nextKit.dark;
+      } else {
+        nextKit.dark = dark;
+      }
+      putKit(nextKit);
+    });
+  }
+  const clearBtn = root.querySelector('[data-rev01-dark-clear]');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      if (!confirm('Clear the dark variant? Visitors in dark mode will see the light kit.')) return;
+      const nextKit = JSON.parse(JSON.stringify(STATE.preset));
+      delete nextKit.dark;
+      putKit(nextKit);
     });
   }
 })();

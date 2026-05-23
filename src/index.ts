@@ -23,6 +23,12 @@ import passwordAdminRoute from './password/admin-route';
 import siteSettingsRoute from './routes/dashboard/site-settings';
 import themeRoute from './themes/route';
 import { configureFormRender } from './canvas/elements/form';
+// Wave 3 routers wired by main thread after parallel-agent merge.
+import searchRouter from './search/route';
+import symbolsRouter from './symbols/route';
+import a11yRoute from './a11y/route';
+import a11yReportRoute from './routes/dashboard/a11y-report';
+import pageSettingsRoute from './routes/dashboard/page-settings';
 
 const app = new Hono<PublicEnv>();
 
@@ -86,6 +92,16 @@ app.route('/api/sites/:siteId/password', passwordAdminRoute);
 // the request falls through here. The handler reads the request Host to scope
 // the cookie to the right site.
 app.route('/__rev01/unlock', unlockRoute);
+// Wave 3 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
+// Symbols (#14) and a11y (#15) live under /api/sites/:siteId/...
+app.route('/api/sites/:siteId/symbols', symbolsRouter);
+app.route('/api/sites', a11yRoute);
+app.route('/dashboard', a11yReportRoute);
+app.route('/dashboard', pageSettingsRoute);
+// Site search (#13) — visitor-facing endpoint on the public-host path.
+// public.ts returns null for `/__rev01/*` so the search request falls through
+// to this app router. The handler reads the request Host to resolve site id.
+app.route('/__rev01/search', searchRouter);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in
