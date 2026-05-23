@@ -398,6 +398,22 @@ export function getStyleKitPreset(kit: string): StyleKitPreset {
 }
 
 // --------------------------------------------------------------------------
+// Wave 2 #10 — `'custom'` dispatch slot.
+//
+// Phase 0 reserved this resolver for the Wave 2 owner (custom theme editor).
+// The implementation lives in `src/themes/custom-resolve.ts` so the runtime
+// validator + the editor panel can share one source of truth. We re-export
+// it here so the canvas render boundary (and any future caller that already
+// imports from `src/canvas/style-kits.ts`) routes `'custom'` through the
+// same dispatch as built-ins without taking a dependency on `src/themes/`.
+// The `getStyleKitPreset(kit: string)` entry-point keeps its
+// 'custom-is-a-programming-error' contract — callers that may see `'custom'`
+// switch to `resolveStyleKitWithCustom(state)` instead.
+// --------------------------------------------------------------------------
+
+export { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
+
+// --------------------------------------------------------------------------
 // CSS builder — translates the preset table into the CSS that both the
 // editor preview and the public renderer ship. One implementation, no drift.
 //

@@ -25,6 +25,12 @@ import type { PublishedSnapshot } from '../canvas/schema';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { site } from '../db/schema';
+// Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
+import { buildEmbedCsp } from '../embed/csp';
+// Wave 2 #9 — password-protected publish gate. Called per request after the
+// site row is resolved; returns a gate Response when the visitor must unlock,
+// or null to continue serving the snapshot.
+import { requireUnlock } from '../password/middleware';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -32,6 +38,19 @@ interface Bindings {
   DATABASE_URL: string;
   SITE_ROOM: DurableObjectNamespace;
   ASSETS_BUCKET: R2Bucket;
+  // Wave 1 #5 — Cloudflare for SaaS Custom Hostnames.
+  CF_API_TOKEN?: string;
+  CF_ZONE_ID?: string;
+  // Wave 2 #7 — Cloudflare Turnstile (form bot-protection).
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET?: string;
+  // Wave 2 #7 — outbound form webhook HMAC signing secret.
+  WEBHOOK_SIGNING_SECRET?: string;
+  // Wave 2 #9 — HMAC secret signing the visitor unlock cookie. Set via
+  // `wrangler secret put UNLOCK_SIGNING_SECRET`.
+  UNLOCK_SIGNING_SECRET: string;
+  // Wave 2 #7 — forms rate-limiter DO binding (declared in wrangler.toml).
+  FORM_RATE_LIMITER?: DurableObjectNamespace;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -173,6 +192,10 @@ interface PublicSiteRow {
   name: string;
   subdomain: string;
   publishedSnapshot: PublishedSnapshot | null;
+  // Wave 2 #9 — password gate fields read by `requireUnlock`.
+  passwordEnabled: boolean;
+  passwordHash: string | null;
+  passwordSetAt: Date | null;
 }
 
 async function loadPublicSite(
@@ -186,6 +209,9 @@ async function loadPublicSite(
       name: site.name,
       subdomain: site.subdomain,
       publishedSnapshot: site.publishedSnapshot,
+      passwordEnabled: site.passwordEnabled,
+      passwordHash: site.passwordHash,
+      passwordSetAt: site.passwordSetAt,
     })
     .from(site)
     .where(eq(site.subdomain, subdomain))
@@ -204,6 +230,9 @@ async function loadPublicSiteById(env: Bindings, siteId: string): Promise<Public
       name: site.name,
       subdomain: site.subdomain,
       publishedSnapshot: site.publishedSnapshot,
+      passwordEnabled: site.passwordEnabled,
+      passwordHash: site.passwordHash,
+      passwordSetAt: site.passwordSetAt,
     })
     .from(site)
     .where(eq(site.id, siteId))
@@ -285,6 +314,26 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return c.text('site not yet published', 404);
   }
 
+  // Wave 2 #9 — internal unlock routes must fall through to the app router.
+  // The middleware's `/__rev01/*` bypass returns null but we never want
+  // public.ts to render a snapshot for these paths regardless of gate state;
+  // the app router has `/__rev01/unlock` mounted to handle the POST.
+  if (path.startsWith('/__rev01/')) {
+    return null;
+  }
+
+  // Wave 2 #9 — password gate. Intercepts visitor traffic before snapshot
+  // serve. Returns null when the gate is disabled or the cookie is valid;
+  // returns a gate Response (401 + HTML) otherwise.
+  const gateResponse = await requireUnlock(c, c.env, {
+    id: siteRow.id,
+    name: siteRow.name,
+    passwordEnabled: siteRow.passwordEnabled,
+    passwordHash: siteRow.passwordHash,
+    passwordSetAt: siteRow.passwordSetAt,
+  });
+  if (gateResponse) return gateResponse;
+
   if (path === '/__live') {
     const upgrade = c.req.header('upgrade');
     if (upgrade !== 'websocket') {
@@ -350,6 +399,11 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   }
 
   const snapshotHtml = renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets');
+  // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
+  // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe
+  // sandbox can only load those origins. Header is set once per snapshot
+  // response; the value is deterministic given the same snapshot.
+  c.header('Content-Security-Policy', buildEmbedCsp(siteRow.publishedSnapshot));
   // Canonical URL: when served via custom domain, canonical-ise to the
   // hostname the visitor actually used so social/search crawlers index the
   // Owner-facing address, not the rev01 subdomain. The subdomain arm keeps

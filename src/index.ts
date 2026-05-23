@@ -15,8 +15,35 @@ import versionRoute from './version/route';
 import customDomainRouter from './custom-domain/route';
 import ogRoute from './og-image/route';
 import { scheduled as customDomainScheduled } from './custom-domain/cron';
+// Wave 2 routers wired by main thread after parallel-agent merge.
+import formsRouter from './forms/route';
+import formsInboxRoute from './routes/dashboard/forms-inbox';
+import unlockRoute from './password/unlock-route';
+import passwordAdminRoute from './password/admin-route';
+import siteSettingsRoute from './routes/dashboard/site-settings';
+import themeRoute from './themes/route';
+import { configureFormRender } from './canvas/elements/form';
 
 const app = new Hono<PublicEnv>();
+
+// Wave 2 #7 — Forms boot hook. The Turnstile public site key is read from
+// env on first request and cached at module scope (the renderer reads from a
+// module-local config, see src/canvas/elements/form.ts). Without it the form
+// element renders no Turnstile widget; the server-side verifier still hard-
+// fails any submission missing the token, so the bot-protection invariant
+// holds. One-shot — runs once per isolate cold-start.
+let formRenderConfigured = false;
+app.use('*', async (c, next) => {
+  if (!formRenderConfigured) {
+    const turnstileSiteKey =
+      typeof c.env.TURNSTILE_SITE_KEY === 'string' && c.env.TURNSTILE_SITE_KEY.length > 0
+        ? c.env.TURNSTILE_SITE_KEY
+        : null;
+    configureFormRender({ turnstileSiteKey });
+    formRenderConfigured = true;
+  }
+  await next();
+});
 
 // Public host router runs FIRST. If the request host belongs to a Published
 // Site (*.rev01.aayushman.dev minus the app host), serve the snapshot here.
@@ -47,6 +74,18 @@ app.route('/api', sectionsApi);
 app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);
 app.route('/og', ogRoute);
+// Wave 2 mounts. The themes router exposes /api/sites/:siteId/custom-theme;
+// the password admin router exposes /api/sites/:siteId/password.
+app.route('/api/forms', formsRouter);
+app.route('/dashboard', formsInboxRoute);
+app.route('/dashboard', siteSettingsRoute);
+app.route('/api/sites', themeRoute);
+app.route('/api/sites/:siteId/password', passwordAdminRoute);
+// Visitor-facing unlock POST. Lives at the public-host path `/__rev01/unlock`;
+// public.ts's handlePublicRequest explicitly returns null for `/__rev01/*` so
+// the request falls through here. The handler reads the request Host to scope
+// the cookie to the right site.
+app.route('/__rev01/unlock', unlockRoute);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in
