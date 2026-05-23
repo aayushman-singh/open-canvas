@@ -15,6 +15,7 @@
 
 import { RENDER_DISPATCH, type ElementRenderCtx } from './elements/index.js';
 import { escapeAttr, escapeCssValue, sanitiseCssKey, styleFromEntries } from './elements/render-utils.js';
+import { renderResponsiveCss } from './responsive/index.js';
 import { getStyleKitPreset } from './style-kits.js';
 import type {
   CanvasElement,
@@ -190,7 +191,8 @@ export function renderCanvasSnapshot(
     siteId,
   };
   const pagesHtml = snapshot.pages.map((page) => renderPage(page, baseCtx)).join('');
+  const responsiveStyle = renderResponsiveCss(snapshot);
   // The outer wrapper always declares `lang="en"` for the POC. A future
   // owner-facing language picker would override this — out of POC scope.
-  return `<main class="rev01-site" lang="en" data-style-kit="${escapeAttr(snapshot.styleKit)}">${pagesHtml}</main>`;
+  return `<main class="rev01-site" lang="en" data-style-kit="${escapeAttr(snapshot.styleKit)}">${responsiveStyle}${pagesHtml}</main>`;
 }

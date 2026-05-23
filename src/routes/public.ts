@@ -22,6 +22,7 @@ import type { ClerkAuthVariables } from '../auth/middleware';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
+import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { site } from '../db/schema';
 
@@ -192,6 +193,24 @@ async function loadPublicSite(
   return rows[0] ?? null;
 }
 
+// Loader used by the custom-domain arm. After `resolveCustomDomain` returns
+// a siteId, we resolve it to the same PublicSiteRow shape the subdomain arm
+// uses so the rendering tail stays one code path.
+async function loadPublicSiteById(env: Bindings, siteId: string): Promise<PublicSiteRow | null> {
+  const database = db(env);
+  const rows = await database
+    .select({
+      id: site.id,
+      name: site.name,
+      subdomain: site.subdomain,
+      publishedSnapshot: site.publishedSnapshot,
+    })
+    .from(site)
+    .where(eq(site.id, siteId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 function extractSubdomain(host: string): string | null {
   if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
   const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
@@ -240,12 +259,25 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     }
     return null;
   }
-  if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
+  // Custom domain arm (Wave 1 #5): if the host isn't the app or a subdomain
+  // Published Address, see whether it matches an Owner-registered custom
+  // hostname whose status is 'active'. resolveCustomDomain returns null for
+  // any host that doesn't match an active row, which falls through to the
+  // null-return below — the request then lands on the app's regular routes
+  // (which will 404 if no route matches the host).
+  const customDomainHit = host.endsWith(PUBLIC_HOST_SUFFIX)
+    ? null
+    : await resolveCustomDomainWithRuntimeCache(host, c.env);
+  if (!host.endsWith(PUBLIC_HOST_SUFFIX) && !customDomainHit) return null;
 
-  const subdomain = extractSubdomain(host);
-  if (subdomain === null) return null;
-
-  const siteRow = await loadPublicSite(c.env, subdomain);
+  let siteRow: PublicSiteRow | null;
+  if (customDomainHit) {
+    siteRow = await loadPublicSiteById(c.env, customDomainHit.siteId);
+  } else {
+    const subdomain = extractSubdomain(host);
+    if (subdomain === null) return null;
+    siteRow = await loadPublicSite(c.env, subdomain);
+  }
   if (!siteRow) {
     return c.text('site not found', 404);
   }
@@ -318,7 +350,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   }
 
   const snapshotHtml = renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets');
-  const canonicalUrl = `https://${siteRow.subdomain}${PUBLIC_HOST_SUFFIX}/`;
+  // Canonical URL: when served via custom domain, canonical-ise to the
+  // hostname the visitor actually used so social/search crawlers index the
+  // Owner-facing address, not the rev01 subdomain. The subdomain arm keeps
+  // its existing canonical.
+  const canonicalUrl = customDomainHit
+    ? `https://${host}/`
+    : `https://${siteRow.subdomain}${PUBLIC_HOST_SUFFIX}/`;
   const titleEscaped = escapeText(siteRow.name);
   const canonicalEscaped = escapeAttr(canonicalUrl);
   const visitorScript = buildVisitorLiveScript(siteRow.publishedSnapshot.version);

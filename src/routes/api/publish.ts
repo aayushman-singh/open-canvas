@@ -28,12 +28,22 @@ import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
+// Wave 1 post-publish hooks. Per-plan contracts:
+//   - Snapshot capture for the version-history timeline (#3).
+//   - OG-image pre-render to R2 keyed by snapshot.version (#6).
+import { captureOnPublish } from '../../version/capture';
+import { onPublishGenerateOg } from '../../og-image/on-publish';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   SITE_ROOM: DurableObjectNamespace;
+  // Wave 1 #6 — OG image pre-render at publish writes to R2.
+  ASSETS_BUCKET: R2Bucket;
+  // Wave 1 #6 — Satori/resvg wasm module slot (optional; the rasteriser
+  // falls back to a disk read on Bun and an on-demand fetch in Workers).
+  OG_RESVG_WASM?: WebAssembly.Module;
 }
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -151,6 +161,25 @@ publishApi.post('/sites/:siteId', async (c) => {
       updatedAt: sql`now()`,
     })
     .where(and(eq(site.id, row.id), eq(site.customerId, customerId)));
+
+  // Wave 1 #3 — capture a version-history snapshot of the editable state at
+  // this publish version. The publish row itself is the source of truth for
+  // what visitors see; this snapshot powers the Owner-facing timeline +
+  // restore. Failure throws (per the project's all-or-nothing posture); the
+  // publish row update above succeeds first so a snapshot-capture crash does
+  // not produce a half-published state on the visitor side.
+  await captureOnPublish(row.id, snapshot.version, database, c.env);
+
+  // Wave 1 #6 — pre-render OG cards into R2 for every page so the first
+  // visitor share-link is unfurled with a cached image. Per-page errors are
+  // trapped inside the hook so a glitch on one page never rolls back the
+  // publish; an extreme failure (binding missing) is logged loud and ignored
+  // here because visitor OG endpoints render on demand.
+  try {
+    await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
+  } catch (error) {
+    console.error('[publish] onPublishGenerateOg failed catastrophically', error);
+  }
 
   const html = renderCanvasSnapshot(snapshot, '/assets');
 

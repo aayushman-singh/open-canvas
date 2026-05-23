@@ -10,6 +10,11 @@ import publishApi from './routes/api/publish';
 import sectionsApi from './routes/api/sections';
 import canvasEditor from './editor/canvas-index';
 import { handlePublicRequest, type PublicEnv } from './routes/public';
+// Wave 1 routers wired by main thread after parallel-agent merge.
+import versionRoute from './version/route';
+import customDomainRouter from './custom-domain/route';
+import ogRoute from './og-image/route';
+import { scheduled as customDomainScheduled } from './custom-domain/cron';
 
 const app = new Hono<PublicEnv>();
 
@@ -38,10 +43,26 @@ app.route('/api/publish', publishApi);
 // editor still calls the legacy path during this Phase 0 cutover.
 app.route('/api/owner/assets', ownerAssetsApi);
 app.route('/api', sectionsApi);
+// Wave 1 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
+app.route('/api/sites/:siteId/snapshots', versionRoute);
+app.route('/api/sites/:siteId/domains', customDomainRouter);
+app.route('/og', ogRoute);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in
 // wrangler.toml; the implementation throws until Wave 2 lands. See
 // docs/superpowers/plans/2026-05-23-07-forms.md.
 export { FormRateLimiter } from './live/form-rate-limiter';
-export default app;
+// Named export so tests can use Hono's `.request(...)` helper directly.
+// (The default export is the Worker module-object Cloudflare expects:
+// `{ fetch, scheduled }`. That shape does NOT expose `.request`.)
+export { app };
+
+// Worker default export carries both the request handler and the cron
+// `scheduled` handler. The cron-trigger expression lives in wrangler.toml
+// `[triggers]`; the handler dispatches to per-feature scheduled tasks.
+// Wave 1 #5 (custom domains) owns the only scheduled task today.
+export default {
+  fetch: app.fetch.bind(app),
+  scheduled: customDomainScheduled,
+};

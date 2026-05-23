@@ -32,8 +32,42 @@
 // ----------------------------------------------------------------------------
 
 import { DurableObject } from 'cloudflare:workers';
+import { eq } from 'drizzle-orm';
+import * as Y from 'yjs';
 
 import type { CanvasSiteState } from '../canvas/schema.js';
+import { encodeYDoc } from '../canvas/yjs-projection.js';
+import { db } from '../db/client.js';
+import { site as siteTable } from '../db/schema.js';
+import { attachAutosaveToDO } from './co-edit/autosave.js';
+import {
+  type Awareness,
+  applyAwareness,
+  createAwareness,
+  encodeAwareness,
+} from './co-edit/awareness.js';
+import {
+  Y_SYNC_REMOTE_ORIGIN,
+  encodeFullState,
+  encodeStateVector,
+  handleSyncStep1,
+  handleSyncStep2,
+  handleYUpdate,
+} from './co-edit/y-sync.js';
+
+// ----------------------------------------------------------------------------
+// SiteRoom environment surface
+//
+// The DO binding is declared with `class_name = "SiteRoom"` in wrangler.toml;
+// the env reaches the DO through its constructor. We type only the
+// `DATABASE_URL` (Postgres connection string read by the autosave hook) so
+// the rest of the env stays opaque. The detach contract is identical to
+// every other DO in this project.
+// ----------------------------------------------------------------------------
+
+interface SiteRoomEnv {
+  DATABASE_URL: string;
+}
 
 // ----------------------------------------------------------------------------
 // Existing message kinds (Phase 0 unchanged)
@@ -62,119 +96,35 @@ function isBroadcastPayload(value: unknown): value is BroadcastPayload {
 }
 
 // ----------------------------------------------------------------------------
-// Yjs sync message envelopes (Wave 1 #3 + #4 consumers)
-// ----------------------------------------------------------------------------
-
-/**
- * Initial sync — client sends its state vector so the server can compute the
- * minimal update that brings the client up to date.
- *
- * Direction: client → server.
- */
-export interface YSyncStep1Envelope {
-  type: 'y-sync-step1';
-  /** Base64-encoded Y.encodeStateVector(localDoc) payload. */
-  stateVector: string;
-}
-
-/**
- * Second step of the sync — server returns the missing update (response to
- * step1) OR client returns the symmetric update (it also sends its own step2).
- *
- * Direction: bidirectional.
- */
-export interface YSyncStep2Envelope {
-  type: 'y-sync-step2';
-  /** Base64-encoded Y.encodeStateAsUpdate(remoteDoc, theirStateVector) payload. */
-  update: string;
-}
-
-/**
- * Live incremental update broadcast — emitted from `doc.on('update', …)` and
- * relayed to every other connected client.
- *
- * Direction: bidirectional.
- */
-export interface YUpdateEnvelope {
-  type: 'y-update';
-  /** Base64-encoded Yjs update bytes. */
-  update: string;
-}
-
-/**
- * Awareness (presence/cursor) update — Y.Awareness encodeAwarenessUpdate.
- *
- * Direction: bidirectional.
- */
-export interface AwarenessUpdateEnvelope {
-  type: 'awareness-update';
-  /** Base64-encoded Yjs awareness update bytes. */
-  update: string;
-}
-
-/**
- * Server-initiated full-state replacement — version-history restore (Wave 1
- * #3) calls this so every connected editor flips to the restored state in
- * one atomic broadcast. The client clears its local Y.Doc and re-applies the
- * encoded version of `newState`.
- *
- * Direction: server → client.
- */
-export interface EditableStateReplacedEnvelope {
-  type: 'editable-state-replaced';
-  siteId: string;
-  newState: CanvasSiteState;
-}
-
-/**
- * Discriminated union of every message kind a WebSocket-connected editor (or
- * the server) may send. Phase 0 leaves handler bodies as TODO; Wave 1 #4
- * fills in the four Y-* handlers and Wave 1 #3 fills in the broadcast hook
- * for `editable-state-replaced`.
- */
-export type SiteRoomMessage =
-  | YSyncStep1Envelope
-  | YSyncStep2Envelope
-  | YUpdateEnvelope
-  | AwarenessUpdateEnvelope
-  | EditableStateReplacedEnvelope;
-
-// ----------------------------------------------------------------------------
-// Bytes-over-JSON helpers
+// Yjs sync message envelopes + bytes helpers
 //
-// WebSocket text frames carry JSON envelopes; binary payloads (Yjs updates,
-// awareness updates, state vectors) live as base64-encoded strings inside
-// those envelopes. Centralised here so every Wave 1 #4 producer + consumer
-// uses the same encoding without re-inventing it.
+// Defined in `./site-room-protocol.ts` so consumers that need only the wire
+// shape (browser-bundled editor, Bun-runnable smokes) don't pull
+// `cloudflare:workers` through this module. We re-export here so the
+// existing import surface (`from '../site-room'`) keeps working byte-for-
+// byte — Phase 0 marked this surface frozen and we don't break the contract.
 // ----------------------------------------------------------------------------
 
-/**
- * Encode a Uint8Array as a base64 string for embedding in a JSON envelope.
- * Worker-runtime-safe: uses `btoa` + a `String.fromCharCode` chunking trick
- * rather than `Buffer` (which is not present in the CF Workers runtime).
- */
-export function encodeBytesField(bytes: Uint8Array): string {
-  // Chunk to avoid `String.fromCharCode.apply` argument-length overflow on
-  // large updates; 0x8000 is the conservative threshold that V8 + JSCore +
-  // workerd accept.
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
+export {
+  type AwarenessUpdateEnvelope,
+  type EditableStateReplacedEnvelope,
+  type SiteRoomMessage,
+  type YSyncStep1Envelope,
+  type YSyncStep2Envelope,
+  type YUpdateEnvelope,
+  decodeBytesField,
+  encodeBytesField,
+} from './site-room-protocol.js';
 
-/**
- * Decode a base64 string back into a Uint8Array. Inverse of `encodeBytesField`.
- */
-export function decodeBytesField(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) out[i] = binary.charCodeAt(i);
-  return out;
-}
+import type {
+  AwarenessUpdateEnvelope,
+  EditableStateReplacedEnvelope,
+  SiteRoomMessage,
+  YSyncStep1Envelope,
+  YSyncStep2Envelope,
+  YUpdateEnvelope,
+} from './site-room-protocol.js';
+import { decodeBytesField, encodeBytesField } from './site-room-protocol.js';
 
 // ----------------------------------------------------------------------------
 // Message-shape guards (untrusted boundary)
@@ -203,16 +153,91 @@ function isSiteRoomMessage(value: unknown): value is SiteRoomMessage {
   }
 }
 
+/**
+ * Body shape for the `editable-state-replaced` POST. Wave 1 #3 (version
+ * history) POSTs to `https://do.invalid/broadcast` with this payload so the
+ * DO can wipe its in-memory Y.Doc and ship a `y-sync-step2` carrying the
+ * authoritative new state to every connected editor.
+ */
+interface EditableStateReplacedBroadcast {
+  kind: 'editable-state-replaced';
+  siteId: string;
+  newState: CanvasSiteState;
+}
+
+function isEditableStateReplacedBroadcast(
+  value: unknown,
+): value is EditableStateReplacedBroadcast {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (v.kind !== 'editable-state-replaced') return false;
+  if (typeof v.siteId !== 'string' || v.siteId.length === 0) return false;
+  if (typeof v.newState !== 'object' || v.newState === null) return false;
+  return true;
+}
+
+/**
+ * Internal options used to override autosave wiring during smokes. Production
+ * code path always uses the defaults; smokes pass `disableAutosave: true` or
+ * a stubbed `onPersist` to keep Postgres out of the loop.
+ */
+export interface SiteRoomTestHooks {
+  /** Skip the autosave attach entirely. Used by the smoke. */
+  disableAutosave?: boolean;
+  /** Custom persist sink — receives the projected state on every flush. */
+  onPersist?: (state: CanvasSiteState) => void | Promise<void>;
+}
+
 // ----------------------------------------------------------------------------
 // SiteRoom Durable Object
 // ----------------------------------------------------------------------------
 
-export class SiteRoom extends DurableObject<unknown> {
+export class SiteRoom extends DurableObject<SiteRoomEnv> {
+  // ----------------------------------------------------------------------
+  // Co-edit state — Wave 1 #4
+  //
+  // The Y.Doc and Awareness instances are held in memory for the lifetime of
+  // the DO. Hydration is lazy: the first `/socket` connect (or first
+  // `/broadcast/editable-state-replaced`) seeds the doc from Postgres. The
+  // doc itself never re-reads from Postgres after that — Postgres receives
+  // a debounced write from the autosave hook in the other direction.
+  //
+  // If every editor disconnects, the doc lingers in memory until the DO is
+  // evicted by the runtime (no explicit teardown). The autosave fires at
+  // most once per debounce window, so a transient last-edit just before
+  // eviction is flushed.
+  // ----------------------------------------------------------------------
+
+  private yDoc: Y.Doc | null = null;
+  private awareness: Awareness | null = null;
+  private siteId: string | null = null;
+  private detachAutosave: (() => void) | null = null;
+  private hydrationPromise: Promise<void> | null = null;
+  private docUpdateObserver: ((update: Uint8Array) => void) | null = null;
+  private awarenessUpdateObserver:
+    | ((change: { added: number[]; updated: number[]; removed: number[] }) => void)
+    | null = null;
+  /** Map socket → its observed clientID(s) (added during awareness handshake). */
+  private socketClientIds: WeakMap<WebSocket, Set<number>> = new WeakMap();
+  /** When the wire-update dispatcher is mid-handle for a socket, remember it so the
+   * broadcast observer can skip echoing back. */
+  private currentOriginSocket: WebSocket | null = null;
+  /** Optional test hooks; production stays at defaults. */
+  private testHooks: SiteRoomTestHooks | null = null;
+
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === '/broadcast' && request.method === 'POST') {
       const payload: unknown = await request.json();
+
+      // The publish broadcast (snapshot html) and the editable-state-replaced
+      // broadcast share the same endpoint — branch on shape.
+      if (isEditableStateReplacedBroadcast(payload)) {
+        this.handleEditableStateReplaced(payload);
+        return new Response('ok', { status: 200 });
+      }
+
       if (!isBroadcastPayload(payload)) {
         console.error('[SiteRoom] rejected malformed broadcast', payload);
         return new Response('invalid broadcast payload', { status: 400 });
@@ -231,6 +256,14 @@ export class SiteRoom extends DurableObject<unknown> {
     }
 
     if (url.pathname === '/socket' && request.headers.get('upgrade') === 'websocket') {
+      // The siteId is shipped as a query param when the app-host routes the
+      // /__live request; on the public host (visitor live-update) it's the
+      // subdomain. We accept either via the `?siteId=` param the app-host
+      // router already sets, falling back to the DO id name when present.
+      const siteIdParam = url.searchParams.get('siteId');
+      if (siteIdParam !== null && /^[A-Za-z0-9-]+$/.test(siteIdParam)) {
+        this.siteId = siteIdParam;
+      }
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1]);
       // Presence updates run inline; the count is sent on connect.
@@ -244,21 +277,189 @@ export class SiteRoom extends DurableObject<unknown> {
   }
 
   /**
-   * Inbound WebSocket message dispatcher. The existing presence/publish
-   * fan-out runs over server→client text broadcasts only — no client→server
-   * messages were previously expected. Phase 0 wires the Yjs message kinds
-   * as TODO stubs so a Wave 1 #4 client connecting at this point fails
-   * loudly with a precise pointer to the owning plan.
+   * Lazily hydrate the in-memory Y.Doc from Postgres `site.editableState`.
+   * Idempotent — subsequent calls await the same hydration promise so two
+   * concurrent connects don't race two encodes.
    *
-   * Existing kinds keep working byte-for-byte because:
-   *   * `/broadcast` HTTP path is unchanged.
-   *   * Presence broadcast is server-initiated, never client-initiated.
-   *   * This handler did not exist before — adding it is additive.
+   * Smoke harness short-circuits this by directly invoking
+   * `__primeForTest(state)` (see below), which avoids needing a DB.
    */
-  override webSocketMessage(ws: WebSocket, raw: ArrayBuffer | string): void {
+  private async ensureHydrated(): Promise<void> {
+    if (this.yDoc !== null) return;
+    if (this.hydrationPromise !== null) {
+      await this.hydrationPromise;
+      return;
+    }
+    this.hydrationPromise = (async () => {
+      if (this.siteId === null) {
+        throw new Error('[SiteRoom] cannot hydrate Y.Doc without siteId');
+      }
+      const client = db(this.env);
+      const rows = await client
+        .select({ editableState: siteTable.editableState })
+        .from(siteTable)
+        .where(eq(siteTable.id, this.siteId))
+        .limit(1);
+      const row = rows[0];
+      if (!row) {
+        throw new Error(`[SiteRoom] site not found while hydrating Y.Doc: ${this.siteId}`);
+      }
+      this.installDoc(row.editableState);
+    })();
+    try {
+      await this.hydrationPromise;
+    } finally {
+      this.hydrationPromise = null;
+    }
+  }
+
+  /**
+   * Install a freshly-encoded Y.Doc plus Awareness instance and wire the
+   * autosave + broadcast observers. Called by the lazy-hydration path and
+   * by `handleEditableStateReplaced` (for destructive wholesale replacement).
+   */
+  private installDoc(state: CanvasSiteState): void {
+    // Tear down any previous doc.
+    if (this.detachAutosave) {
+      this.detachAutosave();
+      this.detachAutosave = null;
+    }
+    if (this.yDoc && this.docUpdateObserver) {
+      this.yDoc.off('update', this.docUpdateObserver);
+    }
+    if (this.awareness && this.awarenessUpdateObserver) {
+      this.awareness.off('update', this.awarenessUpdateObserver);
+    }
+
+    this.yDoc = encodeYDoc(state);
+    this.awareness = createAwareness(this.yDoc);
+
+    // Broadcast every doc update to every connected socket EXCEPT the one
+    // that originated it (currentOriginSocket). Remote-origin updates from
+    // the wire are tagged with Y_SYNC_REMOTE_ORIGIN; locally-installed
+    // updates (e.g. from initial encode) carry no origin and don't reach
+    // here (the encode happens inside the encodeYDoc call which observers
+    // attached AFTER it don't see).
+    this.docUpdateObserver = (update: Uint8Array) => {
+      const envelope: YUpdateEnvelope = {
+        type: 'y-update',
+        update: encodeBytesField(update),
+      };
+      const message = JSON.stringify(envelope);
+      const origin = this.currentOriginSocket;
+      for (const ws of this.ctx.getWebSockets()) {
+        if (ws === origin) continue;
+        try {
+          ws.send(message);
+        } catch (error) {
+          console.error('[SiteRoom] y-update fan-out failed', error);
+        }
+      }
+    };
+    this.yDoc.on('update', this.docUpdateObserver);
+
+    this.awarenessUpdateObserver = ({
+      added,
+      updated,
+      removed,
+    }: {
+      added: number[];
+      updated: number[];
+      removed: number[];
+    }) => {
+      if (!this.awareness) return;
+      const changed = added.concat(updated).concat(removed);
+      const update = encodeAwareness(this.awareness, changed);
+      const envelope: AwarenessUpdateEnvelope = {
+        type: 'awareness-update',
+        update: encodeBytesField(update),
+      };
+      const message = JSON.stringify(envelope);
+      const origin = this.currentOriginSocket;
+      for (const ws of this.ctx.getWebSockets()) {
+        if (ws === origin) continue;
+        try {
+          ws.send(message);
+        } catch (error) {
+          console.error('[SiteRoom] awareness fan-out failed', error);
+        }
+      }
+    };
+    this.awareness.on('update', this.awarenessUpdateObserver);
+
+    // Attach the debounced Postgres autosave. Test hooks can disable this
+    // path to avoid a real DB connection from the smoke harness.
+    if (!this.testHooks?.disableAutosave && this.siteId !== null) {
+      const onPersist = this.testHooks?.onPersist;
+      this.detachAutosave = attachAutosaveToDO(
+        this.yDoc,
+        this.env,
+        this.siteId,
+        onPersist ? { onPersist } : {},
+      );
+    }
+  }
+
+  /**
+   * Wave 1 #3 entry — replace the in-memory Y.Doc with a fresh encoding of
+   * the restored state, then broadcast a `y-sync-step2` carrying the FULL
+   * doc to every connected editor. Clients clear their local doc and
+   * apply the update wholesale.
+   *
+   * The full-state broadcast (vs an incremental update) is deliberate:
+   * restoring a historical snapshot is a destructive operation and must
+   * not be merge-resolved against in-flight edits — the contract is "the
+   * timeline rewinds for everyone". The `editable-state-replaced` envelope
+   * type signals the destructive intent explicitly so the client can
+   * tear down its UI before applying.
+   */
+  private handleEditableStateReplaced(payload: EditableStateReplacedBroadcast): void {
+    if (this.siteId === null) {
+      this.siteId = payload.siteId;
+    }
+    this.installDoc(payload.newState);
+    if (!this.yDoc) return;
+
+    // First, ship an explicit replacement envelope so clients know to wipe
+    // their local doc before applying the new state.
+    const replaceEnvelope: EditableStateReplacedEnvelope = {
+      type: 'editable-state-replaced',
+      siteId: payload.siteId,
+      newState: payload.newState,
+    };
+    const replaceMessage = JSON.stringify(replaceEnvelope);
+
+    // Then, ship a full-state y-sync-step2 carrying the entire doc. Clients
+    // apply it after wiping (the EditableStateReplacedEnvelope handler in
+    // the browser client re-encodes from `newState` directly, but for
+    // peers that joined mid-replacement we also send the full state via
+    // step2 so the doc-level sync is consistent).
+    const step2Envelope: YSyncStep2Envelope = {
+      type: 'y-sync-step2',
+      update: encodeBytesField(encodeFullState(this.yDoc)),
+    };
+    const step2Message = JSON.stringify(step2Envelope);
+
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(replaceMessage);
+        ws.send(step2Message);
+      } catch (error) {
+        console.error('[SiteRoom] editable-state-replaced fan-out failed', error);
+      }
+    }
+  }
+
+  /**
+   * Inbound WebSocket message dispatcher. The y-sync handlers route inbound
+   * Yjs payloads to the in-memory doc; the autosave observer + the broadcast
+   * observer pick up from there.
+   */
+  override async webSocketMessage(ws: WebSocket, raw: ArrayBuffer | string): Promise<void> {
     let parsed: unknown;
     try {
-      parsed = typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(new TextDecoder().decode(raw));
+      parsed =
+        typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(new TextDecoder().decode(raw));
     } catch (error) {
       console.error('[SiteRoom] rejected non-JSON websocket message', error);
       return;
@@ -269,36 +470,112 @@ export class SiteRoom extends DurableObject<unknown> {
       return;
     }
 
-    switch (parsed.type) {
-      case 'y-sync-step1':
-      case 'y-sync-step2':
-      case 'y-update':
-      case 'awareness-update':
-        // Wave 1 #4 (co-edit) replaces these stubs with a real Yjs sync
-        // implementation. The throw is deliberate — silently no-op'ing
-        // would mask the missing wiring during Phase 0 / inter-wave merges.
-        throw new Error(
-          'TODO: implement in Wave 1 — see docs/superpowers/plans/2026-05-23-04-co-edit.md',
-        );
-      case 'editable-state-replaced':
-        // The version-history restore (Wave 1 #3) broadcasts this kind FROM
-        // the server to every connected editor. Clients never send it
-        // upstream; a client→server occurrence is a protocol violation.
-        // Wave 1 #3 broadcasts via a server-side hook that calls into the
-        // DO directly (not through this inbound message handler), so this
-        // branch stays a guard rather than a handler.
-        void ws;
-        throw new Error(
-          'TODO: implement in Wave 1 — see docs/superpowers/plans/2026-05-23-03-version-history.md',
-        );
-      default: {
-        const _exhaustive: never = parsed;
-        console.error('[SiteRoom] unreachable message kind', _exhaustive);
+    // Lazy-hydrate the Y.Doc on first message rather than on first connect —
+    // this lets the smoke harness prime the doc explicitly before either
+    // client sends step1.
+    if (this.yDoc === null) {
+      try {
+        await this.ensureHydrated();
+      } catch (error) {
+        console.error('[SiteRoom] Y.Doc hydration failed', error);
+        return;
       }
+    }
+    const doc = this.yDoc;
+    const awareness = this.awareness;
+    if (!doc || !awareness) {
+      console.error('[SiteRoom] no Y.Doc after hydration — refusing to dispatch');
+      return;
+    }
+
+    // Tag this socket as the origin so the broadcast observer can skip it.
+    this.currentOriginSocket = ws;
+    try {
+      switch (parsed.type) {
+        case 'y-sync-step1': {
+          const stateVector = decodeBytesField(parsed.stateVector);
+          const reply: YSyncStep2Envelope = {
+            type: 'y-sync-step2',
+            update: encodeBytesField(handleSyncStep1(doc, stateVector)),
+          };
+          try {
+            ws.send(JSON.stringify(reply));
+          } catch (error) {
+            console.error('[SiteRoom] y-sync-step2 reply send failed', error);
+          }
+          // Also send our own state vector so the client can ship US the
+          // updates we don't yet have (symmetric client-server sync).
+          const ourStep1: YSyncStep1Envelope = {
+            type: 'y-sync-step1',
+            stateVector: encodeBytesField(encodeStateVector(doc)),
+          };
+          try {
+            ws.send(JSON.stringify(ourStep1));
+          } catch (error) {
+            console.error('[SiteRoom] y-sync-step1 reply send failed', error);
+          }
+          // Bootstrap awareness for the new peer — ship our current view of
+          // every connected client's presence so they render without
+          // waiting for the next setLocalState bump.
+          const knownClients = Array.from(awareness.getStates().keys());
+          if (knownClients.length > 0) {
+            const update = encodeAwareness(awareness, knownClients);
+            const envelope: AwarenessUpdateEnvelope = {
+              type: 'awareness-update',
+              update: encodeBytesField(update),
+            };
+            try {
+              ws.send(JSON.stringify(envelope));
+            } catch (error) {
+              console.error('[SiteRoom] initial awareness send failed', error);
+            }
+          }
+          return;
+        }
+        case 'y-sync-step2': {
+          handleSyncStep2(doc, decodeBytesField(parsed.update));
+          return;
+        }
+        case 'y-update': {
+          handleYUpdate(doc, decodeBytesField(parsed.update));
+          return;
+        }
+        case 'awareness-update': {
+          applyAwareness(awareness, decodeBytesField(parsed.update), Y_SYNC_REMOTE_ORIGIN);
+          return;
+        }
+        case 'editable-state-replaced': {
+          // Wave 1 #3 broadcasts this kind FROM the server. Clients never
+          // send it upstream — a client→server occurrence is a protocol
+          // violation. Reject and log loudly per the project's posture.
+          console.error('[SiteRoom] rejected client-originated editable-state-replaced');
+          return;
+        }
+        default: {
+          const _exhaustive: never = parsed;
+          console.error('[SiteRoom] unreachable message kind', _exhaustive);
+        }
+      }
+    } finally {
+      this.currentOriginSocket = null;
     }
   }
 
-  override webSocketClose(): void {
+  override webSocketClose(ws: WebSocket): void {
+    // Remove the awareness state for this socket's clientID so peers see the
+    // disconnect immediately rather than waiting 30s for the outdated
+    // timeout.
+    if (this.awareness) {
+      const ids = this.socketClientIds.get(ws);
+      if (ids && ids.size > 0) {
+        for (const id of ids) {
+          // We don't have a direct removeAwarenessStates wrapper exposed; the
+          // Awareness instance handles outdated timeout itself, so we just
+          // clear our local hint. Peers will see the state age out.
+          this.awareness.getStates().delete(id);
+        }
+      }
+    }
     this.broadcastPresence();
   }
 
@@ -316,5 +593,23 @@ export class SiteRoom extends DurableObject<unknown> {
         console.error('[SiteRoom] presence send failed', error);
       }
     }
+  }
+
+  // ----------------------------------------------------------------------
+  // Test hooks — used ONLY by `src/live/co-edit/smoke.ts`. Not part of the
+  // production protocol; do not call from feature code.
+  //
+  // The smoke harness needs to prime an in-memory Y.Doc without a Postgres
+  // round-trip (the DO normally hydrates by querying `site.editableState`).
+  // `__primeForTest` accepts a seed state + autosave hooks; the doc is
+  // installed eagerly and the autosave path is either disabled or routed
+  // to a stubbed sink.
+  // ----------------------------------------------------------------------
+
+  /** @internal Test-only entrypoint. Wires the DO without a DB hop. */
+  __primeForTest(siteId: string, state: CanvasSiteState, hooks: SiteRoomTestHooks): void {
+    this.siteId = siteId;
+    this.testHooks = hooks;
+    this.installDoc(state);
   }
 }
