@@ -24,9 +24,8 @@
 //
 //   5. Broadcast `editable-state-replaced` to the SiteRoom DO so every
 //      connected editor flips immediately. Broadcast failure is logged
-//      loudly but does not roll back the row — the swap is durable, the
-//      next page-load will read it. See SUBSYSTEM.md for the cross-wave
-//      dependency on Wave 1 #4 implementing the inbound handler.
+//      loudly. Connected editors must not keep stale state behind a
+//      successful restore response.
 //
 // Destructiveness: a restore overwrites any unsaved edits between the
 // target snapshot and now. The pre-restore safety snapshot makes that
@@ -64,7 +63,8 @@ export interface RestoreEnv {
  *
  * The DO handler for this `kind` is owned by Wave 1 #4 (co-edit). Until that
  * lands the Phase 0 stub will reject the body with HTTP 400 — the restore
- * primitive still succeeds because the row swap is the durable contract.
+ * primitive fails loudly because connected editors would otherwise keep
+ * stale state after the row swap.
  */
 export interface EditableStateReplacedBroadcast {
   kind: 'editable-state-replaced';
@@ -77,13 +77,8 @@ export interface RestoreResult {
   snapshotId: string;
   /** The new editable state (decoded from the snapshot). */
   newState: CanvasSiteState;
-  /**
-   * Whether the SiteRoom broadcast was accepted. `false` when the DO
-   * rejected the payload (typically because Wave 1 #4 is not yet landed,
-   * or the binding is a no-op stub in the smoke). The row swap has
-   * already succeeded either way.
-   */
-  broadcasted: boolean;
+  /** True when the SiteRoom accepted the editor replacement broadcast. */
+  broadcasted: true;
 }
 
 export class RestoreError extends Error {
@@ -174,15 +169,14 @@ export async function restoreSnapshot(
     .where(eq(site.id, siteId));
 
   // Step 5 — SiteRoom broadcast. Wave 1 #4 owns the inbound handler for
-  // this kind; until that lands the DO will reject with HTTP 400 and we
-  // surface that via `broadcasted: false` rather than throwing. The row
-  // swap is already durable.
-  const broadcasted = await broadcastReplacement(env, siteId, newState);
+  // this kind. If the DO rejects the payload, the restore request fails
+  // instead of reporting ok=true while editors keep stale state.
+  await broadcastReplacement(env, siteId, newState);
 
   return {
     snapshotId: snapshotRow.id,
     newState,
-    broadcasted,
+    broadcasted: true,
   };
 }
 
@@ -190,7 +184,7 @@ async function broadcastReplacement(
   env: RestoreEnv,
   siteId: string,
   newState: CanvasSiteState,
-): Promise<boolean> {
+): Promise<void> {
   try {
     const id = env.SITE_ROOM.idFromName(siteId);
     const stub = env.SITE_ROOM.get(id);
@@ -211,13 +205,17 @@ async function broadcastReplacement(
         response.status,
         text,
       );
-      return false;
+      throw new RestoreError(
+        502,
+        `restore broadcast failed with status ${String(response.status)}: ${text}`,
+      );
     }
-    return true;
   } catch (error) {
-    // Per the project posture: log loudly, but the row swap is the
-    // durable contract — we do NOT throw and roll the swap back.
+    if (error instanceof RestoreError) throw error;
     console.error('[version/restore] SiteRoom broadcast failed', error);
-    return false;
+    throw new RestoreError(
+      502,
+      `restore broadcast failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }

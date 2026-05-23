@@ -12,7 +12,7 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { html, raw } from 'hono/html';
 import { createR2Client } from '../assets/r2-client';
@@ -22,9 +22,10 @@ import type { ClerkAuthVariables } from '../auth/middleware';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
+import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
-import { site } from '../db/schema';
+import { ownerAsset, site } from '../db/schema';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
@@ -64,6 +65,8 @@ interface Bindings {
   UNLOCK_SIGNING_SECRET: string;
   // Wave 2 #7 — forms rate-limiter DO binding (declared in wrangler.toml).
   FORM_RATE_LIMITER?: DurableObjectNamespace;
+  // Wave 5 #23 + #24 — Gemini API key for chat agent + auto-translate.
+  GEMINI_API_KEY?: string;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -75,11 +78,14 @@ const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
 // never accidentally treat the app host as a Published Address.
 const APP_HOSTS = new Set([
   'rev01.aayushman.dev',
+  'rev01.test',
   'localhost:8787',
   'localhost',
   '127.0.0.1',
   '127.0.0.1:8787',
 ]);
+
+const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
 // Visitor script: opens a WebSocket to /__live, reacts to publish broadcasts
 // by swapping the snapshot HTML inside [data-rev01-public-root]. innerHTML is
@@ -289,10 +295,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
       }
       const id = c.env.SITE_ROOM.idFromName(siteIdParam);
       const stub = c.env.SITE_ROOM.get(id);
-      const doRequest = new Request('https://do.invalid/socket', {
+      const doRequest = new Request(
+        `https://do.invalid/socket?siteId=${encodeURIComponent(siteIdParam)}`,
+        {
         method: 'GET',
         headers: c.req.raw.headers,
-      });
+        },
+      );
       return stub.fetch(doRequest);
     }
     return null;
@@ -323,11 +332,9 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return c.text('site not yet published', 404);
   }
 
-  // Wave 2 #9 — internal unlock routes must fall through to the app router.
-  // The middleware's `/__rev01/*` bypass returns null but we never want
-  // public.ts to render a snapshot for these paths regardless of gate state;
-  // the app router has `/__rev01/unlock` mounted to handle the POST.
-  if (path.startsWith('/__rev01/')) {
+  // Wave 2 #9 — the unlock POST must reach the app router even when the site
+  // is protected, otherwise no visitor could ever set the unlock cookie.
+  if (path === '/__rev01/unlock') {
     return null;
   }
 
@@ -350,6 +357,12 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   });
   if (gateResponse) return gateResponse;
 
+  // Internal visitor subsystem routes (search, forms, etc.) fall through only
+  // after the password gate has passed. They are not snapshot pages.
+  if (path.startsWith('/__rev01/')) {
+    return null;
+  }
+
   if (path === '/__live') {
     const upgrade = c.req.header('upgrade');
     if (upgrade !== 'websocket') {
@@ -357,10 +370,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     }
     const id = c.env.SITE_ROOM.idFromName(siteRow.id);
     const stub = c.env.SITE_ROOM.get(id);
-    const doRequest = new Request('https://do.invalid/socket', {
+    const doRequest = new Request(
+      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}`,
+      {
       method: 'GET',
       headers: c.req.raw.headers,
-    });
+      },
+    );
     return stub.fetch(doRequest);
   }
 
@@ -382,19 +398,22 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     // check. We accept either because the renderer emits UUID URLs, but
     // operators / cache warmers may probe by content hash directly.
     if (!referencedAssetIds.has(addr)) {
-      // For content-hash addressing we have to resolve UUID → contentHash
-      // via the DB before we can rule out a 64-hex addr. Skip that work
-      // unless the addr looks like a hash; cheap UUID rejects 404 fast.
-      if (!/^[0-9a-f]{64}$/.test(addr)) {
+      // For content-hash addressing we resolve the current snapshot's
+      // referenced UUIDs to their hashes and only allow a match inside that
+      // set. A global content-hash hit in ownerAsset is not enough.
+      if (!CONTENT_HASH_RE.test(addr)) {
         return c.text('asset not found', 404);
       }
-      // Defer content-hash reachability to readOwnerAsset's existence
-      // check (which scopes by no Owner — the read route serves any row
-      // by id/hash; the snapshot-bound rule above is the only restriction
-      // we apply for visitor traffic). The trade-off is intentional: any
-      // content-hash that resolves to a real row is served, even if the
-      // SPECIFIC ownerAsset.id is not in this snapshot, because that's
-      // the same bytes the snapshot points at via a different id.
+      if (referencedAssetIds.size === 0) {
+        return c.text('asset not found', 404);
+      }
+      const referencedRows = await db(c.env)
+        .select({ contentHash: ownerAsset.contentHash })
+        .from(ownerAsset)
+        .where(inArray(ownerAsset.id, [...referencedAssetIds]));
+      if (!referencedRows.some((row) => row.contentHash === addr)) {
+        return c.text('asset not found', 404);
+      }
     }
     const r2 = createR2Client(c.env.ASSETS_BUCKET);
     const cfImageFetch: CfImageFetcher | null =
@@ -422,9 +441,15 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // Wave 4 #17 — wrap rendered snapshot HTML with the interactive runtime
   // <script> tag when the snapshot contains accordion / carousel elements.
   // No-op (string-equality return) for snapshots without any interactives.
+  const snapshot = siteRow.publishedSnapshot;
+  const resolvedKit = resolveStyleKitWithCustom(snapshot);
+  const customKitCss =
+    snapshot.styleKit === 'custom'
+      ? `\n${buildStyleKitCss('custom', resolvedKit)}`
+      : '';
   const snapshotHtml = injectInteractiveRuntime(
-    renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets'),
-    siteRow.publishedSnapshot,
+    renderCanvasSnapshot(snapshot, '/assets'),
+    snapshot,
   );
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
   // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe
@@ -434,7 +459,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // Canonical URL is emitted by Wave 3 #21's `renderCanvasHead` (below). It
   // derives the canonical from the visitor-hit host, which is the custom
   // hostname when the visitor used one and the subdomain otherwise.
-  const visitorScript = buildVisitorLiveScript(siteRow.publishedSnapshot.version);
+  const visitorScript = buildVisitorLiveScript(snapshot.version);
 
   // Wave 3 #21 — pick the page being served (root → first; otherwise first
   // path segment matches a slug). The renderer concats every page into the
@@ -442,13 +467,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // canonical + OG context.
   const pageSlug =
     path === '/' || path === ''
-      ? (siteRow.publishedSnapshot.pages[0]?.slug ?? '')
+      ? (snapshot.pages[0]?.slug ?? '')
       : path.replace(/^\//, '').split('/')[0] ?? '';
   const currentPage =
-    siteRow.publishedSnapshot.pages.find((p) => p.slug === pageSlug)
-      ?? siteRow.publishedSnapshot.pages[0]
+    snapshot.pages.find((p) => p.slug === pageSlug)
+      ?? snapshot.pages[0]
       ?? null;
-  const headMeta = renderCanvasHead(siteRow.publishedSnapshot, {
+  const headMeta = renderCanvasHead(snapshot, {
     siteId: siteRow.id,
     host,
     protocol: requestUrl.protocol === 'http:' ? 'http' : 'https',
@@ -467,15 +492,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   let dualModeCss = '';
   let modeSetterScript = '';
   if (darkModeEnabled) {
-    const kit = resolveStyleKitWithCustom(
-      siteRow.publishedSnapshot.customStyleKit
-        ? {
-            styleKit: siteRow.publishedSnapshot.styleKit,
-            customStyleKit: siteRow.publishedSnapshot.customStyleKit,
-          }
-        : { styleKit: siteRow.publishedSnapshot.styleKit },
-    );
-    dualModeCss = emitDualModeCss(kit, siteRow.publishedSnapshot.styleKit);
+    dualModeCss = emitDualModeCss(resolvedKit, snapshot.styleKit);
     modeSetterScript = getModeSetterScript();
   }
 
@@ -487,7 +504,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     ${raw(headMeta)}
     ${darkModeEnabled ? raw(`<script>${modeSetterScript}</script>`) : ''}
-    <style>${raw(canvasPublishedStyles)}${darkModeEnabled ? `\n${dualModeCss}` : ''}</style>
+    <style>${raw(canvasPublishedStyles)}${raw(customKitCss)}${darkModeEnabled ? `\n${dualModeCss}` : ''}</style>
   </head>
   <body>
     <div data-rev01-public-root>${raw(snapshotHtml)}</div>

@@ -16,7 +16,8 @@
 //        b. Site with password + no cookie → 401 + gate body.
 //        c. Site with valid cookie → null.
 //        d. Site with stale-hashEpoch cookie → 401 (rotation invalidation).
-//        e. Reserved path /__rev01/* → null (bypass).
+//        e. Unlock path /__rev01/unlock → null (bypass).
+//        f. Visitor subsystem path /__rev01/search → 401 (still gated).
 //   4. Rate-limit: 6th failed attempt inside 60s gets 429.
 //
 // Hermetic, no network, no DB.
@@ -268,12 +269,20 @@ async function runMiddlewareSuite(): Promise<void> {
   assert(r4 !== null, 'stale-hashEpoch cookie should be rejected');
   assert(r4.status === 401, 'stale cookie response should be 401');
 
-  // (e) Reserved /__rev01/ path bypasses the gate.
+  // (e) Unlock path bypasses the gate so the unlock POST can land.
   const cReserved = makeContext('https://x.rev01.aayushman.dev/__rev01/unlock', null);
   const r5 = await requireUnlock(cReserved as never, env, protectedSite);
-  assert(r5 === null, 'reserved /__rev01/ path must bypass the gate');
+  assert(r5 === null, 'unlock path must bypass the gate');
 
-  // (f) Retry + ratelimited markers surface in the rendered gate.
+  // (f) Visitor subsystem paths are still visitor traffic and must stay
+  // behind the password gate. Search results and form submissions would
+  // otherwise leak protected-site state.
+  const cSearch = makeContext('https://x.rev01.aayushman.dev/__rev01/search?q=secret', null);
+  const rSearch = await requireUnlock(cSearch as never, env, protectedSite);
+  assert(rSearch !== null, 'protected visitor search must be gated without a cookie');
+  assert(rSearch.status === 401, 'protected visitor search gate response should be 401');
+
+  // (g) Retry + ratelimited markers surface in the rendered gate.
   const cRetry = makeContext(
     'https://x.rev01.aayushman.dev/about?retry=1',
     null,
@@ -294,7 +303,7 @@ async function runMiddlewareSuite(): Promise<void> {
   const rlBody = await r7.text();
   assert(rlBody.includes('Too many attempts'), 'ratelimited gate missing wait copy');
 
-  // (g) Drift detection: passwordEnabled=true with null hash MUST throw.
+  // (h) Drift detection: passwordEnabled=true with null hash MUST throw.
   await assertThrowsAsync(
     () =>
       requireUnlock(cNoCookie as never, env, {

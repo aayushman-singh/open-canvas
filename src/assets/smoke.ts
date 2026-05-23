@@ -27,6 +27,8 @@ import { deleteOwnerAsset } from './delete.js';
 import { sha256Hex } from './hash.js';
 import { readOwnerAsset, type CfImageFetcher, type CfImageOptions } from './read.js';
 import { createR2Client, type R2BucketLike, type R2PutOptions } from './r2-client.js';
+import { collectReferencedAssets, collectReferencedAssetIds } from './site-assets.js';
+import type { CanvasPage } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -139,6 +141,47 @@ function makePng32(): Uint8Array {
   bytes.set([0, 0, 0, 1], 16);
   bytes.set([0, 0, 0, 1], 20);
   return bytes;
+}
+
+function runReferenceWalkTests(): void {
+  const pages: CanvasPage[] = [
+    {
+      id: 'page-assets',
+      slug: 'assets',
+      title: 'Assets',
+      width: 1440,
+      ogImageAssetId: 'og-image-id',
+      sections: [
+        {
+          id: 'section-media',
+          recipeId: 'hero-split',
+          name: 'Media',
+          height: 400,
+          elements: [
+            {
+              id: 'hero-media',
+              type: 'media',
+              mediaKind: 'video',
+              assetId: 'video-id',
+              posterAssetId: 'poster-id',
+              alt: 'Launch reel',
+              fit: 'cover',
+              box: { x: 0, y: 0, w: 640, h: 360, z: 1 },
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const refs = collectReferencedAssets(pages);
+  assert(
+    refs.some((ref) => ref.assetId === 'og-image-id' && ref.expectedKind === 'image'),
+    'expected collectReferencedAssets to include page ogImageAssetId as an image reference',
+  );
+  const ids = collectReferencedAssetIds(pages);
+  assert(ids.has('og-image-id'), 'expected collectReferencedAssetIds to include ogImageAssetId');
+  assert(ids.has('video-id'), 'expected collectReferencedAssetIds to keep media assetId');
+  assert(ids.has('poster-id'), 'expected collectReferencedAssetIds to keep posterAssetId');
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +530,7 @@ const png32 = makePng32();
 assert(png32.byteLength === 32, `expected 32 bytes, got ${String(png32.byteLength)}`);
 const expectedHash = await sha256Hex(png32);
 
+runReferenceWalkTests();
 await runUploadTests(png32, expectedHash);
 await runReadTests(png32, expectedHash);
 await runDeleteTests(png32, expectedHash);

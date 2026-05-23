@@ -371,6 +371,12 @@ export interface PublishedSnapshot {
   customStyleKit?: StyleKitPreset;
   /** Mirror of `CanvasSiteState.symbols`; the renderer needs masters to resolve instances. */
   symbols?: SymbolMaster[];
+  /** Mirror of `CanvasSiteState.defaultLocale`; used by public `<html lang>`. */
+  defaultLocale?: string;
+  /** Mirror of `CanvasSiteState.siteNoIndex`; used by SEO meta emission. */
+  siteNoIndex?: boolean;
+  /** Mirror of `CanvasSiteState.darkModeEnabled`; used by visitor-mode CSS emission. */
+  darkModeEnabled?: boolean;
 }
 
 // -- Style Kit token contract (Task 8) -------------------------------------

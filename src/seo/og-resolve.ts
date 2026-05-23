@@ -5,6 +5,10 @@
 // Precedence (per plan 2026-05-23-21-seo-meta.md):
 //   1. Owner-uploaded `page.ogImageAssetId` — if it resolves through the
 //      provided `assetLookup` to a content hash, return `/assets/<hash>`.
+//      Without an assetLookup (the public renderer path), return
+//      `/assets/<assetId>` and let the public asset route enforce snapshot
+//      reachability. If a provided lookup cannot resolve the explicit id,
+//      throw loudly instead of hiding the broken explicit choice.
 //   2. Generated card from #6 — `/og/<siteId>/<pageSlug>.png`. Requires
 //      `ctx.siteId` and `page.slug` to be non-empty.
 //   3. None — `null`. The caller drops the `og:image` / `twitter:image` tag
@@ -39,14 +43,14 @@ export interface OgResolveContext {
 export function resolveOgUrl(page: CanvasPage, ctx: OgResolveContext): string | null {
   // 1. Explicit asset wins.
   if (page.ogImageAssetId !== undefined && page.ogImageAssetId.length > 0) {
-    const hash = ctx.assetLookup ? ctx.assetLookup(page.ogImageAssetId) : null;
+    if (!ctx.assetLookup) {
+      return `/assets/${encodeURIComponent(page.ogImageAssetId)}`;
+    }
+    const hash = ctx.assetLookup(page.ogImageAssetId);
     if (hash !== null && hash.length > 0) {
       return `/assets/${hash}`;
     }
-    // Explicit asset id was set but did not resolve (e.g. row deleted).
-    // Fall through to the generator rather than failing — matches the
-    // resilient behaviour the OG route (`src/og-image/route.ts`) already
-    // applies for the same scenario.
+    throw new Error(`resolveOgUrl: ogImageAssetId ${page.ogImageAssetId} did not resolve`);
   }
 
   // 2. Generated card. Requires both siteId and slug to be present.

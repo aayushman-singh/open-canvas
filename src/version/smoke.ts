@@ -530,8 +530,7 @@ function compileOrderBy(expr: unknown): { column: keyof SiteSnapshot; direction:
 // SiteRoom stub for the restore broadcast — no-op fetch returning 200.
 // We do NOT need a working DO; we only need the env shape that
 // `restoreSnapshot` consumes. The smoke checks the broadcast attempt was
-// made AND that a non-ok response from the stub is handled gracefully
-// (broadcasted=false).
+// made AND that a non-ok response from the stub fails loudly.
 // ---------------------------------------------------------------------------
 
 function makeSiteRoomStub(opts: { ok: boolean }): DurableObjectNamespace {
@@ -659,9 +658,7 @@ async function runRestoreSwapsAndCapturesSafety(): Promise<void> {
   assert(preview.reason === 'publish', 'preview should reflect publish reason');
   process.stdout.write('[version:smoke] OK 3a — preview render contains snapshot content\n');
 
-  // Bonus: a failing broadcast surfaces as broadcasted=false but the row
-  // swap still succeeds — the all-or-nothing posture applies to the swap
-  // (durable), not to the live-update push.
+  // Bonus: a failing broadcast throws, so the route cannot report ok=true.
   const failingEnv: RestoreEnv = { SITE_ROOM: makeSiteRoomStub({ ok: false }) };
   // Capture a fresh manual snapshot so we have something to restore to.
   await captureManual(siteId, 'failing-broadcast-test', dbShim as unknown as Db, failingEnv);
@@ -669,17 +666,23 @@ async function runRestoreSwapsAndCapturesSafety(): Promise<void> {
   const newPage = await listSnapshots(siteId, dbShim as unknown as Db);
   const newest = newPage.items[0];
   assert(newest !== undefined, 'expected at least one snapshot to restore from');
-  const failingResult = await restoreSnapshot(
+  let failedBroadcastThrew = false;
+  try {
+    await restoreSnapshot(
     siteId,
     newest.id,
     dbShim as unknown as Db,
     failingEnv,
-  );
-  assert(
-    failingResult.broadcasted === false,
-    'failing broadcast stub should surface as broadcasted=false',
-  );
-  process.stdout.write('[version:smoke] OK 3b — failing broadcast does not roll back the swap\n');
+    );
+  } catch (err) {
+    failedBroadcastThrew = true;
+    assert(
+      err instanceof Error && err.message.includes('restore broadcast failed'),
+      `expected restore broadcast error, got ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  assert(failedBroadcastThrew, 'failing broadcast stub should throw');
+  process.stdout.write('[version:smoke] OK 3b — failing broadcast throws loudly\n');
 }
 
 async function runPruneKeepsLast50AndRecentPublishes(): Promise<void> {

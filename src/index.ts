@@ -32,6 +32,17 @@ import pageSettingsRoute from './routes/dashboard/page-settings';
 // Wave 4 routers wired by main thread after parallel-agent merge.
 import navEditorRoute from './routes/dashboard/nav-editor';
 import sitemapRouter from './seo/sitemap/route';
+// Wave 5 routers wired by main thread after parallel-agent merge.
+import fontsRouter from './fonts/route';
+import chatApi from './agent/chat/route';
+import chatPanelRoute from './routes/dashboard/chat-panel';
+// Translate (#24) has its own router but needs site + translator injected
+// per-request via Hono variables. The router is mounted via a thin wrapping
+// middleware that loads the editable state and constructs a GeminiTranslator.
+import translateRouter from './agent/translate/route';
+import { GeminiTranslator } from './agent/translate/llm';
+import { clerkAuth } from './auth/middleware';
+import { requireAuth } from './auth/require-auth';
 
 const app = new Hono<PublicEnv>();
 
@@ -95,6 +106,9 @@ app.route('/api/sites/:siteId/password', passwordAdminRoute);
 // the request falls through here. The handler reads the request Host to scope
 // the cookie to the right site.
 app.route('/__rev01/unlock', unlockRoute);
+// Visitor-facing form submissions. The public-host router lets this path fall
+// through only after the password gate has passed.
+app.route('/__rev01/forms', formsRouter);
 // Wave 3 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
 // Symbols (#14) and a11y (#15) live under /api/sites/:siteId/...
 app.route('/api/sites/:siteId/symbols', symbolsRouter);
@@ -102,8 +116,8 @@ app.route('/api/sites', a11yRoute);
 app.route('/dashboard', a11yReportRoute);
 app.route('/dashboard', pageSettingsRoute);
 // Site search (#13) — visitor-facing endpoint on the public-host path.
-// public.ts returns null for `/__rev01/*` so the search request falls through
-// to this app router. The handler reads the request Host to resolve site id.
+// public.ts lets this path fall through only after the password gate has
+// passed. The handler reads the request Host to resolve site id.
 app.route('/__rev01/search', searchRouter);
 // Wave 4 mounts.
 // Nav editor UI (#16) lives under /dashboard.
@@ -112,6 +126,54 @@ app.route('/dashboard', navEditorRoute);
 // fall through (return null) for `/sitemap.xml` and `/robots.txt` — see the
 // fallthrough block in handlePublicRequest.
 app.route('/', sitemapRouter);
+// Wave 5 mounts.
+// Custom fonts (#12) — public `GET /fonts/:contentHash` + Owner-scoped
+// `/api/sites/:siteId/fonts` verbs. The router is root-mounted so both
+// paths reach their handlers.
+app.route('/', fontsRouter);
+// AI chat (#23) — multi-turn agent over CanvasSiteState. Mounts at
+// /api/sites so the inner routes become /api/sites/:siteId/chat and
+// /api/sites/:siteId/chat/stream.
+app.route('/api/sites', chatApi);
+app.route('/dashboard', chatPanelRoute);
+// Auto-translate (#24) — needs editable state + translator injected per
+// request before the inner router runs. The wrapping middleware loads the
+// owned site row and instantiates GeminiTranslator, then hands off.
+app.use('/api/sites/:siteId/translate', clerkAuth(), requireAuth(), async (c, next) => {
+  // Lazy import the site loader + DB shapes — avoids pulling the publish
+  // route's full import tree into this entry point.
+  const { db } = await import('./db/client');
+  const { site, customer } = await import('./db/schema');
+  const { eq, and } = await import('drizzle-orm');
+  const auth = c.get('auth');
+  if (!auth.userId) return c.json({ error: 'site not found' }, 404);
+  const siteId = c.req.param('siteId');
+  if (!siteId) return c.json({ error: 'site not found' }, 404);
+  const database = db(c.env);
+  const customerRow = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.clerkUserId, auth.userId))
+    .limit(1);
+  const customerId = customerRow[0]?.id;
+  if (!customerId) return c.json({ error: 'site not found' }, 404);
+  const siteRow = await database
+    .select({ editableState: site.editableState })
+    .from(site)
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .limit(1);
+  if (!siteRow[0]) return c.json({ error: 'site not found' }, 404);
+  c.set(
+    'translateSiteState' as never,
+    siteRow[0].editableState as never,
+  );
+  c.set(
+    'translateTranslator' as never,
+    new GeminiTranslator({ apiKey: c.env.GEMINI_API_KEY ?? '' }) as never,
+  );
+  await next();
+});
+app.route('/api/sites/:siteId/translate', translateRouter);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in

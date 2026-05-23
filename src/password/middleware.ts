@@ -11,9 +11,10 @@
 //
 //   1. If the site row's `passwordEnabled` is false → return `null` (continue
 //      to snapshot serve).
-//   2. If the request is the unlock POST itself (`/__rev01/unlock`) or any
-//      other reserved `/__rev01/*` path → return `null` so the dedicated
-//      router handles it without the gate intercepting itself.
+//   2. If the request is the unlock POST itself (`/__rev01/unlock`) → return
+//      `null` so the dedicated router handles it without the gate
+//      intercepting itself. Other `/__rev01/*` visitor endpoints are still
+//      gated.
 //   3. Read the per-site cookie. If valid (signature good, exp > now,
 //      hashEpoch >= site.passwordSetAt.getTime()) → return `null`
 //      (continue).
@@ -48,11 +49,7 @@ export interface RequireUnlockEnv {
   UNLOCK_SIGNING_SECRET: string;
 }
 
-/**
- * Reserved path prefix the unlock subsystem owns. Hits to any subpath
- * bypass the gate so the unlock POST can land even on a protected site.
- */
-const RESERVED_PREFIX = '/__rev01/';
+const UNLOCK_PATH = '/__rev01/unlock';
 
 /**
  * Check the unlock cookie for `site` against the incoming request.
@@ -96,11 +93,10 @@ export async function requireUnlock(
 
   const requestUrl = new URL(c.req.url);
 
-  // Bypass the gate for the unlock POST + any future reserved path. The
-  // unlock router is mounted on the public host at `/__rev01/unlock`; we
-  // also bypass any other `/__rev01/*` so the subsystem can add sibling
-  // endpoints later without each one having to remember to skip the gate.
-  if (requestUrl.pathname.startsWith(RESERVED_PREFIX)) {
+  // Bypass only the unlock route. Search, forms, and other visitor-facing
+  // subsystem paths carry published-site content and must remain behind the
+  // password gate.
+  if (requestUrl.pathname === UNLOCK_PATH) {
     return null;
   }
 

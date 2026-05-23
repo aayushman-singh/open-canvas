@@ -16,7 +16,7 @@
 import { RENDER_DISPATCH, type ElementRenderCtx } from './elements/index.js';
 import { escapeAttr, escapeCssValue, sanitiseCssKey, styleFromEntries } from './elements/render-utils.js';
 import { renderResponsiveCss } from './responsive/index.js';
-import { getStyleKitPreset } from './style-kits.js';
+import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
 import type {
   CanvasElement,
   CanvasPage,
@@ -218,12 +218,12 @@ export function renderCanvasSnapshot(
   // boundary, the renderer refuses to emit HTML for a kit that has no preset
   // — there is no default. A missing token must never silently degrade.
   //
-  // The 'custom' kit is the Wave 2 #10 entry point. The Phase 0 scaffold does
-  // not yet wire `customStyleKit` into the renderer; resolving 'custom' is
-  // the Wave 2 owner's responsibility. Until then, calling render with
-  // `styleKit: 'custom'` will throw via `getStyleKitPreset` — that is the
-  // intentional "fail loudly until implemented" path.
-  if (snapshot.styleKit !== 'custom') {
+  // Custom kits are site-owned data carried on the snapshot. Validate them
+  // here even though the public route also emits CSS from them, so every
+  // render entry point has the same fail-loud boundary.
+  if (snapshot.styleKit === 'custom') {
+    resolveStyleKitWithCustom(snapshot);
+  } else {
     getStyleKitPreset(snapshot.styleKit);
   }
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {

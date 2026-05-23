@@ -449,7 +449,7 @@ function declaration(prop: string, value: string | number): string {
   return `${prop}: ${String(value)};`;
 }
 
-function buildKitTokenBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string {
+function buildKitTokenBlock(kitName: string, preset: StyleKitPreset): string {
   // Kit tokens are namespaced `--rev01-kit-*` to keep them off the editor
   // chrome's `--rev01-*` namespace. Editor chrome (src/editor/canvas-styles.ts)
   // sets its own `--rev01-bg`/`--rev01-accent` on :root for the topbar,
@@ -493,7 +493,7 @@ function buildKitTokenBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): s
 }
 
 function buildActionVariantBlock(
-  kitName: BuiltInStyleKit,
+  kitName: string,
   variant: ActionVariant,
   tokens: ActionVariantTokens,
 ): string {
@@ -507,7 +507,7 @@ function buildActionVariantBlock(
 }
 
 function buildSurfaceVariantBlock(
-  kitName: BuiltInStyleKit,
+  kitName: string,
   variant: SurfaceVariant,
   tokens: SurfaceVariantTokens,
 ): string {
@@ -520,7 +520,7 @@ function buildSurfaceVariantBlock(
   return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="container"][data-variant=${quoteCssString(variant)}] .rev01-surface {\n  ${decls.join('\n  ')}\n}`;
 }
 
-function buildShapeBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string {
+function buildShapeBlock(kitName: string, preset: StyleKitPreset): string {
   return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="shape"] .rev01-shape {
   background: ${preset.shapeFill};
   border: ${preset.shapeStrokeWidth} solid ${preset.shapeStroke};
@@ -540,7 +540,7 @@ function buildMotionKeyframes(): string {
 @keyframes rev01-parallax-soft { from { transform: translateY(6px); } to { transform: translateY(0); } }`;
 }
 
-function buildMotionBlock(kitName: BuiltInStyleKit): string {
+function buildMotionBlock(kitName: string): string {
   // Each preset maps to a CSS animation by name. The kit's duration/easing
   // come from the kit-level token block (already on the wrapper); we only
   // attach the animation name here so a single rule per preset works for
@@ -558,7 +558,7 @@ function buildMotionBlock(kitName: BuiltInStyleKit): string {
   return presetRules.join('\n');
 }
 
-function buildKitBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string {
+function buildKitBlock(kitName: string, preset: StyleKitPreset): string {
   const parts: string[] = [buildKitTokenBlock(kitName, preset), buildShapeBlock(kitName, preset)];
   for (const variant of ACTION_VARIANTS) {
     const block = buildActionVariantBlock(kitName, variant, preset.actionVariants[variant]);
@@ -570,6 +570,26 @@ function buildKitBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string
   }
   parts.push(buildMotionBlock(kitName));
   return parts.join('\n');
+}
+
+function buildTextRules(kitName: string): string {
+  return [
+    `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="text"][data-role="heading"] .rev01-text {\n  font-family: var(--rev01-kit-font-display);\n}`,
+    `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="text"][data-role="body"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  line-height: var(--rev01-kit-line-height);\n}`,
+    `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="text"][data-role="label"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  letter-spacing: 0.04em;\n}`,
+  ].join('\n');
+}
+
+/**
+ * Emit CSS for one concrete kit name and preset. Built-in kit CSS is emitted
+ * through `buildAllStyleKitsCss`; public visitor responses use this helper to
+ * append the per-site custom kit block when `styleKit === 'custom'`.
+ */
+export function buildStyleKitCss(kitName: string, preset: StyleKitPreset): string {
+  if (kitName.length === 0) {
+    throw new Error('buildStyleKitCss: kitName must be non-empty');
+  }
+  return [buildTextRules(kitName), buildKitBlock(kitName, preset)].join('\n');
 }
 
 /**
@@ -590,13 +610,6 @@ export function buildAllStyleKitsCss(): string {
   // the kit level so role-specific size scales also work (the renderer
   // already emits the absolute fontSize; the scale here is a multiplier so
   // owner-set sizes still respect the kit's modular scale).
-  const baseTextRules: string[] = [];
-  for (const kit of BUILT_IN_STYLE_KITS) {
-    baseTextRules.push(
-      `[data-style-kit=${quoteCssString(kit)}] [data-element-type="text"][data-role="heading"] .rev01-text {\n  font-family: var(--rev01-kit-font-display);\n}`,
-      `[data-style-kit=${quoteCssString(kit)}] [data-element-type="text"][data-role="body"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  line-height: var(--rev01-kit-line-height);\n}`,
-      `[data-style-kit=${quoteCssString(kit)}] [data-element-type="text"][data-role="label"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  letter-spacing: 0.04em;\n}`,
-    );
-  }
+  const baseTextRules = BUILT_IN_STYLE_KITS.map((kit) => buildTextRules(kit));
   return [keyframes, baseTextRules.join('\n'), kitBlocks.join('\n')].join('\n');
 }
