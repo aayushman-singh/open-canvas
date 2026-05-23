@@ -3,7 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import app from './index';
+import { app } from './index';
 import { applyCanvasAgentOp } from './agent/canvas-ops';
 import { CANVAS_AGENT_TOOLS } from './agent/canvas-tools';
 import {

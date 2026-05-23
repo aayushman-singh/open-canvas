@@ -74,3 +74,11 @@ bucket_name = "rev01-assets"
 # [[kv_namespaces]]
 # binding = "KV"
 # id = "to-be-created"
+
+# Wave 1 #5 (custom domains, plan 05). Cron tick every 5 minutes invokes
+# the `scheduled` handler exported from src/index.ts which delegates to
+# src/custom-domain/cron.ts. The handler polls Cloudflare for pending /
+# verifying custom hostnames and reconciles `status` + `certIssuedAt` on
+# each row. 30-minute-stuck rows flip to `failed` without hitting CF.
+[triggers]
+crons = ["*/5 * * * *"]

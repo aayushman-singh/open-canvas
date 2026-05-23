@@ -48,8 +48,10 @@
     "@clerk/backend": "^3.4.11",
     "@google/genai": "2.5.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@resvg/resvg-wasm": "2.6.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.21",
+    "satori": "0.26.0",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.30"
   },
