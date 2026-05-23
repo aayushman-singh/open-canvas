@@ -50,6 +50,7 @@ const SMOKES: SmokeEntry[] = [
   { name: 'seo', script: 'seo:smoke' },
   { name: 'sitemap', script: 'sitemap:smoke' },
   { name: 'nav', script: 'nav:smoke' },
+  { name: 'table', script: 'table:smoke' },
   { name: 'visitor-mode', script: 'visitor-mode:smoke' },
   { name: 'chat', script: 'chat:smoke' },
   { name: 'translate', script: 'translate:smoke' },

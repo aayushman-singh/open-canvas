@@ -1,0 +1,67 @@
+// src/interactive/inject.ts
+//
+// Wave 4 #17 — Snapshot-time `<script>` injection. The public route in
+// `src/routes/public.ts` calls `injectInteractiveRuntime(html, snapshot)` AFTER
+// `renderCanvasSnapshot`; if the snapshot contains at least one accordion or
+// carousel element, this function appends an inline `<script>` carrying the
+// IIFE runtime. Otherwise the HTML is returned untouched — a snapshot with no
+// interactives pays zero runtime bytes.
+//
+// The scan is shallow + cheap: it walks `pages[*].sections[*].elements[*]` and
+// short-circuits on the first matching `type`. We never instantiate the
+// elements; this is a discriminant-only scan.
+//
+// Integration shape (main thread):
+//
+//     import { injectInteractiveRuntime } from '../interactive/inject.js';
+//     const snapshotHtml = renderCanvasSnapshot(snapshot, '/assets');
+//     const finalHtml = injectInteractiveRuntime(snapshotHtml, snapshot);
+//     // ... pass finalHtml into the document envelope ...
+
+import type { ElementType, PublishedSnapshot } from '../canvas/schema.js';
+import { INTERACTIVE_RUNTIME_SRC } from './build.js';
+
+/**
+ * Element types that require the interactive runtime. Listed inline (rather
+ * than derived) so adding a new interactive element in a future wave is an
+ * intentional one-line edit here AND in the runtime's dispatch arm.
+ */
+const INTERACTIVE_ELEMENT_TYPES: ReadonlySet<ElementType> = new Set<ElementType>([
+  'accordion',
+  'carousel',
+]);
+
+/**
+ * Walk the snapshot's element tree until an interactive type is found.
+ * O(elements) worst case, but most snapshots short-circuit on the first match
+ * in their first interactive section.
+ */
+export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): boolean {
+  for (const page of snapshot.pages) {
+    for (const section of page.sections) {
+      for (const element of section.elements) {
+        if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * If the snapshot contains any interactive element, append an inline
+ * `<script>` tag carrying the runtime IIFE to the rendered HTML. Otherwise
+ * return the HTML unchanged.
+ *
+ * The script is appended verbatim — no `defer`/`async` (it is inline, so the
+ * browser parses + runs it during HTML parsing), no module-level import. The
+ * runtime guards its own `DOMContentLoaded` listener, so the script can sit
+ * anywhere in the document body and the hydration still fires after the DOM
+ * is parsed.
+ */
+export function injectInteractiveRuntime(
+  snapshotHtml: string,
+  snapshot: PublishedSnapshot,
+): string {
+  if (!snapshotNeedsInteractiveRuntime(snapshot)) return snapshotHtml;
+  return `${snapshotHtml}<script data-rev01-interactive-runtime>${INTERACTIVE_RUNTIME_SRC}</script>`;
+}

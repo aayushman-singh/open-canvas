@@ -38,6 +38,7 @@
     "seo:smoke": "bun run src/seo/smoke.ts",
     "sitemap:smoke": "bun run src/seo/sitemap/smoke.ts",
     "nav:smoke": "bun run src/canvas/elements/nav-smoke.ts",
+    "table:smoke": "bun run src/canvas/elements/table-smoke.ts",
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",
     "chat:smoke": "bun run src/agent/chat/smoke.ts",
     "translate:smoke": "bun run src/agent/translate/smoke.ts",
@@ -52,6 +53,7 @@
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.21",
     "satori": "0.26.0",
+    "shiki": "^4.1.0",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.30"
   },

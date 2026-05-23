@@ -41,6 +41,9 @@ import { renderCanvasHead, resolveLang } from '../seo/meta-emit';
 import { emitDualModeCss } from '../themes/visitor-mode/css-emit';
 import { getModeSetterScript } from '../themes/visitor-mode/inline-script';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
+// Wave 4 #17 — vanilla-JS hydration runtime for accordion + carousel elements.
+// Wrap is a no-op when no interactive elements present in the snapshot.
+import { injectInteractiveRuntime } from '../interactive/inject';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -328,6 +331,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return null;
   }
 
+  // Wave 4 #22 — sitemap.xml + robots.txt are public crawler discovery
+  // surfaces, not snapshot HTML. Fall through to the app router which
+  // mounts `/sitemap.xml` and `/robots.txt` via the sitemap router.
+  if (path === '/sitemap.xml' || path === '/robots.txt') {
+    return null;
+  }
+
   // Wave 2 #9 — password gate. Intercepts visitor traffic before snapshot
   // serve. Returns null when the gate is disabled or the cookie is valid;
   // returns a gate Response (401 + HTML) otherwise.
@@ -409,7 +419,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // single source of truth; missing means the site has zero symbols.
   configureSymbolInstanceRender({ symbols: siteRow.publishedSnapshot.symbols ?? [] });
 
-  const snapshotHtml = renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets');
+  // Wave 4 #17 — wrap rendered snapshot HTML with the interactive runtime
+  // <script> tag when the snapshot contains accordion / carousel elements.
+  // No-op (string-equality return) for snapshots without any interactives.
+  const snapshotHtml = injectInteractiveRuntime(
+    renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets'),
+    siteRow.publishedSnapshot,
+  );
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
   // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe
   // sandbox can only load those origins. Header is set once per snapshot
