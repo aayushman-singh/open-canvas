@@ -141,12 +141,14 @@ canvasApi.put('/sites/:siteId', async (c) => {
   return c.json({ ok: true });
 });
 
-// Maximum payload size for the legacy data-URL upload bridge. The bridge
-// exists so the editor's existing JSON-shaped POST keeps working after the
-// asset re-root (ADR 0004 + 0006); the canonical new path is
-// `POST /api/owner/assets` (multipart, Owner-rooted). Per the original
-// constraint we cap at 2 MB of base64; atob inflates by ~4/3, so the binary
-// upper bound is ~1.5 MB. Past this point we 413 loudly.
+// DEPRECATED. Maximum payload size for the legacy data-URL upload bridge.
+// The editor has been migrated to the canonical multipart endpoint
+// (`POST /api/owner/assets`, ADR 0004 + 0006) and no in-tree caller hits
+// this route any longer. It is retained only so older deployed editor
+// builds during the rollout window do not 404, and will be removed in a
+// follow-up commit once the rollout window closes. Cap is 2 MB of base64;
+// atob inflates by ~4/3, so the binary upper bound is ~1.5 MB. Past this
+// point we 413 loudly.
 const MAX_ASSET_DATA_URL_BYTES = 2 * 1024 * 1024;
 
 interface DataUrlUploadInput {
@@ -187,11 +189,13 @@ function decodeDataUrl(input: string): DecodedDataUrl {
   return { mediaType, bytes };
 }
 
-// Legacy upload bridge for the editor. Translates the editor's JSON shape
-// (`{ dataUrl, alt }`) into an Owner-rooted upload via the shared
-// `uploadOwnerAsset` primitive. Wave-1 consumers should migrate to
-// `POST /api/owner/assets` (multipart); this bridge keeps the editor green
-// during the cutover.
+// DEPRECATED — legacy upload bridge for the editor. Translates the
+// editor's old JSON shape (`{ dataUrl, alt }`) into an Owner-rooted upload
+// via the shared `uploadOwnerAsset` primitive. The editor now POSTs
+// multipart directly to `/api/owner/assets` (ADR 0004 + 0006), and there
+// are no remaining in-tree callers of this route. It is retained only so
+// older deployed editor builds during the rollout window do not 404, and
+// will be removed in a follow-up commit once the rollout window closes.
 canvasApi.post('/sites/:siteId/assets', async (c) => {
   const siteId = c.req.param('siteId');
   const result = await loadOwnedSite(c, siteId);
@@ -367,6 +371,14 @@ async function generateImageViaReplicate(
   return { bytes: buffer, mediaType };
 }
 
+// ADR 0004 decision 2: AI generation previews are NOT Owner Assets until the
+// owner applies them to a slot. This route returns the raw bytes from
+// Replicate back to the browser; the browser holds them through the preview
+// moment. Only on Apply does the editor POST the bytes to
+// `/api/owner/assets` (multipart) and create the Owner Asset row. Discarded
+// previews are gone when the tab closes. The server holds no transient asset
+// state — no DB row, no R2 put — which removes the cleanup job that would
+// otherwise be required.
 canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
   const siteId = c.req.param('siteId');
   const result = await loadOwnedSite(c, siteId);
@@ -388,28 +400,24 @@ canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
   const aspectRatio = snapToFluxAspectRatio(parsed.boxW, parsed.boxH);
   const image = await generateImageViaReplicate(token, parsed.prompt, aspectRatio);
 
-  // Mirror the upload-path size budget; an oversized generation is rejected
-  // before we touch R2 or the DB.
+  // Mirror the upload-path size budget so an oversized generation is
+  // rejected loudly. The browser would also refuse to re-upload an oversize
+  // payload via `/api/owner/assets`, but failing here is a clearer signal.
   if (image.bytes.byteLength > MAX_ASSET_DATA_URL_BYTES) {
     return c.json({ error: 'generated asset too large' }, 413);
   }
 
-  const database = db(c.env);
-  const r2 = createR2Client(c.env.ASSETS_BUCKET);
-  const uploaded = await uploadOwnerAsset(
-    { db: database, r2 },
-    {
-      customerId: result.customerId,
-      bytes: image.bytes,
-      mediaType: image.mediaType,
-      alt: parsed.alt,
-      siteId: result.site.id,
+  // Construct from a fresh ArrayBuffer slice so Response sees a plain
+  // BodyInit and not a Uint8Array view (the latter is rejected by some
+  // Worker runtimes' Response constructor type contract).
+  const bodyBytes = image.bytes.slice().buffer;
+  return new Response(bodyBytes, {
+    status: 200,
+    headers: {
+      'Content-Type': image.mediaType,
+      'Cache-Control': 'no-store',
+      'Content-Length': String(image.bytes.byteLength),
     },
-  );
-  return c.json({
-    assetId: uploaded.id,
-    kind: uploaded.kind,
-    mediaType: uploaded.mediaType,
   });
 });
 

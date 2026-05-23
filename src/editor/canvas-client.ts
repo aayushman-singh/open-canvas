@@ -1518,21 +1518,36 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderGrid();
   }
 
+  // Revoke any blob URLs held by AI-preview wraps before wiping the
+  // inspector. Without this, navigating selection while a preview is open
+  // leaks the bytes for the rest of the tab session.
+  function revokePendingPreviews() {
+    if (!inspector) return;
+    const previews = inspector.querySelectorAll("[data-object-url]");
+    for (let i = 0; i < previews.length; i++) {
+      const url = previews[i].getAttribute("data-object-url");
+      if (url) URL.revokeObjectURL(url);
+    }
+  }
+
   function renderInspector() {
     if (!inspector) return;
     if (!selectedElementId) {
       inspector.hidden = true;
+      revokePendingPreviews();
       inspector.replaceChildren();
       return;
     }
     const found = findElement(selectedElementId);
     if (!found) {
       inspector.hidden = true;
+      revokePendingPreviews();
       inspector.replaceChildren();
       return;
     }
     inspector.hidden = false;
     const { element, section } = found;
+    revokePendingPreviews();
     inspector.replaceChildren();
 
     const heading = document.createElement("h3");
@@ -1806,32 +1821,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // Render-side fit:cover still handles any residual aspect drift (e.g.,
   // generated assets that snapped to a nearby preset rather than the exact
   // slot ratio).
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result;
-        if (typeof result === "string") resolve(result);
-        else reject(new Error("FileReader did not return a string"));
-      };
-      reader.onerror = () => reject(reader.error || new Error("FileReader error"));
-      reader.readAsDataURL(file);
-    });
-  }
-
-  function blobToDataUrl(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result;
-        if (typeof result === "string") resolve(result);
-        else reject(new Error("FileReader did not return a string"));
-      };
-      reader.onerror = () => reject(reader.error || new Error("FileReader error"));
-      reader.readAsDataURL(blob);
-    });
-  }
-
   // Cropper.js v2 is pulled on demand from jsDelivr the first time the Owner
   // picks a file; import is cached so subsequent uploads are immediate. Pinned
   // to a specific version so jsDelivr cache hits and the CDN side can't ship
@@ -2013,11 +2002,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
-  async function postAssetUpload(dataUrl, altValue) {
-    const response = await authFetch(SITE_BASE + "/assets", {
+  // Canonical Owner-rooted upload per ADR 0004 + ADR 0006. The legacy
+  // data-URL JSON bridge at /api/canvas/sites/:siteId/assets is deprecated
+  // and has no remaining in-tree callers. We pass the Blob/File straight
+  // through as the 'file' multipart field — no base64 inflation. Returns
+  // { assetId, kind } so call sites stay simple; the server's full
+  // UploadAssetResult is otherwise discarded.
+  async function postAssetUpload(blob, altValue, elementId) {
+    const form = new FormData();
+    form.append("file", blob);
+    form.append("alt", altValue);
+    form.append("siteId", SITE_ID);
+    if (typeof elementId === "string" && elementId.length > 0) {
+      form.append("elementId", elementId);
+    }
+    const response = await authFetch("/api/owner/assets", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ dataUrl: dataUrl, alt: altValue }),
+      body: form,
     });
     if (!response.ok) {
       let detail = response.statusText;
@@ -2028,10 +2029,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       throw new Error(detail);
     }
     const body = await response.json();
-    if (!body || typeof body.assetId !== "string" || typeof body.kind !== "string") {
+    if (!body || typeof body.id !== "string" || typeof body.kind !== "string") {
       throw new Error("malformed server response");
     }
-    return body;
+    return { assetId: body.id, kind: body.kind };
   }
 
   async function uploadMediaForElement(element, file) {
@@ -2051,8 +2052,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         setStatus("Loading cropper…");
         const cropped = await cropFileToSlotAspect(file, boxW, boxH);
         setStatus("Uploading…");
-        const dataUrl = await blobToDataUrl(cropped.blob);
-        const uploaded = await postAssetUpload(dataUrl, altValue);
+        const uploaded = await postAssetUpload(cropped.blob, altValue, element.id);
         element.assetId = uploaded.assetId;
         element.mediaKind = uploaded.kind;
         element.alt = altValue;
@@ -2064,9 +2064,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
 
       // Video: upload original bytes; crop only the first-frame poster.
-      setStatus("Reading video…");
-      const videoDataUrl = await fileToDataUrl(file);
-
       setStatus("Extracting poster…");
       const posterBlob = await extractVideoFirstFrame(file);
       const posterFile = new File([posterBlob], "poster.png", { type: "image/png" });
@@ -2075,11 +2072,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const croppedPoster = await cropFileToSlotAspect(posterFile, boxW, boxH);
 
       setStatus("Uploading video…");
-      const uploadedVideo = await postAssetUpload(videoDataUrl, altValue);
+      const uploadedVideo = await postAssetUpload(file, altValue, element.id);
 
       setStatus("Uploading poster…");
-      const posterDataUrl = await blobToDataUrl(croppedPoster.blob);
-      const uploadedPoster = await postAssetUpload(posterDataUrl, altValue);
+      const uploadedPoster = await postAssetUpload(croppedPoster.blob, altValue, element.id);
 
       element.assetId = uploadedVideo.assetId;
       element.mediaKind = "video";
@@ -2098,6 +2094,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // ADR 0004 decision 2: AI generation previews are NOT Owner Assets until
+  // the owner applies them to a slot. The /assets/generate route now returns
+  // raw image bytes; we hold them in a blob URL through the preview moment
+  // and only POST them to the canonical /api/owner/assets multipart route on
+  // Apply. Discard simply revokes the blob URL and drops the bytes.
   async function generateImageForElement(element, prompt) {
     const altInputId = "media-upload-alt-" + element.id;
     const altInput = document.getElementById(altInputId);
@@ -2130,20 +2131,120 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         setStatus("Generate failed: " + detail, "error");
         return;
       }
-      const body = await response.json();
-      if (!body || typeof body.assetId !== "string") {
-        setStatus("Generate failed: malformed server response", "error");
+      const mediaType = response.headers.get("content-type") || "image/webp";
+      if (!mediaType.startsWith("image/")) {
+        setStatus("Generate failed: server did not return image bytes", "error");
         return;
       }
-      element.assetId = body.assetId;
-      element.mediaKind = "image";
+      const blob = await response.blob();
+      showGeneratePreview(element, blob, mediaType, altValue);
+      setStatus("Preview ready — Apply to save", "ok");
+    } catch (err) {
+      setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
+  function showGeneratePreview(element, blob, mediaType, altValue) {
+    if (!inspector) return;
+    // Drop any prior pending preview for this element so re-runs do not
+    // stack and leak object URLs.
+    const prior = document.getElementById("ai-preview-" + element.id);
+    if (prior) {
+      const staleUrl = prior.getAttribute("data-object-url");
+      if (staleUrl) URL.revokeObjectURL(staleUrl);
+      prior.remove();
+    }
+
+    const objectUrl = URL.createObjectURL(blob);
+    const wrap = document.createElement("div");
+    wrap.className = "field";
+    wrap.id = "ai-preview-" + element.id;
+    wrap.setAttribute("data-object-url", objectUrl);
+
+    const label = document.createElement("label");
+    label.textContent = "Preview (not saved yet)";
+    wrap.appendChild(label);
+
+    const img = document.createElement("img");
+    img.src = objectUrl;
+    img.alt = altValue;
+    img.style.cssText = "max-width:100%;display:block;border:1px solid var(--rev01-border,#ccc);";
+    wrap.appendChild(img);
+
+    const buttons = document.createElement("div");
+    buttons.style.cssText = "display:flex;gap:6px;margin-top:6px;";
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.textContent = "Apply";
+
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.textContent = "Discard";
+
+    applyBtn.addEventListener("click", () => {
+      applyGeneratePreview(element, blob, mediaType, altValue, wrap, applyBtn, discardBtn, objectUrl);
+    });
+    discardBtn.addEventListener("click", () => {
+      URL.revokeObjectURL(objectUrl);
+      wrap.remove();
+      setStatus("Discarded");
+    });
+
+    buttons.appendChild(applyBtn);
+    buttons.appendChild(discardBtn);
+    wrap.appendChild(buttons);
+    inspector.appendChild(wrap);
+  }
+
+  async function applyGeneratePreview(element, blob, mediaType, altValue, wrap, applyBtn, discardBtn, objectUrl) {
+    applyBtn.disabled = true;
+    discardBtn.disabled = true;
+    setStatus("Saving…");
+    try {
+      const dotIdx = mediaType.indexOf("/");
+      const ext = dotIdx > 0 ? mediaType.slice(dotIdx + 1) : "webp";
+      const form = new FormData();
+      form.append("file", new File([blob], "generated." + ext, { type: mediaType }));
+      form.append("alt", altValue);
+      form.append("siteId", SITE_ID);
+      form.append("elementId", element.id);
+
+      const response = await authFetch("/api/owner/assets", {
+        method: "POST",
+        body: form,
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (_) { /* ignore */ }
+        setStatus("Apply failed: " + detail, "error");
+        applyBtn.disabled = false;
+        discardBtn.disabled = false;
+        return;
+      }
+      const body = await response.json();
+      if (!body || typeof body.id !== "string" || typeof body.kind !== "string") {
+        setStatus("Apply failed: malformed server response", "error");
+        applyBtn.disabled = false;
+        discardBtn.disabled = false;
+        return;
+      }
+      element.assetId = body.id;
+      element.mediaKind = body.kind;
       element.alt = altValue;
+      URL.revokeObjectURL(objectUrl);
+      wrap.remove();
       rebuildElement(element.id);
       renderInspector();
       scheduleSave();
-      setStatus("Generated", "ok");
+      setStatus("Applied", "ok");
     } catch (err) {
-      setStatus("Generate failed: " + (err && err.message ? err.message : String(err)), "error");
+      setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      applyBtn.disabled = false;
+      discardBtn.disabled = false;
     }
   }
 
@@ -4342,11 +4443,281 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
+      attachTranslateButton();
       attachPresence();
       setStatus("Ready", "ok");
     } catch (err) {
       setStatus("Failed to load site: " + (err && err.message ? err.message : String(err)), "error");
     }
   })();
+
+  // -- Wishlist #24 — Owner-facing translate accept-and-apply UI ----------
+  //
+  // Server route POST /api/sites/:siteId/translate returns
+  // { ops, preview, changes }. The Owner picks from/to/mode in three select
+  // modals, then a preview panel shows the change count + first ~10 diffs.
+  // Accept = PUT /api/canvas/sites/:siteId with { editableState: preview }
+  // (the existing site-update endpoint validates + persists). On 200 we
+  // location.reload() so the editor re-bootstraps from the persisted state.
+  //
+  // No silent fallbacks: every non-2xx surfaces via setStatus(..., "error")
+  // and leaves the preview panel open so the Owner can retry or discard.
+  // ----------------------------------------------------------------------
+
+  const TRANSLATE_LOCALES = [
+    { value: "en", label: "English (en)" },
+    { value: "es", label: "Spanish (es)" },
+    { value: "fr", label: "French (fr)" },
+    { value: "de", label: "German (de)" },
+    { value: "it", label: "Italian (it)" },
+    { value: "pt", label: "Portuguese (pt)" },
+    { value: "ja", label: "Japanese (ja)" },
+    { value: "zh", label: "Chinese (zh)" },
+    { value: "ko", label: "Korean (ko)" },
+    { value: "ar", label: "Arabic (ar)" },
+    { value: "fa", label: "Persian (fa)" },
+    { value: "he", label: "Hebrew (he)" },
+    { value: "ur", label: "Urdu (ur)" },
+  ];
+
+  let translatePanel = null;
+
+  function detectDefaultLocale() {
+    if (state && typeof state.defaultLocale === "string" && state.defaultLocale.length > 0) {
+      return state.defaultLocale;
+    }
+    if (state && Array.isArray(state.pages)) {
+      for (const p of state.pages) {
+        if (p && typeof p.locale === "string" && p.locale.length > 0) return p.locale;
+      }
+    }
+    return "en";
+  }
+
+  function attachTranslateButton() {
+    const btn = document.getElementById("canvas-translate");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      void openTranslatePanel();
+    });
+  }
+
+  async function openTranslatePanel() {
+    if (translatePanel) {
+      setStatus("Translate panel already open", "error");
+      return;
+    }
+    const sourceDefault = detectDefaultLocale();
+    const from = await openSelectModal({
+      title: "Translate",
+      label: "Source language",
+      options: TRANSLATE_LOCALES,
+      defaultValue: sourceDefault,
+    });
+    if (from === null) return;
+    const to = await openSelectModal({
+      title: "Translate",
+      label: "Target language",
+      options: TRANSLATE_LOCALES,
+      defaultValue: from === "en" ? "es" : "en",
+    });
+    if (to === null) return;
+    if (to === from) {
+      setStatus("Target language must differ from source", "error");
+      return;
+    }
+    const mode = await openSelectModal({
+      title: "Translate",
+      label: "Mode",
+      options: [
+        { value: "sibling", label: "Sibling — add translated copy alongside original (default)" },
+        { value: "replace", label: "Replace — overwrite original text in place" },
+      ],
+      defaultValue: "sibling",
+    });
+    if (mode === null) return;
+
+    setStatus("Translating…");
+    let response;
+    try {
+      response = await authFetch("/api/sites/" + SITE_ID + "/translate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ from: from, to: to, mode: mode }),
+      });
+    } catch (err) {
+      setStatus("Translate failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+    if (!response.ok) {
+      let detail = response.statusText;
+      try {
+        const body = await response.json();
+        if (body && body.error) detail = body.error;
+      } catch (_) { /* ignore */ }
+      setStatus("Translate failed: " + detail, "error");
+      return;
+    }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch (err) {
+      setStatus("Translate failed: malformed server response", "error");
+      return;
+    }
+    if (!payload || typeof payload !== "object" || !payload.preview || !Array.isArray(payload.changes)) {
+      setStatus("Translate failed: malformed server response", "error");
+      return;
+    }
+    setStatus("Preview ready — Accept to persist", "ok");
+    showTranslatePreview({
+      from: from,
+      to: to,
+      mode: mode,
+      preview: payload.preview,
+      changes: payload.changes,
+    });
+  }
+
+  function showTranslatePreview(result) {
+    // Style-matched to the rev01-modal surface so the preview reads as one
+    // overlay with the from/to/mode pickers that preceded it.
+    const backdrop = document.createElement("div");
+    backdrop.className = "rev01-modal-backdrop";
+    const panel = document.createElement("div");
+    panel.className = "rev01-modal";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-label", "Translate preview");
+    panel.style.minWidth = "480px";
+    panel.style.maxWidth = "640px";
+
+    const h = document.createElement("h3");
+    h.textContent = "Translate preview";
+    panel.appendChild(h);
+
+    const summary = document.createElement("div");
+    summary.style.cssText = "font-size:12px;color:var(--rev01-fg-mute);line-height:1.5;";
+    const changeCount = result.changes.length;
+    summary.textContent =
+      result.from + " → " + result.to +
+      " · mode: " + result.mode +
+      " · " + changeCount + " change" + (changeCount === 1 ? "" : "s");
+    panel.appendChild(summary);
+
+    if (changeCount === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "font-size:12px;color:var(--rev01-fg-mute);";
+      empty.textContent = "No translatable strings found in this site.";
+      panel.appendChild(empty);
+    } else {
+      const listLabel = document.createElement("label");
+      listLabel.textContent = "Sample changes (first " + Math.min(changeCount, 10) + ")";
+      panel.appendChild(listLabel);
+
+      const list = document.createElement("div");
+      list.style.cssText =
+        "max-height:240px;overflow:auto;border:1px solid var(--rev01-hairline);" +
+        "border-radius:4px;padding:8px;background:var(--rev01-bg-panel);" +
+        "font-family:var(--rev01-font-mono,monospace);font-size:11px;line-height:1.5;";
+      const limit = Math.min(changeCount, 10);
+      for (let i = 0; i < limit; i++) {
+        const row = result.changes[i];
+        if (!row) continue;
+        const item = document.createElement("div");
+        item.style.cssText = "margin-bottom:6px;word-break:break-word;";
+        const pathEl = document.createElement("div");
+        pathEl.style.cssText = "color:var(--rev01-fg-mute);";
+        pathEl.textContent = typeof row.path === "string" ? row.path : "";
+        const diff = document.createElement("div");
+        diff.textContent = (typeof row.original === "string" ? row.original : "") + "  →  " +
+          (typeof row.translated === "string" ? row.translated : "");
+        item.appendChild(pathEl);
+        item.appendChild(diff);
+        list.appendChild(item);
+      }
+      panel.appendChild(list);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "rev01-modal-actions";
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.textContent = "Discard";
+    const acceptBtn = document.createElement("button");
+    acceptBtn.type = "button";
+    acceptBtn.textContent = "Accept";
+    if (changeCount === 0) acceptBtn.disabled = true;
+    actions.appendChild(discardBtn);
+    actions.appendChild(acceptBtn);
+    panel.appendChild(actions);
+
+    backdrop.appendChild(panel);
+
+    function closePanel() {
+      if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+      document.body.classList.remove("rev01-modal-open");
+      translatePanel = null;
+    }
+    discardBtn.addEventListener("click", () => {
+      closePanel();
+      setStatus("Discarded");
+    });
+    acceptBtn.addEventListener("click", () => {
+      void acceptTranslatePreview(result.preview, acceptBtn, discardBtn, closePanel);
+    });
+    backdrop.addEventListener("click", (ev) => {
+      // Treat backdrop click as discard, but only while the accept button is
+      // still enabled — mid-save we keep the panel pinned so the Owner sees
+      // the result of the PUT before it disappears.
+      if (ev.target === backdrop && !acceptBtn.disabled) {
+        closePanel();
+        setStatus("Discarded");
+      }
+    });
+
+    document.body.classList.add("rev01-modal-open");
+    document.body.appendChild(backdrop);
+    translatePanel = backdrop;
+    acceptBtn.focus();
+  }
+
+  async function acceptTranslatePreview(preview, acceptBtn, discardBtn, closePanel) {
+    acceptBtn.disabled = true;
+    discardBtn.disabled = true;
+    setStatus("Applying translation…");
+    let response;
+    try {
+      response = await authFetch(SITE_BASE, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ editableState: preview }),
+      });
+    } catch (err) {
+      setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      acceptBtn.disabled = false;
+      discardBtn.disabled = false;
+      return;
+    }
+    if (!response.ok) {
+      let detail = response.statusText;
+      try {
+        const body = await response.json();
+        if (body && Array.isArray(body.errors) && body.errors.length > 0) {
+          detail = body.errors[0];
+        } else if (body && body.error) {
+          detail = body.error;
+        }
+      } catch (_) { /* ignore */ }
+      setStatus("Apply failed: " + detail, "error");
+      acceptBtn.disabled = false;
+      discardBtn.disabled = false;
+      return;
+    }
+    setStatus("Translation applied — reloading…", "ok");
+    closePanel();
+    // Reload the editor so it re-bootstraps from the freshly-persisted state.
+    location.reload();
+  }
 })();`;
 }

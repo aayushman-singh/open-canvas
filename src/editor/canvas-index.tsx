@@ -114,6 +114,9 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
             <button id="canvas-save" type="button">
               Save
             </button>
+            <button id="canvas-translate" type="button">
+              Translate
+            </button>
             <button id="canvas-publish" type="button">
               Publish
             </button>
