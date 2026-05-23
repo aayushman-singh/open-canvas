@@ -213,10 +213,7 @@ interface PublicSiteRow {
   passwordSetAt: Date | null;
 }
 
-async function loadPublicSite(
-  env: Bindings,
-  subdomain: string,
-): Promise<PublicSiteRow | null> {
+async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicSiteRow | null> {
   const database = db(env);
   const rows = await database
     .select({
@@ -298,8 +295,8 @@ export async function handlePublicRequest<P extends string, I extends Input>(
       const doRequest = new Request(
         `https://do.invalid/socket?siteId=${encodeURIComponent(siteIdParam)}`,
         {
-        method: 'GET',
-        headers: c.req.raw.headers,
+          method: 'GET',
+          headers: c.req.raw.headers,
         },
       );
       return stub.fetch(doRequest);
@@ -373,8 +370,8 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     const doRequest = new Request(
       `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}`,
       {
-      method: 'GET',
-      headers: c.req.raw.headers,
+        method: 'GET',
+        headers: c.req.raw.headers,
       },
     );
     return stub.fetch(doRequest);
@@ -444,9 +441,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const snapshot = siteRow.publishedSnapshot;
   const resolvedKit = resolveStyleKitWithCustom(snapshot);
   const customKitCss =
-    snapshot.styleKit === 'custom'
-      ? `\n${buildStyleKitCss('custom', resolvedKit)}`
-      : '';
+    snapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
   const snapshotHtml = injectInteractiveRuntime(
     renderCanvasSnapshot(snapshot, '/assets'),
     snapshot,
@@ -468,20 +463,15 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const pageSlug =
     path === '/' || path === ''
       ? (snapshot.pages[0]?.slug ?? '')
-      : path.replace(/^\//, '').split('/')[0] ?? '';
-  const currentPage =
-    snapshot.pages.find((p) => p.slug === pageSlug)
-      ?? snapshot.pages[0]
-      ?? null;
+      : (path.replace(/^\//, '').split('/')[0] ?? '');
+  const currentPage = snapshot.pages.find((p) => p.slug === pageSlug) ?? snapshot.pages[0] ?? null;
   const headMeta = renderCanvasHead(snapshot, {
     siteId: siteRow.id,
     host,
     protocol: requestUrl.protocol === 'http:' ? 'http' : 'https',
     pageSlug,
   });
-  const lang = currentPage
-    ? resolveLang(currentPage, siteRow.publishedSnapshot)
-    : 'en';
+  const lang = currentPage ? resolveLang(currentPage, siteRow.publishedSnapshot) : 'en';
 
   // Wave 3 #20 — light/dark visitor toggle. Only emit dual-palette CSS +
   // early mode setter when the Owner has enabled dark mode for this site.
@@ -498,21 +488,32 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   return c.html(
     html`<!doctype html>
-<html lang="${raw(escapeAttr(lang))}">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    ${raw(headMeta)}
-    ${darkModeEnabled ? raw(`<script>${modeSetterScript}</script>`) : ''}
-    <style>${raw(canvasPublishedStyles)}${raw(customKitCss)}${darkModeEnabled ? `\n${dualModeCss}` : ''}</style>
-  </head>
-  <body>
-    <div data-rev01-public-root>${raw(snapshotHtml)}</div>
-    <aside data-rev01-presence hidden role="status" aria-live="polite" aria-label="People viewing">
-      👀 <span data-rev01-presence-count>0</span> viewing
-    </aside>
-    <script type="module">${raw(visitorScript)}</script>
-  </body>
-</html>`,
+      <html lang="${raw(escapeAttr(lang))}">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          ${raw(headMeta)} ${darkModeEnabled ? raw(`<script>${modeSetterScript}</script>`) : ''}
+          <style>
+            ${raw(canvasPublishedStyles)}${raw(customKitCss)}${darkModeEnabled
+              ? `\n${dualModeCss}`
+              : ''}
+          </style>
+        </head>
+        <body>
+          <div data-rev01-public-root>${raw(snapshotHtml)}</div>
+          <aside
+            data-rev01-presence
+            hidden
+            role="status"
+            aria-live="polite"
+            aria-label="People viewing"
+          >
+            👀 <span data-rev01-presence-count>0</span> viewing
+          </aside>
+          <script type="module">
+            ${raw(visitorScript)};
+          </script>
+        </body>
+      </html>`,
   );
 }
