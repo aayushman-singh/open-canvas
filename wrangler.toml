@@ -19,6 +19,13 @@ zone_name = "aayushman.dev"
 name = "SITE_ROOM"
 class_name = "SiteRoom"
 
+# Phase 0 scaffold — Wave 2 #7 (forms) rate limiter. Binding declared so the
+# Wave 2 agent can wire the env access without touching wrangler.toml. The
+# implementation in src/live/form-rate-limiter.ts throws until Wave 2 lands.
+[[durable_objects.bindings]]
+name = "FORM_RATE_LIMITER"
+class_name = "FormRateLimiter"
+
 # v1 introduced the legacy per-page PageDocument DO (ProseMirror + Yjs).
 # v3 drops it after the canvas-first POC (T9) replaced the live-collab
 # surface with SiteRoom. The v1 tag must remain so the migration ledger
@@ -34,6 +41,35 @@ new_sqlite_classes = ["SiteRoom"]
 [[migrations]]
 tag = "v3"
 deleted_classes = ["PageDocument"]
+
+# Phase 0 scaffold — register the Wave 2 #7 forms-rate-limiter DO class.
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["FormRateLimiter"]
+
+# Phase 0 scaffold — Owner Asset originals (ADR 0006 + plan #2). The bucket
+# itself is created out-of-band (`wrangler r2 bucket create rev01-assets`);
+# this binding wires the Worker to it. Wave 1 / Phase 0 asset-pipeline owner
+# (Agent 3) populates the read/write paths.
+[[r2_buckets]]
+binding = "ASSETS_BUCKET"
+bucket_name = "rev01-assets"
+
+# Phase 0 scaffold — sensitive env vars declared here for documentation. The
+# real values are NEVER committed; the deploy operator sets each via
+# `wrangler secret put <NAME>`. Code reads via `c.env.<NAME>`.
+#
+# Required by Wave 1 #5 (custom domains, plan 05):
+#   CF_API_TOKEN          — Cloudflare API token with Custom Hostnames perms.
+#   CF_ZONE_ID            — Zone id under which Custom Hostnames are created.
+#
+# Required by Wave 2 #7 (forms, plan 07):
+#   TURNSTILE_SECRET      — Cloudflare Turnstile server-side verify secret.
+#   TURNSTILE_SITE_KEY    — Cloudflare Turnstile public site key.
+#   WEBHOOK_SIGNING_SECRET — HMAC-SHA256 secret signing outbound form webhooks.
+#
+# Required by Wave 2 #9 (password publish, plan 09):
+#   UNLOCK_SIGNING_SECRET — HMAC-SHA256 secret signing visitor unlock cookies.
 
 # [[kv_namespaces]]
 # binding = "KV"

@@ -1,10 +1,38 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
+import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
-import { allTemplateSeeds } from '../../templates/registry';
+import { canvasPublishedStyles } from '../../canvas/public-styles';
+import { renderCanvasSnapshot } from '../../canvas/render';
+import { getSeedAsset } from '../../canvas/seed-assets';
+import type { PublishedSnapshot } from '../../canvas/schema';
+import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
+
+// The dashboard template preview iframe fetches seed assets through this
+// route (NOT through the public R2 read path) so the preview works before
+// the Owner has chosen a template. The seed bytes live as base64 text
+// files under `src/assets/seed-source/`; we read them at module load and
+// cache the decoded bytes so the preview asset serve is a pure-memory op.
+const seedSourceDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'seed-source');
+const seedBytesCache = new Map<string, Uint8Array>();
+function readSeedBytes(sourcePath: string): Uint8Array {
+  const cached = seedBytesCache.get(sourcePath);
+  if (cached) return cached;
+  const text = readFileSync(join(seedSourceDir, sourcePath), 'utf8').replace(/\s+/g, '');
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  seedBytesCache.set(sourcePath, bytes);
+  return bytes;
+}
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -44,12 +72,12 @@ const pageStyles = `
   }
   .templates {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
   }
   .template {
     display: grid;
-    min-height: 180px;
+    min-height: 370px;
     cursor: pointer;
   }
   .template input {
@@ -60,12 +88,30 @@ const pageStyles = `
   .template-body {
     display: grid;
     align-content: space-between;
-    gap: 18px;
-    padding: 16px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--panel);
+    overflow: hidden;
     transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+  }
+  .template-preview {
+    height: 232px;
+    border-bottom: 1px solid var(--line);
+    background: #05070c;
+  }
+  .template-preview iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    pointer-events: none;
+    background: #05070c;
+  }
+  .template-copy {
+    display: grid;
+    align-content: space-between;
+    gap: 18px;
+    padding: 16px;
   }
   .template input:checked + .template-body {
     border-color: var(--accent);
@@ -141,10 +187,61 @@ const pageStyles = `
     cursor: pointer;
   }
   @media (max-width: 760px) {
+    .templates { grid-template-columns: 1fr; }
     .fields { grid-template-columns: 1fr; }
     .subdomain { align-items: stretch; flex-direction: column; }
   }
 `;
+
+const previewStyles = `
+  html,
+  body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #05070c;
+  }
+  .rev01-preview-stage {
+    width: 316.8px;
+    min-height: 400px;
+    margin: 0 auto;
+    overflow: visible;
+  }
+  .rev01-preview-stage > .rev01-site {
+    width: 1440px;
+    transform: scale(0.22);
+    transform-origin: top left;
+  }
+  .rev01-preview-stage .rev01-page {
+    margin: 0;
+  }
+`;
+
+function PreviewPage({ template }: { template: TemplateSeed }) {
+  const snapshot: PublishedSnapshot = {
+    version: 1,
+    publishedAt: '2026-05-22T00:00:00.000Z',
+    styleKit: template.state.styleKit,
+    pages: template.state.pages,
+  };
+  const html = renderCanvasSnapshot(snapshot, `/dashboard/templates/${template.id}/assets`);
+
+  return (
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{template.name} preview</title>
+        <style>{raw(canvasPublishedStyles)}</style>
+        <style>{raw(previewStyles)}</style>
+      </head>
+      <body>
+        <div class="rev01-preview-stage">{raw(html)}</div>
+      </body>
+    </html>
+  );
+}
 
 function Page() {
   const subdomainPattern = SUBDOMAIN_RE.source;
@@ -156,8 +253,8 @@ function Page() {
     >
       <h1>Choose a starting point</h1>
       <p class="lede">
-        Pick the canvas seed closest to what you want. You can still move every primitive,
-        rewrite the rich text, swap the Style Kit, and publish when it feels right.
+        Pick the canvas seed closest to what you want. You can still move every primitive, rewrite
+        the rich text, swap the Style Kit, and publish when it feels right.
       </p>
 
       <form method="post" action="/api/sites">
@@ -174,11 +271,22 @@ function Page() {
                   checked={idx === 0}
                 />
                 <span class="template-body">
-                  <span>
-                    <h2>{template.name}</h2>
-                    <p>{template.tagline}</p>
+                  <span class="template-preview">
+                    <iframe
+                      src={`/dashboard/templates/${template.id}/preview`}
+                      title={`${template.name} preview`}
+                      loading="lazy"
+                      sandbox=""
+                      referrerpolicy="no-referrer"
+                    />
                   </span>
-                  <span class="kit">{template.state.styleKit}</span>
+                  <span class="template-copy">
+                    <span>
+                      <h2>{template.name}</h2>
+                      <p>{template.tagline}</p>
+                    </span>
+                    <span class="kit">{template.state.styleKit}</span>
+                  </span>
                 </span>
               </label>
             ))}
@@ -213,5 +321,37 @@ function Page() {
     </DashboardShell>
   );
 }
+
+templatesRoute.get('/:templateId/preview', (c) => {
+  const template = getTemplateSeed(c.req.param('templateId'));
+  if (!template) {
+    return c.text('template not found', 404);
+  }
+  return c.html(<PreviewPage template={template} />);
+});
+
+templatesRoute.get('/:templateId/assets/:assetId', (c) => {
+  const template = getTemplateSeed(c.req.param('templateId'));
+  if (!template) {
+    return c.text('template not found', 404);
+  }
+  const asset = getSeedAsset(c.req.param('assetId'));
+  if (!asset) {
+    return c.text('template asset not found', 404);
+  }
+  // The preview path reads bytes directly from the seed-source files so it
+  // works in dev without the R2 binding being populated. The R2-backed
+  // read path (`/assets/:contentHash` on the public host) is the canonical
+  // surface for live sites; this dashboard-side route is a build-time
+  // preview affordance only.
+  const bytes = readSeedBytes(asset.sourcePath);
+  return new Response(bytes, {
+    headers: {
+      'content-type': asset.mediaType,
+      'cache-control': 'public, max-age=31536000, immutable',
+      'x-content-type-options': 'nosniff',
+    },
+  });
+});
 
 templatesRoute.get('/', (c) => c.html(<Page />));

@@ -329,10 +329,14 @@ function validateElement(
         );
       }
       if (typeof element.assetId !== 'string') {
-        errors.push(`${basePath}.assetId must be a string (empty string allowed for unfilled slots)`);
+        errors.push(
+          `${basePath}.assetId must be a string (empty string allowed for unfilled slots)`,
+        );
       }
       if (element.posterAssetId !== undefined && typeof element.posterAssetId !== 'string') {
-        errors.push(`${basePath}.posterAssetId must be a string when present (empty string allowed for unfilled slots)`);
+        errors.push(
+          `${basePath}.posterAssetId must be a string when present (empty string allowed for unfilled slots)`,
+        );
       }
       if (typeof element.alt !== 'string') {
         errors.push(`${basePath}.alt must be a string`);
@@ -522,6 +526,33 @@ function validateEditableShape(state: unknown, errors: string[]): void {
   state.pages.forEach((page, idx) => {
     validatePage(page, `pages[${String(idx)}]`, errors);
   });
+  // Phase 0 scaffold: `symbols` is the Wave 3 #14 entry point. Permissive
+  // here — missing is treated as empty; present must be an array. Inner
+  // shape validation lives in the Wave 3 owner's code (validation rules
+  // for SymbolMaster structure are out of scope for the scaffold).
+  if (state.symbols !== undefined && !Array.isArray(state.symbols)) {
+    errors.push(`symbols must be an array when present (got ${describe(state.symbols)})`);
+  }
+}
+
+function validatePublishedMediaReferences(pages: unknown, errors: string[]): void {
+  if (!Array.isArray(pages)) return;
+  pages.forEach((page, pageIdx) => {
+    if (!isRecord(page) || !Array.isArray(page.sections)) return;
+    page.sections.forEach((section, sectionIdx) => {
+      if (!isRecord(section) || !Array.isArray(section.elements)) return;
+      section.elements.forEach((element, elementIdx) => {
+        if (!isRecord(element) || element.type !== 'media') return;
+        const basePath = `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}]`;
+        if (element.assetId === '') {
+          errors.push(`${basePath}.assetId must be non-empty in published snapshots`);
+        }
+        if (element.posterAssetId === '') {
+          errors.push(`${basePath}.posterAssetId must be non-empty in published snapshots`);
+        }
+      });
+    });
+  });
 }
 
 export function validateCanvasSiteState(state: unknown): ValidationResult {
@@ -549,6 +580,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   }
   // Re-use the editable validator on the snapshot's pages + style kit.
   validateEditableShape({ styleKit: snapshot.styleKit, pages: snapshot.pages }, errors);
+  validatePublishedMediaReferences(snapshot.pages, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }

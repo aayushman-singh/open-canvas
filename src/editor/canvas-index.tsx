@@ -14,7 +14,7 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware';
 import { requireAuth } from '../auth/require-auth';
-import { STYLE_KITS, type StyleKit } from '../canvas/schema';
+import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
 import { db } from '../db/client';
@@ -134,11 +134,25 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
           </header>
           <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
             <div class="rev01-sidebar-tabs" role="tablist" aria-label="Canvas tools">
-              <button type="button" class="active" role="tab" aria-selected="true">
+              <button
+                type="button"
+                class="active"
+                role="tab"
+                aria-selected="true"
+                data-sidebar-tab="add"
+              >
                 Add
               </button>
+              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections">
+                Sections
+              </button>
             </div>
-            <div class="rev01-sidebar-panel" role="tabpanel" aria-label="Add">
+            <div
+              class="rev01-sidebar-panel"
+              role="tabpanel"
+              aria-label="Add"
+              data-sidebar-panel="add"
+            >
               <section class="rev01-sidebar-group">
                 <h2>Sections</h2>
                 <button
@@ -199,7 +213,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
               <section class="rev01-sidebar-group">
                 <h2>Colors</h2>
                 <div class="rev01-sidebar-kit-grid" role="group" aria-label="Style kit">
-                  {STYLE_KITS.map((kit) => {
+                  {BUILT_IN_STYLE_KITS.map((kit) => {
                     const isActive = kit === owned.styleKit;
                     return (
                       <button
@@ -215,6 +229,17 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
                 </div>
               </section>
               <section id="canvas-sidebar-selection" class="rev01-sidebar-group" hidden />
+            </div>
+            <div
+              class="rev01-sidebar-panel"
+              role="tabpanel"
+              aria-label="Sections"
+              data-sidebar-panel="sections"
+              hidden
+            >
+              <div class="rev01-section-picker" data-section-picker-root>
+                <p class="rev01-section-picker-empty">Loading sections…</p>
+              </div>
             </div>
           </aside>
           <div id="canvas-root" data-site-id={owned.id} />

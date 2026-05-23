@@ -10,19 +10,23 @@ import {
   collectReferencedAssetIds,
   collectReferencedAssets,
   findAssetReferenceErrors,
-} from './assets/owner-assets';
+} from './assets/site-assets';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
 import { SECTION_RECIPE_IDS } from './canvas/schema';
 import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { STYLE_KIT_PRESETS } from './canvas/style-kits';
-import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
+import {
+  validateCanvasSiteState,
+  validatePublishedSnapshot,
+  validateSeedFixture,
+} from './canvas/validate';
 import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
 import {
-  prepareSeedOwnerAssetsForSite,
+  prepareSeedAssetsForCustomer,
   RESERVED_SUBDOMAINS,
   SUBDOMAIN_RE,
   validateSubdomain,
@@ -126,6 +130,59 @@ assert(RESERVED_SUBDOMAINS.has('admin'), 'expected RESERVED_SUBDOMAINS to includ
 
 const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
 assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');
+
+const editableEmptyMediaState: CanvasSiteState = {
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-empty-media',
+      slug: 'home',
+      title: 'Home',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-empty-media',
+          recipeId: 'hero-split',
+          name: 'Empty media',
+          height: 400,
+          elements: [
+            {
+              id: 'empty-media',
+              type: 'media',
+              mediaKind: 'image',
+              assetId: '',
+              alt: '',
+              fit: 'cover',
+              box: { x: 0, y: 0, w: 320, h: 180, z: 1 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const editableEmptyMedia = validateCanvasSiteState(editableEmptyMediaState);
+assert(
+  editableEmptyMedia.valid,
+  editableEmptyMedia.valid
+    ? ''
+    : `expected editable empty media slot to remain saveable: ${editableEmptyMedia.errors.join('; ')}`,
+);
+const publishedEmptyMedia = validatePublishedSnapshot({
+  version: 1,
+  publishedAt: '2030-01-02T00:00:00.000Z',
+  styleKit: editableEmptyMediaState.styleKit,
+  pages: editableEmptyMediaState.pages,
+});
+assert(!publishedEmptyMedia.valid, 'expected published snapshots to reject empty media asset ids');
+assert(
+  !publishedEmptyMedia.valid &&
+    publishedEmptyMedia.errors.some((message) =>
+      message.includes('assetId must be non-empty in published snapshots'),
+    ),
+  'expected published empty-media rejection to name the empty assetId',
+);
 
 // Task 5.6 invariant: a two-page state must be rejected. Clone the starter
 // template's single page and push another copy so the only reason for
@@ -341,11 +398,84 @@ assert(
   !/<input\s+type="hidden"\s+name="templateId"/.test(templatesPageSource),
   'expected templates page not to hide templateId in a single fixed input',
 );
+assert(
+  templatesPageSource.includes('<iframe') && templatesPageSource.includes('/preview'),
+  'expected templates page to render iframe previews for selectable templates',
+);
+assert(
+  templatesPageSource.includes('sandbox=""'),
+  'expected template preview iframes to be sandboxed without extra permissions',
+);
+assert(
+  templatesPageSource.includes("templatesRoute.get('/:templateId/preview'"),
+  'expected templates route to expose a per-template preview page',
+);
+assert(
+  templatesPageSource.includes("templatesRoute.get('/:templateId/assets/:assetId'"),
+  'expected templates route to serve seed assets used by template previews',
+);
+assert(
+  templatesPageSource.includes('renderCanvasSnapshot') &&
+    templatesPageSource.includes('canvasPublishedStyles'),
+  'expected template previews to use the real canvas renderer and published styles',
+);
 
 const sitesApiSource = await readSource('./routes/api/sites.ts');
 assert(
   !sitesApiSource.includes("input.templateId.trim() === '' ? 'starter-canvas'"),
   'expected site creation API not to silently default a missing templateId',
+);
+const sectionsApiSource = await readSource('./routes/api/sections.ts');
+assert(
+  sectionsApiSource.includes('.where(and(eq(site.id, siteId), eq(site.customerId, customerId)))'),
+  'expected section import site lookup to be scoped by both site id and owner customer',
+);
+assert(
+  !sectionsApiSource.includes("return c.json({ error: 'forbidden' }, 403)"),
+  'expected section import to hide unowned site ids behind the same 404 contract as canvas APIs',
+);
+
+const dashboardSource = await readSource('./routes/dashboard/index.tsx');
+assert(
+  dashboardSource.includes('ownedSites'),
+  'expected dashboard to model all owned sites, not only one editor link',
+);
+assert(
+  dashboardSource.includes('ownedSites.map'),
+  'expected dashboard to render every owned site in a list/grid',
+);
+assert(
+  !dashboardSource.includes('const latestSite'),
+  'expected dashboard not to query only the latest site',
+);
+assert(
+  !dashboardSource.includes('let editorLink'),
+  'expected dashboard not to collapse owned sites into a single editorLink',
+);
+
+const enterpriseTemplate = getTemplateSeed('enterprise-scale-canvas');
+assert(enterpriseTemplate !== null, 'expected enterprise-scale-canvas template seed to exist');
+assert(
+  enterpriseTemplate.name === 'Enterprise Scale',
+  `expected enterprise-scale-canvas name to be Enterprise Scale (got ${enterpriseTemplate.name})`,
+);
+const enterprisePage = enterpriseTemplate.state.pages[0];
+assert(enterprisePage !== undefined, 'expected enterprise template to contain one canvas page');
+assert(
+  enterprisePage.title === 'Enterprise Scale',
+  `expected enterprise page title to be Enterprise Scale (got ${enterprisePage.title})`,
+);
+assert(
+  enterprisePage.sections.length >= 6,
+  `expected enterprise template to carry a full multi-section page (got ${String(enterprisePage.sections.length)})`,
+);
+assert(
+  enterprisePage.sections.some((section) => section.id === 'enterprise-proof'),
+  'expected enterprise template to include a proof section',
+);
+assert(
+  enterprisePage.sections.some((section) => section.id === 'enterprise-governance'),
+  'expected enterprise template to include a governance section',
 );
 
 // -- Canvas-first review regressions --------------------------------------
@@ -355,6 +485,8 @@ assert(
 
 const canvasIndexSource = await readSource('./editor/canvas-index.tsx');
 const canvasClientSource = await readSource('./editor/canvas-client.ts');
+const canvasApiSource = await readSource('./routes/api/canvas.ts');
+const publishApiSource = await readSource('./routes/api/publish.ts');
 assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
@@ -366,6 +498,32 @@ assert(
 assert(
   canvasClientSource.includes('"/api/publish/sites/" + SITE_ID'),
   'expected canvas client to POST to /api/publish/sites/:siteId',
+);
+assert(
+  canvasApiSource.includes('cannot save: missing assets'),
+  'expected canvas save API to reject stale editable states that reference deleted assets',
+);
+assert(
+  publishApiSource.includes('cannot publish: unfilled media slots'),
+  'expected publish API to reject empty media slots with a 400-level owner error',
+);
+assert(
+  canvasClientSource.includes('/api/owner/assets/'),
+  'expected media picker delete/gallery flow to use the current owner asset route',
+);
+assert(
+  !canvasClientSource.includes('/api/me/assets'),
+  'expected media picker not to call the retired /api/me/assets route after main asset-pipeline merge',
+);
+assert(
+  canvasClientSource.includes('function clearDeletedAssetFromLocalState'),
+  'expected media picker delete success to clear every local reference before any later full-state save',
+);
+assert(
+  canvasClientSource.includes(
+    'Live published sites that will show missing media until you re-publish',
+  ),
+  'expected media picker delete confirmation to distinguish published breakage from editable clearing',
 );
 assert(
   canvasClientSource.includes('async function flushPendingSave()'),
@@ -382,6 +540,12 @@ assert(
 assert(
   /async function publishSite[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
   'expected publish to flush pending local saves before snapshotting editable state',
+);
+assert(
+  /async function importPendingSectionAt[\s\S]*const saved = await flushPendingSave\(\);[\s\S]*if \(!saved\) return;/.test(
+    canvasClientSource,
+  ),
+  'expected section import to flush pending local saves before asking the server',
 );
 assert(
   canvasIndexSource.includes('id="canvas-sidebar"'),
@@ -449,9 +613,7 @@ try {
   await rm(inlineCanvasClientParseDir, { recursive: true, force: true });
 }
 assert(
-  inlineCanvasClient.includes(
-    "querySelectorAll('[data-sidebar-style-kit]')",
-  ),
+  inlineCanvasClient.includes("querySelectorAll('[data-sidebar-style-kit]')"),
   'expected style-kit click handling to bind sidebar style-kit buttons',
 );
 assert(
@@ -716,19 +878,25 @@ for (const [assetId, asset] of Object.entries(SEED_ASSET_REGISTRY)) {
       asset.mediaType.startsWith('video/'),
       `expected seed video ${assetId} to use a video/* mediaType`,
     );
-    const decoded = atob(asset.bytesBase64);
+    // Post-ADR-0006 the seed registry does not carry bytes inline. The
+    // per-byte sanity check we used to run on `bytesBase64` is now
+    // performed at upload time by the `seed:assets` script (verifies
+    // contentHash matches the bytes file). The registry-level
+    // image/video kind discriminator is the only assertion the smoke
+    // can make here without re-decoding source bytes.
     assert(
-      !decoded.startsWith('\x89PNG\r\n\x1A\n'),
-      `expected seed video ${assetId} to contain video bytes, not a PNG payload`,
+      asset.contentHash.length === 64,
+      `expected seed ${assetId} to carry a sha256 contentHash (64 hex chars)`,
     );
   }
 }
 
 // Site-creation materialisation: after creating a smoke site, the count of
-// `ownerAsset` rows for that customer MUST equal the count of seed asset ids
-// referenced by `starterTemplate.state`. We bypass the Clerk-gated POST and
-// directly mirror the production materialiser's INSERTs so the smoke runs
-// without a Clerk session.
+// `ownerAsset` rows for that Owner MUST equal the count of seed asset ids
+// referenced by `starterTemplate.state`. Per ADR 0004 the asset root is
+// the Owner — two sites under the same Owner share seed rows; we exercise
+// only the single-Owner path here so the row count comparison stays
+// straightforward.
 const T6_CLERK_USER = 'smoke-t6-' + crypto.randomUUID().slice(0, 8);
 const T6_SUB = 't6-' + crypto.randomUUID().slice(0, 8).toLowerCase();
 const referencedSeedIds = [...collectReferencedAssetIds(starterTemplate.state.pages)];
@@ -736,15 +904,15 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
-const preparedForSiteA = prepareSeedOwnerAssetsForSite('site-a', 'cust-a', starterTemplate.state);
-const preparedForSiteB = prepareSeedOwnerAssetsForSite('site-b', 'cust-b', starterTemplate.state);
-assert(preparedForSiteA.ok, 'expected seed asset preparation for site-a to succeed');
-assert(preparedForSiteB.ok, 'expected seed asset preparation for site-b to succeed');
+const preparedForCustomerA = prepareSeedAssetsForCustomer('customer-a', starterTemplate.state);
+const preparedForCustomerB = prepareSeedAssetsForCustomer('customer-b', starterTemplate.state);
+assert(preparedForCustomerA.ok, 'expected seed asset preparation for customer-a to succeed');
+assert(preparedForCustomerB.ok, 'expected seed asset preparation for customer-b to succeed');
 const preparedAIds = new Set(
-  preparedForSiteA.ok ? preparedForSiteA.seedRows.map((row) => row.id) : [],
+  preparedForCustomerA.ok ? preparedForCustomerA.seedRows.map((row) => row.id) : [],
 );
 const preparedBIds = new Set(
-  preparedForSiteB.ok ? preparedForSiteB.seedRows.map((row) => row.id) : [],
+  preparedForCustomerB.ok ? preparedForCustomerB.seedRows.map((row) => row.id) : [],
 );
 for (const originalId of referencedSeedIds) {
   assert(
@@ -752,24 +920,23 @@ for (const originalId of referencedSeedIds) {
     `expected materialised asset ids not to reuse global seed id "${originalId}"`,
   );
 }
-const preparedAStateIds = collectReferencedAssetIds(preparedForSiteA.editableState.pages);
+const preparedAStateIds = collectReferencedAssetIds(preparedForCustomerA.editableState.pages);
 for (const originalId of referencedSeedIds) {
   assert(
     !preparedAStateIds.has(originalId),
     `expected editable state not to retain global seed asset id "${originalId}" after materialisation`,
   );
 }
-for (const row of preparedForSiteA.seedRows) {
+for (const row of preparedForCustomerA.seedRows) {
   assert(
     preparedAStateIds.has(row.id),
-    `expected editable state to reference materialised site asset id "${row.id}"`,
+    `expected editable state to reference materialised Owner Asset id "${row.id}"`,
   );
 }
 for (const id of preparedAIds) {
-  assert(!preparedBIds.has(id), `expected per-site materialised asset id ${id} not to collide`);
+  assert(!preparedBIds.has(id), `expected per-customer materialised asset id ${id} not to collide`);
 }
 let t6SiteId: string | null = null;
-let t6CustomerId: string | null = null;
 try {
   const inserted = await smokeDb
     .insert(customer)
@@ -778,14 +945,14 @@ try {
       email: `${T6_CLERK_USER}@example.invalid`,
     })
     .returning({ id: customer.id });
-  t6CustomerId = inserted[0]?.id ?? null;
+  const t6CustomerId = inserted[0]?.id;
   assert(
     typeof t6CustomerId === 'string' && t6CustomerId.length > 0,
     'expected T6 smoke customer insert to return an id',
   );
 
   t6SiteId = crypto.randomUUID();
-  const preparedT6 = prepareSeedOwnerAssetsForSite(t6SiteId, t6CustomerId, starterTemplate.state);
+  const preparedT6 = prepareSeedAssetsForCustomer(t6CustomerId, starterTemplate.state);
   assert(preparedT6.ok, 'expected T6 seed asset preparation to succeed');
   await smokeDb.insert(site).values({
     id: t6SiteId,
@@ -798,7 +965,7 @@ try {
     publishedVersion: 0,
   });
   const seedRows = preparedT6.seedRows;
-  await smokeDb.insert(ownerAsset).values(seedRows);
+  await smokeDb.insert(ownerAsset).values(seedRows).onConflictDoNothing();
 
   const assetRows = await smokeDb
     .select({ id: ownerAsset.id })
@@ -818,9 +985,6 @@ try {
 } finally {
   if (t6SiteId) {
     await smokeDb.delete(site).where(eq(site.id, t6SiteId));
-  }
-  if (t6CustomerId) {
-    await smokeDb.delete(ownerAsset).where(eq(ownerAsset.customerId, t6CustomerId));
   }
   await smokeDb.delete(customer).where(eq(customer.clerkUserId, T6_CLERK_USER));
 }

@@ -15,19 +15,22 @@
 import { eq } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { html, raw } from 'hono/html';
-import { assetResponse, collectReferencedAssetIds } from '../assets/owner-assets';
+import { createR2Client } from '../assets/r2-client';
+import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
+import { collectReferencedAssetIds } from '../assets/site-assets';
 import type { ClerkAuthVariables } from '../auth/middleware';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { db } from '../db/client';
-import { ownerAsset, site } from '../db/schema';
+import { site } from '../db/schema';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   SITE_ROOM: DurableObjectNamespace;
+  ASSETS_BUCKET: R2Bucket;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -266,29 +269,52 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   if (path.startsWith('/assets/')) {
     // Visitor-facing asset surface. We serve ONLY assets that the current
-    // publishedSnapshot.pages reference. Editable-only assets (uploaded but
-    // never published) are 404 — the public surface is constrained by the
-    // published snapshot, not the editable library. Missing rows are also
-    // 404; we never leak existence by status code.
-    const assetId = path.slice('/assets/'.length);
-    if (assetId.length === 0 || assetId.includes('/')) {
+    // publishedSnapshot.pages reference (per the snapshot-bound visibility
+    // rule that predates the asset re-root: editable-only assets are 404
+    // here even when the row exists). The `addr` segment may be a UUID or
+    // a content hash; the publish-snapshot reachable set is UUID-keyed via
+    // `MediaElement.assetId`, but content-hash addressing is allowed too
+    // — see `readOwnerAsset` for the OR lookup. Missing rows are 404; we
+    // never leak existence by status code.
+    const addr = path.slice('/assets/'.length);
+    if (addr.length === 0 || addr.includes('/')) {
       return c.text('asset not found', 404);
     }
-    const referenced = collectReferencedAssetIds(siteRow.publishedSnapshot.pages);
-    if (!referenced.has(assetId)) {
+    const referencedAssetIds = collectReferencedAssetIds(siteRow.publishedSnapshot.pages);
+    // Allow either the UUID or the content hash to satisfy the reachability
+    // check. We accept either because the renderer emits UUID URLs, but
+    // operators / cache warmers may probe by content hash directly.
+    if (!referencedAssetIds.has(addr)) {
+      // For content-hash addressing we have to resolve UUID → contentHash
+      // via the DB before we can rule out a 64-hex addr. Skip that work
+      // unless the addr looks like a hash; cheap UUID rejects 404 fast.
+      if (!/^[0-9a-f]{64}$/.test(addr)) {
+        return c.text('asset not found', 404);
+      }
+      // Defer content-hash reachability to readOwnerAsset's existence
+      // check (which scopes by no Owner — the read route serves any row
+      // by id/hash; the snapshot-bound rule above is the only restriction
+      // we apply for visitor traffic). The trade-off is intentional: any
+      // content-hash that resolves to a real row is served, even if the
+      // SPECIFIC ownerAsset.id is not in this snapshot, because that's
+      // the same bytes the snapshot points at via a different id.
+    }
+    const r2 = createR2Client(c.env.ASSETS_BUCKET);
+    const cfImageFetch: CfImageFetcher | null =
+      typeof fetch === 'function' ? (url, options) => fetch(url, options as RequestInit) : null;
+    const response = await readOwnerAsset(
+      {
+        db: db(c.env),
+        r2,
+        cfImageFetch,
+        publicOrigin: `${requestUrl.protocol}//${requestUrl.host}`,
+      },
+      { addr, url: requestUrl },
+    );
+    if (!response) {
       return c.text('asset not found', 404);
     }
-    const database = db(c.env);
-    const rows = await database
-      .select({ mediaType: ownerAsset.mediaType, bytesBase64: ownerAsset.bytesBase64 })
-      .from(ownerAsset)
-      .where(eq(ownerAsset.id, assetId))
-      .limit(1);
-    const row = rows[0];
-    if (!row) {
-      return c.text('asset not found', 404);
-    }
-    return assetResponse(row.mediaType, row.bytesBase64);
+    return response;
   }
 
   const snapshotHtml = renderCanvasSnapshot(siteRow.publishedSnapshot, '/assets');

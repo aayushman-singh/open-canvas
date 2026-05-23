@@ -21,12 +21,17 @@
 import type {
   ActionVariant,
   ActionVariantTokens,
-  StyleKit,
+  BuiltInStyleKit,
   StyleKitPreset,
   SurfaceVariant,
   SurfaceVariantTokens,
 } from './schema.js';
-import { ACTION_VARIANTS, STYLE_KITS, SURFACE_VARIANTS } from './schema.js';
+import {
+  ACTION_VARIANTS,
+  BUILT_IN_STYLE_KITS,
+  STYLE_KITS,
+  SURFACE_VARIANTS,
+} from './schema.js';
 
 // --------------------------------------------------------------------------
 // The four kits.
@@ -358,15 +363,16 @@ const GREEN_ORGANIC: StyleKitPreset = {
   },
 };
 
-// `satisfies` enforces that the literal is a valid `Record<StyleKit, ...>`
-// AND lets the four field shapes stay precise (no widening to
-// StyleKitPreset[StyleKit] — useful for "go to definition" on the editor).
-export const STYLE_KIT_PRESETS: Record<StyleKit, StyleKitPreset> = {
+// `satisfies` enforces that the literal is a valid `Record<BuiltInStyleKit, ...>`
+// AND lets the four field shapes stay precise. `'custom'` (Phase 0 scaffold
+// for Wave 2 #10) is NOT a key here — it resolves at render time from
+// `CanvasSiteState.customStyleKit` instead.
+export const STYLE_KIT_PRESETS: Record<BuiltInStyleKit, StyleKitPreset> = {
   charcoal: CHARCOAL,
   'orange-editorial': ORANGE_EDITORIAL,
   'blue-saas': BLUE_SAAS,
   'green-organic': GREEN_ORGANIC,
-} satisfies Record<StyleKit, StyleKitPreset>;
+} satisfies Record<BuiltInStyleKit, StyleKitPreset>;
 
 // --------------------------------------------------------------------------
 // Lookup helper. Fails loudly so a corrupted kit name never silently
@@ -375,12 +381,20 @@ export const STYLE_KIT_PRESETS: Record<StyleKit, StyleKitPreset> = {
 // --------------------------------------------------------------------------
 
 export function getStyleKitPreset(kit: string): StyleKitPreset {
+  // Note: 'custom' (Phase 0 scaffold for Wave 2 #10) does not have a row in
+  // STYLE_KIT_PRESETS. Callers that may pass 'custom' must check the selector
+  // and route through `customStyleKit` before calling this. Calling
+  // getStyleKitPreset('custom') is treated as a programming error and throws.
   if (!Object.prototype.hasOwnProperty.call(STYLE_KIT_PRESETS, kit)) {
     throw new Error(
       `getStyleKitPreset: unknown style kit ${JSON.stringify(kit)} — expected one of ${STYLE_KITS.join(', ')}`,
     );
   }
-  return STYLE_KIT_PRESETS[kit as StyleKit];
+  const preset = STYLE_KIT_PRESETS[kit as BuiltInStyleKit];
+  if (preset === undefined) {
+    throw new Error(`getStyleKitPreset: preset table missing entry for ${JSON.stringify(kit)}`);
+  }
+  return preset;
 }
 
 // --------------------------------------------------------------------------
@@ -419,7 +433,7 @@ function declaration(prop: string, value: string | number): string {
   return `${prop}: ${String(value)};`;
 }
 
-function buildKitTokenBlock(kitName: StyleKit, preset: StyleKitPreset): string {
+function buildKitTokenBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string {
   // Kit tokens are namespaced `--rev01-kit-*` to keep them off the editor
   // chrome's `--rev01-*` namespace. Editor chrome (src/editor/canvas-styles.ts)
   // sets its own `--rev01-bg`/`--rev01-accent` on :root for the topbar,
@@ -463,7 +477,7 @@ function buildKitTokenBlock(kitName: StyleKit, preset: StyleKitPreset): string {
 }
 
 function buildActionVariantBlock(
-  kitName: StyleKit,
+  kitName: BuiltInStyleKit,
   variant: ActionVariant,
   tokens: ActionVariantTokens,
 ): string {
@@ -477,7 +491,7 @@ function buildActionVariantBlock(
 }
 
 function buildSurfaceVariantBlock(
-  kitName: StyleKit,
+  kitName: BuiltInStyleKit,
   variant: SurfaceVariant,
   tokens: SurfaceVariantTokens,
 ): string {
@@ -490,7 +504,7 @@ function buildSurfaceVariantBlock(
   return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="container"][data-variant=${quoteCssString(variant)}] .rev01-surface {\n  ${decls.join('\n  ')}\n}`;
 }
 
-function buildShapeBlock(kitName: StyleKit, preset: StyleKitPreset): string {
+function buildShapeBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string {
   return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="shape"] .rev01-shape {
   background: ${preset.shapeFill};
   border: ${preset.shapeStrokeWidth} solid ${preset.shapeStroke};
@@ -510,7 +524,7 @@ function buildMotionKeyframes(): string {
 @keyframes rev01-parallax-soft { from { transform: translateY(6px); } to { transform: translateY(0); } }`;
 }
 
-function buildMotionBlock(kitName: StyleKit): string {
+function buildMotionBlock(kitName: BuiltInStyleKit): string {
   // Each preset maps to a CSS animation by name. The kit's duration/easing
   // come from the kit-level token block (already on the wrapper); we only
   // attach the animation name here so a single rule per preset works for
@@ -528,7 +542,7 @@ function buildMotionBlock(kitName: StyleKit): string {
   return presetRules.join('\n');
 }
 
-function buildKitBlock(kitName: StyleKit, preset: StyleKitPreset): string {
+function buildKitBlock(kitName: BuiltInStyleKit, preset: StyleKitPreset): string {
   const parts: string[] = [buildKitTokenBlock(kitName, preset), buildShapeBlock(kitName, preset)];
   for (const variant of ACTION_VARIANTS) {
     const block = buildActionVariantBlock(kitName, variant, preset.actionVariants[variant]);
@@ -549,14 +563,19 @@ function buildKitBlock(kitName: StyleKit, preset: StyleKitPreset): string {
  */
 export function buildAllStyleKitsCss(): string {
   const keyframes = buildMotionKeyframes();
-  const kitBlocks = STYLE_KITS.map((kit) => buildKitBlock(kit, STYLE_KIT_PRESETS[kit]));
+  // Iterate built-in kits only. `'custom'` resolves at render time from
+  // `CanvasSiteState.customStyleKit`; emitting a kit-wide CSS block for a
+  // value that lives in per-site state would mix layers.
+  const kitBlocks = BUILT_IN_STYLE_KITS.map((kit) =>
+    buildKitBlock(kit, STYLE_KIT_PRESETS[kit]),
+  );
   // Per-element typography uses the kit's font tokens. The display family
   // applies to headings; body to body; label to labels. These rules live at
   // the kit level so role-specific size scales also work (the renderer
   // already emits the absolute fontSize; the scale here is a multiplier so
   // owner-set sizes still respect the kit's modular scale).
   const baseTextRules: string[] = [];
-  for (const kit of STYLE_KITS) {
+  for (const kit of BUILT_IN_STYLE_KITS) {
     baseTextRules.push(
       `[data-style-kit=${quoteCssString(kit)}] [data-element-type="text"][data-role="heading"] .rev01-text {\n  font-family: var(--rev01-kit-font-display);\n}`,
       `[data-style-kit=${quoteCssString(kit)}] [data-element-type="text"][data-role="body"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  line-height: var(--rev01-kit-line-height);\n}`,

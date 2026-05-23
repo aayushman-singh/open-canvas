@@ -30,7 +30,7 @@ import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/owner-assets';
+import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import type { RecipeFactoryInput } from '../../canvas/recipes';
 import {
   INLINE_MARK_TYPES,
@@ -45,7 +45,7 @@ import {
 } from '../../canvas/schema';
 import { validateCanvasSiteState, isAllowedHref } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, site, ownerAsset } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -345,16 +345,22 @@ async function runOpsPipeline(
     };
   }
 
-  // Verify every media asset reference in the resulting state belongs to this
-  // site's owner and matches the media element's expected kind. This catches
-  // replaceMedia ops AND recipe-created sections that receive assetIds.
+  // Verify every media asset reference in the resulting state belongs to
+  // this Owner and matches the media element's expected kind. Per ADR 0004
+  // the asset root is the Owner, not the site — so two sites under the
+  // same Owner can share assets. The scoping below honours that.
   const referencedAssetIds = collectReferencedAssetIds(next.pages);
   if (referencedAssetIds.size > 0) {
     const database = db(c.env);
     const rows = await database
       .select({ id: ownerAsset.id, kind: ownerAsset.kind })
       .from(ownerAsset)
-      .where(and(eq(ownerAsset.customerId, row.customerId), inArray(ownerAsset.id, [...referencedAssetIds])));
+      .where(
+        and(
+          eq(ownerAsset.customerId, row.customerId),
+          inArray(ownerAsset.id, [...referencedAssetIds]),
+        ),
+      );
     const referenceErrors = findAssetReferenceErrors(next.pages, rows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {

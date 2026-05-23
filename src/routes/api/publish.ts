@@ -20,7 +20,11 @@
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/owner-assets';
+import {
+  collectReferencedAssetIds,
+  collectUnfilledAssetReferences,
+  findAssetReferenceErrors,
+} from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { renderCanvasSnapshot } from '../../canvas/render';
@@ -87,11 +91,27 @@ publishApi.post('/sites/:siteId', async (c) => {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
   }
 
+  const unfilledMediaSlots = collectUnfilledAssetReferences(row.editableState.pages);
+  if (unfilledMediaSlots.length > 0) {
+    return c.json(
+      {
+        error: 'cannot publish: unfilled media slots',
+        unfilledMediaSlots: unfilledMediaSlots.map((reference) => ({
+          role: reference.role,
+          path: reference.path,
+          elementId: reference.mediaElementId,
+        })),
+      },
+      400,
+    );
+  }
+
   // Asset reachability guard: every media `assetId` and `posterAssetId`
-  // referenced by the editable state must exist as an `ownerAsset` row for
-  // this site's owner and match the element's expected kind. We refuse to
-  // publish a snapshot that would point at missing or mismatched media: no
-  // auto-fix, no placeholder substitution.
+  // referenced by the editable state must exist as an `ownerAsset` row owned
+  // by the current Owner and match the element's expected kind. Per ADR 0004
+  // the root is the Owner, not the site — an asset uploaded against one of
+  // this Owner's other sites still resolves here. No auto-fix, no
+  // placeholder substitution.
   const referenced = collectReferencedAssetIds(row.editableState.pages);
   if (referenced.size > 0) {
     const referencedList = [...referenced];

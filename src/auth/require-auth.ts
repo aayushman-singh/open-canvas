@@ -1,9 +1,11 @@
 import { createMiddleware } from 'hono/factory';
-import type { ClerkAuthVariables } from './middleware';
+import { resolveClerkKeys, type ClerkAuthVariables } from './middleware';
 
 type ClerkBindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_TEST_PUBLISHABLE_KEY?: string;
+  CLERK_TEST_SECRET_KEY?: string;
 };
 
 // Derives the Account Portal origin from the publishable key.
@@ -77,7 +79,8 @@ export function requireAuth() {
       return c.json({ error: 'unauthorized' }, 401);
     }
 
-    const signInUrl = buildSignInUrl(c.env.CLERK_PUBLISHABLE_KEY, requestUrl.toString());
+    const { publishableKey } = resolveClerkKeys(c.env);
+    const signInUrl = buildSignInUrl(publishableKey, requestUrl.toString());
     return c.redirect(signInUrl, 302);
   });
 }

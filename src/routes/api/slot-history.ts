@@ -7,26 +7,19 @@
 import { Hono } from 'hono';
 import { and, desc, eq } from 'drizzle-orm';
 import { clerkAuth } from '../../auth/middleware';
-import { requireAuth } from '../../auth/require-auth';
 import { requireOwnedSite, type OwnerEnv } from '../../auth/context';
 import { db } from '../../db/client';
 import { ownerAsset, slotHistory } from '../../db/schema';
 
 const slotHistoryApi = new Hono<OwnerEnv>();
 
-const realRequireAuth = requireAuth();
-
 // Auth middleware — scoped to '/sites/*' so it covers every route this router
 // declares (all paths begin /sites/:siteId/…) without intercepting sibling
-// routers that share the /api mount point (e.g. assetsApi at /api/me/assets).
+// routers that share the /api mount point (e.g. assetsApi at /api/owner/assets).
 //
 // Using a single path pattern instead of two specific patterns means any new
 // route added under /sites/ is automatically protected; only routes outside
 // /sites/ could slip through, and this router currently declares none.
-//
-// SMOKE bypass runs before clerkAuth so the Clerk SDK never reads (and
-// consumes) the request body when the smoke harness is driving requests.
-// Production paths cannot reach the bypass because env.SMOKE is unset.
 slotHistoryApi.use('/sites/*', clerkAuth());
 slotHistoryApi.use('/sites/*', async (c, next) => {
   if (c.env.SMOKE === '1') {
@@ -37,8 +30,12 @@ slotHistoryApi.use('/sites/*', async (c, next) => {
     }
     return c.json({ error: 'unauthorized' }, 401);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return realRequireAuth(c as any, next);
+  const auth = c.get('auth');
+  if (auth.userId) {
+    await next();
+    return;
+  }
+  return c.json({ error: 'unauthorized' }, 401);
 });
 
 // GET — list last N history entries newest-first.
@@ -51,24 +48,24 @@ slotHistoryApi.get('/sites/:siteId/elements/:elementId/history', async (c) => {
 
   const rows = await db(c.env)
     .select({
-      assetId: slotHistory.assetId,
-      lastUsedAt: slotHistory.lastUsedAt,
+      assetId: slotHistory.ownerAssetId,
+      lastUsedAt: slotHistory.usedAt,
       kind: ownerAsset.kind,
       mediaType: ownerAsset.mediaType,
       alt: ownerAsset.alt,
     })
     .from(slotHistory)
-    .innerJoin(ownerAsset, eq(ownerAsset.id, slotHistory.assetId))
+    .innerJoin(ownerAsset, eq(ownerAsset.id, slotHistory.ownerAssetId))
     .where(
       and(eq(slotHistory.siteId, ctx.site.id), eq(slotHistory.elementId, c.req.param('elementId'))),
     )
-    .orderBy(desc(slotHistory.lastUsedAt))
+    .orderBy(desc(slotHistory.usedAt))
     .limit(limit);
 
   return c.json({ entries: rows });
 });
 
-// PUT — MRU upsert on (siteId, elementId, assetId). Also bumps owner_asset.last_used_at.
+// PUT — MRU upsert on (siteId, elementId, assetId).
 slotHistoryApi.put('/sites/:siteId/elements/:elementId/history/:assetId', async (c) => {
   const ctx = await requireOwnedSite(c, c.req.param('siteId'));
   if (!ctx.ok) return ctx.response;
@@ -92,15 +89,11 @@ slotHistoryApi.put('/sites/:siteId/elements/:elementId/history/:assetId', async 
   // surfaces as 500 and the second never runs.
   await database
     .insert(slotHistory)
-    .values({ siteId: ctx.site.id, elementId, assetId, lastUsedAt: now })
+    .values({ siteId: ctx.site.id, elementId, ownerAssetId: assetId, usedAt: now })
     .onConflictDoUpdate({
-      target: [slotHistory.siteId, slotHistory.elementId, slotHistory.assetId],
-      set: { lastUsedAt: now },
+      target: [slotHistory.siteId, slotHistory.elementId, slotHistory.ownerAssetId],
+      set: { usedAt: now },
     });
-  await database
-    .update(ownerAsset)
-    .set({ lastUsedAt: now })
-    .where(and(eq(ownerAsset.id, assetId), eq(ownerAsset.customerId, ctx.customer.id)));
 
   return c.json({ ok: true });
 });
