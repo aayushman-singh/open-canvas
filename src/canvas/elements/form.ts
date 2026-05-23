@@ -133,10 +133,7 @@ function renderField(field: FormFieldDef, formId: string): string {
     case 'select': {
       const options = Array.isArray(field.options) ? field.options : [];
       const optionsHtml = options
-        .map(
-          (opt) =>
-            `<option value="${escapeAttr(opt.value)}">${escapeHtml(opt.label)}</option>`,
-        )
+        .map((opt) => `<option value="${escapeAttr(opt.value)}">${escapeHtml(opt.label)}</option>`)
         .join('');
       return [
         `<label class="rev01-form-field" for="${escapeAttr(fieldId)}">`,

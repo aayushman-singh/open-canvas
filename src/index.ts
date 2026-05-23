@@ -163,10 +163,7 @@ app.use('/api/sites/:siteId/translate', clerkAuth(), requireAuth(), async (c, ne
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
   if (!siteRow[0]) return c.json({ error: 'site not found' }, 404);
-  c.set(
-    'translateSiteState' as never,
-    siteRow[0].editableState as never,
-  );
+  c.set('translateSiteState' as never, siteRow[0].editableState as never);
   c.set(
     'translateTranslator' as never,
     new GeminiTranslator({ apiKey: c.env.GEMINI_API_KEY ?? '' }) as never,
