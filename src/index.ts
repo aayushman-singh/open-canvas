@@ -29,6 +29,9 @@ import symbolsRouter from './symbols/route';
 import a11yRoute from './a11y/route';
 import a11yReportRoute from './routes/dashboard/a11y-report';
 import pageSettingsRoute from './routes/dashboard/page-settings';
+// Wave 4 routers wired by main thread after parallel-agent merge.
+import navEditorRoute from './routes/dashboard/nav-editor';
+import sitemapRouter from './seo/sitemap/route';
 
 const app = new Hono<PublicEnv>();
 
@@ -102,6 +105,13 @@ app.route('/dashboard', pageSettingsRoute);
 // public.ts returns null for `/__rev01/*` so the search request falls through
 // to this app router. The handler reads the request Host to resolve site id.
 app.route('/__rev01/search', searchRouter);
+// Wave 4 mounts.
+// Nav editor UI (#16) lives under /dashboard.
+app.route('/dashboard', navEditorRoute);
+// Sitemap.xml + robots.txt (#22) on public-host root paths. public.ts must
+// fall through (return null) for `/sitemap.xml` and `/robots.txt` — see the
+// fallthrough block in handlePublicRequest.
+app.route('/', sitemapRouter);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in
