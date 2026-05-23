@@ -33,6 +33,11 @@ import { customer, ownerAsset, site } from '../../db/schema';
 //   - OG-image pre-render to R2 keyed by snapshot.version (#6).
 import { captureOnPublish } from '../../version/capture';
 import { onPublishGenerateOg } from '../../og-image/on-publish';
+// Wave 3 pre/post-publish hooks.
+//   - Pre-publish: a11y audit refuses to publish on blocking issues (#15).
+//   - Post-publish: search index rebuild for the visitor-facing search (#13).
+import { runAudit } from '../../a11y/audit';
+import { rebuildSearchIndex } from '../../search/indexer';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -95,6 +100,21 @@ publishApi.post('/sites/:siteId', async (c) => {
   const validation = validateCanvasSiteState(row.editableState);
   if (!validation.valid) {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
+  }
+
+  // Wave 3 #15 — accessibility audit gate. Blocks publish when blocking issues
+  // exist (e.g. missing alt text, contrast < 3.0, empty page title). Warnings
+  // and info-level findings do NOT block. 422 is the structured failure code.
+  const auditReport = runAudit(row.editableState);
+  if (auditReport.blockerCount > 0) {
+    return c.json(
+      {
+        error: 'cannot publish: accessibility blockers',
+        blockers: auditReport.issues.filter((i) => i.severity === 'blocking'),
+        report: auditReport,
+      },
+      422,
+    );
   }
 
   // Asset reachability guard: every media `assetId` and `posterAssetId`
@@ -169,6 +189,13 @@ publishApi.post('/sites/:siteId', async (c) => {
   // publish row update above succeeds first so a snapshot-capture crash does
   // not produce a half-published state on the visitor side.
   await captureOnPublish(row.id, snapshot.version, database, c.env);
+
+  // Wave 3 #13 — rebuild the visitor-facing search index for this site. Same
+  // all-or-nothing posture: an indexer error propagates and the request
+  // fails. The publish row + version snapshot are already written, so a
+  // retry after a transient DB blip simply reindexes against the same
+  // snapshot.
+  await rebuildSearchIndex(row.id, snapshot, database);
 
   // Wave 1 #6 — pre-render OG cards into R2 for every page so the first
   // visitor share-link is unfurled with a cached image. Per-page errors are
