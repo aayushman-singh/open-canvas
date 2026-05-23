@@ -396,6 +396,62 @@ assert(
   'expected dashboard not to collapse owned sites into a single editorLink',
 );
 
+const publicRouteSource = await readSource('./routes/public.ts');
+const publishRouteSource = await readSource('./routes/api/publish.ts');
+const indexSource = await readSource('./index.ts');
+const siteRoomSource = await readSource('./live/site-room.ts');
+const unlockRouteSource = await readSource('./password/unlock-route.ts');
+const renderSource = await readSource('./canvas/render.ts');
+assert(
+  /renderCanvasSnapshot\(\s*renderSnapshot,\s*'\/assets',\s*siteRow\.id\s*\)/.test(
+    publicRouteSource,
+  ),
+  'expected public render to pass site id through so Form elements post to /__rev01/forms/:siteId/:formId',
+);
+assert(
+  /renderCanvasSnapshot\(\s*snapshot,\s*'\/assets',\s*row\.id\s*\)/.test(publishRouteSource),
+  'expected publish broadcast render to pass site id through so live-updated forms keep a valid action',
+);
+assert(
+  publicRouteSource.includes('prepareRender(path, snapshot)') &&
+    publicRouteSource.includes('renderSnapshot') &&
+    publicRouteSource.includes('dir="${raw(escapeAttr(dir))}"'),
+  'expected public route to use the i18n render hook for locale routing, RTL mirroring, and html dir',
+);
+assert(
+  !publicRouteSource.includes('const pageSlug =\n    path ===') &&
+    !publicRouteSource.includes('path.replace(/^\\//, \'\').split(\'/\')[0]'),
+  'expected public route not to use first-path-segment slug matching after i18n routing lands',
+);
+assert(
+  !renderSource.includes('lang="en" data-style-kit'),
+  'expected canvas body renderer not to force lang="en" inside locale-aware documents',
+);
+assert(
+  publicRouteSource.includes('emitFontFaceBlocks') &&
+    publicRouteSource.includes('resolveFontTokens') &&
+    publicRouteSource.includes('siteFont'),
+  'expected public route to resolve custom font tokens and emit @font-face CSS for Published Sites',
+);
+assert(
+  publicRouteSource.includes('role=visitor') &&
+    indexSource.includes("app.get('/__live'") &&
+    indexSource.includes('requireAuth()') &&
+    indexSource.includes('role=editor'),
+  'expected /__live to separate unauthenticated visitor sockets from authenticated editor sockets',
+);
+assert(
+  siteRoomSource.includes('socketRoles') &&
+    siteRoomSource.includes('isEditorSocket') &&
+    siteRoomSource.includes('rejected visitor websocket message'),
+  'expected SiteRoom to reject visitor-originated Yjs writes and fan out Yjs payloads only to editors',
+);
+assert(
+  unlockRouteSource.includes('resolveCustomDomainWithRuntimeCache') &&
+    unlockRouteSource.includes('loadSiteById'),
+  'expected password unlock route to resolve custom-domain Published Addresses, not only subdomains',
+);
+
 const enterpriseTemplate = getTemplateSeed('enterprise-scale-canvas');
 assert(enterpriseTemplate !== null, 'expected enterprise-scale-canvas template seed to exist');
 assert(

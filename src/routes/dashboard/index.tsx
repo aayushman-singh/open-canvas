@@ -49,8 +49,8 @@ dashboard.get('/', async (c) => {
       },
     });
 
-  // Surface a one-click jump into the editor for the most recent owned site.
-  // Two queries (no joins) so the neon-http driver stays happy.
+  // Surface every owned site. Two queries (no joins) so the neon-http driver
+  // stays happy.
   const customerRow = await database
     .select({ id: customer.id })
     .from(customer)
@@ -58,21 +58,17 @@ dashboard.get('/', async (c) => {
     .limit(1);
   const customerId = customerRow[0]?.id;
 
-  let editorLink: { siteId: string; siteName: string } | null = null;
+  let ownedSites: Array<{ siteId: string; siteName: string }> = [];
   if (customerId) {
-    const latestSite = await database
+    const rows = await database
       .select({ id: site.id, name: site.name })
       .from(site)
       .where(eq(site.customerId, customerId))
-      .orderBy(desc(site.createdAt))
-      .limit(1);
-    const siteRow = latestSite[0];
-    if (siteRow) {
-      editorLink = {
-        siteId: siteRow.id,
-        siteName: siteRow.name,
-      };
-    }
+      .orderBy(desc(site.createdAt));
+    ownedSites = rows.map((siteRow) => ({
+      siteId: siteRow.id,
+      siteName: siteRow.name,
+    }));
   }
 
   const signOutUrl = buildSignOutUrl(
@@ -87,11 +83,14 @@ dashboard.get('/', async (c) => {
     >
       <h1>rev01</h1>
       <p>Signed in as {primaryEmail}.</p>
-      {editorLink ? (
-        <p>
-          Continue editing{' '}
-          <a href={`/dashboard/sites/${editorLink.siteId}/edit`}>{editorLink.siteName}</a>.
-        </p>
+      {ownedSites.length > 0 ? (
+        <ul>
+          {ownedSites.map((ownedSite) => (
+            <li>
+              <a href={`/dashboard/sites/${ownedSite.siteId}/edit`}>{ownedSite.siteName}</a>
+            </li>
+          ))}
+        </ul>
       ) : (
         <p>
           No sites yet — <a href="/dashboard/templates">pick a template</a> to start.

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { and, eq } from 'drizzle-orm';
 import ownerAssetsApi from './assets/route';
 import landing from './landing';
 import { dashboard } from './routes/dashboard';
@@ -43,6 +44,8 @@ import translateRouter from './agent/translate/route';
 import { GeminiTranslator } from './agent/translate/llm';
 import { clerkAuth } from './auth/middleware';
 import { requireAuth } from './auth/require-auth';
+import { db } from './db/client';
+import { customer, site } from './db/schema';
 
 const app = new Hono<PublicEnv>();
 
@@ -73,6 +76,55 @@ app.use('*', async (c, next) => {
   const handled = await handlePublicRequest(c);
   if (handled) return handled;
   await next();
+});
+
+app.get('/__live', clerkAuth(), requireAuth(), async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('__live editor route reached without authenticated user');
+  }
+
+  const siteId = c.req.query('siteId');
+  if (!siteId || !/^[A-Za-z0-9-]+$/.test(siteId)) {
+    return c.text('site not found', 404);
+  }
+
+  const upgrade = c.req.header('upgrade');
+  if (upgrade !== 'websocket') {
+    return c.text('expected websocket upgrade', 426);
+  }
+
+  const database = db(c.env);
+  const customerRow = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.clerkUserId, auth.userId))
+    .limit(1);
+  const customerId = customerRow[0]?.id;
+  if (!customerId) {
+    return c.text('site not found', 404);
+  }
+
+  const ownedRows = await database
+    .select({ id: site.id })
+    .from(site)
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .limit(1);
+  if (!ownedRows[0]) {
+    return c.text('site not found', 404);
+  }
+
+  const id = c.env.SITE_ROOM.idFromName(siteId);
+  const stub = c.env.SITE_ROOM.get(id);
+  return stub.fetch(
+    new Request(
+      `https://do.invalid/socket?siteId=${encodeURIComponent(siteId)}&role=editor`,
+      {
+        method: 'GET',
+        headers: c.req.raw.headers,
+      },
+    ),
+  );
 });
 
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));

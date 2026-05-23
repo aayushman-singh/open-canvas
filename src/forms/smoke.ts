@@ -47,11 +47,7 @@ import type {
 
 import { exportFormSubmissionsCsv, listFormSubmissions } from './inbox.js';
 import { handleFormSubmit, hashIp, validateSubmissionPayload } from './submit.js';
-import {
-  WEBHOOK_SIGNATURE_HEADER,
-  deliverWebhook,
-  signWebhookBody,
-} from './webhook.js';
+import { WEBHOOK_SIGNATURE_HEADER, deliverWebhook, signWebhookBody } from './webhook.js';
 import type { TurnstileVerifyResult } from './turnstile.js';
 
 void and;
@@ -481,9 +477,7 @@ class StubRateLimiter {
     const key = `${ipHash}|${kind}`;
     const current = this.state.get(key);
     const now = this.now();
-    let counter: CounterState = current
-      ? { ...current }
-      : { count: 0, windowStartMs: now };
+    let counter: CounterState = current ? { ...current } : { count: 0, windowStartMs: now };
     if (now - counter.windowStartMs >= this.windowMs) {
       counter = { count: 0, windowStartMs: now };
     }
@@ -509,10 +503,7 @@ function makeRateLimiterNamespace(
       ({ toString: () => name, equals: () => false, name }) as unknown as DurableObjectId,
     get: () => {
       const stubInstance = {
-        fetch: async (
-          _input: RequestInfo | URL,
-          init?: RequestInit,
-        ): Promise<Response> => {
+        fetch: async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
           if (!init || init.method !== 'POST' || typeof init.body !== 'string') {
             return Promise.resolve(new Response('bad', { status: 400 }));
           }
@@ -666,10 +657,7 @@ async function runRateLimitElevenSubmits(): Promise<void> {
   for (let i = 1; i <= 10; i += 1) {
     const outcome = await submit(i);
     if (outcome.status !== 'ok') {
-      fail(
-        `3.${String(i)} submit ${String(i)}/10 expected ok`,
-        `got ${outcome.status}`,
-      );
+      fail(`3.${String(i)} submit ${String(i)}/10 expected ok`, `got ${outcome.status}`);
     }
   }
   ok('3.A first 10 submits accepted within 60s window');
@@ -682,7 +670,11 @@ async function runRateLimitElevenSubmits(): Promise<void> {
     JSON.stringify(eleventh),
   );
   if (eleventh.status === 'rate-limited-ip') {
-    assert(eleventh.remaining === 0, '3.C remaining=0 reported on rate limit', String(eleventh.remaining));
+    assert(
+      eleventh.remaining === 0,
+      '3.C remaining=0 reported on rate limit',
+      String(eleventh.remaining),
+    );
   }
   assert(
     db.submissions.length === 10,
@@ -721,11 +713,7 @@ async function runWebhookDelivery(): Promise<void> {
   const captured: Array<{ url: string; body: string; signature: string | null }> = [];
   const webhookFetch: typeof fetch = (input, init): Promise<Response> => {
     const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const initObj = init ?? {};
     const headers = new Headers(initObj.headers ?? {});
     const body = typeof initObj.body === 'string' ? initObj.body : '';
@@ -902,17 +890,13 @@ async function runUnitChecks(): Promise<void> {
   assert(sigA !== sigC, '0.8 webhook signature differs when body differs');
 
   // deliverWebhook rejects non-http URLs loudly.
-  const bogus = await deliverWebhook(
-    'ftp://nope.example.com/x',
-    'secret',
-    {
-      siteId: SITE_ID,
-      formElementId: FORM_ID,
-      pageSlug: PAGE_SLUG,
-      payload: {},
-      submittedAt: new Date().toISOString(),
-    },
-  );
+  const bogus = await deliverWebhook('ftp://nope.example.com/x', 'secret', {
+    siteId: SITE_ID,
+    formElementId: FORM_ID,
+    pageSlug: PAGE_SLUG,
+    payload: {},
+    submittedAt: new Date().toISOString(),
+  });
   assert(!bogus.ok && bogus.error === 'invalid-url', '0.9 deliverWebhook rejects non-http URL');
 }
 

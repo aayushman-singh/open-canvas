@@ -6,10 +6,8 @@
 // gate captured.
 //
 // Flow:
-//   1. Resolve the site row by Host header (subdomain arm only — custom
-//      domain support is on the integration side; this router uses the
-//      same `resolveSiteForHost` helper signature so the main thread can
-//      swap the resolver in).
+//   1. Resolve the site row by Host header (wildcard subdomain or active
+//      custom domain).
 //   2. Parse the form body for `password` + `redirect`.
 //   3. Check rate-limit BEFORE verifying. A wrong password triggers the
 //      same budget as no password at all — the limiter doesn't care about
@@ -35,12 +33,15 @@ import {
   InProcessRateLimiter,
   type FormRateLimiterDoNamespace,
 } from './rate-limit.js';
+import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router.js';
 import { db } from '../db/client.js';
 import { site } from '../db/schema.js';
 
 interface Bindings {
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
+  CF_API_TOKEN?: string;
+  CF_ZONE_ID?: string;
   /**
    * Wave 2 #7's DO. Optional at the type level because #7 may not have
    * landed; the route falls back to an in-process limiter when missing.
@@ -59,9 +60,7 @@ const router = new Hono<Env>();
 //
 // The unlock POST arrives on the Visitor's host (`*.rev01.aayushman.dev` or
 // a custom domain bound via Wave 1 #5). We resolve the site row by the same
-// rules `src/routes/public.ts` uses for the snapshot path: subdomain match
-// against the wildcard suffix. Custom-domain resolution is handled by the
-// main thread when it integrates — see Reporting #4 below.
+// rules `src/routes/public.ts` uses for the snapshot path.
 
 const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
 
@@ -92,12 +91,40 @@ async function loadSiteBySubdomain(
   return rows[0] ?? null;
 }
 
+async function loadSiteById(env: Bindings, siteId: string): Promise<SiteRow | null> {
+  const database = db(env);
+  const rows = await database
+    .select({
+      id: site.id,
+      name: site.name,
+      passwordEnabled: site.passwordEnabled,
+      passwordHash: site.passwordHash,
+      passwordSetAt: site.passwordSetAt,
+    })
+    .from(site)
+    .where(eq(site.id, siteId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 function extractSubdomain(host: string): string | null {
   if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
   const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
   if (prefix.length === 0) return null;
   if (prefix.includes('.')) return null;
   return prefix;
+}
+
+async function resolveSiteForHost(env: Bindings, host: string): Promise<SiteRow | null> {
+  const subdomain = extractSubdomain(host);
+  if (subdomain) {
+    return loadSiteBySubdomain(env, subdomain);
+  }
+  const customDomainHit = await resolveCustomDomainWithRuntimeCache(host, env);
+  if (customDomainHit) {
+    return loadSiteById(env, customDomainHit.siteId);
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -151,14 +178,7 @@ function extractIp(request: Request): string {
 router.post('/', async (c) => {
   const requestUrl = new URL(c.req.url);
   const host = requestUrl.host;
-  const subdomain = extractSubdomain(host);
-  if (!subdomain) {
-    // The route is mounted on the public host. A non-public host arriving
-    // here is a routing misconfiguration; we fail loudly so it doesn't
-    // silently accept passwords for nobody.
-    return c.text('unlock route is only valid on a published host', 400);
-  }
-  const siteRow = await loadSiteBySubdomain(c.env, subdomain);
+  const siteRow = await resolveSiteForHost(c.env, host);
   if (!siteRow) {
     return c.text('site not found', 404);
   }

@@ -246,7 +246,5 @@ export function renderCanvasSnapshot(
       void opts.emitHeadMeta(page);
     }
   }
-  // The outer wrapper always declares `lang="en"` for the POC. A future
-  // owner-facing language picker would override this — out of POC scope.
-  return `<main class="rev01-site" lang="en" data-style-kit="${escapeAttr(snapshot.styleKit)}">${responsiveStyle}${pagesHtml}</main>`;
+  return `<main class="rev01-site" data-style-kit="${escapeAttr(snapshot.styleKit)}">${responsiveStyle}${pagesHtml}</main>`;
 }

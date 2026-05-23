@@ -264,7 +264,10 @@ class SelectBuilder {
 }
 
 class InsertBuilder {
-  constructor(private db: InMemoryDb, private table: TableMarker) {}
+  constructor(
+    private db: InMemoryDb,
+    private table: TableMarker,
+  ) {}
   values(payload: Record<string, unknown> | Array<Record<string, unknown>>): PromiseLike<void> {
     const list = Array.isArray(payload) ? payload : [payload];
     for (const v of list) {
@@ -297,7 +300,10 @@ class InsertBuilder {
 class UpdateBuilder {
   private patch: Record<string, unknown> | null = null;
   private predicate: WherePredicate | null = null;
-  constructor(private db: InMemoryDb, private table: TableMarker) {}
+  constructor(
+    private db: InMemoryDb,
+    private table: TableMarker,
+  ) {}
   set(patch: Record<string, unknown>): this {
     this.patch = patch;
     return this;
@@ -324,7 +330,10 @@ class UpdateBuilder {
 
 class DeleteBuilder {
   private predicate: WherePredicate | null = null;
-  constructor(private db: InMemoryDb, private table: TableMarker) {}
+  constructor(
+    private db: InMemoryDb,
+    private table: TableMarker,
+  ) {}
   where(expr: unknown): Promise<void> {
     this.predicate = compilePredicate(expr);
     this.run();
@@ -575,7 +584,10 @@ async function runTwoPublishesListNewestFirst(): Promise<void> {
   assert(page.items.length === 2, `expected 2 items, got ${String(page.items.length)}`);
   assert(page.items[0]?.publishedVersion === 2, 'expected newest first to be publishedVersion=2');
   assert(page.items[1]?.publishedVersion === 1, 'expected second item to be publishedVersion=1');
-  assert(page.items.every((i) => i.reason === 'publish'), 'expected both items reason=publish');
+  assert(
+    page.items.every((i) => i.reason === 'publish'),
+    'expected both items reason=publish',
+  );
   process.stdout.write('[version:smoke] OK 1 — two publishes listed newest-first\n');
 }
 
@@ -589,7 +601,10 @@ async function runManualSnapshotShowsLabel(): Promise<void> {
   const page = await listSnapshots(siteId, dbShim as unknown as Db);
   assert(page.items.length === 1, `expected 1 item, got ${String(page.items.length)}`);
   assert(page.items[0]?.reason === 'manual', 'expected reason=manual');
-  assert(page.items[0]?.label === 'demo', `expected label "demo", got ${String(page.items[0]?.label)}`);
+  assert(
+    page.items[0]?.label === 'demo',
+    `expected label "demo", got ${String(page.items[0]?.label)}`,
+  );
   process.stdout.write('[version:smoke] OK 2 — manual snapshot label persists\n');
 }
 
@@ -668,12 +683,7 @@ async function runRestoreSwapsAndCapturesSafety(): Promise<void> {
   assert(newest !== undefined, 'expected at least one snapshot to restore from');
   let failedBroadcastThrew = false;
   try {
-    await restoreSnapshot(
-    siteId,
-    newest.id,
-    dbShim as unknown as Db,
-    failingEnv,
-    );
+    await restoreSnapshot(siteId, newest.id, dbShim as unknown as Db, failingEnv);
   } catch (err) {
     failedBroadcastThrew = true;
     assert(
@@ -730,10 +740,7 @@ async function runPruneKeepsLast50AndRecentPublishes(): Promise<void> {
   assert(set.has('manual-old-1'), 'expected manual-old-1 dropped');
   assert(set.has('manual-old-2'), 'expected manual-old-2 dropped');
   assert(set.has('publish-old-outside-90d'), 'expected outside-90d publish dropped');
-  assert(
-    !set.has('publish-old-inside-90d'),
-    'expected inside-90d publish RETAINED beyond top 50',
-  );
+  assert(!set.has('publish-old-inside-90d'), 'expected inside-90d publish RETAINED beyond top 50');
   // Top 50 manual rows stay.
   for (let i = 0; i < 50; i += 1) {
     assert(
