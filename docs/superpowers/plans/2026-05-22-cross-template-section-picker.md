@@ -13,12 +13,14 @@
 ## Scope
 
 **In scope (MVP):**
+
 - Browse sections from any of the 5 built template seeds.
 - Insert a cloned section into a slot chosen via placement-mode drop slots.
 - Materialise the source section's seed media into the target site so images render.
 - Search by section name; filter by template.
 
 **Out of scope (v2):**
+
 - Cross-site section import (lift a section from another live site).
 - Drag-to-reorder existing sections.
 - HTML5 drag-from-picker-card directly to canvas position.
@@ -30,12 +32,14 @@
 ## File Structure
 
 **Create:**
+
 - `src/canvas/section-import.ts` — pure util that clones a `CanvasSection` and produces the new section + seed asset rows for a target site.
 - `src/canvas/section-import-smoke.ts` — smoke test that imports a known section from each template and asserts ID regeneration + asset materialisation.
 - `src/routes/api/sections.ts` — Hono router with `GET /api/templates/sections` catalog and `POST /api/sites/:siteId/sections/import` endpoints.
 - `src/templates/section-catalog.ts` — boot-time-built catalog of `{ templateId, templateName, sectionId, recipeId, sectionName, headingPreview }` from `allTemplateSeeds`.
 
 **Modify:**
+
 - `src/editor/canvas-index.tsx` — replace the single-tab markup with a two-tab tablist + two panels (Add + Sections).
 - `src/editor/canvas-client.ts` — add `attachSidebarTabs()`, the Sections panel data fetch + render, and the placement-mode overlay.
 - `src/editor/canvas-styles.ts` — picker grid, card, placement-mode slot styles.
@@ -51,6 +55,7 @@
 Auth: requires owner session (`auth.userId` set by the existing auth middleware).
 
 Response 200:
+
 ```json
 {
   "sections": [
@@ -73,6 +78,7 @@ Response 200:
 Auth: requires owner session and the owner must own `:siteId`.
 
 Request body:
+
 ```json
 {
   "templateId": "starter-canvas",
@@ -85,6 +91,7 @@ Request body:
 - `templateId` must resolve to a `TemplateSeed` in `allTemplateSeeds`; `sectionId` must exist within `seed.state.pages[0].sections`. Either miss → 404.
 
 Response 200:
+
 ```json
 { "editableState": { "...": "full updated CanvasSiteState" } }
 ```
@@ -104,6 +111,7 @@ The util reuses `prepareSeedAssetsForSite`'s mental model but scoped to one sect
 5. Rewrite each element's `assetId` (and `posterAssetId` when present) to the materialised ID.
 
 The cloned section also gets:
+
 - A new `section.id` of the form `sec-<recipeId>-<crypto.randomUUID().slice(0,8)>` (matches the existing recipe-generated section ID convention).
 - New element IDs of the form `<originalIdRolePrefix>-<crypto.randomUUID().slice(0,8)>` — strip any trailing random suffix from the original ID first to preserve the role-prefix; e.g. `hero-heading-abc123` → role prefix `hero-heading` → new ID `hero-heading-d4f9c2a1`. If the original has no recognisable prefix, generate `el-<random>`.
 
@@ -140,6 +148,7 @@ The Sections tab only fetches the catalog on its first activation (a `sectionsCa
 ### Task 1: Section import util — clone + asset materialisation
 
 **Files:**
+
 - Create: `src/canvas/section-import.ts`
 - Test: `src/canvas/section-import-smoke.ts`
 
@@ -178,10 +187,7 @@ for (const seed of allTemplateSeeds) {
   assert(result.ok, `import failed for ${seed.id}: ${result.ok ? '' : result.errors.join('; ')}`);
   if (!result.ok) continue;
 
-  assert(
-    result.section.id !== sourceSection.id,
-    `${seed.id}: section.id was not regenerated`,
-  );
+  assert(result.section.id !== sourceSection.id, `${seed.id}: section.id was not regenerated`);
   for (const element of result.section.elements) {
     if (element.type !== 'media') continue;
     const media = element as MediaElement;
@@ -206,10 +212,7 @@ for (const seed of allTemplateSeeds) {
     assert(registryEntry !== undefined, `${seed.id}: row references unknown raw seed ${rawSeedId}`);
     if (registryEntry !== undefined) {
       assert(row.kind === registryEntry.kind, `${seed.id}: row kind mismatch`);
-      assert(
-        row.bytesBase64 === registryEntry.bytesBase64,
-        `${seed.id}: row bytes mismatch`,
-      );
+      assert(row.bytesBase64 === registryEntry.bytesBase64, `${seed.id}: row bytes mismatch`);
     }
   }
 }
@@ -336,10 +339,7 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
       if (!posterSeed) {
         errors.push(`unknown seed poster asset id: ${media.posterAssetId}`);
       } else if (!assetIdMap.has(media.posterAssetId)) {
-        assetIdMap.set(
-          media.posterAssetId,
-          materialisedAssetId(targetSiteId, media.posterAssetId),
-        );
+        assetIdMap.set(media.posterAssetId, materialisedAssetId(targetSiteId, media.posterAssetId));
       }
     }
   }
@@ -411,6 +411,7 @@ git commit -m "feat: add section-import util for cross-template section reuse"
 ### Task 2: Boot-time section catalog
 
 **Files:**
+
 - Create: `src/templates/section-catalog.ts`
 
 - [ ] **Step 1: Write the catalog module**
@@ -496,6 +497,7 @@ git commit -m "feat: add boot-time section catalog from template seeds"
 ### Task 3: Sections API endpoints
 
 **Files:**
+
 - Create: `src/routes/api/sections.ts`
 - Modify: `src/index.ts`
 
@@ -542,7 +544,9 @@ interface ImportBody {
   insertAt: number;
 }
 
-function parseImportBody(value: unknown): { ok: true; body: ImportBody } | { ok: false; error: string } {
+function parseImportBody(
+  value: unknown,
+): { ok: true; body: ImportBody } | { ok: false; error: string } {
   if (!value || typeof value !== 'object') return { ok: false, error: 'body must be an object' };
   const v = value as Record<string, unknown>;
   if (typeof v.templateId !== 'string' || v.templateId.length === 0) {
@@ -646,13 +650,13 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
 
   const validation = validateCanvasSiteState(state);
   if (!validation.valid) {
-    return c.json({ error: 'imported section produced invalid state', details: validation.errors }, 500);
+    return c.json(
+      { error: 'imported section produced invalid state', details: validation.errors },
+      500,
+    );
   }
 
-  const siteUpdate = database
-    .update(site)
-    .set({ editableState: state })
-    .where(eq(site.id, siteId));
+  const siteUpdate = database.update(site).set({ editableState: state }).where(eq(site.id, siteId));
   if (importResult.newAssetRows.length === 0) {
     await siteUpdate;
   } else {
@@ -708,6 +712,7 @@ git commit -m "feat: add sections catalog and import API endpoints"
 ### Task 4: Sidebar tab switcher infra
 
 **Files:**
+
 - Modify: `src/editor/canvas-index.tsx`
 - Modify: `src/editor/canvas-client.ts`
 - Modify: `src/editor/canvas-styles.ts`
@@ -850,6 +855,7 @@ Expected: no errors.
 
 Run: `npm run dev`
 Open the editor for an existing site in a browser. Click "Sections" tab. Confirm:
+
 - "Sections" tab gains highlight, "Add" loses it.
 - The Add panel hides; the Sections panel shows "Loading sections…".
 - Clicking "Add" reverses it.
@@ -868,6 +874,7 @@ git commit -m "feat: add sidebar tablist with stub Sections tab"
 ### Task 5: Sections picker UI — fetch and render catalog
 
 **Files:**
+
 - Modify: `src/editor/canvas-client.ts`
 - Modify: `src/editor/canvas-styles.ts`
 
@@ -877,7 +884,7 @@ Above `attachSidebarTabs()`, add:
 
 ```javascript
 let sectionsCatalog = null; // null = unloaded, [] = loaded-empty, [...] = loaded
-let pendingImport = null;   // { templateId, sectionId, templateName } when in placement mode
+let pendingImport = null; // { templateId, sectionId, templateName } when in placement mode
 let activeTemplateFilter = 'all';
 let activeSearchQuery = '';
 
@@ -911,21 +918,34 @@ function renderSectionsPanel() {
   const filtered = sectionsCatalog.filter((entry) => {
     if (activeTemplateFilter !== 'all' && entry.templateId !== activeTemplateFilter) return false;
     if (activeSearchQuery.length > 0) {
-      const haystack = (entry.sectionName + ' ' + entry.headingPreview + ' ' + entry.templateName).toLowerCase();
+      const haystack = (
+        entry.sectionName +
+        ' ' +
+        entry.headingPreview +
+        ' ' +
+        entry.templateName
+      ).toLowerCase();
       if (!haystack.includes(activeSearchQuery.toLowerCase())) return false;
     }
     return true;
   });
 
   const filterOptions = ['<option value="all">All templates</option>']
-    .concat(templateIds.map((id) => `<option value="${escapeAttr(id)}">${escapeHtml(templateNames.get(id) || id)}</option>`))
+    .concat(
+      templateIds.map(
+        (id) =>
+          `<option value="${escapeAttr(id)}">${escapeHtml(templateNames.get(id) || id)}</option>`,
+      ),
+    )
     .join('');
 
-  const cards = filtered.map((entry) => {
-    const isPending = pendingImport
-      && pendingImport.templateId === entry.templateId
-      && pendingImport.sectionId === entry.sectionId;
-    return `
+  const cards = filtered
+    .map((entry) => {
+      const isPending =
+        pendingImport &&
+        pendingImport.templateId === entry.templateId &&
+        pendingImport.sectionId === entry.sectionId;
+      return `
       <li class="rev01-section-card${isPending ? ' is-pending' : ''}">
         <div class="rev01-section-card-head">
           <span class="rev01-section-card-name">${escapeHtml(entry.sectionName)}</span>
@@ -945,7 +965,8 @@ function renderSectionsPanel() {
         </div>
       </li>
     `;
-  }).join('');
+    })
+    .join('');
 
   root.innerHTML = `
     <div class="rev01-section-picker-controls">
@@ -960,9 +981,10 @@ function renderSectionsPanel() {
         ${filterOptions}
       </select>
     </div>
-    ${filtered.length === 0
-      ? '<p class="rev01-section-picker-empty">No sections match.</p>'
-      : `<ul class="rev01-section-picker-grid">${cards}</ul>`
+    ${
+      filtered.length === 0
+        ? '<p class="rev01-section-picker-empty">No sections match.</p>'
+        : `<ul class="rev01-section-picker-grid">${cards}</ul>`
     }
   `;
 
@@ -986,9 +1008,11 @@ function renderSectionsPanel() {
       const templateId = button.getAttribute('data-template-id') || '';
       const sectionId = button.getAttribute('data-section-id') || '';
       const templateName = button.getAttribute('data-template-name') || '';
-      if (pendingImport
-          && pendingImport.templateId === templateId
-          && pendingImport.sectionId === sectionId) {
+      if (
+        pendingImport &&
+        pendingImport.templateId === templateId &&
+        pendingImport.sectionId === sectionId
+      ) {
         exitPlacementMode();
       } else {
         enterPlacementMode({ templateId, sectionId, templateName });
@@ -1029,11 +1053,12 @@ If `setStatus` does not accept `'info'` as a kind, fall back to `setStatus('...'
 - [ ] **Step 3: Typecheck and lint**
 
 Run: `npm run typecheck && npm run lint`
-Expected: no errors. If ESLint complains about unused variables for the placeholder `renderPlacementSlots`, add an inline `// eslint-disable-next-line @typescript-eslint/no-unused-vars` *only* for that line, or implement Task 6 directly afterwards.
+Expected: no errors. If ESLint complains about unused variables for the placeholder `renderPlacementSlots`, add an inline `// eslint-disable-next-line @typescript-eslint/no-unused-vars` _only_ for that line, or implement Task 6 directly afterwards.
 
 - [ ] **Step 4: Manual smoke in browser**
 
 Run: `npm run dev`
+
 - Open editor for a site. Click "Sections" tab.
 - Confirm: cards render with names, recipe pills, template labels, and "Use" buttons.
 - Type into search: list filters.
@@ -1055,6 +1080,7 @@ git commit -m "feat: render sections picker grid with search and template filter
 ### Task 6: Placement-mode drop slots and import POST
 
 **Files:**
+
 - Modify: `src/editor/canvas-client.ts`
 - Modify: `src/editor/canvas-styles.ts`
 
@@ -1075,14 +1101,16 @@ In `src/editor/canvas-styles.ts`, append:
   font-size: 12px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease, background-color 120ms ease;
+  transition:
+    opacity 120ms ease,
+    background-color 120ms ease;
 }
 .rev01-section-slot:hover,
 .rev01-section-slot:focus-visible {
   opacity: 1;
   background-color: var(--accent-soft);
 }
-body[data-placement-active="true"] .rev01-section-slot {
+body[data-placement-active='true'] .rev01-section-slot {
   opacity: 1;
 }
 .rev01-section-card.is-pending .rev01-section-card-use {
@@ -1168,7 +1196,9 @@ async function importPendingSectionAt(insertAt) {
       try {
         const body = await response.json();
         if (body && body.error) detail = body.error;
-      } catch (_) { /* ignore */ }
+      } catch (_) {
+        /* ignore */
+      }
       setStatus(`Insert failed: ${detail}`, 'error');
       return;
     }
@@ -1227,6 +1257,7 @@ Expected: no errors.
 - [ ] **Step 6: End-to-end manual test in browser**
 
 Run: `npm run dev`
+
 - Open editor for a site with at least 2 existing sections.
 - Click "Sections" tab. Click "Use" on a card from a different template than the current site.
 - Confirm: dashed slots appear above, between, and below sections.
@@ -1253,6 +1284,7 @@ git commit -m "feat: add placement-mode drop slots and section import POST"
 ### Task 7: Cross-cutting verification
 
 **Files:**
+
 - Run only — no edits unless issues surface.
 
 - [ ] **Step 1: Full typecheck**
@@ -1288,6 +1320,7 @@ Expected: succeeds.
 - [ ] **Step 7: Manual cross-template regression in browser**
 
 Run: `npm run dev`
+
 - Create a fresh site from Template A (e.g. `starter-canvas`).
 - Import a section from Template B (e.g. `enterprise-scale`).
 - Confirm images render.
@@ -1312,7 +1345,7 @@ git commit -m "chore: format and lint follow-ups for section picker"
 **Risk 1: `SECTION_CATALOG` is built at module load and embedded into the Workers bundle. If `allTemplateSeeds` grows large, bundle size grows.**
 Mitigation: At MVP scale (5 templates × ~7 sections), payload is < 5 KB. No mitigation needed. Revisit if templates exceed 20 or if seed bodies grow rich-text-heavy.
 
-**Risk 2: The catalog ships the section *metadata only*, but the import endpoint accesses the full source section by looking it up in `allTemplateSeeds`. If a section is renamed or removed in code but a client has a stale catalog cached, the import fails with 404.**
+**Risk 2: The catalog ships the section _metadata only_, but the import endpoint accesses the full source section by looking it up in `allTemplateSeeds`. If a section is renamed or removed in code but a client has a stale catalog cached, the import fails with 404.**
 Mitigation: Acceptable — fail loud, owner refreshes the page, client re-fetches catalog. Documented in the contract.
 
 **Risk 3: `database.batch([siteUpdate, assetInsert])` semantics — Neon's batch is not a true SQL transaction. If the update succeeds and the insert fails, the site's `editableState` references asset IDs whose rows do not exist.**

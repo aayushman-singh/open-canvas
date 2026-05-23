@@ -110,7 +110,9 @@ export async function uploadOwnerAsset(
   const existing = await deps.db
     .select()
     .from(ownerAsset)
-    .where(and(eq(ownerAsset.customerId, input.customerId), eq(ownerAsset.contentHash, contentHash)))
+    .where(
+      and(eq(ownerAsset.customerId, input.customerId), eq(ownerAsset.contentHash, contentHash)),
+    )
     .limit(1);
   const found = existing[0];
   if (found) {
@@ -134,7 +136,8 @@ export async function uploadOwnerAsset(
 
   // Probe dimensions before R2 put — if we are inserting a row we want the
   // dimensions in the row, and the probe is cheap (handful of byte reads).
-  const dimensions = kind === 'image' ? probeImageDimensions(input.bytes) : { width: null, height: null };
+  const dimensions =
+    kind === 'image' ? probeImageDimensions(input.bytes) : { width: null, height: null };
 
   // R2 put-if-missing. The shared bytes-across-Owners case (different Owner
   // uploaded these bytes earlier) is the path where `uploaded` is false —

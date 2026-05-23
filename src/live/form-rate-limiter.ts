@@ -16,9 +16,7 @@ export class FormRateLimiter extends DurableObject<unknown> {
   override async fetch(request: Request): Promise<Response> {
     void request;
     return Promise.reject(
-      new Error(
-        'TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md',
-      ),
+      new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md'),
     );
   }
 
@@ -31,9 +29,7 @@ export class FormRateLimiter extends DurableObject<unknown> {
     void ipHash;
     void formId;
     return Promise.reject(
-      new Error(
-        'TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md',
-      ),
+      new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md'),
     );
   }
 }

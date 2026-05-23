@@ -1,6 +1,6 @@
 # Sitemap + robots generation
 
-**Wishlist #:** 22  **Tier:** B  **Wave:** 4  **Status:** queued
+**Wishlist #:** 22 **Tier:** B **Wave:** 4 **Status:** queued
 **Depends on:** Phase 0 ✓, **#21 SEO meta merged (Wave 3)**
 **Blocks:** none
 

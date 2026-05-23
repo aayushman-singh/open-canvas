@@ -1,6 +1,6 @@
 # Custom theme editor
 
-**Wishlist #:** 10  **Tier:** A  **Wave:** 2  **Status:** queued
+**Wishlist #:** 10 **Tier:** A **Wave:** 2 **Status:** queued
 **Depends on:** Phase 0 ✓
 **Blocks:** none (#20 light/dark consumes the dual-palette structure introduced here)
 
@@ -34,10 +34,10 @@ Phase 0:
 ```ts
 // src/canvas/schema.ts (Phase 0)
 export interface CanvasSiteState {
-  styleKit: StyleKit;                  // selector — picks built-in OR 'custom'
-  customStyleKit?: StyleKitPreset;     // only set when styleKit === 'custom'
+  styleKit: StyleKit; // selector — picks built-in OR 'custom'
+  customStyleKit?: StyleKitPreset; // only set when styleKit === 'custom'
   pages: CanvasPage[];
-  symbols: SymbolMaster[];             // from #14 scaffold
+  symbols: SymbolMaster[]; // from #14 scaffold
 }
 ```
 

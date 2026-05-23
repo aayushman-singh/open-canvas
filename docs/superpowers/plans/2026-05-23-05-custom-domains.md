@@ -1,6 +1,6 @@
 # Custom domains (Cloudflare for SaaS)
 
-**Wishlist #:** 5  **Tier:** S  **Wave:** 1  **Status:** queued
+**Wishlist #:** 5 **Tier:** S **Wave:** 1 **Status:** queued
 **Depends on:** Phase 0 ✓ (`customDomain` table, CF env vars)
 **Blocks:** none
 
@@ -33,7 +33,8 @@ Already scaffolded in Phase 0:
 ```ts
 // src/db/schema.ts (Phase 0)
 customDomain = pgTable('custom_domain', {
-  id, siteId,
+  id,
+  siteId,
   hostname: text('hostname').notNull().unique(),
   cfHostnameId: text('cf_hostname_id').notNull(),
   status: text('status').notNull().$type<'pending' | 'verifying' | 'active' | 'failed'>(),

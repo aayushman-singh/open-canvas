@@ -195,9 +195,7 @@ function isSiteRoomMessage(value: unknown): value is SiteRoomMessage {
     case 'awareness-update':
       return hasStringField(v, 'update');
     case 'editable-state-replaced':
-      return (
-        hasStringField(v, 'siteId') && typeof v.newState === 'object' && v.newState !== null
-      );
+      return hasStringField(v, 'siteId') && typeof v.newState === 'object' && v.newState !== null;
     default:
       return false;
   }
@@ -258,7 +256,8 @@ export class SiteRoom extends DurableObject<unknown> {
   override webSocketMessage(ws: WebSocket, raw: ArrayBuffer | string): void {
     let parsed: unknown;
     try {
-      parsed = typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(new TextDecoder().decode(raw));
+      parsed =
+        typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(new TextDecoder().decode(raw));
     } catch (error) {
       console.error('[SiteRoom] rejected non-JSON websocket message', error);
       return;

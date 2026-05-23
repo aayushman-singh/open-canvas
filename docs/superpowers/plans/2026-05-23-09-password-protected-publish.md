@@ -1,6 +1,6 @@
 # Password-protected publish
 
-**Wishlist #:** 9  **Tier:** A  **Wave:** 2  **Status:** queued
+**Wishlist #:** 9 **Tier:** A **Wave:** 2 **Status:** queued
 **Depends on:** Phase 0 ✓
 **Blocks:** none
 
@@ -26,6 +26,7 @@ An Owner toggles "Require password" for a site and sets a password. Visitors hit
 ## Schema delta
 
 Coordinate with Phase 0 — `site` table additions:
+
 ```ts
 passwordEnabled: boolean('password_enabled').notNull().default(false),
 passwordHash: text('password_hash'),

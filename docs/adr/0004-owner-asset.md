@@ -34,6 +34,7 @@ The product outcome requires those concepts. Sites stop being the asset root, th
 ## Out of scope
 
 This ADR does not decide:
+
 - Storage backend for Owner Asset bytes (today they live inline in Neon as base64; an object-storage move is a separate decision)
 - Cross-owner sharing of assets, marketplace concepts, or owner-to-owner gifting
 - Image transformations, server-side resize variants, or responsive `srcset` generation
@@ -45,6 +46,7 @@ This ADR does not decide:
 ## Consequences
 
 **Positive:**
+
 - The gallery feature can be specified as a literal description of the data: "show every Owner Asset, ordered by last use." No synthesis layer needed.
 - AI generation cost is paid in Replicate; storage cost is only paid for kept results.
 - Deletion is honest. The owner is never surprised by where the asset was being used.
@@ -52,6 +54,7 @@ This ADR does not decide:
 - An Owner Asset survives any single site's deletion, matching the owner's mental model of "my images are mine."
 
 **Negative:**
+
 - A migration is required: existing `site_asset` rows must be reparented to the owning customer, ids preserved, `site_id` column replaced by a `customer_id` column. Visitor route logic must be re-stated against the new root.
 - The AI generate endpoint changes contract: it returns bytes to the client and no longer creates a persistent row. Any caller depending on the prior side effect breaks.
 - Deletion is more work to ship than a cascade — the confirm-cascade flow must compute references across editable states and published snapshots, render the affected list, and only then apply the delete.

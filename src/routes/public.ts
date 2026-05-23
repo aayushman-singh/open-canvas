@@ -174,10 +174,7 @@ interface PublicSiteRow {
   publishedSnapshot: PublishedSnapshot | null;
 }
 
-async function loadPublicSite(
-  env: Bindings,
-  subdomain: string,
-): Promise<PublicSiteRow | null> {
+async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicSiteRow | null> {
   const database = db(env);
   const rows = await database
     .select({
@@ -325,21 +322,31 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   return c.html(
     html`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${raw(titleEscaped)}</title>
-    <link rel="canonical" href="${raw(canonicalEscaped)}" />
-    <style>${raw(canvasPublishedStyles)}</style>
-  </head>
-  <body>
-    <div data-rev01-public-root>${raw(snapshotHtml)}</div>
-    <aside data-rev01-presence hidden role="status" aria-live="polite" aria-label="People viewing">
-      👀 <span data-rev01-presence-count>0</span> viewing
-    </aside>
-    <script type="module">${raw(visitorScript)}</script>
-  </body>
-</html>`,
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${raw(titleEscaped)}</title>
+          <link rel="canonical" href="${raw(canonicalEscaped)}" />
+          <style>
+            ${raw(canvasPublishedStyles)}
+          </style>
+        </head>
+        <body>
+          <div data-rev01-public-root>${raw(snapshotHtml)}</div>
+          <aside
+            data-rev01-presence
+            hidden
+            role="status"
+            aria-live="polite"
+            aria-label="People viewing"
+          >
+            👀 <span data-rev01-presence-count>0</span> viewing
+          </aside>
+          <script type="module">
+            ${raw(visitorScript)};
+          </script>
+        </body>
+      </html>`,
   );
 }

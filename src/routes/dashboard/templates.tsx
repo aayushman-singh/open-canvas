@@ -19,7 +19,13 @@ import { DashboardShell } from './shell';
 // the Owner has chosen a template. The seed bytes live as base64 text
 // files under `src/assets/seed-source/`; we read them at module load and
 // cache the decoded bytes so the preview asset serve is a pure-memory op.
-const seedSourceDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'seed-source');
+const seedSourceDir = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  'assets',
+  'seed-source',
+);
 const seedBytesCache = new Map<string, Uint8Array>();
 function readSeedBytes(sourcePath: string): Uint8Array {
   const cached = seedBytesCache.get(sourcePath);

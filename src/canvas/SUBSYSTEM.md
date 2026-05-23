@@ -34,10 +34,10 @@ actions + motion tokens — switching kits never mutates element content.
 ## Outputs
 
 - **canvas API + canvas-agent + publish** — a validation verdict (`{ valid:
-  true }` or `{ valid: false, errors }`) describing what is wrong with a
+true }` or `{ valid: false, errors }`) describing what is wrong with a
   candidate state or snapshot. Validation never throws.
 - **public host** — a deterministic HTML string for a `(CanvasSiteState,
-  StyleKit, assets)` triple (`render.ts`). The renderer throws on unknown
+StyleKit, assets)` triple (`render.ts`). The renderer throws on unknown
   shapes because its input is supposed to be validated upstream.
 - **canvas-agent** — the recipe catalogue (`recipes.ts`) the agent consults
   when proposing previewed edits.

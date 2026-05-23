@@ -23,7 +23,9 @@ export function StatusBar() {
         <a href="https://github.com/aayushman-singh/rev01" rel="noopener">
           github/
         </a>
-        <a class="cta" href="/dashboard">launch -&gt;</a>
+        <a class="cta" href="/dashboard">
+          launch -&gt;
+        </a>
       </nav>
     </header>
   );

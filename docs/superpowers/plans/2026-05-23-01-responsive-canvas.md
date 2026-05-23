@@ -1,6 +1,6 @@
 # Responsive canvas render
 
-**Wishlist #:** 1  **Tier:** S  **Wave:** 1  **Status:** queued
+**Wishlist #:** 1 **Tier:** S **Wave:** 1 **Status:** queued
 **Depends on:** Phase 0 ✓
 **Blocks:** none
 
@@ -31,7 +31,10 @@ Already scaffolded in Phase 0:
 export type Breakpoint = 'desktop' | 'tablet' | 'phone';
 
 export interface ResponsiveBoxOverride {
-  x?: number; y?: number; w?: number; h?: number;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
   hidden?: boolean;
 }
 

@@ -36,7 +36,7 @@ to the same UUIDs after the migration, and those UUIDs still resolve to
    renderer (`src/canvas/render.ts`, frozen) emits `<img src="/assets/<UUID>">`;
    the public route's `/assets/:addr` handler resolves either a UUID or a
    64-hex contentHash via a single indexed query (`WHERE id = :addr OR
-   content_hash = :addr`).
+content_hash = :addr`).
 
 3. The new `POST /api/owner/assets` upload route, the seed materialiser,
    and the section-import path all generate fresh UUIDs for the `id`

@@ -15,12 +15,7 @@ import { fileURLToPath } from 'node:url';
 import * as Y from 'yjs';
 
 import { attachAutosave, decodeYDoc, encodeYDoc } from './yjs-projection.js';
-import type {
-  CanvasElement,
-  CanvasPage,
-  CanvasSection,
-  CanvasSiteState,
-} from './schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, CanvasSiteState } from './schema.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -298,7 +293,9 @@ const syntheticState: CanvasSiteState = {
   const doc = encodeYDoc(syntheticState);
   const decoded = decodeYDoc(doc);
   assertDeepEqual(decoded, syntheticState, 'round-trip synthetic-state');
-  process.stdout.write('[yjs-projection:smoke] round-trip OK: synthetic state covering every ElementType\n');
+  process.stdout.write(
+    '[yjs-projection:smoke] round-trip OK: synthetic state covering every ElementType\n',
+  );
 }
 
 // ----------------------------------------------------------------------------

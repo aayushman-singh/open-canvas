@@ -1,6 +1,6 @@
 # Auto-translate batch op
 
-**Wishlist #:** 24  **Tier:** C  **Wave:** 5  **Status:** queued
+**Wishlist #:** 24 **Tier:** C **Wave:** 5 **Status:** queued
 **Depends on:** Phase 0 ✓, #23 chat agent (Wave 5 sibling — strictly sequential or co-wave)
 **Blocks:** none
 

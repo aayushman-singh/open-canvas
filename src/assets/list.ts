@@ -58,9 +58,7 @@ export async function listOwnerAssets(
     .from(ownerAsset)
     .leftJoin(lastUsedSubquery, eq(lastUsedSubquery.ownerAssetId, ownerAsset.id))
     .where(eq(ownerAsset.customerId, customerId))
-    .orderBy(
-      desc(sql`coalesce(${lastUsedSubquery.maxUsedAt}, ${ownerAsset.createdAt})`),
-    );
+    .orderBy(desc(sql`coalesce(${lastUsedSubquery.maxUsedAt}, ${ownerAsset.createdAt})`));
 
   return rows.map((row) => ({
     id: row.id,

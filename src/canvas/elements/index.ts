@@ -57,10 +57,7 @@ export type { CodeElement, CodeLanguage } from './code.js';
 export type { EmbedElement } from './embed.js';
 export type { FormElement, FormFieldDef, FormFieldKind } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
-export type {
-  SymbolInstanceElement,
-  SymbolInstanceOverrides,
-} from './symbol-instance.js';
+export type { SymbolInstanceElement, SymbolInstanceOverrides } from './symbol-instance.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
 
 // Re-export recipe id constants so the recipes module + smoke tests can

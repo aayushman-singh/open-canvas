@@ -14,14 +14,14 @@
 // renderer never has to know how Owner Assets are addressed.
 
 import { RENDER_DISPATCH, type ElementRenderCtx } from './elements/index.js';
-import { escapeAttr, escapeCssValue, sanitiseCssKey, styleFromEntries } from './elements/render-utils.js';
+import {
+  escapeAttr,
+  escapeCssValue,
+  sanitiseCssKey,
+  styleFromEntries,
+} from './elements/render-utils.js';
 import { getStyleKitPreset } from './style-kits.js';
-import type {
-  CanvasElement,
-  CanvasPage,
-  CanvasSection,
-  PublishedSnapshot,
-} from './schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, PublishedSnapshot } from './schema.js';
 
 function buildElementWrapperStyle(element: CanvasElement): string {
   const { box } = element;
@@ -133,11 +133,7 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
-function renderSection(
-  section: CanvasSection,
-  pageWidth: number,
-  ctx: ElementRenderCtx,
-): string {
+function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
   const bgEffect = section.backgroundEffect ?? 'none';
   const entrance = section.entrance ?? 'none';
   const style = styleFromEntries([
@@ -149,9 +145,7 @@ function renderSection(
   // contract: whatever order elements appear in the array is the order DOM
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
-  const elementsHtml = section.elements
-    .map((element) => renderElement(element, ctx))
-    .join('');
+  const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
   return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}" data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${elementsHtml}</section>`;
 }
 

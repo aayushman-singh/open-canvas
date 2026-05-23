@@ -31,9 +31,7 @@ export interface ChartRenderCtx {
 export function renderChart(el: ChartElement, ctx: ChartRenderCtx): string {
   void el;
   void ctx;
-  throw new Error(
-    'TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-11-charts.md',
-  );
+  throw new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-11-charts.md');
 }
 
 export const CHART_RECIPE_ID = 'chart-card' as const;

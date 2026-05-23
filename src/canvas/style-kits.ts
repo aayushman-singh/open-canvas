@@ -26,12 +26,7 @@ import type {
   SurfaceVariant,
   SurfaceVariantTokens,
 } from './schema.js';
-import {
-  ACTION_VARIANTS,
-  BUILT_IN_STYLE_KITS,
-  STYLE_KITS,
-  SURFACE_VARIANTS,
-} from './schema.js';
+import { ACTION_VARIANTS, BUILT_IN_STYLE_KITS, STYLE_KITS, SURFACE_VARIANTS } from './schema.js';
 
 // --------------------------------------------------------------------------
 // The four kits.
@@ -566,9 +561,7 @@ export function buildAllStyleKitsCss(): string {
   // Iterate built-in kits only. `'custom'` resolves at render time from
   // `CanvasSiteState.customStyleKit`; emitting a kit-wide CSS block for a
   // value that lives in per-site state would mix layers.
-  const kitBlocks = BUILT_IN_STYLE_KITS.map((kit) =>
-    buildKitBlock(kit, STYLE_KIT_PRESETS[kit]),
-  );
+  const kitBlocks = BUILT_IN_STYLE_KITS.map((kit) => buildKitBlock(kit, STYLE_KIT_PRESETS[kit]));
   // Per-element typography uses the kit's font tokens. The display family
   // applies to headings; body to body; label to labels. These rules live at
   // the kit level so role-specific size scales also work (the renderer

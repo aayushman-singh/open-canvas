@@ -1,6 +1,6 @@
 # Asset pipeline (R2 + cf.image)
 
-**Wishlist #:** 2  **Tier:** S  **Phase:** 0 (main thread, sequential)
+**Wishlist #:** 2 **Tier:** S **Phase:** 0 (main thread, sequential)
 **Status:** queued for Phase 0
 
 > This plan documents the asset-pipeline work that is **pulled forward into Phase 0** rather than dispatched to a wave-1 agent. Reason: it unblocks #6 OG image and #12 custom fonts, and it changes the `ownerAsset` shape that every existing seed-asset code path depends on. Doing it sequentially on `main` keeps every downstream agent's contract stable.
@@ -36,8 +36,12 @@ Per ADR 0004, assets re-root from `site` to `customer` (Owner). Table renamed `s
 ```ts
 // src/db/schema.ts
 ownerAsset = pgTable('owner_asset', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  customerId: text('customer_id').notNull().references(() => customer.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  customerId: text('customer_id')
+    .notNull()
+    .references(() => customer.id, { onDelete: 'cascade' }),
   contentHash: text('content_hash').notNull(),
   r2Key: text('r2_key').notNull(),
   mediaType: text('media_type').notNull(),
@@ -54,6 +58,7 @@ ownerAsset = pgTable('owner_asset', {
 `slot_history` (ADR 0004 follow-up) — if not already in schema, scaffolded here keyed by `(siteId, elementId)` referencing `ownerAsset.id`.
 
 `wrangler.toml`:
+
 ```toml
 [[r2_buckets]]
 binding = "ASSETS_BUCKET"

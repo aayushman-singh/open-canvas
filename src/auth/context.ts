@@ -16,7 +16,11 @@ type Bindings = {
 export type OwnerEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
 export type OwnerOk = { ok: true; customer: { id: string } };
-export type OwnedSiteOk = { ok: true; customer: { id: string }; site: { id: string; customerId: string } };
+export type OwnedSiteOk = {
+  ok: true;
+  customer: { id: string };
+  site: { id: string; customerId: string };
+};
 export type Fail = { ok: false; response: Response };
 
 /**

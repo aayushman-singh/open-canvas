@@ -71,6 +71,7 @@ The engineer should skim these so the rest of the plan makes sense:
 ### Task 1: Add `ownerAsset` and `slotHistory` Drizzle table definitions
 
 **Files:**
+
 - Modify: `src/db/schema.ts` — append two tables after line 112.
 
 - [ ] **Step 1: Add the table definitions**
@@ -152,6 +153,7 @@ git commit -m "feat(schema): add owner_asset and slot_history tables"
 ### Task 2: Write the SQL migration
 
 **Files:**
+
 - Create: `drizzle/0001_owner_asset.sql`
 
 - [ ] **Step 1: Write the SQL**
@@ -214,9 +216,11 @@ If drizzle-kit suggests dropping `site_asset`, abort: answer "No". `site_asset` 
 - [ ] **Step 3: Verify row counts match**
 
 Run:
+
 ```bash
 psql $DATABASE_URL -c "SELECT (SELECT count(*) FROM site_asset) AS site_asset_rows, (SELECT count(*) FROM owner_asset) AS owner_asset_rows;"
 ```
+
 Expected: both counts equal. If `owner_asset_rows` < `site_asset_rows`, the join on `site` lost rows because of a `customer_id` mismatch — investigate (orphaned `site_asset.site_id` values).
 
 - [ ] **Step 4: Commit**
@@ -229,6 +233,7 @@ git commit -m "feat(schema): migrate site_asset rows into owner_asset, add slot_
 ### Task 3: Add a Drizzle-level reader so existing code can be exercised against the new table
 
 **Files:**
+
 - Create: `src/assets/owner-assets.ts`
 
 - [ ] **Step 1: Write the initial helper file**
@@ -327,6 +332,7 @@ git commit -m "feat(assets): add owner-assets helpers alongside site-assets"
 ### Task 4: Create the owner-scoped asset router (upload + peek only)
 
 **Files:**
+
 - Create: `src/routes/api/assets.ts`
 - Modify: `src/index.ts` — mount the new router.
 
@@ -339,11 +345,7 @@ import type { PublicEnv } from '../public.js';
 import { requireOwnerContext } from '../../auth/context.js'; // see Task 4 note below
 import { db } from '../../db/client.js';
 import { ownerAsset } from '../../db/schema.js';
-import {
-  assetResponse,
-  dataUrlToOwnerAsset,
-  readOwnerAsset,
-} from '../../assets/owner-assets.js';
+import { assetResponse, dataUrlToOwnerAsset, readOwnerAsset } from '../../assets/owner-assets.js';
 
 const MAX_ASSET_DATA_URL_BYTES = 1_500_000;
 
@@ -482,11 +484,15 @@ Open `src/owner-asset-smoke.ts` and add the following scenario (the file is crea
 import app from '../src/index';
 const env = { DATABASE_URL: process.env.DATABASE_URL ?? '' };
 const dataUrl = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=`;
-const res = await app.request('http://rev01.test/api/me/assets', {
-  method: 'POST',
-  headers: { 'content-type': 'application/json', cookie: process.env.SMOKE_CLERK_COOKIE ?? '' },
-  body: JSON.stringify({ dataUrl, alt: 'smoke' }),
-}, env);
+const res = await app.request(
+  'http://rev01.test/api/me/assets',
+  {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie: process.env.SMOKE_CLERK_COOKIE ?? '' },
+    body: JSON.stringify({ dataUrl, alt: 'smoke' }),
+  },
+  env,
+);
 console.log(res.status, await res.json());
 ```
 
@@ -505,6 +511,7 @@ git commit -m "feat(api): owner-scoped POST /me/assets and GET /me/assets/:asset
 ### Task 5: Switch site creation to seed `owner_asset` rows
 
 **Files:**
+
 - Modify: `src/routes/api/sites.ts`
 - Modify: `src/canvas/seed-assets.ts` (only if `prepareSeedAssetsForSite` lives there; otherwise it stays in `sites.ts`).
 
@@ -520,14 +527,15 @@ import { ownerAsset, type NewOwnerAsset } from '../../db/schema.js';
 export function prepareSeedOwnerAssetsForSite(
   customerId: string,
   state: CanvasSiteState,
-): { ok: true; editableState: CanvasSiteState; seedRows: NewOwnerAsset[] }
+):
+  | { ok: true; editableState: CanvasSiteState; seedRows: NewOwnerAsset[] }
   | { ok: false; unknownSeedIds: string[]; assetKindErrors: AssetReferenceError[] } {
   // existing body, but every row uses { id, customerId, mediaType, bytesBase64, kind, alt }
   // — drop the per-site asset id remap if it existed.
 }
 ```
 
-If the existing function remaps seed ids per-site (so two sites do not collide on the same `seed-hero-poster-1` id), it must keep doing so — but the remap target is now scoped to `customer_id`. Two sites under the *same* customer can share a seed asset id because the row already exists; check whether the row exists for this customer first and skip the insert if so.
+If the existing function remaps seed ids per-site (so two sites do not collide on the same `seed-hero-poster-1` id), it must keep doing so — but the remap target is now scoped to `customer_id`. Two sites under the _same_ customer can share a seed asset id because the row already exists; check whether the row exists for this customer first and skip the insert if so.
 
 - [ ] **Step 2: Update the call site**
 
@@ -539,10 +547,7 @@ const preparedSeedAssets = prepareSeedOwnerAssetsForSite(customerId, seed.state)
 if (seedRows.length === 0) {
   await siteInsert;
 } else {
-  const assetInsert = database
-    .insert(ownerAsset)
-    .values(seedRows)
-    .onConflictDoNothing(); // same customer + same seed id is fine
+  const assetInsert = database.insert(ownerAsset).values(seedRows).onConflictDoNothing(); // same customer + same seed id is fine
   await database.batch([siteInsert, assetInsert]);
 }
 ```
@@ -562,6 +567,7 @@ git commit -m "feat(sites): seed owner_asset rows on site creation instead of si
 ### Task 6: Switch the visitor `/assets/:assetId` route to `owner_asset`
 
 **Files:**
+
 - Modify: `src/routes/public.ts:267-295`
 
 - [ ] **Step 1: Replace the read**
@@ -606,6 +612,7 @@ git commit -m "feat(public): visitor /assets/:assetId reads owner_asset via snap
 ### Task 7: Switch the publish guard
 
 **Files:**
+
 - Modify: `src/routes/api/publish.ts`
 
 - [ ] **Step 1: Replace the asset lookup**
@@ -614,12 +621,13 @@ Find the publish handler's reference check (it currently selects `siteAsset.id, 
 
 ```ts
 const ids = Array.from(collectReferencedAssetIds(editableState.pages));
-const knownAssets = ids.length === 0
-  ? []
-  : await database
-      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
-      .from(ownerAsset)
-      .where(and(eq(ownerAsset.customerId, siteRow.customerId), inArray(ownerAsset.id, ids)));
+const knownAssets =
+  ids.length === 0
+    ? []
+    : await database
+        .select({ id: ownerAsset.id, kind: ownerAsset.kind })
+        .from(ownerAsset)
+        .where(and(eq(ownerAsset.customerId, siteRow.customerId), inArray(ownerAsset.id, ids)));
 ```
 
 The rest of the reference-error machinery (`findAssetReferenceErrors`) consumes `AssetKindRow[]` and does not change.
@@ -640,6 +648,7 @@ git commit -m "feat(publish): guard references against owner_asset for the site'
 ### Task 8: Retire the old upload, generate, and peek routes on `canvas.ts`
 
 **Files:**
+
 - Modify: `src/routes/api/canvas.ts` — delete the three handlers at lines 164–415.
 
 - [ ] **Step 1: Delete the handlers**
@@ -679,6 +688,7 @@ git commit -m "refactor(api): remove per-site asset routes; clients hit /me/asse
 ### Task 9: Rewrite generate to return bytes without persisting
 
 **Files:**
+
 - Modify: `src/routes/api/assets.ts` — add the generate handler here (the previous home is gone).
 - Modify: `src/editor/canvas-client.ts` — `appendImageGenerator` now applies via `POST /me/assets`.
 
@@ -687,18 +697,25 @@ git commit -m "refactor(api): remove per-site asset routes; clients hit /me/asse
 Append to `src/routes/api/assets.ts`:
 
 ```ts
-import { generateImageViaReplicate, snapToFluxAspectRatio, MAX_ASSET_DATA_URL_BYTES }
-  from '../../assets/owner-assets.js';
+import {
+  generateImageViaReplicate,
+  snapToFluxAspectRatio,
+  MAX_ASSET_DATA_URL_BYTES,
+} from '../../assets/owner-assets.js';
 
-interface GenerateInput { prompt: string; alt: string; boxW: number; boxH: number; }
+interface GenerateInput {
+  prompt: string;
+  alt: string;
+  boxW: number;
+  boxH: number;
+}
 
 function parseGenerateInput(body: unknown): GenerateInput | { error: string } {
   if (!isRecord(body)) return { error: 'request body must be a JSON object' };
   const { prompt, alt, boxW, boxH } = body;
   if (typeof prompt !== 'string' || prompt.trim().length === 0)
     return { error: 'prompt is required (non-empty string)' };
-  if (typeof alt !== 'string')
-    return { error: 'alt is required (string; "" is acceptable)' };
+  if (typeof alt !== 'string') return { error: 'alt is required (string; "" is acceptable)' };
   if (typeof boxW !== 'number' || !Number.isFinite(boxW) || boxW <= 0)
     return { error: 'boxW is required (positive finite number)' };
   if (typeof boxH !== 'number' || !Number.isFinite(boxH) || boxH <= 0)
@@ -758,10 +775,18 @@ async function generatePreview(prompt: string, alt: string, boxW: number, boxH: 
     body: JSON.stringify({ prompt, alt, boxW, boxH }),
   });
   if (!res.ok) throw new Error(`generate failed: ${res.status}`);
-  return (await res.json()) as { kind: 'image'; mediaType: string; bytesBase64: string; alt: string };
+  return (await res.json()) as {
+    kind: 'image';
+    mediaType: string;
+    bytesBase64: string;
+    alt: string;
+  };
 }
 
-async function applyPreviewToElement(elementId: string, preview: { mediaType: string; bytesBase64: string; alt: string }) {
+async function applyPreviewToElement(
+  elementId: string,
+  preview: { mediaType: string; bytesBase64: string; alt: string },
+) {
   const dataUrl = `data:${preview.mediaType};base64,${preview.bytesBase64}`;
   const up = await fetch('/api/me/assets', {
     method: 'POST',
@@ -791,6 +816,7 @@ git commit -m "feat(api): /me/assets/generate returns bytes; client applies via 
 ### Task 9b: Switch agent media-producing flow off `site_asset`
 
 **Files:**
+
 - Modify: `src/routes/api/canvas-agent.ts`
 - Modify: `src/agent/canvas-tools.ts` (if it persists bytes directly; today it only references existing asset ids per the investigator scan, so changes here are limited to imports)
 
@@ -809,12 +835,13 @@ The functions themselves are pure walkers over `CanvasPage[]` and do not change 
 Find any `inArray(siteAsset.id, ids)` or `eq(siteAsset.siteId, …)` query in `canvas-agent.ts`. Replace with the owner-scoped equivalent:
 
 ```ts
-const knownAssets = ids.length === 0
-  ? []
-  : await database
-      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
-      .from(ownerAsset)
-      .where(and(eq(ownerAsset.customerId, ctx.customer.id), inArray(ownerAsset.id, ids)));
+const knownAssets =
+  ids.length === 0
+    ? []
+    : await database
+        .select({ id: ownerAsset.id, kind: ownerAsset.kind })
+        .from(ownerAsset)
+        .where(and(eq(ownerAsset.customerId, ctx.customer.id), inArray(ownerAsset.id, ids)));
 ```
 
 Use the `requireOwnedSite` helper from `src/auth/context.ts` (Task 4) to get `ctx.customer.id`.
@@ -841,12 +868,14 @@ git commit -m "feat(agent): canvas-agent reference checks and asset creation use
 ### Task 10: Add the owner-asset smoke script
 
 **Files:**
+
 - Create: `src/owner-asset-smoke.ts`
 - Modify: `package.json` — add `asset:smoke` script.
 
 - [ ] **Step 1: Write the smoke**
 
 The smoke should:
+
 1. Pick or insert a customer row directly via Drizzle.
 2. POST `/api/me/assets` with a tiny PNG; assert `200` and a row appears in `owner_asset` with matching `customer_id`.
 3. POST `/api/me/assets/generate` against a stub Replicate token if available; if not, skip (mark `[skip]`) and continue.
@@ -891,6 +920,7 @@ git commit -m "test(smoke): owner_asset upload + generate + read smoke"
 ### Task 11: Slot-history router
 
 **Files:**
+
 - Create: `src/routes/api/slot-history.ts`
 - Modify: `src/index.ts` — mount.
 
@@ -923,10 +953,9 @@ slotHistoryRouter.get('/sites/:siteId/elements/:elementId/history', async (c) =>
     })
     .from(slotHistory)
     .innerJoin(ownerAsset, eq(ownerAsset.id, slotHistory.assetId))
-    .where(and(
-      eq(slotHistory.siteId, ctx.site.id),
-      eq(slotHistory.elementId, c.req.param('elementId')),
-    ))
+    .where(
+      and(eq(slotHistory.siteId, ctx.site.id), eq(slotHistory.elementId, c.req.param('elementId'))),
+    )
     .orderBy(desc(slotHistory.lastUsedAt))
     .limit(limit);
   return c.json({ entries: rows });
@@ -958,10 +987,7 @@ slotHistoryRouter.put('/sites/:siteId/elements/:elementId/history/:assetId', asy
         target: [slotHistory.siteId, slotHistory.elementId, slotHistory.assetId],
         set: { lastUsedAt: now },
       });
-    await tx
-      .update(ownerAsset)
-      .set({ lastUsedAt: now })
-      .where(eq(ownerAsset.id, assetId));
+    await tx.update(ownerAsset).set({ lastUsedAt: now }).where(eq(ownerAsset.id, assetId));
   });
   return c.json({ ok: true });
 });
@@ -973,10 +999,9 @@ slotHistoryRouter.delete('/sites/:siteId/elements/:elementId/history', async (c)
   if (!ctx.ok) return ctx.response;
   await db(c.env)
     .delete(slotHistory)
-    .where(and(
-      eq(slotHistory.siteId, ctx.site.id),
-      eq(slotHistory.elementId, c.req.param('elementId')),
-    ));
+    .where(
+      and(eq(slotHistory.siteId, ctx.site.id), eq(slotHistory.elementId, c.req.param('elementId'))),
+    );
   return c.json({ ok: true });
 });
 ```
@@ -1018,6 +1043,7 @@ git commit -m "feat(api): slot_history list, MRU upsert, and per-element purge"
 ### Task 12: Element-deletion cleanup hook
 
 **Files:**
+
 - Modify: `src/editor/canvas-client.ts` — wherever a media element is removed (search for the delete-element handler), call the slot-history DELETE endpoint.
 
 - [ ] **Step 1: Find the deletion path**
@@ -1041,7 +1067,9 @@ if (element.type === 'media') {
   // is now unreachable, so it has no user-visible effect. We still log the
   // failure for debugging per the no-silent-failure rule.
   fetch(`/api/sites/${siteId}/elements/${element.id}/history`, { method: 'DELETE' })
-    .then((r) => { if (!r.ok) console.error('slot-history cleanup failed', r.status); })
+    .then((r) => {
+      if (!r.ok) console.error('slot-history cleanup failed', r.status);
+    })
     .catch((err) => console.error('slot-history cleanup failed', err));
 }
 ```
@@ -1060,6 +1088,7 @@ git commit -m "feat(editor): purge slot_history when its media element is delete
 ### Task 13: List gallery and probe asset usage
 
 **Files:**
+
 - Modify: `src/routes/api/assets.ts` — add GET `/me/assets` and GET `/me/assets/:assetId/usage`.
 - Modify: `src/assets/owner-assets.ts` — add `findAssetUsage` and `findAffectedPublishedSites`.
 
@@ -1182,6 +1211,7 @@ git commit -m "feat(api): GET /me/assets gallery and /me/assets/:assetId/usage p
 ### Task 14: Delete with cascade
 
 **Files:**
+
 - Modify: `src/routes/api/assets.ts` — add DELETE `/me/assets/:assetId`.
 
 - [ ] **Step 1: Add the handler**
@@ -1241,10 +1271,7 @@ assets.delete('/me/assets/:assetId', async (c) => {
 Add a helper next to `findAssetUsage`:
 
 ```ts
-export function clearAssetReferences(
-  state: CanvasSiteState,
-  assetId: string,
-): CanvasSiteState {
+export function clearAssetReferences(state: CanvasSiteState, assetId: string): CanvasSiteState {
   // Walk pages → sections → elements. For every media element where
   // assetId or posterAssetId equals the doomed id, replace with an empty
   // string. Return a new state — do not mutate.
@@ -1270,6 +1297,7 @@ export function clearAssetReferences(
 - [ ] **Step 2: Smoke + commit**
 
 Extend `owner-asset-smoke.ts` with a delete scenario:
+
 1. Create asset, attach to an element in a site's editable state.
 2. Probe usage — expect 1 entry.
 3. DELETE without `confirm=cascade` — expect 400.
@@ -1287,6 +1315,7 @@ git commit -m "feat(api): DELETE /me/assets/:assetId with cascade-confirm handsh
 ### Task 15: Picker module skeleton
 
 **Files:**
+
 - Create: `src/editor/media-picker.ts`
 
 - [ ] **Step 1: Define the contract**
@@ -1346,8 +1375,12 @@ if (element.type === 'media') {
   const disposer = mountMediaPicker(host, {
     siteId,
     element,
-    setAssetId(next) { element.assetId = next; },
-    rebuildElement() { rebuildElement(element.id); },
+    setAssetId(next) {
+      element.assetId = next;
+    },
+    rebuildElement() {
+      rebuildElement(element.id);
+    },
     scheduleSave,
   });
   inspectorTeardowns.push(disposer); // existing teardown registry, or add one if missing
@@ -1364,6 +1397,7 @@ git commit -m "feat(editor): scaffold media-picker module mounted by inspector"
 ### Task 16: Current row (with replace/upload/generate buttons)
 
 **Files:**
+
 - Modify: `src/editor/media-picker.ts`
 
 - [ ] **Step 1: Implement `renderCurrent`**
@@ -1424,6 +1458,7 @@ git commit -m "feat(editor): media-picker current row with upload + generate"
 ### Task 17: History row
 
 **Files:**
+
 - Modify: `src/editor/media-picker.ts`
 
 - [ ] **Step 1: Implement `renderHistoryRow`**
@@ -1443,9 +1478,7 @@ function renderHistoryRow(root: HTMLElement, ctx: PickerContext) {
 }
 
 async function loadHistory(ctx: PickerContext): Promise<HistoryEntry[]> {
-  const res = await fetch(
-    `/api/sites/${ctx.siteId}/elements/${ctx.element.id}/history?limit=4`,
-  );
+  const res = await fetch(`/api/sites/${ctx.siteId}/elements/${ctx.element.id}/history?limit=4`);
   if (!res.ok) throw new Error(`history fetch failed: ${res.status}`);
   const body = (await res.json()) as { entries: HistoryEntry[] };
   return body.entries;
@@ -1494,12 +1527,11 @@ async function applyAssetIdToElement(
   refreshCurrentThumb(currentThumb, assetId);
   ctx.scheduleSave();
   // MRU upsert — fire-and-forget, but log failures.
-  fetch(
-    `/api/sites/${ctx.siteId}/elements/${ctx.element.id}/history/${assetId}`,
-    { method: 'PUT' },
-  ).then((r) => {
-    if (!r.ok) console.error('slot-history upsert failed', r.status);
-  }).catch((err) => console.error('slot-history upsert failed', err));
+  fetch(`/api/sites/${ctx.siteId}/elements/${ctx.element.id}/history/${assetId}`, { method: 'PUT' })
+    .then((r) => {
+      if (!r.ok) console.error('slot-history upsert failed', r.status);
+    })
+    .catch((err) => console.error('slot-history upsert failed', err));
 }
 ```
 
@@ -1513,6 +1545,7 @@ git commit -m "feat(editor): media-picker history row with MRU apply"
 ### Task 18: Gallery row with delete-cascade confirm
 
 **Files:**
+
 - Modify: `src/editor/media-picker.ts`
 
 - [ ] **Step 1: Implement `renderGalleryRow`**
@@ -1640,6 +1673,7 @@ git commit -m "feat(editor): gallery row with cascade-confirm delete"
 ### Task 19: Glue — `refreshAll` and selection highlight sync
 
 **Files:**
+
 - Modify: `src/editor/media-picker.ts`
 
 - [ ] **Step 1: Implement `refreshAll`**
@@ -1678,6 +1712,7 @@ Add minimal CSS for `.media-picker`, `.picker-thumb`, `.picker-thumb.selected`, 
 - [ ] **Step 3: Manual sanity check in dev**
 
 Run: `bun.cmd run dev`
+
 1. Open the editor.
 2. Select a media element on the canvas.
 3. Confirm three rows render: current image, history (may be empty), gallery (seed image plus any uploads).
@@ -1699,6 +1734,7 @@ git commit -m "feat(editor): picker refreshes selection highlight and MRU on app
 ### Task 20: Migrate remaining call sites and delete `site_asset`
 
 **Files:**
+
 - Modify: `src/assets/site-assets.ts` → delete after every import has moved to `owner-assets.ts`.
 - Modify: `src/db/schema.ts` — remove `siteAsset` definition.
 - Create: `drizzle/0002_drop_site_asset.sql`
@@ -1706,9 +1742,11 @@ git commit -m "feat(editor): picker refreshes selection highlight and MRU on app
 - [ ] **Step 1: Confirm no live code reads `siteAsset`**
 
 Run:
+
 ```bash
 grep -rn "siteAsset\b\|site_asset\b" src/ --include="*.ts"
 ```
+
 Expected: only references inside `src/db/schema.ts` (definition) and `src/review-smoke.ts` (legacy comments). If any route or helper still reads it, that is a bug from earlier phases — fix it before continuing.
 
 - [ ] **Step 2: Move every import**
@@ -1747,6 +1785,7 @@ git commit -m "refactor(schema): drop site_asset; owner_asset is the only asset 
 ### Task 21: Update RECON.md and the architecture doc
 
 **Files:**
+
 - Modify: `RECON.md`
 - Modify: `docs/architecture/0001-architecture.md`
 
@@ -1767,16 +1806,16 @@ git commit -m "docs: replace Site Asset references with Owner Asset (ADR 0004)"
 
 After all 21 tasks, confirm each of these by running the listed command and observing the listed result.
 
-| What | How | Expected |
-|---|---|---|
-| Type safety | `bun.cmd run typecheck` | zero errors |
-| Render fixture | `bun.cmd run canvas:smoke` | green |
-| End-to-end fictional run | `bun.cmd run review:smoke` | green |
-| Asset lifecycle | `bun.cmd run asset:smoke` | green |
-| Editor visual | `bun.cmd run dev`, open editor, swap an image | canvas updates immediately, history row populates, gallery shows all owner assets |
-| Delete cascade | In the editor, click "×" on a gallery image used in a published site | modal names the affected published address, owner confirms, delete proceeds, slot in editor goes empty |
-| AI generate is transient | In the editor, generate but discard | no new row in `owner_asset` (check via `psql -c "select count(*) from owner_asset where customer_id = …"` before and after) |
-| Visitor route still works | Visit a published address that has images | images load |
+| What                      | How                                                                  | Expected                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Type safety               | `bun.cmd run typecheck`                                              | zero errors                                                                                                                 |
+| Render fixture            | `bun.cmd run canvas:smoke`                                           | green                                                                                                                       |
+| End-to-end fictional run  | `bun.cmd run review:smoke`                                           | green                                                                                                                       |
+| Asset lifecycle           | `bun.cmd run asset:smoke`                                            | green                                                                                                                       |
+| Editor visual             | `bun.cmd run dev`, open editor, swap an image                        | canvas updates immediately, history row populates, gallery shows all owner assets                                           |
+| Delete cascade            | In the editor, click "×" on a gallery image used in a published site | modal names the affected published address, owner confirms, delete proceeds, slot in editor goes empty                      |
+| AI generate is transient  | In the editor, generate but discard                                  | no new row in `owner_asset` (check via `psql -c "select count(*) from owner_asset where customer_id = …"` before and after) |
+| Visitor route still works | Visit a published address that has images                            | images load                                                                                                                 |
 
 ---
 

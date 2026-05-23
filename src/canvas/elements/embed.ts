@@ -20,9 +20,7 @@ export interface EmbedRenderCtx {
 export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
   void el;
   void ctx;
-  throw new Error(
-    'TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-08-embed.md',
-  );
+  throw new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-08-embed.md');
 }
 
 export const EMBED_RECIPE_ID = 'embed-card' as const;

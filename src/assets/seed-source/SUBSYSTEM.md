@@ -21,8 +21,8 @@ then, base64 wins on simplicity.
 
 ## Files
 
-| File | Bytes | Used by |
-|------|-------|---------|
+| File                  | Bytes                    | Used by                                       |
+| --------------------- | ------------------------ | --------------------------------------------- |
 | `transparent.png.b64` | 68 (1x1 transparent PNG) | `seed-hero-poster-1`, `seed-feature-canvas-1` |
 
 When a new seed file is added:

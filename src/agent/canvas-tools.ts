@@ -15,11 +15,7 @@
 // the LLM cannot drift into producing a plain string for `content` or
 // inventing a new `recipeId`.
 
-import {
-  INLINE_MARK_TYPES,
-  MEDIA_KINDS,
-  SECTION_RECIPE_IDS,
-} from '../canvas/schema.js';
+import { INLINE_MARK_TYPES, MEDIA_KINDS, SECTION_RECIPE_IDS } from '../canvas/schema.js';
 import type { JsonSchema, LlmTool } from './llm.js';
 
 // ---------------------------------------------------------------------------
@@ -61,7 +57,8 @@ const inlineRunSchema: JsonSchema = {
   properties: {
     text: {
       type: 'string',
-      description: 'Raw text for this run. Empty string is allowed only when the run carries marks.',
+      description:
+        'Raw text for this run. Empty string is allowed only when the run carries marks.',
     },
     marks: {
       type: 'array',

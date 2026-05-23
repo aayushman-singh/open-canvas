@@ -36,7 +36,9 @@ export async function sha256Hex(input: ArrayBuffer | Uint8Array): Promise<string
  */
 export function contentHashToR2Key(contentHash: string, ext: string): string {
   if (!/^[0-9a-f]{64}$/.test(contentHash)) {
-    throw new Error(`contentHashToR2Key: contentHash must be 64 hex characters, got ${contentHash}`);
+    throw new Error(
+      `contentHashToR2Key: contentHash must be 64 hex characters, got ${contentHash}`,
+    );
   }
   const cleanExt = ext.startsWith('.') ? ext.slice(1) : ext;
   if (!/^[a-z0-9]+$/.test(cleanExt)) {

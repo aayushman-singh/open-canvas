@@ -41,9 +41,7 @@ export interface FormRenderCtx {
 export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
   void el;
   void ctx;
-  throw new Error(
-    'TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md',
-  );
+  throw new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md');
 }
 
 // Section Recipe id reserved for "contact-form" — factory lives in the forms

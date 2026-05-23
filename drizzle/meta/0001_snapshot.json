@@ -52,12 +52,8 @@
           "name": "chat_session_site_id_site_id_fk",
           "tableFrom": "chat_session",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -65,12 +61,8 @@
           "name": "chat_session_customer_id_customer_id_fk",
           "tableFrom": "chat_session",
           "tableTo": "customer",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -141,12 +133,8 @@
           "name": "custom_domain_site_id_site_id_fk",
           "tableFrom": "custom_domain",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -156,9 +144,7 @@
         "custom_domain_hostname_unique": {
           "name": "custom_domain_hostname_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "hostname"
-          ]
+          "columns": ["hostname"]
         }
       },
       "policies": {},
@@ -209,9 +195,7 @@
         "customer_clerk_user_id_unique": {
           "name": "customer_clerk_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "clerk_user_id"
-          ]
+          "columns": ["clerk_user_id"]
         }
       },
       "policies": {},
@@ -279,12 +263,8 @@
           "name": "form_submission_site_id_site_id_fk",
           "tableFrom": "form_submission",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -378,12 +358,8 @@
           "name": "page_site_id_site_id_fk",
           "tableFrom": "page",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -487,12 +463,8 @@
           "name": "site_customer_id_customer_id_fk",
           "tableFrom": "site",
           "tableTo": "customer",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -502,9 +474,7 @@
         "site_subdomain_unique": {
           "name": "site_subdomain_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "subdomain"
-          ]
+          "columns": ["subdomain"]
         }
       },
       "policies": {},
@@ -579,12 +549,8 @@
           "name": "site_font_site_id_site_id_fk",
           "tableFrom": "site_font",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -642,12 +608,8 @@
           "name": "site_search_entry_site_id_site_id_fk",
           "tableFrom": "site_search_entry",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -712,12 +674,8 @@
           "name": "site_snapshot_site_id_site_id_fk",
           "tableFrom": "site_snapshot",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -912,12 +870,8 @@
           "name": "owner_asset_customer_id_customer_id_fk",
           "tableFrom": "owner_asset",
           "tableTo": "customer",
-          "columnsFrom": [
-            "customer_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -964,12 +918,8 @@
           "name": "slot_history_site_id_site_id_fk",
           "tableFrom": "slot_history",
           "tableTo": "site",
-          "columnsFrom": [
-            "site_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["site_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -977,12 +927,8 @@
           "name": "slot_history_owner_asset_id_owner_asset_id_fk",
           "tableFrom": "slot_history",
           "tableTo": "owner_asset",
-          "columnsFrom": [
-            "owner_asset_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["owner_asset_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -990,11 +936,7 @@
       "compositePrimaryKeys": {
         "slot_history_site_id_element_id_owner_asset_id_pk": {
           "name": "slot_history_site_id_element_id_owner_asset_id_pk",
-          "columns": [
-            "site_id",
-            "element_id",
-            "owner_asset_id"
-          ]
+          "columns": ["site_id", "element_id", "owner_asset_id"]
         }
       },
       "uniqueConstraints": {},

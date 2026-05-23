@@ -1,6 +1,6 @@
 # Version history + restore
 
-**Wishlist #:** 3  **Tier:** S  **Wave:** 1  **Status:** queued
+**Wishlist #:** 3 **Tier:** S **Wave:** 1 **Status:** queued
 **Depends on:** Phase 0 ✓ (Yjs projection, `siteSnapshot` table)
 **Blocks:** none
 
@@ -31,7 +31,8 @@ Already scaffolded in Phase 0:
 ```ts
 // src/db/schema.ts (Phase 0)
 siteSnapshot = pgTable('site_snapshot', {
-  id, siteId,
+  id,
+  siteId,
   yjsSnapshotBytes: bytea('yjs_snapshot_bytes').notNull(),
   capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
   reason: text('reason').notNull().$type<'publish' | 'manual'>(),

@@ -44,12 +44,18 @@ const AUTHORIZED_PARTIES = [
 // CLERK_TEST_* secrets are populated in the local .env only and are NEVER
 // added to the prod worker secret set, so their presence reliably signals
 // "this is a dev environment".
-export function resolveClerkKeys(
-  env: ClerkBindings,
-): { publishableKey: string; secretKey: string } {
+export function resolveClerkKeys(env: ClerkBindings): {
+  publishableKey: string;
+  secretKey: string;
+} {
   const testPub = env.CLERK_TEST_PUBLISHABLE_KEY;
   const testSec = env.CLERK_TEST_SECRET_KEY;
-  if (typeof testPub === 'string' && testPub.length > 0 && typeof testSec === 'string' && testSec.length > 0) {
+  if (
+    typeof testPub === 'string' &&
+    testPub.length > 0 &&
+    typeof testSec === 'string' &&
+    testSec.length > 0
+  ) {
     return { publishableKey: testPub, secretKey: testSec };
   }
   return { publishableKey: env.CLERK_PUBLISHABLE_KEY, secretKey: env.CLERK_SECRET_KEY };

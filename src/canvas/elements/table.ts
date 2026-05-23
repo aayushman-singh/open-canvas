@@ -32,9 +32,7 @@ export interface TableRenderCtx {
 export function renderTable(el: TableElement, ctx: TableRenderCtx): string {
   void el;
   void ctx;
-  throw new Error(
-    'TODO: implement in Wave 4 — see docs/superpowers/plans/2026-05-23-18-table.md',
-  );
+  throw new Error('TODO: implement in Wave 4 — see docs/superpowers/plans/2026-05-23-18-table.md');
 }
 
 export const TABLE_RECIPE_ID = 'table-card' as const;
