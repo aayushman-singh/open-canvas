@@ -546,8 +546,8 @@ function runRenderForm(): void {
     styleKit: 'charcoal',
   });
   assert(
-    html.includes(`action="/api/forms/${SITE_ID}/${FORM_ID}"`),
-    '1.1 renderForm: <form action> points at /api/forms/:siteId/:formId',
+    html.includes(`action="/__rev01/forms/${SITE_ID}/${FORM_ID}"`),
+    '1.1 renderForm: <form action> points at /__rev01/forms/:siteId/:formId',
   );
   assert(html.includes('method="post"'), '1.2 renderForm: method=post');
   assert(html.includes('name="name"'), '1.3 renderForm: text input present');

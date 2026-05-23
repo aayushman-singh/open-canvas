@@ -14,9 +14,8 @@
 //      pages } and re-validate it (defence in depth).
 //   5. UPDATE the row: publishedSnapshot, publishedVersion, updatedAt.
 //   6. Render snapshot HTML and POST it to SITE_ROOM/broadcast keyed by the
-//      site id. Broadcast errors are logged loud but do not roll back the
-//      publish — the row is already updated and the next visitor page-load
-//      will read the new snapshot.
+//      site id. Broadcast errors throw so the route never reports success
+//      while open visitor tabs missed the update.
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -38,6 +37,8 @@ import { onPublishGenerateOg } from '../../og-image/on-publish';
 //   - Post-publish: search index rebuild for the visitor-facing search (#13).
 import { runAudit } from '../../a11y/audit';
 import { rebuildSearchIndex } from '../../search/indexer';
+import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
+import { injectInteractiveRuntime } from '../../interactive/inject';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -163,6 +164,19 @@ publishApi.post('/sites/:siteId', async (c) => {
     publishedAt: new Date().toISOString(),
     styleKit: row.editableState.styleKit,
     pages: row.editableState.pages,
+    ...(row.editableState.customStyleKit !== undefined
+      ? { customStyleKit: row.editableState.customStyleKit }
+      : {}),
+    symbols: row.editableState.symbols,
+    ...(row.editableState.defaultLocale !== undefined
+      ? { defaultLocale: row.editableState.defaultLocale }
+      : {}),
+    ...(row.editableState.siteNoIndex !== undefined
+      ? { siteNoIndex: row.editableState.siteNoIndex }
+      : {}),
+    ...(row.editableState.darkModeEnabled !== undefined
+      ? { darkModeEnabled: row.editableState.darkModeEnabled }
+      : {}),
   };
 
   const snapshotValidation = validatePublishedSnapshot(snapshot);
@@ -172,6 +186,11 @@ publishApi.post('/sites/:siteId', async (c) => {
     // published contract and we want to know loudly.
     return c.json({ error: 'published snapshot invalid', errors: snapshotValidation.errors }, 500);
   }
+
+  configureSymbolInstanceRender({ symbols: snapshot.symbols ?? [] });
+  const html = injectInteractiveRuntime(renderCanvasSnapshot(snapshot, '/assets'), snapshot);
+
+  await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
 
   await database
     .update(site)
@@ -197,39 +216,19 @@ publishApi.post('/sites/:siteId', async (c) => {
   // snapshot.
   await rebuildSearchIndex(row.id, snapshot, database);
 
-  // Wave 1 #6 — pre-render OG cards into R2 for every page so the first
-  // visitor share-link is unfurled with a cached image. Per-page errors are
-  // trapped inside the hook so a glitch on one page never rolls back the
-  // publish; an extreme failure (binding missing) is logged loud and ignored
-  // here because visitor OG endpoints render on demand.
-  try {
-    await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
-  } catch (error) {
-    console.error('[publish] onPublishGenerateOg failed catastrophically', error);
-  }
-
-  const html = renderCanvasSnapshot(snapshot, '/assets');
-
-  try {
-    const id = c.env.SITE_ROOM.idFromName(row.id);
-    const stub = c.env.SITE_ROOM.get(id);
-    const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ version: snapshot.version, html }),
-    });
-    if (!broadcastResponse.ok) {
-      console.error(
-        '[publish] SiteRoom broadcast non-ok status',
-        broadcastResponse.status,
-        await broadcastResponse.text(),
-      );
-    }
-  } catch (error) {
-    // The publish row is already updated; visitors loading the page after
-    // this point see the new snapshot. The only thing that fails here is
-    // the live-update push to already-open tabs.
-    console.error('[publish] SiteRoom broadcast failed', error);
+  // Live visitor broadcast must be accepted before the API reports success.
+  const id = c.env.SITE_ROOM.idFromName(row.id);
+  const stub = c.env.SITE_ROOM.get(id);
+  const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: snapshot.version, html }),
+  });
+  if (!broadcastResponse.ok) {
+    const body = await broadcastResponse.text();
+    throw new Error(
+      `[publish] SiteRoom broadcast failed with status ${String(broadcastResponse.status)}: ${body}`,
+    );
   }
 
   return c.json({

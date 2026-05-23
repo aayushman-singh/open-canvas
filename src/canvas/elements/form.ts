@@ -2,7 +2,7 @@
 //
 // Wave 2 #7 — Forms subsystem renderer.
 //
-// Emits a real semantic <form method="post" action="/api/forms/<siteId>/<id>">.
+// Emits a real semantic <form method="post" action="/__rev01/forms/<siteId>/<id>">.
 // Every visible field becomes an <input>/<textarea>/<select>; the field id is
 // reused as the form-data key so the submit-handler payload shape is stable
 // and deterministic.
@@ -80,7 +80,7 @@ const config: FormRenderConfig = {
  * between assertions. Pass `null` to disable Turnstile widget emission.
  *
  * Main-thread integration: call this from the Worker init path with
- * `env.TURNSTILE_SITE_KEY` before mounting `/api/forms`.
+ * `env.TURNSTILE_SITE_KEY` before mounting the forms routers.
  */
 export function configureFormRender(next: { turnstileSiteKey: string | null }): void {
   config.turnstileSiteKey = next.turnstileSiteKey;
@@ -151,7 +151,7 @@ function renderField(field: FormFieldDef, formId: string): string {
 }
 
 export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
-  const action = `/api/forms/${encodeURIComponent(ctx.siteId)}/${encodeURIComponent(el.id)}`;
+  const action = `/__rev01/forms/${encodeURIComponent(ctx.siteId)}/${encodeURIComponent(el.id)}`;
   const fieldsHtml = el.fields.map((field) => renderField(field, el.id)).join('');
 
   // Turnstile widget. The Cloudflare-managed JS loader script is emitted next

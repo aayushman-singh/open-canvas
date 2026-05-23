@@ -331,6 +331,17 @@ export function ThemePanel(props: ThemePanelProps) {
           not Owner-editable. */}
       {editing ? <DarkVariantSection siteId={props.siteId} preset={props.activePreset} /> : null}
 
+      {/* >>> Wave 5 #12 — Custom fonts section. ADDITIVE seam: lives in its
+          own subtree outside the #10 form (Save/Reset/Promote flow stays
+          byte-for-byte unchanged) and outside the #20 DarkVariantSection
+          (independent state + client script). Always rendered — Owners can
+          upload + manage fonts whether or not they are editing a custom
+          theme. Assigning a font to display/body/mono only takes effect
+          inside a custom theme; the section surfaces that constraint to
+          the Owner via the empty-state label. */}
+      <CustomFontsSection siteId={props.siteId} editing={editing} />
+      {/* <<< Wave 5 #12 — end custom fonts section */}
+
       <script type="module">
         {raw(themePanelClientScript(props.siteId, props.activePreset))}
       </script>
@@ -863,3 +874,259 @@ export {
 // Type re-exports so consumers of the panel don't have to import from schema
 // directly when wiring it up.
 export type { ActionVariant, MotionPreset, SurfaceVariant };
+
+// --------------------------------------------------------------------------
+// Wave 5 #12 — Custom fonts section. ADDITIVE: lives in its own subtree so
+// the existing #10 + #20 flows stay byte-for-byte unchanged. The section
+// renders:
+//   - A file picker + name / weight / style inputs for WOFF2 upload, posted
+//     to POST /api/sites/:siteId/fonts (Wave 5 #12 route).
+//   - A list of the site's current fonts (fetched on mount via GET .../fonts)
+//     with per-row "Assign as display" / "Assign as body" / "Assign as mono"
+//     buttons that rewrite the active custom kit's font tokens via the
+//     existing PUT /api/sites/:siteId/custom-theme endpoint.
+//   - A delete button per row that DELETEs the font.
+// The client script lives below as a string so the section is self-contained.
+// --------------------------------------------------------------------------
+
+function CustomFontsSection({ siteId, editing }: { siteId: string; editing: boolean }) {
+  return (
+    <section data-rev01-custom-fonts class="rev01-theme-row">
+      <h3>Custom fonts</h3>
+      <p class="rev01-theme-status">
+        {editing
+          ? 'Upload a WOFF2 file and assign it as the display, body, or mono font for this custom theme.'
+          : 'Upload fonts here; assigning one to display / body / mono is enabled once you start a custom theme.'}
+      </p>
+      <form
+        data-rev01-fonts-form
+        method="post"
+        action={`/api/sites/${escapeAttribute(siteId)}/fonts`}
+        enctype="multipart/form-data"
+      >
+        <label>
+          <span>Font name</span>
+          <input
+            type="text"
+            name="name"
+            data-rev01-font-name
+            placeholder="Display"
+            autocomplete="off"
+            spellcheck={false}
+          />
+        </label>
+        <label>
+          <span>Family classification</span>
+          <select name="family" data-rev01-font-family>
+            <option value="sans-serif">sans-serif</option>
+            <option value="serif">serif</option>
+            <option value="mono">mono</option>
+            <option value="display">display</option>
+          </select>
+        </label>
+        <div class="rev01-theme-grid">
+          <label>
+            <span>Weight</span>
+            <input
+              type="text"
+              name="weight"
+              data-rev01-font-weight
+              value="400"
+              inputmode="numeric"
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            <span>Style</span>
+            <select name="style" data-rev01-font-style>
+              <option value="normal" selected>
+                normal
+              </option>
+              <option value="italic">italic</option>
+            </select>
+          </label>
+        </div>
+        <label>
+          <span>WOFF2 file</span>
+          <input type="file" name="file" accept=".woff2,font/woff2" data-rev01-font-file />
+        </label>
+        <div class="rev01-theme-actions">
+          <button type="submit" data-rev01-font-upload>
+            Upload font
+          </button>
+        </div>
+      </form>
+      <p class="rev01-theme-status" data-rev01-font-status></p>
+      <div data-rev01-font-list></div>
+      <script type="module">{raw(customFontsClientScript(siteId, editing))}</script>
+    </section>
+  );
+}
+
+function customFontsClientScript(siteId: string, editing: boolean): string {
+  // The script handles: list-on-mount, upload (multipart POST), per-row
+  // assign (rewrites the active custom kit's font tokens via the existing
+  // PUT /custom-theme endpoint with a `font:<contentHash>` token), and
+  // delete. The kit fetch + merge runs inside the assign handler so we
+  // always operate on the freshest custom kit (the Owner may have changed
+  // colours between mounting the section and clicking assign).
+  const payload = { siteId, editing };
+  const json = JSON.stringify(payload).replace(/</g, '\\u003c');
+  return String.raw`
+(() => {
+  const STATE = JSON.parse(${JSON.stringify(json)});
+  const root = document.querySelector('[data-rev01-custom-fonts]');
+  if (!root) return;
+  const listEl = root.querySelector('[data-rev01-font-list]');
+  const status = root.querySelector('[data-rev01-font-status]');
+  const form = root.querySelector('[data-rev01-fonts-form]');
+  function setStatus(msg) { if (status) status.textContent = msg; }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+  }
+
+  async function fetchFonts() {
+    try {
+      const response = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/fonts', {
+        headers: { accept: 'application/json' },
+      });
+      if (!response.ok) { setStatus('Failed to load fonts: ' + response.statusText); return; }
+      const body = await response.json();
+      renderList(body.fonts || []);
+    } catch (err) {
+      setStatus('Network error loading fonts: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+
+  function renderList(fonts) {
+    if (!listEl) return;
+    if (fonts.length === 0) {
+      listEl.innerHTML = '<p class="rev01-theme-status">No custom fonts uploaded yet.</p>';
+      return;
+    }
+    const rows = fonts.map((font) => {
+      const meta = escapeHtml(font.name) + ' · ' + escapeHtml(font.family) +
+        ' · w' + String(font.weight) + ' · ' + escapeHtml(font.style);
+      const assignButtons = STATE.editing
+        ? '<div class="rev01-theme-actions">' +
+          '<button type="button" data-variant="ghost" data-rev01-font-assign="display" data-rev01-font-hash="' + escapeHtml(font.contentHash) + '">Display</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-assign="body" data-rev01-font-hash="' + escapeHtml(font.contentHash) + '">Body</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-assign="mono" data-rev01-font-hash="' + escapeHtml(font.contentHash) + '">Mono</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeHtml(font.id) + '">Delete</button>' +
+          '</div>'
+        : '<div class="rev01-theme-actions">' +
+          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeHtml(font.id) + '">Delete</button>' +
+          '</div>';
+      return '<div class="rev01-theme-row"><strong>' + meta + '</strong>' + assignButtons + '</div>';
+    }).join('');
+    listEl.innerHTML = rows;
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const fd = new FormData(form);
+      setStatus('Uploading font…');
+      try {
+        const response = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/fonts', {
+          method: 'POST',
+          body: fd,
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            if (body && body.error) detail = body.error;
+          } catch (_) { /* noop */ }
+          setStatus('Upload failed: ' + detail);
+          return;
+        }
+        setStatus('Font uploaded. Reloading list…');
+        await fetchFonts();
+      } catch (err) {
+        setStatus('Network error: ' + (err && err.message ? err.message : String(err)));
+      }
+    });
+  }
+
+  if (listEl) {
+    listEl.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const assignSlot = target.getAttribute('data-rev01-font-assign');
+      const assignHash = target.getAttribute('data-rev01-font-hash');
+      if (assignSlot && assignHash) {
+        if (!STATE.editing) {
+          setStatus('Start a custom theme first to assign a font.');
+          return;
+        }
+        setStatus('Assigning font to ' + assignSlot + '…');
+        try {
+          // Fetch the current site state so we operate on the freshest
+          // custom kit. The route requires the full kit on PUT — partial
+          // updates are not supported.
+          const stateResponse = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId), {
+            headers: { accept: 'application/json' },
+          });
+          if (!stateResponse.ok) {
+            setStatus('Could not load current theme: ' + stateResponse.statusText);
+            return;
+          }
+          const stateBody = await stateResponse.json();
+          const kit = stateBody && stateBody.editableState && stateBody.editableState.customStyleKit;
+          if (!kit) {
+            setStatus('No custom theme to assign font to. Click "Start from this kit" first.');
+            return;
+          }
+          const token = 'font:' + assignHash;
+          if (assignSlot === 'display') kit.fontFamilyDisplay = token;
+          else if (assignSlot === 'body') kit.fontFamilyBody = token;
+          else if (assignSlot === 'mono') kit.fontFamilyMono = token;
+          const put = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/custom-theme', {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({ customStyleKit: kit }),
+          });
+          if (!put.ok) {
+            let detail = put.statusText;
+            try { const body = await put.json(); if (body && body.error) detail = body.error; } catch (_) {}
+            setStatus('Assign failed: ' + detail);
+            return;
+          }
+          setStatus('Font assigned to ' + assignSlot + '. Reloading…');
+          location.reload();
+        } catch (err) {
+          setStatus('Network error: ' + (err && err.message ? err.message : String(err)));
+        }
+        return;
+      }
+
+      const deleteId = target.getAttribute('data-rev01-font-delete');
+      if (deleteId) {
+        if (!confirm('Delete this font? Any token that references it will stop rendering.')) return;
+        setStatus('Deleting font…');
+        try {
+          const response = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/fonts/' + encodeURIComponent(deleteId), {
+            method: 'DELETE',
+          });
+          if (!response.ok) {
+            setStatus('Delete failed: ' + response.statusText);
+            return;
+          }
+          setStatus('Font deleted.');
+          await fetchFonts();
+        } catch (err) {
+          setStatus('Network error: ' + (err && err.message ? err.message : String(err)));
+        }
+      }
+    });
+  }
+
+  fetchFonts();
+})();
+`;
+}

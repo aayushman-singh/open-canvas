@@ -14,9 +14,9 @@ import type { CanvasPage, MediaKind } from '../canvas/schema.js';
 export interface ReferencedAsset {
   assetId: string;
   expectedKind: MediaKind;
-  role: 'asset' | 'poster';
+  role: 'asset' | 'poster' | 'og-image';
   path: string;
-  mediaElementId: string;
+  mediaElementId?: string;
 }
 
 export interface AssetKindRow {
@@ -42,6 +42,14 @@ export interface AssetReferenceError extends ReferencedAsset {
 export function collectReferencedAssets(pages: CanvasPage[]): ReferencedAsset[] {
   const out: ReferencedAsset[] = [];
   for (const [pageIdx, page] of pages.entries()) {
+    if (typeof page.ogImageAssetId === 'string' && page.ogImageAssetId.length > 0) {
+      out.push({
+        assetId: page.ogImageAssetId,
+        expectedKind: 'image',
+        role: 'og-image',
+        path: `pages[${String(pageIdx)}].ogImageAssetId`,
+      });
+    }
     for (const [sectionIdx, section] of page.sections.entries()) {
       for (const [elementIdx, element] of section.elements.entries()) {
         if (element.type !== 'media') continue;

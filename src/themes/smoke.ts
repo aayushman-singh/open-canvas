@@ -28,7 +28,11 @@ import type {
   PublishedSnapshot,
   StyleKitPreset,
 } from '../canvas/schema.js';
-import { getStyleKitPreset, STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
+import {
+  buildStyleKitCss,
+  getStyleKitPreset,
+  STYLE_KIT_PRESETS,
+} from '../canvas/style-kits.js';
 
 import { checkKitContrast, BG_TEXT_AA_THRESHOLD } from './contrast-guard.js';
 import {
@@ -220,6 +224,13 @@ assert(
     recovered.text === customKit.text,
   'expected resolved preset from snapshot to mirror authored custom kit tokens',
 );
+const customCss = buildStyleKitCss('custom', customKit);
+assert(
+  customCss.includes('[data-style-kit="custom"]') &&
+    customCss.includes('--rev01-kit-bg: #102030;') &&
+    customCss.includes('--rev01-kit-accent: #ff7a59;'),
+  'expected buildStyleKitCss to emit real custom kit tokens for the public visitor stylesheet',
+);
 
 // --------------------------------------------------------------------------
 // Test 3 — missing customStyleKit when styleKit='custom' throws loudly.
@@ -236,6 +247,27 @@ try {
   );
 }
 assert(missingThrew, 'expected resolveStyleKitWithCustom to throw when customStyleKit is absent');
+
+let renderMissingThrew = false;
+try {
+  renderCanvasSnapshot(
+    {
+      version: 1,
+      publishedAt: '2026-05-23T00:00:00.000Z',
+      styleKit: 'custom',
+      pages: customSnapshot.pages,
+    },
+    '/assets',
+    'site-themes-smoke',
+  );
+} catch (err) {
+  renderMissingThrew = true;
+  assert(
+    err instanceof Error && err.message.includes('customStyleKit is missing'),
+    `expected renderer error to name customStyleKit as missing, got "${err instanceof Error ? err.message : String(err)}"`,
+  );
+}
+assert(renderMissingThrew, 'expected renderer to throw when styleKit=custom has no customStyleKit');
 
 // --------------------------------------------------------------------------
 // Test 4 — runtime validator catches out-of-shape custom kit.

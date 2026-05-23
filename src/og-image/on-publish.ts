@@ -20,8 +20,9 @@
 
 import { createR2Client } from '../assets/r2-client.js';
 import type { PublishedSnapshot, StyleKitPreset } from '../canvas/schema.js';
-import { getStyleKitPreset, STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
+import { getStyleKitPreset } from '../canvas/style-kits.js';
 import type { Db } from '../db/client.js';
+import { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 import { headCached, writeCached } from './cache.js';
 import { rasteriseSvgToPng, type RasteriseEnv } from './rasterise.js';
 import { renderOgCardSvg } from './render.js';
@@ -63,31 +64,20 @@ export async function onPublishGenerateOg(
     if (present) {
       return { kind: 'skipped' as const, slug: page.slug, reason: 'cache-hit' };
     }
-    try {
-      const svg = await renderOgCardSvg({
-        siteName: siteName ?? 'Site',
-        pageTitle: page.title,
-        ...(page.description !== undefined ? { pageDescription: page.description } : {}),
-        preset,
-      });
-      // `env` passes through any pre-loaded wasm module from the worker
-      // build; on Bun / dev it's undefined and rasterise.ts falls back to
-      // a disk read.
-      const rasteriseEnv: RasteriseEnv = {};
-      if (env.wasmModule !== undefined) rasteriseEnv.wasmModule = env.wasmModule;
-      const { bytes } = await rasteriseSvgToPng(svg, rasteriseEnv);
-      await writeCached(r2, siteId, page.slug, snapshot.version, bytes);
-      return { kind: 'rendered' as const, slug: page.slug };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // Loud log per the all-or-nothing policy: the publish row is already
-      // updated by the caller; this failure does not unwind it. The OG
-      // route will render-on-demand the next time a visitor hits the URL.
-      console.error(
-        `[og-image] onPublishGenerateOg page=${page.slug} site=${siteId} v=${String(snapshot.version)} failed: ${message}`,
-      );
-      return { kind: 'failed' as const, slug: page.slug, error: message };
-    }
+    const svg = await renderOgCardSvg({
+      siteName: siteName ?? 'Site',
+      pageTitle: page.title,
+      ...(page.description !== undefined ? { pageDescription: page.description } : {}),
+      preset,
+    });
+    // `env` passes through any pre-loaded wasm module from the worker
+    // build; on Bun / dev it's undefined and rasterise.ts falls back to
+    // a disk read.
+    const rasteriseEnv: RasteriseEnv = {};
+    if (env.wasmModule !== undefined) rasteriseEnv.wasmModule = env.wasmModule;
+    const { bytes } = await rasteriseSvgToPng(svg, rasteriseEnv);
+    await writeCached(r2, siteId, page.slug, snapshot.version, bytes);
+    return { kind: 'rendered' as const, slug: page.slug };
   });
 
   const results = await Promise.all(tasks);
@@ -97,21 +87,13 @@ export async function onPublishGenerateOg(
   for (const result of results) {
     if (result.kind === 'rendered') rendered.push(result.slug);
     else if (result.kind === 'skipped') skipped.push(result.slug);
-    else failed.push({ slug: result.slug, error: result.error });
   }
   return { rendered, skipped, failed };
 }
 
 function resolveStyleKitPreset(snapshot: PublishedSnapshot): StyleKitPreset {
   if (snapshot.styleKit === 'custom') {
-    const custom = snapshot.customStyleKit;
-    if (custom === undefined) {
-      console.error(
-        '[og-image] publish-hook: styleKit=custom but no customStyleKit; falling back to charcoal preset',
-      );
-      return STYLE_KIT_PRESETS.charcoal;
-    }
-    return custom;
+    return resolveStyleKitWithCustom(snapshot);
   }
   return getStyleKitPreset(snapshot.styleKit);
 }

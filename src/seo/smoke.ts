@@ -9,6 +9,7 @@
 //   2. noIndex: true → robots noindex,nofollow emitted.
 //   3. ogImageAssetId set → og:image points to /assets/<contentHash> (stub lookup).
 //   4. Without ogImageAssetId → og:image falls back to /og/<siteId>/<pageSlug>.png.
+//      With an explicit but unresolved ogImageAssetId → throws loudly.
 //   5. HTML entities in title/description escaped correctly.
 //   6. Site-level siteNoIndex overrides per-page (always noindex).
 //
@@ -169,6 +170,15 @@ assert(
     `/assets/${KNOWN_ASSET_HASH}`,
   '3: resolveOgUrl must return /assets/<hash> when the lookup resolves',
 );
+const meta3Direct = emitPageMeta(page3, {
+  siteId: SITE_ID,
+  host: HOST,
+  snapshot: snapshot3,
+});
+assert(
+  meta3Direct.includes(`<meta property="og:image" content="/assets/${KNOWN_ASSET_ID}">`),
+  '3: og:image must point to /assets/<assetId> when the public renderer has no asset lookup',
+);
 
 // ---------------------------------------------------------------------------
 // Assertion 4 — without ogImageAssetId, og:image falls back to the generator.
@@ -197,19 +207,26 @@ assert(
   '4: resolveOgUrl must produce the generator URL when no asset id is set',
 );
 
-// Also: an asset id present but unresolved (deleted asset) falls through to
-// the generator, matching the resilient behaviour of the OG route.
+// Also: an asset id present but unresolved is a publish/metadata integrity
+// error. It must not silently fall through to a generated image that hides
+// the broken explicit choice.
 const page4b: CanvasPage = { ...page4, ogImageAssetId: 'missing-asset-id' };
-const meta4b = emitPageMeta(page4b, {
-  siteId: SITE_ID,
-  host: HOST,
-  snapshot: snapshot4,
-  assetLookup: stubAssetLookup,
-});
-assert(
-  meta4b.includes(`<meta property="og:image" content="${expectedFallback}">`),
-  '4: unresolved ogImageAssetId must fall through to the generator URL',
-);
+let unresolvedOgThrew = false;
+try {
+  emitPageMeta(page4b, {
+    siteId: SITE_ID,
+    host: HOST,
+    snapshot: snapshot4,
+    assetLookup: stubAssetLookup,
+  });
+} catch (err) {
+  unresolvedOgThrew = true;
+  assert(
+    err instanceof Error && err.message.includes('missing-asset-id'),
+    `4: unresolved ogImageAssetId error must name the missing id, got ${err instanceof Error ? err.message : String(err)}`,
+  );
+}
+assert(unresolvedOgThrew, '4: unresolved ogImageAssetId must throw loudly');
 
 // ---------------------------------------------------------------------------
 // Assertion 5 — HTML entities in title/description escaped correctly.
