@@ -78,6 +78,8 @@ interface BroadcastPayload {
   html: string;
 }
 
+type SocketRole = 'visitor' | 'editor';
+
 // Runtime check for the /broadcast body. The publish endpoint is the only
 // caller, but the DO HTTP boundary is treated as untrusted: if a malformed
 // payload ever reaches this point (test harness mistake, future internal
@@ -219,6 +221,8 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
     | null = null;
   /** Map socket → its observed clientID(s) (added during awareness handshake). */
   private socketClientIds: WeakMap<WebSocket, Set<number>> = new WeakMap();
+  /** Visitor sockets receive publish/presence broadcasts; only editors speak Yjs. */
+  private socketRoles: WeakMap<WebSocket, SocketRole> = new WeakMap();
   /** When the wire-update dispatcher is mid-handle for a socket, remember it so the
    * broadcast observer can skip echoing back. */
   private currentOriginSocket: WebSocket | null = null;
@@ -256,16 +260,21 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
     }
 
     if (url.pathname === '/socket' && request.headers.get('upgrade') === 'websocket') {
-      // The siteId is shipped as a query param when the app-host routes the
-      // /__live request; on the public host (visitor live-update) it's the
-      // subdomain. We accept either via the `?siteId=` param the app-host
-      // router already sets, falling back to the DO id name when present.
+      const roleParam = url.searchParams.get('role');
+      if (roleParam !== 'visitor' && roleParam !== 'editor') {
+        console.error('[SiteRoom] rejected socket without valid role', { role: roleParam });
+        return new Response('invalid socket role', { status: 400 });
+      }
+      // Both the public visitor route and the app-host editor route pass the
+      // canonical site id. The role param decides whether this socket may
+      // speak Yjs or only receive publish/presence broadcasts.
       const siteIdParam = url.searchParams.get('siteId');
       if (siteIdParam !== null && /^[A-Za-z0-9-]+$/.test(siteIdParam)) {
         this.siteId = siteIdParam;
       }
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1]);
+      this.socketRoles.set(pair[1], roleParam);
       // Presence updates run inline; the count is sent on connect.
       queueMicrotask(() => {
         this.broadcastPresence();
@@ -349,6 +358,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       const origin = this.currentOriginSocket;
       for (const ws of this.ctx.getWebSockets()) {
         if (ws === origin) continue;
+        if (!this.isEditorSocket(ws)) continue;
         try {
           ws.send(message);
         } catch (error) {
@@ -378,6 +388,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       const origin = this.currentOriginSocket;
       for (const ws of this.ctx.getWebSockets()) {
         if (ws === origin) continue;
+        if (!this.isEditorSocket(ws)) continue;
         try {
           ws.send(message);
         } catch (error) {
@@ -440,14 +451,16 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
     };
     const step2Message = JSON.stringify(step2Envelope);
 
-    for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.send(replaceMessage);
-        ws.send(step2Message);
-      } catch (error) {
-        console.error('[SiteRoom] editable-state-replaced fan-out failed', error);
-      }
-    }
+    this.sendToEditorSockets(
+      replaceMessage,
+      null,
+      '[SiteRoom] editable-state-replaced fan-out failed',
+    );
+    this.sendToEditorSockets(
+      step2Message,
+      null,
+      '[SiteRoom] editable-state-replaced fan-out failed',
+    );
   }
 
   /**
@@ -467,6 +480,11 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
 
     if (!isSiteRoomMessage(parsed)) {
       console.error('[SiteRoom] rejected unknown websocket message kind', parsed);
+      return;
+    }
+
+    if (!this.isEditorSocket(ws)) {
+      console.error('[SiteRoom] rejected visitor websocket message', parsed);
       return;
     }
 
@@ -591,6 +609,22 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
         ws.send(message);
       } catch (error) {
         console.error('[SiteRoom] presence send failed', error);
+      }
+    }
+  }
+
+  private isEditorSocket(ws: WebSocket): boolean {
+    return this.socketRoles.get(ws) === 'editor';
+  }
+
+  private sendToEditorSockets(message: string, skip: WebSocket | null, errorMessage: string): void {
+    for (const ws of this.ctx.getWebSockets()) {
+      if (skip !== null && ws === skip) continue;
+      if (!this.isEditorSocket(ws)) continue;
+      try {
+        ws.send(message);
+      } catch (error) {
+        console.error(errorMessage, error);
       }
     }
   }

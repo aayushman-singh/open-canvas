@@ -188,7 +188,10 @@ publishApi.post('/sites/:siteId', async (c) => {
   }
 
   configureSymbolInstanceRender({ symbols: snapshot.symbols ?? [] });
-  const html = injectInteractiveRuntime(renderCanvasSnapshot(snapshot, '/assets'), snapshot);
+  const html = injectInteractiveRuntime(
+    renderCanvasSnapshot(snapshot, '/assets', row.id),
+    snapshot,
+  );
 
   await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
 

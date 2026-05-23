@@ -23,22 +23,11 @@
 //      it without depending on `src/themes/`.
 
 import { renderCanvasSnapshot } from '../canvas/render.js';
-import type {
-  CanvasSiteState,
-  PublishedSnapshot,
-  StyleKitPreset,
-} from '../canvas/schema.js';
-import {
-  buildStyleKitCss,
-  getStyleKitPreset,
-  STYLE_KIT_PRESETS,
-} from '../canvas/style-kits.js';
+import type { CanvasSiteState, PublishedSnapshot, StyleKitPreset } from '../canvas/schema.js';
+import { buildStyleKitCss, getStyleKitPreset, STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
 
 import { checkKitContrast, BG_TEXT_AA_THRESHOLD } from './contrast-guard.js';
-import {
-  resolveStyleKitWithCustom,
-  validateStyleKitPreset,
-} from './custom-resolve.js';
+import { resolveStyleKitWithCustom, validateStyleKitPreset } from './custom-resolve.js';
 import {
   findActiveSurfaceTreatmentId,
   findActiveTypePairId,
@@ -102,7 +91,12 @@ function buildCustomKit(): StyleKitPreset {
         color: '#f5f5fa',
         border: '1px solid rgba(255,122,89,0.3)',
       },
-      brutalist: { background: '#102030', color: '#f5f5fa', border: '2px solid #ff7a59', weight: 700 },
+      brutalist: {
+        background: '#102030',
+        color: '#f5f5fa',
+        border: '2px solid #ff7a59',
+        weight: 700,
+      },
       underline: { background: 'transparent', color: '#ff7a59' },
     },
     motionDurationMs: 360,
@@ -454,8 +448,8 @@ assert(
 // time (it is verified at runtime).
 const styleKitsModule = await import('../canvas/style-kits.js');
 assert(
-  typeof (styleKitsModule as { resolveStyleKitWithCustom?: unknown })
-    .resolveStyleKitWithCustom === 'function',
+  typeof (styleKitsModule as { resolveStyleKitWithCustom?: unknown }).resolveStyleKitWithCustom ===
+    'function',
   'expected src/canvas/style-kits.ts to re-export resolveStyleKitWithCustom',
 );
 

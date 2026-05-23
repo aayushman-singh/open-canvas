@@ -25,10 +25,7 @@
 // rate-limit budget; we only count failed POSTs.
 
 import { type Context } from 'hono';
-import {
-  readUnlockCookieFromHeader,
-  verifyUnlockCookie,
-} from './cookie.js';
+import { readUnlockCookieFromHeader, verifyUnlockCookie } from './cookie.js';
 import { renderGateHtml } from './gate.js';
 
 export interface PasswordProtectedSite {
@@ -78,14 +75,10 @@ export async function requireUnlock(
   // standard error path; a silent "let traffic through" would defeat the
   // entire feature.
   if (site.passwordHash === null || site.passwordHash.length === 0) {
-    throw new Error(
-      `requireUnlock: site ${site.id} has passwordEnabled=true but no passwordHash`,
-    );
+    throw new Error(`requireUnlock: site ${site.id} has passwordEnabled=true but no passwordHash`);
   }
   if (site.passwordSetAt === null) {
-    throw new Error(
-      `requireUnlock: site ${site.id} has passwordEnabled=true but no passwordSetAt`,
-    );
+    throw new Error(`requireUnlock: site ${site.id} has passwordEnabled=true but no passwordSetAt`);
   }
   if (typeof env.UNLOCK_SIGNING_SECRET !== 'string' || env.UNLOCK_SIGNING_SECRET.length === 0) {
     throw new Error('requireUnlock: env.UNLOCK_SIGNING_SECRET is missing');
@@ -125,9 +118,8 @@ export async function requireUnlock(
     filteredSearch.append(key, value);
   }
   const filteredQs = filteredSearch.toString();
-  const redirectPath = filteredQs.length > 0
-    ? `${requestUrl.pathname}?${filteredQs}`
-    : requestUrl.pathname;
+  const redirectPath =
+    filteredQs.length > 0 ? `${requestUrl.pathname}?${filteredQs}` : requestUrl.pathname;
 
   const html = renderGateHtml({
     redirect: redirectPath,

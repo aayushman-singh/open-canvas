@@ -77,10 +77,7 @@ assert(
   meta1.includes('<meta property="og:description" content="Who we are and what we ship.">'),
   '1: og:description must reflect page.description',
 );
-assert(
-  meta1.includes('<meta property="og:type" content="website">'),
-  '1: og:type must be website',
-);
+assert(meta1.includes('<meta property="og:type" content="website">'), '1: og:type must be website');
 assert(
   meta1.includes('<meta property="og:url" content="https://studio.example.com/about">'),
   '1: og:url must reflect the computed canonical URL',
@@ -120,7 +117,10 @@ assert(
   meta2.includes('<meta name="robots" content="noindex,nofollow">'),
   '2: noIndex:true must emit robots noindex,nofollow',
 );
-assert(resolveNoIndex(page2, snapshot2) === true, '2: resolveNoIndex must agree with the emit output');
+assert(
+  resolveNoIndex(page2, snapshot2) === true,
+  '2: resolveNoIndex must agree with the emit output',
+);
 
 // A page with neither flag must NOT emit the robots tag.
 const meta1NoRobots = !meta1.includes('name="robots"');
@@ -250,9 +250,7 @@ assert(
 );
 // Attribute escaping: " ' & < > all encoded.
 assert(
-  meta5.includes(
-    '<meta property="og:title" content="Ship &quot;fast&quot; &amp; &lt;bold&gt;">',
-  ),
+  meta5.includes('<meta property="og:title" content="Ship &quot;fast&quot; &amp; &lt;bold&gt;">'),
   '5: og:title attribute must escape quotes and entities',
 );
 assert(

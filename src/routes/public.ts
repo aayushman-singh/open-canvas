@@ -25,7 +25,7 @@ import type { PublishedSnapshot } from '../canvas/schema';
 import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
-import { ownerAsset, site } from '../db/schema';
+import { ownerAsset, site, siteFont } from '../db/schema';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
@@ -42,6 +42,9 @@ import { renderCanvasHead, resolveLang } from '../seo/meta-emit';
 import { emitDualModeCss } from '../themes/visitor-mode/css-emit';
 import { getModeSetterScript } from '../themes/visitor-mode/inline-script';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
+import { prepareRender } from '../i18n/render-hook';
+import { emitFontFaceBlocks } from '../fonts/face-emit';
+import { makeFontLookup, resolveFontTokens } from '../fonts/resolve';
 // Wave 4 #17 — vanilla-JS hydration runtime for accordion + carousel elements.
 // Wrap is a no-op when no interactive elements present in the snapshot.
 import { injectInteractiveRuntime } from '../interactive/inject';
@@ -269,38 +272,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const host = requestUrl.host;
   const path = requestUrl.pathname;
 
-  // Special case: the editor lives on the app host (rev01.aayushman.dev) but
-  // still wants to join the same SiteRoom DO that visitors join on the
-  // Published Address. We allow `/__live?siteId=<id>` on the app host to
-  // proxy through to the DO scoped to that site id. Everything else on the
-  // app host falls through to the app routes as usual.
-  //
-  // The editor passes its `siteId` (a UUID-shaped string already validated
-  // by the editor route and the canvas API) — we reject anything that does
-  // not match the strict id charset to avoid letting an attacker stuff
-  // garbage through to the DO namespace.
   if (APP_HOSTS.has(host)) {
-    if (path === '/__live') {
-      const siteIdParam = requestUrl.searchParams.get('siteId');
-      if (siteIdParam === null || !/^[A-Za-z0-9-]+$/.test(siteIdParam)) {
-        // No siteId, or malformed — not our concern; let the app handle it.
-        return null;
-      }
-      const upgrade = c.req.header('upgrade');
-      if (upgrade !== 'websocket') {
-        return c.text('expected websocket upgrade', 426);
-      }
-      const id = c.env.SITE_ROOM.idFromName(siteIdParam);
-      const stub = c.env.SITE_ROOM.get(id);
-      const doRequest = new Request(
-        `https://do.invalid/socket?siteId=${encodeURIComponent(siteIdParam)}`,
-        {
-          method: 'GET',
-          headers: c.req.raw.headers,
-        },
-      );
-      return stub.fetch(doRequest);
-    }
     return null;
   }
   // Custom domain arm (Wave 1 #5): if the host isn't the app or a subdomain
@@ -368,7 +340,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     const id = c.env.SITE_ROOM.idFromName(siteRow.id);
     const stub = c.env.SITE_ROOM.get(id);
     const doRequest = new Request(
-      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}`,
+      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}&role=visitor`,
       {
         method: 'GET',
         headers: c.req.raw.headers,
@@ -439,62 +411,83 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // <script> tag when the snapshot contains accordion / carousel elements.
   // No-op (string-equality return) for snapshots without any interactives.
   const snapshot = siteRow.publishedSnapshot;
-  const resolvedKit = resolveStyleKitWithCustom(snapshot);
+  const prepared = prepareRender(path, snapshot);
+  const fallbackPrepared =
+    prepared.page === null && (path === '/' || path === '') && snapshot.pages[0]
+      ? prepareRender(`/${snapshot.pages[0].slug}`, snapshot)
+      : null;
+  const activeRender = fallbackPrepared ?? prepared;
+  if (activeRender.page === null) {
+    return c.text('page not found', 404);
+  }
+  const renderSnapshot = activeRender.renderSnapshot;
+  const currentPage = activeRender.page;
+  const pageSlug = activeRender.pageSlug;
+  const dir = activeRender.dir;
+
+  const baseKit = resolveStyleKitWithCustom(renderSnapshot);
+  const fontRows = await db(c.env)
+    .select({
+      contentHash: siteFont.contentHash,
+      name: siteFont.name,
+      family: siteFont.family,
+      weight: siteFont.weight,
+      style: siteFont.style,
+    })
+    .from(siteFont)
+    .where(eq(siteFont.siteId, siteRow.id));
+  const fontFaceCss = emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  const resolvedKit = resolveFontTokens(baseKit, makeFontLookup(fontRows));
   const customKitCss =
-    snapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
+    renderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
   const snapshotHtml = injectInteractiveRuntime(
-    renderCanvasSnapshot(snapshot, '/assets'),
-    snapshot,
+    renderCanvasSnapshot(renderSnapshot, '/assets', siteRow.id),
+    renderSnapshot,
   );
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
   // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe
   // sandbox can only load those origins. Header is set once per snapshot
   // response; the value is deterministic given the same snapshot.
-  c.header('Content-Security-Policy', buildEmbedCsp(siteRow.publishedSnapshot));
+  c.header('Content-Security-Policy', buildEmbedCsp(renderSnapshot));
   // Canonical URL is emitted by Wave 3 #21's `renderCanvasHead` (below). It
   // derives the canonical from the visitor-hit host, which is the custom
   // hostname when the visitor used one and the subdomain otherwise.
-  const visitorScript = buildVisitorLiveScript(snapshot.version);
+  const visitorScript = buildVisitorLiveScript(renderSnapshot.version);
 
-  // Wave 3 #21 — pick the page being served (root → first; otherwise first
-  // path segment matches a slug). The renderer concats every page into the
-  // body today; per-page metadata still uses the visitor-facing slug for
-  // canonical + OG context.
-  const pageSlug =
-    path === '/' || path === ''
-      ? (snapshot.pages[0]?.slug ?? '')
-      : (path.replace(/^\//, '').split('/')[0] ?? '');
-  const currentPage = snapshot.pages.find((p) => p.slug === pageSlug) ?? snapshot.pages[0] ?? null;
-  const headMeta = renderCanvasHead(snapshot, {
+  // Wave 3 #21 + Wave 5 #25 — use the locale-aware render hook so the page
+  // selected for body, head metadata, lang, and dir is one decision.
+  const headMeta = renderCanvasHead(renderSnapshot, {
     siteId: siteRow.id,
     host,
     protocol: requestUrl.protocol === 'http:' ? 'http' : 'https',
     pageSlug,
   });
-  const lang = currentPage ? resolveLang(currentPage, siteRow.publishedSnapshot) : 'en';
+  const lang = resolveLang(currentPage, renderSnapshot);
 
   // Wave 3 #20 — light/dark visitor toggle. Only emit dual-palette CSS +
   // early mode setter when the Owner has enabled dark mode for this site.
   // The flag lives at the editable level and is mirrored into snapshots by a
   // future Wave 5 patch; until then we read it off the snapshot defensively.
   const darkModeEnabled =
-    (siteRow.publishedSnapshot as { darkModeEnabled?: boolean }).darkModeEnabled === true;
+    (renderSnapshot as { darkModeEnabled?: boolean }).darkModeEnabled === true;
   let dualModeCss = '';
   let modeSetterScript = '';
   if (darkModeEnabled) {
-    dualModeCss = emitDualModeCss(resolvedKit, snapshot.styleKit);
+    dualModeCss = emitDualModeCss(resolvedKit, renderSnapshot.styleKit);
     modeSetterScript = getModeSetterScript();
   }
 
   return c.html(
     html`<!doctype html>
-      <html lang="${raw(escapeAttr(lang))}">
+      <html lang="${raw(escapeAttr(lang))}" dir="${raw(escapeAttr(dir))}">
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           ${raw(headMeta)} ${darkModeEnabled ? raw(`<script>${modeSetterScript}</script>`) : ''}
           <style>
-            ${raw(canvasPublishedStyles)}${raw(customKitCss)}${darkModeEnabled
+            ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
+              fontFaceCss ? `\n${fontFaceCss}` : '',
+            )}${darkModeEnabled
               ? `\n${dualModeCss}`
               : ''}
           </style>

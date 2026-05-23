@@ -67,7 +67,10 @@ async function runHashSuite(): Promise<void> {
   // Round-trip.
   assert(await verifyPassword(password, hash), 'verify should return true for the right password');
   assert(await verifyPassword(password, hash2), 'second hash should verify too');
-  assert(!(await verifyPassword('wrong', hash)), 'verify should return false for the wrong password');
+  assert(
+    !(await verifyPassword('wrong', hash)),
+    'verify should return false for the wrong password',
+  );
 
   // Empty password: hashing rejects.
   await assertThrowsAsync(() => hashPassword(''), 'hashing empty password should throw');
@@ -173,7 +176,10 @@ async function runCookieSuite(): Promise<void> {
 
   // Cookie header round-trip.
   const headerValue = buildUnlockCookieHeader({ siteId, value: token });
-  assert(headerValue.includes(`${unlockCookieName(siteId)}=${token}`), 'cookie header missing value');
+  assert(
+    headerValue.includes(`${unlockCookieName(siteId)}=${token}`),
+    'cookie header missing value',
+  );
   assert(headerValue.includes('HttpOnly'), 'cookie header missing HttpOnly');
   assert(headerValue.includes('SameSite=Lax'), 'cookie header missing SameSite=Lax');
   assert(headerValue.includes('Secure'), 'cookie header missing Secure by default');
@@ -283,10 +289,7 @@ async function runMiddlewareSuite(): Promise<void> {
   assert(rSearch.status === 401, 'protected visitor search gate response should be 401');
 
   // (g) Retry + ratelimited markers surface in the rendered gate.
-  const cRetry = makeContext(
-    'https://x.rev01.aayushman.dev/about?retry=1',
-    null,
-  );
+  const cRetry = makeContext('https://x.rev01.aayushman.dev/about?retry=1', null);
   const r6 = await requireUnlock(cRetry as never, env, protectedSite);
   assert(r6 !== null, 'retry path still renders gate');
   const retryBody = await r6.text();

@@ -133,11 +133,7 @@ export async function restoreSnapshot(
     throw new RestoreError(404, `snapshot ${snapshotId} does not belong to site ${siteId}`);
   }
 
-  const siteRows = await db
-    .select({ id: site.id })
-    .from(site)
-    .where(eq(site.id, siteId))
-    .limit(1);
+  const siteRows = await db.select({ id: site.id }).from(site).where(eq(site.id, siteId)).limit(1);
   if (!siteRows[0]) {
     throw new RestoreError(404, `site ${siteId} not found`);
   }
@@ -200,11 +196,7 @@ async function broadcastReplacement(
     });
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      console.error(
-        '[version/restore] SiteRoom broadcast non-ok status',
-        response.status,
-        text,
-      );
+      console.error('[version/restore] SiteRoom broadcast non-ok status', response.status, text);
       throw new RestoreError(
         502,
         `restore broadcast failed with status ${String(response.status)}: ${text}`,
