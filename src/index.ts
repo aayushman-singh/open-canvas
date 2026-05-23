@@ -163,10 +163,17 @@ app.use('/api/sites/:siteId/translate', clerkAuth(), requireAuth(), async (c, ne
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
   if (!siteRow[0]) return c.json({ error: 'site not found' }, 404);
+  // GeminiTranslator constructor throws on empty apiKey. Fail loudly here
+  // with 503 rather than letting the inner router 500 — per the no-fallback
+  // posture, translate is unusable without the secret configured.
+  const apiKey = c.env.GEMINI_API_KEY;
+  if (typeof apiKey !== 'string' || apiKey.length === 0) {
+    return c.json({ error: 'translate disabled: GEMINI_API_KEY not configured' }, 503);
+  }
   c.set('translateSiteState' as never, siteRow[0].editableState as never);
   c.set(
     'translateTranslator' as never,
-    new GeminiTranslator({ apiKey: c.env.GEMINI_API_KEY ?? '' }) as never,
+    new GeminiTranslator({ apiKey }) as never,
   );
   await next();
 });
