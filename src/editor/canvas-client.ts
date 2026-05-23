@@ -754,6 +754,210 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  // -- Wave 2 #11 chart editor extensibility slot ------------------------
+  //
+  // The editor preview renders an inline approximation of the server SVG
+  // so the Owner sees colour bands + a kind hint while typing into the
+  // data grid. The visitor-facing render is the canonical server SVG
+  // (see src/canvas/elements/chart.ts) — this preview deliberately uses
+  // the SAME palette algorithm by reading the kit accent off the editor
+  // wrapper's --rev01-kit-accent token, so the editor swatch order
+  // matches what the server emits. No client-side chart library: ~80 lines
+  // of plain DOM + a fixed-format colour-rotation.
+  // ----------------------------------------------------------------------
+
+  const CHART_KINDS = ["bar", "line", "pie", "donut", "area"];
+
+  function parseHexAccent(raw) {
+    if (typeof raw !== "string") return null;
+    const cleaned = raw.trim().replace(/^#/, "");
+    let r, g, b;
+    if (cleaned.length === 3) {
+      r = parseInt(cleaned[0] + cleaned[0], 16);
+      g = parseInt(cleaned[1] + cleaned[1], 16);
+      b = parseInt(cleaned[2] + cleaned[2], 16);
+    } else if (cleaned.length === 6) {
+      r = parseInt(cleaned.slice(0, 2), 16);
+      g = parseInt(cleaned.slice(2, 4), 16);
+      b = parseInt(cleaned.slice(4, 6), 16);
+    } else { return null; }
+    if (!isFinite(r) || !isFinite(g) || !isFinite(b)) return null;
+    return { r: r, g: g, b: b };
+  }
+
+  // Mirror src/charts/colors.ts buildPaletteFromAccent. The editor must
+  // produce the SAME 5 colours the server emits so the swatch order in the
+  // inspector matches the published SVG. If colors.ts changes, this list
+  // must change too.
+  const PREVIEW_OFFSETS = [
+    [0, 0], [36, 0], [-36, 0.10], [72, -0.10], [-72, 0.05],
+  ];
+
+  function rgbToHslPreview(r, g, b) {
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn), min = Math.min(rn, gn, bn);
+    const l = (max + min) / 2;
+    let h = 0, s = 0;
+    const d = max - min;
+    if (d !== 0) {
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      if (max === rn) h = ((gn - bn) / d) % 6;
+      else if (max === gn) h = (bn - rn) / d + 2;
+      else h = (rn - gn) / d + 4;
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    return { h: h, s: s, l: l };
+  }
+
+  function hslToHexPreview(h, s, l) {
+    const hh = (((h % 360) + 360) % 360) / 360;
+    function chan(p, q, t) {
+      let tn = t;
+      if (tn < 0) tn += 1;
+      if (tn > 1) tn -= 1;
+      if (tn < 1 / 6) return p + (q - p) * 6 * tn;
+      if (tn < 1 / 2) return q;
+      if (tn < 2 / 3) return p + (q - p) * (2 / 3 - tn) * 6;
+      return p;
+    }
+    let r, g, b;
+    if (s === 0) { r = g = b = l; }
+    else {
+      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+      const p = 2 * l - q;
+      r = chan(p, q, hh + 1 / 3);
+      g = chan(p, q, hh);
+      b = chan(p, q, hh - 1 / 3);
+    }
+    function toHex(v) { return Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, "0"); }
+    return "#" + toHex(r) + toHex(g) + toHex(b);
+  }
+
+  function clampPreview(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  function previewPaletteFromAccent(accentHex) {
+    const rgb = parseHexAccent(accentHex);
+    if (!rgb) return ["#888", "#888", "#888", "#888", "#888"];
+    const base = rgbToHslPreview(rgb.r, rgb.g, rgb.b);
+    const s = clampPreview(base.s, 0.45, 0.85);
+    const out = [];
+    for (let i = 0; i < PREVIEW_OFFSETS.length; i++) {
+      const offset = PREVIEW_OFFSETS[i];
+      const h = base.h + offset[0];
+      const l = clampPreview(base.l + offset[1], 0.25, 0.75);
+      out.push(hslToHexPreview(h, s, l));
+    }
+    return out;
+  }
+
+  function currentChartPalette() {
+    if (!mainEl) return ["#888", "#888", "#888", "#888", "#888"];
+    const cs = window.getComputedStyle(mainEl);
+    const accent = (cs.getPropertyValue("--rev01-kit-accent") || "").trim();
+    return previewPaletteFromAccent(accent || "#888888");
+  }
+
+  function buildChartBody(element) {
+    const node = document.createElement("div");
+    node.className = "rev01-chart-preview";
+    node.style.width = "100%";
+    node.style.height = "100%";
+    node.style.position = "relative";
+    node.style.overflow = "hidden";
+    node.style.borderRadius = "4px";
+    node.style.background = "rgba(0, 0, 0, 0.04)";
+    const palette = currentChartPalette();
+    const series = Array.isArray(element.series) ? element.series : [];
+    const categories = Array.isArray(element.categories) ? element.categories : [];
+    if (series.length === 0 || categories.length === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "Chart (" + (element.kind || "bar") + ") — add data";
+      empty.style.position = "absolute";
+      empty.style.inset = "0";
+      empty.style.display = "flex";
+      empty.style.alignItems = "center";
+      empty.style.justifyContent = "center";
+      empty.style.fontSize = "12px";
+      empty.style.opacity = "0.7";
+      node.appendChild(empty);
+      return node;
+    }
+    if (element.kind === "pie" || element.kind === "donut") {
+      const values = (series[0] && Array.isArray(series[0].values)) ? series[0].values.slice(0, categories.length) : [];
+      let total = 0;
+      for (let i = 0; i < values.length; i++) {
+        const v = values[i];
+        if (typeof v === "number" && isFinite(v) && v > 0) total += v;
+      }
+      if (total <= 0) {
+        node.textContent = "Pie has no data";
+        node.style.display = "flex";
+        node.style.alignItems = "center";
+        node.style.justifyContent = "center";
+        node.style.fontSize = "12px";
+        return node;
+      }
+      // CSS conic-gradient gives us a tooltip-free pie preview with zero math.
+      const stops = [];
+      let cursor = 0;
+      for (let i = 0; i < values.length; i++) {
+        const v = typeof values[i] === "number" && isFinite(values[i]) && values[i] > 0 ? values[i] : 0;
+        const start = cursor;
+        const end = cursor + (v / total) * 100;
+        const color = palette[i % palette.length];
+        stops.push(color + " " + start.toFixed(2) + "% " + end.toFixed(2) + "%");
+        cursor = end;
+      }
+      const disc = document.createElement("div");
+      disc.style.position = "absolute";
+      disc.style.inset = "8px";
+      disc.style.borderRadius = "50%";
+      disc.style.background = "conic-gradient(" + stops.join(", ") + ")";
+      if (element.kind === "donut") {
+        disc.style.maskImage = "radial-gradient(circle, transparent 28%, black 29%)";
+        disc.style.webkitMaskImage = "radial-gradient(circle, transparent 28%, black 29%)";
+      }
+      node.appendChild(disc);
+      return node;
+    }
+    // bar / line / area share a stacked band preview. Compute per-series
+    // max so legends line up; render N rows where each row is the per-
+    // category values as proportional cells.
+    const rowHost = document.createElement("div");
+    rowHost.style.position = "absolute";
+    rowHost.style.inset = "8px";
+    rowHost.style.display = "flex";
+    rowHost.style.flexDirection = "column";
+    rowHost.style.gap = "4px";
+    for (let si = 0; si < series.length; si++) {
+      const row = document.createElement("div");
+      row.style.flex = "1";
+      row.style.display = "flex";
+      row.style.gap = "2px";
+      const values = Array.isArray(series[si].values) ? series[si].values : [];
+      let maxVal = 0;
+      for (let i = 0; i < values.length; i++) {
+        const v = values[i];
+        if (typeof v === "number" && isFinite(v) && v > maxVal) maxVal = v;
+      }
+      const color = palette[si % palette.length];
+      for (let ci = 0; ci < categories.length; ci++) {
+        const cell = document.createElement("div");
+        cell.style.flex = "1";
+        cell.style.background = color;
+        const v = values[ci];
+        const ratio = (typeof v === "number" && isFinite(v) && maxVal > 0) ? Math.max(0.05, v / maxVal) : 0.05;
+        cell.style.opacity = String(ratio);
+        cell.title = (series[si].label || "Series " + (si + 1)) + " / " + (categories[ci] || ("Cat " + (ci + 1))) + ": " + (typeof v === "number" ? v : "—");
+        row.appendChild(cell);
+      }
+      rowHost.appendChild(row);
+    }
+    node.appendChild(rowHost);
+    return node;
+  }
+
   function buildElementBody(element) {
     switch (element.type) {
       case "text": return buildTextBody(element);
@@ -761,6 +965,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       case "action": return buildActionBody(element);
       case "shape": return buildShapeBody(element);
       case "container": return buildContainerBody(element);
+      case "chart": return buildChartBody(element);
     }
     const fallback = document.createElement("div");
     return fallback;
@@ -830,6 +1035,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       { label: "+Btn", action: "add-action" },
       { label: "+\u25c7", action: "add-shape" },
       { label: "+\u25a1", action: "add-container" },
+      // Wave 2 #11 \u2014 chart element. Additive entry; existing buttons unchanged.
+      { label: "+\ud83d\udcca", action: "add-chart" },
       { label: "Dup", action: "duplicate-section" },
       { label: "\u2191", action: "move-up" },
       { label: "\u2193", action: "move-down" },
@@ -1057,6 +1264,241 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return group;
   }
 
+  // -- Wave 2 #11 chart editor data grid ---------------------------------
+  //
+  // Renders directly into the inspector. Re-renders the whole chart block
+  // on every structural change (add/remove series or category) so we don't
+  // have to manage incremental DOM updates for a small spreadsheet grid.
+  // Cell edits update element.series[].values in place and call
+  // rebuildElement(id) + scheduleSave() — same shape every other inspector
+  // input uses.
+  function buildChartInspector(element) {
+    const wrap = document.createElement("div");
+    wrap.className = "rev01-chart-inspector";
+    inspector.appendChild(wrap);
+
+    // Kind picker.
+    const kind = selectInput(CHART_KINDS, element.kind);
+    kind.addEventListener("change", () => {
+      element.kind = kind.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    wrap.appendChild(field("Chart kind", kind));
+
+    // Axis titles (bar / line / area only — pie/donut ignore these on the
+    // server. We still let the Owner type them so switching kinds doesn't
+    // lose data.)
+    const xTitle = document.createElement("input");
+    xTitle.type = "text";
+    xTitle.value = typeof element.xAxisTitle === "string" ? element.xAxisTitle : "";
+    xTitle.placeholder = "X-axis title (optional)";
+    xTitle.addEventListener("change", () => {
+      if (xTitle.value.length === 0) { delete element.xAxisTitle; }
+      else { element.xAxisTitle = xTitle.value; }
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    wrap.appendChild(field("X-axis title", xTitle));
+
+    const yTitle = document.createElement("input");
+    yTitle.type = "text";
+    yTitle.value = typeof element.yAxisTitle === "string" ? element.yAxisTitle : "";
+    yTitle.placeholder = "Y-axis title (optional)";
+    yTitle.addEventListener("change", () => {
+      if (yTitle.value.length === 0) { delete element.yAxisTitle; }
+      else { element.yAxisTitle = yTitle.value; }
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    wrap.appendChild(field("Y-axis title", yTitle));
+
+    // Legend toggle.
+    const legendRow = document.createElement("div");
+    legendRow.className = "row";
+    const legendBox = document.createElement("input");
+    legendBox.type = "checkbox";
+    legendBox.checked = element.showLegend !== false;
+    legendBox.addEventListener("change", () => {
+      element.showLegend = legendBox.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    const legendLabel = document.createElement("label");
+    legendLabel.textContent = "show legend";
+    legendRow.appendChild(legendBox);
+    legendRow.appendChild(legendLabel);
+    wrap.appendChild(legendRow);
+
+    // Data grid host. Stored on 'wrap' so the controls below can target it
+    // when the grid needs a structural rebuild (add/remove series/cat).
+    const gridHost = document.createElement("div");
+    gridHost.className = "rev01-chart-grid-host";
+    gridHost.style.marginTop = "8px";
+    wrap.appendChild(gridHost);
+
+    function renderGrid() {
+      gridHost.replaceChildren();
+      const series = Array.isArray(element.series) ? element.series : (element.series = []);
+      const cats = Array.isArray(element.categories) ? element.categories : (element.categories = []);
+      // Header row: blank + each category name.
+      const table = document.createElement("table");
+      table.className = "rev01-chart-grid";
+      table.style.borderCollapse = "collapse";
+      table.style.width = "100%";
+      table.style.fontSize = "11px";
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      const corner = document.createElement("th");
+      corner.style.textAlign = "left";
+      corner.style.padding = "4px";
+      corner.textContent = "Series \\ Category";
+      headRow.appendChild(corner);
+      for (let ci = 0; ci < cats.length; ci++) {
+        const th = document.createElement("th");
+        th.style.padding = "2px";
+        const catInput = document.createElement("input");
+        catInput.type = "text";
+        catInput.value = String(cats[ci]);
+        catInput.style.width = "100%";
+        catInput.style.minWidth = "60px";
+        catInput.style.boxSizing = "border-box";
+        catInput.addEventListener("change", () => {
+          cats[ci] = catInput.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        th.appendChild(catInput);
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "x";
+        removeBtn.title = "Remove this category";
+        removeBtn.style.marginLeft = "2px";
+        removeBtn.addEventListener("click", () => {
+          cats.splice(ci, 1);
+          for (let si = 0; si < series.length; si++) {
+            if (Array.isArray(series[si].values)) series[si].values.splice(ci, 1);
+          }
+          renderGrid();
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        th.appendChild(removeBtn);
+        headRow.appendChild(th);
+      }
+      // Trailing + column header for adding a category.
+      const addCatTh = document.createElement("th");
+      const addCatBtn = document.createElement("button");
+      addCatBtn.type = "button";
+      addCatBtn.textContent = "+ cat";
+      addCatBtn.addEventListener("click", () => {
+        cats.push("Cat " + (cats.length + 1));
+        for (let si = 0; si < series.length; si++) {
+          if (Array.isArray(series[si].values)) series[si].values.push(0);
+        }
+        renderGrid();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      addCatTh.appendChild(addCatBtn);
+      headRow.appendChild(addCatTh);
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      for (let si = 0; si < series.length; si++) {
+        const row = document.createElement("tr");
+        const labelTd = document.createElement("td");
+        labelTd.style.padding = "2px";
+        const labelInput = document.createElement("input");
+        labelInput.type = "text";
+        labelInput.value = String(series[si].label);
+        labelInput.style.width = "100%";
+        labelInput.style.minWidth = "80px";
+        labelInput.style.boxSizing = "border-box";
+        labelInput.addEventListener("change", () => {
+          series[si].label = labelInput.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        labelTd.appendChild(labelInput);
+        row.appendChild(labelTd);
+        if (!Array.isArray(series[si].values)) series[si].values = [];
+        // Pad / trim values to category count so the grid is rectangular.
+        while (series[si].values.length < cats.length) series[si].values.push(0);
+        if (series[si].values.length > cats.length) series[si].values.length = cats.length;
+        for (let ci = 0; ci < cats.length; ci++) {
+          const td = document.createElement("td");
+          td.style.padding = "2px";
+          const num = document.createElement("input");
+          num.type = "number";
+          num.step = "any";
+          num.style.width = "100%";
+          num.style.minWidth = "60px";
+          num.style.boxSizing = "border-box";
+          num.value = String(series[si].values[ci]);
+          num.addEventListener("change", () => {
+            const n = Number(num.value);
+            if (Number.isFinite(n)) {
+              series[si].values[ci] = n;
+              rebuildElement(element.id);
+              scheduleSave();
+            } else {
+              num.value = String(series[si].values[ci]);
+            }
+          });
+          td.appendChild(num);
+          row.appendChild(td);
+        }
+        // Trailing cell — remove-series button.
+        const removeTd = document.createElement("td");
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "x";
+        removeBtn.title = "Remove this series";
+        removeBtn.addEventListener("click", () => {
+          series.splice(si, 1);
+          renderGrid();
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        removeTd.appendChild(removeBtn);
+        row.appendChild(removeTd);
+        tbody.appendChild(row);
+      }
+      // Add-series row.
+      const addRow = document.createElement("tr");
+      const addCell = document.createElement("td");
+      addCell.colSpan = cats.length + 2;
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.textContent = "+ series";
+      addBtn.addEventListener("click", () => {
+        const newValues = [];
+        for (let i = 0; i < cats.length; i++) newValues.push(0);
+        series.push({ label: "Series " + (series.length + 1), values: newValues });
+        renderGrid();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      addCell.appendChild(addBtn);
+      addRow.appendChild(addCell);
+      tbody.appendChild(addRow);
+      table.appendChild(tbody);
+      gridHost.appendChild(table);
+
+      if (series.length === 0 && cats.length === 0) {
+        const hint = document.createElement("div");
+        hint.style.fontSize = "11px";
+        hint.style.opacity = "0.7";
+        hint.style.marginTop = "4px";
+        hint.textContent = "Add a category and a series to start.";
+        gridHost.appendChild(hint);
+      }
+    }
+    renderGrid();
+  }
+
   function renderInspector() {
     if (!inspector) return;
     if (!selectedElementId) {
@@ -1227,6 +1669,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       inspector.appendChild(field("Fit", fit));
 
+      // chart inspector block follows below (additive Wave 2 #11 slot).
       if (element.mediaKind === "video") {
         const playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
         const autoplay = document.createElement("input");
@@ -1282,6 +1725,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         const cl = document.createElement("label"); cl.textContent = "controls"; row4.appendChild(cl);
         inspector.appendChild(row4);
       }
+    }
+
+    // -- Wave 2 #11 chart inspector ----------------------------------------
+    //
+    // Kind picker, axis title fields, legend toggle, and a spreadsheet-like
+    // data grid (series rows x category columns) with add/remove controls
+    // for both. Every keystroke calls scheduleSave() and rebuildElement()
+    // so the preview thumbnail updates inline. The grid is rendered fresh
+    // on every change via a local renderChartGrid() helper so we don't
+    // have to manage incremental DOM diffs for a 6x6 grid.
+    if (element.type === "chart") {
+      buildChartInspector(element);
     }
 
     // Motion controls.
@@ -2592,6 +3047,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (component === "action") return "add-action";
     if (component === "shape") return "add-shape";
     if (component === "container") return "add-container";
+    // Wave 2 #11 — sidebar entry for chart elements.
+    if (component === "chart") return "add-chart";
     return null;
   }
 
@@ -2669,6 +3126,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         id: newElementId(),
         type: "container",
         variant: "flat",
+        box: defaultBox(section, 480, 320),
+      });
+    } else if (action === "add-chart") {
+      // Wave 2 #11 — additive chart element creation. Default to a small
+      // bar chart with two series across three categories so the Owner has
+      // something to edit in the data grid the moment they click +Chart.
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "chart",
+        kind: "bar",
+        series: [
+          { label: "Series A", values: [3, 5, 2] },
+          { label: "Series B", values: [4, 1, 6] },
+        ],
+        categories: ["Jan", "Feb", "Mar"],
+        showLegend: true,
         box: defaultBox(section, 480, 320),
       });
     } else if (action === "duplicate-section") {
