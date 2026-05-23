@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
-import { clerkAuth } from '../../auth/middleware';
+import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/middleware';
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
@@ -10,6 +10,9 @@ import { DashboardShell } from './shell';
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_TEST_PUBLISHABLE_KEY?: string;
+  CLERK_TEST_SECRET_KEY?: string;
+  DEV_PUBLIC_HOST?: string;
   DATABASE_URL: string;
 };
 
@@ -75,10 +78,8 @@ dashboard.get('/', async (c) => {
     }
   }
 
-  const signOutUrl = buildSignOutUrl(
-    c.env.CLERK_PUBLISHABLE_KEY,
-    new URL('/', c.req.url).toString(),
-  );
+  const { publishableKey } = resolveClerkKeys(c.env);
+  const signOutUrl = buildSignOutUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url, '/'));
 
   return c.html(
     <DashboardShell

@@ -16,8 +16,8 @@ type ClerkBindings = {
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   // Optional override for the dev origin used to rebuild request URLs when
-  // wrangler dev's routes-based URL synthesis is in effect. Defaults to
-  // http://127.0.0.1:8787 when not set.
+  // wrangler dev's routes-based URL synthesis is in effect. When omitted,
+  // local development uses http://127.0.0.1:8787.
   DEV_PUBLIC_HOST?: string;
 };
 
@@ -26,6 +26,15 @@ export type ClerkAuthVariables = {
   user: User | null;
   clerk: ReturnType<typeof createClerkClient>;
 };
+
+type ClerkKeyPair = {
+  publishableKey: string;
+  secretKey: string;
+};
+
+function isNonEmptyString(value: string | undefined): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
 
 const AUTHORIZED_PARTIES = [
   'http://localhost:8787',
@@ -44,15 +53,92 @@ const AUTHORIZED_PARTIES = [
 // CLERK_TEST_* secrets are populated in the local .env only and are NEVER
 // added to the prod worker secret set, so their presence reliably signals
 // "this is a dev environment".
-export function resolveClerkKeys(
-  env: ClerkBindings,
-): { publishableKey: string; secretKey: string } {
+export function resolveClerkKeys(env: ClerkBindings): ClerkKeyPair {
   const testPub = env.CLERK_TEST_PUBLISHABLE_KEY;
   const testSec = env.CLERK_TEST_SECRET_KEY;
-  if (typeof testPub === 'string' && testPub.length > 0 && typeof testSec === 'string' && testSec.length > 0) {
+  const hasTestPub = isNonEmptyString(testPub);
+  const hasTestSec = isNonEmptyString(testSec);
+
+  if (testPub === '' || testSec === '') {
+    throw new Error(
+      'CLERK_TEST_PUBLISHABLE_KEY and CLERK_TEST_SECRET_KEY must be non-empty when set',
+    );
+  }
+
+  if (hasTestPub !== hasTestSec) {
+    throw new Error(
+      'CLERK_TEST_PUBLISHABLE_KEY and CLERK_TEST_SECRET_KEY must be configured together',
+    );
+  }
+
+  if (hasTestPub && hasTestSec) {
     return { publishableKey: testPub, secretKey: testSec };
   }
+
+  if (!isNonEmptyString(env.CLERK_PUBLISHABLE_KEY) || !isNonEmptyString(env.CLERK_SECRET_KEY)) {
+    throw new Error('CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY are required');
+  }
+
   return { publishableKey: env.CLERK_PUBLISHABLE_KEY, secretKey: env.CLERK_SECRET_KEY };
+}
+
+function usesTestClerkKeys(env: ClerkBindings, keys: ClerkKeyPair): boolean {
+  return (
+    keys.publishableKey === env.CLERK_TEST_PUBLISHABLE_KEY &&
+    keys.secretKey === env.CLERK_TEST_SECRET_KEY
+  );
+}
+
+function resolveDevPublicOrigin(env: ClerkBindings): string {
+  if (env.DEV_PUBLIC_HOST === '') {
+    throw new Error('DEV_PUBLIC_HOST must be a non-empty origin when set');
+  }
+
+  const origin = env.DEV_PUBLIC_HOST ?? 'http://127.0.0.1:8787';
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch (error) {
+    throw new Error(`DEV_PUBLIC_HOST must be a valid origin: ${origin}`, { cause: error });
+  }
+
+  if (url.pathname !== '/' || url.search || url.hash) {
+    throw new Error(`DEV_PUBLIC_HOST must be an origin without path, query, or hash: ${origin}`);
+  }
+
+  return url.origin;
+}
+
+function resolveRedirectPath(source: URL, overridePath: string | undefined): string {
+  if (overridePath === undefined) {
+    return `${source.pathname}${source.search}`;
+  }
+
+  if (!overridePath.startsWith('/')) {
+    throw new Error(`auth redirect override path must be root-relative: ${overridePath}`);
+  }
+
+  return overridePath;
+}
+
+export function resolveAuthRedirectUrl(
+  env: ClerkBindings,
+  requestUrl: string,
+  overridePath?: string,
+): string {
+  const source = new URL(requestUrl);
+  const keys = resolveClerkKeys(env);
+  const path = resolveRedirectPath(source, overridePath);
+
+  if (usesTestClerkKeys(env, keys)) {
+    return new URL(path, resolveDevPublicOrigin(env)).toString();
+  }
+
+  if (overridePath !== undefined) {
+    return new URL(overridePath, source).toString();
+  }
+
+  return source.toString();
 }
 
 export function clerkAuth() {
@@ -78,10 +164,11 @@ export function clerkAuth() {
     // localhost origin so Clerk validates against what the browser actually
     // saw. The `DEV_PUBLIC_HOST` env var lets the operator override the
     // origin if the local dev port/host differs from the default.
-    const usingTestKeys = keys.publishableKey === c.env.CLERK_TEST_PUBLISHABLE_KEY;
+    const usingTestKeys = usesTestClerkKeys(c.env, keys);
     let requestForClerk: Request = c.req.raw;
     if (usingTestKeys) {
-      const localOrigin = c.env.DEV_PUBLIC_HOST ?? 'http://127.0.0.1:8787';
+      const localOrigin = resolveDevPublicOrigin(c.env);
+      const localOriginUrl = new URL(localOrigin);
       const original = new URL(c.req.url);
       const rebuilt = new URL(original.pathname + original.search, localOrigin);
       // Rebuild with the local origin AND override Origin/Referer headers so
@@ -91,15 +178,20 @@ export function clerkAuth() {
       // `refresh_request_origin_azp_mismatch` once the short-lived dev JWT
       // expires (~60s).
       const headers = new Headers(c.req.raw.headers);
-      headers.set('host', new URL(localOrigin).host);
+      headers.set('host', localOriginUrl.host);
       headers.set('origin', localOrigin);
       const existingReferer = headers.get('referer');
       if (existingReferer) {
         try {
-          const refererPath = new URL(existingReferer).pathname;
-          headers.set('referer', new URL(refererPath, localOrigin).toString());
-        } catch {
-          headers.delete('referer');
+          const refererUrl = new URL(existingReferer);
+          headers.set(
+            'referer',
+            new URL(`${refererUrl.pathname}${refererUrl.search}`, localOrigin).toString(),
+          );
+        } catch (error) {
+          throw new Error(`failed to rewrite Clerk referer header: ${existingReferer}`, {
+            cause: error,
+          });
         }
       }
       requestForClerk = new Request(rebuilt.toString(), {
