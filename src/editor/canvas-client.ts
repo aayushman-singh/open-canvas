@@ -1260,12 +1260,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       { label: "Save", action: "save-to-library" },
       { label: "Del", action: "delete-section", danger: true },
     ];
-    if (!onlyInstance) {
-      buttons.push({ label: "Sym", action: "convert-to-symbol" });
-    }
-    if (hasInstance) {
-      buttons.push({ label: "Det", action: "detach-instance" });
-    }
+    void onlyInstance;
+    void hasInstance;
     for (const def of buttons) {
       const button = document.createElement("button");
       button.type = "button";
@@ -3251,25 +3247,40 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function wrapSelectionWith(tagName) {
-    const sel = window.getSelection();
+    var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
+    var range = sel.getRangeAt(0);
     if (range.collapsed) return;
-    const el = document.createElement(tagName);
+    var upper = tagName.toUpperCase();
+    var existing = findAncestor(range.commonAncestorContainer, upper);
+    if (existing) {
+      var parent = existing.parentNode;
+      if (!parent) return;
+      while (existing.firstChild) parent.insertBefore(existing.firstChild, existing);
+      parent.removeChild(existing);
+      return;
+    }
+    var el = document.createElement(tagName);
     try {
       range.surroundContents(el);
     } catch (_) {
-      // surroundContents throws if the Range crosses an element boundary.
-      // Fall back to insertHTML with a stringified fragment so the Owner
-      // doesn't lose the action.
-      const fragment = range.extractContents();
+      var fragment = range.extractContents();
       el.appendChild(fragment);
       range.insertNode(el);
     }
     sel.removeAllRanges();
-    const next = document.createRange();
+    var next = document.createRange();
     next.selectNode(el);
     sel.addRange(next);
+  }
+
+  function findAncestor(node, tagName) {
+    var cur = node;
+    while (cur && cur.nodeType !== 9) {
+      if (cur.nodeType === 1 && cur.tagName === tagName) return cur;
+      cur = cur.parentNode;
+    }
+    return null;
   }
 
   async function promptForLinkHref(current) {
@@ -5075,6 +5086,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // actions, and the "Add symbol instance" sidebar command.
 
   function ensureSymbolsTabMounted() {
+    return null;
     if (!sidebar) return null;
     const tabsRow = sidebar.querySelector(".rev01-sidebar-tabs");
     if (!tabsRow) return null;
