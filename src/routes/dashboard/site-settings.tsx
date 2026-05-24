@@ -25,6 +25,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell } from './shell';
+import { Button, Badge, Card } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -41,65 +42,6 @@ siteSettingsRoute.use('*', requireAuth());
 
 const pageStyles = `
   .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
-  .card {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--panel);
-    padding: 22px;
-    margin-bottom: 18px;
-  }
-  .card h2 {
-    margin: 0 0 8px;
-    font-size: 18px;
-    letter-spacing: 0;
-  }
-  .card .sub {
-    margin: 0 0 18px;
-    color: var(--muted);
-    max-width: 760px;
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 3px 10px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .badge.success {
-    background: rgba(74, 222, 128, 0.1);
-    border-color: rgba(74, 222, 128, 0.35);
-    color: #86efac;
-  }
-  .badge.neutral {
-    background: rgba(148, 163, 184, 0.12);
-    border-color: rgba(148, 163, 184, 0.28);
-    color: #cbd5e1;
-  }
-  .button {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 10px 14px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .button.primary {
-    border-color: #7dd3fc;
-    background: #7dd3fc;
-    color: #082f49;
-  }
-  .button.danger {
-    margin-top: 10px;
-    border-color: rgba(248, 113, 113, 0.35);
-    background: rgba(248, 113, 113, 0.1);
-    color: #fca5a5;
-  }
-  .button:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-  }
   .status-row {
     display: flex;
     align-items: center;
@@ -458,7 +400,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         <code>{owned.subdomain}.rev01.aayushman.dev</code>.
       </p>
 
-      <section class="card">
+      <Card>
         <h2>Password protection</h2>
         <p class="sub">
           When enabled, visitors must enter a password before they see any page of this site. The
@@ -466,9 +408,9 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           previously unlocked the site — they'll have to re-enter the new password.
         </p>
         <div class="status-row">
-          <span class={`badge ${enabled ? 'success' : 'neutral'}`}>
+          <Badge variant={enabled ? 'success' : 'neutral'}>
             {enabled ? 'Enabled' : 'Disabled'}
-          </span>
+          </Badge>
           <span class="meta">{setAtLine}</span>
         </div>
         <form class="pw" autocomplete="off">
@@ -484,20 +426,20 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               required
             />
           </label>
-          <button class="button primary" type="submit">
+          <Button variant="primary" type="submit">
             {enabled ? 'Update' : 'Enable'}
-          </button>
+          </Button>
         </form>
         <p class="err" role="alert" aria-live="polite"></p>
         <p class="ok" role="status" aria-live="polite"></p>
         {enabled ? (
-          <button class="button danger" type="button" data-action="disable">
+          <Button variant="danger" data-action="disable">
             Disable password protection
-          </button>
+          </Button>
         ) : null}
-      </section>
+      </Card>
 
-      <section class="card">
+      <Card>
         <h2>Collaborators</h2>
         <p class="sub">
           Add people by email to let them edit this site. They must have a rev01 account. An
@@ -515,9 +457,9 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               <option value="viewer">Viewer</option>
             </select>
           </label>
-          <button class="button primary" type="submit">
+          <Button variant="primary" type="submit">
             Invite
-          </button>
+          </Button>
         </form>
         <p class="err" data-collab-err role="alert" aria-live="polite"></p>
         <p class="ok" data-collab-ok role="status" aria-live="polite"></p>
@@ -535,7 +477,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             </li>
           ))}
         </ul>
-      </section>
+      </Card>
 
       <script type="module">{raw(clientScript(siteId))}</script>
     </DashboardShell>,

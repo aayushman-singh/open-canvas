@@ -34,6 +34,7 @@ import type { CanvasPage, CanvasSiteState } from '../../canvas/schema';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { DashboardShell } from './shell';
+import { Button, Card } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -50,24 +51,6 @@ pageSettingsRoute.use('*', requireAuth());
 
 const pageStyles = `
   .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
-  .card {
-    padding: 20px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
-    margin-bottom: 18px;
-  }
-  .card h2 {
-    margin: 0 0 6px;
-    font-size: 18px;
-    letter-spacing: -0.005em;
-  }
-  .card .sub {
-    margin: 0 0 16px;
-    color: var(--muted);
-    font-size: 13.5px;
-    line-height: 1.55;
-  }
   form.seo {
     display: grid;
     gap: 14px;
@@ -119,16 +102,6 @@ const pageStyles = `
     align-items: center;
     margin-top: 6px;
   }
-  form.seo button {
-    border: 0;
-    border-radius: 6px;
-    background: var(--accent);
-    color: #05111a;
-    padding: 11px 16px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  form.seo button[disabled] { opacity: 0.5; cursor: not-allowed; }
   .err {
     margin-top: 4px;
     color: #fca5a5;
@@ -318,7 +291,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
       </p>
 
       {siteNoIndex ? (
-        <section class="card" style="border-color: rgba(251, 191, 36, 0.5);">
+        <Card style="border-color: rgba(251, 191, 36, 0.5);">
           <h2>Site is set to noindex</h2>
           <p class="sub">
             The site-level <code>siteNoIndex</code> switch is on, so every page
@@ -326,10 +299,10 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
             per-page setting below. Turn it off in site settings to expose
             pages individually.
           </p>
-        </section>
+        </Card>
       ) : null}
 
-      <section class="card">
+      <Card>
         <h2>Page meta</h2>
         <p class="sub">
           The page title doubles as the browser tab title and the social-card
@@ -392,12 +365,12 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
             </label>
           </div>
           <div class="save-row">
-            <button type="submit">Save</button>
+            <Button variant="primary" type="submit">Save</Button>
           </div>
           <p class="err" role="alert" aria-live="polite"></p>
           <p class="ok" role="status" aria-live="polite"></p>
         </form>
-      </section>
+      </Card>
 
       <script type="module">{raw(clientScript(siteId, pageId))}</script>
     </DashboardShell>,

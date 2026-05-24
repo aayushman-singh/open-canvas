@@ -29,6 +29,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customDomain, customer, site, type CustomDomain } from '../../db/schema';
 import { DashboardShell } from './shell';
+import { Button, Badge } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -70,15 +71,6 @@ const pageStyles = `
     padding: 10px 12px;
     font-size: 15px;
   }
-  form.add-domain button {
-    border: 0;
-    border-radius: 6px;
-    background: var(--accent);
-    color: #05111a;
-    padding: 11px 16px;
-    font-weight: 700;
-    cursor: pointer;
-  }
   form.add-domain button[disabled] { opacity: 0.5; cursor: not-allowed; }
   .domains-empty {
     padding: 24px;
@@ -106,29 +98,6 @@ const pageStyles = `
     color: var(--text);
   }
   .domain-actions { margin-left: auto; }
-  .domain-actions button {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--muted);
-    padding: 8px 12px;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .domain-actions button:hover { color: var(--text); border-color: var(--text); }
-  .badge {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 4px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-  }
-  .badge.pending { background: rgba(125, 211, 252, 0.1); border-color: rgba(125, 211, 252, 0.4); color: #7dd3fc; }
-  .badge.verifying { background: rgba(250, 204, 21, 0.1); border-color: rgba(250, 204, 21, 0.4); color: #fde047; }
-  .badge.active { background: rgba(74, 222, 128, 0.1); border-color: rgba(74, 222, 128, 0.4); color: #86efac; }
-  .badge.failed { background: rgba(248, 113, 113, 0.1); border-color: rgba(248, 113, 113, 0.4); color: #fca5a5; }
   .dns {
     margin: 4px 0 0;
     padding: 12px;
@@ -279,11 +248,9 @@ function DomainCard({ domain }: { domain: CustomDomain }) {
     <article class="domain" data-domain-id={domain.id} data-hostname={domain.hostname}>
       <div class="domain-head">
         <span class="domain-host">{domain.hostname}</span>
-        <span class={`badge ${domain.status}`}>{domain.status}</span>
+        <Badge variant={domain.status === 'active' ? 'success' : domain.status === 'failed' ? 'danger' : domain.status === 'verifying' ? 'warning' : 'info'}>{domain.status}</Badge>
         <span class="domain-actions">
-          <button type="button" data-action="delete">
-            Remove
-          </button>
+          <Button variant="secondary" data-action="delete" size="sm">Remove</Button>
         </span>
       </div>
       {instructions.map((ins) => (
@@ -435,7 +402,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
           <span>Hostname</span>
           <input type="text" name="hostname" placeholder="www.example.com" autocomplete="off" required />
         </label>
-        <button type="submit">Add domain</button>
+        <Button variant="primary" type="submit">Add domain</Button>
       </form>
       <p class="form-error" role="status" aria-live="polite"></p>
       {domains.length === 0 ? (

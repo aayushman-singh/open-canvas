@@ -1,5 +1,6 @@
 import { raw } from 'hono/html';
 import type { Child } from 'hono/jsx';
+import { uiStyles } from '../../ui';
 
 const shellStyles = `
   :root {
@@ -114,7 +115,7 @@ const NAV_ITEMS = [
 ];
 
 export function DashboardShell({ title, crumbs, activePath, pageStyles, children }: Props) {
-  const css = pageStyles ? `${shellStyles}\n${pageStyles}` : shellStyles;
+  const css = pageStyles ? `${uiStyles}\n${shellStyles}\n${pageStyles}` : `${uiStyles}\n${shellStyles}`;
   const showCrumbs = crumbs.length > 1;
   return (
     <html lang="en">

@@ -24,6 +24,7 @@ import { customer, site } from '../../db/schema.js';
 
 import { listSnapshots, type SnapshotListItem } from '../../version/list.js';
 import { DashboardShell } from './shell.js';
+import { Button, Badge } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -86,33 +87,9 @@ const panelStyles = `
     color: var(--text);
     margin-bottom: 8px;
   }
-  .timeline-entry .badge {
-    display: inline-block;
-    font-size: 11px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--bg);
-    background: var(--accent);
-    border-radius: 4px;
-    padding: 2px 6px;
-    margin-left: 6px;
-  }
   .timeline-entry .actions {
     display: flex;
     gap: 6px;
-  }
-  .timeline-entry button {
-    background: transparent;
-    color: var(--text);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 12px;
-    padding: 4px 10px;
-    cursor: pointer;
-  }
-  .timeline-entry button.danger {
-    color: #fca5a5;
-    border-color: rgba(252, 165, 165, 0.4);
   }
   .timeline-form {
     margin-top: 16px;
@@ -127,16 +104,6 @@ const panelStyles = `
     border-radius: 6px;
     font-size: 13px;
     padding: 6px 10px;
-  }
-  .timeline-form button {
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 6px 14px;
-    cursor: pointer;
   }
   .timeline-preview {
     background: var(--panel);
@@ -351,15 +318,15 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
                   <div class="when">{relativeWhen(entry.capturedAt)}</div>
                   <div class="what">
                     {entryLabel(entry)}
-                    {entry.reason === 'publish' && <span class="badge">publish</span>}
+                    {entry.reason === 'publish' && <Badge variant="info">publish</Badge>}
                   </div>
                   <div class="actions">
-                    <button type="button" data-timeline-action="preview">
+                    <Button variant="secondary" size="sm" data-timeline-action="preview">
                       Preview
-                    </button>
-                    <button type="button" class="danger" data-timeline-action="restore">
+                    </Button>
+                    <Button variant="danger" size="sm" data-timeline-action="restore">
                       Restore
-                    </button>
+                    </Button>
                   </div>
                 </li>
               ))}
@@ -373,7 +340,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
               maxlength={200}
               required
             />
-            <button type="submit">Save</button>
+            <Button variant="primary" type="submit" size="sm">Save</Button>
           </form>
         </section>
         <section class="timeline-preview" data-timeline-preview>

@@ -13,6 +13,7 @@ import { customer, customTemplate } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
+import { Button } from '../../ui';
 
 // Seed asset bytes inlined as base64 so the template preview works in
 // Workers (no filesystem access). Each key matches a SeedAsset.sourcePath.
@@ -178,16 +179,7 @@ const pageStyles = `
     color: var(--faint);
     font-size: 12px;
   }
-  button {
-    justify-self: start;
-    border: 0;
-    border-radius: 6px;
-    background: var(--accent);
-    color: #05111a;
-    padding: 12px 16px;
-    font-weight: 700;
-    cursor: pointer;
-  }
+  .rev01-ui-btn { justify-self: start; }
   @media (max-width: 760px) {
     .templates { grid-template-columns: 1fr; }
     .fields { grid-template-columns: 1fr; }
@@ -357,7 +349,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
           </label>
         </div>
 
-        <button type="submit">Create site</button>
+        <Button variant="primary" type="submit">Create site</Button>
       </form>
     </DashboardShell>
   );

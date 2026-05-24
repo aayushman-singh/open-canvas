@@ -7,6 +7,7 @@ import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
+import { Button, Badge, Pill } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import type { PublishedSnapshot, CanvasSiteState } from '../../canvas/schema';
@@ -326,31 +327,6 @@ const cardStyles = `
     align-items: center;
     margin-bottom: 14px;
   }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-  .badge-kit {
-    background: rgba(125,211,252,0.10);
-    color: var(--accent);
-    border: 1px solid rgba(125,211,252,0.18);
-  }
-  .badge-pub {
-    background: rgba(74,222,128,0.10);
-    color: #4ade80;
-    border: 1px solid rgba(74,222,128,0.18);
-  }
-  .badge-draft {
-    background: rgba(250,204,21,0.10);
-    color: #facc15;
-    border: 1px solid rgba(250,204,21,0.18);
-  }
   .site-card-date {
     font-size: 12px;
     color: var(--faint);
@@ -484,28 +460,6 @@ const cardStyles = `
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 12px;
   }
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
-  }
-  .pill-on {
-    background: rgba(74,222,128,0.10);
-    color: #4ade80;
-  }
-  .pill-off {
-    background: rgba(255,255,255,0.04);
-    color: var(--faint);
-  }
-  .pill-info {
-    background: rgba(125,211,252,0.08);
-    color: var(--accent);
-  }
-
   .dash-sign-out {
     font-size: 13px;
     color: var(--faint);
@@ -818,15 +772,6 @@ function buildCards(
   });
 }
 
-function Pill({ on, label }: { on: boolean; label?: string }) {
-  const text = label ?? (on ? 'On' : 'Off');
-  return <span class={`pill ${on ? 'pill-on' : 'pill-off'}`}>{text}</span>;
-}
-
-function InfoPill({ label }: { label: string }) {
-  return <span class="pill pill-info">{label}</span>;
-}
-
 function DetailRow({
   label,
   href,
@@ -856,28 +801,28 @@ function DetailsPanel({ s }: { s: SiteCard }) {
       <table class="details-table">
         <tbody>
           <DetailRow label="Hosting" href={`${editBase}/settings`}>
-            <InfoPill label="Starter" />
+            <Pill variant="info">Starter</Pill>
           </DetailRow>
           <DetailRow label="CDN">
-            <InfoPill label="Cloudflare Edge" />
+            <Pill variant="info">Cloudflare Edge</Pill>
           </DetailRow>
           <DetailRow label="Custom domain" href={`${editBase}/domains`}>
-            <Pill on={false} label="Not configured" />
+            <Pill variant="off">Not configured</Pill>
           </DetailRow>
           <DetailRow label="Password protection" href={`${editBase}/settings`}>
-            <Pill on={s.passwordEnabled} />
+            <Pill variant={s.passwordEnabled ? 'on' : 'off'}>{s.passwordEnabled ? 'On' : 'Off'}</Pill>
           </DetailRow>
           <DetailRow label="Search indexing" href={`${editBase}/settings`}>
-            <Pill on={s.searchIndexing} />
+            <Pill variant={s.searchIndexing ? 'on' : 'off'}>{s.searchIndexing ? 'On' : 'Off'}</Pill>
           </DetailRow>
           <DetailRow label="Visitor dark mode" href={`${editBase}/settings`}>
-            <Pill on={s.darkModeEnabled} label={s.darkModeEnabled ? 'Toggleable' : 'Locked'} />
+            <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>{s.darkModeEnabled ? 'Toggleable' : 'Locked'}</Pill>
           </DetailRow>
           <DetailRow label="Analytics">
-            <Pill on={false} label="Not connected" />
+            <Pill variant="off">Not connected</Pill>
           </DetailRow>
           <DetailRow label="Style kit" href={`${editBase}/edit`}>
-            <InfoPill label={s.styleKit} />
+            <Pill variant="info">{s.styleKit}</Pill>
           </DetailRow>
         </tbody>
       </table>
@@ -957,8 +902,8 @@ dashboard.get('/', async (c) => {
       <div class="dash-header">
         <h1>Your sites</h1>
         <div class="dash-header-actions">
-          <button class="import-site" type="button" id="import-btn">Import</button>
-          <a class="new-site" href="/dashboard/templates">+ New site</a>
+          <Button variant="secondary" class="import-site" id="import-btn">Import</Button>
+          <Button variant="primary" class="new-site" href="/dashboard/templates">+ New site</Button>
         </div>
       </div>
 
@@ -983,8 +928,8 @@ dashboard.get('/', async (c) => {
           <div class="import-error" id="import-error"></div>
           <div class="import-progress" id="import-progress">Importing... this may take up to 30 seconds.</div>
           <div class="import-actions">
-            <button class="btn-import-cancel" type="button" id="import-cancel">Cancel</button>
-            <button class="btn-import-submit" type="button" id="import-submit">Import</button>
+            <Button variant="secondary" class="btn-import-cancel" id="import-cancel">Cancel</Button>
+            <Button variant="primary" class="btn-import-submit" id="import-submit">Import</Button>
           </div>
         </div>
       </div>
@@ -1018,40 +963,40 @@ dashboard.get('/', async (c) => {
                   {s.subdomain}.rev01.aayushman.dev
                 </a>
                 <div class="site-card-meta">
-                  <span class="badge badge-kit">{s.styleKit}</span>
+                  <Badge variant="info">{s.styleKit}</Badge>
                   {s.publishedVersion > 0 ? (
-                    <span class="badge badge-pub">published v{String(s.publishedVersion)}</span>
+                    <Badge variant="success">published v{String(s.publishedVersion)}</Badge>
                   ) : (
-                    <span class="badge badge-draft">draft</span>
+                    <Badge variant="warning">draft</Badge>
                   )}
                   <span class="site-card-date">Updated {formatDate(s.updatedAt)}</span>
                 </div>
                 <div class="site-card-actions">
-                  <a class="btn-edit" href={`/dashboard/sites/${s.siteId}/edit`}>Edit</a>
+                  <Button variant="primary" class="btn-edit" href={`/dashboard/sites/${s.siteId}/edit`}>Edit</Button>
                   {s.publishedVersion > 0 ? (
-                    <button
+                    <Button
+                      variant="secondary"
                       class="btn-unpublish"
                       data-site-id={s.siteId}
                       data-action="unpublish"
-                      type="button"
                     >
                       <span class="dot" />
                       Live &middot; Make draft
-                    </button>
+                    </Button>
                   ) : (
-                    <button class="btn-publish" data-site-id={s.siteId} type="button">
+                    <Button variant="secondary" class="btn-publish" data-site-id={s.siteId}>
                       Publish
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="secondary"
                     class="btn-dots"
-                    type="button"
                     aria-expanded="false"
                     aria-label="Site details"
                     title="Site details"
                   >
                     &#x22EE;
-                  </button>
+                  </Button>
                 </div>
               </div>
               <DetailsPanel s={s} />

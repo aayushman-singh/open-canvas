@@ -69,6 +69,7 @@ import { SITE_NAV_INNER_ELEMENT_ID } from '../../symbols/nav-bootstrap';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { DashboardShell } from './shell';
+import { Button, Card } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -85,24 +86,6 @@ navEditorRoute.use('*', requireAuth());
 
 const pageStyles = `
   .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
-  .card {
-    padding: 20px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
-    margin-bottom: 18px;
-  }
-  .card h2 {
-    margin: 0 0 6px;
-    font-size: 18px;
-    letter-spacing: -0.005em;
-  }
-  .card .sub {
-    margin: 0 0 16px;
-    color: var(--muted);
-    font-size: 13.5px;
-    line-height: 1.55;
-  }
   form.nav-config {
     display: grid;
     gap: 14px;
@@ -199,16 +182,6 @@ const pageStyles = `
     align-items: center;
     margin-top: 6px;
   }
-  form.nav-config button.save {
-    border: 0;
-    border-radius: 6px;
-    background: var(--accent);
-    color: #05111a;
-    padding: 11px 16px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  form.nav-config button.save[disabled] { opacity: 0.5; cursor: not-allowed; }
   .err {
     margin-top: 4px;
     color: #fca5a5;
@@ -495,7 +468,7 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
         page.
       </p>
 
-      <section class="card">
+      <Card>
         <h2>Bar configuration</h2>
         <p class="sub">
           Layout slots, sticky behaviour, and the optional logo. Layout
@@ -552,17 +525,17 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
             </p>
           ) : null}
 
-          <button type="button" class="add-link">+ Add link</button>
+          <Button variant="ghost" class="add-link">+ Add link</Button>
 
           <div class="save-row">
-            <button type="submit" class="save">Save</button>
+            <Button variant="primary" type="submit" class="save">Save</Button>
           </div>
           <p class="err" role="alert" aria-live="polite"></p>
           <p class="ok" role="status" aria-live="polite"></p>
         </form>
-      </section>
+      </Card>
 
-      <section class="card">
+      <Card>
         <h2>Per-page suppression</h2>
         <p class="sub">
           The schema is intentionally narrow — pages do not carry a
@@ -573,7 +546,7 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
           deleted. Adding the bar back to a page that had it removed is an
           explicit &ldquo;Show site nav here&rdquo; action on that page.
         </p>
-      </section>
+      </Card>
 
       <script type="module">{raw(clientScript(siteId, pageSlugs))}</script>
     </DashboardShell>,

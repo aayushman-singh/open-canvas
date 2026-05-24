@@ -25,6 +25,7 @@ import { db } from '../../db/client.js';
 import { customer, site } from '../../db/schema.js';
 
 import { DashboardShell } from './shell.js';
+import { Button } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -138,16 +139,6 @@ const pageStyles = `
     border-radius: 8px;
     font: inherit;
   }
-  .chat-input button {
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    background: var(--accent);
-    color: var(--bg);
-    padding: 0 18px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
   .chat-status { color: var(--muted); font-size: 13px; min-height: 18px; }
 `;
 
@@ -362,7 +353,7 @@ chatPanelRoute.get('/sites/:siteId/chat', async (c) => {
             <div class="chat-status" id="chat-status"></div>
             <div class="chat-input">
               <textarea id="chat-input" placeholder="Make the hero section more dramatic…" />
-              <button id="chat-send" type="button">Send</button>
+              <Button variant="primary" id="chat-send">Send</Button>
             </div>
           </div>
         </div>
