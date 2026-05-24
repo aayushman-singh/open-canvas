@@ -2943,12 +2943,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     let dropTarget = null;
 
+    function pointInsideRect(clientX, clientY, rect) {
+      return clientX >= rect.left && clientX <= rect.right &&
+        clientY >= rect.top && clientY <= rect.bottom;
+    }
+
     function findDropTarget(clientX, clientY) {
       const reelEl = document.getElementById("canvas-reel");
       if (reelEl && !reelEl.hidden) {
         const reelRect = reelEl.getBoundingClientRect();
-        if (clientX >= reelRect.left && clientX <= reelRect.right &&
-            clientY >= reelRect.top && clientY <= reelRect.bottom) {
+        if (pointInsideRect(clientX, clientY, reelRect)) {
           const tiles = Array.from(reelEl.querySelectorAll("[data-reel-section]"));
           for (let i = 0; i < tiles.length; i++) {
             const rect = tiles[i].getBoundingClientRect();
@@ -2958,6 +2962,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           return { zone: "reel", insertAt: tiles.length, tiles: tiles };
         }
       }
+
+      const rootRect = root.getBoundingClientRect();
+      if (!pointInsideRect(clientX, clientY, rootRect)) return null;
+
       const sectionNodes = Array.from(root.querySelectorAll("[data-rev01-section]"));
       for (let i = 0; i < sectionNodes.length; i++) {
         const rect = sectionNodes[i].getBoundingClientRect();
@@ -2967,11 +2975,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return { zone: "canvas", insertAt: sectionNodes.length, nodes: sectionNodes };
     }
 
+    function normaliseDropTarget(target) {
+      if (!target) return null;
+      if (target.insertAt === fromIdx || target.insertAt === fromIdx + 1) return null;
+      return target;
+    }
+
     function positionDropLine(target) {
       if (!target) { dropLine.hidden = true; return; }
-      if (target.insertAt === fromIdx || target.insertAt === fromIdx + 1) {
-        if (target.zone === "canvas") { dropLine.hidden = true; return; }
-      }
       dropLine.hidden = false;
       if (target.zone === "canvas") {
         const nodes = target.nodes;
@@ -3003,7 +3014,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     function onMove(ev) {
       ghost.style.left = ev.clientX - 100 + "px";
       ghost.style.top = ev.clientY - 20 + "px";
-      dropTarget = findDropTarget(ev.clientX, ev.clientY);
+      dropTarget = normaliseDropTarget(findDropTarget(ev.clientX, ev.clientY));
       positionDropLine(dropTarget);
     }
 
