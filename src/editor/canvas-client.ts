@@ -977,6 +977,157 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return fallback;
   }
 
+  // -- Element context menu (3-dot, top-left on hover) --------------------
+
+  let openMenuElementId = null;
+
+  function closeElementMenu() {
+    if (!openMenuElementId) return;
+    const prev = root.querySelector('[data-rev01-element="' + cssEscape(openMenuElementId) + '"] .element-menu');
+    if (prev) prev.remove();
+    const prevTrigger = root.querySelector('[data-rev01-element="' + cssEscape(openMenuElementId) + '"] .element-menu-trigger');
+    if (prevTrigger) prevTrigger.removeAttribute("data-menu-open");
+    openMenuElementId = null;
+  }
+
+  function buildElementMenu(element, section, wrapper) {
+    const menu = document.createElement("div");
+    menu.className = "element-menu";
+    menu.setAttribute("data-element-menu", "true");
+
+    var resizeLabel = document.createElement("div");
+    resizeLabel.className = "menu-item";
+    resizeLabel.style.cursor = "default";
+    resizeLabel.style.color = "var(--rev01-fg-mute)";
+    resizeLabel.style.fontSize = "11px";
+    resizeLabel.textContent = "Resize";
+    menu.appendChild(resizeLabel);
+
+    var wRow = document.createElement("div");
+    wRow.className = "menu-resize-row";
+    var wLabel = document.createElement("label");
+    wLabel.textContent = "W";
+    var wInput = document.createElement("input");
+    wInput.type = "number";
+    wInput.min = "24";
+    wInput.value = String(Math.round(element.box.w));
+    wRow.appendChild(wLabel);
+    wRow.appendChild(wInput);
+    menu.appendChild(wRow);
+
+    var hRow = document.createElement("div");
+    hRow.className = "menu-resize-row";
+    var hLabel = document.createElement("label");
+    hLabel.textContent = "H";
+    var hInput = document.createElement("input");
+    hInput.type = "number";
+    hInput.min = "24";
+    hInput.value = String(Math.round(element.box.h));
+    hRow.appendChild(hLabel);
+    hRow.appendChild(hInput);
+    menu.appendChild(hRow);
+
+    function commitResize() {
+      var page = currentPage();
+      var pageWidth = page ? page.width : 1440;
+      var sectionHeight = section.height;
+      var nw = Number(wInput.value);
+      var nh = Number(hInput.value);
+      if (!Number.isFinite(nw) || nw < 24) nw = 24;
+      if (!Number.isFinite(nh) || nh < 24) nh = 24;
+      if (element.box.x + nw > pageWidth) nw = pageWidth - element.box.x;
+      if (element.box.y + nh > sectionHeight) nh = sectionHeight - element.box.y;
+      element.box.w = nw;
+      element.box.h = nh;
+      wrapper.style.width = nw + "px";
+      wrapper.style.height = nh + "px";
+      wInput.value = String(Math.round(nw));
+      hInput.value = String(Math.round(nh));
+      scheduleSave();
+    }
+    wInput.addEventListener("change", commitResize);
+    hInput.addEventListener("change", commitResize);
+    wInput.addEventListener("keydown", function(ev) { if (ev.key === "Enter") { commitResize(); } });
+    hInput.addEventListener("keydown", function(ev) { if (ev.key === "Enter") { commitResize(); } });
+
+    var div1 = document.createElement("div");
+    div1.className = "menu-divider";
+    menu.appendChild(div1);
+
+    var items = [
+      { label: "Bring to front", action: "front" },
+      { label: "Send to back", action: "back" },
+    ];
+    for (var i = 0; i < items.length; i++) {
+      (function(item) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "menu-item";
+        btn.textContent = item.label;
+        btn.addEventListener("click", function() {
+          applyZOrderAction(section, element, item.action);
+          closeElementMenu();
+        });
+        menu.appendChild(btn);
+      })(items[i]);
+    }
+
+    var div2 = document.createElement("div");
+    div2.className = "menu-divider";
+    menu.appendChild(div2);
+
+    var dupBtn = document.createElement("button");
+    dupBtn.type = "button";
+    dupBtn.className = "menu-item";
+    dupBtn.textContent = "Duplicate";
+    dupBtn.addEventListener("click", function() {
+      var copy = JSON.parse(JSON.stringify(element));
+      copy.id = newElementId();
+      copy.box.x = Math.min(copy.box.x + 20, (currentPage() ? currentPage().width : 1440) - copy.box.w);
+      copy.box.y = Math.min(copy.box.y + 20, section.height - copy.box.h);
+      copy.box.z = nextZ(section);
+      section.elements.push(copy);
+      closeElementMenu();
+      renderAll();
+      selectElement(copy.id);
+      scheduleSave();
+    });
+    menu.appendChild(dupBtn);
+
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "menu-item danger";
+    delBtn.textContent = "Delete";
+    delBtn.addEventListener("click", function() {
+      var idx = section.elements.indexOf(element);
+      if (idx >= 0) section.elements.splice(idx, 1);
+      closeElementMenu();
+      selectedElementId = null;
+      renderAll();
+      renderInspector();
+      scheduleSave();
+    });
+    menu.appendChild(delBtn);
+
+    return menu;
+  }
+
+  function toggleElementMenu(elementId, wrapper) {
+    if (openMenuElementId === elementId) {
+      closeElementMenu();
+      return;
+    }
+    closeElementMenu();
+    var found = findElement(elementId);
+    if (!found) return;
+    selectElement(elementId);
+    var menu = buildElementMenu(found.element, found.section, wrapper);
+    wrapper.appendChild(menu);
+    var trigger = wrapper.querySelector(".element-menu-trigger");
+    if (trigger) trigger.setAttribute("data-menu-open", "true");
+    openMenuElementId = elementId;
+  }
+
   function buildElementNode(element) {
     const wrapper = document.createElement("div");
     wrapper.className = "rev01-element";
@@ -1006,6 +1157,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     handle.className = "resize-handle";
     handle.setAttribute("data-resize-handle", "true");
     wrapper.appendChild(handle);
+    var trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "element-menu-trigger";
+    trigger.setAttribute("data-element-menu-trigger", element.id);
+    trigger.textContent = "⋮";
+    wrapper.appendChild(trigger);
     if (selectedElementId === element.id) {
       wrapper.setAttribute("data-selected", "true");
     }
@@ -3007,6 +3164,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function attachPointerHandlers() {
     root.addEventListener("mousedown", (ev) => {
+      if (ev.target instanceof Element && (ev.target.closest("[data-element-menu-trigger]") || ev.target.closest("[data-element-menu]"))) return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
         const wrapper = handle.closest('.rev01-element');
@@ -3315,6 +3473,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     root.addEventListener("click", (ev) => {
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
+      var menuTrigger = target.closest("[data-element-menu-trigger]");
+      if (menuTrigger) {
+        var triggerId = menuTrigger.getAttribute("data-element-menu-trigger");
+        var triggerWrapper = menuTrigger.closest(".rev01-element");
+        if (triggerId && triggerWrapper) toggleElementMenu(triggerId, triggerWrapper);
+        ev.stopPropagation();
+        return;
+      }
+      if (target.closest("[data-element-menu]")) {
+        ev.stopPropagation();
+        return;
+      }
+      closeElementMenu();
       const toolbarButton = target.closest('[data-section-action]');
       if (toolbarButton) {
         const action = toolbarButton.getAttribute('data-section-action');
@@ -4434,6 +4605,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderAll();
       attachRootEvents();
       attachPointerHandlers();
+      document.addEventListener("click", function(ev) {
+        if (openMenuElementId && ev.target instanceof Element && !ev.target.closest("[data-element-menu]") && !ev.target.closest("[data-element-menu-trigger]")) {
+          closeElementMenu();
+        }
+      });
       attachSidebarTabs();
       // Wave 3 #14 — inject the "Symbols" tab dynamically because the
       // canvas-index.tsx shell is frozen for this wave. The tab + panel

@@ -530,6 +530,104 @@ body[data-placement-active="true"] .rev01-section-slot {
   display: block;
 }
 
+/* -- Element context menu (3-dot trigger, top-left on hover) ------------- */
+.rev01-element .element-menu-trigger {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 22px;
+  height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--rev01-bg-panel-strong);
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: 4px;
+  color: var(--rev01-fg);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10001;
+  padding: 0;
+  letter-spacing: 1px;
+}
+.rev01-element:hover .element-menu-trigger,
+.rev01-element .element-menu-trigger[data-menu-open="true"] {
+  display: flex;
+}
+.rev01-element .element-menu-trigger:hover {
+  background: var(--rev01-accent-soft);
+  border-color: var(--rev01-accent);
+}
+
+.element-menu {
+  position: absolute;
+  top: 28px;
+  left: 4px;
+  min-width: 180px;
+  background: var(--rev01-bg-panel-strong);
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: var(--rev01-radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  padding: 4px 0;
+  z-index: 10002;
+  font-family: var(--rev01-font-sans);
+  font-size: 12px;
+}
+.element-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: var(--rev01-fg);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+}
+.element-menu .menu-item:hover {
+  background: var(--rev01-accent-soft);
+}
+.element-menu .menu-item.danger {
+  color: var(--rev01-danger);
+}
+.element-menu .menu-item.danger:hover {
+  background: oklch(0.7 0.21 25 / 0.15);
+}
+.element-menu .menu-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--rev01-hairline);
+}
+.element-menu .menu-resize-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+}
+.element-menu .menu-resize-row label {
+  color: var(--rev01-fg-mute);
+  font-size: 11px;
+  min-width: 14px;
+}
+.element-menu .menu-resize-row input {
+  width: 56px;
+  padding: 2px 4px;
+  border: 1px solid var(--rev01-hairline-strong);
+  border-radius: 4px;
+  background: var(--rev01-bg);
+  color: var(--rev01-fg);
+  font-size: 11px;
+  font-family: var(--rev01-font-mono);
+}
+.element-menu .menu-resize-row input:focus {
+  outline: 1px solid var(--rev01-accent);
+  border-color: var(--rev01-accent);
+}
+
 .rev01-text { color: inherit; }
 .rev01-action {
   display: inline-flex;
