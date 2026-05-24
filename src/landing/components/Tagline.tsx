@@ -1,3 +1,5 @@
+import { Button } from '../../ui';
+
 export function Tagline() {
   return (
     <section class="tagline" aria-label="product tagline">
@@ -9,6 +11,14 @@ export function Tagline() {
         One canvas model, one Style Kit graph, one Published Address. The agent proposes concrete
         canvas edits you can preview, accept, and publish.
       </p>
+      <div class="tagline-cta">
+        <Button variant="primary" size="lg" href="/dashboard">
+          Start building
+        </Button>
+        <Button variant="secondary" size="lg" href="https://github.com/aayushman-singh/rev01" target="_blank" rel="noopener">
+          View source
+        </Button>
+      </div>
     </section>
   );
 }

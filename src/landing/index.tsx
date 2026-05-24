@@ -11,6 +11,7 @@ import { StatLine } from './components/StatLine';
 import { StatusBar } from './components/StatusBar';
 import { Tagline } from './components/Tagline';
 import { styles } from './styles';
+import { uiStyles } from '../ui';
 
 const landing = new Hono();
 
@@ -33,7 +34,7 @@ function Page() {
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
         />
-        <style>{raw(styles)}</style>
+        <style>{raw(uiStyles + '\n' + styles)}</style>
       </head>
       <body>
         <StatusBar />

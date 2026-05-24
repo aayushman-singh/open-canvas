@@ -19,6 +19,14 @@ export const styles = `
   --radius: 8px;
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* map to UI primitive tokens */
+  --bg: var(--bg-deep);
+  --panel: var(--bg-panel);
+  --text: var(--fg);
+  --muted: var(--fg-mute);
+  --faint: var(--fg-faint);
+  --line: var(--hairline);
 }
 
 * {
@@ -80,7 +88,7 @@ a:focus-visible {
   border-radius: 2px;
 }
 
-/* ============ status bar ============ */
+/* ============ navigation bar ============ */
 
 .statusbar {
   position: sticky;
@@ -89,8 +97,8 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: 1.1rem;
-  padding: 0.55rem 1.25rem;
-  height: 36px;
+  padding: 0.7rem 1.25rem;
+  height: 48px;
   font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -99,6 +107,19 @@ a:focus-visible {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--hairline);
+}
+
+.statusbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.statusbar .brand-name {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  color: var(--fg);
 }
 
 .statusbar .dot {
@@ -112,54 +133,25 @@ a:focus-visible {
   animation: pulse 1.4s ease-in-out infinite;
 }
 
-.statusbar .seg {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  white-space: nowrap;
-}
-
-.statusbar .k {
-  color: var(--fg-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.statusbar .v {
-  color: var(--fg);
-}
-
-.statusbar .sep {
-  color: var(--fg-faint);
-  user-select: none;
+.statusbar .spacer {
+  flex: 1;
 }
 
 .statusbar .nav {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.2rem;
 }
 
 .statusbar .nav a {
   color: var(--fg-mute);
   border-bottom: none;
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 .statusbar .nav a:hover {
   color: var(--fg);
-}
-
-.statusbar .nav a.cta {
-  color: var(--accent);
-  border: 1px solid oklch(0.78 0.15 200 / 0.4);
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--accent-soft);
-}
-
-.statusbar .nav a.cta:hover {
-  background: oklch(0.78 0.15 200 / 0.28);
 }
 
 /* ============ shell ============ */
@@ -598,6 +590,13 @@ section {
   max-width: 56ch;
 }
 
+.tagline-cta {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
 /* ============ feature grid ============ */
 
 .features {
@@ -711,15 +710,43 @@ section {
 
 footer {
   margin-top: clamp(2.5rem, 6vh, 4rem);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--fg-faint);
+}
+
+.footer-cta {
+  text-align: center;
+  padding: 3rem 1rem;
+  margin-bottom: 2rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+}
+
+.footer-heading {
+  font-family: var(--font-sans);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 600;
+  color: var(--fg);
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.footer-sub {
+  color: var(--fg-mute);
+  font-size: 14px;
+  margin: 0 0 1.2rem;
+  font-family: var(--font-sans);
+}
+
+.footer-links {
   padding-top: 1.5rem;
   border-top: 1px dashed var(--hairline);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem 1.4rem;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--fg-faint);
 }
 
 footer .badge {
@@ -818,11 +845,12 @@ footer .when {
     gap: 0.6rem;
     padding: 0.45rem 0.8rem;
   }
-  .statusbar .nav a:not(.cta) {
+  .statusbar .nav a:not(.rev01-ui-btn) {
     display: none;
   }
-  .statusbar .seg.optional {
-    display: none;
+  .tagline-cta {
+    flex-direction: column;
+    align-items: flex-start;
   }
   .tagline h1 {
     font-size: clamp(1.7rem, 8vw, 2.4rem);
