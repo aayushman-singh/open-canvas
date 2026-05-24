@@ -42,7 +42,7 @@ function buildThumbHtml(
     styleKit: state.styleKit,
     pages: state.pages,
     ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
-    ...(state.symbols.length > 0 ? { symbols: state.symbols } : {}),
+    ...(state.symbols?.length ? { symbols: state.symbols } : {}),
   };
   try {
     const canvasHtml = renderCanvasSnapshot(
