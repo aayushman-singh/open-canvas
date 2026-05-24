@@ -1,6 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
@@ -14,18 +11,20 @@ import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../temp
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
 
-// The dashboard template preview iframe fetches seed assets through this
-// route (NOT through the public R2 read path) so the preview works before
-// the Owner has chosen a template. The seed bytes live as base64 text
-// files under `src/assets/seed-source/`; we read them at module load and
-// cache the decoded bytes so the preview asset serve is a pure-memory op.
-const seedSourceDir = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'seed-source');
+// Seed asset bytes inlined as base64 so the template preview works in
+// Workers (no filesystem access). Each key matches a SeedAsset.sourcePath.
+const SEED_SOURCE_B64: Record<string, string> = {
+  'transparent.png.b64':
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgAAIAAAUAAeImBZsAAAAASUVORK5CYII=',
+};
+
 const seedBytesCache = new Map<string, Uint8Array>();
 function readSeedBytes(sourcePath: string): Uint8Array {
   const cached = seedBytesCache.get(sourcePath);
   if (cached) return cached;
-  const text = readFileSync(join(seedSourceDir, sourcePath), 'utf8').replace(/\s+/g, '');
-  const binary = atob(text);
+  const b64 = SEED_SOURCE_B64[sourcePath];
+  if (!b64) throw new Error(`seed source not found: ${sourcePath}`);
+  const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
