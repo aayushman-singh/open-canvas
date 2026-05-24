@@ -3591,6 +3591,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     openBtn.addEventListener('click', function (ev) {
       ev.preventDefault();
       window.open(href, '_blank');
+      removeLinkPopover();
     });
     bar.appendChild(openBtn);
 
