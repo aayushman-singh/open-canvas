@@ -1,6 +1,6 @@
 # Light/dark visitor toggle
 
-**Wishlist #:** 20  **Tier:** B  **Wave:** 3  **Status:** queued
+**Wishlist #:** 20 **Tier:** B **Wave:** 3 **Status:** queued
 **Depends on:** Phase 0 ✓, #10 custom theme editor (Wave 2)
 **Blocks:** none
 
@@ -32,7 +32,7 @@ Phase 0:
 // src/canvas/schema.ts
 export interface StyleKitPreset {
   // ... existing fields
-  dark?: Partial<StyleKitPreset>;   // overrides for dark mode
+  dark?: Partial<StyleKitPreset>; // overrides for dark mode
 }
 
 // site-level setting added in editableState:

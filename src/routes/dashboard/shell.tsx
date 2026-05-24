@@ -21,6 +21,52 @@ const shellStyles = `
     background: var(--bg);
     color: var(--text);
   }
+
+  .app-header {
+    border-bottom: 1px solid var(--line);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .app-header-inner {
+    width: min(1120px, calc(100vw - 32px));
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    height: 52px;
+  }
+  .app-logo {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text);
+    text-decoration: none;
+    letter-spacing: -0.03em;
+    margin-right: 4px;
+  }
+  .app-nav {
+    display: flex;
+    gap: 2px;
+  }
+  .app-nav-link {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: color 0.12s, background 0.12s;
+  }
+  .app-nav-link:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.05);
+  }
+  .app-nav-link[aria-current="page"] {
+    color: var(--text);
+    background: rgba(255,255,255,0.08);
+  }
+
   main {
     width: min(1120px, calc(100vw - 32px));
     margin: 0 auto;
@@ -57,12 +103,19 @@ export type Crumb = { href?: string; label: string };
 type Props = {
   title: string;
   crumbs: Crumb[];
+  activePath?: string;
   pageStyles?: string;
   children?: Child;
 };
 
-export function DashboardShell({ title, crumbs, pageStyles, children }: Props) {
+const NAV_ITEMS = [
+  { href: '/dashboard', label: 'Sites' },
+  { href: '/dashboard/templates', label: 'Templates' },
+];
+
+export function DashboardShell({ title, crumbs, activePath, pageStyles, children }: Props) {
   const css = pageStyles ? `${shellStyles}\n${pageStyles}` : shellStyles;
+  const showCrumbs = crumbs.length > 1;
   return (
     <html lang="en">
       <head>
@@ -72,19 +125,37 @@ export function DashboardShell({ title, crumbs, pageStyles, children }: Props) {
         <style>{raw(css)}</style>
       </head>
       <body>
+        <header class="app-header">
+          <div class="app-header-inner">
+            <a href="/dashboard" class="app-logo">rev01</a>
+            <nav class="app-nav">
+              {NAV_ITEMS.map((item) => (
+                <a
+                  href={item.href}
+                  class="app-nav-link"
+                  {...(activePath === item.href ? { 'aria-current': 'page' } : {})}
+                >
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+          </div>
+        </header>
         <main>
-          <nav class="crumbs">
-            {crumbs.map((crumb, i) => (
-              <>
-                {i > 0 && <span>/</span>}
-                {crumb.href ? (
-                  <a href={crumb.href}>{crumb.label}</a>
-                ) : (
-                  <span class="here">{crumb.label}</span>
-                )}
-              </>
-            ))}
-          </nav>
+          {showCrumbs && (
+            <nav class="crumbs">
+              {crumbs.map((crumb, i) => (
+                <>
+                  {i > 0 && <span>/</span>}
+                  {crumb.href ? (
+                    <a href={crumb.href}>{crumb.label}</a>
+                  ) : (
+                    <span class="here">{crumb.label}</span>
+                  )}
+                </>
+              ))}
+            </nav>
+          )}
           {children}
         </main>
       </body>

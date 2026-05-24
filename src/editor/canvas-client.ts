@@ -5302,7 +5302,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         }
       });
       attachSidebarTabs();
-      // Wave 3 #14 — inject the "Symbols" tab dynamically because the
+      var sidebarToggle = document.getElementById("sidebar-toggle");
+      if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener("click", function() {
+          var collapsed = sidebar.classList.toggle("collapsed");
+          sidebarToggle.textContent = collapsed ? "›" : "‹";
+          if (viewport) viewport.classList.toggle("sidebar-collapsed", collapsed);
+        });
+      }
+      // Wave 3 #14 — inject the "Components" tab dynamically because the
       // canvas-index.tsx shell is frozen for this wave. The tab + panel
       // mount immediately so the Owner can click into it; the panel's
       // contents render lazily on first activation.
@@ -5310,15 +5318,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
-      attachTranslateButton();
       attachPresence();
       setStatus("Ready", "ok");
     } catch (err) {
       setStatus("Failed to load site: " + (err && err.message ? err.message : String(err)), "error");
     }
   })();
-
-  // -- Wishlist #24 — Owner-facing translate accept-and-apply UI ----------
   //
   // Server route POST /api/sites/:siteId/translate returns
   // { ops, preview, changes }. The Owner picks from/to/mode in three select

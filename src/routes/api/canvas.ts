@@ -1,7 +1,8 @@
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { createR2Client } from '../../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../../assets/read';
+import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
@@ -37,7 +38,18 @@ async function loadOwnedSite(
   c: Context<Env>,
   siteId: string,
 ): Promise<
-  | { found: true; customerId: string; site: { id: string; name: string; subdomain: string; styleKit: StyleKit; editableState: CanvasSiteState; publishedVersion: number } }
+  | {
+      found: true;
+      customerId: string;
+      site: {
+        id: string;
+        name: string;
+        subdomain: string;
+        styleKit: StyleKit;
+        editableState: CanvasSiteState;
+        publishedVersion: number;
+      };
+    }
   | { found: false }
 > {
   const auth = c.get('auth');
@@ -148,11 +160,49 @@ canvasApi.put('/sites/:siteId', async (c) => {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
   }
 
+  const nextState = editableState as unknown as CanvasSiteState;
   const database = db(c.env);
+  const referenced = collectReferencedAssetIds(nextState.pages);
+  if (referenced.size > 0) {
+    const referencedList = [...referenced];
+    const presentRows = await database
+      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
+      .from(ownerAsset)
+      .where(
+        and(eq(ownerAsset.customerId, result.customerId), inArray(ownerAsset.id, referencedList)),
+      );
+    const referenceErrors = findAssetReferenceErrors(nextState.pages, presentRows);
+    const missing = referenceErrors.filter((error) => error.reason === 'missing');
+    if (missing.length > 0) {
+      return c.json(
+        {
+          error: 'cannot save: missing assets',
+          missingAssetIds: missing.map((error) => error.assetId),
+        },
+        400,
+      );
+    }
+    const mismatched = referenceErrors.filter((error) => error.reason === 'kind-mismatch');
+    if (mismatched.length > 0) {
+      return c.json(
+        {
+          error: 'cannot save: asset kind mismatch',
+          assetKindErrors: mismatched.map((error) => ({
+            assetId: error.assetId,
+            expectedKind: error.expectedKind,
+            actualKind: error.actualKind,
+            path: error.path,
+          })),
+        },
+        400,
+      );
+    }
+  }
+
   await database
     .update(site)
     .set({
-      editableState: editableState as unknown as CanvasSiteState,
+      editableState: nextState,
       updatedAt: sql`now()`,
     })
     .where(and(eq(site.id, siteId), eq(site.customerId, result.customerId)));

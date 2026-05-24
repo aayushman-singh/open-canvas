@@ -146,6 +146,19 @@ export function clerkAuth() {
     Bindings: ClerkBindings;
     Variables: ClerkAuthVariables;
   }>(async (c, next) => {
+    // If a prior middleware (e.g. editTokenAuth) already resolved the Owner's
+    // identity, skip the Clerk handshake entirely. This lets /__api/* routes
+    // reuse the same sub-app handlers without a Clerk session cookie.
+    try {
+      const existing = c.get('auth');
+      if (existing && existing.userId) {
+        await next();
+        return;
+      }
+    } catch {
+      // c.get('auth') throws if the variable was never set — continue to Clerk.
+    }
+
     const keys = resolveClerkKeys(c.env);
     const clerk = createClerkClient({
       publishableKey: keys.publishableKey,
@@ -242,6 +255,40 @@ export function clerkAuth() {
 
     const user = await clerk.users.getUser(auth.userId);
     c.set('user', user);
+
+    await next();
+  });
+}
+
+import { getCookie } from 'hono/cookie';
+import { verifyEditToken, EDIT_TOKEN_COOKIE } from './edit-token';
+
+type EditTokenBindings = ClerkBindings & { UNLOCK_SIGNING_SECRET: string };
+
+export function editTokenAuth() {
+  return createMiddleware<{
+    Bindings: EditTokenBindings;
+    Variables: ClerkAuthVariables;
+  }>(async (c, next) => {
+    const token = getCookie(c, EDIT_TOKEN_COOKIE);
+    const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
+    if (!payload) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const keys = resolveClerkKeys(c.env);
+    const clerk = createClerkClient({
+      publishableKey: keys.publishableKey,
+      secretKey: keys.secretKey,
+    });
+
+    c.set('clerk', clerk);
+    c.set('auth', {
+      userId: payload.clerkUserId,
+      sessionId: null,
+      getToken: null,
+    });
+    c.set('user', null);
 
     await next();
   });

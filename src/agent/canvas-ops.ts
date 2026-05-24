@@ -16,16 +16,8 @@
 // type mismatches, and unknown recipe ids all throw with a context-rich
 // message that the route turns into a 400 with the message body.
 
-import {
-  createSectionFromRecipe,
-  type RecipeFactoryInput,
-} from '../canvas/recipes.js';
-import type {
-  CanvasSiteState,
-  InlineRun,
-  MediaKind,
-  SectionRecipeId,
-} from '../canvas/schema.js';
+import { createSectionFromRecipe, type RecipeFactoryInput } from '../canvas/recipes.js';
+import type { CanvasSiteState, InlineRun, MediaKind, SectionRecipeId } from '../canvas/schema.js';
 
 export type CanvasAgentOp =
   | { kind: 'rewriteText'; elementId: string; content: InlineRun[] }
@@ -58,10 +50,7 @@ export type CanvasAgentOp =
  *     any section in the page.
  *   - `createSectionFromRecipe` itself rejects the recipe id (unknown id).
  */
-export function applyCanvasAgentOp(
-  state: CanvasSiteState,
-  op: CanvasAgentOp,
-): CanvasSiteState {
+export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): CanvasSiteState {
   const next = structuredClone(state);
   const page = next.pages[0];
   if (!page) {

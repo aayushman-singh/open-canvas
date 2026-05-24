@@ -419,6 +419,8 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
   const referencingSite = {
     id: 'site-1',
     name: 'My Site',
+    subdomain: 'my-site',
+    publishedVersion: 1,
     editableState: {
       pages: [
         {
@@ -433,10 +435,26 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
         },
       ],
     },
-    publishedSnapshot: null,
+    publishedSnapshot: {
+      pages: [
+        {
+          slug: 'home',
+          sections: [
+            {
+              elements: [
+                { id: 'el-1', type: 'media', assetId: 'asset-uuid-2', mediaKind: 'image' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
   };
 
-  function makeDeleteShim(returnSibling: boolean): Db {
+  function makeDeleteShim(
+    returnSibling: boolean,
+    updateLog: Array<Record<string, unknown>> = [],
+  ): Db {
     // The delete handler makes three sequential queries:
     //   1. ownerAsset row lookup (.limit(1))
     //   2. site list for the customer (no .limit)
@@ -462,6 +480,14 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
           },
         }),
       }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateLog.push(values);
+            return Promise.resolve();
+          },
+        }),
+      }),
       delete: () => ({ where: () => Promise.resolve() }),
     } as unknown as Db;
   }
@@ -481,18 +507,29 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
   );
   if (reportResult.status === 'confirm_required') {
     assert(
-      reportResult.references.length === 1,
-      `expected one reference, got ${String(reportResult.references.length)}`,
+      reportResult.references.length === 2,
+      `expected editable + published references, got ${String(reportResult.references.length)}`,
     );
-    const ref = reportResult.references[0]!;
-    assert(ref.siteId === 'site-1', `expected siteId site-1, got ${ref.siteId}`);
-    assert(ref.elementId === 'el-1', `expected elementId el-1, got ${ref.elementId}`);
-    assert(ref.role === 'asset', `expected role asset, got ${ref.role}`);
+    const editableRef = reportResult.references.find((ref) => ref.source === 'editable');
+    const publishedRef = reportResult.references.find((ref) => ref.source === 'published');
+    assert(editableRef !== undefined, 'expected reference report to include editable source');
+    assert(publishedRef !== undefined, 'expected reference report to include published source');
+    assert(editableRef.siteId === 'site-1', `expected siteId site-1, got ${editableRef.siteId}`);
+    assert(
+      editableRef.elementId === 'el-1',
+      `expected elementId el-1, got ${editableRef.elementId}`,
+    );
+    assert(editableRef.role === 'asset', `expected role asset, got ${editableRef.role}`);
+    assert(
+      publishedRef.publishedAddress === 'my-site',
+      `expected published address my-site, got ${String(publishedRef.publishedAddress)}`,
+    );
   }
 
   // 7a — confirm + no siblings → R2 object deleted alongside the row.
+  const updateLog: Array<Record<string, unknown>> = [];
   const confirmResult = await deleteOwnerAsset(
-    { db: makeDeleteShim(false), r2: reportClient },
+    { db: makeDeleteShim(false, updateLog), r2: reportClient },
     { assetId: 'asset-uuid-2', customerId: 'cust-1', confirm: true },
   );
   assert(confirmResult.status === 'deleted', `expected deleted, got ${confirmResult.status}`);
@@ -502,6 +539,22 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
       'expected R2 object deletion when no siblings remain',
     );
   }
+  assert(
+    updateLog.length === 1,
+    `expected one editable-state cleanup update, got ${updateLog.length}`,
+  );
+  const updatedState = updateLog[0]?.editableState;
+  assert(
+    typeof updatedState === 'object' && updatedState !== null,
+    'expected delete cascade to write a cleared editableState',
+  );
+  const firstElement = (
+    updatedState as { pages: Array<{ sections: Array<{ elements: unknown[] }> }> }
+  ).pages[0]?.sections[0]?.elements[0] as { assetId?: string } | undefined;
+  assert(
+    firstElement?.assetId === '',
+    `expected delete cascade to clear editable assetId, got ${String(firstElement?.assetId)}`,
+  );
 
   // 7b — confirm + sibling → R2 object preserved (other rows reference it).
   const siblingR2 = new MockR2();

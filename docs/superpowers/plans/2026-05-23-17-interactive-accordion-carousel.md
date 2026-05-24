@@ -1,6 +1,6 @@
 # Accordion + carousel + interactive runtime
 
-**Wishlist #:** 17  **Tier:** B  **Wave:** 4  **Status:** queued
+**Wishlist #:** 17 **Tier:** B **Wave:** 4 **Status:** queued
 **Depends on:** Phase 0 ✓ (`accordion`, `carousel` ElementType stubs)
 **Blocks:** none
 

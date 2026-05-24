@@ -1,6 +1,6 @@
 # Multi-page nav
 
-**Wishlist #:** 16  **Tier:** B  **Wave:** 4  **Status:** queued
+**Wishlist #:** 16 **Tier:** B **Wave:** 4 **Status:** queued
 **Depends on:** Phase 0 ✓, **#14 symbols (Wave 3) must be merged**
 **Blocks:** none
 

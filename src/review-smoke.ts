@@ -18,7 +18,11 @@ import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
 import { SECTION_RECIPE_IDS } from './canvas/schema';
 import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { STYLE_KIT_PRESETS } from './canvas/style-kits';
-import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate';
+import {
+  validateCanvasSiteState,
+  validatePublishedSnapshot,
+  validateSeedFixture,
+} from './canvas/validate';
 import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
@@ -146,6 +150,59 @@ assert(
 
 const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
 assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');
+
+const editableEmptyMediaState: CanvasSiteState = {
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-empty-media',
+      slug: 'home',
+      title: 'Home',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-empty-media',
+          recipeId: 'hero-split',
+          name: 'Empty media',
+          height: 400,
+          elements: [
+            {
+              id: 'empty-media',
+              type: 'media',
+              mediaKind: 'image',
+              assetId: '',
+              alt: '',
+              fit: 'cover',
+              box: { x: 0, y: 0, w: 320, h: 180, z: 1 },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const editableEmptyMedia = validateCanvasSiteState(editableEmptyMediaState);
+assert(
+  editableEmptyMedia.valid,
+  editableEmptyMedia.valid
+    ? ''
+    : `expected editable empty media slot to remain saveable: ${editableEmptyMedia.errors.join('; ')}`,
+);
+const publishedEmptyMedia = validatePublishedSnapshot({
+  version: 1,
+  publishedAt: '2030-01-02T00:00:00.000Z',
+  styleKit: editableEmptyMediaState.styleKit,
+  pages: editableEmptyMediaState.pages,
+});
+assert(!publishedEmptyMedia.valid, 'expected published snapshots to reject empty media asset ids');
+assert(
+  !publishedEmptyMedia.valid &&
+    publishedEmptyMedia.errors.some((message) =>
+      message.includes('assetId must be non-empty in published snapshots'),
+    ),
+  'expected published empty-media rejection to name the empty assetId',
+);
 
 // Task 5.6 invariant: a two-page state must be rejected. Clone the starter
 // template's single page and push another copy so the only reason for
@@ -614,6 +671,8 @@ try {
 
 const canvasIndexSource = await readSource('./editor/canvas-index.tsx');
 const canvasClientSource = await readSource('./editor/canvas-client.ts');
+const canvasApiSource = await readSource('./routes/api/canvas.ts');
+const publishApiSource = await readSource('./routes/api/publish.ts');
 assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
@@ -625,6 +684,32 @@ assert(
 assert(
   canvasClientSource.includes('"/api/publish/sites/" + SITE_ID'),
   'expected canvas client to POST to /api/publish/sites/:siteId',
+);
+assert(
+  canvasApiSource.includes('cannot save: missing assets'),
+  'expected canvas save API to reject stale editable states that reference deleted assets',
+);
+assert(
+  publishApiSource.includes('cannot publish: unfilled media slots'),
+  'expected publish API to reject empty media slots with a 400-level owner error',
+);
+assert(
+  canvasClientSource.includes('/api/owner/assets/'),
+  'expected media picker delete/gallery flow to use the current owner asset route',
+);
+assert(
+  !canvasClientSource.includes('/api/me/assets'),
+  'expected media picker not to call the retired /api/me/assets route after main asset-pipeline merge',
+);
+assert(
+  canvasClientSource.includes('function clearDeletedAssetFromLocalState'),
+  'expected media picker delete success to clear every local reference before any later full-state save',
+);
+assert(
+  canvasClientSource.includes(
+    'Live published sites that will show missing media until you re-publish',
+  ),
+  'expected media picker delete confirmation to distinguish published breakage from editable clearing',
 );
 assert(
   canvasClientSource.includes('async function flushPendingSave()'),
@@ -1051,10 +1136,7 @@ for (const row of preparedForCustomerA.seedRows) {
   );
 }
 for (const id of preparedAIds) {
-  assert(
-    !preparedBIds.has(id),
-    `expected per-customer materialised asset id ${id} not to collide`,
-  );
+  assert(!preparedBIds.has(id), `expected per-customer materialised asset id ${id} not to collide`);
 }
 let t6SiteId: string | null = null;
 try {

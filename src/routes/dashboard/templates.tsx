@@ -258,7 +258,8 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
   return (
     <DashboardShell
       title="rev01 — create site"
-      crumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: 'Create site' }]}
+      crumbs={[{ label: 'Templates' }]}
+      activePath="/dashboard/templates"
       pageStyles={pageStyles}
     >
       <h1>Choose a starting point</h1>

@@ -127,10 +127,7 @@ ownerAssetsApi.delete('/:id', async (c) => {
   const confirm = c.req.query('confirm') === '1';
   const database = db(c.env);
   const r2 = createR2Client(c.env.ASSETS_BUCKET);
-  const result = await deleteOwnerAsset(
-    { db: database, r2 },
-    { assetId, customerId, confirm },
-  );
+  const result = await deleteOwnerAsset({ db: database, r2 }, { assetId, customerId, confirm });
   if (result.status === 'not_found') {
     return c.json({ error: 'asset not found' }, 404);
   }
@@ -139,7 +136,8 @@ ownerAssetsApi.delete('/:id', async (c) => {
       {
         error: 'confirmation required',
         references: result.references,
-        confirmHint: 'pass ?confirm=1 to proceed; this will blank every referenced slot',
+        confirmHint:
+          'pass ?confirm=1 to proceed; editable slots are cleared and live published sites show missing media until re-published',
       },
       412,
     );

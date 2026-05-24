@@ -6,13 +6,7 @@
 // The Phase 0 element registry pulls this render function into
 // RENDER_DISPATCH alongside the nine new element types.
 
-import {
-  escapeAttr,
-  escapeHtml,
-  findLinkMark,
-  hasMark,
-  styleFromEntries,
-} from './render-utils.js';
+import { escapeAttr, escapeHtml, findLinkMark, hasMark, styleFromEntries } from './render-utils.js';
 import type { InlineRun, TextElement } from '../schema.js';
 
 /**

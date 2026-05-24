@@ -6,7 +6,7 @@
 
 **Architecture:** Keep the existing Cloudflare Worker, Hono routes, Clerk auth, Drizzle/Neon store, and Gemini adapter pattern. Replace the ProseMirror page model with canvas JSON: a site has canvas pages, each page has ordered canvas sections, each section has positioned design primitives. Publish promotes the current editable site into a stored published snapshot and broadcasts the new rendered HTML through a site Durable Object.
 
-**Rich text scope (2026-05-22 amendment):** ProseMirror remains retired as the *page* model. Rich text lives **only inside a `TextElement`** as a flat array of inline runs — no block structure (no paragraphs/lists/blockquotes). The text element's `role` (heading / body / label), `fontSize`, `fontWeight`, `align`, and `box` are unchanged; what changes is the content shape. See "Rich Text Content Model" below for the exact contract; Task 4.5 retrofits Task 1's schema/validator/renderer/fixture and Task 4's editor to honour it before Task 5 ships publish.
+**Rich text scope (2026-05-22 amendment):** ProseMirror remains retired as the _page_ model. Rich text lives **only inside a `TextElement`** as a flat array of inline runs — no block structure (no paragraphs/lists/blockquotes). The text element's `role` (heading / body / label), `fontSize`, `fontWeight`, `align`, and `box` are unchanged; what changes is the content shape. See "Rich Text Content Model" below for the exact contract; Task 4.5 retrofits Task 1's schema/validator/renderer/fixture and Task 4's editor to honour it before Task 5 ships publish.
 
 **Tech Stack:** Cloudflare Workers, Hono JSX, Drizzle ORM, Neon serverless Postgres, Clerk, Durable Objects, vanilla browser JS, Gemini adapter via `@google/genai`.
 
@@ -38,14 +38,14 @@ export type InlineMark =
   | { type: 'link'; href: string };
 
 export interface InlineRun {
-  text: string;          // raw text, no HTML; newlines are literal U+000A
-  marks?: InlineMark[];  // 0..N marks; order is style-irrelevant but must be deduplicated by type (link allowed once)
+  text: string; // raw text, no HTML; newlines are literal U+000A
+  marks?: InlineMark[]; // 0..N marks; order is style-irrelevant but must be deduplicated by type (link allowed once)
 }
 
 // Replaces the prior `text: string` field on TextElement:
 export interface TextElement extends BaseElement {
   type: 'text';
-  content: InlineRun[];  // 1..N runs; the concatenation of run.text is the plain-text projection
+  content: InlineRun[]; // 1..N runs; the concatenation of run.text is the plain-text projection
   role: 'heading' | 'body' | 'label';
   fontSize: number;
   fontWeight: 400 | 500 | 600 | 700;
@@ -152,6 +152,7 @@ These are the cross-cutting invariants the POC commits to. They override looser 
 ## File Structure
 
 Create:
+
 - `src/canvas/schema.ts` - canonical canvas JSON types, deterministic style kits, design primitives, motion presets, and section recipes.
 - `src/canvas/validate.ts` - pure validator for canvas pages, style kits, primitives, media, motion, and snapshots.
 - `src/canvas/render.ts` - pure renderer from published snapshot to HTML.
@@ -170,6 +171,7 @@ Create:
 - `src/assets/site-assets.ts` - site asset helpers and response serialization.
 
 Modify:
+
 - `src/db/schema.ts` - replace document-shaped page fields with canvas fields; add subdomain, published snapshot fields, and site assets.
 - `src/templates/registry.ts` - collapse to one canvas template seed.
 - `src/routes/api/sites.ts` - fix auth middleware and create a canvas site with subdomain.
@@ -181,6 +183,7 @@ Modify:
 - `README.md`, `RECON.md`, `src/*/SUBSYSTEM.md` - align public docs with canvas-first POC.
 
 Retire after replacement is passing:
+
 - `src/document/*`
 - `src/multiplayer/*`
 - old `src/editor/client.ts`, `src/editor/index.tsx`, `src/editor/styles.ts`
@@ -191,6 +194,7 @@ Retire after replacement is passing:
 ### Task 1: Canvas Domain Model And Validator
 
 **Files:**
+
 - Create: `src/canvas/schema.ts`
 - Create: `src/canvas/validate.ts`
 - Create: `src/canvas/fixtures/home.json`
@@ -211,19 +215,52 @@ export type ElementType = (typeof ELEMENT_TYPES)[number];
 export const MEDIA_KINDS = ['image', 'video'] as const;
 export type MediaKind = (typeof MEDIA_KINDS)[number];
 
-export const ACTION_VARIANTS = ['solid', 'outline', 'ghost', 'pill', 'glass', 'brutalist', 'underline'] as const;
+export const ACTION_VARIANTS = [
+  'solid',
+  'outline',
+  'ghost',
+  'pill',
+  'glass',
+  'brutalist',
+  'underline',
+] as const;
 export type ActionVariant = (typeof ACTION_VARIANTS)[number];
 
-export const SURFACE_VARIANTS = ['flat', 'raised', 'glass', 'outlined', 'sticker', 'editorial-frame', 'soft-panel'] as const;
+export const SURFACE_VARIANTS = [
+  'flat',
+  'raised',
+  'glass',
+  'outlined',
+  'sticker',
+  'editorial-frame',
+  'soft-panel',
+] as const;
 export type SurfaceVariant = (typeof SURFACE_VARIANTS)[number];
 
 export const SHAPE_VARIANTS = ['rect', 'pill', 'circle', 'line', 'badge', 'blob'] as const;
 export type ShapeVariant = (typeof SHAPE_VARIANTS)[number];
 
-export const MOTION_PRESETS = ['none', 'fade-up', 'slide-left', 'scale-in', 'blur-in', 'stagger-children', 'slow-drift', 'parallax-soft'] as const;
+export const MOTION_PRESETS = [
+  'none',
+  'fade-up',
+  'slide-left',
+  'scale-in',
+  'blur-in',
+  'stagger-children',
+  'slow-drift',
+  'parallax-soft',
+] as const;
 export type MotionPreset = (typeof MOTION_PRESETS)[number];
 
-export const SECTION_RECIPE_IDS = ['hero-split', 'feature-grid', 'gallery-strip', 'cta-band', 'logo-strip', 'testimonial-row', 'video-hero'] as const;
+export const SECTION_RECIPE_IDS = [
+  'hero-split',
+  'feature-grid',
+  'gallery-strip',
+  'cta-band',
+  'logo-strip',
+  'testimonial-row',
+  'video-hero',
+] as const;
 export type SectionRecipeId = (typeof SECTION_RECIPE_IDS)[number];
 
 export interface CanvasPoint {
@@ -290,7 +327,12 @@ export interface ContainerElement extends BaseElement {
   variant: SurfaceVariant;
 }
 
-export type CanvasElement = TextElement | MediaElement | ActionElement | ShapeElement | ContainerElement;
+export type CanvasElement =
+  | TextElement
+  | MediaElement
+  | ActionElement
+  | ShapeElement
+  | ContainerElement;
 
 export interface CanvasSection {
   id: string;
@@ -364,6 +406,7 @@ console.log('[canvas:smoke] OK');
 - [ ] **Step 3: Implement the validator**
 
 Create `src/canvas/validate.ts` with `validateCanvasSiteState` and `validatePublishedSnapshot`. It must reject:
+
 - unknown style kit
 - unknown element type
 - unknown action, surface, shape, media, or motion variant
@@ -399,6 +442,7 @@ Expected: FAIL with `renderCanvasSnapshot red-test sentinel`.
 - [ ] **Step 6: Implement enough rendering to pass**
 
 Implement `renderCanvasSnapshot` as a pure HTML string renderer. It should:
+
 - wrap all pages in `<main class="rev01-site" data-style-kit="...">`
 - render sections with `position:relative;width:...px;height:...px`
 - render elements as absolutely positioned nodes using their `box`
@@ -438,6 +482,7 @@ git commit -m "feat: add canvas document model"
 ### Task 2: Database Shape, Single Template Seed, And Site Creation
 
 **Files:**
+
 - Modify: `src/db/schema.ts`
 - Modify: `src/templates/registry.ts`
 - Modify: `src/routes/api/sites.ts`
@@ -468,8 +513,12 @@ Add `siteAsset`:
 
 ```ts
 export const siteAsset = pgTable('site_asset', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id').notNull().references(() => site.id, { onDelete: 'cascade' }),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  siteId: text('site_id')
+    .notNull()
+    .references(() => site.id, { onDelete: 'cascade' }),
   mediaType: text('media_type').notNull(),
   bytesBase64: text('bytes_base64').notNull(),
   kind: text('kind').notNull().$type<'image' | 'video'>(),
@@ -496,7 +545,8 @@ export interface TemplateSeed {
 export const starterTemplate: TemplateSeed = {
   id: 'starter-canvas',
   name: 'Starter Canvas',
-  tagline: 'A desktop canvas site with editable sections, text, media, actions, shapes, containers, style kits, and motion.',
+  tagline:
+    'A desktop canvas site with editable sections, text, media, actions, shapes, containers, style kits, and motion.',
   state: seed as CanvasSiteState,
 };
 
@@ -526,6 +576,7 @@ On duplicate subdomain, return `409` with a clear JSON error. Do not silently mu
 - [ ] **Step 4: Update template screen**
 
 Modify `src/routes/dashboard/templates.tsx` to show one form:
+
 - site name
 - published address input prefix/suffix: `<input name="subdomain">.aayushman.dev`
 - hidden template id `starter-canvas`
@@ -536,6 +587,7 @@ Keep the screen plain but usable.
 - [ ] **Step 5: Add route smoke coverage**
 
 Modify `src/review-smoke.ts` to assert:
+
 - invalid subdomain returns 400 from `POST /api/sites` once authenticated request helpers are available
 - unknown public host returns 404 after Task 4 wires public routing
 
@@ -564,6 +616,7 @@ git commit -m "feat: create canvas sites from one template"
 ### Task 3: Canvas Editor Load, Save, Style Kit, And Section Editing APIs
 
 **Files:**
+
 - Create: `src/routes/api/canvas.ts`
 - Modify: `src/index.ts`
 - Modify: `src/routes/dashboard/index.tsx`
@@ -572,6 +625,7 @@ git commit -m "feat: create canvas sites from one template"
 - [ ] **Step 1: Add owner canvas API**
 
 Create `src/routes/api/canvas.ts` with:
+
 - `GET /api/canvas/sites/:siteId` returns `{ siteId, name, subdomain, editableState, publishedVersion }`
 - `PUT /api/canvas/sites/:siteId` accepts full `CanvasSiteState`, validates it, writes `site.editableState`, and returns `{ ok: true }`
 - `POST /api/canvas/sites/:siteId/style-kit` accepts `{ styleKit }`, validates against `STYLE_KITS`, updates `editableState.styleKit` and `site.styleKit`
@@ -592,9 +646,7 @@ app.route('/api/canvas', canvasApi);
 Modify `src/routes/dashboard/index.tsx` to point latest site to:
 
 ```tsx
-<a href={`/dashboard/sites/${editorLink.siteId}/edit`}>
-  {editorLink.siteName}
-</a>
+<a href={`/dashboard/sites/${editorLink.siteId}/edit`}>{editorLink.siteName}</a>
 ```
 
 No page id is needed for the POC because the editable site owns one canvas page.
@@ -626,6 +678,7 @@ git commit -m "feat: add canvas editing api"
 ### Task 4: Desktop Canvas Editor UI
 
 **Files:**
+
 - Create: `src/editor/canvas-index.tsx`
 - Create: `src/editor/canvas-client.ts`
 - Create: `src/editor/canvas-styles.ts`
@@ -634,6 +687,7 @@ git commit -m "feat: add canvas editing api"
 - [ ] **Step 1: Add editor route shell**
 
 Create `src/editor/canvas-index.tsx` route `GET /dashboard/sites/:siteId/edit`. It should:
+
 - auth-gate owner
 - verify site ownership
 - render topbar with site name, public address, style-kit choices, save button, publish button
@@ -644,6 +698,7 @@ Create `src/editor/canvas-index.tsx` route `GET /dashboard/sites/:siteId/edit`. 
 - [ ] **Step 2: Add client state loader**
 
 Create `src/editor/canvas-client.ts` exporting `canvasClientScript(params)`. First client milestone:
+
 - fetch `/api/canvas/sites/:siteId`
 - store `state`
 - render page sections into `#canvas-root`
@@ -653,6 +708,7 @@ Create `src/editor/canvas-client.ts` exporting `canvasClientScript(params)`. Fir
 - [ ] **Step 3: Add selection and inline text editing**
 
 In the client script:
+
 - clicking an element selects it
 - double-clicking text sets `contenteditable=true`
 - blur writes text back to state and re-renders
@@ -661,6 +717,7 @@ In the client script:
 - [ ] **Step 4: Add drag and resize**
 
 In the client script:
+
 - selected elements can be dragged within their canvas section
 - selected elements have one southeast resize handle
 - clamp movement to section bounds and page width
@@ -669,6 +726,7 @@ In the client script:
 - [ ] **Step 5: Add content and section controls**
 
 Add toolbar buttons:
+
 - add text to selected section
 - add image/video media to selected section using existing asset id or URL-backed seed asset
 - add action to selected section
@@ -683,6 +741,7 @@ Add toolbar buttons:
 Style-kit buttons call `POST /api/canvas/sites/:siteId/style-kit`, update local state, and re-render immediately.
 
 The selected-element inspector should expose only curated controls:
+
 - action variant from `ACTION_VARIANTS`
 - shape variant from `SHAPE_VARIANTS`
 - container variant from `SURFACE_VARIANTS`
@@ -722,17 +781,18 @@ git commit -m "feat: add desktop canvas editor"
 
 ### Task 4.5: Rich Text Content Retrofit
 
-**Why:** Tasks 1 and 4 shipped `TextElement.text: string`. The plan now requires `TextElement.content: InlineRun[]`. This task lands the contract from "Rich Text Content Model" above across schema, validator, renderer, fixture, smoke, editor, and any code that read `element.text` — *before* publish (Task 5) renders snapshots and *before* AI rewrite (Task 7) speaks the contract.
+**Why:** Tasks 1 and 4 shipped `TextElement.text: string`. The plan now requires `TextElement.content: InlineRun[]`. This task lands the contract from "Rich Text Content Model" above across schema, validator, renderer, fixture, smoke, editor, and any code that read `element.text` — _before_ publish (Task 5) renders snapshots and _before_ AI rewrite (Task 7) speaks the contract.
 
 **Files:**
+
 - Modify: `src/canvas/schema.ts`
 - Modify: `src/canvas/validate.ts`
 - Modify: `src/canvas/render.ts`
 - Modify: `src/canvas/fixtures/home.json`
 - Modify: `src/canvas/smoke.ts`
 - Modify: `src/editor/canvas-client.ts`
-- Modify: `src/editor/canvas-styles.ts` *(only if inline-mark toolbar needs new styles — keep this minimal)*
-- Modify: `src/review-smoke.ts` *(add rich-text validator assertions)*
+- Modify: `src/editor/canvas-styles.ts` _(only if inline-mark toolbar needs new styles — keep this minimal)_
+- Modify: `src/review-smoke.ts` _(add rich-text validator assertions)_
 
 - [ ] **Step 1: Update the schema**
 
@@ -741,6 +801,7 @@ In `src/canvas/schema.ts`, add the exports defined in "Rich Text Content Model":
 - [ ] **Step 2: Update the validator**
 
 In `src/canvas/validate.ts`:
+
 - Replace the `text` string check on text elements with a `content` array walk.
 - For each run: `text` must be a string (empty allowed only if not the sole run; concatenated plain text must not be empty across the element). `marks` (if present) must be an array; each entry is one of the seven object shapes; `link` marks carry an `href` validated against the same allowlist as `ActionElement.href`; no two marks in the same run share a `type`.
 - Emit specific error messages: `text element {id}.content must be a non-empty array`, `text element {id}.content[i].text must be a string`, `text element {id}.content[i].marks[j].type must be one of [...]`, `text element {id}.content[i].marks[j].href ...`, `text element {id} has empty concatenated plain text`.
@@ -749,6 +810,7 @@ In `src/canvas/validate.ts`:
 - [ ] **Step 3: Update the renderer**
 
 In `src/canvas/render.ts`:
+
 - Replace the text-element render branch with a run walk. Outer tag still comes from `role`.
 - For each run, build the nested-mark structure in the fixed order: `<a>` (if link present, outermost), then `<strong>`, `<em>`, `<u>`, `<s>`, `<mark>`, `<code>` (innermost wraps the text node).
 - A run with no marks emits a bare `<span>` around the escaped text.
@@ -758,6 +820,7 @@ In `src/canvas/render.ts`:
 - [ ] **Step 4: Update the fixture**
 
 Modify `src/canvas/fixtures/home.json`:
+
 - Rewrite every text element's `text` string into a `content` array.
 - `hero-heading`: at least two runs, one of which carries a `bold` mark.
 - One text element somewhere (e.g. `hero-body` or `cta-heading`) contains a run with a `link` mark pointing at `https://rev01.aayushman.dev`. Keep the visible behaviour close to the original copy.
@@ -766,6 +829,7 @@ Modify `src/canvas/fixtures/home.json`:
 - [ ] **Step 5: Update the smoke**
 
 In `src/canvas/smoke.ts`, keep all existing data-attribute assertions and add three more:
+
 - the rendered HTML contains `<strong>` somewhere inside the heading element's marker block (proves at least one bold mark rendered);
 - the rendered HTML contains `<a class="rev01-inline-link"` with an `https://` href (proves the link mark path);
 - the validator rejects a hand-built text element whose `content` includes a `link` mark with `href: 'javascript:alert(1)'`.
@@ -773,6 +837,7 @@ In `src/canvas/smoke.ts`, keep all existing data-attribute assertions and add th
 - [ ] **Step 6: Update the editor**
 
 In `src/editor/canvas-client.ts`:
+
 - Replace the plain-text contenteditable commit path with a DOM-to-`InlineRun[]` serializer (per "Rich Text Content Model" above). Cancel/Escape restores the pre-edit `content` snapshot.
 - Add a small inline mark toolbar that appears anchored to the selected text element while it is in edit mode (visible only during edit). Seven buttons matching `INLINE_MARK_TYPES`. `link` button prompts for an href; pre-validate the href against the validator allowlist before applying, and `setStatus('Link rejected: {reason}')` on failure.
 - Keyboard shortcuts: Cmd/Ctrl+B/I/U for bold/italic/underline, Cmd/Ctrl+Shift+X for strike, Cmd/Ctrl+K for link. `preventDefault` so the browser's defaults don't take over.
@@ -782,6 +847,7 @@ In `src/editor/canvas-client.ts`:
 - [ ] **Step 7: Update `src/review-smoke.ts`**
 
 Add three new assertions:
+
 - A text element whose `content` is `[]` is rejected with a message mentioning "non-empty array".
 - A run whose `marks` contains `{ type: 'rainbow' }` is rejected with a message mentioning the offending type.
 - A link mark with `href: 'javascript:alert(1)'` is rejected.
@@ -812,6 +878,7 @@ git commit -m "feat: inline rich text content inside text elements"
 ### Task 5: Published Snapshot, Public Address Routing, And Visitor Live Update
 
 **Files:**
+
 - Create: `src/routes/api/publish.ts`
 - Create: `src/routes/public.ts`
 - Create: `src/live/site-room.ts`
@@ -825,6 +892,7 @@ git commit -m "feat: inline rich text content inside text elements"
 Create `src/routes/api/publish.ts` with `POST /api/publish/sites/:siteId`.
 
 It must:
+
 - auth-gate owner
 - load owned site
 - validate `editableState`
@@ -839,10 +907,11 @@ It must:
 Create `src/routes/public.ts` with a function:
 
 ```ts
-export async function handlePublicRequest(c: Context<Env>): Promise<Response | null>
+export async function handlePublicRequest(c: Context<Env>): Promise<Response | null>;
 ```
 
 It should:
+
 - inspect `new URL(c.req.url).host`
 - resolve only owned-domain subdomains such as `*.aayushman.dev`
 - ignore app hosts such as `rev01.aayushman.dev` and `localhost:8787`
@@ -911,13 +980,15 @@ The public renderer should include:
 
 ```html
 <script type="module">
-const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/__live`);
-ws.addEventListener('message', (event) => {
-  const payload = JSON.parse(event.data);
-  if (payload && payload.html) {
-    document.querySelector('[data-rev01-public-root]').innerHTML = payload.html;
-  }
-});
+  const ws = new WebSocket(
+    `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/__live`,
+  );
+  ws.addEventListener('message', (event) => {
+    const payload = JSON.parse(event.data);
+    if (payload && payload.html) {
+      document.querySelector('[data-rev01-public-root]').innerHTML = payload.html;
+    }
+  });
 </script>
 ```
 
@@ -948,9 +1019,10 @@ git commit -m "feat: publish canvas sites to public addresses"
 **Why:** Task 5 shipped publish + public routing + the SiteRoom DO, but its smoke coverage stops at "subdomain not found returns 404" and "app host serves landing". The plan now requires explicit assertions for the publish path itself, the `/__live` upgrade path, and the stale-version visitor protection. A code-review finding on `src/live/site-room.ts` (BroadcastPayload accepted any JSON shape — wrong-type payloads would reach every visitor's `innerHTML` assignment) is fixed here.
 
 **Files:**
+
 - Modify: `src/live/site-room.ts`
-- Modify: `src/routes/api/publish.ts` *(only if needed to expose a versioned payload shape)*
-- Modify: `src/routes/public.ts` *(stale-version filter in visitor script)*
+- Modify: `src/routes/api/publish.ts` _(only if needed to expose a versioned payload shape)_
+- Modify: `src/routes/public.ts` _(stale-version filter in visitor script)_
 - Modify: `src/review-smoke.ts`
 
 - [ ] **Step 1: Lock the broadcast payload shape at runtime**
@@ -961,7 +1033,12 @@ In `src/live/site-room.ts`, replace the implicit `as BroadcastPayload` cast with
 function isBroadcastPayload(value: unknown): value is { version: number; html: string } {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return typeof v.version === 'number' && Number.isFinite(v.version) && v.version >= 1 && typeof v.html === 'string';
+  return (
+    typeof v.version === 'number' &&
+    Number.isFinite(v.version) &&
+    v.version >= 1 &&
+    typeof v.html === 'string'
+  );
 }
 ```
 
@@ -970,6 +1047,7 @@ If the parsed body fails this check, return `400 'invalid broadcast payload'`. F
 - [ ] **Step 2: Stamp + filter stale versions in the visitor script**
 
 In `src/routes/public.ts` (the inline `VISITOR_LIVE_SCRIPT`):
+
 - Store the server-rendered snapshot version in a window-scoped `let currentVersion = N` literal injected at render time (escape the integer).
 - When a `broadcast` message arrives, ignore it if `payload.version <= currentVersion`. Otherwise apply and update `currentVersion = payload.version`.
 - A reconnect that fires after the page has already been refreshed by a full reload starts at the rendered snapshot version, so stale republishes never overwrite a fresh load.
@@ -1014,11 +1092,12 @@ git commit -m "feat: harden publish broadcast + visitor live-update smoke"
 **Why:** Tasks 1 + 4 left the schema with `pages: CanvasPage[]` and the editor pinned to `state.pages[0]`. The invariants block above says the POC validator must enforce exactly one page, the surface primitive must render `aria-hidden`, and DOM order must follow `elements[]` deterministically. This task lands those rules retroactively so T6 and T7 can rely on them.
 
 **Files:**
+
 - Modify: `src/canvas/validate.ts`
 - Modify: `src/canvas/render.ts`
 - Modify: `src/canvas/smoke.ts`
-- Modify: `src/routes/api/canvas.ts` *(PUT defends against multi-page payloads loudly)*
-- Modify: `src/routes/api/publish.ts` *(snapshot validation already calls validate, so the new rule cascades — confirm)*
+- Modify: `src/routes/api/canvas.ts` _(PUT defends against multi-page payloads loudly)_
+- Modify: `src/routes/api/publish.ts` _(snapshot validation already calls validate, so the new rule cascades — confirm)_
 - Modify: `src/review-smoke.ts`
 
 - [ ] **Step 1: Validator — exactly one page**
@@ -1028,6 +1107,7 @@ In `src/canvas/validate.ts`, after the existing "no pages" check, also reject `s
 - [ ] **Step 2: Renderer — surface + shape aria-hidden, deterministic order**
 
 In `src/canvas/render.ts`:
+
 - The element render loop already iterates `section.elements[]` in order — confirm and add a comment that this is the reading order contract.
 - For shape and surface (container) elements, emit `aria-hidden="true" role="presentation"` on the outer wrapper.
 - For text and action elements, emit no extra ARIA attributes (defaults are correct).
@@ -1037,6 +1117,7 @@ In `src/canvas/render.ts`:
 - [ ] **Step 3: Smoke**
 
 In `src/canvas/smoke.ts`, add:
+
 - The rendered HTML for `section-hero` contains an element with `aria-hidden="true"` (the shape `hero-orb` or the surface `hero-card`).
 - The rendered HTML does NOT contain `aria-hidden="true"` on the text heading (`hero-heading`).
 - The validator rejects `{ ...starter, pages: [...starter.pages, ...starter.pages] }` (two pages) with the new error message.
@@ -1076,12 +1157,14 @@ git commit -m "feat: enforce single-page POC + a11y reading order"
 **Why:** Task 4 shipped the editor with no zoom, pan/scroll, or z-order controls. Absolute-positioned elements at a 1440px design width on a smaller laptop screen are unusable without fit-to-width zoom; overlapping shapes/surfaces need bring-forward / send-back. Owner-facing reading order (Task 5.6) is also surfaced here via element reorder controls.
 
 **Files:**
+
 - Modify: `src/editor/canvas-client.ts`
 - Modify: `src/editor/canvas-styles.ts`
 
 - [ ] **Step 1: Viewport zoom**
 
 In `src/editor/canvas-client.ts`, wrap `#canvas-root` in a viewport container with explicit scroll. The viewport has:
+
 - A toolbar zoom group (top-left of the canvas): buttons `Fit`, `100%`, `+`, `-`. Zoom range 0.25..2.0 in 0.1 increments.
 - A `let zoom = 1` state variable; the canvas-root wrapper has `transform: scale(zoom)` + a `transform-origin: top left;` and the viewport scrolls naturally.
 - `Fit` computes `viewport.clientWidth / page.width` clamped to [0.25, 1.0] (don't auto-zoom-in past 100%).
@@ -1091,6 +1174,7 @@ In `src/editor/canvas-client.ts`, wrap `#canvas-root` in a viewport container wi
 - [ ] **Step 2: Z-order controls**
 
 In the element inspector (any selected element):
+
 - Add four buttons: `Bring to front`, `Send to back`, `Forward`, `Backward`.
 - Z-order operates on the element's `box.z` integer. "Bring to front" → `max(siblingZ) + 1`. "Send to back" → `min(siblingZ) - 1`. "Forward" / "Backward" → swap z with the next sibling in the same direction.
 - After mutation, re-render the section and trigger autosave.
@@ -1102,6 +1186,7 @@ In the element inspector add two buttons: `Move up in reading order`, `Move down
 - [ ] **Step 4: Styles**
 
 In `src/editor/canvas-styles.ts`, add styles for:
+
 - `.rev01-viewport` (scroll container, dark background outside the page).
 - `.rev01-zoom-toolbar` (small floating button group, top-left of viewport).
 - `.rev01-reorder-buttons` (compact inspector group).
@@ -1130,6 +1215,7 @@ git commit -m "feat: viewport zoom, z-order, and reading-order controls"
 ### Task 6: Site Assets And Media Replacement
 
 **Files:**
+
 - Create: `src/assets/site-assets.ts`
 - Create: `src/canvas/seed-assets.ts` — registry of seed asset bytes
 - Modify: `src/routes/api/canvas.ts`
@@ -1142,6 +1228,7 @@ git commit -m "feat: viewport zoom, z-order, and reading-order controls"
 - Modify: `src/review-smoke.ts`
 
 **Amended scope (2026-05-22 round 2):**
+
 - A site created from a Template Seed must ship a working set of `siteAsset` rows. No broken `<img>` / `<video>` after site creation.
 - The public `/assets/:assetId` route serves ONLY assets referenced by the current `publishedSnapshot`. Visitor-visible asset surface is constrained by the published snapshot, not the editable library.
 - The publish endpoint refuses to publish a state that references a missing asset id.
@@ -1151,7 +1238,11 @@ git commit -m "feat: viewport zoom, z-order, and reading-order controls"
 Create `src/assets/site-assets.ts`:
 
 ```ts
-export function dataUrlToAsset(input: string): { kind: 'image' | 'video'; mediaType: string; bytesBase64: string } {
+export function dataUrlToAsset(input: string): {
+  kind: 'image' | 'video';
+  mediaType: string;
+  bytesBase64: string;
+} {
   const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=]+)$/.exec(input);
   if (!match) throw new Error('asset data must be a base64 data URL');
   const mediaType = match[1];
@@ -1174,7 +1265,9 @@ export function assetResponse(mediaType: string, bytesBase64: string): Response 
 // referenced by a media element (including posterAssetId). Used by:
 // - publish to verify all referenced assets exist before snapshotting;
 // - public /assets/:assetId to scope serving to the current snapshot only.
-export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> { /* ... */ }
+export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> {
+  /* ... */
+}
 ```
 
 - [ ] **Step 2: Build the seed asset registry**
@@ -1188,6 +1281,7 @@ The validator gains a step: every media element's `assetId` AND `posterAssetId` 
 - [ ] **Step 3: Materialise seed assets on site creation**
 
 Modify `src/routes/api/sites.ts`. After the `site` row is inserted (and before returning 201), insert one `siteAsset` row per seed asset id referenced by `starterTemplate.state.pages`. Each row gets:
+
 - `id = seed asset id` (so the editable state's `assetId` references resolve immediately).
 - `siteId = newSiteId`.
 - `mediaType` from the registry entry.
@@ -1202,6 +1296,7 @@ The seed-asset bytes are large-ish — keep the in-Postgres copy as base64 text 
 - [ ] **Step 4: Add owner asset upload route**
 
 In `src/routes/api/canvas.ts`, add:
+
 - `POST /api/canvas/sites/:siteId/assets`
 - accepts `{ dataUrl, alt }`
 - validates ownership
@@ -1214,6 +1309,7 @@ Owner asset upload always creates a NEW row. The seed asset ids are never overwr
 - [ ] **Step 5: Add publish-scoped public asset route**
 
 In `src/routes/public.ts`, serve `/assets/:assetId` ONLY for assets that appear in the resolved site's `publishedSnapshot`:
+
 - Reject if the site has no `publishedSnapshot` → 404.
 - Compute the set of `assetId`s referenced by `publishedSnapshot.pages` (via `collectReferencedAssetIds`).
 - If the requested `assetId` is not in the set → 404 (do NOT leak existence of editable-only assets).
@@ -1225,6 +1321,7 @@ The Owner-side editor reads assets via a separate owner-gated route (Step 7) —
 - [ ] **Step 6: Refuse publish on missing-asset reference**
 
 In `src/routes/api/publish.ts`, before writing the snapshot:
+
 - Compute `referenced = collectReferencedAssetIds(editableState.pages)`.
 - Query `siteAsset` for the intersection of `siteId = site.id` AND `id IN (referenced)`.
 - If the count of returned rows < `referenced.size`, find the missing ones and return `400 { error: 'cannot publish: missing assets', missingAssetIds: [...] }`.
@@ -1237,6 +1334,7 @@ In `src/routes/api/canvas.ts`, add `GET /sites/:siteId/assets/:assetId` (owner-g
 - [ ] **Step 8: Editor media replacement**
 
 In `src/editor/canvas-client.ts`, when a media element is selected:
+
 - Show a file input (one for image, one for video — accept the corresponding mime types).
 - Read the selected file as a base64 data URL.
 - POST to `/api/canvas/sites/:siteId/assets` with `{ dataUrl, alt }`.
@@ -1248,6 +1346,7 @@ In `src/editor/canvas-client.ts`, when a media element is selected:
 - [ ] **Step 9: Smoke**
 
 In `src/review-smoke.ts`, add:
+
 - The validator's new `validateSeedFixture` accepts the seed fixture (positive case).
 - The validator's `validateSeedFixture` rejects a hand-built fixture whose media references an unknown asset id.
 - After site creation via the owner's site-create endpoint, the corresponding `siteAsset` row count == seed asset id count.
@@ -1278,6 +1377,7 @@ git commit -m "feat: seed media assets + publish-scoped public asset serving"
 ### Task 7: Previewed AI Canvas Edits
 
 **Files:**
+
 - Create: `src/agent/canvas-ops.ts`
 - Create: `src/agent/canvas-tools.ts`
 - Create: `src/routes/api/canvas-agent.ts`
@@ -1294,7 +1394,13 @@ import type { CanvasSiteState, CanvasSection } from '../canvas/schema';
 
 export type CanvasAgentOp =
   | { kind: 'rewriteText'; elementId: string; content: InlineRun[] }
-  | { kind: 'replaceMedia'; elementId: string; mediaKind: 'image' | 'video'; assetId: string; alt: string }
+  | {
+      kind: 'replaceMedia';
+      elementId: string;
+      mediaKind: 'image' | 'video';
+      assetId: string;
+      alt: string;
+    }
   | { kind: 'insertSection'; afterSectionId: string | null; section: CanvasSection };
 
 export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): CanvasSiteState {
@@ -1303,13 +1409,15 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
   if (!page) throw new Error('canvas agent op requires at least one page');
   if (op.kind === 'rewriteText') {
     const element = page.sections.flatMap((s) => s.elements).find((el) => el.id === op.elementId);
-    if (!element || element.type !== 'text') throw new Error(`text element not found: ${op.elementId}`);
+    if (!element || element.type !== 'text')
+      throw new Error(`text element not found: ${op.elementId}`);
     element.content = op.content;
     return next;
   }
   if (op.kind === 'replaceMedia') {
     const element = page.sections.flatMap((s) => s.elements).find((el) => el.id === op.elementId);
-    if (!element || element.type !== 'media') throw new Error(`media element not found: ${op.elementId}`);
+    if (!element || element.type !== 'media')
+      throw new Error(`media element not found: ${op.elementId}`);
     element.mediaKind = op.mediaKind;
     element.assetId = op.assetId;
     element.alt = op.alt;
@@ -1335,11 +1443,17 @@ export interface RecipeFactoryInput {
   assetIds: { hero?: string; cards?: string[]; gallery?: string[] };
 }
 export type RecipeFactory = (input: RecipeFactoryInput) => CanvasSection;
-export const RECIPE_REGISTRY: Record<SectionRecipeId, RecipeFactory> = { /* one per id */ };
-export function createSectionFromRecipe(recipeId: SectionRecipeId, input: RecipeFactoryInput): CanvasSection;
+export const RECIPE_REGISTRY: Record<SectionRecipeId, RecipeFactory> = {
+  /* one per id */
+};
+export function createSectionFromRecipe(
+  recipeId: SectionRecipeId,
+  input: RecipeFactoryInput,
+): CanvasSection;
 ```
 
 Every entry in `SECTION_RECIPE_IDS` MUST have a factory. Each factory:
+
 - Produces a fully-formed `CanvasSection` with deterministic ids (`sec-{recipe}-{shortRand}`, elements `el-{role}-{shortRand}`).
 - Honours the rich-text content model (no plain-string `text` anywhere).
 - References asset ids supplied via `assetIds`; falls back to placeholder seed ids ONLY if `assetIds` is empty AND the brief explicitly asks for it. Default behaviour: the caller MUST supply real asset ids (the preview endpoint generates or uploads them first).
@@ -1356,6 +1470,7 @@ Every entry in `SECTION_RECIPE_IDS` MUST have a factory. Each factory:
 - [ ] **Step 2: Define constrained tools**
 
 Create `src/agent/canvas-tools.ts` with tools:
+
 - `rewriteText(elementId, content)` — `content` is the `InlineRun[]` defined in the Rich Text Content Model. Tool schema MUST instruct the model to produce the run array, not a plain string.
 - `replaceMedia(elementId, assetId, alt)` — the LLM picks an existing uploaded asset by id and supplies alt text. The tool does NOT generate media bytes. Media uploads go through the owner asset route (Task 6). **Renamed from `generateReplacementMedia` (2026-05-22 round 2 amendment)** because no real media-generation adapter exists; T-future may add one.
 - `createSection(recipeId, afterSectionId, brief, assetIds)` — `recipeId` MUST be one of `SECTION_RECIPE_IDS`; `assetIds` are existing uploaded asset ids the recipe should slot. Tool schema enumerates valid recipe ids in the description so the model cannot invent one.
@@ -1365,6 +1480,7 @@ The endpoint returns preview ops only. It does not mutate `editableState`.
 - [ ] **Step 3: Add preview endpoint**
 
 Create `src/routes/api/canvas-agent.ts`:
+
 - `POST /api/canvas-agent/sites/:siteId/preview`
 - auth-gates owner
 - loads editable state
@@ -1378,6 +1494,7 @@ Create `src/routes/api/canvas-agent.ts`:
 - [ ] **Step 4: Add apply endpoint**
 
 Add `POST /api/canvas-agent/sites/:siteId/apply`:
+
 - accepts `{ ops }`
 - validates by dry-run
 - writes updated `editableState`
@@ -1386,6 +1503,7 @@ Add `POST /api/canvas-agent/sites/:siteId/apply`:
 - [ ] **Step 5: Add editor preview UI**
 
 In `src/editor/canvas-client.ts`:
+
 - selected text element shows "AI rewrite"
 - selected media shows "AI media"
 - section toolbar shows "AI section"
@@ -1416,6 +1534,7 @@ git commit -m "feat: preview ai edits for canvas sites"
 ### Task 8: Deterministic Style Kits, Visual Variants, Motion, And Presence Indicator
 
 **Files:**
+
 - Modify: `src/canvas/schema.ts`
 - Modify: `src/canvas/render.ts`
 - Modify: `src/editor/canvas-client.ts`
@@ -1448,7 +1567,10 @@ export interface StyleKitPreset {
   radius: string;
   borderWidth: string;
   shadow: string;
-  surfaceVariants: Record<SurfaceVariant, { background?: string; border?: string; shadow?: string; radius?: string }>;
+  surfaceVariants: Record<
+    SurfaceVariant,
+    { background?: string; border?: string; shadow?: string; radius?: string }
+  >;
   // Shapes
   shapeFill: string;
   shapeStroke: string;
@@ -1456,19 +1578,25 @@ export interface StyleKitPreset {
   // Actions
   actionRadius: string;
   actionPadding: string;
-  actionVariants: Record<ActionVariant, { background?: string; color?: string; border?: string; weight?: number }>;
+  actionVariants: Record<
+    ActionVariant,
+    { background?: string; color?: string; border?: string; weight?: number }
+  >;
   // Motion
   motionDurationMs: number;
   motionEasing: string;
   motionPresets: Record<MotionPreset, { delayMs?: number; transform?: string; opacity?: number }>;
 }
 
-export const STYLE_KIT_PRESETS: Record<StyleKit, StyleKitPreset> = { /* four kits, fully populated */ };
+export const STYLE_KIT_PRESETS: Record<StyleKit, StyleKitPreset> = {
+  /* four kits, fully populated */
+};
 ```
 
 Every kit MUST fill every field. There is no "default" fallback at runtime — a missing token is a compile error. The renderer translates each preset into a block of `--rev01-*` CSS custom properties on the page wrapper; per-variant maps emit `[data-variant="..."]` selectors so action / surface / shape variants pick up the kit's variant tweaks automatically.
 
 Switching the active style kit MUST visibly affect:
+
 - Page background, panel/surface colours, default text colour.
 - Body + heading typography (different fonts per kit).
 - Action visual variants (a `solid` action in `orange-editorial` differs from a `solid` in `blue-saas`).
@@ -1483,6 +1611,7 @@ Renderer and editor should set CSS variables from `STYLE_KIT_PRESETS[state.style
 Pinned styles on a positioned element override only the matching CSS variable or style field for that element.
 
 Renderer and editor must support:
+
 - action variants from `ACTION_VARIANTS`
 - container/card variants from `SURFACE_VARIANTS`
 - shape variants from `SHAPE_VARIANTS`
@@ -1519,6 +1648,7 @@ git commit -m "feat: add style kits and presence indicator"
 ### Task 9: Retire Old ProseMirror Path And Update Docs
 
 **Files:**
+
 - Delete or stop exporting: `src/document/*`, `src/multiplayer/*`, old `src/editor/client.ts`, old `src/editor/index.tsx`, old `src/editor/styles.ts`
 - Modify: `src/index.ts`
 - Modify: `package.json`
@@ -1530,6 +1660,7 @@ git commit -m "feat: add style kits and presence indicator"
 - [ ] **Step 1: Remove old route wiring**
 
 In `src/index.ts`, remove:
+
 - old `pages` route unless still used by live site room
 - old `agent` route if replaced by `canvas-agent`
 - `PageDocument` export
@@ -1542,6 +1673,7 @@ In `wrangler.toml`, remove `PAGE_DO` only after no imports reference `PageDocume
 - [ ] **Step 3: Remove ProseMirror dependencies**
 
 In `package.json`, remove:
+
 - `prosemirror-model`
 - `prosemirror-state`
 - `prosemirror-transform`
@@ -1586,6 +1718,7 @@ git commit -m "refactor: retire prosemirror poc path"
 ## Self-Review Notes
 
 Spec coverage:
+
 - Canvas page, canvas sections, positioned text/media/actions/shapes/containers: Tasks 1 and 4.
 - Video support: Tasks 1, 4, 6, and 8.
 - Professional template adaptability through curated design primitives, visual variants, section recipes, and motion presets: Tasks 1, 4, 7, and 8.

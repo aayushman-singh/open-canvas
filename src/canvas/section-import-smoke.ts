@@ -48,23 +48,14 @@ for (const seed of allTemplateSeeds) {
   }
 
   for (const row of result.newAssetRows) {
-    assert(
-      row.customerId === targetCustomerId,
-      `${seed.id}: asset row customerId mismatch`,
-    );
-    assert(
-      row.id.startsWith(`seed-${targetCustomerId}-`),
-      `${seed.id}: asset row id shape wrong`,
-    );
+    assert(row.customerId === targetCustomerId, `${seed.id}: asset row customerId mismatch`);
+    assert(row.id.startsWith(`seed-${targetCustomerId}-`), `${seed.id}: asset row id shape wrong`);
     const rawSeedId = row.id.slice(`seed-${targetCustomerId}-`.length);
     const registryEntry = SEED_ASSET_REGISTRY[rawSeedId];
     assert(registryEntry !== undefined, `${seed.id}: row references unknown raw seed ${rawSeedId}`);
     if (registryEntry !== undefined) {
       assert(row.kind === registryEntry.kind, `${seed.id}: row kind mismatch`);
-      assert(
-        row.contentHash === registryEntry.contentHash,
-        `${seed.id}: row contentHash mismatch`,
-      );
+      assert(row.contentHash === registryEntry.contentHash, `${seed.id}: row contentHash mismatch`);
       assert(row.r2Key === registryEntry.r2Key, `${seed.id}: row r2Key mismatch`);
       assert(row.byteSize === registryEntry.byteSize, `${seed.id}: row byteSize mismatch`);
     }

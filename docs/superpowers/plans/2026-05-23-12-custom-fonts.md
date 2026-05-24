@@ -1,6 +1,6 @@
 # Custom font upload
 
-**Wishlist #:** 12  **Tier:** A  **Wave:** 5  **Status:** queued
+**Wishlist #:** 12 **Tier:** A **Wave:** 5 **Status:** queued
 **Depends on:** Phase 0 ✓ (asset pipeline #2), #10 custom theme editor (Wave 2)
 **Blocks:** none
 
@@ -32,7 +32,8 @@ Phase 0 if `siteFont` table exists; otherwise add here:
 ```ts
 // src/db/schema.ts
 siteFont = pgTable('site_font', {
-  id, siteId,
+  id,
+  siteId,
   name: text('name').notNull(),
   family: text('family').notNull(),
   weight: integer('weight').notNull().default(400),

@@ -18,7 +18,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import type { R2Client } from './r2-client.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site } from '../db/schema.js';
-import type { CanvasSiteState } from '../canvas/schema.js';
+import type { CanvasSiteState, PublishedSnapshot } from '../canvas/schema.js';
 
 export interface DeleteAssetDeps {
   db: Db;
@@ -35,9 +35,20 @@ export interface DeleteAssetInput {
 export interface AssetReference {
   siteId: string;
   siteName: string;
+  source: 'editable' | 'published';
+  publishedAddress: string | null;
   pageSlug: string;
   elementId: string;
   role: 'asset' | 'poster';
+}
+
+interface OwnerSiteAssetScanRow {
+  id: string;
+  name: string;
+  subdomain: string;
+  publishedVersion: number;
+  editableState: CanvasSiteState;
+  publishedSnapshot: PublishedSnapshot | null;
 }
 
 export type DeleteAssetResult =
@@ -68,13 +79,25 @@ export async function deleteOwnerAsset(
   const row = rows[0];
   if (!row) return { status: 'not_found' };
 
-  const references = await collectAssetReferences(deps.db, input.customerId, input.assetId);
+  const ownerSites = await loadOwnerSites(deps.db, input.customerId);
+  const references = collectAssetReferences(ownerSites, input.assetId);
   if (!input.confirm) {
     return { status: 'confirm_required', references };
   }
 
+  for (const siteRow of ownerSites) {
+    const cleared = clearAssetReferences(siteRow.editableState, input.assetId);
+    if (!cleared.changed) continue;
+    await deps.db
+      .update(site)
+      .set({ editableState: cleared.state })
+      .where(and(eq(site.id, siteRow.id), eq(site.customerId, input.customerId)));
+  }
+
   // Cascade deletes drop slot_history rows automatically.
-  await deps.db.delete(ownerAsset).where(eq(ownerAsset.id, input.assetId));
+  await deps.db
+    .delete(ownerAsset)
+    .where(and(eq(ownerAsset.id, input.assetId), eq(ownerAsset.customerId, input.customerId)));
 
   // Only delete the R2 object when no other ownerAsset row anywhere
   // (any Owner) still references the same contentHash. A different Owner's
@@ -91,26 +114,45 @@ export async function deleteOwnerAsset(
   return { status: 'deleted', references, r2ObjectDeleted };
 }
 
-async function collectAssetReferences(
-  db: Db,
-  customerId: string,
-  assetId: string,
-): Promise<AssetReference[]> {
-  const ownerSites = await db
+async function loadOwnerSites(db: Db, customerId: string): Promise<OwnerSiteAssetScanRow[]> {
+  return db
     .select({
       id: site.id,
       name: site.name,
+      subdomain: site.subdomain,
+      publishedVersion: site.publishedVersion,
       editableState: site.editableState,
       publishedSnapshot: site.publishedSnapshot,
     })
     .from(site)
     .where(eq(site.customerId, customerId));
+}
 
+function collectAssetReferences(
+  ownerSites: OwnerSiteAssetScanRow[],
+  assetId: string,
+): AssetReference[] {
   const out: AssetReference[] = [];
   for (const siteRow of ownerSites) {
-    collectFromPages(out, siteRow.id, siteRow.name, siteRow.editableState, assetId);
+    collectFromPages(
+      out,
+      siteRow.id,
+      siteRow.name,
+      'editable',
+      null,
+      siteRow.editableState,
+      assetId,
+    );
     if (siteRow.publishedSnapshot) {
-      collectFromPages(out, siteRow.id, siteRow.name, siteRow.publishedSnapshot, assetId);
+      collectFromPages(
+        out,
+        siteRow.id,
+        siteRow.name,
+        'published',
+        siteRow.publishedVersion > 0 ? siteRow.subdomain : null,
+        siteRow.publishedSnapshot,
+        assetId,
+      );
     }
   }
   return out;
@@ -120,6 +162,8 @@ function collectFromPages(
   out: AssetReference[],
   siteId: string,
   siteName: string,
+  source: 'editable' | 'published',
+  publishedAddress: string | null,
   state: CanvasSiteState | { pages: CanvasSiteState['pages'] },
   assetId: string,
 ): void {
@@ -132,17 +176,68 @@ function collectFromPages(
           const key = `${page.slug}|${element.id}|asset`;
           if (!seen.has(key)) {
             seen.add(key);
-            out.push({ siteId, siteName, pageSlug: page.slug, elementId: element.id, role: 'asset' });
+            out.push({
+              siteId,
+              siteName,
+              source,
+              publishedAddress,
+              pageSlug: page.slug,
+              elementId: element.id,
+              role: 'asset',
+            });
           }
         }
         if (element.posterAssetId === assetId) {
           const key = `${page.slug}|${element.id}|poster`;
           if (!seen.has(key)) {
             seen.add(key);
-            out.push({ siteId, siteName, pageSlug: page.slug, elementId: element.id, role: 'poster' });
+            out.push({
+              siteId,
+              siteName,
+              source,
+              publishedAddress,
+              pageSlug: page.slug,
+              elementId: element.id,
+              role: 'poster',
+            });
           }
         }
       }
     }
   }
+}
+
+function clearAssetReferences(
+  state: CanvasSiteState,
+  assetId: string,
+): { changed: false; state: CanvasSiteState } | { changed: true; state: CanvasSiteState } {
+  let pagesChanged = false;
+  const pages = state.pages.map((page) => {
+    let pageChanged = false;
+    const sections = page.sections.map((section) => {
+      let sectionChanged = false;
+      const elements = section.elements.map((element) => {
+        if (element.type !== 'media') return element;
+        let next = element;
+        if (element.assetId === assetId) {
+          next = { ...next, assetId: '' };
+        }
+        if (element.posterAssetId === assetId) {
+          next = { ...next, posterAssetId: '' };
+        }
+        if (next === element) return element;
+        sectionChanged = true;
+        return next;
+      });
+      if (!sectionChanged) return section;
+      pageChanged = true;
+      return { ...section, elements };
+    });
+    if (!pageChanged) return page;
+    pagesChanged = true;
+    return { ...page, sections };
+  });
+
+  if (!pagesChanged) return { changed: false, state };
+  return { changed: true, state: { ...state, pages } };
 }

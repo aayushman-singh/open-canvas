@@ -328,11 +328,15 @@ function validateElement(
           `${basePath}.mediaKind must be one of [${MEDIA_KINDS.join(', ')}] (got ${describe(element.mediaKind)})`,
         );
       }
-      if (!isNonEmptyString(element.assetId)) {
-        errors.push(`${basePath}.assetId must be a non-empty string`);
+      if (typeof element.assetId !== 'string') {
+        errors.push(
+          `${basePath}.assetId must be a string (empty string allowed for unfilled slots)`,
+        );
       }
-      if (element.posterAssetId !== undefined && !isNonEmptyString(element.posterAssetId)) {
-        errors.push(`${basePath}.posterAssetId must be a non-empty string when present`);
+      if (element.posterAssetId !== undefined && typeof element.posterAssetId !== 'string') {
+        errors.push(
+          `${basePath}.posterAssetId must be a string when present (empty string allowed for unfilled slots)`,
+        );
       }
       if (typeof element.alt !== 'string') {
         errors.push(`${basePath}.alt must be a string`);
@@ -531,6 +535,26 @@ function validateEditableShape(state: unknown, errors: string[]): void {
   }
 }
 
+function validatePublishedMediaReferences(pages: unknown, errors: string[]): void {
+  if (!Array.isArray(pages)) return;
+  pages.forEach((page, pageIdx) => {
+    if (!isRecord(page) || !Array.isArray(page.sections)) return;
+    page.sections.forEach((section, sectionIdx) => {
+      if (!isRecord(section) || !Array.isArray(section.elements)) return;
+      section.elements.forEach((element, elementIdx) => {
+        if (!isRecord(element) || element.type !== 'media') return;
+        const basePath = `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}]`;
+        if (element.assetId === '') {
+          errors.push(`${basePath}.assetId must be non-empty in published snapshots`);
+        }
+        if (element.posterAssetId === '') {
+          errors.push(`${basePath}.posterAssetId must be non-empty in published snapshots`);
+        }
+      });
+    });
+  });
+}
+
 export function validateCanvasSiteState(state: unknown): ValidationResult {
   const errors: string[] = [];
   validateEditableShape(state, errors);
@@ -556,6 +580,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   }
   // Re-use the editable validator on the snapshot's pages + style kit.
   validateEditableShape({ styleKit: snapshot.styleKit, pages: snapshot.pages }, errors);
+  validatePublishedMediaReferences(snapshot.pages, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }

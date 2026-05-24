@@ -10,22 +10,23 @@
 
 ## Locked decisions
 
-| # | Decision | Outcome |
-|---|----------|---------|
-| Q1–Q2 | Wishlist scope | 25 items accepted, all in |
-| Q3 | Schema chokepoint | Hybrid — Phase 0 scaffold pre-bakes union, then per-feature dirs |
-| Q4 | Operation paradigm | Stream-as-truth (Yjs op-log canonical, snapshots = materialized photos) |
-| Q5 | CRDT engine | **Yjs** (revive retired `src/multiplayer/` foundations) |
-| Q6 | Asset storage | R2 originals (content-hash key) + `cf.image` transform-on-fetch |
-| Q7 | Custom domains | **Cloudflare for SaaS** — Custom Hostnames API, auto-cert |
-| Q8 | Symbol model | Override-style — master + per-instance partial overrides |
-| Q9 | Forms | Dedicated `formSubmission` table, Turnstile, DO rate-limit, DB + optional webhook delivery |
-| Q10 | Version history | Snapshots **at publish only** — drop per-edit op log persistence |
-| Q11 | Plan format | One md per feature in `docs/superpowers/plans/` + this master index |
-| Q12 | Dispatch | Worktree per agent, 5-wave schedule, 5 concurrent agents per wave |
-| Q13 | Phase 0 scaffold | Schema + registries + DB tables + R2 + asset migration + Yjs projection + per-feature dirs + smoke entries |
+| #     | Decision           | Outcome                                                                                                    |
+| ----- | ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Q1–Q2 | Wishlist scope     | 25 items accepted, all in                                                                                  |
+| Q3    | Schema chokepoint  | Hybrid — Phase 0 scaffold pre-bakes union, then per-feature dirs                                           |
+| Q4    | Operation paradigm | Stream-as-truth (Yjs op-log canonical, snapshots = materialized photos)                                    |
+| Q5    | CRDT engine        | **Yjs** (revive retired `src/multiplayer/` foundations)                                                    |
+| Q6    | Asset storage      | R2 originals (content-hash key) + `cf.image` transform-on-fetch                                            |
+| Q7    | Custom domains     | **Cloudflare for SaaS** — Custom Hostnames API, auto-cert                                                  |
+| Q8    | Symbol model       | Override-style — master + per-instance partial overrides                                                   |
+| Q9    | Forms              | Dedicated `formSubmission` table, Turnstile, DO rate-limit, DB + optional webhook delivery                 |
+| Q10   | Version history    | Snapshots **at publish only** — drop per-edit op log persistence                                           |
+| Q11   | Plan format        | One md per feature in `docs/superpowers/plans/` + this master index                                        |
+| Q12   | Dispatch           | Worktree per agent, 5-wave schedule, 5 concurrent agents per wave                                          |
+| Q13   | Phase 0 scaffold   | Schema + registries + DB tables + R2 + asset migration + Yjs projection + per-feature dirs + smoke entries |
 
 Accepted ADRs:
+
 - [ADR 0005 — Custom domains via Cloudflare for SaaS](../../adr/0005-custom-domains.md).
 - [ADR 0006 — Owner Asset storage backend: R2 originals + Cloudflare image transforms](../../adr/0006-asset-storage-backend.md) (supersedes the storage deferral in ADR 0004).
 - [ADR 0007 — Yjs revival as canonical operation model](../../adr/0007-yjs-revival.md).
@@ -36,48 +37,48 @@ Accepted ADRs:
 
 ### Tier S — flagship engineering
 
-| # | Feature | Owns (write) | Smoke |
-|---|---------|-------------|-------|
-| 1 | Responsive canvas render | `src/canvas/responsive/` | `responsive:smoke` |
-| 2 | Asset pipeline (R2 + cf.image) | **Phase 0** — main thread | `assets:smoke` |
-| 3 | Version history + restore | `src/version/` | `version:smoke` |
-| 4 | Realtime co-editing (Yjs ops) | `src/live/co-edit/` | `coedit:smoke` |
-| 5 | Custom domains (CF for SaaS) | `src/custom-domain/` | `customdomain:smoke` |
-| 6 | OG image generation at edge | `src/og-image/` | `og:smoke` |
+| #   | Feature                        | Owns (write)              | Smoke                |
+| --- | ------------------------------ | ------------------------- | -------------------- |
+| 1   | Responsive canvas render       | `src/canvas/responsive/`  | `responsive:smoke`   |
+| 2   | Asset pipeline (R2 + cf.image) | **Phase 0** — main thread | `assets:smoke`       |
+| 3   | Version history + restore      | `src/version/`            | `version:smoke`      |
+| 4   | Realtime co-editing (Yjs ops)  | `src/live/co-edit/`       | `coedit:smoke`       |
+| 5   | Custom domains (CF for SaaS)   | `src/custom-domain/`      | `customdomain:smoke` |
+| 6   | OG image generation at edge    | `src/og-image/`           | `og:smoke`           |
 
 ### Tier A — meaty subsystems
 
-| # | Feature | Owns (write) | Smoke |
-|---|---------|-------------|-------|
-| 7 | Forms subsystem | `src/forms/` | `forms:smoke` |
-| 8 | Embed primitive | `src/embed/` | `embed:smoke` |
-| 9 | Password-protected publish | `src/password/` | `password:smoke` |
-| 10 | Custom theme editor | `src/themes/` | `themes:smoke` |
-| 11 | Charts primitive | `src/charts/` | `charts:smoke` |
-| 12 | Custom font upload | `src/fonts/` | `fonts:smoke` |
-| 13 | Site search | `src/search/` | `search:smoke` |
-| 14 | Reusable cards / symbols | `src/symbols/` | `symbols:smoke` |
-| 15 | A11y audit subsystem | `src/a11y/` | `a11y:smoke` |
+| #   | Feature                    | Owns (write)    | Smoke            |
+| --- | -------------------------- | --------------- | ---------------- |
+| 7   | Forms subsystem            | `src/forms/`    | `forms:smoke`    |
+| 8   | Embed primitive            | `src/embed/`    | `embed:smoke`    |
+| 9   | Password-protected publish | `src/password/` | `password:smoke` |
+| 10  | Custom theme editor        | `src/themes/`   | `themes:smoke`   |
+| 11  | Charts primitive           | `src/charts/`   | `charts:smoke`   |
+| 12  | Custom font upload         | `src/fonts/`    | `fonts:smoke`    |
+| 13  | Site search                | `src/search/`   | `search:smoke`   |
+| 14  | Reusable cards / symbols   | `src/symbols/`  | `symbols:smoke`  |
+| 15  | A11y audit subsystem       | `src/a11y/`     | `a11y:smoke`     |
 
 ### Tier B — primitives + UX surfaces
 
-| # | Feature | Owns (write) | Smoke |
-|---|---------|-------------|-------|
-| 16 | Multi-page nav (uses #14) | `src/canvas/elements/nav.ts` + editor surface | `nav:smoke` |
-| 17 | Accordion + carousel + interactive runtime | `src/interactive/` | `interactive:smoke` |
-| 18 | Table primitive | `src/canvas/elements/table.ts` | `table:smoke` |
-| 19 | Code block (Shiki) | `src/canvas/elements/code.ts` | `code:smoke` |
-| 20 | Light/dark visitor toggle | `src/themes/visitor-mode/` | `visitor-mode:smoke` |
-| 21 | SEO meta + page metadata | `src/seo/` | `seo:smoke` |
-| 22 | Sitemap + robots generation | `src/seo/sitemap/` (sibling under #21) | `sitemap:smoke` |
+| #   | Feature                                    | Owns (write)                                  | Smoke                |
+| --- | ------------------------------------------ | --------------------------------------------- | -------------------- |
+| 16  | Multi-page nav (uses #14)                  | `src/canvas/elements/nav.ts` + editor surface | `nav:smoke`          |
+| 17  | Accordion + carousel + interactive runtime | `src/interactive/`                            | `interactive:smoke`  |
+| 18  | Table primitive                            | `src/canvas/elements/table.ts`                | `table:smoke`        |
+| 19  | Code block (Shiki)                         | `src/canvas/elements/code.ts`                 | `code:smoke`         |
+| 20  | Light/dark visitor toggle                  | `src/themes/visitor-mode/`                    | `visitor-mode:smoke` |
+| 21  | SEO meta + page metadata                   | `src/seo/`                                    | `seo:smoke`          |
+| 22  | Sitemap + robots generation                | `src/seo/sitemap/` (sibling under #21)        | `sitemap:smoke`      |
 
 ### Tier C — agent-side + i18n
 
-| # | Feature | Owns (write) | Smoke |
-|---|---------|-------------|-------|
-| 23 | AI chat multi-turn command surface | `src/agent/chat/` | `chat:smoke` |
-| 24 | Auto-translate batch op | `src/agent/translate/` | `translate:smoke` |
-| 25 | RTL + per-page locale routing | `src/i18n/` | `i18n:smoke` |
+| #   | Feature                            | Owns (write)           | Smoke             |
+| --- | ---------------------------------- | ---------------------- | ----------------- |
+| 23  | AI chat multi-turn command surface | `src/agent/chat/`      | `chat:smoke`      |
+| 24  | Auto-translate batch op            | `src/agent/translate/` | `translate:smoke` |
+| 25  | RTL + per-page locale routing      | `src/i18n/`            | `i18n:smoke`      |
 
 ---
 
@@ -126,6 +127,7 @@ Wave 5 (Tier C + tail)
 ```
 
 Cross-wave ordering constraints:
+
 - Wave 4 #16 must come after Wave 3 #14.
 - Wave 4 #22 must come after Wave 3 #21 (reads SEO fields).
 - All Tier-B/C waves wait on Phase 0.
@@ -136,14 +138,14 @@ Cross-wave ordering constraints:
 
 5 waves, each = up to 5 concurrent agents dispatched in one tool message.
 
-| Wave | Items | Notes |
-|------|-------|-------|
-| **0** | Phase 0 scaffold (main thread, sequential) | See checklist below. |
-| **1** | #1, #3, #4, #5, #6 | Tier S parallel. |
-| **2** | #7, #8, #9, #10, #11 | Tier A first batch. |
-| **3** | #13, #14, #15, #20, #21 | Tier A second batch. |
-| **4** | #16, #17, #18, #19, #22 | Tier B. #16 depends on #14 from Wave 3. |
-| **5** | #12, #23, #24, #25 | Tier C + Wave-2-dep tail. |
+| Wave  | Items                                      | Notes                                   |
+| ----- | ------------------------------------------ | --------------------------------------- |
+| **0** | Phase 0 scaffold (main thread, sequential) | See checklist below.                    |
+| **1** | #1, #3, #4, #5, #6                         | Tier S parallel.                        |
+| **2** | #7, #8, #9, #10, #11                       | Tier A first batch.                     |
+| **3** | #13, #14, #15, #20, #21                    | Tier A second batch.                    |
+| **4** | #16, #17, #18, #19, #22                    | Tier B. #16 depends on #14 from Wave 3. |
+| **5** | #12, #23, #24, #25                         | Tier C + Wave-2-dep tail.               |
 
 Between waves: main thread merges worktree branches to `wishlist-integration`, runs `bun run wishlist:smoke`, resolves any cross-cutting drift.
 
@@ -154,6 +156,7 @@ Between waves: main thread merges worktree branches to `wishlist-integration`, r
 Sequential, main thread, ~1–2 days. Lands on `main` directly via single PR before any wave fires.
 
 ### 0.1 Schema scaffold (`src/canvas/schema.ts`)
+
 - [ ] Expand `ELEMENT_TYPES` to include `'symbol-instance' | 'form' | 'embed' | 'chart' | 'accordion' | 'carousel' | 'table' | 'code' | 'nav'`.
 - [ ] Expand `SECTION_RECIPE_IDS` w/ recipe names per new element (factories live in each feature dir).
 - [ ] Add `CanvasPage` SEO fields: `title?`, `description?`, `ogImageAssetId?`, `canonical?`, `noIndex?`, `locale?`.
@@ -162,11 +165,13 @@ Sequential, main thread, ~1–2 days. Lands on `main` directly via single PR bef
 - [ ] `CanvasElement` union imports new types from `src/canvas/elements/*` placeholder files.
 
 ### 0.2 Element registry (`src/canvas/elements/`)
+
 - [ ] One stub file per new ElementType. Each exports interface + recipe id constant + render fn signature (body = `throw new Error('TODO')`).
 - [ ] `src/canvas/elements/index.ts` aggregator — frozen contract.
 - [ ] Convert `src/canvas/render.ts` to dispatch table `RENDER_DISPATCH[type](element, ctx)`. Agents add their entry, never edit `render.ts`.
 
 ### 0.3 DB schema additions (`src/db/schema.ts`)
+
 - [ ] `customDomain` table (hostname, cfHostnameId, status, verificationRecord, certIssuedAt).
 - [ ] `formSubmission` table (siteId, formElementId, pageSlug, payload jsonb, ipHash, userAgent, submittedAt).
 - [ ] `siteSnapshot` table (siteId, yjsSnapshotBytes bytea, capturedAt, reason, label, publishedVersion).
@@ -175,11 +180,13 @@ Sequential, main thread, ~1–2 days. Lands on `main` directly via single PR bef
 - [ ] `themePreset` table (siteId, name, tokens jsonb) — optional, defer if owner-themes stay in `editableState`.
 
 ### 0.4 Bindings + env (`wrangler.toml`)
+
 - [ ] R2 bucket binding `ASSETS_BUCKET`.
 - [ ] DO bindings: `SiteRoom` (exists), `FormRateLimiter` (new stub).
 - [ ] Env vars declared: `CF_API_TOKEN`, `CF_ZONE_ID`, `TURNSTILE_SECRET`, `TURNSTILE_SITE_KEY`.
 
 ### 0.5 Yjs projection (`src/canvas/yjs-projection.ts`)
+
 - [ ] Re-add `yjs`, `y-protocols` to `package.json`.
 - [ ] Export `encodeYDoc(state: CanvasSiteState): Y.Doc`.
 - [ ] Export `decodeYDoc(doc: Y.Doc): CanvasSiteState`.
@@ -187,6 +194,7 @@ Sequential, main thread, ~1–2 days. Lands on `main` directly via single PR bef
 - [ ] Frozen contract — co-edit (#4) and version history (#3) both consume.
 
 ### 0.6 Asset pipeline migration (#2 pulled into Phase 0)
+
 - [ ] `src/assets/r2-client.ts` — R2 SDK wrapper.
 - [ ] `POST /api/sites/:id/assets` — multipart upload → SHA256 → R2 put → DB insert.
 - [ ] `GET /assets/:contentHash` — fetch via `cf.image` Transform-from-URL.
@@ -194,9 +202,11 @@ Sequential, main thread, ~1–2 days. Lands on `main` directly via single PR bef
 - [ ] `assets:smoke` script.
 
 ### 0.7 Per-feature dirs created empty
+
 For each Tier-A/B/C feature: `mkdir src/<feature>/` + `SUBSYSTEM.md` stub naming owner agent + wave.
 
 ### 0.8 Smoke scaffold (`package.json`)
+
 - [ ] One entry per feature smoke (no-op stub returning 0 until agent fills).
 - [ ] Master `wishlist:smoke` runs every per-feature smoke serially.
 
@@ -250,42 +260,52 @@ Each per-feature plan file follows this shape. See individual plans for filled-i
 ```markdown
 # <feature-name>
 
-**Wishlist #:** <n>  **Tier:** <S|A|B|C>  **Wave:** <1-5>  **Status:** queued
+**Wishlist #:** <n> **Tier:** <S|A|B|C> **Wave:** <1-5> **Status:** queued
 
 **Depends on:** Phase 0 ✓, [#X if any]
 **Blocks:** [#Y if any]
 
 ## User-visible outcome
+
 <one paragraph, no tech words>
 
 ## Scope in
+
 - ...
 
 ## Scope out
+
 - ...
 
 ## Schema delta
+
 <exact TS interfaces / DB tables — Phase 0 must have already scaffolded these>
 
 ## Files owned (write)
+
 - src/<feature>/...
 
 ## Files read-only (must not modify)
+
 - src/canvas/schema.ts
 - src/canvas/render.ts (dispatch table — register your entry via `src/canvas/elements/<your>.ts`)
 - src/db/schema.ts
 - ...
 
 ## Contract with neighbors
+
 <exports / route shapes / how data flows in and out>
 
 ## Smoke test
+
 - `bun run <feature>:smoke`
 - specific assertions
 
 ## Acceptance criteria
+
 - bulleted, demoable
 
 ## Open questions
+
 <flag here, don't ship with unknowns>
 ```

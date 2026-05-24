@@ -91,8 +91,7 @@ try {
     styleKit: 'charcoal',
   });
 } catch (err) {
-  threwOnUnknown =
-    err instanceof Error && err.message.includes('not-a-real-recipe');
+  threwOnUnknown = err instanceof Error && err.message.includes('not-a-real-recipe');
 }
 assert(threwOnUnknown, 'expected createSectionFromRecipe to throw loud on an unknown recipe id');
 
@@ -177,8 +176,7 @@ try {
     content: [{ text: 'x' }],
   });
 } catch (err) {
-  rewriteUnknownThrew =
-    err instanceof Error && err.message.includes('definitely-not-here');
+  rewriteUnknownThrew = err instanceof Error && err.message.includes('definitely-not-here');
 }
 assert(rewriteUnknownThrew, 'expected rewriteText against an unknown id to throw');
 
@@ -275,13 +273,9 @@ try {
     input: { brief: 'Closer.', styleKit: 'charcoal' },
   });
 } catch (err) {
-  insertUnknownAfterThrew =
-    err instanceof Error && err.message.includes('sec-not-here');
+  insertUnknownAfterThrew = err instanceof Error && err.message.includes('sec-not-here');
 }
-assert(
-  insertUnknownAfterThrew,
-  'expected insertSection with unknown afterSectionId to throw',
-);
+assert(insertUnknownAfterThrew, 'expected insertSection with unknown afterSectionId to throw');
 
 // ---------------------------------------------------------------------------
 // CANVAS_AGENT_TOOLS — schema sanity (well-formed JSON-Schema bodies).

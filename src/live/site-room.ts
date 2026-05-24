@@ -147,9 +147,7 @@ function isSiteRoomMessage(value: unknown): value is SiteRoomMessage {
     case 'awareness-update':
       return hasStringField(v, 'update');
     case 'editable-state-replaced':
-      return (
-        hasStringField(v, 'siteId') && typeof v.newState === 'object' && v.newState !== null
-      );
+      return hasStringField(v, 'siteId') && typeof v.newState === 'object' && v.newState !== null;
     default:
       return false;
   }

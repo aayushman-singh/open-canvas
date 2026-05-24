@@ -29,6 +29,12 @@ export interface AssetReferenceError extends ReferencedAsset {
   actualKind?: MediaKind;
 }
 
+export interface UnfilledAssetReference {
+  role: 'asset' | 'poster';
+  path: string;
+  mediaElementId: string;
+}
+
 /**
  * Walk a snapshot's (or editable site's) pages and return every assetId AND
  * posterAssetId referenced by a media element. Used by:
@@ -79,6 +85,32 @@ export function collectReferencedAssets(pages: CanvasPage[]): ReferencedAsset[] 
 
 export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> {
   return new Set(collectReferencedAssets(pages).map((ref) => ref.assetId));
+}
+
+export function collectUnfilledAssetReferences(pages: CanvasPage[]): UnfilledAssetReference[] {
+  const out: UnfilledAssetReference[] = [];
+  for (const [pageIdx, page] of pages.entries()) {
+    for (const [sectionIdx, section] of page.sections.entries()) {
+      for (const [elementIdx, element] of section.elements.entries()) {
+        if (element.type !== 'media') continue;
+        if (element.assetId === '') {
+          out.push({
+            role: 'asset',
+            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].assetId`,
+            mediaElementId: element.id,
+          });
+        }
+        if (element.posterAssetId === '') {
+          out.push({
+            role: 'poster',
+            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].posterAssetId`,
+            mediaElementId: element.id,
+          });
+        }
+      }
+    }
+  }
+  return out;
 }
 
 export function findAssetReferenceErrors(

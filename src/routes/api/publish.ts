@@ -19,7 +19,11 @@
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
+import {
+  collectReferencedAssetIds,
+  collectUnfilledAssetReferences,
+  findAssetReferenceErrors,
+} from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { renderCanvasSnapshot } from '../../canvas/render';
@@ -115,6 +119,21 @@ publishApi.post('/sites/:siteId', async (c) => {
         report: auditReport,
       },
       422,
+    );
+  }
+
+  const unfilledMediaSlots = collectUnfilledAssetReferences(row.editableState.pages);
+  if (unfilledMediaSlots.length > 0) {
+    return c.json(
+      {
+        error: 'cannot publish: unfilled media slots',
+        unfilledMediaSlots: unfilledMediaSlots.map((reference) => ({
+          role: reference.role,
+          path: reference.path,
+          elementId: reference.mediaElementId,
+        })),
+      },
+      400,
     );
   }
 

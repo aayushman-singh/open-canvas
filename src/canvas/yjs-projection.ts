@@ -271,9 +271,7 @@ function encodeContainerElement(el: ContainerElement): Y.Map<unknown> {
   return out;
 }
 
-function encodeSymbolInstanceOverrides(
-  overrides: SymbolInstanceOverrides,
-): Y.Map<Y.Map<unknown>> {
+function encodeSymbolInstanceOverrides(overrides: SymbolInstanceOverrides): Y.Map<Y.Map<unknown>> {
   const out = new Y.Map<Y.Map<unknown>>();
   for (const elementId of Object.keys(overrides).sort()) {
     const patch = overrides[elementId];
@@ -521,9 +519,7 @@ function encodeElement(el: CanvasElement): Y.Map<unknown> {
       // ElementType is added to the schema without an encode case, the
       // compiler refuses to compile this line.
       const _exhaustive: never = el;
-      throw new Error(
-        `yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`,
-      );
+      throw new Error(`yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`);
     }
   }
 }
@@ -790,9 +786,7 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
         ...base,
         type,
         symbolId: map.get('symbolId') as string,
-        overrides: decodeSymbolInstanceOverrides(
-          map.get('overrides') as Y.Map<Y.Map<unknown>>,
-        ),
+        overrides: decodeSymbolInstanceOverrides(map.get('overrides') as Y.Map<Y.Map<unknown>>),
       };
       return el;
     }
@@ -891,16 +885,12 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
     }
     default: {
       const _exhaustive: never = type;
-      throw new Error(
-        `yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`,
-      );
+      throw new Error(`yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`);
     }
   }
 }
 
-function decodeSymbolInstanceOverrides(
-  map: Y.Map<Y.Map<unknown>>,
-): SymbolInstanceOverrides {
+function decodeSymbolInstanceOverrides(map: Y.Map<Y.Map<unknown>>): SymbolInstanceOverrides {
   const out: SymbolInstanceOverrides = {};
   for (const [elementId, patchMap] of map.entries()) {
     const patch: Record<string, unknown> = {};
@@ -1137,11 +1127,11 @@ export function attachAutosave(
     // next debounce window. Any rejection is the caller's responsibility to
     // surface (consistent with the project's "fail loudly" posture).
     const result = onPersist(projected);
-    if (result && typeof (result).then === 'function') {
+    if (result && typeof result.then === 'function') {
       // Attach a noop catch so an unawaited rejection doesn't trip
       // `unhandledRejection` handlers in the host runtime. The caller's
       // `.then` chain elsewhere remains the source of truth for errors.
-      (result).catch((err: unknown) => {
+      result.catch((err: unknown) => {
         console.error('[yjs-projection] autosave onPersist rejected', err);
       });
     }

@@ -42,6 +42,14 @@ interface OwnedSite {
   styleKit: StyleKit;
 }
 
+export interface EditorPageOptions {
+  siteId: string;
+  siteName: string;
+  subdomain: string;
+  styleKit: StyleKit;
+  context?: 'dashboard' | 'public';
+}
+
 async function lookupOwnedSite(
   env: Bindings,
   clerkUserId: string,
@@ -69,53 +77,50 @@ async function lookupOwnedSite(
   return siteRow[0] ?? null;
 }
 
-canvasEditor.get('/sites/:siteId/edit', async (c) => {
-  const auth = c.get('auth');
-  if (!auth.userId) {
-    throw new Error('canvas editor route reached without an authenticated user');
-  }
+export function editorPageJsx(opts: EditorPageOptions) {
+  const { siteId, siteName, subdomain, styleKit, context = 'dashboard' } = opts;
+  const apiBase = context === 'public' ? '/__api' : '/api';
+  const inlineScript = canvasClientScript({ siteId, apiBase });
+  const publicAddress = `${subdomain}.rev01.aayushman.dev`;
 
-  const siteId = c.req.param('siteId');
-  if (!siteId || !SITE_ID_RE.test(siteId)) {
-    return c.text('site not found', 404);
-  }
+  const breadcrumbs =
+    context === 'public' ? (
+      <span class="crumbs">
+        <a href={`/`} style="color: inherit; text-decoration: none;">
+          {publicAddress}
+        </a>
+        <span class="sep">/</span>
+        <span class="here">editing</span>
+      </span>
+    ) : (
+      <span class="crumbs">
+        <span>rev01</span>
+        <span class="sep">/</span>
+        <a href="/dashboard" style="color: inherit; text-decoration: none;">
+          dashboard
+        </a>
+        <span class="sep">/</span>
+        <span class="here">{siteName}</span>
+      </span>
+    );
 
-  const owned = await lookupOwnedSite(c.env, auth.userId, siteId);
-  if (!owned) {
-    return c.text('site not found', 404);
-  }
-
-  const inlineScript = canvasClientScript({ siteId });
-  const publicAddress = `${owned.subdomain}.rev01.aayushman.dev`;
-
-  return c.html(
+  return (
     <html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="dark" />
-        <title>rev01 — editing {owned.name}</title>
+        <title>rev01 — editing {siteName}</title>
         <style>{raw(canvasEditorStyles)}</style>
       </head>
       <body>
-        <main class="rev01-editor" data-style-kit={owned.styleKit}>
+        <main class="rev01-editor" data-style-kit={styleKit}>
           <header class="rev01-editor-topbar">
-            <span class="crumbs">
-              <span>rev01</span>
-              <span class="sep">/</span>
-              <a href="/dashboard" style="color: inherit; text-decoration: none;">
-                dashboard
-              </a>
-              <span class="sep">/</span>
-              <span class="here">{owned.name}</span>
-            </span>
+            {breadcrumbs}
             <span class="address">{publicAddress}</span>
             <span class="spacer" />
             <button id="canvas-save" type="button">
               Save
-            </button>
-            <button id="canvas-translate" type="button">
-              Translate
             </button>
             <button id="canvas-publish" type="button">
               Publish
@@ -139,6 +144,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
             </span>
           </header>
           <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
+            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">&#x2039;</button>
             <div class="rev01-sidebar-tabs" role="tablist" aria-label="Canvas tools">
               <button
                 type="button"
@@ -220,7 +226,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
                 <h2>Colors</h2>
                 <div class="rev01-sidebar-kit-grid" role="group" aria-label="Style kit">
                   {BUILT_IN_STYLE_KITS.map((kit) => {
-                    const isActive = kit === owned.styleKit;
+                    const isActive = kit === styleKit;
                     return (
                       <button
                         type="button"
@@ -248,7 +254,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
               </div>
             </div>
           </aside>
-          <div id="canvas-root" data-site-id={owned.id} />
+          <div id="canvas-root" data-site-id={siteId} />
           <aside id="canvas-inspector" hidden />
           <footer class="rev01-editor-status">
             <span id="canvas-status">Ready</span>
@@ -256,7 +262,34 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
         </main>
         {raw(`<script type="module">${inlineScript}</script>`)}
       </body>
-    </html>,
+    </html>
+  );
+}
+
+canvasEditor.get('/sites/:siteId/edit', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('canvas editor route reached without an authenticated user');
+  }
+
+  const siteId = c.req.param('siteId');
+  if (!siteId || !SITE_ID_RE.test(siteId)) {
+    return c.text('site not found', 404);
+  }
+
+  const owned = await lookupOwnedSite(c.env, auth.userId, siteId);
+  if (!owned) {
+    return c.text('site not found', 404);
+  }
+
+  return c.html(
+    editorPageJsx({
+      siteId: owned.id,
+      siteName: owned.name,
+      subdomain: owned.subdomain,
+      styleKit: owned.styleKit,
+      context: 'dashboard',
+    }),
   );
 });
 

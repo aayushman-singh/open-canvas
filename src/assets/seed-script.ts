@@ -67,9 +67,7 @@ async function main(): Promise<void> {
   const upload = process.argv.includes('--upload');
   const remote = process.argv.includes('--remote');
   const seeded = await verifySeedRegistry();
-  console.log(
-    `[seed:assets] verified ${String(seeded.length)} seed entries against source bytes`,
-  );
+  console.log(`[seed:assets] verified ${String(seeded.length)} seed entries against source bytes`);
   if (!upload) {
     console.log('[seed:assets] dry-run OK (pass --upload to write to R2 + DB)');
     return;
