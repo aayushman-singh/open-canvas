@@ -9,7 +9,7 @@ import { renderCanvasSnapshot } from '../../canvas/render';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { db } from '../../db/client';
-import { customer, designerTemplate } from '../../db/schema';
+import { customer, customTemplate } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
@@ -245,7 +245,7 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
   );
 }
 
-interface DesignerTemplateCard {
+interface CustomTemplateCard {
   id: string;
   name: string;
   tagline: string;
@@ -253,7 +253,7 @@ interface DesignerTemplateCard {
   visibility: string;
 }
 
-function Page({ designerTemplates }: { designerTemplates: DesignerTemplateCard[] }) {
+function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
     <DashboardShell
@@ -278,7 +278,7 @@ function Page({ designerTemplates }: { designerTemplates: DesignerTemplateCard[]
                   name="templateId"
                   value={template.id}
                   required
-                  checked={idx === 0 && designerTemplates.length === 0}
+                  checked={idx === 0 && customTemplates.length === 0}
                 />
                 <span class="template-body">
                   <span class="template-preview">
@@ -300,7 +300,7 @@ function Page({ designerTemplates }: { designerTemplates: DesignerTemplateCard[]
                 </span>
               </label>
             ))}
-            {designerTemplates.map((dt, idx) => (
+            {customTemplates.map((dt, idx) => (
               <label class="template">
                 <input
                   type="radio"
@@ -312,7 +312,7 @@ function Page({ designerTemplates }: { designerTemplates: DesignerTemplateCard[]
                 <span class="template-body">
                   <span class="template-preview">
                     <iframe
-                      src={`/api/designer-templates/${dt.id}/preview`}
+                      src={`/api/custom-templates/${dt.id}/preview`}
                       title={`${dt.name} preview`}
                       loading="lazy"
                       sandbox=""
@@ -398,7 +398,7 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
 
 templatesRoute.get('/', async (c) => {
   const auth = c.get('auth');
-  let designerTemplates: DesignerTemplateCard[] = [];
+  let customTemplates: CustomTemplateCard[] = [];
   if (auth.userId) {
     const database = db(c.env);
     const customerRow = await database
@@ -410,23 +410,23 @@ templatesRoute.get('/', async (c) => {
 
     const whereClause = customerId
       ? or(
-          eq(designerTemplate.visibility, 'global'),
-          eq(designerTemplate.customerId, customerId),
+          eq(customTemplate.visibility, 'global'),
+          eq(customTemplate.customerId, customerId),
         )
-      : eq(designerTemplate.visibility, 'global');
+      : eq(customTemplate.visibility, 'global');
 
     const rows = await database
       .select({
-        id: designerTemplate.id,
-        name: designerTemplate.name,
-        tagline: designerTemplate.tagline,
-        styleKit: designerTemplate.styleKit,
-        visibility: designerTemplate.visibility,
+        id: customTemplate.id,
+        name: customTemplate.name,
+        tagline: customTemplate.tagline,
+        styleKit: customTemplate.styleKit,
+        visibility: customTemplate.visibility,
       })
-      .from(designerTemplate)
+      .from(customTemplate)
       .where(whereClause!);
 
-    designerTemplates = rows;
+    customTemplates = rows;
   }
-  return c.html(<Page designerTemplates={designerTemplates} />);
+  return c.html(<Page customTemplates={customTemplates} />);
 });

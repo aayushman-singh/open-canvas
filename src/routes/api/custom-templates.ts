@@ -1,19 +1,19 @@
-// src/routes/api/designer-templates.ts
+// src/routes/api/custom-templates.ts
 //
-// Owner + admin routes for designer-created templates.
+// Owner + admin routes for custom templates.
 //
 // Owner routes (Clerk-gated):
-//   GET    /api/designer-templates              — list global + Owner's private
-//   POST   /api/designer-templates              — save site as private template
-//   DELETE /api/designer-templates/:id          — delete a private template
+//   GET    /api/custom-templates              — list global + Owner's private
+//   POST   /api/custom-templates              — save site as private template
+//   DELETE /api/custom-templates/:id          — delete a private template
 //
 // Admin routes (Clerk + requireAdmin):
-//   POST   /api/admin/designer-templates        — save site as global template
-//   DELETE /api/admin/designer-templates/:id    — delete a global template
+//   POST   /api/admin/custom-templates        — save site as global template
+//   DELETE /api/admin/custom-templates/:id    — delete a global template
 //
 // Preview routes (Clerk-gated, used by template picker):
-//   GET    /api/designer-templates/:id/preview  — render preview HTML
-//   GET    /api/designer-templates/:id/assets/:assetId — serve asset from R2
+//   GET    /api/custom-templates/:id/preview  — render preview HTML
+//   GET    /api/custom-templates/:id/assets/:assetId — serve asset from R2
 
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -29,7 +29,7 @@ import { validateCanvasSiteState } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
 import {
   customer,
-  designerTemplate,
+  customTemplate,
   ownerAsset,
   site,
   type AssetManifestEntry,
@@ -143,8 +143,8 @@ function parseSaveBody(value: unknown): SaveBody | { error: string } {
 // Catalog entry type returned by GET
 // ---------------------------------------------------------------------------
 
-export interface DesignerTemplateCatalogEntry {
-  source: 'designer';
+export interface CustomTemplateCatalogEntry {
+  source: 'custom';
   id: string;
   name: string;
   tagline: string;
@@ -156,34 +156,34 @@ export interface DesignerTemplateCatalogEntry {
 // Owner routes
 // ---------------------------------------------------------------------------
 
-export const designerTemplatesOwner = new Hono<Env>();
-designerTemplatesOwner.use('*', clerkAuth());
-designerTemplatesOwner.use('*', requireAuth());
+export const customTemplatesOwner = new Hono<Env>();
+customTemplatesOwner.use('*', clerkAuth());
+customTemplatesOwner.use('*', requireAuth());
 
-designerTemplatesOwner.get('/', async (c) => {
+customTemplatesOwner.get('/', async (c) => {
   const auth = c.get('auth');
-  if (!auth.userId) throw new Error('designer-templates reached without auth');
+  if (!auth.userId) throw new Error('custom-templates reached without auth');
 
   const database = db(c.env);
   const customerId = await resolveCustomerId(database, auth.userId);
 
   const whereClause = customerId
-    ? or(eq(designerTemplate.visibility, 'global'), eq(designerTemplate.customerId, customerId))
-    : eq(designerTemplate.visibility, 'global');
+    ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
+    : eq(customTemplate.visibility, 'global');
 
   const rows = await database
     .select({
-      id: designerTemplate.id,
-      name: designerTemplate.name,
-      tagline: designerTemplate.tagline,
-      styleKit: designerTemplate.styleKit,
-      visibility: designerTemplate.visibility,
+      id: customTemplate.id,
+      name: customTemplate.name,
+      tagline: customTemplate.tagline,
+      styleKit: customTemplate.styleKit,
+      visibility: customTemplate.visibility,
     })
-    .from(designerTemplate)
+    .from(customTemplate)
     .where(whereClause!);
 
-  const entries: DesignerTemplateCatalogEntry[] = rows.map((r) => ({
-    source: 'designer' as const,
+  const entries: CustomTemplateCatalogEntry[] = rows.map((r) => ({
+    source: 'custom' as const,
     id: r.id,
     name: r.name,
     tagline: r.tagline,
@@ -194,9 +194,9 @@ designerTemplatesOwner.get('/', async (c) => {
   return c.json({ templates: entries });
 });
 
-designerTemplatesOwner.post('/', async (c) => {
+customTemplatesOwner.post('/', async (c) => {
   const auth = c.get('auth');
-  if (!auth.userId) throw new Error('designer-templates reached without auth');
+  if (!auth.userId) throw new Error('custom-templates reached without auth');
 
   const database = db(c.env);
   const customerId = await resolveCustomerId(database, auth.userId);
@@ -222,7 +222,7 @@ designerTemplatesOwner.post('/', async (c) => {
   const manifest = await buildAssetManifest(database, customerId, siteState);
 
   const [row] = await database
-    .insert(designerTemplate)
+    .insert(customTemplate)
     .values({
       customerId,
       visibility: 'private',
@@ -232,29 +232,29 @@ designerTemplatesOwner.post('/', async (c) => {
       siteState,
       assetManifest: manifest,
     })
-    .returning({ id: designerTemplate.id });
+    .returning({ id: customTemplate.id });
 
   return c.json({ ok: true, id: row!.id });
 });
 
-designerTemplatesOwner.delete('/:id', async (c) => {
+customTemplatesOwner.delete('/:id', async (c) => {
   const auth = c.get('auth');
-  if (!auth.userId) throw new Error('designer-templates reached without auth');
+  if (!auth.userId) throw new Error('custom-templates reached without auth');
 
   const database = db(c.env);
   const customerId = await resolveCustomerId(database, auth.userId);
   if (!customerId) return c.json({ error: 'no customer row' }, 409);
 
   const deleted = await database
-    .delete(designerTemplate)
+    .delete(customTemplate)
     .where(
       and(
-        eq(designerTemplate.id, c.req.param('id')),
-        eq(designerTemplate.customerId, customerId),
-        eq(designerTemplate.visibility, 'private'),
+        eq(customTemplate.id, c.req.param('id')),
+        eq(customTemplate.customerId, customerId),
+        eq(customTemplate.visibility, 'private'),
       ),
     )
-    .returning({ id: designerTemplate.id });
+    .returning({ id: customTemplate.id });
 
   if (deleted.length === 0) return c.json({ error: 'template not found' }, 404);
   return c.json({ ok: true });
@@ -271,12 +271,12 @@ const previewStyles = `
   .rev01-preview-stage .rev01-page { margin: 0; }
 `;
 
-designerTemplatesOwner.get('/:id/preview', async (c) => {
+customTemplatesOwner.get('/:id/preview', async (c) => {
   const database = db(c.env);
   const row = await database
-    .select({ siteState: designerTemplate.siteState, name: designerTemplate.name })
-    .from(designerTemplate)
-    .where(eq(designerTemplate.id, c.req.param('id')))
+    .select({ siteState: customTemplate.siteState, name: customTemplate.name })
+    .from(customTemplate)
+    .where(eq(customTemplate.id, c.req.param('id')))
     .limit(1);
   const tmpl = row[0];
   if (!tmpl) return c.text('template not found', 404);
@@ -289,7 +289,7 @@ designerTemplatesOwner.get('/:id/preview', async (c) => {
   };
   const html = renderCanvasSnapshot(
     snapshot,
-    `/api/designer-templates/${c.req.param('id')}/assets`,
+    `/api/custom-templates/${c.req.param('id')}/assets`,
   );
 
   return c.html(
@@ -297,12 +297,12 @@ designerTemplatesOwner.get('/:id/preview', async (c) => {
   );
 });
 
-designerTemplatesOwner.get('/:id/assets/:assetId', async (c) => {
+customTemplatesOwner.get('/:id/assets/:assetId', async (c) => {
   const database = db(c.env);
   const row = await database
-    .select({ assetManifest: designerTemplate.assetManifest })
-    .from(designerTemplate)
-    .where(eq(designerTemplate.id, c.req.param('id')))
+    .select({ assetManifest: customTemplate.assetManifest })
+    .from(customTemplate)
+    .where(eq(customTemplate.id, c.req.param('id')))
     .limit(1);
   const tmpl = row[0];
   if (!tmpl) return c.text('template not found', 404);
@@ -327,14 +327,14 @@ designerTemplatesOwner.get('/:id/assets/:assetId', async (c) => {
 // Admin routes
 // ---------------------------------------------------------------------------
 
-export const designerTemplatesAdmin = new Hono<Env>();
-designerTemplatesAdmin.use('*', clerkAuth());
-designerTemplatesAdmin.use('*', requireAuth());
-designerTemplatesAdmin.use('*', requireAdmin());
+export const customTemplatesAdmin = new Hono<Env>();
+customTemplatesAdmin.use('*', clerkAuth());
+customTemplatesAdmin.use('*', requireAuth());
+customTemplatesAdmin.use('*', requireAdmin());
 
-designerTemplatesAdmin.post('/', async (c) => {
+customTemplatesAdmin.post('/', async (c) => {
   const auth = c.get('auth');
-  if (!auth.userId) throw new Error('admin designer-templates reached without auth');
+  if (!auth.userId) throw new Error('admin custom-templates reached without auth');
 
   const database = db(c.env);
   const customerId = await resolveCustomerId(database, auth.userId);
@@ -360,7 +360,7 @@ designerTemplatesAdmin.post('/', async (c) => {
   const manifest = await buildAssetManifest(database, customerId, siteState);
 
   const [row] = await database
-    .insert(designerTemplate)
+    .insert(customTemplate)
     .values({
       customerId: null,
       visibility: 'global',
@@ -370,24 +370,24 @@ designerTemplatesAdmin.post('/', async (c) => {
       siteState,
       assetManifest: manifest,
     })
-    .returning({ id: designerTemplate.id });
+    .returning({ id: customTemplate.id });
 
   return c.json({ ok: true, id: row!.id });
 });
 
-designerTemplatesAdmin.delete('/:id', async (c) => {
+customTemplatesAdmin.delete('/:id', async (c) => {
   const database = db(c.env);
 
   const deleted = await database
-    .delete(designerTemplate)
+    .delete(customTemplate)
     .where(
       and(
-        eq(designerTemplate.id, c.req.param('id')),
-        isNull(designerTemplate.customerId),
-        eq(designerTemplate.visibility, 'global'),
+        eq(customTemplate.id, c.req.param('id')),
+        isNull(customTemplate.customerId),
+        eq(customTemplate.visibility, 'global'),
       ),
     )
-    .returning({ id: designerTemplate.id });
+    .returning({ id: customTemplate.id });
 
   if (deleted.length === 0) return c.json({ error: 'global template not found' }, 404);
   return c.json({ ok: true });

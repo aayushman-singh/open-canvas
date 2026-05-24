@@ -8,7 +8,7 @@ import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, designerTemplate, ownerAsset, site, type AssetManifestEntry } from '../../db/schema';
+import { customer, customTemplate, ownerAsset, site, type AssetManifestEntry } from '../../db/schema';
 import { getTemplateSeed } from '../../templates/registry';
 
 type Bindings = {
@@ -269,13 +269,13 @@ sites.post('/', async (c) => {
   } else {
     const dtRow = await database
       .select({
-        siteState: designerTemplate.siteState,
-        assetManifest: designerTemplate.assetManifest,
-        visibility: designerTemplate.visibility,
-        customerId: designerTemplate.customerId,
+        siteState: customTemplate.siteState,
+        assetManifest: customTemplate.assetManifest,
+        visibility: customTemplate.visibility,
+        customerId: customTemplate.customerId,
       })
-      .from(designerTemplate)
-      .where(eq(designerTemplate.id, templateId))
+      .from(customTemplate)
+      .where(eq(customTemplate.id, templateId))
       .limit(1);
     const dt = dtRow[0];
     if (!dt) {

@@ -353,7 +353,7 @@ export const chatSession = pgTable('chat_session', {
 export type ChatSession = typeof chatSession.$inferSelect;
 export type NewChatSession = typeof chatSession.$inferInsert;
 
-// -- AssetManifestEntry (shared by library_section + designer_template) -------
+// -- AssetManifestEntry (shared by library_section + custom_template) ---------
 //
 // Snapshot of an ownerAsset at save time. On import, the target Owner gets
 // new ownerAsset rows with the same contentHash/r2Key, deduped by
@@ -398,21 +398,21 @@ export const librarySection = pgTable('library_section', {
 export type LibrarySection = typeof librarySection.$inferSelect;
 export type NewLibrarySection = typeof librarySection.$inferInsert;
 
-// -- designerTemplate (Designer-created templates — global + per-Owner) -------
+// -- customTemplate (Owner-created templates — global + per-Owner) ------------
 //
 // Stores templates created via "save as template" from the editor. Global
 // templates (customerId NULL, visibility 'global') are admin-curated. Private
 // templates (customerId set, visibility 'private') are per-Owner.
 
-export const DESIGNER_TEMPLATE_VISIBILITY = ['global', 'private'] as const;
-export type DesignerTemplateVisibility = (typeof DESIGNER_TEMPLATE_VISIBILITY)[number];
+export const CUSTOM_TEMPLATE_VISIBILITY = ['global', 'private'] as const;
+export type CustomTemplateVisibility = (typeof CUSTOM_TEMPLATE_VISIBILITY)[number];
 
-export const designerTemplate = pgTable('designer_template', {
+export const customTemplate = pgTable('custom_template', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
-  visibility: text('visibility').notNull().$type<DesignerTemplateVisibility>(),
+  visibility: text('visibility').notNull().$type<CustomTemplateVisibility>(),
   name: text('name').notNull(),
   tagline: text('tagline').notNull().default(''),
   styleKit: text('style_kit').notNull(),
@@ -422,5 +422,5 @@ export const designerTemplate = pgTable('designer_template', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export type DesignerTemplate = typeof designerTemplate.$inferSelect;
-export type NewDesignerTemplate = typeof designerTemplate.$inferInsert;
+export type CustomTemplate = typeof customTemplate.$inferSelect;
+export type NewCustomTemplate = typeof customTemplate.$inferInsert;

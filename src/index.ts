@@ -42,15 +42,15 @@ import chatPanelRoute from './routes/dashboard/chat-panel';
 // middleware that loads the editable state and constructs a GeminiTranslator.
 import translateRouter from './agent/translate/route';
 import { GeminiTranslator } from './agent/translate/llm';
-// Section library + designer template routes
+// Section library + custom template routes
 import {
   librarySectionsOwner,
   librarySectionsAdmin,
 } from './routes/api/library-sections';
 import {
-  designerTemplatesOwner,
-  designerTemplatesAdmin,
-} from './routes/api/designer-templates';
+  customTemplatesOwner,
+  customTemplatesAdmin,
+} from './routes/api/custom-templates';
 import { clerkAuth } from './auth/middleware';
 import { requireAuth } from './auth/require-auth';
 import { db } from './db/client';
@@ -151,11 +151,11 @@ app.route('/api/publish', publishApi);
 // editor still calls the legacy path during this Phase 0 cutover.
 app.route('/api/owner/assets', ownerAssetsApi);
 app.route('/api', sectionsApi);
-// Section library + designer template mounts.
+// Section library + custom template mounts.
 app.route('/api/library', librarySectionsOwner);
 app.route('/api/admin/library', librarySectionsAdmin);
-app.route('/api/designer-templates', designerTemplatesOwner);
-app.route('/api/admin/designer-templates', designerTemplatesAdmin);
+app.route('/api/custom-templates', customTemplatesOwner);
+app.route('/api/admin/custom-templates', customTemplatesAdmin);
 // Wave 1 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
 app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);

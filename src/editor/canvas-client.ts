@@ -3609,7 +3609,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var saved = await flushPendingSave();
       if (!saved) return;
       setStatus("Saving as template...", "ok");
-      var response = await authFetch("/api/designer-templates", {
+      var response = await authFetch("/api/custom-templates", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ siteId: SITE_ID, name: name.trim(), tagline: tagline.trim() }),
