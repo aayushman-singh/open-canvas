@@ -16,9 +16,9 @@
 // inventing a new `recipeId`.
 
 import {
+  AGENT_RECIPE_IDS,
   INLINE_MARK_TYPES,
   MEDIA_KINDS,
-  SECTION_RECIPE_IDS,
 } from '../canvas/schema.js';
 import type { JsonSchema, LlmTool } from './llm.js';
 
@@ -155,10 +155,10 @@ const createSectionSchema: JsonSchema = {
   properties: {
     recipeId: {
       type: 'string',
-      enum: [...SECTION_RECIPE_IDS],
+      enum: [...AGENT_RECIPE_IDS],
       description:
         'The section recipe to instantiate. recipeId MUST be one of [' +
-        SECTION_RECIPE_IDS.join(', ') +
+        AGENT_RECIPE_IDS.join(', ') +
         ']; do not invent new ids.',
     },
     afterSectionId: {
@@ -202,7 +202,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
     description:
       'Append a new section to the page using a built-in recipe factory. The model picks a recipeId ' +
       'from [' +
-      SECTION_RECIPE_IDS.join(', ') +
+      AGENT_RECIPE_IDS.join(', ') +
       '] and supplies a short brief; the recipe factory authors the section shape. ' +
       'The model never hand-writes section JSON.',
     parameters: createSectionSchema,

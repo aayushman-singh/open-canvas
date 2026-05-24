@@ -21,6 +21,7 @@ import {
   type RecipeFactoryInput,
 } from '../canvas/recipes.js';
 import {
+  AGENT_RECIPE_IDS,
   INLINE_MARK_TYPES,
   SECTION_RECIPE_IDS,
   type CanvasSiteState,
@@ -297,9 +298,9 @@ assert(createSectionTool !== undefined, 'createSection tool must exist');
 const recipeIdEnum = createSectionTool?.parameters.properties?.recipeId?.enum;
 assert(
   Array.isArray(recipeIdEnum) &&
-    recipeIdEnum.length === SECTION_RECIPE_IDS.length &&
-    [...SECTION_RECIPE_IDS].every((id) => recipeIdEnum.includes(id)),
-  `expected createSection.recipeId.enum to list every SECTION_RECIPE_IDS entry`,
+    recipeIdEnum.length === AGENT_RECIPE_IDS.length &&
+    [...AGENT_RECIPE_IDS].every((id) => recipeIdEnum.includes(id)),
+  `expected createSection.recipeId.enum to list every AGENT_RECIPE_IDS entry (not 'custom')`,
 );
 
 const rewriteTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'rewriteText');

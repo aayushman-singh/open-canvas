@@ -33,14 +33,14 @@ import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import type { RecipeFactoryInput } from '../../canvas/recipes';
 import {
+  AGENT_RECIPE_IDS,
   INLINE_MARK_TYPES,
   MEDIA_KINDS,
-  SECTION_RECIPE_IDS,
+  type AgentRecipeId,
   type CanvasSiteState,
   type InlineMark,
   type InlineRun,
   type MediaKind,
-  type SectionRecipeId,
   type StyleKit,
 } from '../../canvas/schema';
 import { validateCanvasSiteState, isAllowedHref } from '../../canvas/validate';
@@ -223,10 +223,10 @@ function parseReplaceMedia(args: unknown): ParseResult {
 
 function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResult {
   if (!isRecord(args)) return { ok: false, error: 'createSection arguments must be an object' };
-  if (!isOneOf<SectionRecipeId>(args.recipeId, SECTION_RECIPE_IDS)) {
+  if (!isOneOf<AgentRecipeId>(args.recipeId, AGENT_RECIPE_IDS)) {
     return {
       ok: false,
-      error: `createSection.recipeId must be one of [${SECTION_RECIPE_IDS.join(', ')}] (got ${JSON.stringify(args.recipeId)})`,
+      error: `createSection.recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}] (got ${JSON.stringify(args.recipeId)})`,
     };
   }
   if (typeof args.brief !== 'string' || args.brief.length === 0) {
@@ -422,7 +422,7 @@ function buildSystemPrompt(state: CanvasSiteState): string {
     'For replaceMedia: assetId must already exist as an uploaded asset on this site. The tool does not generate media.',
   );
   lines.push(
-    `For createSection: recipeId must be one of [${SECTION_RECIPE_IDS.join(', ')}]. Send a short brief.`,
+    `For createSection: recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}]. Send a short brief.`,
   );
   return lines.join('\n');
 }

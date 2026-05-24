@@ -9,10 +9,11 @@ import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { importLibrarySectionIntoSite } from '../../canvas/library-section-import';
 import { importSectionIntoSite } from '../../canvas/section-import';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site } from '../../db/schema';
+import { customer, librarySection, ownerAsset, site } from '../../db/schema';
 import { allTemplateSeeds } from '../../templates/registry';
 import { SECTION_CATALOG } from '../../templates/section-catalog';
 
@@ -33,29 +34,35 @@ sections.get('/templates/sections', (c) => {
   return c.json({ sections: SECTION_CATALOG });
 });
 
-interface ImportBody {
-  templateId: string;
-  sectionId: string;
-  insertAt: number;
-}
+type SeedImportBody = { source: 'seed'; templateId: string; sectionId: string; insertAt: number };
+type LibraryImportBody = { source: 'library'; librarySectionId: string; insertAt: number };
+type ImportBody = SeedImportBody | LibraryImportBody;
 
 type ParsedBody = { ok: true; body: ImportBody } | { ok: false; error: string };
 
 function parseImportBody(value: unknown): ParsedBody {
   if (!value || typeof value !== 'object') return { ok: false, error: 'body must be an object' };
   const v = value as Record<string, unknown>;
+  if (typeof v.insertAt !== 'number' || !Number.isInteger(v.insertAt) || v.insertAt < 0) {
+    return { ok: false, error: 'insertAt must be a non-negative integer' };
+  }
+
+  if (v.source === 'library') {
+    if (typeof v.librarySectionId !== 'string' || v.librarySectionId.length === 0) {
+      return { ok: false, error: 'librarySectionId is required for library source' };
+    }
+    return { ok: true, body: { source: 'library', librarySectionId: v.librarySectionId, insertAt: v.insertAt } };
+  }
+
   if (typeof v.templateId !== 'string' || v.templateId.length === 0) {
     return { ok: false, error: 'templateId is required' };
   }
   if (typeof v.sectionId !== 'string' || v.sectionId.length === 0) {
     return { ok: false, error: 'sectionId is required' };
   }
-  if (typeof v.insertAt !== 'number' || !Number.isInteger(v.insertAt) || v.insertAt < 0) {
-    return { ok: false, error: 'insertAt must be a non-negative integer' };
-  }
   return {
     ok: true,
-    body: { templateId: v.templateId, sectionId: v.sectionId, insertAt: v.insertAt },
+    body: { source: 'seed', templateId: v.templateId, sectionId: v.sectionId, insertAt: v.insertAt },
   };
 }
 
@@ -70,16 +77,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, 400);
   }
-  const { templateId, sectionId, insertAt } = parsed.body;
-
-  const seed = allTemplateSeeds.find((t) => t.id === templateId);
-  if (!seed) {
-    return c.json({ error: `unknown templateId: ${templateId}` }, 404);
-  }
-  const sourceSection = seed.state.pages[0]?.sections.find((s) => s.id === sectionId);
-  if (!sourceSection) {
-    return c.json({ error: `unknown sectionId in template: ${sectionId}` }, 404);
-  }
+  const { insertAt } = parsed.body;
 
   const database = db(c.env);
 
@@ -116,25 +114,67 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   }
 
   // Owner Asset rows are scoped to the customer per ADR 0004, not the site.
-  // The dedup set checks against every asset the Owner already owns so the
-  // section import does not re-insert a row that another site under this
-  // Owner already has.
   const existingAssetRows = await database
-    .select({ id: ownerAsset.id })
+    .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
     .from(ownerAsset)
     .where(eq(ownerAsset.customerId, customerId));
-  const existingAssetIds = new Set(existingAssetRows.map((r) => r.id));
 
-  const importResult = importSectionIntoSite({
-    targetCustomerId: customerId,
-    sourceSection,
-    existingAssetIds,
-  });
-  if (!importResult.ok) {
-    return c.json({ error: 'section import failed', details: importResult.errors }, 500);
+  let importedSection;
+  let newAssetRows: Array<typeof ownerAsset.$inferInsert> = [];
+
+  const body = parsed.body;
+  if (body.source === 'library') {
+    const libRow = await database
+      .select({
+        sectionData: librarySection.sectionData,
+        assetManifest: librarySection.assetManifest,
+      })
+      .from(librarySection)
+      .where(eq(librarySection.id, body.librarySectionId))
+      .limit(1);
+    const lib = libRow[0];
+    if (!lib) {
+      return c.json({ error: 'library section not found' }, 404);
+    }
+
+    const existingByHash = new Map(existingAssetRows.map((r) => [r.contentHash, r.id]));
+    const importResult = importLibrarySectionIntoSite({
+      targetCustomerId: customerId,
+      sourceSection: lib.sectionData,
+      assetManifest: lib.assetManifest,
+      existingAssetsByHash: existingByHash,
+    });
+    if (!importResult.ok) {
+      return c.json({ error: 'library section import failed', details: importResult.errors }, 500);
+    }
+    importedSection = importResult.section;
+    newAssetRows = importResult.newAssetRows;
+  } else {
+    const seed = allTemplateSeeds.find((t) => t.id === body.templateId);
+    if (!seed) {
+      return c.json({ error: `unknown templateId: ${body.templateId}` }, 404);
+    }
+    const sourceSection = seed.state.pages[0]?.sections.find(
+      (s) => s.id === body.sectionId,
+    );
+    if (!sourceSection) {
+      return c.json({ error: `unknown sectionId in template: ${body.sectionId}` }, 404);
+    }
+
+    const existingAssetIds = new Set(existingAssetRows.map((r) => r.id));
+    const importResult = importSectionIntoSite({
+      targetCustomerId: customerId,
+      sourceSection,
+      existingAssetIds,
+    });
+    if (!importResult.ok) {
+      return c.json({ error: 'section import failed', details: importResult.errors }, 500);
+    }
+    importedSection = importResult.section;
+    newAssetRows = importResult.newAssetRows;
   }
 
-  page.sections.splice(insertAt, 0, importResult.section);
+  page.sections.splice(insertAt, 0, importedSection);
 
   const validation = validateCanvasSiteState(state);
   if (!validation.valid) {
@@ -148,16 +188,12 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     .update(site)
     .set({ editableState: state, updatedAt: sql`now()` })
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
-  if (importResult.newAssetRows.length === 0) {
+  if (newAssetRows.length === 0) {
     await siteUpdate;
   } else {
-    // Same conflict-skip story as the site-creation materialiser: per-Owner
-    // deterministic ids mean a re-import after the same Owner already owns
-    // these seed rows is a noop on the asset side, while the editable state
-    // still gets the new section.
     const assetInsert = database
       .insert(ownerAsset)
-      .values(importResult.newAssetRows)
+      .values(newAssetRows)
       .onConflictDoNothing();
     await database.batch([siteUpdate, assetInsert]);
   }

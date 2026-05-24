@@ -49,14 +49,14 @@ import type {
   InlineMark,
   InlineRun,
   MediaKind,
-  SectionRecipeId,
   StyleKit,
 } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
 import {
+  AGENT_RECIPE_IDS,
   INLINE_MARK_TYPES,
   MEDIA_KINDS,
-  SECTION_RECIPE_IDS,
+  type AgentRecipeId,
 } from '../../canvas/schema.js';
 import { isAllowedHref } from '../../canvas/validate.js';
 import type { RecipeFactoryInput } from '../../canvas/recipes.js';
@@ -439,10 +439,10 @@ function parseReplaceMedia(args: unknown): ParseResult {
 
 function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResult {
   if (!isRecord(args)) return { ok: false, error: 'createSection arguments must be an object' };
-  if (!isOneOf<SectionRecipeId>(args.recipeId, SECTION_RECIPE_IDS)) {
+  if (!isOneOf<AgentRecipeId>(args.recipeId, AGENT_RECIPE_IDS)) {
     return {
       ok: false,
-      error: `createSection.recipeId must be one of [${SECTION_RECIPE_IDS.join(', ')}]`,
+      error: `createSection.recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}]`,
     };
   }
   if (typeof args.brief !== 'string' || args.brief.length === 0) {
@@ -627,7 +627,7 @@ export function buildSystemPrompt(state: CanvasSiteState): string {
     '  - replaceMedia: swap a Media Element to an EXISTING uploaded Owner Asset. The tool does NOT generate media bytes.',
   );
   lines.push(
-    `  - createSection: append a new Canvas Section using a Section Recipe. recipeId must be one of [${SECTION_RECIPE_IDS.join(', ')}].`,
+    `  - createSection: append a new Canvas Section using a Section Recipe. recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}].`,
   );
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent ids — call query_site first when you are unsure.');

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { collectReferencedAssets } from '../../assets/site-assets';
@@ -8,7 +8,7 @@ import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site } from '../../db/schema';
+import { customer, designerTemplate, ownerAsset, site, type AssetManifestEntry } from '../../db/schema';
 import { getTemplateSeed } from '../../templates/registry';
 
 type Bindings = {
@@ -233,11 +233,6 @@ sites.post('/', async (c) => {
     return c.json({ error: 'templateId is required' }, 400);
   }
 
-  const seed = getTemplateSeed(templateId);
-  if (!seed) {
-    return c.json({ error: `unknown templateId: ${templateId}` }, 404);
-  }
-
   const database = db(c.env);
 
   const customerRow = await database
@@ -253,30 +248,106 @@ sites.post('/', async (c) => {
     );
   }
 
-  const newSiteId = crypto.randomUUID();
-  const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seed.state);
-  if (!preparedSeedAssets.ok) {
-    return c.json(
-      {
-        error: 'template seed references invalid asset ids',
-        unknownSeedIds: preparedSeedAssets.unknownSeedIds,
-        assetKindErrors: preparedSeedAssets.assetKindErrors,
-      },
-      500,
-    );
+  let editableState: CanvasSiteState;
+  let assetRows: Array<typeof ownerAsset.$inferInsert> = [];
+
+  const seed = getTemplateSeed(templateId);
+  if (seed) {
+    const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seed.state);
+    if (!preparedSeedAssets.ok) {
+      return c.json(
+        {
+          error: 'template seed references invalid asset ids',
+          unknownSeedIds: preparedSeedAssets.unknownSeedIds,
+          assetKindErrors: preparedSeedAssets.assetKindErrors,
+        },
+        500,
+      );
+    }
+    editableState = preparedSeedAssets.editableState;
+    assetRows = preparedSeedAssets.seedRows;
+  } else {
+    const dtRow = await database
+      .select({
+        siteState: designerTemplate.siteState,
+        assetManifest: designerTemplate.assetManifest,
+        visibility: designerTemplate.visibility,
+        customerId: designerTemplate.customerId,
+      })
+      .from(designerTemplate)
+      .where(eq(designerTemplate.id, templateId))
+      .limit(1);
+    const dt = dtRow[0];
+    if (!dt) {
+      return c.json({ error: `unknown templateId: ${templateId}` }, 404);
+    }
+    if (dt.visibility === 'private' && dt.customerId !== customerId) {
+      return c.json({ error: `unknown templateId: ${templateId}` }, 404);
+    }
+
+    editableState = structuredClone(dt.siteState);
+
+    const existingAssets = await database
+      .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
+      .from(ownerAsset)
+      .where(eq(ownerAsset.customerId, customerId));
+    const existingByHash = new Map(existingAssets.map((r) => [r.contentHash, r.id]));
+
+    const assetIdMap = new Map<string, string>();
+    const newRows: Array<typeof ownerAsset.$inferInsert> = [];
+
+    for (const entry of dt.assetManifest) {
+      if (assetIdMap.has(entry.assetId)) continue;
+      const existing = existingByHash.get(entry.contentHash);
+      if (existing) {
+        assetIdMap.set(entry.assetId, existing);
+      } else {
+        const freshId = crypto.randomUUID();
+        assetIdMap.set(entry.assetId, freshId);
+        existingByHash.set(entry.contentHash, freshId);
+        newRows.push({
+          id: freshId,
+          customerId,
+          contentHash: entry.contentHash,
+          r2Key: entry.r2Key,
+          mediaType: entry.mediaType,
+          kind: entry.kind,
+          alt: entry.alt,
+          width: entry.width,
+          height: entry.height,
+          byteSize: entry.byteSize,
+        });
+      }
+    }
+
+    for (const page of editableState.pages) {
+      for (const section of page.sections) {
+        for (const element of section.elements) {
+          if (element.type !== 'media') continue;
+          const mapped = assetIdMap.get(element.assetId);
+          if (mapped) element.assetId = mapped;
+          if (element.posterAssetId !== undefined) {
+            const posterMapped = assetIdMap.get(element.posterAssetId);
+            if (posterMapped) element.posterAssetId = posterMapped;
+          }
+        }
+      }
+    }
+    assetRows = newRows;
   }
-  const { editableState, seedRows } = preparedSeedAssets;
+
   const validation = validateCanvasSiteState(editableState);
   if (!validation.valid) {
     return c.json(
       {
-        error: 'template seed failed canvas validation',
+        error: 'template failed canvas validation',
         details: validation.errors,
       },
       500,
     );
   }
 
+  const newSiteId = crypto.randomUUID();
   try {
     const siteInsert = database.insert(site).values({
       id: newSiteId,
@@ -288,16 +359,13 @@ sites.post('/', async (c) => {
       publishedSnapshot: null,
       publishedVersion: 0,
     });
-    if (seedRows.length === 0) {
+    if (assetRows.length === 0) {
       await siteInsert;
     } else {
-      // The materialised seed asset id is deterministic per-customer (per
-      // ADR 0004 re-rooting). If this Owner already created a site from the
-      // same template, the rows are already present — skip the duplicates
-      // rather than failing the site insert. This is NOT a fallback: the
-      // Owner Asset row IS what we want to exist after the call, and
-      // ON CONFLICT DO NOTHING is the deterministic upsert primitive.
-      const assetInsert = database.insert(ownerAsset).values(seedRows).onConflictDoNothing();
+      const assetInsert = database
+        .insert(ownerAsset)
+        .values(assetRows)
+        .onConflictDoNothing();
       await database.batch([siteInsert, assetInsert]);
     }
   } catch (err) {

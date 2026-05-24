@@ -28,6 +28,7 @@
 // emitting a malformed section.
 
 import {
+  AGENT_RECIPE_IDS,
   SECTION_RECIPE_IDS,
   type CanvasSection,
   type InlineRun,
@@ -542,6 +543,36 @@ function buildVideoHero(input: RecipeFactoryInput): CanvasSection {
 }
 
 // ---------------------------------------------------------------------------
+// Custom passthrough — designer-saved sections that don't match a recipe.
+// The agent never uses this; it exists to satisfy the Record<SectionRecipeId>
+// exhaustiveness check.
+// ---------------------------------------------------------------------------
+
+function buildCustom(input: RecipeFactoryInput): CanvasSection {
+  const headline = briefOr(input.brief, 'Custom section');
+  return {
+    id: makeSectionId('custom'),
+    recipeId: 'custom',
+    name: 'Custom',
+    height: 600,
+    backgroundEffect: 'none',
+    entrance: 'fade-up',
+    elements: [
+      {
+        id: makeElementId('heading'),
+        type: 'text',
+        box: { x: 80, y: 120, w: 800, h: 100, z: 2 },
+        content: runOf(headline),
+        role: 'heading',
+        fontSize: 44,
+        fontWeight: 600,
+        align: 'left',
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Registry + entry point
 // ---------------------------------------------------------------------------
 
@@ -553,13 +584,16 @@ export const RECIPE_REGISTRY: Record<SectionRecipeId, RecipeFactory> = {
   'logo-strip': buildLogoStrip,
   'testimonial-row': buildTestimonialRow,
   'video-hero': buildVideoHero,
+  custom: buildCustom,
 };
 
-// Compile-time check: every SectionRecipeId has exactly one factory. If a new
-// recipe id is added in schema.ts without a matching factory, this `satisfies`
-// constraint will fail to compile.
+// Compile-time check: every SectionRecipeId has exactly one factory.
 const _RECIPE_REGISTRY_KEYS_MATCH: ReadonlyArray<SectionRecipeId> = SECTION_RECIPE_IDS;
 void _RECIPE_REGISTRY_KEYS_MATCH;
+
+// Compile-time check: AGENT_RECIPE_IDS is a subset of SECTION_RECIPE_IDS.
+const _AGENT_IDS_SUBSET: ReadonlyArray<SectionRecipeId> = AGENT_RECIPE_IDS;
+void _AGENT_IDS_SUBSET;
 
 export function createSectionFromRecipe(
   recipeId: SectionRecipeId,

@@ -15,6 +15,13 @@
       "when": 1779481459000,
       "tag": "0001_owner_asset_pipeline",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779615008015,
+      "tag": "0002_workable_robbie_robertson",
+      "breakpoints": true
     }
   ]
 }

@@ -109,6 +109,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const sidebarSelection = document.getElementById("canvas-sidebar-selection");
   const saveButton = document.getElementById("canvas-save");
   const publishButton = document.getElementById("canvas-publish");
+  const saveTemplateButton = document.getElementById("canvas-save-template");
 
   // -- Viewport + zoom ---------------------------------------------------
   // The route ships #canvas-root directly inside the editor shell. We wrap
@@ -1301,6 +1302,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       { label: "Dup", action: "duplicate-section" },
       { label: "\u2191", action: "move-up" },
       { label: "\u2193", action: "move-down" },
+      { label: "Save", action: "save-to-library" },
       { label: "Del", action: "delete-section", danger: true },
     ];
     if (!onlyInstance) {
@@ -3547,6 +3549,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       page.sections[idx] = next;
       renderAll();
       scheduleSave();
+    } else if (action === "save-to-library") {
+      void saveToLibrary(section);
     } else if (action === "convert-to-symbol") {
       // Wave 3 #14 — "Convert to Symbol": lift the section into a new
       // SymbolMaster on the site, then replace its slot with a symbol-instance
@@ -3556,6 +3560,72 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // Wave 3 #14 — "Detach": inline the master + overrides into the host
       // section, removing the symbol-instance reference.
       void detachInstanceInSection(section, idx, page);
+    }
+  }
+
+  // -- Save section to library -------------------------------------------
+
+  async function saveToLibrary(section) {
+    var name = prompt("Section name for the library:", section.name || "");
+    if (name === null) return;
+    if (name.trim().length === 0) name = section.name || "Untitled";
+    try {
+      var saved = await flushPendingSave();
+      if (!saved) return;
+      setStatus("Saving section to library...", "ok");
+      var response = await authFetch("/api/library/sections", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteId: SITE_ID, sectionId: section.id, name: name.trim() }),
+      });
+      if (!response.ok) {
+        var detail = response.statusText;
+        try {
+          var body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (e2) { /* ignore */ }
+        setStatus("Save failed: " + detail, "error");
+        return;
+      }
+      sectionsCatalog = null;
+      setStatus("Section saved to library", "ok");
+    } catch (err) {
+      setStatus("Save failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
+  // -- Save site as template ----------------------------------------------
+
+  async function saveSiteAsTemplate() {
+    var name = prompt("Template name:", state && state.pages && state.pages[0] ? state.pages[0].title : "");
+    if (name === null) return;
+    if (name.trim().length === 0) {
+      setStatus("Template name is required", "error");
+      return;
+    }
+    var tagline = prompt("One-line description:", "");
+    if (tagline === null) tagline = "";
+    try {
+      var saved = await flushPendingSave();
+      if (!saved) return;
+      setStatus("Saving as template...", "ok");
+      var response = await authFetch("/api/designer-templates", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ siteId: SITE_ID, name: name.trim(), tagline: tagline.trim() }),
+      });
+      if (!response.ok) {
+        var detail = response.statusText;
+        try {
+          var body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (e2) { /* ignore */ }
+        setStatus("Save as template failed: " + detail, "error");
+        return;
+      }
+      setStatus("Saved as template", "ok");
+    } catch (err) {
+      setStatus("Save as template failed: " + (err && err.message ? err.message : String(err)), "error");
     }
   }
 
@@ -3755,7 +3825,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!root) return;
     if (sectionsCatalog === null) {
       try {
-        const response = await authFetch('/api/templates/sections');
+        const response = await authFetch('/api/library/sections');
         if (!response.ok) {
           root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
           return;
@@ -3787,12 +3857,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function renderSectionsPickerShell(root) {
-    const templateIds = Array.from(new Set(sectionsCatalog.map((e) => e.templateId)));
-    const templateNames = new Map(sectionsCatalog.map((e) => [e.templateId, e.templateName]));
-
-    const filterOptions = ['<option value="all">All templates</option>']
-      .concat(templateIds.map((id) => '<option value="' + escapeAttr(id) + '">' + escapeHtml(templateNames.get(id) || id) + '</option>'))
-      .join('');
+    const filterOptions = [
+      '<option value="all">All sections</option>',
+      '<option value="seed">Built-in</option>',
+      '<option value="library">Library</option>',
+    ].join('');
 
     root.innerHTML =
       '<div class="rev01-section-picker-controls">' +
@@ -3823,31 +3892,35 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!gridContainer || sectionsCatalog === null) return;
 
     const filtered = sectionsCatalog.filter((entry) => {
-      if (activeTemplateFilter !== 'all' && entry.templateId !== activeTemplateFilter) return false;
+      if (activeTemplateFilter !== 'all' && entry.source !== activeTemplateFilter) return false;
       if (activeSearchQuery.length > 0) {
-        const haystack = (entry.sectionName + ' ' + entry.headingPreview + ' ' + entry.templateName).toLowerCase();
+        const haystack = (entry.name + ' ' + entry.headingPreview + ' ' + (entry.templateName || '')).toLowerCase();
         if (!haystack.includes(activeSearchQuery.toLowerCase())) return false;
       }
       return true;
     });
 
     const cards = filtered.map((entry) => {
-      const isPending = pendingImport
-        && pendingImport.templateId === entry.templateId
-        && pendingImport.sectionId === entry.sectionId;
+      const isPending = pendingImport && pendingImport.id === entry.id;
+      const sourceLabel = entry.source === 'seed'
+        ? escapeHtml(entry.templateName || 'Built-in')
+        : (entry.visibility === 'private' ? 'Your library' : 'Library');
       return (
         '<li class="rev01-section-card' + (isPending ? ' is-pending' : '') + '">' +
           '<div class="rev01-section-card-head">' +
-            '<span class="rev01-section-card-name">' + escapeHtml(entry.sectionName) + '</span>' +
+            '<span class="rev01-section-card-name">' + escapeHtml(entry.name) + '</span>' +
             '<span class="rev01-section-card-recipe">' + escapeHtml(entry.recipeId) + '</span>' +
           '</div>' +
           '<p class="rev01-section-card-preview">' + escapeHtml(entry.headingPreview) + '</p>' +
           '<div class="rev01-section-card-foot">' +
-            '<span class="rev01-section-card-template">' + escapeHtml(entry.templateName) + '</span>' +
+            '<span class="rev01-section-card-template">' + sourceLabel + '</span>' +
             '<button type="button" class="rev01-section-card-use" data-section-card-use ' +
-              'data-template-id="' + escapeAttr(entry.templateId) + '" ' +
-              'data-section-id="' + escapeAttr(entry.sectionId) + '" ' +
-              'data-template-name="' + escapeAttr(entry.templateName) + '">' +
+              'data-entry-id="' + escapeAttr(entry.id) + '" ' +
+              'data-entry-source="' + escapeAttr(entry.source) + '" ' +
+              'data-entry-name="' + escapeAttr(entry.name) + '"' +
+              (entry.templateId ? ' data-template-id="' + escapeAttr(entry.templateId) + '"' : '') +
+              (entry.librarySectionId ? ' data-library-section-id="' + escapeAttr(entry.librarySectionId) + '"' : '') +
+              (entry.sectionId ? ' data-section-id="' + escapeAttr(entry.sectionId) + '"' : '') + '>' +
               (isPending ? 'Cancel' : 'Use') +
             '</button>' +
           '</div>' +
@@ -3861,15 +3934,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     gridContainer.querySelectorAll('[data-section-card-use]').forEach((button) => {
       button.addEventListener('click', () => {
+        const entryId = button.getAttribute('data-entry-id') || '';
+        const entrySource = button.getAttribute('data-entry-source') || '';
+        const entryName = button.getAttribute('data-entry-name') || '';
         const templateId = button.getAttribute('data-template-id') || '';
         const sectionId = button.getAttribute('data-section-id') || '';
-        const templateName = button.getAttribute('data-template-name') || '';
-        if (pendingImport
-            && pendingImport.templateId === templateId
-            && pendingImport.sectionId === sectionId) {
+        const librarySectionId = button.getAttribute('data-library-section-id') || '';
+        if (pendingImport && pendingImport.id === entryId) {
           exitPlacementMode();
         } else {
-          enterPlacementMode({ templateId, sectionId, templateName });
+          enterPlacementMode({
+            id: entryId,
+            source: entrySource,
+            name: entryName,
+            templateId: templateId,
+            sectionId: sectionId,
+            librarySectionId: librarySectionId,
+          });
         }
       });
     });
@@ -3879,7 +3960,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     pendingImport = target;
     // setStatus only recognises "error" / "ok" tones in this codebase;
     // "info" would silently fall through. Use "ok" for the pending banner.
-    setStatus('Click a slot to insert "' + target.templateName + '" section', 'ok');
+    setStatus('Click a slot to insert "' + target.name + '" section', 'ok');
     renderSectionsPanel();
     renderPlacementSlots();
   }
@@ -3951,14 +4032,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const saved = await flushPendingSave();
       if (!saved) return;
       setStatus('Inserting section…', 'ok');
+      const importBody = target.source === 'library'
+        ? { source: 'library', librarySectionId: target.librarySectionId, insertAt: insertAt }
+        : { templateId: target.templateId, sectionId: target.sectionId, insertAt: insertAt };
       const response = await authFetch('/api/sites/' + SITE_ID + '/sections/import', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          templateId: target.templateId,
-          sectionId: target.sectionId,
-          insertAt: insertAt,
-        }),
+        body: JSON.stringify(importBody),
       });
       if (!response.ok) {
         let detail = response.statusText;
@@ -3983,7 +4063,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       renderAll();
       renderSectionsPanel();
-      setStatus('Inserted section from ' + target.templateName, 'ok');
+      setStatus('Inserted section from ' + target.name, 'ok');
     } catch (err) {
       setStatus('Insert failed: ' + (err && err.message ? err.message : String(err)), 'error');
     }
@@ -4181,6 +4261,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       saveButton.addEventListener("click", () => {
         if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
         void saveStateNow();
+      });
+    }
+    if (saveTemplateButton) {
+      saveTemplateButton.addEventListener("click", () => {
+        void saveSiteAsTemplate();
       });
     }
     window.addEventListener("keydown", (ev) => {

@@ -1,3 +1,4 @@
+import { eq, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
@@ -7,6 +8,8 @@ import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
+import { db } from '../../db/client';
+import { customer, designerTemplate } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
@@ -242,7 +245,15 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
   );
 }
 
-function Page() {
+interface DesignerTemplateCard {
+  id: string;
+  name: string;
+  tagline: string;
+  styleKit: string;
+  visibility: string;
+}
+
+function Page({ designerTemplates }: { designerTemplates: DesignerTemplateCard[] }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
     <DashboardShell
@@ -267,7 +278,7 @@ function Page() {
                   name="templateId"
                   value={template.id}
                   required
-                  checked={idx === 0}
+                  checked={idx === 0 && designerTemplates.length === 0}
                 />
                 <span class="template-body">
                   <span class="template-preview">
@@ -285,6 +296,38 @@ function Page() {
                       <p>{template.tagline}</p>
                     </span>
                     <span class="kit">{template.state.styleKit}</span>
+                  </span>
+                </span>
+              </label>
+            ))}
+            {designerTemplates.map((dt, idx) => (
+              <label class="template">
+                <input
+                  type="radio"
+                  name="templateId"
+                  value={dt.id}
+                  required
+                  checked={false}
+                />
+                <span class="template-body">
+                  <span class="template-preview">
+                    <iframe
+                      src={`/api/designer-templates/${dt.id}/preview`}
+                      title={`${dt.name} preview`}
+                      loading="lazy"
+                      sandbox=""
+                      referrerpolicy="no-referrer"
+                    />
+                  </span>
+                  <span class="template-copy">
+                    <span>
+                      <h2>{dt.name}</h2>
+                      <p>{dt.tagline}</p>
+                    </span>
+                    <span class="kit">
+                      {dt.styleKit}
+                      {dt.visibility === 'private' ? ' · yours' : ''}
+                    </span>
                   </span>
                 </span>
               </label>
@@ -353,4 +396,37 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
   });
 });
 
-templatesRoute.get('/', (c) => c.html(<Page />));
+templatesRoute.get('/', async (c) => {
+  const auth = c.get('auth');
+  let designerTemplates: DesignerTemplateCard[] = [];
+  if (auth.userId) {
+    const database = db(c.env);
+    const customerRow = await database
+      .select({ id: customer.id })
+      .from(customer)
+      .where(eq(customer.clerkUserId, auth.userId))
+      .limit(1);
+    const customerId = customerRow[0]?.id;
+
+    const whereClause = customerId
+      ? or(
+          eq(designerTemplate.visibility, 'global'),
+          eq(designerTemplate.customerId, customerId),
+        )
+      : eq(designerTemplate.visibility, 'global');
+
+    const rows = await database
+      .select({
+        id: designerTemplate.id,
+        name: designerTemplate.name,
+        tagline: designerTemplate.tagline,
+        styleKit: designerTemplate.styleKit,
+        visibility: designerTemplate.visibility,
+      })
+      .from(designerTemplate)
+      .where(whereClause!);
+
+    designerTemplates = rows;
+  }
+  return c.html(<Page designerTemplates={designerTemplates} />);
+});

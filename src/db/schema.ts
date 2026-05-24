@@ -9,7 +9,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import type { CanvasSiteState, PublishedSnapshot, StyleKit } from '../canvas/schema';
+import type { CanvasSection, CanvasSiteState, PublishedSnapshot, StyleKit } from '../canvas/schema';
 
 // -- Postgres `bytea` custom column (Phase 0 — Wave 1 #3 version history) ----
 //
@@ -352,3 +352,75 @@ export const chatSession = pgTable('chat_session', {
 
 export type ChatSession = typeof chatSession.$inferSelect;
 export type NewChatSession = typeof chatSession.$inferInsert;
+
+// -- AssetManifestEntry (shared by library_section + designer_template) -------
+//
+// Snapshot of an ownerAsset at save time. On import, the target Owner gets
+// new ownerAsset rows with the same contentHash/r2Key, deduped by
+// (customerId, contentHash). No bytes are copied — R2 is content-addressed.
+
+export interface AssetManifestEntry {
+  assetId: string;
+  contentHash: string;
+  r2Key: string;
+  mediaType: string;
+  kind: 'image' | 'video';
+  alt: string;
+  width: number | null;
+  height: number | null;
+  byteSize: number;
+}
+
+// -- librarySection (Section Library — global + per-Owner reusable sections) --
+//
+// Stores reusable section definitions. Global sections (customerId NULL,
+// visibility 'global') are admin-curated and visible to all Owners. Private
+// sections (customerId set, visibility 'private') are per-Owner.
+
+export const LIBRARY_SECTION_VISIBILITY = ['global', 'private'] as const;
+export type LibrarySectionVisibility = (typeof LIBRARY_SECTION_VISIBILITY)[number];
+
+export const librarySection = pgTable('library_section', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
+  visibility: text('visibility').notNull().$type<LibrarySectionVisibility>(),
+  name: text('name').notNull(),
+  recipeId: text('recipe_id').notNull(),
+  sectionData: jsonb('section_data').notNull().$type<CanvasSection>(),
+  assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
+  headingPreview: text('heading_preview').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type LibrarySection = typeof librarySection.$inferSelect;
+export type NewLibrarySection = typeof librarySection.$inferInsert;
+
+// -- designerTemplate (Designer-created templates — global + per-Owner) -------
+//
+// Stores templates created via "save as template" from the editor. Global
+// templates (customerId NULL, visibility 'global') are admin-curated. Private
+// templates (customerId set, visibility 'private') are per-Owner.
+
+export const DESIGNER_TEMPLATE_VISIBILITY = ['global', 'private'] as const;
+export type DesignerTemplateVisibility = (typeof DESIGNER_TEMPLATE_VISIBILITY)[number];
+
+export const designerTemplate = pgTable('designer_template', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
+  visibility: text('visibility').notNull().$type<DesignerTemplateVisibility>(),
+  name: text('name').notNull(),
+  tagline: text('tagline').notNull().default(''),
+  styleKit: text('style_kit').notNull(),
+  siteState: jsonb('site_state').notNull().$type<CanvasSiteState>(),
+  assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type DesignerTemplate = typeof designerTemplate.$inferSelect;
+export type NewDesignerTemplate = typeof designerTemplate.$inferInsert;

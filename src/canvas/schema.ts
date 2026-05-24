@@ -92,7 +92,7 @@ export const MOTION_PRESETS = [
 ] as const;
 export type MotionPreset = (typeof MOTION_PRESETS)[number];
 
-export const SECTION_RECIPE_IDS = [
+export const AGENT_RECIPE_IDS = [
   'hero-split',
   'feature-grid',
   'gallery-strip',
@@ -101,6 +101,9 @@ export const SECTION_RECIPE_IDS = [
   'testimonial-row',
   'video-hero',
 ] as const;
+export type AgentRecipeId = (typeof AGENT_RECIPE_IDS)[number];
+
+export const SECTION_RECIPE_IDS = [...AGENT_RECIPE_IDS, 'custom'] as const;
 export type SectionRecipeId = (typeof SECTION_RECIPE_IDS)[number];
 
 // Inline rich-text marks for the rich text inside a TextElement. The set is

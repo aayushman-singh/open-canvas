@@ -120,6 +120,9 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
             <button id="canvas-publish" type="button">
               Publish
             </button>
+            <button id="canvas-save-template" type="button">
+              Save as template
+            </button>
             {/* Presence indicator — visible only when count > 1. The DO
                 broadcasts `{ type: "presence", count }` over the same /__live
                 WebSocket used by the visitor live-update path. The client
