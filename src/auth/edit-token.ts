@@ -18,6 +18,20 @@ export interface EditTokenPayload {
 const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' } as const;
 const TTL_SECONDS = 14400; // 4 hours
 
+function isEditTokenPayload(value: unknown): value is EditTokenPayload {
+  if (value === null || typeof value !== 'object') return false;
+  const payload = value as Record<string, unknown>;
+  return (
+    typeof payload.siteId === 'string' &&
+    typeof payload.customerId === 'string' &&
+    typeof payload.clerkUserId === 'string' &&
+    typeof payload.iat === 'number' &&
+    typeof payload.exp === 'number' &&
+    Number.isFinite(payload.iat) &&
+    Number.isFinite(payload.exp)
+  );
+}
+
 function base64UrlEncode(data: ArrayBuffer | Uint8Array): string {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   let binary = '';
@@ -38,13 +52,10 @@ function base64UrlDecode(str: string): Uint8Array {
 }
 
 async function importKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    ALGORITHM,
-    false,
-    ['sign', 'verify'],
-  );
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), ALGORITHM, false, [
+    'sign',
+    'verify',
+  ]);
 }
 
 export async function signEditToken(
@@ -54,7 +65,9 @@ export async function signEditToken(
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const full: EditTokenPayload = { ...payload, iat: now, exp: now + ttl };
-  const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
+  const header = base64UrlEncode(
+    new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })),
+  );
   const body = base64UrlEncode(new TextEncoder().encode(JSON.stringify(full)));
   const data = `${header}.${body}`;
   const key = await importKey(secret);
@@ -79,30 +92,19 @@ export async function verifyEditToken(
   }
 
   const key = await importKey(secret);
-  const valid = await crypto.subtle.verify(
-    'HMAC',
-    key,
-    sigBytes,
-    new TextEncoder().encode(data),
-  );
+  const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(data));
   if (!valid) return null;
 
-  let payload: EditTokenPayload;
+  let payload: unknown;
   try {
     payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[1]!)));
   } catch {
     return null;
   }
 
+  if (!isEditTokenPayload(payload)) return null;
   const now = Math.floor(Date.now() / 1000);
-  if (typeof payload.exp !== 'number' || payload.exp <= now) return null;
-  if (
-    typeof payload.siteId !== 'string' ||
-    typeof payload.customerId !== 'string' ||
-    typeof payload.clerkUserId !== 'string'
-  ) {
-    return null;
-  }
+  if (payload.exp <= now) return null;
 
   return payload;
 }

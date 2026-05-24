@@ -7,6 +7,12 @@
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const FROM_ADDRESS = 'rev01 <noreply@rev01.aayushman.dev>';
 
+function isSendEmailResult(value: unknown): value is { id: string } {
+  return (
+    typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string'
+  );
+}
+
 export interface SendEmailOptions {
   to: string;
   subject: string;
@@ -20,7 +26,7 @@ export async function sendEmail(
   const response = await fetch(RESEND_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -32,16 +38,15 @@ export async function sendEmail(
   });
 
   if (!response.ok) {
-    let detail = response.statusText;
-    try {
-      const body = await response.json() as { message?: string };
-      if (body && typeof body.message === 'string') detail = body.message;
-    } catch {
-      // ignore parse failure
-    }
+    const bodyText = (await response.text()).trim();
+    const detail = bodyText.length > 0 ? bodyText : response.statusText;
     throw new Error(`Resend API error (${response.status}): ${detail}`);
   }
 
-  const result = await response.json() as { id: string };
-  return result;
+  const result: unknown = await response.json();
+  if (!isSendEmailResult(result)) {
+    throw new Error('Resend API response missing required string id');
+  }
+
+  return { id: result.id };
 }

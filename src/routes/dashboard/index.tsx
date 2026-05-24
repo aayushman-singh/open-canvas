@@ -839,7 +839,7 @@ function DetailRow({
   const inner = (
     <>
       <td>{label}</td>
-      <td>{children as string}</td>
+      <td>{children}</td>
     </>
   );
   if (href) {

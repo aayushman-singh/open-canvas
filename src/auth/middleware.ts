@@ -1,5 +1,7 @@
 import { createClerkClient, type User } from '@clerk/backend';
+import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
+import { EDIT_TOKEN_COOKIE, verifyEditToken } from './edit-token';
 
 export type AuthState = {
   userId: string | null;
@@ -264,9 +266,6 @@ export function clerkAuth() {
 // __rev01_edit cookie (set by the /api/on-site-edit popup) and populates the
 // same auth / user / clerk context variables that clerkAuth() would, so
 // downstream handlers (canvasApi, publishApi, etc.) work unchanged.
-import { getCookie } from 'hono/cookie';
-import { verifyEditToken, EDIT_TOKEN_COOKIE } from './edit-token';
-
 type EditTokenBindings = ClerkBindings & { UNLOCK_SIGNING_SECRET: string };
 
 export function editTokenAuth() {

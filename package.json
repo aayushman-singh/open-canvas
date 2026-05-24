@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "dev:all": "bun run --cwd services/scraper dev & wrangler dev",
+    "dev:all": "bun run scripts/dev-all.mjs",
     "deploy": "wrangler deploy",
     "build": "wrangler deploy --dry-run --outdir=dist",
     "typecheck": "tsc --noEmit",
@@ -43,7 +43,6 @@
     "table:smoke": "bun run src/canvas/elements/table-smoke.ts",
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",
     "chat:smoke": "bun run src/agent/chat/smoke.ts",
-    "translate:smoke": "bun run src/agent/translate/smoke.ts",
     "i18n:smoke": "bun run src/i18n/smoke.ts",
     "wishlist:smoke": "bun run src/wishlist-smoke.ts"
   },

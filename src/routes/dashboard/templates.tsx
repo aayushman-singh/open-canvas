@@ -287,7 +287,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                       src={`/dashboard/templates/${template.id}/preview`}
                       title={`${template.name} preview`}
                       loading="lazy"
-                      sandbox="allow-scripts"
+                      sandbox=""
                       referrerpolicy="no-referrer"
                     />
                   </span>
@@ -316,7 +316,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                       src={`/api/custom-templates/${dt.id}/preview`}
                       title={`${dt.name} preview`}
                       loading="lazy"
-                      sandbox="allow-scripts"
+                      sandbox=""
                       referrerpolicy="no-referrer"
                     />
                   </span>

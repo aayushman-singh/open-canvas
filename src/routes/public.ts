@@ -20,7 +20,12 @@ import { createR2Client } from '../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
 import { collectReferencedAssetIds } from '../assets/site-assets';
 import type { ClerkAuthVariables } from '../auth/middleware';
-import { verifyEditToken, EDIT_TOKEN_COOKIE, signEditToken, EDIT_TOKEN_MAX_AGE } from '../auth/edit-token';
+import {
+  verifyEditToken,
+  EDIT_TOKEN_COOKIE,
+  signEditToken,
+  EDIT_TOKEN_MAX_AGE,
+} from '../auth/edit-token';
 import { verifyInviteToken } from '../auth/invite-token';
 import { editorPageJsx, type EditorPageOptions } from '../editor/canvas-index';
 import { siteCollaborator } from '../db/schema';
@@ -411,7 +416,7 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   return new Response(null, {
     status: 302,
     headers: {
-      'Location': '/__edit',
+      Location: '/__edit',
       'Set-Cookie': cookieValue,
     },
   });
@@ -428,7 +433,7 @@ function buildComingSoonPage<P extends string, I extends Input>(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex" />
-  <title>${escapeHtmlForPage(siteRow.name)} — coming soon</title>
+  <title>${escapeHtmlForPage(siteRow.name)} — not yet published</title>
   <style>
     body { margin: 0; min-height: 100vh; display: flex; flex-direction: column;
            align-items: center; justify-content: center; font-family: system-ui, sans-serif;
@@ -445,17 +450,21 @@ function buildComingSoonPage<P extends string, I extends Input>(
 <body>
   <div class="wrap">
     <h1>${escapeHtmlForPage(siteRow.name)}</h1>
-    <p>This site is being built and will be live soon.</p>
+    <p>This site is not yet published.</p>
     <div class="badge"><a href="https://rev01.aayushman.dev">made with rev01</a></div>
   </div>
 </body>
 </html>`,
-    200,
+    404,
   );
 }
 
 function escapeHtmlForPage(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function buildPublishedFooterHtml(): string {
@@ -718,9 +727,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <style>
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',
-            )}${darkModeEnabled
-              ? `\n${dualModeCss}`
-              : ''}
+            )}${darkModeEnabled ? `\n${dualModeCss}` : ''}
           </style>
         </head>
         <body>

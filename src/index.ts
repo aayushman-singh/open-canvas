@@ -228,6 +228,7 @@ app.route('/__api/canvas', canvasApi);
 app.route('/__api/canvas-agent', canvasAgentApi);
 app.route('/__api/publish', publishApi);
 app.route('/__api/owner/assets', ownerAssetsApi);
+app.route('/__api', slotHistoryApi);
 app.route('/__api', sectionsApi);
 app.route('/__api/library', librarySectionsOwner);
 app.route('/__api/custom-templates', customTemplatesOwner);

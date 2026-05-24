@@ -681,8 +681,8 @@ assert(
   'expected canvas client to look up #canvas-publish',
 );
 assert(
-  canvasClientSource.includes('"/api/publish/sites/" + SITE_ID'),
-  'expected canvas client to POST to /api/publish/sites/:siteId',
+  canvasClientSource.includes('API_BASE + "/publish/sites/" + SITE_ID'),
+  'expected canvas client to POST to the selected publish API base for :siteId',
 );
 assert(
   canvasApiSource.includes('cannot save: missing assets'),
@@ -693,8 +693,8 @@ assert(
   'expected publish API to reject empty media slots with a 400-level owner error',
 );
 assert(
-  canvasClientSource.includes('/api/owner/assets/'),
-  'expected media picker delete/gallery flow to use the current owner asset route',
+  canvasClientSource.includes('API_BASE + "/owner/assets"'),
+  'expected media picker delete/gallery flow to use the selected owner asset API base',
 );
 assert(
   !canvasClientSource.includes('/api/me/assets'),

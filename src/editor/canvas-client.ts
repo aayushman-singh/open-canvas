@@ -1902,12 +1902,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
       inspector.appendChild(aiBtn);
 
-      // Upload control — separate input for image vs video mediaKinds so the
-      // file picker filters appropriately. POST to the owner upload route as
-      // a base64 data URL; on success, update the element's assetId / kind /
-      // alt from the response and re-render.
-      appendMediaUploader(element);
-      appendImageGenerator(element);
+      // Three-row media picker: current thumb + upload + AI generate + alt,
+      // history row (slot MRU), gallery grid (all owner assets by kind).
+      mountMediaPicker(element, inspector);
 
       const fit = selectInput(["cover", "contain"], element.fit);
       fit.addEventListener("change", () => {
@@ -2249,7 +2246,346 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return { assetId: body.id, kind: body.kind };
   }
 
-  async function uploadMediaForElement(element, file) {
+  async function applyAssetIdToElement(element, nextAssetId, refreshFn, nextKind) {
+    element.assetId = nextAssetId;
+    if (typeof nextKind === "string" && nextKind.length > 0) {
+      element.mediaKind = nextKind;
+    }
+    rebuildElement(element.id);
+    scheduleSave();
+    if (nextAssetId && nextAssetId !== "__placeholder__") {
+      authFetch(
+        API_BASE + "/sites/" + encodeURIComponent(SITE_ID) +
+        "/elements/" + encodeURIComponent(element.id) +
+        "/history/" + encodeURIComponent(nextAssetId),
+        { method: "PUT" },
+      )
+        .then((r) => {
+          if (!r.ok) console.error("slot-history upsert failed", r.status);
+        })
+        .catch((err) => console.error("slot-history upsert failed", err));
+    }
+    if (typeof refreshFn === "function") {
+      await refreshFn();
+    }
+  }
+
+  function buildPickerThumb(assetId, selectedAssetId, onClick) {
+    const isEmpty = !assetId || assetId === "__placeholder__";
+    if (isEmpty) {
+      const cell = document.createElement("div");
+      cell.className = "picker-thumb empty";
+      cell.textContent = "-";
+      cell.setAttribute("title", "No asset selected");
+      return cell;
+    }
+    const img = document.createElement("img");
+    img.className = "picker-thumb" + (assetId === selectedAssetId ? " selected" : "");
+    img.src = SITE_BASE + "/assets/" + encodeURIComponent(assetId);
+    img.alt = "";
+    img.title = assetId;
+    img.addEventListener("click", () => onClick(assetId));
+    return img;
+  }
+
+  function mountMediaPicker(element, host) {
+    const pickerWrap = document.createElement("div");
+    pickerWrap.className = "media-picker";
+
+    const currentRowLabel = document.createElement("div");
+    currentRowLabel.className = "picker-row-label";
+    currentRowLabel.textContent = "Current";
+    pickerWrap.appendChild(currentRowLabel);
+
+    const currentRow = document.createElement("div");
+    currentRow.className = "picker-current-row";
+    pickerWrap.appendChild(currentRow);
+
+    let currentThumb = buildPickerThumb(element.assetId, element.assetId, () => {});
+    currentRow.appendChild(currentThumb);
+
+    const actionsCol = document.createElement("div");
+    actionsCol.className = "picker-current-actions";
+    currentRow.appendChild(actionsCol);
+
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = element.mediaKind === "image" ? "image/*" : "video/*";
+
+    const uploadBtn = document.createElement("button");
+    uploadBtn.type = "button";
+    uploadBtn.textContent = element.mediaKind === "image" ? "Upload image" : "Upload video";
+    uploadBtn.addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+    actionsCol.appendChild(uploadBtn);
+    actionsCol.appendChild(fileInput);
+
+    const altInput = document.createElement("input");
+    altInput.type = "text";
+    altInput.id = "media-upload-alt-" + element.id;
+    altInput.value = typeof element.alt === "string" ? element.alt : "";
+    altInput.placeholder = "Alt text";
+    altInput.addEventListener("change", () => {
+      element.alt = altInput.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    actionsCol.appendChild(altInput);
+
+    if (element.mediaKind === "image") {
+      const genRow = document.createElement("div");
+      genRow.style.cssText = "display:flex;gap:4px;";
+
+      const promptInput = document.createElement("textarea");
+      promptInput.rows = 1;
+      promptInput.placeholder = "Describe image...";
+      promptInput.style.cssText = "flex:1;min-width:0;font-size:11px;resize:none;box-sizing:border-box;" +
+        "appearance:none;background:var(--rev01-bg-panel);border:1px solid var(--rev01-hairline);" +
+        "color:var(--rev01-fg);border-radius:4px;padding:4px 6px;font-family:inherit;";
+
+      const genBtn = document.createElement("button");
+      genBtn.type = "button";
+      genBtn.textContent = "AI";
+      genBtn.addEventListener("click", () => {
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+          setStatus("Enter a prompt first", "error");
+          return;
+        }
+        generateImageForElement(element, prompt);
+      });
+
+      genRow.appendChild(promptInput);
+      genRow.appendChild(genBtn);
+      actionsCol.appendChild(genRow);
+    }
+
+    const historyLabel = document.createElement("div");
+    historyLabel.className = "picker-row-label";
+    historyLabel.textContent = "Recent in this slot";
+    pickerWrap.appendChild(historyLabel);
+
+    const historyRow = document.createElement("div");
+    historyRow.className = "picker-history-row";
+    pickerWrap.appendChild(historyRow);
+
+    const galleryLabel = document.createElement("div");
+    galleryLabel.className = "picker-row-label";
+    galleryLabel.textContent = "Your gallery";
+    pickerWrap.appendChild(galleryLabel);
+
+    const galleryGrid = document.createElement("div");
+    galleryGrid.className = "picker-gallery-grid";
+    pickerWrap.appendChild(galleryGrid);
+
+    host.appendChild(pickerWrap);
+
+    function refreshCurrentThumb() {
+      const nextThumb = buildPickerThumb(element.assetId, element.assetId, () => {});
+      currentRow.replaceChild(nextThumb, currentThumb);
+      currentThumb = nextThumb;
+    }
+
+    function refreshAll() {
+      refreshCurrentThumb();
+      return Promise.all([refreshHistoryRow(), refreshGalleryGrid()]);
+    }
+
+    async function refreshHistoryRow() {
+      historyRow.replaceChildren();
+      let entries;
+      try {
+        const resp = await authFetch(
+          API_BASE + "/sites/" + encodeURIComponent(SITE_ID) +
+          "/elements/" + encodeURIComponent(element.id) + "/history?limit=4",
+        );
+        if (!resp.ok) {
+          console.error("slot-history fetch failed", resp.status);
+          return;
+        }
+        const body = await resp.json();
+        entries = Array.isArray(body.entries) ? body.entries : [];
+      } catch (err) {
+        console.error("slot-history fetch failed", err);
+        return;
+      }
+      for (const entry of entries) {
+        const assetId = entry.assetId;
+        const thumb = buildPickerThumb(assetId, element.assetId, (id) => {
+          void applyAssetIdToElement(element, id, refreshAll);
+        });
+        historyRow.appendChild(thumb);
+      }
+      if (entries.length === 0) {
+        const hint = document.createElement("span");
+        hint.style.cssText = "font-size:11px;color:var(--rev01-fg-faint);font-family:var(--rev01-font-mono);";
+        hint.textContent = "None yet";
+        historyRow.appendChild(hint);
+      }
+    }
+
+    async function refreshGalleryGrid() {
+      galleryGrid.replaceChildren();
+      let entries;
+      try {
+        const resp = await authFetch(API_BASE + "/owner/assets");
+        if (!resp.ok) {
+          console.error("gallery fetch failed", resp.status);
+          return;
+        }
+        const body = await resp.json();
+        entries = Array.isArray(body.assets)
+          ? body.assets.filter((entry) => entry && entry.kind === element.mediaKind)
+          : [];
+      } catch (err) {
+        console.error("gallery fetch failed", err);
+        return;
+      }
+      for (const entry of entries) {
+        const assetId = typeof entry.id === "string" ? entry.id : entry.assetId;
+        if (typeof assetId !== "string" || assetId.length === 0) continue;
+        const cell = document.createElement("div");
+        cell.className = "picker-gallery-cell";
+
+        const thumb = buildPickerThumb(assetId, element.assetId, (id) => {
+          void applyAssetIdToElement(element, id, refreshAll);
+        });
+        cell.appendChild(thumb);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "picker-delete";
+        delBtn.type = "button";
+        delBtn.textContent = "x";
+        delBtn.title = "Delete asset";
+        delBtn.addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          await runDeleteAsset(assetId, refreshAll);
+        });
+        cell.appendChild(delBtn);
+
+        galleryGrid.appendChild(cell);
+      }
+      if (entries.length === 0) {
+        const hint = document.createElement("span");
+        hint.style.cssText = "font-size:11px;color:var(--rev01-fg-faint);font-family:var(--rev01-font-mono);grid-column:1/-1;";
+        hint.textContent = "No assets yet";
+        galleryGrid.appendChild(hint);
+      }
+    }
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      void uploadMediaForElement(element, file, refreshAll);
+    });
+
+    void refreshHistoryRow();
+    void refreshGalleryGrid();
+  }
+
+  function clearDeletedAssetFromLocalState(assetId) {
+    if (!state || !Array.isArray(state.pages)) return 0;
+    let cleared = 0;
+    for (const page of state.pages) {
+      const sections = Array.isArray(page.sections) ? page.sections : [];
+      for (const section of sections) {
+        const elements = Array.isArray(section.elements) ? section.elements : [];
+        for (const mediaElement of elements) {
+          if (!mediaElement || mediaElement.type !== "media") continue;
+          if (mediaElement.assetId === assetId) {
+            mediaElement.assetId = "";
+            cleared++;
+          }
+          if (mediaElement.posterAssetId === assetId) {
+            mediaElement.posterAssetId = "";
+            cleared++;
+          }
+        }
+      }
+    }
+    if (cleared > 0) {
+      renderAll();
+      scheduleSave();
+    }
+    return cleared;
+  }
+
+  async function runDeleteAsset(assetId, refreshFn) {
+    let references = [];
+    try {
+      const resp = await authFetch(API_BASE + "/owner/assets/" + encodeURIComponent(assetId), {
+        method: "DELETE",
+      });
+      const body = await resp.json();
+      if (resp.status === 412 || resp.ok) {
+        references = Array.isArray(body.references) ? body.references : [];
+      } else {
+        const detail = body && body.error ? body.error : resp.statusText;
+        setStatus("Delete failed: " + detail, "error");
+        return;
+      }
+    } catch (err) {
+      setStatus("Delete failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+
+    const editableRefs = references.filter((ref) => ref && ref.source === "editable");
+    const publishedRefs = references.filter((ref) => ref && ref.source === "published");
+    const lines = ["Delete asset " + assetId + "?"];
+    if (editableRefs.length > 0) {
+      lines.push("", "Editable slots that will be cleared:");
+      for (const ref of editableRefs) {
+        lines.push(
+          "  - " + (ref.siteName || ref.siteId) + " / " + ref.pageSlug +
+          " / element " + ref.elementId + " (" + ref.role + ")",
+        );
+      }
+    }
+    if (publishedRefs.length > 0) {
+      lines.push("", "Live published sites that will show missing media until you re-publish:");
+      for (const ref of publishedRefs) {
+        const address = ref.publishedAddress ? " (live: " + ref.publishedAddress + ")" : "";
+        lines.push(
+          "  - " + (ref.siteName || ref.siteId) + address + " / " + ref.pageSlug +
+          " / element " + ref.elementId + " (" + ref.role + ")",
+        );
+      }
+    }
+    if (editableRefs.length === 0 && publishedRefs.length === 0) {
+      lines.push("", "No canvas references were found.");
+    }
+    lines.push("", "Continue?");
+    if (!confirm(lines.join("\\n"))) return;
+
+    try {
+      const resp = await authFetch(
+        API_BASE + "/owner/assets/" + encodeURIComponent(assetId) + "?confirm=1",
+        { method: "DELETE" },
+      );
+      if (!resp.ok) {
+        let detail = resp.statusText;
+        try {
+          const body = await resp.json();
+          if (body && body.error) detail = body.error;
+        } catch (_) { /* ignore */ }
+        setStatus("Delete failed: " + detail, "error");
+        return;
+      }
+    } catch (err) {
+      setStatus("Delete failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+
+    clearDeletedAssetFromLocalState(assetId);
+    setStatus("Asset deleted", "ok");
+    if (typeof refreshFn === "function") {
+      await refreshFn();
+    }
+  }
+
+  async function uploadMediaForElement(element, file, refreshFn) {
     const altInputId = "media-upload-alt-" + element.id;
     const altInput = document.getElementById(altInputId);
     const altValue =
@@ -2267,12 +2603,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         const cropped = await cropFileToSlotAspect(file, boxW, boxH);
         setStatus("Uploading…");
         const uploaded = await postAssetUpload(cropped.blob, altValue, element.id);
-        element.assetId = uploaded.assetId;
-        element.mediaKind = uploaded.kind;
         element.alt = altValue;
-        rebuildElement(element.id);
+        await applyAssetIdToElement(element, uploaded.assetId, refreshFn, uploaded.kind);
         renderInspector();
-        scheduleSave();
         setStatus("Uploaded", "ok");
         return;
       }
@@ -2291,13 +2624,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus("Uploading poster…");
       const uploadedPoster = await postAssetUpload(croppedPoster.blob, altValue, element.id);
 
-      element.assetId = uploadedVideo.assetId;
       element.mediaKind = "video";
       element.posterAssetId = uploadedPoster.assetId;
       element.alt = altValue;
-      rebuildElement(element.id);
+      await applyAssetIdToElement(element, uploadedVideo.assetId, refreshFn, "video");
       renderInspector();
-      scheduleSave();
       setStatus("Uploaded", "ok");
     } catch (err) {
       if (err && err.message === "crop cancelled") {

@@ -25,7 +25,6 @@ import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell } from './shell';
-import { Button, Badge, Card } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -42,6 +41,65 @@ siteSettingsRoute.use('*', requireAuth());
 
 const pageStyles = `
   .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    padding: 22px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    margin: 0 0 8px;
+    font-size: 18px;
+    letter-spacing: 0;
+  }
+  .card .sub {
+    margin: 0 0 18px;
+    color: var(--muted);
+    max-width: 760px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .badge.success {
+    background: rgba(74, 222, 128, 0.1);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: #86efac;
+  }
+  .badge.neutral {
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.28);
+    color: #cbd5e1;
+  }
+  .button {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .button.primary {
+    border-color: #7dd3fc;
+    background: #7dd3fc;
+    color: #082f49;
+  }
+  .button.danger {
+    margin-top: 10px;
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(248, 113, 113, 0.1);
+    color: #fca5a5;
+  }
+  .button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
   .status-row {
     display: flex;
     align-items: center;
@@ -212,6 +270,10 @@ function clientScript(siteId: string): string {
   }
   function showError(msg) { clearStatus(); if (err) err.textContent = msg; }
   function showOk(msg) { clearStatus(); if (ok) ok.textContent = msg; }
+  async function responseDetail(response) {
+    const bodyText = (await response.text()).trim();
+    return bodyText || response.statusText;
+  }
   if (form) {
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -231,11 +293,7 @@ function clientScript(siteId: string): string {
           body: JSON.stringify({ password }),
         });
         if (!response.ok) {
-          let detail = response.statusText;
-          try {
-            const body = await response.json();
-            if (body && body.error) detail = body.error;
-          } catch (_) { /* noop */ }
+          const detail = await responseDetail(response);
           showError(detail);
           if (button) button.disabled = false;
           return;
@@ -258,11 +316,7 @@ function clientScript(siteId: string): string {
           headers: { 'accept': 'application/json' },
         });
         if (!response.ok) {
-          let detail = response.statusText;
-          try {
-            const body = await response.json();
-            if (body && body.error) detail = body.error;
-          } catch (_) { /* noop */ }
+          const detail = await responseDetail(response);
           showError('Could not disable: ' + detail);
           disableBtn.disabled = false;
           return;
@@ -288,6 +342,10 @@ function clientScript(siteId: string): string {
     if (collabErr) collabErr.textContent = '';
     if (collabOk) collabOk.textContent = '';
   }
+  async function responseDetail(response) {
+    const bodyText = (await response.text()).trim();
+    return bodyText || response.statusText;
+  }
 
   if (collabForm) {
     collabForm.addEventListener('submit', async (event) => {
@@ -307,11 +365,7 @@ function clientScript(siteId: string): string {
           body: JSON.stringify({ email, role }),
         });
         if (!response.ok) {
-          let detail = response.statusText;
-          try {
-            const body = await response.json();
-            if (body && body.error) detail = body.error;
-          } catch (_) {}
+          const detail = await responseDetail(response);
           if (collabErr) collabErr.textContent = detail;
           if (submitBtn) submitBtn.disabled = false;
           return;
@@ -341,11 +395,7 @@ function clientScript(siteId: string): string {
           headers: { 'accept': 'application/json' },
         });
         if (!response.ok) {
-          let detail = response.statusText;
-          try {
-            const body = await response.json();
-            if (body && body.error) detail = body.error;
-          } catch (_) {}
+          const detail = await responseDetail(response);
           if (collabErr) collabErr.textContent = detail;
           btn.disabled = false;
           return;
@@ -404,20 +454,21 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
     >
       <h1>Settings</h1>
       <p class="lede">
-        Per-site controls for the published address <code>{owned.subdomain}.rev01.aayushman.dev</code>.
+        Per-site controls for the published address{' '}
+        <code>{owned.subdomain}.rev01.aayushman.dev</code>.
       </p>
 
-      <Card>
+      <section class="card">
         <h2>Password protection</h2>
         <p class="sub">
-          When enabled, visitors must enter a password before they see any page of this site.
-          The same password applies to every page. Changing the password signs out everyone who
+          When enabled, visitors must enter a password before they see any page of this site. The
+          same password applies to every page. Changing the password signs out everyone who
           previously unlocked the site — they'll have to re-enter the new password.
         </p>
         <div class="status-row">
-          <Badge variant={enabled ? 'success' : 'neutral'}>
+          <span class={`badge ${enabled ? 'success' : 'neutral'}`}>
             {enabled ? 'Enabled' : 'Disabled'}
-          </Badge>
+          </span>
           <span class="meta">{setAtLine}</span>
         </div>
         <form class="pw" autocomplete="off">
@@ -433,20 +484,24 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               required
             />
           </label>
-          <Button variant="primary" type="submit">{enabled ? 'Update' : 'Enable'}</Button>
+          <button class="button primary" type="submit">
+            {enabled ? 'Update' : 'Enable'}
+          </button>
         </form>
         <p class="err" role="alert" aria-live="polite"></p>
         <p class="ok" role="status" aria-live="polite"></p>
         {enabled ? (
-          <Button variant="danger" data-action="disable">Disable password protection</Button>
+          <button class="button danger" type="button" data-action="disable">
+            Disable password protection
+          </button>
         ) : null}
-      </Card>
+      </section>
 
-      <Card>
+      <section class="card">
         <h2>Collaborators</h2>
         <p class="sub">
-          Add people by email to let them edit this site. They must have a rev01 account.
-          An invitation email will be sent when you add them.
+          Add people by email to let them edit this site. They must have a rev01 account. An
+          invitation email will be sent when you add them.
         </p>
         <form class="collab-form" data-collab-form autocomplete="off">
           <label>
@@ -460,7 +515,9 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               <option value="viewer">Viewer</option>
             </select>
           </label>
-          <Button variant="primary" type="submit">Invite</Button>
+          <button class="button primary" type="submit">
+            Invite
+          </button>
         </form>
         <p class="err" data-collab-err role="alert" aria-live="polite"></p>
         <p class="ok" data-collab-ok role="status" aria-live="polite"></p>
@@ -472,11 +529,13 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               <span class={`status-badge ${collab.acceptedAt ? 'active' : 'pending'}`}>
                 {collab.acceptedAt ? 'active' : 'pending'}
               </span>
-              <button type="button" class="remove-btn" data-remove-collab={collab.id}>Remove</button>
+              <button type="button" class="remove-btn" data-remove-collab={collab.id}>
+                Remove
+              </button>
             </li>
           ))}
         </ul>
-      </Card>
+      </section>
 
       <script type="module">{raw(clientScript(siteId))}</script>
     </DashboardShell>,

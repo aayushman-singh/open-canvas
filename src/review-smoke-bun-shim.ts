@@ -5,6 +5,10 @@
 
 interface BunPluginBuilder {
   module(specifier: string, callback: () => { loader: string; contents: string }): void;
+  onLoad(
+    options: { filter: RegExp },
+    callback: (args: { path: string }) => { loader: string; contents: string },
+  ): void;
 }
 
 interface BunPlugin {
@@ -29,6 +33,10 @@ globalScope.Bun.plugin({
 }
 export class WorkerEntrypoint {}
 `,
+    }));
+    build.onLoad({ filter: /\.ttf$/ }, (args) => ({
+      loader: 'js',
+      contents: `export default ${JSON.stringify(args.path)};`,
     }));
   },
 });
