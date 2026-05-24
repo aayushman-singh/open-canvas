@@ -380,12 +380,13 @@ assert(
 
 const dashboardSource = await readSource('./routes/dashboard/index.tsx');
 assert(
-  dashboardSource.includes('ownedSites'),
-  'expected dashboard to model all owned sites, not only one editor link',
+  dashboardSource.includes('interface SiteCard') &&
+    dashboardSource.includes('let cards: SiteCard[] = []'),
+  'expected dashboard to model all owned sites as cards, not only one editor link',
 );
 assert(
-  dashboardSource.includes('ownedSites.map'),
-  'expected dashboard to render every owned site in a list/grid',
+  dashboardSource.includes('cards.map'),
+  'expected dashboard to render every owned site card in a list/grid',
 );
 assert(
   !dashboardSource.includes('const latestSite'),
@@ -590,6 +591,22 @@ assert(
 assert(
   !inlineCanvasClient.includes("querySelectorAll('[data-style-kit]')"),
   'expected style-kit click handling not to bind generic data-style-kit nodes',
+);
+assert(
+  inlineCanvasClient.includes('function isEditableShortcutTarget('),
+  'expected canvas interaction shortcuts to ignore inputs, textareas, selects, buttons, and contenteditable targets',
+);
+assert(
+  inlineCanvasClient.includes('temporaryPanPreviousMode'),
+  'expected temporary Space pan to restore the previous interaction mode instead of always selecting',
+);
+assert(
+  inlineCanvasClient.includes('window.addEventListener("blur"'),
+  'expected temporary Space pan to recover if the window loses focus before keyup',
+);
+assert(
+  inlineCanvasClient.includes('mbtn.setAttribute("aria-label"'),
+  'expected icon-only interaction-mode toolbar buttons to expose accessible labels',
 );
 
 const tsconfigSource = await readSource('../tsconfig.json');
