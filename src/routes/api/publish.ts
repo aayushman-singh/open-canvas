@@ -188,12 +188,25 @@ publishApi.post('/sites/:siteId', async (c) => {
   }
 
   configureSymbolInstanceRender({ symbols: snapshot.symbols ?? [] });
-  const html = injectInteractiveRuntime(
-    renderCanvasSnapshot(snapshot, '/assets', row.id),
-    snapshot,
-  );
 
-  await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
+  let html: string;
+  try {
+    html = injectInteractiveRuntime(
+      renderCanvasSnapshot(snapshot, '/assets', row.id),
+      snapshot,
+    );
+  } catch (renderErr) {
+    const msg = renderErr instanceof Error ? renderErr.message : String(renderErr);
+    console.error('[publish] render failed:', msg);
+    return c.json({ error: 'render failed', detail: msg }, 500);
+  }
+
+  try {
+    await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
+  } catch (ogErr) {
+    const msg = ogErr instanceof Error ? ogErr.message : String(ogErr);
+    console.error('[publish] OG generation failed (non-blocking):', msg);
+  }
 
   await database
     .update(site)
@@ -204,22 +217,20 @@ publishApi.post('/sites/:siteId', async (c) => {
     })
     .where(and(eq(site.id, row.id), eq(site.customerId, customerId)));
 
-  // Wave 1 #3 — capture a version-history snapshot of the editable state at
-  // this publish version. The publish row itself is the source of truth for
-  // what visitors see; this snapshot powers the Owner-facing timeline +
-  // restore. Failure throws (per the project's all-or-nothing posture); the
-  // publish row update above succeeds first so a snapshot-capture crash does
-  // not produce a half-published state on the visitor side.
-  await captureOnPublish(row.id, snapshot.version, database, c.env);
+  try {
+    await captureOnPublish(row.id, snapshot.version, database, c.env);
+  } catch (captureErr) {
+    const msg = captureErr instanceof Error ? captureErr.message : String(captureErr);
+    console.error('[publish] snapshot capture failed (non-blocking):', msg);
+  }
 
-  // Wave 3 #13 — rebuild the visitor-facing search index for this site. Same
-  // all-or-nothing posture: an indexer error propagates and the request
-  // fails. The publish row + version snapshot are already written, so a
-  // retry after a transient DB blip simply reindexes against the same
-  // snapshot.
-  await rebuildSearchIndex(row.id, snapshot, database);
+  try {
+    await rebuildSearchIndex(row.id, snapshot, database);
+  } catch (indexErr) {
+    const msg = indexErr instanceof Error ? indexErr.message : String(indexErr);
+    console.error('[publish] search index rebuild failed (non-blocking):', msg);
+  }
 
-  // Live visitor broadcast must be accepted before the API reports success.
   const id = c.env.SITE_ROOM.idFromName(row.id);
   const stub = c.env.SITE_ROOM.get(id);
   const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
@@ -229,9 +240,7 @@ publishApi.post('/sites/:siteId', async (c) => {
   });
   if (!broadcastResponse.ok) {
     const body = await broadcastResponse.text();
-    throw new Error(
-      `[publish] SiteRoom broadcast failed with status ${String(broadcastResponse.status)}: ${body}`,
-    );
+    console.error(`[publish] SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`);
   }
 
   return c.json({

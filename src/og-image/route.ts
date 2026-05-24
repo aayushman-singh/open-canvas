@@ -28,6 +28,8 @@ import { ownerAsset, site } from '../db/schema.js';
 import { readCached, writeCached, OG_CONTENT_TYPE } from './cache.js';
 import { renderOgCardSvg } from './render.js';
 import { rasteriseSvgToPng, type RasteriseEnv } from './rasterise.js';
+// @ts-expect-error Wrangler bundles .wasm as WebAssembly.Module via [[rules]] type=CompiledWasm
+import resvgWasmModule from '@resvg/resvg-wasm/index_bg.wasm';
 
 interface Bindings {
   DATABASE_URL: string;
@@ -84,7 +86,7 @@ ogRouter.get('/:siteId/:pageSlugWithExt', async (c) => {
     ...(page.description !== undefined ? { pageDescription: page.description } : {}),
     preset,
   });
-  const { bytes } = await rasteriseSvgToPng(svg);
+  const { bytes } = await rasteriseSvgToPng(svg, { wasmModule: resvgWasmModule as WebAssembly.Module });
   await writeCached(r2, siteId, pageSlug, snapshot.version, bytes);
 
   return new Response(bytes, {

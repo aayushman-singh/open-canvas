@@ -26,6 +26,8 @@ import { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 import { headCached, writeCached } from './cache.js';
 import { rasteriseSvgToPng, type RasteriseEnv } from './rasterise.js';
 import { renderOgCardSvg } from './render.js';
+// @ts-expect-error Wrangler bundles .wasm as WebAssembly.Module via [[rules]] type=CompiledWasm
+import resvgWasmModule from '@resvg/resvg-wasm/index_bg.wasm';
 
 interface OgEnv {
   ASSETS_BUCKET: R2Bucket;
@@ -73,8 +75,9 @@ export async function onPublishGenerateOg(
     // `env` passes through any pre-loaded wasm module from the worker
     // build; on Bun / dev it's undefined and rasterise.ts falls back to
     // a disk read.
-    const rasteriseEnv: RasteriseEnv = {};
-    if (env.wasmModule !== undefined) rasteriseEnv.wasmModule = env.wasmModule;
+    const rasteriseEnv: RasteriseEnv = {
+      wasmModule: resvgWasmModule as WebAssembly.Module,
+    };
     const { bytes } = await rasteriseSvgToPng(svg, rasteriseEnv);
     await writeCached(r2, siteId, page.slug, snapshot.version, bytes);
     return { kind: 'rendered' as const, slug: page.slug };

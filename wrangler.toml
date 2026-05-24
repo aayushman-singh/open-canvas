@@ -15,6 +15,16 @@ custom_domain = true
 pattern = "*.rev01.aayushman.dev/*"
 zone_name = "aayushman.dev"
 
+[[rules]]
+type = "Data"
+globs = ["**/*.ttf"]
+fallthrough = false
+
+[[rules]]
+type = "CompiledWasm"
+globs = ["**/*.wasm"]
+fallthrough = false
+
 [[durable_objects.bindings]]
 name = "SITE_ROOM"
 class_name = "SiteRoom"
