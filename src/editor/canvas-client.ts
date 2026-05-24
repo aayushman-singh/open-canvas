@@ -752,6 +752,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const a = document.createElement("a");
       a.className = "rev01-inline-link";
       a.setAttribute("href", link.href);
+      if (link.target === "_blank") {
+        a.setAttribute("target", "_blank");
+      }
       // Don't navigate from inside the editor when the Owner clicks a link.
       a.addEventListener("click", (ev) => { ev.preventDefault(); });
       a.appendChild(inner);
@@ -3451,7 +3454,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         const tag = cur.tagName;
         if (tag === "A" && !seen.has("link")) {
           seen.add("link");
-          marks.push({ type: "link", href: cur.getAttribute("href") || "" });
+          var linkMark = { type: "link", href: cur.getAttribute("href") || "" };
+          if (cur.getAttribute("target") === "_blank") {
+            linkMark.target = "_blank";
+          }
+          marks.push(linkMark);
         } else if (MARK_TAGS[tag]) {
           const built = MARK_TAGS[tag]();
           if (!seen.has(built.type)) {
@@ -3473,7 +3480,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
       if (a[i].type !== b[i].type) return false;
-      if (a[i].type === "link" && a[i].href !== b[i].href) return false;
+      if (a[i].type === "link") {
+        if (a[i].href !== b[i].href) return false;
+        if ((a[i].target || "") !== (b[i].target || "")) return false;
+      }
     }
     return true;
   }
