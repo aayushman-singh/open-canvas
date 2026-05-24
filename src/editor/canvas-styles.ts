@@ -977,6 +977,20 @@ body[data-placement-active="true"] .rev01-section-slot {
   color: var(--rev01-ok);
 }
 
+/* Inline links inside contenteditable — accent underline + text cursor so
+   the Owner sees linked text at a glance without losing the ability to
+   click-to-place-caret. Mirrors public-styles.ts .rev01-inline-link. */
+[contenteditable="true"] a.rev01-inline-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+  text-underline-offset: 2px;
+  cursor: text;
+}
+[contenteditable="true"] a.rev01-inline-link:hover {
+  color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+}
+
 /* Inline mark toolbar — only present in the DOM while a text element is in
    edit mode. Appended to document.body and pinned via position: fixed by
    the client so it stays anchored above the text element regardless of
@@ -1008,6 +1022,84 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-mark-toolbar button:hover {
   border-color: var(--rev01-accent);
   color: var(--rev01-fg);
+}
+
+/* Link hover popover — singleton floating bar shown when the mouse enters
+   an <a> inside a contenteditable text element. Positioned below (or above)
+   the link via position: fixed. Z-index above the mark toolbar (180). */
+.rev01-link-popover {
+  position: fixed;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 190;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--rev01-bg-titlebar);
+  border: 1px solid var(--rev01-hairline-strong);
+  box-shadow: 0 6px 18px oklch(0 0 0 / 0.35);
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  color: var(--rev01-fg);
+  max-width: 420px;
+  pointer-events: auto;
+}
+.rev01-link-popover .rev01-link-popover-url {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--rev01-fg-mute);
+  max-width: 240px;
+  user-select: none;
+}
+.rev01-link-popover button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg);
+  font: inherit;
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rev01-link-popover button:hover {
+  border-color: var(--rev01-accent);
+  color: var(--rev01-fg);
+}
+
+/* Link modal inline validation error */
+.rev01-link-modal-error {
+  color: var(--rev01-error, #e55);
+  font-size: 11px;
+  min-height: 16px;
+  margin: -4px 0 0;
+}
+/* Link modal text preview */
+.rev01-link-modal-preview {
+  font-size: 12px;
+  color: var(--rev01-fg-mute);
+  padding: 6px 10px;
+  background: var(--rev01-bg-panel);
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Link modal checkbox row */
+.rev01-link-modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--rev01-fg);
+  cursor: pointer;
+}
+.rev01-link-modal-checkbox input[type="checkbox"] {
+  accent-color: var(--rev01-accent);
+  cursor: pointer;
 }
 
 /* Inspector reading-order group (above the z-order group). Two compact
