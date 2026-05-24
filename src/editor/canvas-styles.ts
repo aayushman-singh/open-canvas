@@ -17,7 +17,7 @@ const chromeCss = String.raw`
 :root {
   --rev01-bg: #0a0e1a;
   --rev01-bg-panel: oklch(0.2 0.04 245 / 0.82);
-  --rev01-bg-panel-strong: oklch(0.22 0.04 245 / 0.95);
+  --rev01-bg-panel-strong: oklch(0.22 0.04 245);
   --rev01-bg-titlebar: oklch(0.16 0.03 245 / 0.92);
   --rev01-fg: oklch(0.96 0.02 240);
   --rev01-fg-mute: oklch(0.72 0.04 240);
@@ -523,6 +523,10 @@ body[data-placement-active="true"] .rev01-section-slot {
   cursor: pointer;
   user-select: none;
 }
+.rev01-element[data-element-type="text"] {
+  cursor: text;
+  user-select: text;
+}
 .rev01-element[data-selected="true"] {
   outline: 2px solid var(--rev01-accent);
   outline-offset: 1px;
@@ -536,20 +540,23 @@ body[data-placement-active="true"] .rev01-section-slot {
 
 .rev01-element .resize-handle {
   position: absolute;
-  right: -6px;
-  bottom: -6px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   background: var(--rev01-accent);
   border: 1px solid var(--rev01-bg);
   border-radius: 2px;
-  cursor: nwse-resize;
   display: none;
   z-index: 10000;
 }
-.rev01-element[data-selected="true"] .resize-handle {
-  display: block;
-}
+.rev01-element[data-selected="true"] .resize-handle { display: block; }
+.resize-handle-n  { top: -5px; left: calc(50% - 5px); cursor: ns-resize; }
+.resize-handle-s  { bottom: -5px; left: calc(50% - 5px); cursor: ns-resize; }
+.resize-handle-e  { right: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.resize-handle-w  { left: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.resize-handle-ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.resize-handle-nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.resize-handle-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.resize-handle-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
 
 /* -- Element context menu (3-dot trigger, top-left on hover) ------------- */
 .rev01-element .element-menu-trigger {
@@ -622,31 +629,6 @@ body[data-placement-active="true"] .rev01-section-slot {
   height: 1px;
   margin: 4px 0;
   background: var(--rev01-hairline);
-}
-.element-menu .menu-resize-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-}
-.element-menu .menu-resize-row label {
-  color: var(--rev01-fg-mute);
-  font-size: 11px;
-  min-width: 14px;
-}
-.element-menu .menu-resize-row input {
-  width: 56px;
-  padding: 2px 4px;
-  border: 1px solid var(--rev01-hairline-strong);
-  border-radius: 4px;
-  background: var(--rev01-bg);
-  color: var(--rev01-fg);
-  font-size: 11px;
-  font-family: var(--rev01-font-mono);
-}
-.element-menu .menu-resize-row input:focus {
-  outline: 1px solid var(--rev01-accent);
-  border-color: var(--rev01-accent);
 }
 
 .rev01-text { color: inherit; }

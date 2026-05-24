@@ -198,7 +198,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     zoomToolbar.setAttribute("role", "toolbar");
     zoomToolbar.setAttribute("aria-label", "Zoom and interaction mode");
     var modeDefs = [
-      { label: "←", title: "Select (V)", ariaLabel: "Select mode", action: "select" },
+      { label: "↖", title: "Select (V)", ariaLabel: "Select mode", action: "select" },
       { label: "✋", title: "Pan (Space)", ariaLabel: "Pan mode", action: "pan" },
     ];
     for (var mi = 0; mi < modeDefs.length; mi++) {
@@ -1089,65 +1089,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     menu.className = "element-menu";
     menu.setAttribute("data-element-menu", "true");
 
-    var resizeLabel = document.createElement("div");
-    resizeLabel.className = "menu-item";
-    resizeLabel.style.cursor = "default";
-    resizeLabel.style.color = "var(--rev01-fg-mute)";
-    resizeLabel.style.fontSize = "11px";
-    resizeLabel.textContent = "Resize";
-    menu.appendChild(resizeLabel);
-
-    var wRow = document.createElement("div");
-    wRow.className = "menu-resize-row";
-    var wLabel = document.createElement("label");
-    wLabel.textContent = "W";
-    var wInput = document.createElement("input");
-    wInput.type = "number";
-    wInput.min = "24";
-    wInput.value = String(Math.round(element.box.w));
-    wRow.appendChild(wLabel);
-    wRow.appendChild(wInput);
-    menu.appendChild(wRow);
-
-    var hRow = document.createElement("div");
-    hRow.className = "menu-resize-row";
-    var hLabel = document.createElement("label");
-    hLabel.textContent = "H";
-    var hInput = document.createElement("input");
-    hInput.type = "number";
-    hInput.min = "24";
-    hInput.value = String(Math.round(element.box.h));
-    hRow.appendChild(hLabel);
-    hRow.appendChild(hInput);
-    menu.appendChild(hRow);
-
-    function commitResize() {
-      var page = currentPage();
-      var pageWidth = page ? page.width : 1440;
-      var sectionHeight = section.height;
-      var nw = Number(wInput.value);
-      var nh = Number(hInput.value);
-      if (!Number.isFinite(nw) || nw < 24) nw = 24;
-      if (!Number.isFinite(nh) || nh < 24) nh = 24;
-      if (element.box.x + nw > pageWidth) nw = pageWidth - element.box.x;
-      if (element.box.y + nh > sectionHeight) nh = sectionHeight - element.box.y;
-      element.box.w = nw;
-      element.box.h = nh;
-      wrapper.style.width = nw + "px";
-      wrapper.style.height = nh + "px";
-      wInput.value = String(Math.round(nw));
-      hInput.value = String(Math.round(nh));
-      scheduleSave();
-    }
-    wInput.addEventListener("change", commitResize);
-    hInput.addEventListener("change", commitResize);
-    wInput.addEventListener("keydown", function(ev) { if (ev.key === "Enter") { commitResize(); } });
-    hInput.addEventListener("keydown", function(ev) { if (ev.key === "Enter") { commitResize(); } });
-
-    var div1 = document.createElement("div");
-    div1.className = "menu-divider";
-    menu.appendChild(div1);
-
     var items = [
       { label: "Bring to front", action: "front" },
       { label: "Send to back", action: "back" },
@@ -1247,10 +1188,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     setBoxStyle(wrapper, element.box);
     applyPinnedStyle(wrapper, element);
     wrapper.appendChild(buildElementBody(element));
-    const handle = document.createElement("div");
-    handle.className = "resize-handle";
-    handle.setAttribute("data-resize-handle", "true");
-    wrapper.appendChild(handle);
+    var dirs = ["n","s","e","w","ne","nw","se","sw"];
+    for (var di = 0; di < dirs.length; di++) {
+      var rh = document.createElement("div");
+      rh.className = "resize-handle resize-handle-" + dirs[di];
+      rh.setAttribute("data-resize-handle", "true");
+      rh.setAttribute("data-resize-dir", dirs[di]);
+      wrapper.appendChild(rh);
+    }
     var trigger = document.createElement("button");
     trigger.type = "button";
     trigger.className = "element-menu-trigger";
@@ -3430,15 +3375,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!wrapper) return;
     const inner = wrapper.querySelector(".rev01-text");
     if (!inner) return;
+    var textH = inner.scrollHeight;
+    if (textH > found.element.box.h) {
+      found.element.box.h = textH;
+      setBoxStyle(wrapper, found.element.box);
+      scheduleSave();
+    }
+
     editingElementId = elementId;
     // Deep-clone the pre-edit content so Escape/Cancel can restore exactly.
     editingSnapshot = JSON.parse(JSON.stringify(found.element.content || []));
     inner.setAttribute("contenteditable", "true");
     inner.focus();
-    const range = document.createRange();
-    range.selectNodeContents(inner);
-    const sel = window.getSelection();
-    if (sel) { sel.removeAllRanges(); sel.addRange(range); }
 
     buildMarkToolbar(wrapper);
 
@@ -3760,7 +3708,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
         const wrapper = handle.closest('.rev01-element');
-        if (wrapper) { beginResize(ev, wrapper); ev.preventDefault(); }
+        const dir = handle.getAttribute('data-resize-dir') || 'se';
+        if (wrapper) { beginResize(ev, wrapper, dir); ev.preventDefault(); }
         return;
       }
       const wrapper = ev.target instanceof Element ? ev.target.closest('.rev01-element') : null;
@@ -3768,6 +3717,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const elementId = wrapper.getAttribute('data-rev01-element');
       if (!elementId) return;
       if (editingElementId === elementId) return;
+      const elType = wrapper.getAttribute('data-element-type');
+      if (elType === "text") return;
       if (selectedElementId !== elementId) {
         selectElement(elementId);
         return;
@@ -3816,7 +3767,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     window.addEventListener("mouseup", onUp);
   }
 
-  function beginResize(startEv, wrapper) {
+  function beginResize(startEv, wrapper, dir) {
     const elementId = wrapper.getAttribute('data-rev01-element');
     if (!elementId) return;
     const found = findElement(elementId);
@@ -3825,24 +3776,41 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!sectionEl) return;
     const start = pointerToCanvas(startEv, sectionEl);
     if (!start) return;
-    const originalBox = Object.assign({}, found.element.box);
+    const ob = Object.assign({}, found.element.box);
     const page = currentPage();
     const pageWidth = page ? page.width : 1440;
     const sectionHeight = found.section.height;
+    const moveX = dir.includes("e") || dir.includes("w");
+    const moveY = dir.includes("s") || dir.includes("n");
+    const fromLeft = dir.includes("w");
+    const fromTop = dir.includes("n");
 
     function onMove(ev) {
       const current = pointerToCanvas(ev, sectionEl);
       if (!current) return;
       const dx = current.x - start.x;
       const dy = current.y - start.y;
-      let nw = originalBox.w + dx;
-      let nh = originalBox.h + dy;
-      if (nw < 24) nw = 24;
-      if (nh < 24) nh = 24;
-      if (originalBox.x + nw > pageWidth) nw = pageWidth - originalBox.x;
-      if (originalBox.y + nh > sectionHeight) nh = sectionHeight - originalBox.y;
+      var nx = ob.x, ny = ob.y, nw = ob.w, nh = ob.h;
+      if (moveX) {
+        if (fromLeft) { nx = ob.x + dx; nw = ob.w - dx; }
+        else { nw = ob.w + dx; }
+      }
+      if (moveY) {
+        if (fromTop) { ny = ob.y + dy; nh = ob.h - dy; }
+        else { nh = ob.h + dy; }
+      }
+      if (nw < 24) { if (fromLeft) nx = ob.x + ob.w - 24; nw = 24; }
+      if (nh < 24) { if (fromTop) ny = ob.y + ob.h - 24; nh = 24; }
+      if (nx < 0) { nw += nx; nx = 0; }
+      if (ny < 0) { nh += ny; ny = 0; }
+      if (nx + nw > pageWidth) nw = pageWidth - nx;
+      if (ny + nh > sectionHeight) nh = sectionHeight - ny;
+      wrapper.style.left = nx + "px";
+      wrapper.style.top = ny + "px";
       wrapper.style.width = nw + "px";
       wrapper.style.height = nh + "px";
+      found.element.box.x = nx;
+      found.element.box.y = ny;
       found.element.box.w = nw;
       found.element.box.h = nh;
     }
@@ -4158,29 +4126,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const elementNode = target.closest('.rev01-element');
       if (elementNode) {
         const id = elementNode.getAttribute('data-rev01-element');
-        if (id && id !== selectedElementId) selectElement(id);
+        if (!id) return;
+        const elType = elementNode.getAttribute('data-element-type');
+        if (elType === "text") {
+          if (editingElementId !== id) {
+            selectElement(id);
+            beginTextEdit(id);
+          }
+          return;
+        }
+        if (id !== selectedElementId) selectElement(id);
         return;
       }
       const sectionNode = target.closest('.rev01-section');
       if (sectionNode) {
         const sid = sectionNode.getAttribute('data-rev01-section');
         if (sid) { selectSection(sid); selectElement(null); }
-      }
-    });
-
-    root.addEventListener("dblclick", (ev) => {
-      if (interactionMode === "pan") return;
-      const target = ev.target instanceof Element ? ev.target : null;
-      if (!target) return;
-      const elementNode = target.closest('.rev01-element');
-      if (!elementNode) return;
-      const id = elementNode.getAttribute('data-rev01-element');
-      if (!id) return;
-      const found = findElement(id);
-      if (!found) return;
-      if (found.element.type === "text") {
-        selectElement(id);
-        beginTextEdit(id);
       }
     });
 
@@ -4822,7 +4783,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     });
     window.addEventListener("keyup", (ev) => {
-      if (ev.key === " ") endTemporaryPan();
+      if (ev.key === " ") { ev.preventDefault(); endTemporaryPan(); }
     });
     window.addEventListener("blur", endTemporaryPan);
   }
