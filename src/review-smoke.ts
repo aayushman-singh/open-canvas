@@ -11,6 +11,7 @@ import {
   collectReferencedAssets,
   findAssetReferenceErrors,
 } from './assets/site-assets';
+import { resolveAuthRedirectUrl, resolveClerkKeys } from './auth/middleware';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
@@ -21,6 +22,7 @@ import { validateCanvasSiteState, validateSeedFixture } from './canvas/validate'
 import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
+import { buildSignInUrl, buildSignOutUrl } from './auth/require-auth';
 import {
   prepareSeedAssetsForCustomer,
   RESERVED_SUBDOMAINS,
@@ -495,6 +497,115 @@ assert(
   enterprisePage.sections.some((section) => section.id === 'enterprise-governance'),
   'expected enterprise template to include a governance section',
 );
+// -- Dev Clerk auth URL regressions ----------------------------------------
+// Wrangler dev rewrites c.req.url to the prod custom-domain route. When
+// CLERK_TEST_* keys are present, every Clerk portal redirect must use the same
+// local origin as the request passed into clerk.authenticateRequest; otherwise
+// sign-in/sign-out bounces between localhost and prod.
+
+const authMiddlewareSource = await readSource('./auth/middleware.ts');
+const requireAuthSource = await readSource('./auth/require-auth.ts');
+const dashboardSource = await readSource('./routes/dashboard/index.tsx');
+assert(
+  authMiddlewareSource.includes('export function resolveAuthRedirectUrl'),
+  'expected auth middleware to expose a shared local/prod redirect URL resolver',
+);
+assert(
+  requireAuthSource.includes('resolveAuthRedirectUrl(c.env, c.req.url)'),
+  'expected requireAuth sign-in redirect_url to use the shared local/prod URL resolver',
+);
+assert(
+  dashboardSource.includes('resolveClerkKeys(c.env)'),
+  'expected dashboard sign-out to use the same resolved Clerk key pair as clerkAuth',
+);
+assert(
+  dashboardSource.includes("resolveAuthRedirectUrl(c.env, c.req.url, '/')"),
+  'expected dashboard sign-out redirect_url to resolve to local origin in dev',
+);
+
+const livePublishableKey = `pk_live_${btoa('clerk.rev01.aayushman.dev$')}`;
+const testPublishableKey = `pk_test_${btoa('local-dev.clerk.accounts.dev$')}`;
+const devClerkEnv = {
+  CLERK_PUBLISHABLE_KEY: livePublishableKey,
+  CLERK_SECRET_KEY: 'sk_live_review_smoke',
+  CLERK_TEST_PUBLISHABLE_KEY: testPublishableKey,
+  CLERK_TEST_SECRET_KEY: 'sk_test_review_smoke',
+  DEV_PUBLIC_HOST: 'http://localhost:8787',
+};
+const liveClerkEnv = {
+  CLERK_PUBLISHABLE_KEY: livePublishableKey,
+  CLERK_SECRET_KEY: 'sk_live_review_smoke',
+};
+const devSignInRedirect = resolveAuthRedirectUrl(
+  devClerkEnv,
+  'https://rev01.aayushman.dev/dashboard?next=sites',
+);
+assert(
+  devSignInRedirect === 'http://localhost:8787/dashboard?next=sites',
+  `expected dev sign-in redirect_url to stay local, got ${devSignInRedirect}`,
+);
+const devSignInUrl = new URL(
+  buildSignInUrl(resolveClerkKeys(devClerkEnv).publishableKey, devSignInRedirect),
+);
+assert(
+  devSignInUrl.origin === 'https://local-dev.accounts.dev',
+  `expected dev sign-in to use the test Clerk portal, got ${devSignInUrl.origin}`,
+);
+assert(
+  devSignInUrl.searchParams.get('redirect_url') === devSignInRedirect,
+  'expected dev sign-in redirect_url query param to match the resolved local URL',
+);
+const devSignOutRedirect = resolveAuthRedirectUrl(
+  devClerkEnv,
+  'https://rev01.aayushman.dev/dashboard',
+  '/',
+);
+assert(
+  devSignOutRedirect === 'http://localhost:8787/',
+  `expected dev sign-out redirect_url to stay local, got ${devSignOutRedirect}`,
+);
+const devSignOutUrl = new URL(
+  buildSignOutUrl(resolveClerkKeys(devClerkEnv).publishableKey, devSignOutRedirect),
+);
+assert(
+  devSignOutUrl.origin === 'https://local-dev.accounts.dev',
+  `expected dev sign-out to use the test Clerk portal, got ${devSignOutUrl.origin}`,
+);
+assert(
+  devSignOutUrl.searchParams.get('redirect_url') === devSignOutRedirect,
+  'expected dev sign-out redirect_url query param to match the resolved local URL',
+);
+const liveRedirect = resolveAuthRedirectUrl(
+  liveClerkEnv,
+  'https://rev01.aayushman.dev/dashboard?next=sites',
+);
+assert(
+  liveRedirect === 'https://rev01.aayushman.dev/dashboard?next=sites',
+  `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
+);
+const liveSignOutRedirect = resolveAuthRedirectUrl(
+  liveClerkEnv,
+  'https://rev01.aayushman.dev/dashboard',
+  '/',
+);
+assert(
+  liveSignOutRedirect === 'https://rev01.aayushman.dev/',
+  `expected live sign-out redirect_url to use the live origin, got ${liveSignOutRedirect}`,
+);
+try {
+  resolveAuthRedirectUrl(
+    devClerkEnv,
+    'https://rev01.aayushman.dev/dashboard',
+    'https://example.invalid/',
+  );
+  throw new Error('expected absolute auth redirect override paths to be rejected');
+} catch (error) {
+  assert(
+    error instanceof Error &&
+      error.message.includes('auth redirect override path must be root-relative'),
+    `expected root-relative override path failure, got ${String(error)}`,
+  );
+}
 
 // -- Canvas-first review regressions --------------------------------------
 // These are source-level checks for the browser-only editor script. They keep
