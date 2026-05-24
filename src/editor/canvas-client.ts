@@ -4282,9 +4282,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     revokePendingPreviews();
     inspector.replaceChildren();
 
+    const headerRow = document.createElement("div");
+    headerRow.className = "inspector-header";
     const heading = document.createElement("h3");
     heading.textContent = element.type + " element";
-    inspector.appendChild(heading);
+    headerRow.appendChild(heading);
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "inspector-close";
+    closeBtn.setAttribute("aria-label", "Close inspector");
+    closeBtn.textContent = "×";
+    closeBtn.addEventListener("click", () => { selectElement(null); });
+    headerRow.appendChild(closeBtn);
+    inspector.appendChild(headerRow);
 
     const meta = document.createElement("div");
     meta.className = "meta";
@@ -8087,6 +8097,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (target.closest('.rev01-ai-panel')) return;
       if (inspector && inspector.contains(target)) return;
       if (target.closest('#canvas-reel')) return;
+      if (target.closest('.rev01-element')) return;
+      if (target.closest('#canvas-sidebar')) return;
+      selectElement(null);
+    });
+
+    document.addEventListener("mousedown", (ev) => {
+      if (!selectedElementId) return;
+      const target = ev.target instanceof Element ? ev.target : null;
+      if (!target) return;
+      if (inspector && inspector.contains(target)) return;
       if (target.closest('.rev01-element')) return;
       if (target.closest('#canvas-sidebar')) return;
       selectElement(null);

@@ -1404,6 +1404,31 @@ body[data-placement-active="true"] .rev01-section-slot {
   gap: 4px;
   align-items: center;
 }
+/* Inspector close button + header layout (c9d761f).
+   The base #canvas-inspector and h3 rules above this block already
+   come from the Open Canvas rebrand — only the inspector-header
+   row + inspector-close button are added here. */
+#canvas-inspector .inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px;
+}
+#canvas-inspector .inspector-close {
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+#canvas-inspector .inspector-close:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
 .reel-header-actions button {
   appearance: none;
   background: transparent;
