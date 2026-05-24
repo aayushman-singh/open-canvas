@@ -345,7 +345,7 @@ for (const kit of BUILT_IN_STYLE_KITS) {
   const motionKeys = Object.keys(preset.motionPresets).sort().join(',');
   assert(
     motionKeys ===
-      'blur-in,fade-up,none,parallax-soft,scale-in,slide-left,slow-drift,stagger-children',
+      'blur-in,bounce-in,fade-down,fade-in,fade-right,fade-up,flip-in,none,parallax-soft,rotate-in,scale-in,slide-left,slide-right,slide-up,slow-drift,stagger-children,zoom-out',
     `expected kit ${kit} to cover every motion preset (got ${motionKeys})`,
   );
 }

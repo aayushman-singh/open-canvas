@@ -100,9 +100,18 @@ const CHARCOAL: StyleKitPreset = {
   motionPresets: {
     none: {},
     'fade-up': { transform: 'translateY(12px)', opacity: 0 },
+    'fade-down': { transform: 'translateY(-12px)', opacity: 0 },
+    'fade-in': { opacity: 0 },
+    'fade-right': { transform: 'translateX(-12px)', opacity: 0 },
     'slide-left': { transform: 'translateX(20px)', opacity: 0 },
+    'slide-up': { transform: 'translateY(20px)' },
+    'slide-right': { transform: 'translateX(-20px)' },
     'scale-in': { transform: 'scale(0.96)', opacity: 0 },
+    'zoom-out': { transform: 'scale(1.08)', opacity: 0 },
     'blur-in': { opacity: 0 },
+    'rotate-in': { transform: 'rotate(-6deg) scale(0.95)', opacity: 0 },
+    'flip-in': { transform: 'perspective(600px) rotateY(90deg)', opacity: 0 },
+    'bounce-in': { transform: 'scale(0.6)', opacity: 0 },
     'stagger-children': { transform: 'translateY(8px)', opacity: 0, delayMs: 60 },
     'slow-drift': { transform: 'translateY(0px)' },
     'parallax-soft': { transform: 'translateY(6px)' },
@@ -185,9 +194,18 @@ const ORANGE_EDITORIAL: StyleKitPreset = {
   motionPresets: {
     none: {},
     'fade-up': { transform: 'translateY(16px)', opacity: 0 },
+    'fade-down': { transform: 'translateY(-16px)', opacity: 0 },
+    'fade-in': { opacity: 0 },
+    'fade-right': { transform: 'translateX(-16px)', opacity: 0 },
     'slide-left': { transform: 'translateX(24px)', opacity: 0 },
+    'slide-up': { transform: 'translateY(24px)' },
+    'slide-right': { transform: 'translateX(-24px)' },
     'scale-in': { transform: 'scale(0.94)', opacity: 0 },
+    'zoom-out': { transform: 'scale(1.1)', opacity: 0 },
     'blur-in': { opacity: 0 },
+    'rotate-in': { transform: 'rotate(-8deg) scale(0.93)', opacity: 0 },
+    'flip-in': { transform: 'perspective(600px) rotateY(90deg)', opacity: 0 },
+    'bounce-in': { transform: 'scale(0.55)', opacity: 0 },
     'stagger-children': { transform: 'translateY(10px)', opacity: 0, delayMs: 80 },
     'slow-drift': { transform: 'translateY(0px)' },
     'parallax-soft': { transform: 'translateY(8px)' },
@@ -267,9 +285,18 @@ const BLUE_SAAS: StyleKitPreset = {
   motionPresets: {
     none: {},
     'fade-up': { transform: 'translateY(14px)', opacity: 0 },
+    'fade-down': { transform: 'translateY(-14px)', opacity: 0 },
+    'fade-in': { opacity: 0 },
+    'fade-right': { transform: 'translateX(-14px)', opacity: 0 },
     'slide-left': { transform: 'translateX(22px)', opacity: 0 },
+    'slide-up': { transform: 'translateY(22px)' },
+    'slide-right': { transform: 'translateX(-22px)' },
     'scale-in': { transform: 'scale(0.97)', opacity: 0 },
+    'zoom-out': { transform: 'scale(1.06)', opacity: 0 },
     'blur-in': { opacity: 0 },
+    'rotate-in': { transform: 'rotate(-5deg) scale(0.96)', opacity: 0 },
+    'flip-in': { transform: 'perspective(600px) rotateY(90deg)', opacity: 0 },
+    'bounce-in': { transform: 'scale(0.65)', opacity: 0 },
     'stagger-children': { transform: 'translateY(10px)', opacity: 0, delayMs: 70 },
     'slow-drift': { transform: 'translateY(0px)' },
     'parallax-soft': { transform: 'translateY(8px)' },
@@ -349,9 +376,18 @@ const GREEN_ORGANIC: StyleKitPreset = {
   motionPresets: {
     none: {},
     'fade-up': { transform: 'translateY(18px)', opacity: 0 },
+    'fade-down': { transform: 'translateY(-18px)', opacity: 0 },
+    'fade-in': { opacity: 0 },
+    'fade-right': { transform: 'translateX(-18px)', opacity: 0 },
     'slide-left': { transform: 'translateX(28px)', opacity: 0 },
+    'slide-up': { transform: 'translateY(28px)' },
+    'slide-right': { transform: 'translateX(-28px)' },
     'scale-in': { transform: 'scale(0.95)', opacity: 0 },
+    'zoom-out': { transform: 'scale(1.12)', opacity: 0 },
     'blur-in': { opacity: 0 },
+    'rotate-in': { transform: 'rotate(-4deg) scale(0.94)', opacity: 0 },
+    'flip-in': { transform: 'perspective(600px) rotateY(90deg)', opacity: 0 },
+    'bounce-in': { transform: 'scale(0.7)', opacity: 0 },
     'stagger-children': { transform: 'translateY(12px)', opacity: 0, delayMs: 110 },
     'slow-drift': { transform: 'translateY(0px)' },
     'parallax-soft': { transform: 'translateY(10px)' },
@@ -523,14 +559,19 @@ function buildShapeBlock(kitName: string, preset: StyleKitPreset): string {
 }
 
 function buildMotionKeyframes(): string {
-  // One set of keyframes, reused by every kit. Per-kit duration/easing is
-  // applied via the [data-motion-preset] selector below. Keyframe names are
-  // global (CSS keyframes are not scoped) so the names get a `rev01-` prefix
-  // to avoid clashing with anything a future stylesheet might define.
   return `@keyframes rev01-fade-up { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes rev01-fade-down { from { transform: translateY(-12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes rev01-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rev01-fade-right { from { transform: translateX(-12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes rev01-slide-left { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes rev01-slide-up { from { transform: translateY(20px); } to { transform: translateY(0); } }
+@keyframes rev01-slide-right { from { transform: translateX(-20px); } to { transform: translateX(0); } }
 @keyframes rev01-scale-in { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes rev01-zoom-out { from { transform: scale(1.08); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes rev01-blur-in { from { filter: blur(8px); opacity: 0; } to { filter: blur(0); opacity: 1; } }
+@keyframes rev01-rotate-in { from { transform: rotate(-6deg) scale(0.95); opacity: 0; } to { transform: rotate(0) scale(1); opacity: 1; } }
+@keyframes rev01-flip-in { from { transform: perspective(600px) rotateY(90deg); opacity: 0; } to { transform: perspective(600px) rotateY(0); opacity: 1; } }
+@keyframes rev01-bounce-in { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 80% { transform: scale(0.95); } 100% { transform: scale(1); } }
 @keyframes rev01-slow-drift { 0% { transform: translateY(0); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0); } }
 @keyframes rev01-parallax-soft { from { transform: translateY(6px); } to { transform: translateY(0); } }`;
 }
@@ -541,14 +582,28 @@ function buildMotionBlock(kitName: string): string {
   // attach the animation name here so a single rule per preset works for
   // every kit. The `--rev01-kit-motion-*` tokens are already set on the
   // wrapper by `buildKitTokenBlock` — no need to redeclare here.
+  const sk = quoteCssString(kitName);
+  const dur = 'var(--rev01-kit-motion-duration)';
+  const eas = 'var(--rev01-kit-motion-easing)';
+  const anim = (preset: string, kf: string, extra = '') =>
+    `[data-style-kit=${sk}] [data-motion-preset="${preset}"] {\n  animation: rev01-${kf} ${dur} ${eas} both;${extra ? '\n  ' + extra : ''}\n}`;
   const presetRules: string[] = [
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="fade-up"] {\n  animation: rev01-fade-up var(--rev01-kit-motion-duration) var(--rev01-kit-motion-easing) both;\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="slide-left"] {\n  animation: rev01-slide-left var(--rev01-kit-motion-duration) var(--rev01-kit-motion-easing) both;\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="scale-in"] {\n  animation: rev01-scale-in var(--rev01-kit-motion-duration) var(--rev01-kit-motion-easing) both;\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="blur-in"] {\n  animation: rev01-blur-in var(--rev01-kit-motion-duration) var(--rev01-kit-motion-easing) both;\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="parallax-soft"] {\n  animation: rev01-parallax-soft var(--rev01-kit-motion-duration) var(--rev01-kit-motion-easing) both;\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="slow-drift"] {\n  animation: rev01-slow-drift calc(var(--rev01-kit-motion-duration) * 4) ease-in-out infinite;\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-motion-preset="stagger-children"] {\n  animation: rev01-fade-up var(--rev01-kit-motion-duration) var(--rev01-kit-motion-easing) both;\n}`,
+    anim('fade-up', 'fade-up'),
+    anim('fade-down', 'fade-down'),
+    anim('fade-in', 'fade-in'),
+    anim('fade-right', 'fade-right'),
+    anim('slide-left', 'slide-left'),
+    anim('slide-up', 'slide-up'),
+    anim('slide-right', 'slide-right'),
+    anim('scale-in', 'scale-in'),
+    anim('zoom-out', 'zoom-out'),
+    anim('blur-in', 'blur-in'),
+    anim('rotate-in', 'rotate-in'),
+    anim('flip-in', 'flip-in'),
+    anim('bounce-in', 'bounce-in', 'animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);'),
+    `[data-style-kit=${sk}] [data-motion-preset="parallax-soft"] {\n  animation: rev01-parallax-soft ${dur} ${eas} both;\n}`,
+    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: rev01-slow-drift calc(${dur} * 4) ease-in-out infinite;\n}`,
+    `[data-style-kit=${sk}] [data-motion-preset="stagger-children"] {\n  animation: rev01-fade-up ${dur} ${eas} both;\n}`,
   ];
   return presetRules.join('\n');
 }

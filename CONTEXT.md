@@ -157,6 +157,30 @@ _Avoid_: Undo stack, version history, asset trail
 > **Dev:** "When the **Owner** edits a **Section**, should the **Visitor** see it immediately?"
 > **Domain expert:** "No. The **Visitor** sees the **Published Site** only after the **Owner** publishes, and then the open **Published Address** updates immediately."
 
+**Site Import**:
+The act of creating an Editable Site by scraping an external website at a given URL, rather than starting from a Template Seed.
+_Avoid_: Migration, clone, copy, conversion
+
+**Scraper Service**:
+An external service that loads a URL in a headless browser, extracts page structure and assets, and returns a CanvasSiteState.
+_Avoid_: Crawler, spider, proxy, converter
+
+**Import Mapping**:
+The classification of a scraped DOM element into a Design Primitive type (Text, Media, Action, Shape, Container) based on tag semantics and computed styles.
+_Avoid_: Conversion rule, parser, transformer
+
+**Seed Color**:
+The single most prominent brand/accent color extracted from a scraped site, used as input to the OKLCH theme algebra to derive a full Style Kit.
+_Avoid_: Primary color, theme color, dominant color
+
+## Relationships (Import)
+
+- A **Site Import** creates one **Editable Site** with one **Canvas Page**
+- A **Site Import** derives a custom **Style Kit** from the scraped site's **Seed Color** and font usage
+- A **Scraper Service** performs the **Import Mapping** for every visible element on the source page
+- A **Site Import** downloads external assets and stores them as **Owner Assets**
+- A **Site Import** replaces source animations with the nearest **Motion Preset**
+
 ## Flagged ambiguities
 
 - "subdomain" was used as one possible form of **Published Address**. The product concept is **Published Address**; subdomain routing is only one way to provide it.

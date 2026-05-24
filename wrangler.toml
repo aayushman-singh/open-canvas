@@ -80,6 +80,10 @@ bucket_name = "rev01-assets"
 #
 # Required by Wave 2 #9 (password publish, plan 09):
 #   UNLOCK_SIGNING_SECRET — HMAC-SHA256 secret signing visitor unlock cookies.
+#
+# Required by site import:
+#   SCRAPER_URL           — Base URL of the external Playwright scraper service.
+#   SCRAPER_API_SECRET    — Shared secret for Worker → scraper auth.
 
 # [[kv_namespaces]]
 # binding = "KV"

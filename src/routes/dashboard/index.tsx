@@ -950,6 +950,7 @@ dashboard.get('/', async (c) => {
     <DashboardShell
       title="rev01 — dashboard"
       crumbs={[{ label: 'Dashboard' }]}
+      activePath="/dashboard"
       pageStyles={cardStyles}
     >
       <div class="dash-header">

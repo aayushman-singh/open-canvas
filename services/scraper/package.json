@@ -1,0 +1,20 @@
+{
+  "name": "@rev01/scraper",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/server.ts",
+    "start": "bun run src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "smoke": "bun run src/smoke.ts"
+  },
+  "dependencies": {
+    "hono": "^4.7.10",
+    "puppeteer": "^24.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.14",
+    "typescript": "^5.8.3"
+  }
+}
