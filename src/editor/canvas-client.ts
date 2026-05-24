@@ -3541,6 +3541,138 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return out;
   }
 
+  // -- Link hover popover --------------------------------------------------
+  var linkPopover = null;
+  var linkPopoverAnchor = null;
+  var linkPopoverShowTimer = null;
+  var linkPopoverHideTimer = null;
+
+  function removeLinkPopover() {
+    if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
+    if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); linkPopoverHideTimer = null; }
+    if (linkPopover && linkPopover.parentNode) {
+      linkPopover.parentNode.removeChild(linkPopover);
+    }
+    linkPopover = null;
+    linkPopoverAnchor = null;
+  }
+
+  function positionLinkPopover(anchorEl) {
+    if (!linkPopover || !anchorEl) return;
+    var rect = anchorEl.getBoundingClientRect();
+    var popoverHeight = linkPopover.offsetHeight || 32;
+    var spaceBelow = window.innerHeight - rect.bottom;
+    var top;
+    if (spaceBelow >= popoverHeight + 8) {
+      top = rect.bottom + 6;
+    } else {
+      top = rect.top - popoverHeight - 6;
+    }
+    linkPopover.style.top = Math.max(0, top) + 'px';
+    linkPopover.style.left = Math.max(0, rect.left) + 'px';
+  }
+
+  function showLinkPopover(anchorEl) {
+    removeLinkPopover();
+    var href = anchorEl.getAttribute('href') || '';
+    var bar = document.createElement('div');
+    bar.className = 'rev01-link-popover';
+
+    var urlSpan = document.createElement('span');
+    urlSpan.className = 'rev01-link-popover-url';
+    urlSpan.textContent = href.length > 40 ? href.slice(0, 37) + '...' : href;
+    urlSpan.title = href;
+    bar.appendChild(urlSpan);
+
+    var openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.textContent = 'Open';
+    openBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+    openBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      window.open(href, '_blank');
+    });
+    bar.appendChild(openBtn);
+
+    var editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+    editBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var currentHref = anchorEl.getAttribute('href') || '';
+      var currentTarget = anchorEl.getAttribute('target') || '';
+      var linkText = anchorEl.textContent || '';
+      removeLinkPopover();
+      openLinkModal({
+        linkText: linkText,
+        href: currentHref,
+        blank: currentTarget === '_blank',
+      }).then(function (result) {
+        if (result === null) return;
+        anchorEl.setAttribute('href', result.href);
+        if (result.target === '_blank') {
+          anchorEl.setAttribute('target', '_blank');
+        } else {
+          anchorEl.removeAttribute('target');
+        }
+      }).catch(function (err) {
+        setStatus('Link edit failed: ' + (err && err.message ? err.message : String(err)), 'error');
+      });
+    });
+    bar.appendChild(editBtn);
+
+    var unlinkBtn = document.createElement('button');
+    unlinkBtn.type = 'button';
+    unlinkBtn.textContent = 'Unlink';
+    unlinkBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+    unlinkBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var parent = anchorEl.parentNode;
+      if (!parent) return;
+      while (anchorEl.firstChild) {
+        parent.insertBefore(anchorEl.firstChild, anchorEl);
+      }
+      parent.removeChild(anchorEl);
+      removeLinkPopover();
+    });
+    bar.appendChild(unlinkBtn);
+
+    bar.addEventListener('mouseenter', function () {
+      if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); linkPopoverHideTimer = null; }
+    });
+    bar.addEventListener('mouseleave', function () {
+      removeLinkPopover();
+    });
+
+    linkPopover = bar;
+    linkPopoverAnchor = anchorEl;
+    document.body.appendChild(bar);
+    positionLinkPopover(anchorEl);
+  }
+
+  function onLinkMouseEnter(ev) {
+    if (!editingElementId) return;
+    var target = ev.target;
+    if (!target || target.tagName !== 'A') return;
+    if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
+    if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); linkPopoverHideTimer = null; }
+    linkPopoverShowTimer = setTimeout(function () {
+      linkPopoverShowTimer = null;
+      showLinkPopover(target);
+    }, 150);
+  }
+
+  function onLinkMouseLeave(ev) {
+    var target = ev.target;
+    if (!target || target.tagName !== 'A') return;
+    if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
+    linkPopoverHideTimer = setTimeout(function () {
+      linkPopoverHideTimer = null;
+      removeLinkPopover();
+    }, 200);
+  }
+
   // -- Inline mark toolbar ------------------------------------------------
 
   // Anchor we re-position the toolbar against on scroll/resize. Set in
@@ -3576,6 +3708,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // they're cheap no-ops when no text is in edit mode.
   function onMarkToolbarReflow() {
     if (markToolbarAnchor) positionMarkToolbar(markToolbarAnchor);
+    if (linkPopoverAnchor) positionLinkPopover(linkPopoverAnchor);
   }
   window.addEventListener("scroll", onMarkToolbarReflow, { passive: true });
   window.addEventListener("resize", onMarkToolbarReflow);
@@ -3871,6 +4004,27 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     buildMarkToolbar(wrapper);
 
+    inner.addEventListener('mouseover', function (ev) {
+      var node = ev.target;
+      while (node && node !== inner) {
+        if (node.nodeType === 1 && node.tagName === 'A') {
+          onLinkMouseEnter({ target: node });
+          return;
+        }
+        node = node.parentNode;
+      }
+    });
+    inner.addEventListener('mouseout', function (ev) {
+      var node = ev.target;
+      while (node && node !== inner) {
+        if (node.nodeType === 1 && node.tagName === 'A') {
+          onLinkMouseLeave({ target: node });
+          return;
+        }
+        node = node.parentNode;
+      }
+    });
+
     function restoreFromSnapshot() {
       found.element.content = JSON.parse(JSON.stringify(editingSnapshot));
       rebuildElement(elementId);
@@ -3881,6 +4035,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       inner.removeEventListener("blur", onBlur);
       inner.removeEventListener("keydown", onKey);
       removeMarkToolbar();
+      removeLinkPopover();
       const snapshot = editingSnapshot;
       editingElementId = null;
       editingSnapshot = null;
@@ -3915,6 +4070,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // those keep the editor in edit mode by design.
       const next = ev.relatedTarget;
       if (next && markToolbar && markToolbar.contains(next)) return;
+      if (next && linkPopover && linkPopover.contains(next)) return;
+      if (modalOpen) return;
       finish(true);
     }
     function onKey(ev) {
