@@ -260,6 +260,10 @@ export function clerkAuth() {
   });
 }
 
+// Middleware for /__api/* routes on published-site subdomains. Validates the
+// __rev01_edit cookie (set by the /api/on-site-edit popup) and populates the
+// same auth / user / clerk context variables that clerkAuth() would, so
+// downstream handlers (canvasApi, publishApi, etc.) work unchanged.
 import { getCookie } from 'hono/cookie';
 import { verifyEditToken, EDIT_TOKEN_COOKIE } from './edit-token';
 

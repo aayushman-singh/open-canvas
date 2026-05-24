@@ -335,19 +335,26 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   return c.html(editorPageJsx(opts));
 }
 
-// Floating edit button injected into every published page. Navigates to
-// /__edit on click — the edit handler deals with auth (popup if needed).
-function buildEditButtonHtml(siteId: string): string {
-  return `<a href="/__edit" data-rev01-edit aria-label="Edit this site"
-  style="position:fixed;bottom:16px;right:16px;z-index:9999;
-  width:40px;height:40px;border-radius:50%;
-  background:#0d1117;border:1px solid rgba(255,255,255,0.1);
-  display:flex;align-items:center;justify-content:center;
-  color:#e6edf3;text-decoration:none;font-size:18px;
-  opacity:0.6;transition:opacity 0.2s;cursor:pointer;"
-  onmouseover="this.style.opacity='1'"
-  onmouseout="this.style.opacity='0.6'"
-  title="Edit this site">&#9998;</a>`;
+function buildPublishedFooterHtml(): string {
+  return `<footer data-rev01-footer style="
+  margin-top:40px;padding:20px 0;border-top:1px solid rgba(128,128,128,0.15);
+  display:flex;align-items:center;justify-content:center;gap:24px;
+  font-family:system-ui,sans-serif;font-size:12px;color:rgba(128,128,128,0.6);
+  "><a href="https://rev01.aayushman.dev" target="_blank" rel="noopener"
+  style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
+  onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
+  >made with rev01</a
+  ><span style="opacity:0.3">&middot;</span
+  ><a href="/__edit"
+  style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
+  onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
+  >edit this site</a
+  ><span style="opacity:0.3">&middot;</span
+  ><a href="https://rev01.aayushman.dev/dashboard/templates" target="_blank" rel="noopener"
+  style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
+  onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
+  >browse templates</a
+  ></footer>`;
 }
 
 export async function handlePublicRequest<P extends string, I extends Input>(
@@ -601,7 +608,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           >
             👀 <span data-rev01-presence-count>0</span> viewing
           </aside>
-          ${raw(buildEditButtonHtml(siteRow.id))}
+          ${raw(buildPublishedFooterHtml())}
           <script type="module">
             ${raw(visitorScript)};
           </script>

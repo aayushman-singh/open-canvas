@@ -15,6 +15,7 @@
     "canvas-agent:smoke": "bun run src/agent/canvas-agent-smoke.ts",
     "yjs-projection:smoke": "bun run src/canvas/yjs-projection.smoke.ts",
     "section-import:smoke": "bun run src/canvas/section-import-smoke.ts",
+    "import:smoke": "bun run src/routes/api/import-smoke.ts",
     "assets:smoke": "bun run src/assets/smoke.ts",
     "seed:assets": "bun run src/assets/seed-script.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
@@ -59,6 +60,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260521.1",
+    "@playwright/test": "^1.60.0",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "drizzle-kit": "^0.31.10",
