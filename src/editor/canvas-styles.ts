@@ -598,13 +598,34 @@ body[data-placement-active="true"] .rev01-section-slot {
   font-size: 13px;
 }
 #canvas-inspector[hidden] { display: none; }
-#canvas-inspector h3 {
+#canvas-inspector .inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 0 0 12px;
+}
+#canvas-inspector h3 {
+  margin: 0;
   font-family: var(--rev01-font-mono);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--rev01-fg-mute);
+}
+#canvas-inspector .inspector-close {
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--rev01-fg-mute);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+#canvas-inspector .inspector-close:hover {
+  background: var(--rev01-bg-panel);
+  color: var(--rev01-fg);
 }
 #canvas-inspector .field {
   display: grid;
