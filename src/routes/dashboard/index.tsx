@@ -102,23 +102,30 @@ const cardStyles = `
     border: 1px solid var(--line);
     overflow: hidden;
     cursor: pointer;
-    transition: border-color 0.25s, box-shadow 0.25s, transform 0.3s ease, opacity 0.25s;
+    transition: border-color 0.15s, transform 0.15s ease;
   }
-  .site-card:hover {
+  .site-card:hover:not(.site-card--expanded) {
     border-color: rgba(125,211,252,0.35);
+    transform: translateY(-3px);
   }
 
-  /* expanded state */
+  /* backdrop — fades in */
   .card-backdrop {
-    display: none;
     position: fixed;
     inset: 0;
     z-index: 999;
     background: rgba(0,0,0,0.65);
     backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
   }
-  .card-backdrop[data-open="true"] { display: block; }
+  .card-backdrop[data-open="true"] {
+    opacity: 1;
+    pointer-events: auto;
+  }
 
+  /* expanded — instant position, fade in via opacity */
   .site-card--expanded {
     position: fixed;
     z-index: 1000;
@@ -131,8 +138,16 @@ const cardStyles = `
     cursor: default;
     border-color: var(--accent);
     box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--accent);
+    animation: card-fade-in 0.12s ease-out;
   }
-  .site-card--expanded .site-card-thumb { height: 240px; }
+  @keyframes card-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .site-card--expanded .site-card-thumb { height: 260px; }
+  .site-card--expanded .site-card-thumb iframe {
+    transform: scale(0.39);
+  }
 
   .site-card-thumb {
     position: relative;
