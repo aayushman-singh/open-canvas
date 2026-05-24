@@ -90,6 +90,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let interactionMode = "select";
   let spaceHeldForPan = false;
   let temporaryPanPreviousMode = null;
+  let isReelOpen = false;
+  let reelViewMode = "tile";
   // The recipe-id list mirrors src/canvas/schema.ts SECTION_RECIPE_IDS.
   const SECTION_RECIPE_IDS = [
     "hero-split",
@@ -1354,6 +1356,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       node.appendChild(buildElementNode(element));
     }
     node.appendChild(buildSectionToolbar(section));
+    const grip = document.createElement("div");
+    grip.className = "section-grip-handle";
+    grip.setAttribute("data-section-grip", section.id);
+    grip.textContent = "⡇";
+    node.appendChild(grip);
     return node;
   }
 
@@ -1382,6 +1389,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     applyZoom();
     renderInspector();
     renderSidebarSelection();
+    renderReel();
     // If a cross-template import is pending, the article we just replaced
     // wiped any previously-drawn slots; re-draw them now.
     if (pendingImport) {
@@ -1782,6 +1790,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function renderInspector() {
     if (!inspector) return;
+    if (isReelOpen) {
+      inspector.hidden = true;
+      revokePendingPreviews();
+      inspector.replaceChildren();
+      return;
+    }
     if (!selectedElementId) {
       inspector.hidden = true;
       revokePendingPreviews();
@@ -2633,6 +2647,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     selectedElementId = elementId;
     if (elementId) {
+      if (isReelOpen) closeReel();
       const next = root.querySelector('[data-rev01-element="' + cssEscape(elementId) + '"]');
       if (next) next.setAttribute("data-selected", "true");
       const found = findElement(elementId);
@@ -2653,6 +2668,478 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const next = root.querySelector('[data-rev01-section="' + cssEscape(sectionId) + '"]');
       if (next) next.setAttribute("data-selected", "true");
     }
+    if (isReelOpen) renderReel();
+  }
+
+  // -- Film reel --------------------------------------------------------
+
+  function openReel() {
+    isReelOpen = true;
+    selectElement(null);
+    renderReel();
+  }
+
+  function closeReel() {
+    isReelOpen = false;
+    renderReel();
+  }
+
+  function wireframeTextNodes(clone) {
+    const textEls = clone.querySelectorAll('[data-element-type="text"]');
+    for (let i = 0; i < textEls.length; i++) {
+      const el = textEls[i];
+      const w = el.style.width;
+      const h = el.style.height;
+      el.innerHTML = "";
+      const rect = document.createElement("div");
+      rect.style.width = w || "100%";
+      rect.style.height = h || "100%";
+      rect.style.background = "currentColor";
+      rect.style.opacity = "0.15";
+      rect.style.borderRadius = "1px";
+      el.appendChild(rect);
+    }
+  }
+
+  function buildSectionThumbnail(section, pageWidth, thumbWidth) {
+    const clone = buildSectionNode(section, pageWidth);
+    const strip = clone.querySelectorAll(
+      ".section-toolbar, .resize-handle, .element-menu-trigger, .element-menu, [data-section-grip], [data-ai-button]"
+    );
+    for (let i = 0; i < strip.length; i++) strip[i].remove();
+    const editables = clone.querySelectorAll("[contenteditable]");
+    for (let i = 0; i < editables.length; i++) editables[i].removeAttribute("contenteditable");
+    clone.removeAttribute("data-selected");
+    const selectedInside = clone.querySelectorAll("[data-selected]");
+    for (let i = 0; i < selectedInside.length; i++) selectedInside[i].removeAttribute("data-selected");
+    clone.style.pointerEvents = "none";
+    clone.style.userSelect = "none";
+
+    const scale = thumbWidth / pageWidth;
+    if (scale < 0.25) wireframeTextNodes(clone);
+
+    clone.style.transform = "scale(" + scale + ")";
+    clone.style.transformOrigin = "top left";
+
+    const kitWrap = document.createElement("div");
+    if (mainEl && state && state.styleKit) {
+      kitWrap.setAttribute("data-style-kit", state.styleKit);
+    }
+    kitWrap.appendChild(clone);
+
+    const wrap = document.createElement("div");
+    wrap.className = "reel-thumbnail-wrap";
+    wrap.style.width = thumbWidth + "px";
+    wrap.style.height = Math.round(section.height * scale) + "px";
+    wrap.appendChild(kitWrap);
+    return wrap;
+  }
+
+  function buildReelInsertButton(insertAt) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "reel-insert-btn";
+    btn.setAttribute("data-reel-insert-at", String(insertAt));
+    btn.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      insertBlankSectionAt(insertAt);
+    });
+    return btn;
+  }
+
+  function insertBlankSectionAt(insertAt) {
+    const page = currentPage();
+    if (!page) return;
+    const section = {
+      id: newSectionId(),
+      recipeId: "feature-grid",
+      name: "Blank section",
+      height: 640,
+      elements: [],
+    };
+    page.sections.splice(insertAt, 0, section);
+    selectedSectionId = section.id;
+    selectedElementId = null;
+    renderAll();
+    scheduleSave();
+    setStatus("Section added", "ok");
+  }
+
+  function moveSectionToIndex(fromIdx, toIdx) {
+    const page = currentPage();
+    if (!page) return;
+    if (fromIdx === toIdx || fromIdx + 1 === toIdx) return;
+    const section = page.sections.splice(fromIdx, 1)[0];
+    const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
+    page.sections.splice(adjustedTo, 0, section);
+    renderAll();
+    scheduleSave();
+  }
+
+  function renderReel() {
+    const reelEl = document.getElementById("canvas-reel");
+    if (!reelEl) return;
+    if (!isReelOpen) { reelEl.hidden = true; return; }
+    reelEl.hidden = false;
+
+    const page = currentPage();
+    if (!page) return;
+
+    const body = reelEl.querySelector(".reel-body");
+    if (!body) return;
+    body.replaceChildren();
+
+    const pageWidth = page.width;
+    const isTile = reelViewMode === "tile";
+    const thumbW = isTile ? 288 : 64;
+
+    for (let i = 0; i < page.sections.length; i++) {
+      const section = page.sections[i];
+      body.appendChild(buildReelInsertButton(i));
+
+      const tile = document.createElement("div");
+      tile.className = isTile ? "reel-tile" : "reel-list-item";
+      tile.setAttribute("data-reel-section", section.id);
+      tile.setAttribute("data-reel-index", String(i));
+
+      const thumb = buildSectionThumbnail(section, pageWidth, thumbW);
+      if (selectedSectionId === section.id) {
+        thumb.setAttribute("data-reel-selected", "true");
+      }
+      tile.appendChild(thumb);
+
+      if (isTile) {
+        const label = document.createElement("div");
+        label.className = "reel-tile-label";
+        label.textContent = section.name || section.recipeId;
+        tile.appendChild(label);
+      } else {
+        const info = document.createElement("div");
+        info.className = "reel-list-info";
+        const name = document.createElement("div");
+        name.className = "reel-list-name";
+        name.textContent = section.name || "Untitled";
+        const recipe = document.createElement("div");
+        recipe.className = "reel-list-recipe";
+        recipe.textContent = section.recipeId;
+        info.appendChild(name);
+        info.appendChild(recipe);
+        tile.appendChild(info);
+      }
+
+      tile.addEventListener("mousedown", (function(sectionId, idx) {
+        return function(ev) {
+          if (ev.button !== 0) return;
+          ev.preventDefault();
+          beginReelDrag(sectionId, idx, ev);
+        };
+      })(section.id, i));
+
+      body.appendChild(tile);
+    }
+    body.appendChild(buildReelInsertButton(page.sections.length));
+
+    const tileBtn = reelEl.querySelector('[data-reel-view="tile"]');
+    const listBtn = reelEl.querySelector('[data-reel-view="list"]');
+    if (tileBtn) tileBtn.setAttribute("aria-pressed", reelViewMode === "tile" ? "true" : "false");
+    if (listBtn) listBtn.setAttribute("aria-pressed", reelViewMode === "list" ? "true" : "false");
+  }
+
+  function mountReel() {
+    const reelEl = document.createElement("aside");
+    reelEl.id = "canvas-reel";
+    reelEl.hidden = true;
+
+    const header = document.createElement("div");
+    header.className = "reel-header";
+    const heading = document.createElement("h3");
+    heading.textContent = "Sections";
+    header.appendChild(heading);
+
+    const actions = document.createElement("div");
+    actions.className = "reel-header-actions";
+
+    const tileBtn = document.createElement("button");
+    tileBtn.type = "button";
+    tileBtn.textContent = "Tile";
+    tileBtn.setAttribute("data-reel-view", "tile");
+    tileBtn.setAttribute("aria-pressed", "true");
+    tileBtn.addEventListener("click", () => {
+      reelViewMode = "tile";
+      renderReel();
+    });
+    actions.appendChild(tileBtn);
+
+    const listBtn = document.createElement("button");
+    listBtn.type = "button";
+    listBtn.textContent = "List";
+    listBtn.setAttribute("data-reel-view", "list");
+    listBtn.setAttribute("aria-pressed", "false");
+    listBtn.addEventListener("click", () => {
+      reelViewMode = "list";
+      renderReel();
+    });
+    actions.appendChild(listBtn);
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.textContent = "+";
+    addBtn.setAttribute("aria-label", "Add blank section");
+    addBtn.addEventListener("click", () => {
+      const page = currentPage();
+      if (page) insertBlankSectionAt(page.sections.length);
+    });
+    actions.appendChild(addBtn);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "reel-close";
+    closeBtn.textContent = "×";
+    closeBtn.setAttribute("aria-label", "Close film reel");
+    closeBtn.addEventListener("click", () => { closeReel(); });
+    actions.appendChild(closeBtn);
+
+    header.appendChild(actions);
+    reelEl.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "reel-body";
+    reelEl.appendChild(body);
+
+    document.body.appendChild(reelEl);
+  }
+
+  function beginSectionDrag(sectionId, startEv) {
+    const page = currentPage();
+    if (!page) return;
+    const fromIdx = page.sections.findIndex(function(s) { return s.id === sectionId; });
+    if (fromIdx < 0) return;
+    const section = page.sections[fromIdx];
+
+    const sectionEl = root.querySelector('[data-rev01-section="' + cssEscape(sectionId) + '"]');
+    if (sectionEl) sectionEl.style.opacity = "0.5";
+
+    const ghost = buildSectionThumbnail(section, page.width, 200);
+    ghost.style.position = "fixed";
+    ghost.style.pointerEvents = "none";
+    ghost.style.opacity = "0.7";
+    ghost.style.zIndex = "9000";
+    ghost.style.left = startEv.clientX - 100 + "px";
+    ghost.style.top = startEv.clientY - 20 + "px";
+    document.body.appendChild(ghost);
+
+    const dropLine = document.createElement("div");
+    dropLine.className = "reel-drop-indicator";
+    dropLine.hidden = true;
+    document.body.appendChild(dropLine);
+
+    let dropTarget = null;
+
+    function findDropTarget(clientX, clientY) {
+      const reelEl = document.getElementById("canvas-reel");
+      if (reelEl && !reelEl.hidden) {
+        const reelRect = reelEl.getBoundingClientRect();
+        if (clientX >= reelRect.left && clientX <= reelRect.right &&
+            clientY >= reelRect.top && clientY <= reelRect.bottom) {
+          const tiles = Array.from(reelEl.querySelectorAll("[data-reel-section]"));
+          for (let i = 0; i < tiles.length; i++) {
+            const rect = tiles[i].getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (clientY < midY) return { zone: "reel", insertAt: i, tiles: tiles };
+          }
+          return { zone: "reel", insertAt: tiles.length, tiles: tiles };
+        }
+      }
+      const sectionNodes = Array.from(root.querySelectorAll("[data-rev01-section]"));
+      for (let i = 0; i < sectionNodes.length; i++) {
+        const rect = sectionNodes[i].getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (clientY < midY) return { zone: "canvas", insertAt: i, nodes: sectionNodes };
+      }
+      return { zone: "canvas", insertAt: sectionNodes.length, nodes: sectionNodes };
+    }
+
+    function positionDropLine(target) {
+      if (!target) { dropLine.hidden = true; return; }
+      if (target.insertAt === fromIdx || target.insertAt === fromIdx + 1) {
+        if (target.zone === "canvas") { dropLine.hidden = true; return; }
+      }
+      dropLine.hidden = false;
+      if (target.zone === "canvas") {
+        const nodes = target.nodes;
+        var refRect;
+        if (target.insertAt < nodes.length) {
+          refRect = nodes[target.insertAt].getBoundingClientRect();
+          dropLine.style.top = refRect.top - 1 + "px";
+        } else if (nodes.length > 0) {
+          refRect = nodes[nodes.length - 1].getBoundingClientRect();
+          dropLine.style.top = refRect.bottom - 1 + "px";
+        } else { dropLine.hidden = true; return; }
+        dropLine.style.left = refRect.left + "px";
+        dropLine.style.width = refRect.width + "px";
+      } else {
+        const tiles = target.tiles;
+        var refRect2;
+        if (target.insertAt < tiles.length) {
+          refRect2 = tiles[target.insertAt].getBoundingClientRect();
+          dropLine.style.top = refRect2.top - 2 + "px";
+        } else if (tiles.length > 0) {
+          refRect2 = tiles[tiles.length - 1].getBoundingClientRect();
+          dropLine.style.top = refRect2.bottom + "px";
+        } else { dropLine.hidden = true; return; }
+        dropLine.style.left = refRect2.left + "px";
+        dropLine.style.width = refRect2.width + "px";
+      }
+    }
+
+    function onMove(ev) {
+      ghost.style.left = ev.clientX - 100 + "px";
+      ghost.style.top = ev.clientY - 20 + "px";
+      dropTarget = findDropTarget(ev.clientX, ev.clientY);
+      positionDropLine(dropTarget);
+    }
+
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      ghost.remove();
+      dropLine.remove();
+      if (sectionEl) sectionEl.style.opacity = "";
+      if (dropTarget) {
+        moveSectionToIndex(fromIdx, dropTarget.insertAt);
+      }
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function beginReelDrag(sectionId, fromIdx, startEv) {
+    const page = currentPage();
+    if (!page) return;
+    const section = page.sections[fromIdx];
+    if (!section || section.id !== sectionId) return;
+
+    const startX = startEv.clientX;
+    const startY = startEv.clientY;
+    let hasMoved = false;
+    let ghost = null;
+    let dropLine = null;
+    let dropTarget = null;
+
+    function onMove(ev) {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!hasMoved && Math.sqrt(dx * dx + dy * dy) < 5) return;
+      if (!hasMoved) {
+        hasMoved = true;
+        const isTile = reelViewMode === "tile";
+        ghost = buildSectionThumbnail(section, page.width, isTile ? 200 : 64);
+        ghost.style.position = "fixed";
+        ghost.style.pointerEvents = "none";
+        ghost.style.opacity = "0.7";
+        ghost.style.zIndex = "9000";
+        document.body.appendChild(ghost);
+
+        dropLine = document.createElement("div");
+        dropLine.className = "reel-drop-indicator";
+        dropLine.hidden = true;
+        document.body.appendChild(dropLine);
+      }
+
+      ghost.style.left = ev.clientX - 50 + "px";
+      ghost.style.top = ev.clientY - 10 + "px";
+
+      const reelEl = document.getElementById("canvas-reel");
+      if (!reelEl || reelEl.hidden) { dropLine.hidden = true; dropTarget = null; return; }
+      const reelRect = reelEl.getBoundingClientRect();
+      if (ev.clientX < reelRect.left || ev.clientX > reelRect.right ||
+          ev.clientY < reelRect.top || ev.clientY > reelRect.bottom) {
+        dropLine.hidden = true;
+        dropTarget = null;
+        return;
+      }
+      const tiles = Array.from(reelEl.querySelectorAll("[data-reel-section]"));
+      var insertAt = tiles.length;
+      for (let i = 0; i < tiles.length; i++) {
+        const rect = tiles[i].getBoundingClientRect();
+        if (ev.clientY < rect.top + rect.height / 2) { insertAt = i; break; }
+      }
+      if (insertAt === fromIdx || insertAt === fromIdx + 1) {
+        dropLine.hidden = true;
+        dropTarget = null;
+        return;
+      }
+      dropTarget = { insertAt: insertAt };
+      dropLine.hidden = false;
+      var refRect;
+      if (insertAt < tiles.length) {
+        refRect = tiles[insertAt].getBoundingClientRect();
+        dropLine.style.top = refRect.top - 2 + "px";
+      } else if (tiles.length > 0) {
+        refRect = tiles[tiles.length - 1].getBoundingClientRect();
+        dropLine.style.top = refRect.bottom + "px";
+      }
+      if (refRect) {
+        dropLine.style.left = refRect.left + "px";
+        dropLine.style.width = refRect.width + "px";
+      }
+    }
+
+    function onUp() {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (ghost) ghost.remove();
+      if (dropLine) dropLine.remove();
+      if (hasMoved && dropTarget) {
+        moveSectionToIndex(fromIdx, dropTarget.insertAt);
+      }
+    }
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function attachGripHandlers() {
+    root.addEventListener("mousedown", (ev) => {
+      if (interactionMode === "pan") return;
+      const grip = ev.target instanceof Element ? ev.target.closest("[data-section-grip]") : null;
+      if (!grip) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const sectionId = grip.getAttribute("data-section-grip");
+      if (!sectionId) return;
+
+      const startX = ev.clientX;
+      const startY = ev.clientY;
+      let hasMoved = false;
+
+      function onMove(moveEv) {
+        const dx = moveEv.clientX - startX;
+        const dy = moveEv.clientY - startY;
+        if (!hasMoved && Math.sqrt(dx * dx + dy * dy) >= 5) {
+          hasMoved = true;
+          openReel();
+          beginSectionDrag(sectionId, moveEv);
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", onUp);
+        }
+      }
+      function onUp() {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        if (!hasMoved) {
+          if (isReelOpen) {
+            closeReel();
+          } else {
+            openReel();
+          }
+          selectSection(sectionId);
+        }
+      }
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
   }
 
   // -- Rich text: DOM to InlineRun[] serializer -------------------------
@@ -3684,6 +4171,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         selectElement(id);
         beginTextEdit(id);
       }
+    });
+
+    document.addEventListener("mousedown", (ev) => {
+      if (!selectedElementId) return;
+      const target = ev.target instanceof Element ? ev.target : null;
+      if (!target) return;
+      if (inspector && inspector.contains(target)) return;
+      if (target.closest('#canvas-reel')) return;
+      if (target.closest('.rev01-element')) return;
+      if (target.closest('#canvas-sidebar')) return;
+      selectElement(null);
     });
   }
 
@@ -4816,6 +5314,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderAll();
       attachRootEvents();
       attachPointerHandlers();
+      mountReel();
+      attachGripHandlers();
       document.addEventListener("click", function(ev) {
         if (openMenuElementId && ev.target instanceof Element && !ev.target.closest("[data-element-menu]") && !ev.target.closest("[data-element-menu-trigger]")) {
           closeElementMenu();
