@@ -498,7 +498,7 @@ assert(
 );
 assert(
   !publicRouteSource.includes('const pageSlug =\n    path ===') &&
-    !publicRouteSource.includes('path.replace(/^\\//, \'\').split(\'/\')[0]'),
+    !publicRouteSource.includes("path.replace(/^\\//, '').split('/')[0]"),
   'expected public route not to use first-path-segment slug matching after i18n routing lands',
 );
 assert(
@@ -695,6 +695,19 @@ assert(
 assert(
   canvasClientSource.includes('API_BASE + "/owner/assets"'),
   'expected media picker delete/gallery flow to use the selected owner asset API base',
+);
+assert(
+  canvasClientSource.includes("window.open(href, '_blank', 'noopener,noreferrer')"),
+  'expected link popover Open to sever window.opener for new-tab launches',
+);
+assert(
+  canvasClientSource.includes('focusAfterClose.focus({ preventScroll: true })'),
+  'expected link modal to restore contenteditable focus so blur serialization still commits edits',
+);
+assert(
+  canvasClientSource.includes('a.setAttribute("rel", "noopener noreferrer")') &&
+    canvasClientSource.includes("anchorEl.setAttribute('rel', 'noopener noreferrer')"),
+  'expected editor inline links with target=_blank to carry rel=noopener noreferrer',
 );
 assert(
   !canvasClientSource.includes('/api/me/assets'),

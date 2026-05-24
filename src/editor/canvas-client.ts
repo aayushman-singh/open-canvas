@@ -754,6 +754,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       a.setAttribute("href", link.href);
       if (link.target === "_blank") {
         a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
       }
       // Don't navigate from inside the editor when the Owner clicks a link.
       a.addEventListener("click", (ev) => { ev.preventDefault(); });
@@ -3590,7 +3591,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     openBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
     openBtn.addEventListener('click', function (ev) {
       ev.preventDefault();
-      window.open(href, '_blank');
+      if (!isAllowedHref(href)) {
+        setStatus('Link rejected: ' + href + ' is not http/https/mailto/tel/anchor/relative', 'error');
+        removeLinkPopover();
+        return;
+      }
+      window.open(href, '_blank', 'noopener,noreferrer');
       removeLinkPopover();
     });
     bar.appendChild(openBtn);
@@ -3609,13 +3615,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         linkText: linkText,
         href: currentHref,
         blank: currentTarget === '_blank',
+        focusAfterClose: closestEditableRoot(anchorEl),
       }).then(function (result) {
         if (result === null) return;
         anchorEl.setAttribute('href', result.href);
         if (result.target === '_blank') {
           anchorEl.setAttribute('target', '_blank');
+          anchorEl.setAttribute('rel', 'noopener noreferrer');
         } else {
           anchorEl.removeAttribute('target');
+          anchorEl.removeAttribute('rel');
         }
       }).catch(function (err) {
         setStatus('Link edit failed: ' + (err && err.message ? err.message : String(err)), 'error');
@@ -3759,6 +3768,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return null;
   }
 
+  function closestEditableRoot(node) {
+    if (!node) return null;
+    var element = node.nodeType === 1 ? node : node.parentElement;
+    return element ? element.closest('[contenteditable="true"]') : null;
+  }
+
   function openLinkModal(opts) {
     if (modalOpen) {
       throw new Error('openLinkModal: another modal is already open');
@@ -3766,6 +3781,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var linkText = typeof opts.linkText === 'string' ? opts.linkText : '';
     var defaultHref = typeof opts.href === 'string' ? opts.href : 'https://';
     var defaultBlank = opts.blank === true;
+    var focusAfterClose = opts.focusAfterClose && typeof opts.focusAfterClose.focus === 'function'
+      ? opts.focusAfterClose
+      : null;
     modalOpen = true;
     return new Promise(function (resolve) {
       var backdrop = document.createElement('div');
@@ -3845,6 +3863,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
         document.body.classList.remove('rev01-modal-open');
         modalOpen = false;
+        if (focusAfterClose && document.contains(focusAfterClose)) {
+          focusAfterClose.focus({ preventScroll: true });
+        }
         resolve(value);
       }
 
@@ -3907,6 +3928,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       linkText: selectedText,
       href: 'https://',
       blank: true,
+      focusAfterClose: closestEditableRoot(range.commonAncestorContainer),
     });
     if (result === null) return;
     sel.removeAllRanges();
@@ -3916,6 +3938,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     a.setAttribute('href', result.href);
     if (result.target === '_blank') {
       a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
     }
     try {
       savedRange.surroundContents(a);
