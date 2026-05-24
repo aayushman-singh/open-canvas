@@ -782,6 +782,190 @@ body[data-placement-active="true"] .rev01-section-slot {
   word-break: break-all;
 }
 
+#canvas-reel {
+  position: fixed;
+  top: 56px;
+  right: 0;
+  bottom: 28px;
+  width: 320px;
+  z-index: 150;
+  border-left: 1px solid var(--rev01-hairline);
+  background: var(--rev01-bg-panel-strong);
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+}
+#canvas-reel[hidden] { display: none; }
+.reel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--rev01-hairline);
+  flex-shrink: 0;
+}
+.reel-header h3 {
+  margin: 0;
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rev01-fg-mute);
+}
+.reel-header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.reel-header-actions button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg-mute);
+  padding: 3px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+.reel-header-actions button:hover {
+  border-color: var(--rev01-accent);
+  color: var(--rev01-fg);
+}
+.reel-header-actions button[aria-pressed="true"] {
+  background: var(--rev01-accent-soft);
+  border-color: var(--rev01-accent);
+  color: var(--rev01-fg);
+}
+.reel-header-actions .reel-close {
+  border: none;
+  font-size: 16px;
+  padding: 2px 4px;
+}
+.reel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+.reel-thumbnail-wrap {
+  overflow: hidden;
+  position: relative;
+  border-radius: 4px;
+  border: 1px solid var(--rev01-hairline);
+  background: var(--rev01-bg);
+  cursor: grab;
+  transition: border-color 120ms ease;
+}
+.reel-thumbnail-wrap:hover {
+  border-color: var(--rev01-accent);
+}
+.reel-thumbnail-wrap[data-reel-selected="true"] {
+  border-color: var(--rev01-accent);
+  box-shadow: 0 0 0 1px var(--rev01-accent);
+}
+.reel-tile {
+  margin-bottom: 8px;
+}
+.reel-tile-label {
+  margin-top: 4px;
+  font-family: var(--rev01-font-mono);
+  font-size: 10px;
+  color: var(--rev01-fg-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reel-list-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rev01-hairline);
+}
+.reel-list-info {
+  flex: 1;
+  min-width: 0;
+}
+.reel-list-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rev01-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reel-list-recipe {
+  font-family: var(--rev01-font-mono);
+  font-size: 10px;
+  color: var(--rev01-fg-faint);
+}
+.reel-insert-btn {
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin: 2px 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: height 120ms ease;
+  border-radius: 2px;
+}
+.reel-insert-btn:hover {
+  height: 24px;
+  background: var(--rev01-accent-soft);
+}
+.reel-insert-btn:hover::after {
+  content: "+";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rev01-accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+.section-grip-handle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 40px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--rev01-bg-panel-strong);
+  border: 1px solid var(--rev01-hairline-strong);
+  border-right: none;
+  border-radius: 4px 0 0 4px;
+  color: var(--rev01-fg-mute);
+  font-size: 14px;
+  cursor: grab;
+  z-index: 100;
+  user-select: none;
+}
+.rev01-section:hover .section-grip-handle {
+  display: flex;
+}
+.section-grip-handle:hover {
+  color: var(--rev01-fg);
+  background: var(--rev01-accent-soft);
+  border-color: var(--rev01-accent);
+}
+.reel-drop-indicator {
+  position: fixed;
+  height: 2px;
+  background: var(--rev01-accent);
+  z-index: 9001;
+  pointer-events: none;
+  border-radius: 1px;
+  box-shadow: 0 0 4px var(--rev01-accent);
+}
+
 .rev01-editor-status {
   position: fixed;
   bottom: 0;
