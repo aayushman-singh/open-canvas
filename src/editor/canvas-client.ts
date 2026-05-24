@@ -89,6 +89,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let aiBusy = false;
   let interactionMode = "select";
   let spaceHeldForPan = false;
+  let temporaryPanPreviousMode = null;
   // The recipe-id list mirrors src/canvas/schema.ts SECTION_RECIPE_IDS.
   const SECTION_RECIPE_IDS = [
     "hero-split",
@@ -194,14 +195,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     zoomToolbar.setAttribute("role", "toolbar");
     zoomToolbar.setAttribute("aria-label", "Zoom and interaction mode");
     var modeDefs = [
-      { label: "←", title: "Select (V)", action: "select" },
-      { label: "✋", title: "Pan (Space)", action: "pan" },
+      { label: "←", title: "Select (V)", ariaLabel: "Select mode", action: "select" },
+      { label: "✋", title: "Pan (Space)", ariaLabel: "Pan mode", action: "pan" },
     ];
     for (var mi = 0; mi < modeDefs.length; mi++) {
       var mbtn = document.createElement("button");
       mbtn.type = "button";
       mbtn.textContent = modeDefs[mi].label;
       mbtn.title = modeDefs[mi].title;
+      mbtn.setAttribute("aria-label", modeDefs[mi].ariaLabel);
       mbtn.setAttribute("data-mode-action", modeDefs[mi].action);
       mbtn.setAttribute("aria-pressed", modeDefs[mi].action === "select" ? "true" : "false");
       zoomToolbar.appendChild(mbtn);
@@ -231,7 +233,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var modeTarget = ev.target instanceof Element ? ev.target.closest("button[data-mode-action]") : null;
       if (modeTarget) {
         var mode = modeTarget.getAttribute("data-mode-action");
-        if (mode) setInteractionMode(mode);
+        if (mode) {
+          clearTemporaryPanState();
+          setInteractionMode(mode);
+        }
         return;
       }
       const target = ev.target instanceof Element ? ev.target.closest("button[data-zoom-action]") : null;
@@ -256,6 +261,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     );
     viewport.addEventListener("mousedown", function (ev) {
       if (interactionMode !== "pan") return;
+      if (ev.button !== 0) return;
       ev.preventDefault();
       var startX = ev.clientX;
       var startY = ev.clientY;
@@ -263,16 +269,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var scrollY = window.scrollY;
       viewport.setAttribute("data-panning", "true");
       function onMove(e) {
+        e.preventDefault();
         window.scrollTo(scrollX - (e.clientX - startX), scrollY - (e.clientY - startY));
       }
       function onUp() {
         viewport.removeAttribute("data-panning");
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        window.removeEventListener("blur", onUp);
       }
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
+      window.addEventListener("blur", onUp);
     });
+    setInteractionMode("select");
     applyZoom();
   }
 
@@ -293,7 +303,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     };
   }
 
+  function isEditableShortcutTarget(target) {
+    if (!(target instanceof Element)) return false;
+    var control = target.closest("input, textarea, select, button");
+    if (control) return true;
+    var editable = target.closest("[contenteditable]");
+    if (!editable) return false;
+    return editable.getAttribute("contenteditable") !== "false";
+  }
+
   function setInteractionMode(mode) {
+    if (mode !== "select" && mode !== "pan") {
+      throw new Error("setInteractionMode: expected select or pan, got " + String(mode));
+    }
     interactionMode = mode;
     if (viewport) {
       viewport.setAttribute("data-interaction-mode", mode);
@@ -305,6 +327,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           btns[i].getAttribute("data-mode-action") === mode ? "true" : "false");
       }
     }
+  }
+
+  function clearTemporaryPanState() {
+    spaceHeldForPan = false;
+    temporaryPanPreviousMode = null;
+  }
+
+  function endTemporaryPan() {
+    if (!spaceHeldForPan) return;
+    var nextMode = temporaryPanPreviousMode || "select";
+    clearTemporaryPanState();
+    setInteractionMode(nextMode);
   }
 
   function setStatus(text, tone) {
@@ -3994,23 +4028,38 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         void saveStateNow();
         return;
       }
-      if (ev.key === " " && !ev.repeat && !editingElementId && !ev.ctrlKey && !ev.metaKey) {
+      if (
+        ev.key === " " &&
+        !ev.repeat &&
+        !editingElementId &&
+        !ev.ctrlKey &&
+        !ev.metaKey &&
+        !ev.altKey &&
+        !isEditableShortcutTarget(ev.target)
+      ) {
         ev.preventDefault();
+        temporaryPanPreviousMode = interactionMode;
         spaceHeldForPan = true;
         setInteractionMode("pan");
         return;
       }
-      if ((ev.key === "v" || ev.key === "V") && !editingElementId && !ev.ctrlKey && !ev.metaKey) {
+      if (
+        (ev.key === "v" || ev.key === "V") &&
+        !editingElementId &&
+        !ev.ctrlKey &&
+        !ev.metaKey &&
+        !ev.altKey &&
+        !isEditableShortcutTarget(ev.target)
+      ) {
+        clearTemporaryPanState();
         setInteractionMode("select");
         return;
       }
     });
     window.addEventListener("keyup", (ev) => {
-      if (ev.key === " " && spaceHeldForPan) {
-        spaceHeldForPan = false;
-        setInteractionMode("select");
-      }
+      if (ev.key === " ") endTemporaryPan();
     });
+    window.addEventListener("blur", endTemporaryPan);
   }
 
   // -- Wave 3 #14 — Symbols (masters + instances + override UX) ----------
