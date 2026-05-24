@@ -27,6 +27,7 @@ import {
   SUBDOMAIN_RE,
   validateSubdomain,
 } from './routes/api/sites';
+import { canReadScopedLibraryRow, escapeHtmlText } from './routes/api/library-access';
 import { allTemplateSeeds, getTemplateSeed, starterTemplate } from './templates/registry';
 
 function assert(condition: boolean, message: string): asserts condition {
@@ -123,6 +124,23 @@ assert(validSubdomain.valid, 'expected "my-site-1" to be a valid subdomain');
 
 assert(SUBDOMAIN_RE instanceof RegExp, 'expected SUBDOMAIN_RE to be exported as a RegExp');
 assert(RESERVED_SUBDOMAINS.has('admin'), 'expected RESERVED_SUBDOMAINS to include "admin"');
+
+assert(
+  canReadScopedLibraryRow({ visibility: 'global', customerId: null }, null),
+  'expected global library/template rows to be readable without a customer row',
+);
+assert(
+  canReadScopedLibraryRow({ visibility: 'private', customerId: 'owner-a' }, 'owner-a'),
+  'expected private library/template rows to be readable by their owner',
+);
+assert(
+  !canReadScopedLibraryRow({ visibility: 'private', customerId: 'owner-a' }, 'owner-b'),
+  'expected private library/template rows to be hidden from other owners',
+);
+assert(
+  escapeHtmlText('<template "x" & y>') === '&lt;template &quot;x&quot; &amp; y&gt;',
+  'expected custom template preview titles to be HTML-escaped',
+);
 
 const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
 assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');

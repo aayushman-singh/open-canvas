@@ -15,9 +15,8 @@
 //   GET    /api/custom-templates/:id/preview  — render preview HTML
 //   GET    /api/custom-templates/:id/assets/:assetId — serve asset from R2
 
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { raw as rawHtml } from 'hono/html';
 
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
@@ -34,6 +33,7 @@ import {
   site,
   type AssetManifestEntry,
 } from '../../db/schema.js';
+import { canReadScopedLibraryRow, escapeHtmlText } from './library-access.js';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -106,7 +106,7 @@ async function buildAssetManifest(
       contentHash: row.contentHash,
       r2Key: row.r2Key,
       mediaType: row.mediaType,
-      kind: row.kind as 'image' | 'video',
+      kind: row.kind,
       alt: row.alt,
       width: row.width,
       height: row.height,
@@ -180,15 +180,15 @@ customTemplatesOwner.get('/', async (c) => {
       visibility: customTemplate.visibility,
     })
     .from(customTemplate)
-    .where(whereClause!);
+    .where(whereClause);
 
   const entries: CustomTemplateCatalogEntry[] = rows.map((r) => ({
-    source: 'custom' as const,
+    source: 'custom',
     id: r.id,
     name: r.name,
     tagline: r.tagline,
     styleKit: r.styleKit,
-    visibility: r.visibility as 'global' | 'private',
+    visibility: r.visibility,
   }));
 
   return c.json({ templates: entries });
@@ -272,14 +272,25 @@ const previewStyles = `
 `;
 
 customTemplatesOwner.get('/:id/preview', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) throw new Error('custom-template preview reached without auth');
+
   const database = db(c.env);
+  const customerId = await resolveCustomerId(database, auth.userId);
   const row = await database
-    .select({ siteState: customTemplate.siteState, name: customTemplate.name })
+    .select({
+      siteState: customTemplate.siteState,
+      name: customTemplate.name,
+      visibility: customTemplate.visibility,
+      customerId: customTemplate.customerId,
+    })
     .from(customTemplate)
     .where(eq(customTemplate.id, c.req.param('id')))
     .limit(1);
   const tmpl = row[0];
-  if (!tmpl) return c.text('template not found', 404);
+  if (!tmpl || !canReadScopedLibraryRow(tmpl, customerId)) {
+    return c.text('template not found', 404);
+  }
 
   const snapshot: PublishedSnapshot = {
     version: 1,
@@ -293,19 +304,29 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
   );
 
   return c.html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${tmpl.name} preview</title><style>${canvasPublishedStyles}</style><style>${previewStyles}</style></head><body><div class="rev01-preview-stage">${html}</div></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}</style><style>${previewStyles}</style></head><body><div class="rev01-preview-stage">${html}</div></body></html>`,
   );
 });
 
 customTemplatesOwner.get('/:id/assets/:assetId', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) throw new Error('custom-template asset route reached without auth');
+
   const database = db(c.env);
+  const customerId = await resolveCustomerId(database, auth.userId);
   const row = await database
-    .select({ assetManifest: customTemplate.assetManifest })
+    .select({
+      assetManifest: customTemplate.assetManifest,
+      visibility: customTemplate.visibility,
+      customerId: customTemplate.customerId,
+    })
     .from(customTemplate)
     .where(eq(customTemplate.id, c.req.param('id')))
     .limit(1);
   const tmpl = row[0];
-  if (!tmpl) return c.text('template not found', 404);
+  if (!tmpl || !canReadScopedLibraryRow(tmpl, customerId)) {
+    return c.text('template not found', 404);
+  }
 
   const assetId = c.req.param('assetId');
   const entry = tmpl.assetManifest.find((e) => e.assetId === assetId);

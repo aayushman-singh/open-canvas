@@ -11,7 +11,7 @@
 //   POST   /api/admin/library/sections     — save a section as global
 //   DELETE /api/admin/library/sections/:id — delete a global library section
 
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
@@ -105,7 +105,7 @@ async function buildAssetManifest(
       contentHash: row.contentHash,
       r2Key: row.r2Key,
       mediaType: row.mediaType,
-      kind: row.kind as 'image' | 'video',
+      kind: row.kind,
       alt: row.alt,
       width: row.width,
       height: row.height,
@@ -206,7 +206,7 @@ librarySectionsOwner.get('/sections', async (c) => {
       visibility: librarySection.visibility,
     })
     .from(librarySection)
-    .where(whereClause!);
+    .where(whereClause);
 
   for (const row of rows) {
     catalog.push({
@@ -215,7 +215,7 @@ librarySectionsOwner.get('/sections', async (c) => {
       name: row.name,
       recipeId: row.recipeId,
       headingPreview: row.headingPreview,
-      visibility: row.visibility as 'global' | 'private',
+      visibility: row.visibility,
       librarySectionId: row.id,
     });
   }

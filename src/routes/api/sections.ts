@@ -16,6 +16,7 @@ import { db } from '../../db/client';
 import { customer, librarySection, ownerAsset, site } from '../../db/schema';
 import { allTemplateSeeds } from '../../templates/registry';
 import { SECTION_CATALOG } from '../../templates/section-catalog';
+import { canReadScopedLibraryRow } from './library-access';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -128,12 +129,14 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
       .select({
         sectionData: librarySection.sectionData,
         assetManifest: librarySection.assetManifest,
+        visibility: librarySection.visibility,
+        customerId: librarySection.customerId,
       })
       .from(librarySection)
       .where(eq(librarySection.id, body.librarySectionId))
       .limit(1);
     const lib = libRow[0];
-    if (!lib) {
+    if (!lib || !canReadScopedLibraryRow(lib, customerId)) {
       return c.json({ error: 'library section not found' }, 404);
     }
 

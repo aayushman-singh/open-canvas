@@ -8,7 +8,9 @@
 
 import { allTemplateSeeds } from '../templates/registry.js';
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
+import { importLibrarySectionIntoSite } from './library-section-import.js';
 import { importSectionIntoSite } from './section-import.js';
+import type { CanvasSection } from './schema.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -91,6 +93,83 @@ if (firstImport.ok) {
     assert(
       secondImport.newAssetRows.length === 0,
       `dedup failed: produced ${secondImport.newAssetRows.length} rows when all should be skipped`,
+    );
+  }
+}
+
+{
+  const section: CanvasSection = {
+    id: 'section-library-duplicate-hash',
+    recipeId: 'feature-grid',
+    name: 'Duplicate hash media',
+    height: 480,
+    elements: [
+      {
+        id: 'media-a',
+        type: 'media',
+        mediaKind: 'image',
+        assetId: 'source-asset-a',
+        alt: 'First',
+        fit: 'cover',
+        box: { x: 0, y: 0, w: 240, h: 180, z: 1 },
+      },
+      {
+        id: 'media-b',
+        type: 'media',
+        mediaKind: 'image',
+        assetId: 'source-asset-b',
+        alt: 'Second',
+        fit: 'cover',
+        box: { x: 260, y: 0, w: 240, h: 180, z: 2 },
+      },
+    ],
+  };
+  const result = importLibrarySectionIntoSite({
+    targetCustomerId,
+    sourceSection: section,
+    assetManifest: [
+      {
+        assetId: 'source-asset-a',
+        contentHash: 'same-content-hash',
+        r2Key: 'assets/same-content-hash.png',
+        mediaType: 'image/png',
+        kind: 'image',
+        alt: 'First',
+        width: 240,
+        height: 180,
+        byteSize: 1024,
+      },
+      {
+        assetId: 'source-asset-b',
+        contentHash: 'same-content-hash',
+        r2Key: 'assets/same-content-hash.png',
+        mediaType: 'image/png',
+        kind: 'image',
+        alt: 'Second',
+        width: 240,
+        height: 180,
+        byteSize: 1024,
+      },
+    ],
+    existingAssetsByHash: new Map(),
+  });
+  assert(result.ok, 'library duplicate-hash import must succeed');
+  if (result.ok) {
+    assert(
+      result.newAssetRows.length === 1,
+      `expected duplicate content hash to create one owner asset row, got ${result.newAssetRows.length}`,
+    );
+    const mediaElements = result.section.elements.filter((element) => element.type === 'media');
+    assert(mediaElements.length === 2, 'expected two media elements after library import');
+    const first = mediaElements[0]!;
+    const second = mediaElements[1]!;
+    assert(
+      first.assetId === second.assetId,
+      `expected duplicate content hash refs to map to one target asset id, got ${first.assetId} and ${second.assetId}`,
+    );
+    assert(
+      first.assetId !== 'source-asset-a' && second.assetId !== 'source-asset-b',
+      'expected library import not to preserve source owner asset ids',
     );
   }
 }

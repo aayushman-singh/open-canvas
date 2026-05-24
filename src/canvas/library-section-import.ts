@@ -65,7 +65,7 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
 
   const assetIdMap = new Map<string, string>();
   const newAssetRows: ImportedAssetRow[] = [];
-  const seenContentHashes = new Set<string>();
+  const targetAssetsByHash = new Map(existingAssetsByHash);
 
   for (const element of cloned.elements) {
     if (element.type !== 'media') continue;
@@ -82,13 +82,13 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
         continue;
       }
 
-      const existing = existingAssetsByHash.get(manifest.contentHash);
+      const existing = targetAssetsByHash.get(manifest.contentHash);
       if (existing) {
         assetIdMap.set(ref, existing);
-      } else if (!seenContentHashes.has(manifest.contentHash)) {
+      } else {
         const freshId = crypto.randomUUID();
         assetIdMap.set(ref, freshId);
-        seenContentHashes.add(manifest.contentHash);
+        targetAssetsByHash.set(manifest.contentHash, freshId);
         newAssetRows.push({
           id: freshId,
           customerId: targetCustomerId,

@@ -300,7 +300,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                 </span>
               </label>
             ))}
-            {customTemplates.map((dt, idx) => (
+            {customTemplates.map((dt) => (
               <label class="template">
                 <input
                   type="radio"
@@ -424,7 +424,7 @@ templatesRoute.get('/', async (c) => {
         visibility: customTemplate.visibility,
       })
       .from(customTemplate)
-      .where(whereClause!);
+      .where(whereClause);
 
     customTemplates = rows;
   }

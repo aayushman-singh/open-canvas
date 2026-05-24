@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { collectReferencedAssets } from '../../assets/site-assets';
@@ -8,7 +8,8 @@ import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, customTemplate, ownerAsset, site, type AssetManifestEntry } from '../../db/schema';
+import { customer, customTemplate, ownerAsset, site } from '../../db/schema';
+import { canReadScopedLibraryRow } from './library-access';
 import { getTemplateSeed } from '../../templates/registry';
 
 type Bindings = {
@@ -281,7 +282,7 @@ sites.post('/', async (c) => {
     if (!dt) {
       return c.json({ error: `unknown templateId: ${templateId}` }, 404);
     }
-    if (dt.visibility === 'private' && dt.customerId !== customerId) {
+    if (!canReadScopedLibraryRow(dt, customerId)) {
       return c.json({ error: `unknown templateId: ${templateId}` }, 404);
     }
 
