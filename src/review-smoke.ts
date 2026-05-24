@@ -591,6 +591,22 @@ assert(
   !inlineCanvasClient.includes("querySelectorAll('[data-style-kit]')"),
   'expected style-kit click handling not to bind generic data-style-kit nodes',
 );
+assert(
+  inlineCanvasClient.includes('function isEditableShortcutTarget('),
+  'expected canvas interaction shortcuts to ignore inputs, textareas, selects, buttons, and contenteditable targets',
+);
+assert(
+  inlineCanvasClient.includes('temporaryPanPreviousMode'),
+  'expected temporary Space pan to restore the previous interaction mode instead of always selecting',
+);
+assert(
+  inlineCanvasClient.includes('window.addEventListener("blur"'),
+  'expected temporary Space pan to recover if the window loses focus before keyup',
+);
+assert(
+  inlineCanvasClient.includes('mbtn.setAttribute("aria-label"'),
+  'expected icon-only interaction-mode toolbar buttons to expose accessible labels',
+);
 
 const tsconfigSource = await readSource('../tsconfig.json');
 const tsconfig = JSON.parse(tsconfigSource) as { exclude?: string[] };
