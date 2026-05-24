@@ -254,6 +254,40 @@ assert(
         noTargetResult.errors.join('; '),
 );
 
+// Public render: link with target="_blank" must emit target and rel attributes.
+const blankTargetSnapshot: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-05-24T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: blankTargetState.pages,
+};
+const blankTargetHtml = renderCanvasSnapshot(blankTargetSnapshot, '/assets');
+assert(
+  blankTargetHtml.includes('target="_blank"'),
+  'expected rendered HTML to include target="_blank" for link mark with target set',
+);
+assert(
+  blankTargetHtml.includes('rel="noopener noreferrer"'),
+  'expected rendered HTML to include rel="noopener noreferrer" for target="_blank" links',
+);
+
+// Public render: link WITHOUT target must NOT emit target or rel attributes.
+const noTargetSnapshot: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-05-24T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: noTargetState.pages,
+};
+const noTargetHtml = renderCanvasSnapshot(noTargetSnapshot, '/assets');
+assert(
+  !noTargetHtml.includes('target='),
+  'expected rendered HTML to NOT include target= for link mark without target',
+);
+assert(
+  !noTargetHtml.includes('rel='),
+  'expected rendered HTML to NOT include rel= for link mark without target',
+);
+
 // -- Task 5.6: single-page invariant + accessibility -----------------------
 // The hero section contains a shape (`hero-orb`) and a surface (`hero-card`),
 // both decorative-by-default. The rendered HTML for the hero section must

@@ -30,7 +30,10 @@ function renderRun(run: InlineRun): string {
   if (hasMark(run, 'bold')) inner = `<strong>${inner}</strong>`;
   const link = findLinkMark(run);
   if (link) {
-    inner = `<a class="rev01-inline-link" href="${escapeAttr(link.href)}">${inner}</a>`;
+    const targetAttr = link.target === '_blank'
+      ? ' target="_blank" rel="noopener noreferrer"'
+      : '';
+    inner = `<a class="rev01-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${inner}</a>`;
   }
   // The bare <span> wrapper is kept even for no-mark runs because it gives the
   // editor a stable DOM addressing target per run.
