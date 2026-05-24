@@ -125,7 +125,7 @@ const cardStyles = `
     pointer-events: auto;
   }
 
-  /* expanded — instant position, fade in via opacity */
+  /* expanded — no transitions, instant snap, opacity-only fade */
   .site-card--expanded {
     position: fixed;
     z-index: 1000;
@@ -138,6 +138,7 @@ const cardStyles = `
     cursor: default;
     border-color: var(--accent);
     box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--accent);
+    transition: none;
     animation: card-fade-in 0.12s ease-out;
   }
   @keyframes card-fade-in {
