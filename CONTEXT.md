@@ -120,6 +120,10 @@ _Avoid_: Flow item, DOM node, layer
 A right-side panel that shows all sections of a canvas page as miniature thumbnails, used for visual reordering and blank section insertion.
 _Avoid_: Section manager, section list, reorder panel
 
+**Film Reel**:
+A right-side panel that shows all sections of a canvas page as miniature thumbnails, used for visual reordering and blank section insertion.
+_Avoid_: Section manager, section list, reorder panel
+
 **Slot History**:
 The ordered record of owner assets that have previously occupied one media element, kept only for the editing experience.
 _Avoid_: Undo stack, version history, asset trail
