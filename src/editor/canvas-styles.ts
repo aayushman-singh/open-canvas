@@ -439,6 +439,27 @@ body[data-placement-active="true"] .rev01-section-slot {
   min-width: 44px;
   justify-content: center;
 }
+.rev01-zoom-toolbar .zoom-toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--rev01-hairline);
+  margin: 2px 2px;
+}
+.rev01-zoom-toolbar button[data-mode-action][aria-pressed="true"] {
+  background: var(--rev01-accent);
+  color: #fff;
+  border-color: var(--rev01-accent);
+}
+.rev01-viewport[data-interaction-mode="pan"] {
+  cursor: grab;
+}
+.rev01-viewport[data-interaction-mode="pan"][data-panning="true"] {
+  cursor: grabbing;
+}
+.rev01-viewport[data-interaction-mode="pan"] .rev01-element,
+.rev01-viewport[data-interaction-mode="pan"] .rev01-section {
+  pointer-events: none;
+}
 
 .rev01-page {
   margin: 0 auto;

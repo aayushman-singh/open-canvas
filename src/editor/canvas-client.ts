@@ -87,6 +87,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // Accept (after the apply call lands) or Dismiss (no save).
   let aiPanel = null;
   let aiBusy = false;
+  let interactionMode = "select";
+  let spaceHeldForPan = false;
   // The recipe-id list mirrors src/canvas/schema.ts SECTION_RECIPE_IDS.
   const SECTION_RECIPE_IDS = [
     "hero-split",
@@ -190,7 +192,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     zoomToolbar = document.createElement("div");
     zoomToolbar.className = "rev01-zoom-toolbar";
     zoomToolbar.setAttribute("role", "toolbar");
-    zoomToolbar.setAttribute("aria-label", "Zoom");
+    zoomToolbar.setAttribute("aria-label", "Zoom and interaction mode");
+    var modeDefs = [
+      { label: "←", title: "Select (V)", action: "select" },
+      { label: "✋", title: "Pan (Space)", action: "pan" },
+    ];
+    for (var mi = 0; mi < modeDefs.length; mi++) {
+      var mbtn = document.createElement("button");
+      mbtn.type = "button";
+      mbtn.textContent = modeDefs[mi].label;
+      mbtn.title = modeDefs[mi].title;
+      mbtn.setAttribute("data-mode-action", modeDefs[mi].action);
+      mbtn.setAttribute("aria-pressed", modeDefs[mi].action === "select" ? "true" : "false");
+      zoomToolbar.appendChild(mbtn);
+    }
+    var sep = document.createElement("span");
+    sep.className = "zoom-toolbar-sep";
+    zoomToolbar.appendChild(sep);
     const defs = [
       { label: "Fit", action: "fit" },
       { label: "100%", action: "reset" },
@@ -210,6 +228,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     zoomToolbar.appendChild(zoomReadout);
     document.body.appendChild(zoomToolbar);
     zoomToolbar.addEventListener("click", (ev) => {
+      var modeTarget = ev.target instanceof Element ? ev.target.closest("button[data-mode-action]") : null;
+      if (modeTarget) {
+        var mode = modeTarget.getAttribute("data-mode-action");
+        if (mode) setInteractionMode(mode);
+        return;
+      }
       const target = ev.target instanceof Element ? ev.target.closest("button[data-zoom-action]") : null;
       if (!target) return;
       const action = target.getAttribute("data-zoom-action");
@@ -230,6 +254,25 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       },
       { passive: false },
     );
+    viewport.addEventListener("mousedown", function (ev) {
+      if (interactionMode !== "pan") return;
+      ev.preventDefault();
+      var startX = ev.clientX;
+      var startY = ev.clientY;
+      var scrollX = window.scrollX;
+      var scrollY = window.scrollY;
+      viewport.setAttribute("data-panning", "true");
+      function onMove(e) {
+        window.scrollTo(scrollX - (e.clientX - startX), scrollY - (e.clientY - startY));
+      }
+      function onUp() {
+        viewport.removeAttribute("data-panning");
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      }
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    });
     applyZoom();
   }
 
@@ -248,6 +291,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       x: (event.clientX - rect.left) / z,
       y: (event.clientY - rect.top) / z,
     };
+  }
+
+  function setInteractionMode(mode) {
+    interactionMode = mode;
+    if (viewport) {
+      viewport.setAttribute("data-interaction-mode", mode);
+    }
+    if (zoomToolbar) {
+      var btns = zoomToolbar.querySelectorAll("[data-mode-action]");
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].setAttribute("aria-pressed",
+          btns[i].getAttribute("data-mode-action") === mode ? "true" : "false");
+      }
+    }
   }
 
   function setStatus(text, tone) {
@@ -3007,6 +3064,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function attachPointerHandlers() {
     root.addEventListener("mousedown", (ev) => {
+      if (interactionMode === "pan") return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
         const wrapper = handle.closest('.rev01-element');
@@ -3313,6 +3371,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function attachRootEvents() {
     root.addEventListener("click", (ev) => {
+      if (interactionMode === "pan") return;
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
       const toolbarButton = target.closest('[data-section-action]');
@@ -3337,6 +3396,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
 
     root.addEventListener("dblclick", (ev) => {
+      if (interactionMode === "pan") return;
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
       const elementNode = target.closest('.rev01-element');
@@ -3932,6 +3992,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ev.preventDefault();
         if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
         void saveStateNow();
+        return;
+      }
+      if (ev.key === " " && !ev.repeat && !editingElementId && !ev.ctrlKey && !ev.metaKey) {
+        ev.preventDefault();
+        spaceHeldForPan = true;
+        setInteractionMode("pan");
+        return;
+      }
+      if ((ev.key === "v" || ev.key === "V") && !editingElementId && !ev.ctrlKey && !ev.metaKey) {
+        setInteractionMode("select");
+        return;
+      }
+    });
+    window.addEventListener("keyup", (ev) => {
+      if (ev.key === " " && spaceHeldForPan) {
+        spaceHeldForPan = false;
+        setInteractionMode("select");
       }
     });
   }
