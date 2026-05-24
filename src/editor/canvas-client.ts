@@ -3625,53 +3625,173 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return null;
   }
 
-  async function promptForLinkHref(current) {
-    const initial = typeof current === "string" ? current : "https://";
-    const raw = await openTextModal({
-      title: "Add link",
-      label: "URL",
-      defaultValue: initial,
-      placeholder: "https://...",
-    });
-    if (raw === null) return null; // cancelled
-    const href = raw.trim();
-    if (href.length === 0) return null;
-    if (!isAllowedHref(href)) {
-      setStatus("Link rejected: " + href + " is not http/https/mailto/tel/anchor/relative", "error");
-      return null;
+  function openLinkModal(opts) {
+    if (modalOpen) {
+      throw new Error('openLinkModal: another modal is already open');
     }
-    return href;
+    var linkText = typeof opts.linkText === 'string' ? opts.linkText : '';
+    var defaultHref = typeof opts.href === 'string' ? opts.href : 'https://';
+    var defaultBlank = opts.blank === true;
+    modalOpen = true;
+    return new Promise(function (resolve) {
+      var backdrop = document.createElement('div');
+      backdrop.className = 'rev01-modal-backdrop';
+      var panel = document.createElement('div');
+      panel.className = 'rev01-modal';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-label', 'Link');
+
+      var h = document.createElement('h3');
+      h.textContent = 'Link';
+      panel.appendChild(h);
+
+      if (linkText.length > 0) {
+        var previewLabel = document.createElement('label');
+        previewLabel.textContent = 'Text';
+        panel.appendChild(previewLabel);
+        var preview = document.createElement('div');
+        preview.className = 'rev01-link-modal-preview';
+        preview.textContent = linkText;
+        panel.appendChild(preview);
+      }
+
+      var urlLabel = document.createElement('label');
+      urlLabel.textContent = 'URL';
+      panel.appendChild(urlLabel);
+      var urlInput = document.createElement('input');
+      urlInput.type = 'text';
+      urlInput.value = defaultHref;
+      urlInput.placeholder = 'https://...';
+      panel.appendChild(urlInput);
+
+      var errorEl = document.createElement('div');
+      errorEl.className = 'rev01-link-modal-error';
+      errorEl.textContent = '';
+      panel.appendChild(errorEl);
+
+      var checkLabel = document.createElement('label');
+      checkLabel.className = 'rev01-link-modal-checkbox';
+      var checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = defaultBlank;
+      checkLabel.appendChild(checkbox);
+      var checkText = document.createTextNode(' Open in new tab');
+      checkLabel.appendChild(checkText);
+      panel.appendChild(checkLabel);
+
+      function autoToggleBlank() {
+        var val = urlInput.value.trim();
+        if (val.startsWith('http://') || val.startsWith('https://')) {
+          checkbox.checked = true;
+        } else if (val.startsWith('#') || val.startsWith('/')) {
+          checkbox.checked = false;
+        }
+      }
+      if (defaultHref === 'https://') {
+        urlInput.addEventListener('input', autoToggleBlank);
+      }
+
+      var actions = document.createElement('div');
+      actions.className = 'rev01-modal-actions';
+      var cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.textContent = 'Cancel';
+      var applyBtn = document.createElement('button');
+      applyBtn.type = 'button';
+      applyBtn.textContent = 'Apply';
+      actions.appendChild(cancelBtn);
+      actions.appendChild(applyBtn);
+      panel.appendChild(actions);
+
+      backdrop.appendChild(panel);
+
+      function close(value) {
+        document.removeEventListener('keydown', onKey, true);
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove('rev01-modal-open');
+        modalOpen = false;
+        resolve(value);
+      }
+
+      function tryApply() {
+        var href = urlInput.value.trim();
+        if (href.length === 0) {
+          errorEl.textContent = 'URL cannot be empty';
+          return;
+        }
+        if (!isAllowedHref(href)) {
+          errorEl.textContent = 'URL must be http, https, mailto, tel, /relative, or #anchor';
+          return;
+        }
+        var result = { href: href };
+        if (checkbox.checked) {
+          result.target = '_blank';
+        }
+        close(result);
+      }
+
+      function onKey(ev) {
+        if (ev.key === 'Escape') {
+          ev.preventDefault();
+          ev.stopPropagation();
+          close(null);
+          return;
+        }
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          ev.stopPropagation();
+          tryApply();
+        }
+      }
+      backdrop.addEventListener('click', function (ev) {
+        if (ev.target === backdrop) close(null);
+      });
+      cancelBtn.addEventListener('click', function () { close(null); });
+      applyBtn.addEventListener('click', function () { tryApply(); });
+      urlInput.addEventListener('input', function () { errorEl.textContent = ''; });
+      document.addEventListener('keydown', onKey, true);
+
+      document.body.classList.add('rev01-modal-open');
+      document.body.appendChild(backdrop);
+      urlInput.focus();
+      urlInput.select();
+    });
   }
 
   async function applyLinkMark() {
-    const sel = window.getSelection();
+    var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
+    var range = sel.getRangeAt(0);
     if (range.collapsed) {
-      setStatus("Select some text first to add a link", "error");
+      setStatus('Select some text first to add a link', 'error');
       return;
     }
-    // Snapshot the Range before opening the modal — focusing the modal
-    // input would otherwise collapse the editor's Selection, leaving us
-    // with nothing to wrap when the user clicks OK.
-    const savedRange = range.cloneRange();
-    const href = await promptForLinkHref("");
-    if (href === null) return;
-    // Restore the Selection so surroundContents wraps the original text.
+    var savedRange = range.cloneRange();
+    var selectedText = savedRange.toString();
+    var result = await openLinkModal({
+      linkText: selectedText,
+      href: 'https://',
+      blank: true,
+    });
+    if (result === null) return;
     sel.removeAllRanges();
     sel.addRange(savedRange);
-    const a = document.createElement("a");
-    a.className = "rev01-inline-link";
-    a.setAttribute("href", href);
+    var a = document.createElement('a');
+    a.className = 'rev01-inline-link';
+    a.setAttribute('href', result.href);
+    if (result.target === '_blank') {
+      a.setAttribute('target', '_blank');
+    }
     try {
       savedRange.surroundContents(a);
     } catch (_) {
-      const fragment = savedRange.extractContents();
+      var fragment = savedRange.extractContents();
       a.appendChild(fragment);
       savedRange.insertNode(a);
     }
     sel.removeAllRanges();
-    const next = document.createRange();
+    var next = document.createRange();
     next.selectNode(a);
     sel.addRange(next);
   }
