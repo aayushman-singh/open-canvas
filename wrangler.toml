@@ -81,6 +81,9 @@ bucket_name = "rev01-assets"
 # Required by Wave 2 #9 (password publish, plan 09):
 #   UNLOCK_SIGNING_SECRET — HMAC-SHA256 secret signing visitor unlock cookies.
 #
+# Required by collaborator invitations:
+#   RESEND_API_KEY        — Resend.com API key for transactional email.
+#
 # Required by site import:
 #   SCRAPER_URL           — Base URL of the external Playwright scraper service.
 #   SCRAPER_API_SECRET    — Shared secret for Worker → scraper auth.

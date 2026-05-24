@@ -23,8 +23,9 @@ import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell } from './shell';
+import { Button, Badge, Card } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -41,48 +42,11 @@ siteSettingsRoute.use('*', requireAuth());
 
 const pageStyles = `
   .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
-  .card {
-    padding: 20px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
-    margin-bottom: 18px;
-  }
-  .card h2 {
-    margin: 0 0 6px;
-    font-size: 18px;
-    letter-spacing: -0.005em;
-  }
-  .card .sub {
-    margin: 0 0 16px;
-    color: var(--muted);
-    font-size: 13.5px;
-    line-height: 1.55;
-  }
   .status-row {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 18px;
-  }
-  .badge {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 4px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-  }
-  .badge.on {
-    background: rgba(74, 222, 128, 0.1);
-    border-color: rgba(74, 222, 128, 0.4);
-    color: #86efac;
-  }
-  .badge.off {
-    background: rgba(148, 163, 184, 0.1);
-    border-color: rgba(148, 163, 184, 0.32);
-    color: #cbd5e1;
   }
   .status-row .meta { color: var(--muted); font-size: 13px; }
   form.pw {
@@ -105,32 +69,6 @@ const pageStyles = `
     padding: 10px 12px;
     font-size: 15px;
   }
-  form.pw button {
-    border: 0;
-    border-radius: 6px;
-    background: var(--accent);
-    color: #05111a;
-    padding: 11px 16px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  form.pw button[disabled] { opacity: 0.5; cursor: not-allowed; }
-  .danger {
-    margin-top: 14px;
-  }
-  .danger button {
-    border: 1px solid rgba(248, 113, 113, 0.5);
-    border-radius: 6px;
-    background: transparent;
-    color: #fca5a5;
-    padding: 9px 14px;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .danger button:hover {
-    background: rgba(248, 113, 113, 0.08);
-    color: #fda4a4;
-  }
   .err {
     margin-top: 8px;
     color: #fca5a5;
@@ -142,6 +80,73 @@ const pageStyles = `
     color: #86efac;
     font-size: 13px;
     min-height: 18px;
+  }
+  .collab-form {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 8px;
+    align-items: end;
+  }
+  .collab-form label {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .collab-form input[type="email"] {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #0c1220;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+  .collab-form select {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #0c1220;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .collab-list { list-style: none; padding: 0; margin: 16px 0 0; }
+  .collab-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .collab-item .email { flex: 1; }
+  .collab-item .role-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(34,211,238,0.15);
+    color: #22d3ee;
+  }
+  .collab-item .status-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .collab-item .status-badge.pending {
+    background: rgba(250,204,21,0.15);
+    color: #facc15;
+  }
+  .collab-item .status-badge.active {
+    background: rgba(134,239,172,0.15);
+    color: #86efac;
+  }
+  .collab-item .remove-btn {
+    background: none;
+    border: 1px solid rgba(252,165,165,0.3);
+    color: #fca5a5;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
   }
 `;
 
@@ -271,6 +276,89 @@ function clientScript(siteId: string): string {
     });
   }
 })();
+
+(() => {
+  const SITE_ID = ${sid};
+  const collabForm = document.querySelector('[data-collab-form]');
+  const collabErr = document.querySelector('[data-collab-err]');
+  const collabOk = document.querySelector('[data-collab-ok]');
+  const collabList = document.querySelector('[data-collab-list]');
+
+  function clearCollabStatus() {
+    if (collabErr) collabErr.textContent = '';
+    if (collabOk) collabOk.textContent = '';
+  }
+
+  if (collabForm) {
+    collabForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const emailInput = collabForm.querySelector('input[name="email"]');
+      const roleSelect = collabForm.querySelector('select[name="role"]');
+      const submitBtn = collabForm.querySelector('button[type="submit"]');
+      const email = emailInput ? emailInput.value.trim() : '';
+      const role = roleSelect ? roleSelect.value : 'editor';
+      if (!email) return;
+      clearCollabStatus();
+      if (submitBtn) submitBtn.disabled = true;
+      try {
+        const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/collaborators', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+          body: JSON.stringify({ email, role }),
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            if (body && body.error) detail = body.error;
+          } catch (_) {}
+          if (collabErr) collabErr.textContent = detail;
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        if (collabOk) collabOk.textContent = 'Invitation sent to ' + email;
+        if (emailInput) emailInput.value = '';
+        setTimeout(() => location.reload(), 1200);
+      } catch (e) {
+        if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  }
+
+  if (collabList) {
+    collabList.addEventListener('click', async (event) => {
+      const btn = event.target instanceof Element ? event.target.closest('[data-remove-collab]') : null;
+      if (!btn) return;
+      const collabId = btn.getAttribute('data-remove-collab');
+      if (!collabId) return;
+      if (!confirm('Remove this collaborator?')) return;
+      btn.disabled = true;
+      clearCollabStatus();
+      try {
+        const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/collaborators/' + encodeURIComponent(collabId), {
+          method: 'DELETE',
+          headers: { 'accept': 'application/json' },
+        });
+        if (!response.ok) {
+          let detail = response.statusText;
+          try {
+            const body = await response.json();
+            if (body && body.error) detail = body.error;
+          } catch (_) {}
+          if (collabErr) collabErr.textContent = detail;
+          btn.disabled = false;
+          return;
+        }
+        const item = btn.closest('.collab-item');
+        if (item) item.remove();
+      } catch (e) {
+        if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
+        btn.disabled = false;
+      }
+    });
+  }
+})();
 `;
 }
 
@@ -293,6 +381,17 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
     ? `Last changed ${owned.passwordSetAt.toISOString()}`
     : 'Never set';
 
+  const database = db(c.env);
+  const collaborators = await database
+    .select({
+      id: siteCollaborator.id,
+      email: siteCollaborator.invitedEmail,
+      role: siteCollaborator.role,
+      acceptedAt: siteCollaborator.acceptedAt,
+    })
+    .from(siteCollaborator)
+    .where(eq(siteCollaborator.siteId, siteId));
+
   return c.html(
     <DashboardShell
       title={`${owned.name} — settings`}
@@ -308,7 +407,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         Per-site controls for the published address <code>{owned.subdomain}.rev01.aayushman.dev</code>.
       </p>
 
-      <section class="card">
+      <Card>
         <h2>Password protection</h2>
         <p class="sub">
           When enabled, visitors must enter a password before they see any page of this site.
@@ -316,9 +415,9 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           previously unlocked the site — they'll have to re-enter the new password.
         </p>
         <div class="status-row">
-          <span class={`badge ${enabled ? 'on' : 'off'}`}>
+          <Badge variant={enabled ? 'success' : 'neutral'}>
             {enabled ? 'Enabled' : 'Disabled'}
-          </span>
+          </Badge>
           <span class="meta">{setAtLine}</span>
         </div>
         <form class="pw" autocomplete="off">
@@ -334,16 +433,50 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               required
             />
           </label>
-          <button type="submit">{enabled ? 'Update' : 'Enable'}</button>
+          <Button variant="primary" type="submit">{enabled ? 'Update' : 'Enable'}</Button>
         </form>
         <p class="err" role="alert" aria-live="polite"></p>
         <p class="ok" role="status" aria-live="polite"></p>
         {enabled ? (
-          <div class="danger">
-            <button type="button" data-action="disable">Disable password protection</button>
-          </div>
+          <Button variant="danger" data-action="disable">Disable password protection</Button>
         ) : null}
-      </section>
+      </Card>
+
+      <Card>
+        <h2>Collaborators</h2>
+        <p class="sub">
+          Add people by email to let them edit this site. They must have a rev01 account.
+          An invitation email will be sent when you add them.
+        </p>
+        <form class="collab-form" data-collab-form autocomplete="off">
+          <label>
+            <span>Email address</span>
+            <input type="email" name="email" placeholder="collaborator@example.com" required />
+          </label>
+          <label>
+            <span>Role</span>
+            <select name="role">
+              <option value="editor">Editor</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </label>
+          <Button variant="primary" type="submit">Invite</Button>
+        </form>
+        <p class="err" data-collab-err role="alert" aria-live="polite"></p>
+        <p class="ok" data-collab-ok role="status" aria-live="polite"></p>
+        <ul class="collab-list" data-collab-list>
+          {collaborators.map((collab) => (
+            <li class="collab-item" data-collab-id={collab.id}>
+              <span class="email">{collab.email}</span>
+              <span class="role-badge">{collab.role}</span>
+              <span class={`status-badge ${collab.acceptedAt ? 'active' : 'pending'}`}>
+                {collab.acceptedAt ? 'active' : 'pending'}
+              </span>
+              <button type="button" class="remove-btn" data-remove-collab={collab.id}>Remove</button>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <script type="module">{raw(clientScript(siteId))}</script>
     </DashboardShell>,

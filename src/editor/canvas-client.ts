@@ -676,6 +676,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function scheduleSave() {
+    coEditSync();
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
@@ -4589,113 +4590,67 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
-  // -- Presence + co-edit live channel -----------------------------------
+  // -- Real-time co-edit via Yjs ------------------------------------------
   //
-  // Opens a WebSocket to /__live?siteId=<id> on the app host. The DO is keyed
-  // by site.id and counts every connected socket (editors AND visitors). The
-  // pill in the topbar shows "N viewing" only when count > 1 - a lone "1
-  // viewing" pill is meaningless so we hide it.
+  // The co-edit bundle (window.__rev01CoEdit) is loaded as a separate
+  // <script> tag before this IIFE. It exposes connectCoEdit which opens a
+  // WebSocket to /__live, runs the Yjs sync protocol, and provides
+  // applyLocalState / onRemoteState / presence APIs.
   //
-  // No auth on this socket: the public router already exposes /__live for
-  // visitors on the published host, and the editor's view of the same DO is
-  // a read-only signal for the legacy 'presence' envelope; the additional
-  // co-edit envelopes (Wave 1 #4) are authenticated by the upstream session
-  // when the editor route is loaded - only Owners reach this script.
-  //
-  // ----------------------------------------------------------------------
-  // Wave 1 #4 co-edit integration - additive seam, not full Yjs in-browser
-  //
-  // The full CRDT sync path (Y.Doc transactions inside the browser) is
-  // implemented in src/live/co-edit/client.ts and consumed verbatim by the
-  // smoke (which runs under Bun where ES module imports resolve to Yjs).
-  // The editor itself ships as an inline IIFE template literal (this file),
-  // so loading the y-sync client here requires either a) a bundling step
-  // around this script, or b) a dynamic ESM import from a CDN. Both are
-  // out of scope for Wave 1 #4 - the bundler change would touch the
-  // editor route + build pipeline, and a CDN import adds an external
-  // runtime dependency to the editor surface.
-  //
-  // What this seam DOES wire in Wave 1 #4:
-  //   * The editable-state-replaced envelope (Wave 1 #3 version-history
-  //     restore) - the DO POSTs this kind via /broadcast and we apply the
-  //     restored CanvasSiteState directly to state, then renderAll().
-  //     This is the only destructive envelope; no Yjs decoding required.
-  //
-  // What this seam DEFERS to a follow-up (Wave 2 candidate):
-  //   * y-sync-step1 / y-sync-step2 / y-update / awareness-update
-  //     envelopes - these carry binary Yjs payloads that require the Yjs
-  //     library in browser scope. The DO already handles them server-side
-  //     against a real Y.Doc held in memory (see src/live/site-room.ts);
-  //     the moment the editor gains a bundler entry, connectCoEdit from
-  //     src/live/co-edit/client.ts drops in here unchanged.
-  //
-  // The PUT /api/canvas/sites/:siteId save path remains the source of
-  // truth for editor mutations until the bundler lands. The autosave
-  // hook in the DO (attachAutosaveToDO) writes the doc projection to
-  // the same site.editableState column, so the persistence shape is
-  // identical regardless of which path lands the bytes.
-  // ----------------------------------------------------------------------
-  function attachPresence() {
-    const pill = document.querySelector("[data-rev01-presence]");
-    const counter = document.querySelector("[data-rev01-presence-count]");
-    const scheme = location.protocol === "https:" ? "wss:" : "ws:";
-    const url = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID);
-    const RECONNECT_DELAY_MS = 2000;
-    function connect() {
-      let ws;
-      try {
-        ws = new WebSocket(url);
-      } catch (_) {
-        // /__live not reachable yet (e.g. site never published, no DO route).
-        // We don't retry — the pill stays hidden and that's the correct UX.
-        return;
-      }
-      ws.addEventListener("message", (event) => {
-        let payload;
-        try { payload = JSON.parse(event.data); } catch (_) { return; }
-        if (!payload || typeof payload !== "object") return;
-        if (payload.type === "presence" && typeof payload.count === "number" && Number.isFinite(payload.count)) {
-          if (!pill || !counter) return;
-          const count = payload.count;
-          if (count > 1) {
-            counter.textContent = String(count);
-            pill.hidden = false;
-          } else {
-            pill.hidden = true;
-          }
-          return;
-        }
-        // Wave 1 #4 — version-history restore broadcast. The DO ships this
-        // kind via the /broadcast HTTP path when an Owner restores a past
-        // version (Wave 1 #3). Reload state, re-render, and exit edit-mode
-        // selection so the Owner sees the restored state cleanly.
-        if (payload.type === "editable-state-replaced" && payload.newState && typeof payload.newState === "object") {
-          // Cancel any pending direct-mutation save — the restored state
-          // is now the authoritative truth; an in-flight save would
-          // overwrite the restoration.
-          if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-          state = payload.newState;
-          selectedSectionId = null;
-          selectedElementId = null;
-          editingElementId = null;
-          editingSnapshot = null;
-          if (mainEl && state && state.styleKit) {
-            mainEl.setAttribute("data-style-kit", state.styleKit);
-          }
-          renderAll();
-          setStatus("Version restored", "ok");
-          return;
-        }
-      });
-      ws.addEventListener("close", () => {
-        if (pill) pill.hidden = true;
-        setTimeout(connect, RECONNECT_DELAY_MS);
-      });
-      ws.addEventListener("error", () => {
-        try { ws.close(); } catch (_) { /* noop */ }
-      });
+  // Every local mutation calls coEditSync() which projects the current
+  // state into the Y.Doc. Remote updates arrive via onRemoteState and
+  // re-render the canvas. The DO's autosave writes the projected state
+  // to site.editableState in Postgres — the HTTP PUT save path is kept
+  // for the explicit Save button but continuous sync goes through Yjs.
+  // --------------------------------------------------------------------
+
+  var coEditConnection = null;
+
+  function coEditSync() {
+    if (coEditConnection && state) {
+      coEditConnection.applyLocalState(state);
     }
-    connect();
+  }
+
+  function attachCoEdit() {
+    if (typeof window.__rev01CoEdit === "undefined" || !window.__rev01CoEdit || typeof window.__rev01CoEdit.connectCoEdit !== "function") {
+      return;
+    }
+
+    var scheme = location.protocol === "https:" ? "wss:" : "ws:";
+    var wsUrl = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID);
+
+    var conn = window.__rev01CoEdit.connectCoEdit(SITE_ID, state, {
+      websocketUrl: wsUrl,
+    });
+
+    conn.onRemoteState(function(newState) {
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+      state = newState;
+      selectedSectionId = null;
+      selectedElementId = null;
+      editingElementId = null;
+      editingSnapshot = null;
+      if (mainEl && state && state.styleKit) {
+        mainEl.setAttribute("data-style-kit", state.styleKit);
+      }
+      renderAll();
+    });
+
+    conn.onRemotePresence(function(peers) {
+      var pill = document.querySelector("[data-rev01-presence]");
+      var counter = document.querySelector("[data-rev01-presence-count]");
+      if (!pill || !counter) return;
+      var count = peers.size + 1;
+      if (count > 1) {
+        counter.textContent = String(count);
+        pill.hidden = false;
+      } else {
+        pill.hidden = true;
+      }
+    });
+
+    coEditConnection = conn;
   }
 
   // -- Publish ------------------------------------------------------------
@@ -5330,7 +5285,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
-      attachPresence();
+      attachCoEdit();
       setStatus("Ready", "ok");
     } catch (err) {
       setStatus("Failed to load site: " + (err && err.message ? err.message : String(err)), "error");

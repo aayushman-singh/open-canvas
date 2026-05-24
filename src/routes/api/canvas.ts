@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { createR2Client } from '../../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../../assets/read';
@@ -98,6 +98,7 @@ async function loadOwnedSite(
       and(
         eq(siteCollaborator.siteId, siteId),
         eq(siteCollaborator.customerId, customerId),
+        isNotNull(siteCollaborator.acceptedAt),
       ),
     )
     .limit(1);

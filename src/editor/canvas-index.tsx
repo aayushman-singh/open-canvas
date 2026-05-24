@@ -17,6 +17,7 @@ import { requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
+import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { db } from '../db/client';
 import { customer, site } from '../db/schema';
 
@@ -260,6 +261,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <span id="canvas-status">Ready</span>
           </footer>
         </main>
+        {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
         {raw(`<script type="module">${inlineScript}</script>`)}
       </body>
     </html>

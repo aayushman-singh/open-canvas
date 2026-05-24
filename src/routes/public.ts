@@ -20,15 +20,17 @@ import { createR2Client } from '../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
 import { collectReferencedAssetIds } from '../assets/site-assets';
 import type { ClerkAuthVariables } from '../auth/middleware';
-import { verifyEditToken, EDIT_TOKEN_COOKIE } from '../auth/edit-token';
+import { verifyEditToken, EDIT_TOKEN_COOKIE, signEditToken, EDIT_TOKEN_MAX_AGE } from '../auth/edit-token';
+import { verifyInviteToken } from '../auth/invite-token';
 import { editorPageJsx, type EditorPageOptions } from '../editor/canvas-index';
+import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
-import { ownerAsset, site, siteFont } from '../db/schema';
+import { customer, ownerAsset, site, siteFont } from '../db/schema';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
@@ -73,6 +75,8 @@ interface Bindings {
   FORM_RATE_LIMITER?: DurableObjectNamespace;
   // Wave 5 #23 + #24 — Gemini API key for chat agent + auto-translate.
   GEMINI_API_KEY?: string;
+  // Resend API key for transactional email (collaborator invitations).
+  RESEND_API_KEY?: string;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -335,6 +339,125 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   return c.html(editorPageJsx(opts));
 }
 
+async function handleAcceptInvite<P extends string, I extends Input>(
+  c: Context<PublicEnv, P, I>,
+  siteRow: PublicSiteRow,
+): Promise<Response> {
+  const requestUrl = new URL(c.req.url);
+  const token = requestUrl.searchParams.get('token');
+  const payload = await verifyInviteToken(token, c.env.UNLOCK_SIGNING_SECRET);
+
+  if (!payload || payload.siteId !== siteRow.id) {
+    return c.html(
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+      <title>rev01 — invalid invitation</title>
+      <style>body{margin:0;display:flex;align-items:center;justify-content:center;
+      min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
+      .wrap{text-align:center;max-width:400px;}h1{font-size:20px;margin:0 0 12px;}
+      p{font-size:14px;opacity:0.7;line-height:1.5;}</style></head>
+      <body><div class="wrap"><h1>Invitation expired or invalid</h1>
+      <p>Ask the site owner to send a new invitation.</p></div></body></html>`,
+      400,
+    );
+  }
+
+  const database = db(c.env);
+  const updated = await database
+    .update(siteCollaborator)
+    .set({ acceptedAt: new Date() })
+    .where(eq(siteCollaborator.id, payload.collaboratorId))
+    .returning({
+      id: siteCollaborator.id,
+      customerId: siteCollaborator.customerId,
+    });
+
+  if (!updated[0]) {
+    return c.html(
+      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+      <title>rev01 — invitation not found</title>
+      <style>body{margin:0;display:flex;align-items:center;justify-content:center;
+      min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
+      </style></head><body><p>This invitation no longer exists.</p></body></html>`,
+      404,
+    );
+  }
+
+  const collabCustomer = await database
+    .select({ clerkUserId: customer.clerkUserId })
+    .from(customer)
+    .where(eq(customer.id, updated[0].customerId))
+    .limit(1);
+
+  const clerkUserId = collabCustomer[0]?.clerkUserId;
+  if (!clerkUserId) {
+    return c.text('account not found', 404);
+  }
+
+  const editToken = await signEditToken(
+    { siteId: siteRow.id, customerId: updated[0].customerId, clerkUserId },
+    c.env.UNLOCK_SIGNING_SECRET,
+  );
+
+  const cookieValue = [
+    `${EDIT_TOKEN_COOKIE}=${editToken}`,
+    'Domain=rev01.aayushman.dev',
+    'Path=/',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
+  ].join('; ');
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': '/__edit',
+      'Set-Cookie': cookieValue,
+    },
+  });
+}
+
+function buildComingSoonPage<P extends string, I extends Input>(
+  c: Context<PublicEnv, P, I>,
+  siteRow: PublicSiteRow,
+): Response {
+  return c.html(
+    `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>${escapeHtmlForPage(siteRow.name)} — coming soon</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; font-family: system-ui, sans-serif;
+           background: #0d1117; color: #e6edf3; }
+    .wrap { text-align: center; max-width: 480px; padding: 32px; }
+    h1 { font-size: 28px; font-weight: 700; margin: 0 0 12px; }
+    p { font-size: 14px; opacity: 0.6; line-height: 1.6; margin: 0; }
+    .badge { display: inline-block; margin-top: 32px; padding: 6px 14px;
+             border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+             font-size: 11px; opacity: 0.4; }
+    .badge a { color: inherit; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>${escapeHtmlForPage(siteRow.name)}</h1>
+    <p>This site is being built and will be live soon.</p>
+    <div class="badge"><a href="https://rev01.aayushman.dev">made with rev01</a></div>
+  </div>
+</body>
+</html>`,
+    200,
+  );
+}
+
+function escapeHtmlForPage(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function buildPublishedFooterHtml(): string {
   return `<footer data-rev01-footer style="
   margin-top:40px;padding:20px 0;border-top:1px solid rgba(128,128,128,0.15);
@@ -398,12 +521,15 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   if (path === '/__edit') {
     return handleOnSiteEdit(c, siteRow);
   }
+  if (path === '/__accept-invite') {
+    return handleAcceptInvite(c, siteRow);
+  }
   if (path.startsWith('/__api/')) {
     return null;
   }
 
   if (!siteRow.publishedSnapshot) {
-    return c.text('site not yet published', 404);
+    return buildComingSoonPage(c, siteRow);
   }
 
   // Wave 2 #9 — the unlock POST must reach the app router even when the site
