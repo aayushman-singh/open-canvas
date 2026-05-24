@@ -14,11 +14,14 @@
 
 import { eq, inArray } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { html, raw } from 'hono/html';
 import { createR2Client } from '../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
 import { collectReferencedAssetIds } from '../assets/site-assets';
 import type { ClerkAuthVariables } from '../auth/middleware';
+import { verifyEditToken, EDIT_TOKEN_COOKIE } from '../auth/edit-token';
+import { editorPageJsx, type EditorPageOptions } from '../editor/canvas-index';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
 import type { PublishedSnapshot } from '../canvas/schema';
@@ -209,6 +212,7 @@ interface PublicSiteRow {
   id: string;
   name: string;
   subdomain: string;
+  styleKit: string;
   publishedSnapshot: PublishedSnapshot | null;
   // Wave 2 #9 — password gate fields read by `requireUnlock`.
   passwordEnabled: boolean;
@@ -223,6 +227,7 @@ async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicS
       id: site.id,
       name: site.name,
       subdomain: site.subdomain,
+      styleKit: site.styleKit,
       publishedSnapshot: site.publishedSnapshot,
       passwordEnabled: site.passwordEnabled,
       passwordHash: site.passwordHash,
@@ -244,6 +249,7 @@ async function loadPublicSiteById(env: Bindings, siteId: string): Promise<Public
       id: site.id,
       name: site.name,
       subdomain: site.subdomain,
+      styleKit: site.styleKit,
       publishedSnapshot: site.publishedSnapshot,
       passwordEnabled: site.passwordEnabled,
       passwordHash: site.passwordHash,
@@ -263,6 +269,85 @@ function extractSubdomain(host: string): string | null {
   // allowed (matches the SUBDOMAIN_RE shape enforced at site creation).
   if (prefix.includes('.')) return null;
   return prefix;
+}
+
+// On-site editor: validate the edit token cookie and serve the full canvas
+// editor shell. If the token is missing or expired, serve a small bootstrap
+// page that opens the auth popup on the main domain, receives the token via
+// postMessage, and reloads into the editor.
+async function handleOnSiteEdit<P extends string, I extends Input>(
+  c: Context<PublicEnv, P, I>,
+  siteRow: PublicSiteRow,
+): Promise<Response> {
+  const token = getCookie(c, EDIT_TOKEN_COOKIE);
+  const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
+
+  if (!payload || payload.siteId !== siteRow.id) {
+    const siteIdJson = JSON.stringify(siteRow.id);
+    return c.html(
+      `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>rev01 — sign in to edit</title>
+  <style>
+    body { margin: 0; display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; font-family: system-ui, sans-serif;
+           background: #0d1117; color: #e6edf3; }
+    .wrap { text-align: center; }
+    p { opacity: 0.7; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p>Opening sign-in…</p>
+  </div>
+  <script>
+    var popup = window.open(
+      "https://rev01.aayushman.dev/api/on-site-edit?siteId=" + encodeURIComponent(${siteIdJson}),
+      "rev01_auth",
+      "width=420,height=320,menubar=no,toolbar=no"
+    );
+    window.addEventListener("message", function(e) {
+      if (e.data && e.data.type === "rev01:edit-ready") {
+        location.reload();
+      }
+    });
+    if (!popup || popup.closed) {
+      document.querySelector(".wrap p").textContent =
+        "Pop-up blocked. Please allow pop-ups for this site and try again.";
+    }
+  </script>
+</body>
+</html>`,
+    );
+  }
+
+  const opts: EditorPageOptions = {
+    siteId: siteRow.id,
+    siteName: siteRow.name,
+    subdomain: siteRow.subdomain,
+    styleKit: siteRow.styleKit as EditorPageOptions['styleKit'],
+    context: 'public',
+  };
+  return c.html(editorPageJsx(opts));
+}
+
+// Floating edit button injected into every published page. Navigates to
+// /__edit on click — the edit handler deals with auth (popup if needed).
+function buildEditButtonHtml(siteId: string): string {
+  return `<a href="/__edit" data-rev01-edit aria-label="Edit this site"
+  style="position:fixed;bottom:16px;right:16px;z-index:9999;
+  width:40px;height:40px;border-radius:50%;
+  background:#0d1117;border:1px solid rgba(255,255,255,0.1);
+  display:flex;align-items:center;justify-content:center;
+  color:#e6edf3;text-decoration:none;font-size:18px;
+  opacity:0.6;transition:opacity 0.2s;cursor:pointer;"
+  onmouseover="this.style.opacity='1'"
+  onmouseout="this.style.opacity='0.6'"
+  title="Edit this site">&#9998;</a>`;
 }
 
 export async function handlePublicRequest<P extends string, I extends Input>(
@@ -297,6 +382,19 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   if (!siteRow) {
     return c.text('site not found', 404);
   }
+
+  // On-site editor: /__edit serves the canvas editor on the published
+  // subdomain. /__api/* falls through to the app router where duplicated
+  // API mounts with edit-token auth handle the request. Both bypass the
+  // publishedSnapshot and password-gate checks — the editor operates on
+  // editableState and the edit token proves ownership.
+  if (path === '/__edit') {
+    return handleOnSiteEdit(c, siteRow);
+  }
+  if (path.startsWith('/__api/')) {
+    return null;
+  }
+
   if (!siteRow.publishedSnapshot) {
     return c.text('site not yet published', 404);
   }
@@ -310,7 +408,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // Wave 4 #22 — sitemap.xml + robots.txt are public crawler discovery
   // surfaces, not snapshot HTML. Fall through to the app router which
   // mounts `/sitemap.xml` and `/robots.txt` via the sitemap router.
-  if (path === '/sitemap.xml' || path === '/robots.txt') {
+  if (path === '/sitemap.xml' || path === '/robots.txt' || path === '/favicon.ico') {
     return null;
   }
 
@@ -503,6 +601,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           >
             👀 <span data-rev01-presence-count>0</span> viewing
           </aside>
+          ${raw(buildEditButtonHtml(siteRow.id))}
           <script type="module">
             ${raw(visitorScript)};
           </script>

@@ -250,4 +250,43 @@ publishApi.post('/sites/:siteId', async (c) => {
   });
 });
 
+publishApi.post('/sites/:siteId/unpublish', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('unpublish endpoint reached without an authenticated user');
+  }
+
+  const siteId = c.req.param('siteId');
+  if (!siteId) {
+    return c.json({ error: 'missing siteId' }, 400);
+  }
+
+  const database = db(c.env);
+  const customerRow = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.clerkUserId, auth.userId))
+    .limit(1);
+  const customerId = customerRow[0]?.id;
+  if (!customerId) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const result = await database
+    .update(site)
+    .set({
+      publishedSnapshot: null,
+      publishedVersion: 0,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .returning({ id: site.id });
+
+  if (result.length === 0) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  return c.json({ ok: true });
+});
+
 export default publishApi;

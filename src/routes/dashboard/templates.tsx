@@ -286,7 +286,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                       src={`/dashboard/templates/${template.id}/preview`}
                       title={`${template.name} preview`}
                       loading="lazy"
-                      sandbox=""
+                      sandbox="allow-scripts"
                       referrerpolicy="no-referrer"
                     />
                   </span>
@@ -315,7 +315,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                       src={`/api/custom-templates/${dt.id}/preview`}
                       title={`${dt.name} preview`}
                       loading="lazy"
-                      sandbox=""
+                      sandbox="allow-scripts"
                       referrerpolicy="no-referrer"
                     />
                   </span>
@@ -342,19 +342,17 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
           </label>
 
           <label class="field">
-            <span>Subdomain</span>
+            <span>Subdomain <small>(optional — auto-generated from name if blank)</small></span>
             <span class="subdomain">
               <input
                 type="text"
                 name="subdomain"
                 maxlength={63}
-                required
                 pattern={subdomainPattern}
-                placeholder="my-site"
+                placeholder="auto-generated"
               />
               <span class="suffix">{PUBLISHED_SUFFIX}</span>
             </span>
-            <small>Lowercase letters, numbers, and hyphens. 2 to 63 characters.</small>
           </label>
         </div>
 

@@ -216,7 +216,9 @@ sites.post('/', async (c) => {
 
   const input = await parseInput(c);
   const trimmedName = input.siteName.trim();
-  const trimmedSubdomain = input.subdomain.trim().toLowerCase();
+  const derivedSubdomain = input.subdomain.trim().toLowerCase() ||
+    trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
+  const trimmedSubdomain = derivedSubdomain;
   const templateId = input.templateId.trim();
 
   if (trimmedName.length === 0) {

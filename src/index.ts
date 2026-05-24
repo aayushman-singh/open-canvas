@@ -5,6 +5,7 @@ import landing from './landing';
 import { dashboard } from './routes/dashboard';
 import { templatesRoute } from './routes/dashboard/templates';
 import sites from './routes/api/sites';
+import { importRouter } from './routes/api/import';
 import canvasApi from './routes/api/canvas';
 import canvasAgentApi from './routes/api/canvas-agent';
 import publishApi from './routes/api/publish';
@@ -51,10 +52,12 @@ import {
   customTemplatesOwner,
   customTemplatesAdmin,
 } from './routes/api/custom-templates';
-import { clerkAuth } from './auth/middleware';
+import { clerkAuth, editTokenAuth } from './auth/middleware';
 import { requireAuth } from './auth/require-auth';
 import { db } from './db/client';
 import { customer, site } from './db/schema';
+import onSiteEditRoute from './routes/api/on-site-edit';
+import collaboratorsApi from './routes/api/collaborators';
 
 const app = new Hono<PublicEnv>();
 
@@ -137,12 +140,22 @@ app.get('/__live', clerkAuth(), requireAuth(), async (c) => {
 });
 
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
+
+app.get('/favicon.ico', (c) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0d1117"/><text x="4" y="24" font-family="monospace" font-size="22" font-weight="700" fill="#22d3ee">r1</text></svg>`;
+  return c.body(svg, 200, {
+    'content-type': 'image/svg+xml',
+    'cache-control': 'public, max-age=86400',
+  });
+});
+
 app.route('/', landing);
 
 app.route('/dashboard/templates', templatesRoute);
 app.route('/dashboard', canvasEditor);
 app.route('/dashboard', dashboard);
 app.route('/api/sites', sites);
+app.route('/api/import', importRouter);
 app.route('/api/canvas', canvasApi);
 app.route('/api/canvas-agent', canvasAgentApi);
 app.route('/api/publish', publishApi);
@@ -156,6 +169,7 @@ app.route('/api/library', librarySectionsOwner);
 app.route('/api/admin/library', librarySectionsAdmin);
 app.route('/api/custom-templates', customTemplatesOwner);
 app.route('/api/admin/custom-templates', customTemplatesAdmin);
+app.route('/api', collaboratorsApi);
 // Wave 1 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
 app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);
@@ -244,6 +258,59 @@ app.use('/api/sites/:siteId/translate', clerkAuth(), requireAuth(), async (c, ne
   await next();
 });
 app.route('/api/sites/:siteId/translate', translateRouter);
+
+// On-site editor auth popup — main domain endpoint that sets the edit token
+// cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
+app.route('/api/on-site-edit', onSiteEditRoute);
+
+// On-site editor API proxy — same sub-app handlers mounted under /__api with
+// edit-token auth instead of Clerk sessions. The public host router
+// (public.ts) returns null for /__api/* paths so they fall through here.
+// editTokenAuth() validates the __rev01_edit cookie and populates the same
+// auth context variables that clerkAuth()+requireAuth() would, so the
+// sub-apps' built-in clerkAuth() short-circuits (auth already set).
+app.use('/__api/*', editTokenAuth());
+app.route('/__api/canvas', canvasApi);
+app.route('/__api/canvas-agent', canvasAgentApi);
+app.route('/__api/publish', publishApi);
+app.route('/__api/owner/assets', ownerAssetsApi);
+app.route('/__api', sectionsApi);
+app.route('/__api/library', librarySectionsOwner);
+app.route('/__api/custom-templates', customTemplatesOwner);
+app.route('/__api/sites', chatApi);
+// Translate under /__api — same wrapping middleware but with edit-token auth
+// pre-populated (editTokenAuth already set auth above).
+app.use('/__api/sites/:siteId/translate', async (c, next) => {
+  const auth = c.get('auth');
+  if (!auth.userId) return c.json({ error: 'site not found' }, 404);
+  const siteId = c.req.param('siteId');
+  if (!siteId) return c.json({ error: 'site not found' }, 404);
+  const database = db(c.env);
+  const customerRow = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.clerkUserId, auth.userId))
+    .limit(1);
+  const customerId = customerRow[0]?.id;
+  if (!customerId) return c.json({ error: 'site not found' }, 404);
+  const siteRow = await database
+    .select({ editableState: site.editableState })
+    .from(site)
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .limit(1);
+  if (!siteRow[0]) return c.json({ error: 'site not found' }, 404);
+  const apiKey = c.env.GEMINI_API_KEY;
+  if (typeof apiKey !== 'string' || apiKey.length === 0) {
+    return c.json({ error: 'translate disabled: GEMINI_API_KEY not configured' }, 503);
+  }
+  c.set('translateSiteState' as never, siteRow[0].editableState as never);
+  c.set(
+    'translateTranslator' as never,
+    new GeminiTranslator({ apiKey }) as never,
+  );
+  await next();
+});
+app.route('/__api/sites/:siteId/translate', translateRouter);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in

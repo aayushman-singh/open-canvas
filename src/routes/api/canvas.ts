@@ -8,7 +8,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { STYLE_KITS, type CanvasSiteState, type StyleKit } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site } from '../../db/schema';
+import { customer, ownerAsset, site, siteCollaborator } from '../../db/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -65,16 +65,35 @@ async function loadOwnedSite(
       styleKit: site.styleKit,
       editableState: site.editableState,
       publishedVersion: site.publishedVersion,
+      ownerId: site.customerId,
     })
     .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .where(eq(site.id, siteId))
     .limit(1);
   const row = siteRow[0];
   if (!row) {
     return { found: false };
   }
 
-  return { found: true, customerId, site: row };
+  if (row.ownerId === customerId) {
+    return { found: true, customerId, site: row };
+  }
+
+  const collabRow = await database
+    .select({ id: siteCollaborator.id })
+    .from(siteCollaborator)
+    .where(
+      and(
+        eq(siteCollaborator.siteId, siteId),
+        eq(siteCollaborator.customerId, customerId),
+      ),
+    )
+    .limit(1);
+  if (!collabRow[0]) {
+    return { found: false };
+  }
+
+  return { found: true, customerId: row.ownerId, site: row };
 }
 
 canvasApi.get('/sites/:siteId', async (c) => {

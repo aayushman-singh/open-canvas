@@ -18,22 +18,30 @@
 
 export interface CanvasClientScriptParams {
   siteId: string;
+  apiBase?: string;
 }
 
 const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
 
 export function canvasClientScript(params: CanvasClientScriptParams): string {
-  const { siteId } = params;
+  const { siteId, apiBase = '/api' } = params;
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
     throw new Error(
       `canvasClientScript: siteId must match /^[A-Za-z0-9-]+$/ (got ${JSON.stringify(siteId)})`,
     );
   }
+  if (typeof apiBase !== 'string' || !/^\/[a-z_/-]*$/i.test(apiBase)) {
+    throw new Error(
+      `canvasClientScript: apiBase must be a path starting with / (got ${JSON.stringify(apiBase)})`,
+    );
+  }
 
-  // The single safe interpolation. Everything else inside the IIFE is plain JS.
+  // Two safe interpolations: siteId and apiBase. Both are validated above.
+  // Everything inside the IIFE is plain JavaScript, not TypeScript.
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
-  const SITE_BASE = "/api/canvas/sites/" + SITE_ID;
+  const API_BASE = ${JSON.stringify(apiBase)};
+  const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
 
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic"];
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
@@ -2225,7 +2233,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (typeof elementId === "string" && elementId.length > 0) {
       form.append("elementId", elementId);
     }
-    const response = await authFetch("/api/owner/assets", {
+    const response = await authFetch(API_BASE + "/owner/assets", {
       method: "POST",
       body: form,
     });
@@ -2419,7 +2427,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       form.append("siteId", SITE_ID);
       form.append("elementId", element.id);
 
-      const response = await authFetch("/api/owner/assets", {
+      const response = await authFetch(API_BASE + "/owner/assets", {
         method: "POST",
         body: form,
       });
@@ -3515,7 +3523,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         closeAiPanel();
         return;
       }
-      const response = await authFetch("/api/canvas-agent/sites/" + SITE_ID + "/apply", {
+      const response = await authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ops }),
@@ -3613,7 +3621,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     setStatus("Asking the assistant...");
     try {
-      const response = await authFetch("/api/canvas-agent/sites/" + SITE_ID + "/preview", {
+      const response = await authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/preview", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ prompt }),
@@ -4039,7 +4047,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var saved = await flushPendingSave();
       if (!saved) return;
       setStatus("Saving section to library...", "ok");
-      var response = await authFetch("/api/library/sections", {
+      var response = await authFetch(API_BASE + "/library/sections", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ siteId: SITE_ID, sectionId: section.id, name: name.trim() }),
@@ -4075,7 +4083,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var saved = await flushPendingSave();
       if (!saved) return;
       setStatus("Saving as template...", "ok");
-      var response = await authFetch("/api/custom-templates", {
+      var response = await authFetch(API_BASE + "/custom-templates", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ siteId: SITE_ID, name: name.trim(), tagline: tagline.trim() }),
@@ -4295,7 +4303,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!root) return;
     if (sectionsCatalog === null) {
       try {
-        const response = await authFetch('/api/library/sections');
+        const response = await authFetch(API_BASE + '/library/sections');
         if (!response.ok) {
           root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
           return;
@@ -4505,7 +4513,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const importBody = target.source === 'library'
         ? { source: 'library', librarySectionId: target.librarySectionId, insertAt: insertAt }
         : { templateId: target.templateId, sectionId: target.sectionId, insertAt: insertAt };
-      const response = await authFetch('/api/sites/' + SITE_ID + '/sections/import', {
+      const response = await authFetch(API_BASE + '/sites/' + SITE_ID + '/sections/import', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(importBody),
@@ -4688,7 +4696,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const saved = await flushPendingSave();
       if (!saved) return;
       setStatus("Publishing...");
-      const response = await authFetch("/api/publish/sites/" + SITE_ID, {
+      const response = await authFetch(API_BASE + "/publish/sites/" + SITE_ID, {
         method: "POST",
         headers: { "content-type": "application/json" },
       });
@@ -5399,7 +5407,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     setStatus("Translating…");
     let response;
     try {
-      response = await authFetch("/api/sites/" + SITE_ID + "/translate", {
+      response = await authFetch(API_BASE + "/sites/" + SITE_ID + "/translate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ from: from, to: to, mode: mode }),

@@ -448,7 +448,7 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
 
   const apiKey = c.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.length === 0) {
-    return c.json({ error: 'GEMINI_API_KEY not configured' }, 500);
+    return c.json({ error: 'GEMINI_API_KEY not configured' }, 503);
   }
 
   const messages: LlmMessage[] = [{ role: 'user', content: body.prompt }];

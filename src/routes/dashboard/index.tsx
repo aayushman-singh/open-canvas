@@ -77,16 +77,143 @@ const cardStyles = `
     margin-bottom: 4px;
   }
   .dash-header h1 { margin: 0; font-size: 28px; }
-  .dash-header .new-site {
+  .dash-header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .dash-header .new-site,
+  .dash-header .import-site {
     font-size: 13px;
     font-weight: 500;
     padding: 6px 14px;
     border-radius: 6px;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  .dash-header .new-site {
     background: var(--accent);
     color: var(--bg);
-    text-decoration: none;
   }
   .dash-header .new-site:hover { filter: brightness(0.88); }
+  .dash-header .import-site {
+    background: rgba(125,211,252,0.10);
+    color: var(--accent);
+    border: 1px solid rgba(125,211,252,0.18);
+  }
+  .dash-header .import-site:hover { background: rgba(125,211,252,0.18); }
+
+  .import-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .import-modal-overlay[data-open="true"] { display: flex; }
+  .import-modal {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    width: min(480px, calc(100vw - 48px));
+    padding: 28px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+  .import-modal h2 {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .import-modal .import-sub {
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .import-field {
+    margin-bottom: 14px;
+  }
+  .import-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .import-field input {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+  }
+  .import-field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(125,211,252,0.15);
+  }
+  .import-field .field-hint {
+    font-size: 11px;
+    color: var(--faint);
+    margin-top: 4px;
+  }
+  .import-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+  .import-actions button {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  .btn-import-cancel {
+    background: rgba(255,255,255,0.06);
+    color: var(--muted);
+  }
+  .btn-import-cancel:hover { background: rgba(255,255,255,0.10); }
+  .btn-import-submit {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-import-submit:hover { filter: brightness(0.88); }
+  .btn-import-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: none;
+  }
+  .import-error {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(239,68,68,0.10);
+    border: 1px solid rgba(239,68,68,0.25);
+    color: #ef4444;
+    font-size: 13px;
+    display: none;
+  }
+  .import-progress {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--accent);
+    display: none;
+  }
   .dash-sub { color: var(--faint); font-size: 13px; margin: 0 0 24px; }
 
   .site-grid {
@@ -278,6 +405,23 @@ const cardStyles = `
   }
   .btn-publish:hover { background: rgba(250,204,21,0.18); }
 
+  .btn-unpublish {
+    flex: 1;
+    background: rgba(74,222,128,0.10);
+    color: #4ade80;
+    border: 1px solid rgba(74,222,128,0.18);
+  }
+  .btn-unpublish:hover { background: rgba(239,68,68,0.12); color: #ef4444; border-color: rgba(239,68,68,0.25); }
+  .btn-unpublish .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    margin-right: 6px;
+  }
+  .btn-unpublish:hover .dot { background: #ef4444; }
+
   .btn-dots {
     width: 38px;
     min-width: 38px;
@@ -363,7 +507,157 @@ const cardStyles = `
     font-size: 13px;
     color: var(--faint);
   }
+
+  .site-card-thumb { container-type: inline-size; }
+  @container (min-width: 1px) {
+    .site-card-thumb iframe { transform: scale(calc(100cqi / 1440)); }
+    .site-card--expanded .site-card-thumb iframe { transform: scale(calc(100cqi / 1440)); }
+  }
+
+  .status-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #4ade80;
+  }
+  .status-live .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+  }
+
+  .detail-link a {
+    display: contents;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+  }
+  .detail-link:hover {
+    background: rgba(125,211,252,0.06);
+  }
+  .detail-link td:first-child::after {
+    content: ' \\2192';
+    color: var(--accent);
+    opacity: 0;
+    transition: opacity 0.12s;
+  }
+  .detail-link:hover td:first-child::after {
+    opacity: 1;
+  }
+
+  .import-arrow {
+    text-align: center;
+    color: var(--faint);
+    font-size: 12px;
+    padding: 4px 0;
+    letter-spacing: 0.03em;
+  }
 `;
+
+const importScript = raw(`<script>
+(function() {
+  var overlay = document.getElementById('import-overlay');
+  var openBtn = document.getElementById('import-btn');
+  var cancelBtn = document.getElementById('import-cancel');
+  var submitBtn = document.getElementById('import-submit');
+  var urlInput = document.getElementById('import-url');
+  var nameInput = document.getElementById('import-name');
+  var subdomainInput = document.getElementById('import-subdomain');
+  var errorEl = document.getElementById('import-error');
+  var progressEl = document.getElementById('import-progress');
+
+  function openModal() {
+    overlay.setAttribute('data-open', 'true');
+    urlInput.value = '';
+    nameInput.value = '';
+    subdomainInput.value = '';
+    errorEl.style.display = 'none';
+    progressEl.style.display = 'none';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Import';
+    urlInput.focus();
+  }
+
+  function closeModal() {
+    overlay.setAttribute('data-open', 'false');
+  }
+
+  openBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) closeModal();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && overlay.getAttribute('data-open') === 'true') closeModal();
+  });
+
+  urlInput.addEventListener('blur', function() {
+    if (!urlInput.value) return;
+    try {
+      var u = new URL(urlInput.value);
+      if (!nameInput.value) {
+        nameInput.value = u.hostname.replace(/^www\\./, '');
+      }
+      if (!subdomainInput.value) {
+        subdomainInput.value = u.hostname
+          .replace(/^www\\./, '')
+          .replace(/\\.[^.]+$/, '')
+          .replace(/[^a-z0-9]/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 63);
+      }
+    } catch(e) {}
+  });
+
+  submitBtn.addEventListener('click', function() {
+    var url = urlInput.value.trim();
+    var name = nameInput.value.trim();
+    var subdomain = subdomainInput.value.trim().toLowerCase();
+
+    if (!url || !name) {
+      errorEl.textContent = 'URL and site name are required.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    try { new URL(url); } catch(e) {
+      errorEl.textContent = 'Please enter a valid URL.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    errorEl.style.display = 'none';
+    progressEl.style.display = 'block';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Importing...';
+
+    fetch('/api/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ url: url, siteName: name, subdomain: subdomain })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(result) {
+      if (!result.ok) {
+        throw new Error(result.data.error || 'Import failed');
+      }
+      window.location.href = '/dashboard/sites/' + result.data.siteId + '/edit';
+    })
+    .catch(function(err) {
+      progressEl.style.display = 'none';
+      errorEl.textContent = err.message || 'Import failed. Please try again.';
+      errorEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Import';
+    });
+  });
+})();
+</script>`);
 
 const toggleScript = raw(`<script>
 var backdrop = document.getElementById('card-backdrop');
@@ -399,10 +693,10 @@ document.addEventListener('keydown', function(e) {
 });
 
 document.addEventListener('click', function(e) {
-  // Ignore clicks on interactive elements inside the card
   if (e.target.closest('a, button, iframe')) return;
   var card = e.target.closest('.site-card');
   if (!card) return;
+  if (card.classList.contains('site-card--expanded')) return;
   openExpanded(card);
 });
 
@@ -426,6 +720,31 @@ document.addEventListener('click', function(e) {
   btn.setAttribute('aria-expanded', open ? 'false' : 'true');
 });
 
+// Unpublish (make draft) button
+document.addEventListener('click', function(e) {
+  var unpubBtn = e.target.closest('.btn-unpublish');
+  if (!unpubBtn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var siteId = unpubBtn.getAttribute('data-site-id');
+  if (!siteId) return;
+  unpubBtn.textContent = 'Unpublishing...';
+  unpubBtn.style.pointerEvents = 'none';
+  fetch('/api/publish/sites/' + siteId + '/unpublish', { method: 'POST' })
+    .then(function(r) {
+      return r.json().then(function(d) { return { ok: r.ok, data: d }; });
+    })
+    .then(function(result) {
+      if (!result.ok) throw new Error(result.data.error || 'Unpublish failed');
+      location.reload();
+    })
+    .catch(function(err) {
+      unpubBtn.textContent = 'Failed';
+      unpubBtn.style.pointerEvents = '';
+      alert(err.message || 'Unpublish failed');
+    });
+});
+
 // Publish button
 document.addEventListener('click', function(e) {
   var pubBtn = e.target.closest('.btn-publish');
@@ -438,13 +757,17 @@ document.addEventListener('click', function(e) {
   pubBtn.style.pointerEvents = 'none';
   fetch('/api/publish/sites/' + siteId, { method: 'POST' })
     .then(function(r) {
-      if (!r.ok) throw new Error(r.status + '');
-      return r.json();
+      return r.json().then(function(d) { return { ok: r.ok, data: d }; });
     })
-    .then(function() { location.reload(); })
-    .catch(function() {
+    .then(function(result) {
+      if (!result.ok) throw new Error(result.data.error || 'Publish failed');
+      location.reload();
+    })
+    .catch(function(err) {
       pubBtn.textContent = 'Failed';
+      pubBtn.title = err.message || 'Unknown error';
       pubBtn.style.pointerEvents = '';
+      alert(err.message || 'Publish failed');
     });
 });
 </script>`);
@@ -460,8 +783,6 @@ interface SiteCard {
   passwordEnabled: boolean;
   darkModeEnabled: boolean;
   searchIndexing: boolean;
-  sectionCount: number;
-  elementCount: number;
 }
 
 function buildCards(
@@ -479,14 +800,6 @@ function buildCards(
 ): SiteCard[] {
   return rows.map((row) => {
     const state = row.editableState;
-    const page = state.pages[0];
-    const sectionCount = page?.sections?.length ?? 0;
-    let elementCount = 0;
-    if (page?.sections) {
-      for (const sec of page.sections) {
-        elementCount += sec.elements?.length ?? 0;
-      }
-    }
     return {
       siteId: row.id,
       siteName: row.name,
@@ -498,8 +811,6 @@ function buildCards(
       passwordEnabled: row.passwordEnabled,
       darkModeEnabled: state.darkModeEnabled ?? false,
       searchIndexing: !(state.siteNoIndex ?? false),
-      sectionCount,
-      elementCount,
     };
   });
 }
@@ -513,52 +824,58 @@ function InfoPill({ label }: { label: string }) {
   return <span class="pill pill-info">{label}</span>;
 }
 
+function DetailRow({
+  label,
+  href,
+  children,
+}: {
+  label: string;
+  href?: string;
+  children: unknown;
+}) {
+  const inner = (
+    <>
+      <td>{label}</td>
+      <td>{children as string}</td>
+    </>
+  );
+  if (href) {
+    return <tr class="detail-link"><a href={href}>{inner}</a></tr>;
+  }
+  return <tr>{inner}</tr>;
+}
+
 function DetailsPanel({ s }: { s: SiteCard }) {
+  const editBase = `/dashboard/sites/${s.siteId}`;
   return (
     <div class="site-card-details" data-open="false">
       <p class="details-heading">Site details</p>
       <table class="details-table">
         <tbody>
-          <tr>
-            <td>Hosting</td>
-            <td><InfoPill label="Starter" /></td>
-          </tr>
-          <tr>
-            <td>CDN</td>
-            <td><InfoPill label="Cloudflare Edge" /></td>
-          </tr>
-          <tr>
-            <td>Custom domain</td>
-            <td><Pill on={false} label="Not configured" /></td>
-          </tr>
-          <tr>
-            <td>Password protection</td>
-            <td><Pill on={s.passwordEnabled} /></td>
-          </tr>
-          <tr>
-            <td>Search indexing</td>
-            <td><Pill on={s.searchIndexing} /></td>
-          </tr>
-          <tr>
-            <td>Dark mode</td>
-            <td><Pill on={s.darkModeEnabled} /></td>
-          </tr>
-          <tr>
-            <td>Analytics</td>
-            <td><Pill on={false} label="Not connected" /></td>
-          </tr>
-          <tr>
-            <td>Sections</td>
-            <td>{String(s.sectionCount)}</td>
-          </tr>
-          <tr>
-            <td>Elements</td>
-            <td>{String(s.elementCount)}</td>
-          </tr>
-          <tr>
-            <td>Style kit</td>
-            <td><InfoPill label={s.styleKit} /></td>
-          </tr>
+          <DetailRow label="Hosting" href={`${editBase}/settings`}>
+            <InfoPill label="Starter" />
+          </DetailRow>
+          <DetailRow label="CDN">
+            <InfoPill label="Cloudflare Edge" />
+          </DetailRow>
+          <DetailRow label="Custom domain" href={`${editBase}/domains`}>
+            <Pill on={false} label="Not configured" />
+          </DetailRow>
+          <DetailRow label="Password protection" href={`${editBase}/settings`}>
+            <Pill on={s.passwordEnabled} />
+          </DetailRow>
+          <DetailRow label="Search indexing" href={`${editBase}/settings`}>
+            <Pill on={s.searchIndexing} />
+          </DetailRow>
+          <DetailRow label="Visitor dark mode" href={`${editBase}/settings`}>
+            <Pill on={s.darkModeEnabled} label={s.darkModeEnabled ? 'Toggleable' : 'Locked'} />
+          </DetailRow>
+          <DetailRow label="Analytics">
+            <Pill on={false} label="Not connected" />
+          </DetailRow>
+          <DetailRow label="Style kit" href={`${editBase}/edit`}>
+            <InfoPill label={s.styleKit} />
+          </DetailRow>
         </tbody>
       </table>
     </div>
@@ -637,7 +954,37 @@ dashboard.get('/', async (c) => {
     >
       <div class="dash-header">
         <h1>Your sites</h1>
-        <a class="new-site" href="/dashboard/templates">+ New site</a>
+        <div class="dash-header-actions">
+          <button class="import-site" type="button" id="import-btn">Import</button>
+          <a class="new-site" href="/dashboard/templates">+ New site</a>
+        </div>
+      </div>
+
+      <div class="import-modal-overlay" id="import-overlay" data-open="false">
+        <div class="import-modal">
+          <h2>Import a website</h2>
+          <p class="import-sub">Paste any public URL to import it as an editable site.</p>
+          <div class="import-field">
+            <label for="import-url">URL to import</label>
+            <input type="url" id="import-url" placeholder="https://example.com" required />
+          </div>
+          <div class="import-arrow">&#x2193; auto-filled from URL</div>
+          <div class="import-field">
+            <label for="import-name">Site name</label>
+            <input type="text" id="import-name" placeholder="My Imported Site" maxlength={80} required />
+          </div>
+          <div class="import-field">
+            <label for="import-subdomain">Subdomain <small>(optional)</small></label>
+            <input type="text" id="import-subdomain" placeholder="auto-generated from name" />
+            <p class="field-hint">.rev01.aayushman.dev</p>
+          </div>
+          <div class="import-error" id="import-error"></div>
+          <div class="import-progress" id="import-progress">Importing... this may take up to 30 seconds.</div>
+          <div class="import-actions">
+            <button class="btn-import-cancel" type="button" id="import-cancel">Cancel</button>
+            <button class="btn-import-submit" type="button" id="import-submit">Import</button>
+          </div>
+        </div>
       </div>
       <p class="dash-sub">
         Signed in as {primaryEmail}.{' '}
@@ -680,15 +1027,15 @@ dashboard.get('/', async (c) => {
                 <div class="site-card-actions">
                   <a class="btn-edit" href={`/dashboard/sites/${s.siteId}/edit`}>Edit</a>
                   {s.publishedVersion > 0 ? (
-                    <a
-                      class="btn-live"
-                      href={`https://${s.subdomain}.rev01.aayushman.dev`}
-                      target="_blank"
-                      rel="noopener"
+                    <button
+                      class="btn-unpublish"
+                      data-site-id={s.siteId}
+                      data-action="unpublish"
+                      type="button"
                     >
                       <span class="dot" />
-                      Live
-                    </a>
+                      Live &middot; Make draft
+                    </button>
                   ) : (
                     <button class="btn-publish" data-site-id={s.siteId} type="button">
                       Publish
@@ -716,6 +1063,7 @@ dashboard.get('/', async (c) => {
       )}
       <div id="card-backdrop" class="card-backdrop" data-open="false" />
       {toggleScript}
+      {importScript}
     </DashboardShell>,
   );
 });

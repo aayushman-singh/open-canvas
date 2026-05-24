@@ -102,6 +102,36 @@ export const site = pgTable('site', {
 export type Site = typeof site.$inferSelect;
 export type NewSite = typeof site.$inferInsert;
 
+export type CollaboratorRole = 'editor' | 'viewer';
+
+export const siteCollaborator = pgTable(
+  'site_collaborator',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().$type<CollaboratorRole>().default('editor'),
+    invitedByCustomerId: text('invited_by_customer_id')
+      .notNull()
+      .references(() => customer.id),
+    invitedEmail: text('invited_email').notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    siteCustomerUnique: uniqueIndex('site_collaborator_site_customer_unique').on(
+      t.siteId,
+      t.customerId,
+    ),
+  }),
+);
+
 export const page = pgTable(
   'page',
   {

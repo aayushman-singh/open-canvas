@@ -11,9 +11,11 @@
 // every editor save — it catches a registry/source drift before either is
 // used by a route. Pass `--upload` to do the actual R2 + DB writes.
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile, unlink } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { execSync } from 'node:child_process';
 import { SEED_ASSET_REGISTRY, type SeedAsset } from '../canvas/seed-assets.js';
 import { contentHashToR2Key, extFromMediaType, sha256Hex } from './hash.js';
 
@@ -63,6 +65,7 @@ async function verifySeedRegistry(): Promise<{ seedId: string; bytes: Uint8Array
 
 async function main(): Promise<void> {
   const upload = process.argv.includes('--upload');
+  const remote = process.argv.includes('--remote');
   const seeded = await verifySeedRegistry();
   console.log(
     `[seed:assets] verified ${String(seeded.length)} seed entries against source bytes`,
@@ -71,15 +74,24 @@ async function main(): Promise<void> {
     console.log('[seed:assets] dry-run OK (pass --upload to write to R2 + DB)');
     return;
   }
-  // The actual R2 + DB upload path is intentionally not wired here yet —
-  // doing so requires either a wrangler-dev R2 binding shim or an
-  // out-of-band Cloudflare API call, both of which are environmental
-  // concerns rather than asset-pipeline concerns. The path is documented in
-  // `src/assets/MIGRATION.md` and will be added by the dev-onboarding
-  // follow-up; for now the dry-run check is the load-bearing safety net.
-  throw new Error(
-    'seed:assets --upload: not yet wired. Use the editor upload flow or wrangler r2 commands to populate the bucket; the dry-run verification above is the contract guard.',
-  );
+  const BUCKET = 'rev01-assets';
+  const uploaded = new Set<string>();
+  for (const { seedId, bytes } of seeded) {
+    const asset = SEED_ASSET_REGISTRY[seedId]!;
+    if (uploaded.has(asset.r2Key)) continue;
+    const tmp = join(tmpdir(), `seed-${Date.now()}-${seedId}.bin`);
+    await writeFile(tmp, bytes);
+    try {
+      const remoteFlag = remote ? ' --remote' : '';
+      const cmd = `npx wrangler r2 object put "${BUCKET}/${asset.r2Key}" --file="${tmp}" --content-type="${asset.mediaType}"${remoteFlag}`;
+      console.log(`[seed:assets] uploading ${seedId} → ${asset.r2Key}`);
+      execSync(cmd, { stdio: 'inherit' });
+      uploaded.add(asset.r2Key);
+    } finally {
+      await unlink(tmp).catch(() => {});
+    }
+  }
+  console.log(`[seed:assets] uploaded ${String(uploaded.size)} unique R2 objects`);
 }
 
 await main();
