@@ -111,6 +111,149 @@ assert(
   'expected javascript: link rejection to mention the offending href',
 );
 
+// Link mark with target: '_blank' must be accepted by the validator.
+const blankTargetText: TextElement = {
+  id: 'link-blank-target',
+  type: 'text',
+  box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+  content: [
+    {
+      text: 'external',
+      marks: [{ type: 'link', href: 'https://example.com', target: '_blank' }],
+    },
+  ],
+  role: 'body',
+  fontSize: 16,
+  fontWeight: 400,
+  align: 'left',
+};
+const blankTargetState: CanvasSiteState = {
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-blank-target',
+      slug: 'blank-target',
+      title: 'Blank Target',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-blank-target',
+          recipeId: 'hero-split',
+          name: 'Blank Target',
+          height: 400,
+          elements: [blankTargetText],
+        },
+      ],
+    },
+  ],
+};
+const blankTargetResult = validateCanvasSiteState(blankTargetState);
+assert(
+  blankTargetResult.valid,
+  blankTargetResult.valid
+    ? ''
+    : 'expected validator to accept link mark with target="_blank": ' +
+        blankTargetResult.errors.join('; '),
+);
+
+// Link mark with an invalid target value must be rejected.
+const badTargetText: TextElement = {
+  id: 'link-bad-target',
+  type: 'text',
+  box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+  content: [
+    {
+      text: 'bad',
+      marks: [
+        {
+          type: 'link',
+          href: 'https://example.com',
+          target: '_self' as '_blank',
+        },
+      ],
+    },
+  ],
+  role: 'body',
+  fontSize: 16,
+  fontWeight: 400,
+  align: 'left',
+};
+const badTargetState: CanvasSiteState = {
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-bad-target',
+      slug: 'bad-target',
+      title: 'Bad Target',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-bad-target',
+          recipeId: 'hero-split',
+          name: 'Bad Target',
+          height: 400,
+          elements: [badTargetText],
+        },
+      ],
+    },
+  ],
+};
+const badTargetResult = validateCanvasSiteState(badTargetState);
+assert(
+  !badTargetResult.valid,
+  'expected validator to reject link mark with target="_self"',
+);
+assert(
+  !badTargetResult.valid &&
+    badTargetResult.errors.some((m) => m.includes('target')),
+  'expected bad-target rejection error to mention "target"',
+);
+
+// Link mark without target (existing data) must still pass — backward compat.
+const noTargetText: TextElement = {
+  id: 'link-no-target',
+  type: 'text',
+  box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+  content: [
+    { text: 'old link', marks: [{ type: 'link', href: 'https://example.com' }] },
+  ],
+  role: 'body',
+  fontSize: 16,
+  fontWeight: 400,
+  align: 'left',
+};
+const noTargetState: CanvasSiteState = {
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-no-target',
+      slug: 'no-target',
+      title: 'No Target',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-no-target',
+          recipeId: 'hero-split',
+          name: 'No Target',
+          height: 400,
+          elements: [noTargetText],
+        },
+      ],
+    },
+  ],
+};
+const noTargetResult = validateCanvasSiteState(noTargetState);
+assert(
+  noTargetResult.valid,
+  noTargetResult.valid
+    ? ''
+    : 'expected validator to accept link mark without target (backward compat): ' +
+        noTargetResult.errors.join('; '),
+);
+
 // -- Task 5.6: single-page invariant + accessibility -----------------------
 // The hero section contains a shape (`hero-orb`) and a surface (`hero-card`),
 // both decorative-by-default. The rendered HTML for the hero section must

@@ -260,6 +260,14 @@ function validateTextContent(content: unknown, idLabel: string, errors: string[]
             `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].href "${mark.href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
           );
         }
+        if (
+          mark.target !== undefined &&
+          mark.target !== '_blank'
+        ) {
+          errors.push(
+            `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].target must be "_blank" when present (got ${describe(mark.target)})`,
+          );
+        }
       }
     });
   });

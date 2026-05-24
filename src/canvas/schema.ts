@@ -137,7 +137,7 @@ export type InlineMark =
   | { type: 'strike' }
   | { type: 'code' }
   | { type: 'highlight' }
-  | { type: 'link'; href: string };
+  | { type: 'link'; href: string; target?: '_blank' };
 
 export interface InlineRun {
   // raw text, no HTML; newlines are literal U+000A
