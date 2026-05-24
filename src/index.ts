@@ -39,11 +39,6 @@ import sitemapRouter from './seo/sitemap/route';
 import fontsRouter from './fonts/route';
 import chatApi from './agent/chat/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
-// Translate (#24) has its own router but needs site + translator injected
-// per-request via Hono variables. The router is mounted via a thin wrapping
-// middleware that loads the editable state and constructs a GeminiTranslator.
-import translateRouter from './agent/translate/route';
-import { GeminiTranslator } from './agent/translate/llm';
 // Section library + custom template routes
 import {
   librarySectionsOwner,
@@ -218,49 +213,6 @@ app.route('/', fontsRouter);
 // /api/sites/:siteId/chat/stream.
 app.route('/api/sites', chatApi);
 app.route('/dashboard', chatPanelRoute);
-// Auto-translate (#24) — needs editable state + translator injected per
-// request before the inner router runs. The wrapping middleware loads the
-// owned site row and instantiates GeminiTranslator, then hands off.
-app.use('/api/sites/:siteId/translate', clerkAuth(), requireAuth(), async (c, next) => {
-  // Lazy import the site loader + DB shapes — avoids pulling the publish
-  // route's full import tree into this entry point.
-  const { db } = await import('./db/client');
-  const { site, customer } = await import('./db/schema');
-  const { eq, and } = await import('drizzle-orm');
-  const auth = c.get('auth');
-  if (!auth.userId) return c.json({ error: 'site not found' }, 404);
-  const siteId = c.req.param('siteId');
-  if (!siteId) return c.json({ error: 'site not found' }, 404);
-  const database = db(c.env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  const siteRow = await database
-    .select({ editableState: site.editableState })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  if (!siteRow[0]) return c.json({ error: 'site not found' }, 404);
-  // GeminiTranslator constructor throws on empty apiKey. Fail loudly here
-  // with 503 rather than letting the inner router 500 — per the no-fallback
-  // posture, translate is unusable without the secret configured.
-  const apiKey = c.env.GEMINI_API_KEY;
-  if (typeof apiKey !== 'string' || apiKey.length === 0) {
-    return c.json({ error: 'translate disabled: GEMINI_API_KEY not configured' }, 503);
-  }
-  c.set('translateSiteState' as never, siteRow[0].editableState as never);
-  c.set(
-    'translateTranslator' as never,
-    new GeminiTranslator({ apiKey }) as never,
-  );
-  await next();
-});
-app.route('/api/sites/:siteId/translate', translateRouter);
-
 // On-site editor auth popup — main domain endpoint that sets the edit token
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
 app.route('/api/on-site-edit', onSiteEditRoute);
@@ -280,39 +232,6 @@ app.route('/__api', sectionsApi);
 app.route('/__api/library', librarySectionsOwner);
 app.route('/__api/custom-templates', customTemplatesOwner);
 app.route('/__api/sites', chatApi);
-// Translate under /__api — same wrapping middleware but with edit-token auth
-// pre-populated (editTokenAuth already set auth above).
-app.use('/__api/sites/:siteId/translate', async (c, next) => {
-  const auth = c.get('auth');
-  if (!auth.userId) return c.json({ error: 'site not found' }, 404);
-  const siteId = c.req.param('siteId');
-  if (!siteId) return c.json({ error: 'site not found' }, 404);
-  const database = db(c.env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return c.json({ error: 'site not found' }, 404);
-  const siteRow = await database
-    .select({ editableState: site.editableState })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  if (!siteRow[0]) return c.json({ error: 'site not found' }, 404);
-  const apiKey = c.env.GEMINI_API_KEY;
-  if (typeof apiKey !== 'string' || apiKey.length === 0) {
-    return c.json({ error: 'translate disabled: GEMINI_API_KEY not configured' }, 503);
-  }
-  c.set('translateSiteState' as never, siteRow[0].editableState as never);
-  c.set(
-    'translateTranslator' as never,
-    new GeminiTranslator({ apiKey }) as never,
-  );
-  await next();
-});
-app.route('/__api/sites/:siteId/translate', translateRouter);
 
 export { SiteRoom } from './live/site-room';
 // Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in

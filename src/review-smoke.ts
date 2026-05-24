@@ -562,7 +562,6 @@ assert(
 
 const authMiddlewareSource = await readSource('./auth/middleware.ts');
 const requireAuthSource = await readSource('./auth/require-auth.ts');
-const dashboardSource = await readSource('./routes/dashboard/index.tsx');
 assert(
   authMiddlewareSource.includes('export function resolveAuthRedirectUrl'),
   'expected auth middleware to expose a shared local/prod redirect URL resolver',

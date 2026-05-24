@@ -143,7 +143,34 @@ body.rev01-modal-open {
   border-right: 1px solid var(--rev01-hairline);
   background: linear-gradient(180deg, var(--rev01-bg-titlebar), var(--rev01-bg-panel-strong));
   overflow-y: auto;
+  transition: width 0.15s ease, transform 0.15s ease;
 }
+.rev01-editor-sidebar.collapsed {
+  width: 0;
+  overflow: hidden;
+  border-right: none;
+}
+.sidebar-toggle {
+  position: absolute;
+  top: 8px;
+  right: -20px;
+  width: 20px;
+  height: 32px;
+  z-index: 151;
+  background: var(--rev01-bg-panel-strong);
+  border: 1px solid var(--rev01-hairline);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  color: var(--rev01-fg-mute);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.sidebar-toggle:hover { color: var(--rev01-fg); }
+.rev01-viewport.sidebar-collapsed { margin-left: 0; }
 
 .rev01-sidebar-tabs {
   display: flex;
