@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { raw } from 'hono/html';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
@@ -87,6 +88,7 @@ const cardStyles = `
   }
   .dash-header .new-site:hover { filter: brightness(0.88); }
   .dash-sub { color: var(--faint); font-size: 13px; margin: 0 0 24px; }
+
   .site-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -94,16 +96,44 @@ const cardStyles = `
     margin: 0 0 32px;
   }
   .site-card {
+    position: relative;
     background: var(--panel);
     border-radius: 12px;
     border: 1px solid var(--line);
     overflow: hidden;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+    transition: border-color 0.25s, box-shadow 0.25s, transform 0.3s ease, opacity 0.25s;
   }
   .site-card:hover {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
+    border-color: rgba(125,211,252,0.35);
   }
+
+  /* expanded state */
+  .card-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+  }
+  .card-backdrop[data-open="true"] { display: block; }
+
+  .site-card--expanded {
+    position: fixed;
+    z-index: 1000;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(560px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    cursor: default;
+    border-color: var(--accent);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--accent);
+  }
+  .site-card--expanded .site-card-thumb { height: 240px; }
+
   .site-card-thumb {
     position: relative;
     width: 100%;
@@ -123,6 +153,7 @@ const cardStyles = `
     border: none;
     pointer-events: none;
   }
+
   .site-card-body {
     padding: 16px 20px;
   }
@@ -141,6 +172,7 @@ const cardStyles = `
     font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
   .site-card-addr:hover { text-decoration: underline; }
+
   .site-card-meta {
     display: flex;
     flex-wrap: wrap;
@@ -177,12 +209,15 @@ const cardStyles = `
     font-size: 12px;
     color: var(--faint);
   }
+
+  /* --- card actions: Edit | Publish/Live | ... --- */
   .site-card-actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    align-items: stretch;
   }
-  .site-card-actions a {
-    flex: 1;
+  .site-card-actions a,
+  .site-card-actions button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -191,24 +226,328 @@ const cardStyles = `
     font-size: 13px;
     font-weight: 500;
     text-decoration: none;
-    transition: background 0.12s;
+    transition: background 0.12s, filter 0.12s;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
   }
   .btn-edit {
+    flex: 1;
     background: var(--accent);
     color: var(--bg);
   }
   .btn-edit:hover { filter: brightness(0.88); }
-  .btn-view {
-    background: var(--panel-strong, #182235);
-    color: var(--text);
-    border: 1px solid var(--line);
+
+  .btn-live {
+    flex: 1;
+    background: rgba(74,222,128,0.12);
+    color: #4ade80;
+    border: 1px solid rgba(74,222,128,0.22);
   }
-  .btn-view:hover { background: rgba(255,255,255,0.08); }
+  .btn-live:hover { background: rgba(74,222,128,0.20); }
+  .btn-live .dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    margin-right: 6px;
+  }
+
+  .btn-publish {
+    flex: 1;
+    background: rgba(250,204,21,0.10);
+    color: #facc15;
+    border: 1px solid rgba(250,204,21,0.18);
+  }
+  .btn-publish:hover { background: rgba(250,204,21,0.18); }
+
+  .btn-dots {
+    width: 38px;
+    min-width: 38px;
+    background: var(--panel-strong, #182235);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    font-size: 18px;
+    letter-spacing: 1px;
+    line-height: 1;
+    padding: 0;
+  }
+  .btn-dots:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .btn-dots[aria-expanded="true"] {
+    background: rgba(125,211,252,0.10);
+    color: var(--accent);
+    border-color: rgba(125,211,252,0.25);
+  }
+
+  /* --- expandable details panel --- */
+  .site-card-details {
+    display: none;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    padding: 16px 20px;
+  }
+  .site-card-details[data-open="true"] {
+    display: block;
+  }
+  .details-heading {
+    margin: 0 0 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+  }
+  .details-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .details-table tr {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .details-table tr:last-child { border-bottom: none; }
+  .details-table td {
+    padding: 7px 0;
+    vertical-align: middle;
+  }
+  .details-table td:first-child {
+    color: var(--muted);
+    width: 45%;
+  }
+  .details-table td:last-child {
+    color: var(--text);
+    text-align: right;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill-on {
+    background: rgba(74,222,128,0.10);
+    color: #4ade80;
+  }
+  .pill-off {
+    background: rgba(255,255,255,0.04);
+    color: var(--faint);
+  }
+  .pill-info {
+    background: rgba(125,211,252,0.08);
+    color: var(--accent);
+  }
+
   .dash-sign-out {
     font-size: 13px;
     color: var(--faint);
   }
 `;
+
+const toggleScript = raw(`<script>
+var backdrop = document.getElementById('card-backdrop');
+var expandedCard = null;
+
+function closeExpanded() {
+  if (!expandedCard) return;
+  expandedCard.classList.remove('site-card--expanded');
+  var panel = expandedCard.querySelector('.site-card-details');
+  if (panel) panel.setAttribute('data-open', 'false');
+  var btn = expandedCard.querySelector('.btn-dots');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  backdrop.setAttribute('data-open', 'false');
+  expandedCard = null;
+}
+
+function openExpanded(card) {
+  if (expandedCard === card) { closeExpanded(); return; }
+  if (expandedCard) closeExpanded();
+  expandedCard = card;
+  card.classList.add('site-card--expanded');
+  var panel = card.querySelector('.site-card-details');
+  if (panel) panel.setAttribute('data-open', 'true');
+  var btn = card.querySelector('.btn-dots');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  backdrop.setAttribute('data-open', 'true');
+}
+
+backdrop.addEventListener('click', closeExpanded);
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeExpanded();
+});
+
+document.addEventListener('click', function(e) {
+  // Ignore clicks on interactive elements inside the card
+  if (e.target.closest('a, button, iframe')) return;
+  var card = e.target.closest('.site-card');
+  if (!card) return;
+  openExpanded(card);
+});
+
+// 3-dot button toggles details within expanded card
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.btn-dots');
+  if (!btn) return;
+  e.stopPropagation();
+  var card = btn.closest('.site-card');
+  if (!card) return;
+  // If card not expanded, expand it
+  if (!card.classList.contains('site-card--expanded')) {
+    openExpanded(card);
+    return;
+  }
+  // Otherwise toggle details panel
+  var panel = card.querySelector('.site-card-details');
+  if (!panel) return;
+  var open = panel.getAttribute('data-open') === 'true';
+  panel.setAttribute('data-open', open ? 'false' : 'true');
+  btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+});
+
+// Publish button
+document.addEventListener('click', function(e) {
+  var pubBtn = e.target.closest('.btn-publish');
+  if (!pubBtn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  var siteId = pubBtn.getAttribute('data-site-id');
+  if (!siteId) return;
+  pubBtn.textContent = 'Publishing...';
+  pubBtn.style.pointerEvents = 'none';
+  fetch('/api/publish/sites/' + siteId, { method: 'POST' })
+    .then(function(r) {
+      if (!r.ok) throw new Error(r.status + '');
+      return r.json();
+    })
+    .then(function() { location.reload(); })
+    .catch(function() {
+      pubBtn.textContent = 'Failed';
+      pubBtn.style.pointerEvents = '';
+    });
+});
+</script>`);
+
+interface SiteCard {
+  siteId: string;
+  siteName: string;
+  subdomain: string;
+  styleKit: string;
+  publishedVersion: number;
+  updatedAt: Date;
+  thumbHtml: string;
+  passwordEnabled: boolean;
+  darkModeEnabled: boolean;
+  searchIndexing: boolean;
+  sectionCount: number;
+  elementCount: number;
+}
+
+function buildCards(
+  rows: Array<{
+    id: string;
+    name: string;
+    subdomain: string;
+    styleKit: string;
+    publishedVersion: number;
+    updatedAt: Date;
+    editableState: CanvasSiteState;
+    passwordEnabled: boolean;
+  }>,
+  origin: string,
+): SiteCard[] {
+  return rows.map((row) => {
+    const state = row.editableState;
+    const page = state.pages[0];
+    const sectionCount = page?.sections?.length ?? 0;
+    let elementCount = 0;
+    if (page?.sections) {
+      for (const sec of page.sections) {
+        elementCount += sec.elements?.length ?? 0;
+      }
+    }
+    return {
+      siteId: row.id,
+      siteName: row.name,
+      subdomain: row.subdomain,
+      styleKit: row.styleKit,
+      publishedVersion: row.publishedVersion,
+      updatedAt: row.updatedAt,
+      thumbHtml: buildThumbHtml(state, row.id, origin),
+      passwordEnabled: row.passwordEnabled,
+      darkModeEnabled: state.darkModeEnabled ?? false,
+      searchIndexing: !(state.siteNoIndex ?? false),
+      sectionCount,
+      elementCount,
+    };
+  });
+}
+
+function Pill({ on, label }: { on: boolean; label?: string }) {
+  const text = label ?? (on ? 'On' : 'Off');
+  return <span class={`pill ${on ? 'pill-on' : 'pill-off'}`}>{text}</span>;
+}
+
+function InfoPill({ label }: { label: string }) {
+  return <span class="pill pill-info">{label}</span>;
+}
+
+function DetailsPanel({ s }: { s: SiteCard }) {
+  return (
+    <div class="site-card-details" data-open="false">
+      <p class="details-heading">Site details</p>
+      <table class="details-table">
+        <tbody>
+          <tr>
+            <td>Hosting</td>
+            <td><InfoPill label="Starter" /></td>
+          </tr>
+          <tr>
+            <td>CDN</td>
+            <td><InfoPill label="Cloudflare Edge" /></td>
+          </tr>
+          <tr>
+            <td>Custom domain</td>
+            <td><Pill on={false} label="Not configured" /></td>
+          </tr>
+          <tr>
+            <td>Password protection</td>
+            <td><Pill on={s.passwordEnabled} /></td>
+          </tr>
+          <tr>
+            <td>Search indexing</td>
+            <td><Pill on={s.searchIndexing} /></td>
+          </tr>
+          <tr>
+            <td>Dark mode</td>
+            <td><Pill on={s.darkModeEnabled} /></td>
+          </tr>
+          <tr>
+            <td>Analytics</td>
+            <td><Pill on={false} label="Not connected" /></td>
+          </tr>
+          <tr>
+            <td>Sections</td>
+            <td>{String(s.sectionCount)}</td>
+          </tr>
+          <tr>
+            <td>Elements</td>
+            <td>{String(s.elementCount)}</td>
+          </tr>
+          <tr>
+            <td>Style kit</td>
+            <td><InfoPill label={s.styleKit} /></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 dashboard.get('/', async (c) => {
   const user = c.get('user');
@@ -249,16 +588,6 @@ dashboard.get('/', async (c) => {
 
   const origin = new URL(c.req.url).origin;
 
-  interface SiteCard {
-    siteId: string;
-    siteName: string;
-    subdomain: string;
-    styleKit: string;
-    publishedVersion: number;
-    updatedAt: Date;
-    thumbHtml: string;
-  }
-
   let cards: SiteCard[] = [];
   if (customerId) {
     const rows = await database
@@ -270,20 +599,13 @@ dashboard.get('/', async (c) => {
         publishedVersion: site.publishedVersion,
         updatedAt: site.updatedAt,
         editableState: site.editableState,
+        passwordEnabled: site.passwordEnabled,
       })
       .from(site)
       .where(eq(site.customerId, customerId))
       .orderBy(desc(site.createdAt));
 
-    cards = rows.map((row) => ({
-      siteId: row.id,
-      siteName: row.name,
-      subdomain: row.subdomain,
-      styleKit: row.styleKit,
-      publishedVersion: row.publishedVersion,
-      updatedAt: row.updatedAt,
-      thumbHtml: buildThumbHtml(row.editableState, row.id, origin),
-    }));
+    cards = buildCards(rows, origin);
   }
 
   const signOutUrl = buildSignOutUrl(
@@ -343,20 +665,31 @@ dashboard.get('/', async (c) => {
                   <a class="btn-edit" href={`/dashboard/sites/${s.siteId}/edit`}>Edit</a>
                   {s.publishedVersion > 0 ? (
                     <a
-                      class="btn-view"
+                      class="btn-live"
                       href={`https://${s.subdomain}.rev01.aayushman.dev`}
                       target="_blank"
                       rel="noopener"
                     >
-                      View live
+                      <span class="dot" />
+                      Live
                     </a>
                   ) : (
-                    <a class="btn-view" href={`/dashboard/sites/${s.siteId}/edit`}>
-                      Open editor
-                    </a>
+                    <button class="btn-publish" data-site-id={s.siteId} type="button">
+                      Publish
+                    </button>
                   )}
+                  <button
+                    class="btn-dots"
+                    type="button"
+                    aria-expanded="false"
+                    aria-label="Site details"
+                    title="Site details"
+                  >
+                    &#x22EE;
+                  </button>
                 </div>
               </div>
+              <DetailsPanel s={s} />
             </div>
           ))}
         </div>
@@ -365,6 +698,8 @@ dashboard.get('/', async (c) => {
           No sites yet — <a href="/dashboard/templates">pick a template</a> to start.
         </p>
       )}
+      <div id="card-backdrop" class="card-backdrop" data-open="false" />
+      {toggleScript}
     </DashboardShell>,
   );
 });
