@@ -58,6 +58,7 @@ import { makeFontLookup, resolveFontTokens } from '../fonts/resolve';
 // Wave 4 #17 — vanilla-JS hydration runtime for accordion + carousel elements.
 // Wrap is a no-op when no interactive elements present in the snapshot.
 import { injectInteractiveRuntime } from '../interactive/inject';
+import { emitAddonHeadScripts } from '../addons/emit';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -718,6 +719,8 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     modeSetterScript = getModeSetterScript();
   }
 
+  const addonScripts = await emitAddonHeadScripts(db(c.env), siteRow.id);
+
   return c.html(
     html`<!doctype html>
       <html lang="${raw(escapeAttr(lang))}" dir="${raw(escapeAttr(dir))}">
@@ -730,6 +733,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
               fontFaceCss ? `\n${fontFaceCss}` : '',
             )}${darkModeEnabled ? `\n${dualModeCss}` : ''}
           </style>
+          ${addonScripts ? raw(addonScripts) : ''}
         </head>
         <body>
           <div data-rev01-public-root>${raw(snapshotHtml)}</div>
