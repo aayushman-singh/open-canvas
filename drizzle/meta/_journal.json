@@ -29,6 +29,13 @@
       "when": 1779703096319,
       "tag": "0003_curly_lightspeed",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779926400000,
+      "tag": "0004_customer_profile_fields",
+      "breakpoints": true
     }
   ]
 }

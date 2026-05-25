@@ -68,6 +68,35 @@ const shellStyles = `
     background: rgba(255,255,255,0.08);
   }
 
+  .app-header-inner { justify-content: flex-start; }
+  .app-nav { flex: 1; }
+  .app-avatar-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    border: none;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .app-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid transparent;
+    transition: border-color 0.12s;
+  }
+  .app-avatar-link:hover .app-avatar { border-color: var(--accent); }
+  .app-avatar--fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(125,211,252,0.15);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
   main {
     width: min(1120px, calc(100vw - 32px));
     margin: 0 auto;
@@ -101,11 +130,18 @@ const shellStyles = `
 
 export type Crumb = { href?: string; label: string };
 
+type UserMeta = {
+  avatarUrl?: string | undefined;
+  displayName?: string | undefined;
+  email?: string | undefined;
+};
+
 type Props = {
   title: string;
   crumbs: Crumb[];
   activePath?: string;
   pageStyles?: string;
+  userMeta?: UserMeta;
   children?: Child;
 };
 
@@ -113,9 +149,10 @@ const NAV_ITEMS = [
   { href: '/dashboard', label: 'Sites' },
   { href: '/dashboard/templates', label: 'Templates' },
   { href: '/dashboard/shop', label: 'Shop' },
+  { href: '/dashboard/settings', label: 'Settings' },
 ];
 
-export function DashboardShell({ title, crumbs, activePath, pageStyles, children }: Props) {
+export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta, children }: Props) {
   const css = pageStyles ? `${uiStyles}\n${shellStyles}\n${pageStyles}` : `${uiStyles}\n${shellStyles}`;
   const showCrumbs = crumbs.length > 1;
   return (
@@ -141,6 +178,17 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, children
                 </a>
               ))}
             </nav>
+            {userMeta && (
+              <a href="/dashboard/profile" class="app-avatar-link" title={userMeta.displayName ?? userMeta.email ?? 'Profile'}>
+                {userMeta.avatarUrl ? (
+                  <img src={userMeta.avatarUrl} alt="" class="app-avatar" width="28" height="28" />
+                ) : (
+                  <span class="app-avatar app-avatar--fallback">
+                    {(userMeta.displayName ?? userMeta.email ?? '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </a>
+            )}
           </div>
         </header>
         <main>

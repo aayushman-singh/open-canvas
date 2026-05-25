@@ -35,6 +35,9 @@ export const customer = pgTable('customer', {
     .$defaultFn(() => crypto.randomUUID()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
   email: text('email').notNull(),
+  displayName: text('display_name'),
+  bio: text('bio'),
+  timezone: text('timezone').notNull().default('UTC'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
