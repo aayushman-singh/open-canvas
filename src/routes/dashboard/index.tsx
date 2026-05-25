@@ -849,7 +849,7 @@ function DetailsPanel({ s }: { s: SiteCard }) {
           <DetailRow label="Visitor dark mode" href={`${editBase}/settings`}>
             <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>{s.darkModeEnabled ? 'Toggleable' : 'Locked'}</Pill>
           </DetailRow>
-          <DetailRow label="Analytics">
+          <DetailRow label="Analytics" href={`${editBase}/addons`}>
             <Pill variant="off">Not connected</Pill>
           </DetailRow>
           <DetailRow label="Style kit" href={`${editBase}/edit`}>

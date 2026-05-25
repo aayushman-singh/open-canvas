@@ -40,6 +40,9 @@ import fontsRouter from './fonts/route';
 import chatApi from './agent/chat/route';
 import translateApi from './i18n/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
+import addonShopRoute from './routes/dashboard/addon-shop';
+import siteAddonsRoute from './routes/dashboard/site-addons';
+import addonsApi from './routes/api/addons';
 // Section library + custom template routes
 import {
   librarySectionsOwner,
@@ -215,6 +218,10 @@ app.route('/', fontsRouter);
 app.route('/api/sites', chatApi);
 app.route('/api/sites', translateApi);
 app.route('/dashboard', chatPanelRoute);
+// Addon system (ADR 0009)
+app.route('/dashboard', addonShopRoute);
+app.route('/dashboard', siteAddonsRoute);
+app.route('/api/addons', addonsApi);
 // On-site editor auth popup — main domain endpoint that sets the edit token
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
 app.route('/api/on-site-edit', onSiteEditRoute);
