@@ -370,15 +370,24 @@ export function buildCanvasSiteState(
   assetIdMap: Map<string, string>,
   fontFamilyTokenMap: Map<string, string> = new Map(),
 ): CanvasSiteState {
-  const sections: CanvasSection[] = data.sections.map((s, i) => ({
-    id: crypto.randomUUID(),
-    recipeId: 'custom' as const,
-    name: s.name || `section-${i}`,
-    height: Math.max(Math.round(s.height), 100),
-    elements: s.elements
-      .map((el) => convertElement(el, assetIdMap))
-      .filter((el): el is CanvasElement => el !== null),
-  }));
+  const sections: CanvasSection[] = data.sections.map((s, i) => {
+    const name = s.name || `section-${i}`;
+    const nameLower = name.toLowerCase();
+    const role: CanvasSection['role'] =
+      i === 0 && nameLower.includes('header') ? 'header'
+      : i === data.sections.length - 1 && nameLower.includes('footer') ? 'footer'
+      : undefined;
+    return {
+      id: crypto.randomUUID(),
+      recipeId: 'custom' as const,
+      name,
+      height: Math.max(Math.round(s.height), 100),
+      ...(role ? { role } : {}),
+      elements: s.elements
+        .map((el) => convertElement(el, assetIdMap))
+        .filter((el): el is CanvasElement => el !== null),
+    };
+  });
 
   const page: CanvasPage = {
     id: crypto.randomUUID(),
