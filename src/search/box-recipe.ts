@@ -77,7 +77,7 @@ export function buildSearchBoxSection(opts: SearchBoxRecipeOptions = {}): Canvas
     type: 'action',
     box,
     label,
-    href: SEARCH_BOX_ENDPOINT,
+    href: { type: 'external', url: SEARCH_BOX_ENDPOINT },
     variant,
   };
 

@@ -71,7 +71,7 @@ const actionEl: ActionElement = {
   type: 'action',
   box: { x: 100, y: 440, w: 200, h: 56, z: 4 },
   label: 'Get Started',
-  href: '/signup',
+  href: { type: 'external', url: '/signup' },
   variant: 'solid',
 };
 

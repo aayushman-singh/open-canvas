@@ -175,6 +175,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
               <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections">
                 Sections
               </button>
+              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="pages">
+                Pages
+              </button>
             </div>
             <div
               class="rev01-sidebar-panel"
@@ -276,6 +279,22 @@ export function editorPageJsx(opts: EditorPageOptions) {
               <div class="rev01-section-picker" data-section-picker-root>
                 <p class="rev01-section-picker-empty">Loading sections…</p>
               </div>
+            </div>
+            <div
+              class="rev01-sidebar-panel"
+              role="tabpanel"
+              aria-label="Pages"
+              data-sidebar-panel="pages"
+              hidden
+            >
+              <div class="rev01-page-list" id="canvas-page-list"></div>
+              <button
+                class="rev01-sidebar-action"
+                id="canvas-add-page"
+                type="button"
+              >
+                + New Page
+              </button>
             </div>
           </aside>
           <div id="canvas-root" data-site-id={siteId} />

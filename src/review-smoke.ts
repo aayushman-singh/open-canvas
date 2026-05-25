@@ -204,27 +204,31 @@ assert(
   'expected published empty-media rejection to name the empty assetId',
 );
 
-// Task 5.6 invariant: a two-page state must be rejected. Clone the starter
-// template's single page and push another copy so the only reason for
-// rejection is the length rule itself.
+// Multipage invariant: a two-page state is valid when page ids/slugs are unique.
+const secondStarterPage = structuredClone(starterTemplate.state.pages[0]);
+if (!secondStarterPage) throw new Error('starterTemplate must have at least one page');
+secondStarterPage.id = 'page-review-second';
+secondStarterPage.slug = 'review-second';
+secondStarterPage.title = 'Review Second';
 const twoPageStarter = {
   ...starterTemplate.state,
-  pages: [
-    structuredClone(starterTemplate.state.pages[0]),
-    structuredClone(starterTemplate.state.pages[0]),
-  ],
+  pages: [structuredClone(starterTemplate.state.pages[0]), secondStarterPage],
 };
 const twoPageResult = validateCanvasSiteState(twoPageStarter);
 assert(
-  !twoPageResult.valid,
-  'expected validator to reject a two-page state (single-page POC invariant)',
+  twoPageResult.valid,
+  twoPageResult.valid
+    ? ''
+    : 'expected validator to accept a two-page state: ' + twoPageResult.errors.join('; '),
 );
+const duplicatePageStarter = structuredClone(twoPageStarter);
+duplicatePageStarter.pages[1]!.id = duplicatePageStarter.pages[0]!.id;
+duplicatePageStarter.pages[1]!.slug = duplicatePageStarter.pages[0]!.slug;
+const duplicatePageResult = validateCanvasSiteState(duplicatePageStarter);
 assert(
-  !twoPageResult.valid &&
-    twoPageResult.errors.some((message) =>
-      message.includes('exactly one primary canvas page plus optional _404 page'),
-    ),
-  'expected two-page rejection to mention the primary page plus optional _404 invariant',
+  !duplicatePageResult.valid &&
+    duplicatePageResult.errors.some((message) => message.includes('duplicated across pages')),
+  'expected duplicate-page rejection to mention cross-page duplication',
 );
 
 const overWidePage = validateCanvasSiteState({
@@ -484,10 +488,10 @@ const unlockRouteSource = await readSource('./password/unlock-route.ts');
 const renderSource = await readSource('./canvas/render.ts');
 assert(
   publicRouteSource.includes('snapshotForPageSlug(renderSnapshot, pageSlug)') &&
-    /renderCanvasSnapshot\(\s*pageRenderSnapshot,\s*'\/assets',\s*siteRow\.id\s*\)/.test(
+    /renderCanvasSnapshot\(\s*renderSnapshot,\s*'\/assets',\s*siteRow\.id[\s\S]*renderPages:\s*\[currentPage\]/.test(
       publicRouteSource,
     ),
-  'expected public render to select one page and pass site id through so Form elements post to /__rev01/forms/:siteId/:formId',
+  'expected public render to select one page while keeping whole-snapshot link context',
 );
 assert(
   publishRouteSource.includes('buildPublishBroadcastPayload') &&
@@ -1069,7 +1073,7 @@ if (!posterReferenceMedia || posterReferenceMedia.type !== 'media') {
 posterReferenceMedia.mediaKind = 'video';
 posterReferenceMedia.assetId = 'video-asset-id';
 posterReferenceMedia.posterAssetId = 'poster-asset-id';
-const referencedAssets = collectReferencedAssets(posterReferenceState.pages);
+const referencedAssets = collectReferencedAssets(posterReferenceState);
 assert(
   referencedAssets.some(
     (ref) =>
@@ -1077,7 +1081,7 @@ assert(
   ),
   'expected collectReferencedAssets to include poster ids as image references',
 );
-const referenceErrors = findAssetReferenceErrors(posterReferenceState.pages, [
+const referenceErrors = findAssetReferenceErrors(posterReferenceState, [
   { id: 'video-asset-id', kind: 'image' },
   { id: 'poster-asset-id', kind: 'image' },
 ]);
@@ -1123,7 +1127,7 @@ for (const [assetId, asset] of Object.entries(SEED_ASSET_REGISTRY)) {
 // straightforward.
 const T6_CLERK_USER = 'smoke-t6-' + crypto.randomUUID().slice(0, 8);
 const T6_SUB = 't6-' + crypto.randomUUID().slice(0, 8).toLowerCase();
-const referencedSeedIds = [...collectReferencedAssetIds(starterTemplate.state.pages)];
+const referencedSeedIds = [...collectReferencedAssetIds(starterTemplate.state)];
 assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
@@ -1144,7 +1148,7 @@ for (const originalId of referencedSeedIds) {
     `expected materialised asset ids not to reuse global seed id "${originalId}"`,
   );
 }
-const preparedAStateIds = collectReferencedAssetIds(preparedForCustomerA.editableState.pages);
+const preparedAStateIds = collectReferencedAssetIds(preparedForCustomerA.editableState);
 for (const originalId of referencedSeedIds) {
   assert(
     !preparedAStateIds.has(originalId),

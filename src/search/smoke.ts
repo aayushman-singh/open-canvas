@@ -98,7 +98,7 @@ function makeHeroAction(): ActionElement {
     type: 'action',
     box: { x: 0, y: 200, w: 200, h: 56, z: 1 },
     label: 'Reserve your seat',
-    href: '/contact',
+    href: { type: 'external', url: '/contact' },
     variant: 'solid',
   };
 }
@@ -630,7 +630,10 @@ if (recipeSection.elements.length !== 1 || !firstElement || firstElement.type !=
 ok('recipe contains exactly one action element');
 const actionElement = firstElement;
 assert(actionElement.id === SEARCH_BOX_ELEMENT_ID, 'action element uses the namespaced id');
-assert(actionElement.href === SEARCH_BOX_ENDPOINT, 'action href points at the search endpoint');
+assert(
+  actionElement.href.type === 'external' && actionElement.href.url === SEARCH_BOX_ENDPOINT,
+  'action href points at the search endpoint',
+);
 assert(actionElement.variant === 'solid', 'action defaults to the solid variant');
 
 const customised = buildSearchBoxSection({

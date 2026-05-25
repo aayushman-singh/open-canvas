@@ -169,7 +169,7 @@ function buildHeroSplit(input: RecipeFactoryInput): CanvasSection {
         type: 'action',
         box: { x: 80, y: 500, w: 200, h: 56, z: 3 },
         label: 'Start editing',
-        href: '#',
+        href: { type: 'external', url: '#' },
         variant: 'solid',
       },
       {
@@ -351,7 +351,7 @@ function buildCtaBand(input: RecipeFactoryInput): CanvasSection {
         type: 'action',
         box: { x: 540, y: 300, w: 220, h: 64, z: 3 },
         label: 'Get started',
-        href: '#',
+        href: { type: 'external', url: '#' },
         variant: 'pill',
       },
       {
@@ -359,7 +359,7 @@ function buildCtaBand(input: RecipeFactoryInput): CanvasSection {
         type: 'action',
         box: { x: 780, y: 300, w: 220, h: 64, z: 3 },
         label: 'Talk to us',
-        href: 'mailto:hello@example.com',
+        href: { type: 'external', url: 'mailto:hello@example.com' },
         variant: 'underline',
       },
     ],

@@ -53,6 +53,8 @@ function buildThumbHtml(
     publishedAt: new Date().toISOString(),
     styleKit: state.styleKit,
     pages: state.pages,
+    ...(state.header ? { header: state.header } : {}),
+    ...(state.footer ? { footer: state.footer } : {}),
     ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
     ...(state.symbols?.length ? { symbols: state.symbols } : {}),
   };

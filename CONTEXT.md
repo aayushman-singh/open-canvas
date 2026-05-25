@@ -84,9 +84,21 @@ _Avoid_: Screen, view
 A page made of ordered canvas sections rather than flow-based document content.
 _Avoid_: Prose document, webpage DOM, slide deck
 
+**Section Role**:
+A designation that determines a section's placement rule within a page: header (pinned to top), footer (pinned to bottom), or body (freely reorderable between them). Orthogonal to the section's layout shape or recipe.
+_Avoid_: Section type, section kind, section category
+
 **Section**:
-An interchangeable page region the owner can insert, remove, reorder, or replace.
+An interchangeable page region the owner can insert, remove, reorder, or replace. A body-role section; the default.
 _Avoid_: Block, component, template slice
+
+**Header Section**:
+A site-wide section with the header role, rendered before every canvas page. At most one per editable site. Cannot be reordered into page body sections or duplicated.
+_Avoid_: Nav bar, top bar, header component
+
+**Footer Section**:
+A site-wide section with the footer role, rendered after every canvas page. At most one per editable site. Cannot be reordered into page body sections or duplicated.
+_Avoid_: Bottom bar, footer component
 
 **Canvas Section**:
 A section with its own bounded 2D editing space where content elements can be positioned and resized.
@@ -116,7 +128,10 @@ _Avoid_: Undo stack, version history, asset trail
 
 - An **Owner** creates an **Editable Site** from exactly one **Template Seed**
 - An **Editable Site** contains one or more **Canvas Pages**
+- An **Editable Site** may have one **Header Section** and one **Footer Section** shared by every **Canvas Page**
 - A **Canvas Page** contains one or more **Canvas Sections**
+- A **Canvas Page** contains body sections; shared header/footer sections live on the **Editable Site**
+- Every **Section** has a **Section Role** (`body` by default)
 - Every visible **Section** in the POC is a **Canvas Section**
 - A **Section** contains one or more **Content Elements**
 - A **Canvas Section** contains one or more **Positioned Elements**

@@ -222,7 +222,7 @@ canvasApi.put('/sites/:siteId', async (c) => {
 
   const nextState = editableState as unknown as CanvasSiteState;
   const database = db(c.env);
-  const referenced = collectReferencedAssetIds(nextState.pages);
+  const referenced = collectReferencedAssetIds(nextState);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
     const presentRows = await database
@@ -231,7 +231,7 @@ canvasApi.put('/sites/:siteId', async (c) => {
       .where(
         and(eq(ownerAsset.customerId, result.customerId), inArray(ownerAsset.id, referencedList)),
       );
-    const referenceErrors = findAssetReferenceErrors(nextState.pages, presentRows);
+    const referenceErrors = findAssetReferenceErrors(nextState, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
       return c.json(

@@ -297,6 +297,8 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
     publishedAt: new Date().toISOString(),
     styleKit: tmpl.siteState.styleKit,
     pages: tmpl.siteState.pages,
+    ...(tmpl.siteState.header ? { header: tmpl.siteState.header } : {}),
+    ...(tmpl.siteState.footer ? { footer: tmpl.siteState.footer } : {}),
   };
   const html = renderCanvasSnapshot(
     snapshot,

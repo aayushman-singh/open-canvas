@@ -239,10 +239,27 @@ export interface MediaElement extends BaseElement {
   };
 }
 
+export type ActionHref =
+  | { type: 'external'; url: string }
+  | { type: 'page'; pageId: string; anchor?: string };
+
+export function resolveActionHref(
+  href: ActionHref,
+  pages: CanvasPage[],
+): string {
+  if (href.type === 'external') return href.url;
+  const page = pages.find((p) => p.id === href.pageId);
+  if (!page) {
+    throw new Error(`ActionHref pageId "${href.pageId}" does not reference an existing page`);
+  }
+  const base = '/' + page.slug;
+  return href.anchor ? base + '#' + href.anchor : base;
+}
+
 export interface ActionElement extends BaseElement {
   type: 'action';
   label: string;
-  href: string;
+  href: ActionHref;
   variant: ActionVariant;
 }
 
@@ -358,6 +375,10 @@ export interface CanvasPage {
 export interface CanvasSiteState {
   styleKit: StyleKit;
   pages: CanvasPage[];
+  /** Site-wide header section shared across all pages. */
+  header?: CanvasSection;
+  /** Site-wide footer section shared across all pages. */
+  footer?: CanvasSection;
   /**
    * Wave 2 #10 — `styleKit === 'custom'` selects this preset. Required to be
    * present when the selector is `'custom'`; ignored otherwise. The Phase 0
@@ -393,6 +414,10 @@ export interface PublishedSnapshot {
   publishedAt: string;
   styleKit: StyleKit;
   pages: CanvasPage[];
+  /** Mirror of `CanvasSiteState.header`; site-wide header rendered on every page. */
+  header?: CanvasSection;
+  /** Mirror of `CanvasSiteState.footer`; site-wide footer rendered on every page. */
+  footer?: CanvasSection;
   /** Mirror of `CanvasSiteState.customStyleKit` carried through publish. */
   customStyleKit?: StyleKitPreset;
   /** Mirror of `CanvasSiteState.symbols`; the renderer needs masters to resolve instances. */

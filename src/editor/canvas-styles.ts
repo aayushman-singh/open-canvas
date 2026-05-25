@@ -205,6 +205,88 @@ body.rev01-modal-open {
   display: none;
 }
 
+.rev01-sidebar-action {
+  appearance: none;
+  display: block;
+  width: calc(100% - 16px);
+  margin: 0 8px 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--rev01-hairline-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rev01-fg-mute);
+  font: 12px/1.25 var(--rev01-font-mono);
+  cursor: pointer;
+  text-align: center;
+}
+.rev01-sidebar-action:hover {
+  border-color: var(--rev01-accent);
+  color: var(--rev01-fg);
+  background: var(--rev01-accent-soft);
+}
+
+.rev01-page-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+}
+.rev01-page-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--rev01-fg);
+  border: 1px solid transparent;
+}
+.rev01-page-item:hover {
+  background: var(--rev01-bg-raised, var(--rev01-bg-panel));
+}
+.rev01-page-item[data-active="true"] {
+  background: var(--rev01-bg-raised, var(--rev01-bg-panel));
+  border-color: var(--rev01-accent);
+}
+.rev01-page-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rev01-page-item-slug {
+  font-family: var(--rev01-font-mono);
+  font-size: 11px;
+  color: var(--rev01-fg-mute);
+}
+.rev01-page-item-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+.rev01-page-item:hover .rev01-page-item-actions {
+  opacity: 1;
+}
+.rev01-page-item-actions button {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--rev01-hairline);
+  color: var(--rev01-fg-mute);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rev01-page-item-actions button:hover {
+  border-color: var(--rev01-accent);
+  color: var(--rev01-fg);
+}
+.rev01-page-item-actions button[data-danger]:hover {
+  border-color: var(--rev01-danger);
+  color: var(--rev01-danger);
+}
+
 .rev01-section-picker {
   display: flex;
   flex-direction: column;
@@ -395,34 +477,28 @@ body[data-placement-active="true"] .rev01-section-slot {
   color: var(--rev01-fg);
 }
 
-/* Viewport wraps #canvas-root. We apply CSS transform scale on #canvas-root
-   to implement zoom; the viewport itself no longer scrolls — the browser's
-   native body scroll handles vertical overflow. The viewport owns the dark
-   background and centers the canvas horizontally between the fixed docks
-   via flex. Top/bottom padding clears the sticky topbar and fixed status
-   bar; left/right margins clear the fixed sidebar + inspector docks. */
+/* Viewport wraps #canvas-root. The camera object drives all positioning:
+   translate(cam.x, cam.y) scale(cam.zoom) on #canvas-root. The viewport
+   has overflow:hidden — no body scroll, the camera handles everything.
+   Left/right margins clear the fixed sidebar + inspector docks. */
 .rev01-viewport {
   position: relative;
+  overflow: hidden;
   background:
     radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
     linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
   margin-left: 268px;
   margin-right: 320px;
-  padding: 32px;
-  padding-bottom: 60px;
-  min-height: calc(100vh - 56px);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  height: calc(100vh - 56px);
+  display: block;
 }
 
 #canvas-root {
-  /* When the script wraps #canvas-root in .rev01-viewport, the wrapper owns
-     grid-area / scroll / background. #canvas-root itself just hosts the
-     transformed page. Keep transform-origin top-left so zoom math is
-     predictable. */
-  transform-origin: top left;
+  transform-origin: 0 0;
   display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 /* Floating zoom toolbar pinned to the top-left of the canvas area, just
@@ -495,6 +571,53 @@ body[data-placement-active="true"] .rev01-section-slot {
   box-shadow: 0 24px 60px oklch(0 0 0 / 0.5);
   border-radius: 6px;
   overflow: hidden;
+}
+
+.rev01-artboard {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.rev01-artboard[data-active="false"] {
+  opacity: 0.7;
+  pointer-events: none;
+}
+.rev01-artboard[data-active="true"] {
+  opacity: 1;
+}
+.rev01-artboard-label {
+  position: absolute;
+  top: -32px;
+  left: 0;
+  font-family: var(--rev01-font-mono);
+  font-size: 12px;
+  color: var(--rev01-fg-mute);
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.rev01-artboard-label:hover {
+  color: var(--rev01-fg);
+  background: var(--rev01-bg-panel);
+}
+.rev01-artboard[data-active="true"] .rev01-artboard-label {
+  color: var(--rev01-accent);
+}
+.rev01-artboard-outline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 2px;
+}
+.rev01-artboard[data-active="true"] .rev01-artboard-outline {
+  border-color: var(--rev01-accent);
+  border-width: 2px;
 }
 
 .rev01-section {

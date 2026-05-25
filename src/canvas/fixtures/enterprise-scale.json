@@ -69,7 +69,7 @@
               "type": "action",
               "box": { "x": 80, "y": 608, "w": 180, "h": 56, "z": 3 },
               "label": "Talk to sales",
-              "href": "/contact",
+              "href": { "type": "external", "url": "/contact" },
               "variant": "solid"
             },
             {
@@ -77,7 +77,7 @@
               "type": "action",
               "box": { "x": 284, "y": 608, "w": 190, "h": 56, "z": 3 },
               "label": "View platform",
-              "href": "#enterprise-scale",
+              "href": { "type": "external", "url": "#enterprise-scale" },
               "variant": "outline"
             },
             {
@@ -764,7 +764,7 @@
               "type": "action",
               "box": { "x": 128, "y": 560, "w": 190, "h": 54, "z": 2 },
               "label": "Explore scale",
-              "href": "#enterprise-governance",
+              "href": { "type": "external", "url": "#enterprise-governance" },
               "variant": "glass"
             },
             {
@@ -898,7 +898,7 @@
               "type": "action",
               "box": { "x": 84, "y": 446, "w": 196, "h": 54, "z": 2 },
               "label": "Review controls",
-              "href": "#enterprise-success",
+              "href": { "type": "external", "url": "#enterprise-success" },
               "variant": "outline"
             },
             {
@@ -1046,7 +1046,7 @@
               "type": "action",
               "box": { "x": 484, "y": 434, "w": 210, "h": 58, "z": 2 },
               "label": "Contact sales",
-              "href": "/contact",
+              "href": { "type": "external", "url": "/contact" },
               "variant": "solid"
             },
             {
@@ -1054,7 +1054,7 @@
               "type": "action",
               "box": { "x": 724, "y": 434, "w": 232, "h": 58, "z": 2 },
               "label": "Read the guide",
-              "href": "#enterprise-hero",
+              "href": { "type": "external", "url": "#enterprise-hero" },
               "variant": "glass"
             },
             {

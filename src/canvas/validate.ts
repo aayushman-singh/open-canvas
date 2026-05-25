@@ -82,6 +82,43 @@ function pathJoin(parent: string, child: string | number): string {
 }
 
 /**
+ * Validate an ActionHref discriminated union (`{ type: 'external'; url }` or
+ * `{ type: 'page'; pageId; anchor? }`). Collects all errors into `errors`.
+ */
+function validateActionHref(
+  href: unknown,
+  basePath: string,
+  errors: string[],
+  validPageIds: Set<string> | null,
+): void {
+  if (typeof href !== 'object' || href === null) {
+    errors.push(basePath + ' must be an object with type "external" or "page"');
+    return;
+  }
+  const h = href as Record<string, unknown>;
+  if (h.type === 'external') {
+    if (!isNonEmptyString(h.url)) {
+      errors.push(basePath + '.url must be a non-empty string');
+    } else if (!isAllowedHref(h.url)) {
+      errors.push(
+        basePath + '.url "' + h.url + '" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)',
+      );
+    }
+  } else if (h.type === 'page') {
+    if (!isNonEmptyString(h.pageId)) {
+      errors.push(basePath + '.pageId must be a non-empty string');
+    } else if (validPageIds !== null && !validPageIds.has(h.pageId)) {
+      errors.push(basePath + '.pageId "' + h.pageId + '" must reference an existing page');
+    }
+    if (h.anchor !== undefined && typeof h.anchor !== 'string') {
+      errors.push(basePath + '.anchor must be a string when present');
+    }
+  } else {
+    errors.push(basePath + '.type must be "external" or "page" (got ' + describe(h.type) + ')');
+  }
+}
+
+/**
  * The single source of truth for href allowlisting. Used by both
  * ActionElement.href and inline link marks inside TextElement.content so the
  * two paths cannot drift.
@@ -300,6 +337,7 @@ function validateCollectionChildren(
   basePath: string,
   errors: string[],
   pageIds?: Set<string>,
+  validPageIds: Set<string> | null = null,
 ): void {
   if (!Array.isArray(children)) {
     errors.push(`${basePath} must be an array`);
@@ -308,7 +346,7 @@ function validateCollectionChildren(
   children.forEach((child, idx) => {
     const childPath = pathJoin(basePath, idx);
     if (pageIds) registerElementId(child, childPath, pageIds, errors);
-    validateElement(child, childWidth, childHeight, childPath, errors, pageIds);
+    validateElement(child, childWidth, childHeight, childPath, errors, validPageIds, pageIds);
   });
 }
 
@@ -319,6 +357,7 @@ function validateCollectionEntries(
   basePath: string,
   errors: string[],
   pageIds?: Set<string>,
+  validPageIds: Set<string> | null = null,
 ): void {
   if (!Array.isArray(entries)) {
     errors.push(`${basePath} must be an array`);
@@ -326,7 +365,15 @@ function validateCollectionEntries(
   }
   entries.forEach((entry, entryIdx) => {
     const entryPath = pathJoin(basePath, entryIdx);
-    validateCollectionChildren(entry, childWidth, childHeight, entryPath, errors, pageIds);
+    validateCollectionChildren(
+      entry,
+      childWidth,
+      childHeight,
+      entryPath,
+      errors,
+      pageIds,
+      validPageIds,
+    );
   });
 }
 
@@ -336,6 +383,7 @@ function validateElement(
   sectionHeight: number,
   basePath: string,
   errors: string[],
+  validPageIds: Set<string> | null,
   pageIds?: Set<string>,
 ): void {
   if (!isRecord(element)) {
@@ -424,13 +472,7 @@ function validateElement(
       if (!isNonEmptyString(element.label)) {
         errors.push(`${basePath}.label must be a non-empty string`);
       }
-      if (!isNonEmptyString(element.href)) {
-        errors.push(`${basePath}.href must be a non-empty string`);
-      } else if (!isAllowedHref(element.href)) {
-        errors.push(
-          `${basePath}.href "${element.href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
-        );
-      }
+      validateActionHref(element.href, basePath + '.href', errors, validPageIds);
       if (!isOneOf<ActionVariant>(element.variant, ACTION_VARIANTS)) {
         errors.push(
           `${basePath}.variant must be one of [${ACTION_VARIANTS.join(', ')}] (got ${describe(element.variant)})`,
@@ -473,6 +515,7 @@ function validateElement(
         `${basePath}.entryTemplate`,
         errors,
         pageIds,
+        validPageIds,
       );
       validateCollectionEntries(
         element.entries,
@@ -481,6 +524,7 @@ function validateElement(
         `${basePath}.entries`,
         errors,
         pageIds,
+        validPageIds,
       );
       if (!isRecord(element.layout)) {
         errors.push(`${basePath}.layout must be an object`);
@@ -554,6 +598,7 @@ function validateElement(
             `${basePath}.cardTemplate`,
             errors,
             pageIds,
+            validPageIds,
           );
         }
         if (element.fieldBindings !== undefined) {
@@ -587,7 +632,8 @@ function validateSection(
   pageWidth: number,
   basePath: string,
   errors: string[],
-  pageIds: Set<string>,
+  localIds: Set<string>,
+  validPageIds: Set<string> | null,
 ): void {
   if (!isRecord(section)) {
     errors.push(`${basePath} must be an object`);
@@ -595,10 +641,10 @@ function validateSection(
   }
   if (!isNonEmptyString(section.id)) {
     errors.push(`${basePath}.id must be a non-empty string`);
-  } else if (pageIds.has(section.id)) {
+  } else if (localIds.has(section.id)) {
     errors.push(`${basePath}.id "${section.id}" is duplicated within page`);
   } else {
-    pageIds.add(section.id);
+    localIds.add(section.id);
   }
   if (!isOneOf<SectionRecipeId>(section.recipeId, SECTION_RECIPE_IDS)) {
     errors.push(
@@ -651,8 +697,8 @@ function validateSection(
   section.elements.forEach((element, idx) => {
     const path = pathJoin(basePath, 'elements');
     const elementPath = pathJoin(path, idx);
-    registerElementId(element, elementPath, pageIds, errors);
-    validateElement(element, pageWidth, effectiveHeight, elementPath, errors, pageIds);
+    registerElementId(element, elementPath, localIds, errors);
+    validateElement(element, pageWidth, effectiveHeight, elementPath, errors, validPageIds, localIds);
   });
 }
 
@@ -729,7 +775,12 @@ function validateSectionRolePlacement(
   }
 }
 
-function validatePage(page: unknown, basePath: string, errors: string[]): void {
+function validatePage(
+  page: unknown,
+  basePath: string,
+  errors: string[],
+  validPageIds: Set<string> | null,
+): void {
   if (!isRecord(page)) {
     errors.push(`${basePath} must be an object`);
     return;
@@ -784,7 +835,7 @@ function validatePage(page: unknown, basePath: string, errors: string[]): void {
   const effectiveWidth = widthValid ? (page.width as number) : PAGE_WIDTH_MAX;
   page.sections.forEach((section, idx) => {
     const path = pathJoin(pathJoin(basePath, 'sections'), idx);
-    validateSection(section, effectiveWidth, path, errors, ids);
+    validateSection(section, effectiveWidth, path, errors, ids, validPageIds);
   });
 }
 
@@ -793,9 +844,12 @@ function validatePageSetShape(pages: unknown[], errors: string[]): void {
     (page) => isRecord(page) && page.slug === CUSTOM_404_PAGE_SLUG,
   ).length;
   const primaryPageCount = pages.length - custom404Count;
-  if (pages.length === 1 && primaryPageCount === 1) return;
-  if (pages.length === 2 && primaryPageCount === 1 && custom404Count === 1) return;
-  errors.push('state.pages must contain exactly one primary canvas page plus optional _404 page');
+  if (primaryPageCount < 1) {
+    errors.push('state.pages must contain at least one primary canvas page');
+  }
+  if (custom404Count > 1) {
+    errors.push('state.pages must contain at most one _404 page');
+  }
 }
 
 function validateEditableShape(state: unknown, errors: string[]): void {
@@ -813,9 +867,40 @@ function validateEditableShape(state: unknown, errors: string[]): void {
     return;
   }
   validatePageSetShape(state.pages, errors);
+  const validPageIds = new Set<string>();
+  const pageSlugs = new Set<string>();
   state.pages.forEach((page, idx) => {
-    validatePage(page, `pages[${String(idx)}]`, errors);
+    if (!isRecord(page)) return;
+    if (isNonEmptyString(page.id)) {
+      if (validPageIds.has(page.id)) {
+        errors.push(`pages[${String(idx)}].id "${page.id}" is duplicated across pages`);
+      } else {
+        validPageIds.add(page.id);
+      }
+    }
+    if (isNonEmptyString(page.slug)) {
+      if (pageSlugs.has(page.slug)) {
+        errors.push(`pages[${String(idx)}].slug "${page.slug}" is duplicated across pages`);
+      } else {
+        pageSlugs.add(page.slug);
+      }
+    }
   });
+  state.pages.forEach((page, idx) => {
+    validatePage(page, `pages[${String(idx)}]`, errors, validPageIds);
+  });
+  // Site-wide header and footer are optional top-level sections. When present,
+  // validate them with the same section validator used for page sections.
+  // Use PAGE_WIDTH_MAX as the width bound since header/footer span the full
+  // viewport and are not tied to a single page's width.
+  if (state.header !== undefined) {
+    const headerIds = new Set<string>();
+    validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds);
+  }
+  if (state.footer !== undefined) {
+    const footerIds = new Set<string>();
+    validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds);
+  }
   // Phase 0 scaffold: `symbols` is the Wave 3 #14 entry point. Permissive
   // here — missing is treated as empty; present must be an array. Inner
   // shape validation lives in the Wave 3 owner's code (validation rules
@@ -823,26 +908,85 @@ function validateEditableShape(state: unknown, errors: string[]): void {
   if (state.symbols !== undefined && !Array.isArray(state.symbols)) {
     errors.push(`symbols must be an array when present (got ${describe(state.symbols)})`);
   }
+  if (Array.isArray(state.symbols)) {
+    const symbolIds = new Set<string>();
+    state.symbols.forEach((symbol, idx) => {
+      const symbolPath = `symbols[${String(idx)}]`;
+      if (!isRecord(symbol)) {
+        errors.push(`${symbolPath} must be an object`);
+        return;
+      }
+      if (!isNonEmptyString(symbol.id)) {
+        errors.push(`${symbolPath}.id must be a non-empty string`);
+      } else if (symbolIds.has(symbol.id)) {
+        errors.push(`${symbolPath}.id "${symbol.id}" is duplicated across symbols`);
+      } else {
+        symbolIds.add(symbol.id);
+      }
+      if (!isNonEmptyString(symbol.name)) {
+        errors.push(`${symbolPath}.name must be a non-empty string`);
+      }
+      const symbolLocalIds = new Set<string>();
+      validateSection(
+        symbol.section,
+        PAGE_WIDTH_MAX,
+        `${symbolPath}.section`,
+        errors,
+        symbolLocalIds,
+        validPageIds,
+      );
+    });
+  }
 }
 
-function validatePublishedMediaReferences(pages: unknown, errors: string[]): void {
-  if (!Array.isArray(pages)) return;
-  pages.forEach((page, pageIdx) => {
-    if (!isRecord(page) || !Array.isArray(page.sections)) return;
-    page.sections.forEach((section, sectionIdx) => {
-      if (!isRecord(section) || !Array.isArray(section.elements)) return;
-      section.elements.forEach((element, elementIdx) => {
-        if (!isRecord(element) || element.type !== 'media') return;
-        const basePath = `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}]`;
-        if (element.assetId === '') {
-          errors.push(`${basePath}.assetId must be non-empty in published snapshots`);
-        }
-        if (element.posterAssetId === '') {
-          errors.push(`${basePath}.posterAssetId must be non-empty in published snapshots`);
-        }
+function validatePublishedMediaReferencesInSection(
+  section: unknown,
+  basePath: string,
+  errors: string[],
+): void {
+  if (!isRecord(section) || !Array.isArray(section.elements)) return;
+  section.elements.forEach((element, elementIdx) => {
+    if (!isRecord(element) || element.type !== 'media') return;
+    const elementPath = `${basePath}.elements[${String(elementIdx)}]`;
+    if (element.assetId === '') {
+      errors.push(`${elementPath}.assetId must be non-empty in published snapshots`);
+    }
+    if (element.posterAssetId === '') {
+      errors.push(`${elementPath}.posterAssetId must be non-empty in published snapshots`);
+    }
+  });
+}
+
+function validatePublishedMediaReferences(snapshot: unknown, errors: string[]): void {
+  if (!isRecord(snapshot)) return;
+  if (Array.isArray(snapshot.pages)) {
+    snapshot.pages.forEach((page, pageIdx) => {
+      if (!isRecord(page) || !Array.isArray(page.sections)) return;
+      page.sections.forEach((section, sectionIdx) => {
+        validatePublishedMediaReferencesInSection(
+          section,
+          `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+          errors,
+        );
       });
     });
-  });
+  }
+  if (snapshot.header !== undefined) {
+    validatePublishedMediaReferencesInSection(snapshot.header, 'header', errors);
+  }
+  if (snapshot.footer !== undefined) {
+    validatePublishedMediaReferencesInSection(snapshot.footer, 'footer', errors);
+  }
+  if (Array.isArray(snapshot.symbols)) {
+    snapshot.symbols.forEach((symbol, idx) => {
+      if (!isRecord(symbol)) return;
+      validatePublishedMediaReferencesInSection(
+        symbol.section,
+        `symbols[${String(idx)}].section`,
+        errors,
+      );
+    });
+  }
 }
 
 export function validateCanvasSiteState(state: unknown): ValidationResult {
@@ -868,9 +1012,19 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
       errors.push(`publishedAt "${snapshot.publishedAt}" is not a parseable Date`);
     }
   }
-  // Re-use the editable validator on the snapshot's pages + style kit.
-  validateEditableShape({ styleKit: snapshot.styleKit, pages: snapshot.pages }, errors);
-  validatePublishedMediaReferences(snapshot.pages, errors);
+  // Re-use the editable validator on the snapshot's pages + style kit +
+  // optional header/footer sections.
+  validateEditableShape(
+    {
+      styleKit: snapshot.styleKit,
+      pages: snapshot.pages,
+      header: snapshot.header,
+      footer: snapshot.footer,
+      symbols: snapshot.symbols ?? [],
+    },
+    errors,
+  );
+  validatePublishedMediaReferences(snapshot, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }
@@ -891,44 +1045,56 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
  */
 export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
   const errors: string[] = [];
+
+  function validateSeedSection(section: CanvasSection | undefined, sectionPath: string): void {
+    if (!section) return;
+    for (let elIdx = 0; elIdx < section.elements.length; elIdx++) {
+      const element = section.elements[elIdx];
+      if (!element || element.type !== 'media') continue;
+      const elementPath = `${sectionPath}.elements[${String(elIdx)}]`;
+      const assetId = element.assetId;
+      const seedAsset = SEED_ASSET_REGISTRY[assetId];
+      if (!seedAsset) {
+        errors.push(
+          `${elementPath}.assetId "${assetId}" is not registered in SEED_ASSET_REGISTRY`,
+        );
+      } else if (seedAsset.kind !== element.mediaKind) {
+        errors.push(
+          `${elementPath}.assetId "${assetId}" is registered as ${seedAsset.kind}, but mediaKind is ${element.mediaKind}`,
+        );
+      }
+      if (element.posterAssetId !== undefined) {
+        const posterSeedAsset = SEED_ASSET_REGISTRY[element.posterAssetId];
+        if (!posterSeedAsset) {
+          errors.push(
+            `${elementPath}.posterAssetId "${element.posterAssetId}" is not registered in SEED_ASSET_REGISTRY`,
+          );
+        } else if (posterSeedAsset.kind !== 'image') {
+          errors.push(
+            `${elementPath}.posterAssetId "${element.posterAssetId}" is registered as ${posterSeedAsset.kind}, but posters must be image assets`,
+          );
+        }
+      }
+    }
+  }
+
   for (let pageIdx = 0; pageIdx < state.pages.length; pageIdx++) {
     const page = state.pages[pageIdx];
     if (!page) continue;
     const pagePath = `pages[${String(pageIdx)}]`;
     for (let sectionIdx = 0; sectionIdx < page.sections.length; sectionIdx++) {
-      const section = page.sections[sectionIdx];
-      if (!section) continue;
-      const sectionPath = `${pagePath}.sections[${String(sectionIdx)}]`;
-      for (let elIdx = 0; elIdx < section.elements.length; elIdx++) {
-        const element = section.elements[elIdx];
-        if (!element || element.type !== 'media') continue;
-        const elementPath = `${sectionPath}.elements[${String(elIdx)}]`;
-        const assetId = element.assetId;
-        const seedAsset = SEED_ASSET_REGISTRY[assetId];
-        if (!seedAsset) {
-          errors.push(
-            `${elementPath}.assetId "${assetId}" is not registered in SEED_ASSET_REGISTRY`,
-          );
-        } else if (seedAsset.kind !== element.mediaKind) {
-          errors.push(
-            `${elementPath}.assetId "${assetId}" is registered as ${seedAsset.kind}, but mediaKind is ${element.mediaKind}`,
-          );
-        }
-        if (element.posterAssetId !== undefined) {
-          const posterSeedAsset = SEED_ASSET_REGISTRY[element.posterAssetId];
-          if (!posterSeedAsset) {
-            errors.push(
-              `${elementPath}.posterAssetId "${element.posterAssetId}" is not registered in SEED_ASSET_REGISTRY`,
-            );
-          } else if (posterSeedAsset.kind !== 'image') {
-            errors.push(
-              `${elementPath}.posterAssetId "${element.posterAssetId}" is registered as ${posterSeedAsset.kind}, but posters must be image assets`,
-            );
-          }
-        }
-      }
+      validateSeedSection(
+        page.sections[sectionIdx],
+        `${pagePath}.sections[${String(sectionIdx)}]`,
+      );
     }
   }
+  validateSeedSection(state.header, 'header');
+  validateSeedSection(state.footer, 'footer');
+  for (let idx = 0; idx < state.symbols.length; idx++) {
+    validateSeedSection(state.symbols[idx]?.section, `symbols[${String(idx)}].section`);
+  }
+
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }

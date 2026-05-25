@@ -9,12 +9,20 @@
 // consumer that needs to know "which assets does this Canvas state
 // reference, and do those references match the materialised row set".
 
-import type { CanvasPage, MediaKind } from '../canvas/schema.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  CanvasSiteState,
+  MediaKind,
+  PublishedSnapshot,
+  SymbolMaster,
+} from '../canvas/schema.js';
 
 export interface ReferencedAsset {
   assetId: string;
   expectedKind: MediaKind;
-  role: 'asset' | 'poster' | 'og-image';
+  role: 'asset' | 'poster' | 'og-image' | 'background-video' | 'nav-logo' | 'carousel-slide';
   path: string;
   mediaElementId?: string;
 }
@@ -35,91 +43,203 @@ export interface UnfilledAssetReference {
   mediaElementId: string;
 }
 
+export interface AssetReferenceRoot {
+  pages: CanvasPage[];
+  header?: CanvasSection;
+  footer?: CanvasSection;
+  symbols?: SymbolMaster[];
+}
+
+export type AssetReferenceSource =
+  | CanvasPage[]
+  | AssetReferenceRoot
+  | CanvasSiteState
+  | PublishedSnapshot;
+
+function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
+  return Array.isArray(source)
+    ? { pages: source }
+    : {
+        pages: source.pages,
+        ...(source.header !== undefined ? { header: source.header } : {}),
+        ...(source.footer !== undefined ? { footer: source.footer } : {}),
+        ...(source.symbols !== undefined ? { symbols: source.symbols } : {}),
+      };
+}
+
+function pushReference(
+  out: ReferencedAsset[],
+  assetId: string | undefined,
+  expectedKind: MediaKind,
+  role: ReferencedAsset['role'],
+  path: string,
+  mediaElementId?: string,
+): void {
+  if (typeof assetId !== 'string' || assetId.length === 0) return;
+  out.push({
+    assetId,
+    expectedKind,
+    role,
+    path,
+    ...(mediaElementId !== undefined ? { mediaElementId } : {}),
+  });
+}
+
+function collectElementReferences(
+  element: CanvasElement,
+  elementPath: string,
+  out: ReferencedAsset[],
+): void {
+  if (element.type === 'media') {
+    pushReference(
+      out,
+      element.assetId,
+      element.mediaKind,
+      'asset',
+      `${elementPath}.assetId`,
+      element.id,
+    );
+    pushReference(
+      out,
+      element.posterAssetId,
+      'image',
+      'poster',
+      `${elementPath}.posterAssetId`,
+      element.id,
+    );
+    return;
+  }
+  if (element.type === 'nav') {
+    pushReference(out, element.logoAssetId, 'image', 'nav-logo', `${elementPath}.logoAssetId`);
+    return;
+  }
+  if (element.type === 'carousel') {
+    element.slides.forEach((slide, slideIdx) => {
+      pushReference(
+        out,
+        slide.assetId,
+        'image',
+        'carousel-slide',
+        `${elementPath}.slides[${String(slideIdx)}].assetId`,
+        element.id,
+      );
+    });
+  }
+}
+
+function collectSectionReferences(
+  section: CanvasSection,
+  sectionPath: string,
+  out: ReferencedAsset[],
+): void {
+  pushReference(
+    out,
+    section.backgroundVideo,
+    'video',
+    'background-video',
+    `${sectionPath}.backgroundVideo`,
+  );
+  for (const [elementIdx, element] of section.elements.entries()) {
+    collectElementReferences(element, `${sectionPath}.elements[${String(elementIdx)}]`, out);
+  }
+}
+
 /**
- * Walk a snapshot's (or editable site's) pages and return every assetId AND
- * posterAssetId referenced by a media element. Used by:
+ * Walk a snapshot or editable site and return every referenced Owner Asset.
+ * Passing a bare CanvasPage[] is still supported for older callers, but new
+ * callers should pass the whole state/snapshot so site-wide header/footer
+ * references are included. Used by:
  *   - publish guard: reject if any referenced id is missing from `ownerAsset`.
  *   - public `/assets/:assetId` route: 404 if the request is for an id not
  *     in the current snapshot's reachable set.
  *
  * Returns a fresh array so callers can mutate it without affecting the
- * source pages.
+ * source state.
  */
-export function collectReferencedAssets(pages: CanvasPage[]): ReferencedAsset[] {
+export function collectReferencedAssets(source: AssetReferenceSource): ReferencedAsset[] {
+  const root = referenceRootFrom(source);
   const out: ReferencedAsset[] = [];
-  for (const [pageIdx, page] of pages.entries()) {
-    if (typeof page.ogImageAssetId === 'string' && page.ogImageAssetId.length > 0) {
-      out.push({
-        assetId: page.ogImageAssetId,
-        expectedKind: 'image',
-        role: 'og-image',
-        path: `pages[${String(pageIdx)}].ogImageAssetId`,
-      });
-    }
+  for (const [pageIdx, page] of root.pages.entries()) {
+    pushReference(
+      out,
+      page.ogImageAssetId,
+      'image',
+      'og-image',
+      `pages[${String(pageIdx)}].ogImageAssetId`,
+    );
     for (const [sectionIdx, section] of page.sections.entries()) {
-      for (const [elementIdx, element] of section.elements.entries()) {
-        if (element.type !== 'media') continue;
-        if (typeof element.assetId === 'string' && element.assetId.length > 0) {
-          out.push({
-            assetId: element.assetId,
-            expectedKind: element.mediaKind,
-            role: 'asset',
-            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].assetId`,
-            mediaElementId: element.id,
-          });
-        }
-        if (typeof element.posterAssetId === 'string' && element.posterAssetId.length > 0) {
-          out.push({
-            assetId: element.posterAssetId,
-            expectedKind: 'image',
-            role: 'poster',
-            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].posterAssetId`,
-            mediaElementId: element.id,
-          });
-        }
-      }
+      collectSectionReferences(
+        section,
+        `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+        out,
+      );
     }
   }
+  if (root.header !== undefined) collectSectionReferences(root.header, 'header', out);
+  if (root.footer !== undefined) collectSectionReferences(root.footer, 'footer', out);
+  root.symbols?.forEach((symbol, idx) => {
+    collectSectionReferences(symbol.section, `symbols[${String(idx)}].section`, out);
+  });
   return out;
 }
 
-export function collectReferencedAssetIds(pages: CanvasPage[]): Set<string> {
-  return new Set(collectReferencedAssets(pages).map((ref) => ref.assetId));
+export function collectReferencedAssetIds(source: AssetReferenceSource): Set<string> {
+  return new Set(collectReferencedAssets(source).map((ref) => ref.assetId));
 }
 
-export function collectUnfilledAssetReferences(pages: CanvasPage[]): UnfilledAssetReference[] {
-  const out: UnfilledAssetReference[] = [];
-  for (const [pageIdx, page] of pages.entries()) {
-    for (const [sectionIdx, section] of page.sections.entries()) {
-      for (const [elementIdx, element] of section.elements.entries()) {
-        if (element.type !== 'media') continue;
-        if (element.assetId === '') {
-          out.push({
-            role: 'asset',
-            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].assetId`,
-            mediaElementId: element.id,
-          });
-        }
-        if (element.posterAssetId === '') {
-          out.push({
-            role: 'poster',
-            path: `pages[${String(pageIdx)}].sections[${String(sectionIdx)}].elements[${String(elementIdx)}].posterAssetId`,
-            mediaElementId: element.id,
-          });
-        }
-      }
+function collectUnfilledSectionReferences(
+  section: CanvasSection,
+  sectionPath: string,
+  out: UnfilledAssetReference[],
+): void {
+  for (const [elementIdx, element] of section.elements.entries()) {
+    if (element.type !== 'media') continue;
+    if (element.assetId === '') {
+      out.push({
+        role: 'asset',
+        path: `${sectionPath}.elements[${String(elementIdx)}].assetId`,
+        mediaElementId: element.id,
+      });
+    }
+    if (element.posterAssetId === '') {
+      out.push({
+        role: 'poster',
+        path: `${sectionPath}.elements[${String(elementIdx)}].posterAssetId`,
+        mediaElementId: element.id,
+      });
     }
   }
+}
+
+export function collectUnfilledAssetReferences(
+  source: AssetReferenceSource,
+): UnfilledAssetReference[] {
+  const root = referenceRootFrom(source);
+  const out: UnfilledAssetReference[] = [];
+  for (const [pageIdx, page] of root.pages.entries()) {
+    for (const [sectionIdx, section] of page.sections.entries()) {
+      collectUnfilledSectionReferences(
+        section,
+        `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+        out,
+      );
+    }
+  }
+  if (root.header !== undefined) collectUnfilledSectionReferences(root.header, 'header', out);
+  if (root.footer !== undefined) collectUnfilledSectionReferences(root.footer, 'footer', out);
+  root.symbols?.forEach((symbol, idx) => {
+    collectUnfilledSectionReferences(symbol.section, `symbols[${String(idx)}].section`, out);
+  });
   return out;
 }
 
 export function findAssetReferenceErrors(
-  pages: CanvasPage[],
+  source: AssetReferenceSource,
   assets: AssetKindRow[],
 ): AssetReferenceError[] {
   const kindsById = new Map(assets.map((asset) => [asset.id, asset.kind]));
   const errors: AssetReferenceError[] = [];
-  for (const reference of collectReferencedAssets(pages)) {
+  for (const reference of collectReferencedAssets(source)) {
     const actualKind = kindsById.get(reference.assetId);
     if (!actualKind) {
       errors.push({ ...reference, reason: 'missing' });

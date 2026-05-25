@@ -70,6 +70,7 @@ assert(html.includes('<video'), 'expected a <video> tag in rendered HTML');
 // 2. Video has autoplay, loop, muted, playsinline attributes
 const videoTagMatch = html.match(/<video[^>]*>/);
 assert(videoTagMatch !== null, 'expected to match <video> opening tag');
+if (videoTagMatch === null) throw new Error('expected to match <video> opening tag');
 const videoTag = videoTagMatch[0];
 assert(videoTag.includes('autoplay'), 'expected autoplay attribute on video');
 assert(videoTag.includes('loop'), 'expected loop attribute on video');

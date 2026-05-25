@@ -23,7 +23,7 @@
 // `ElementRenderCtx` declared below — a single shape every render fn reads
 // from, regardless of whether it cares about every field.
 
-import type { CanvasElement } from '../schema.js';
+import type { CanvasElement, CanvasPage } from '../schema.js';
 
 import { renderAccordion } from './accordion.js';
 import { renderAction } from './action.js';
@@ -94,6 +94,8 @@ export interface ElementRenderCtx {
   siteId: string;
   /** Slug of the page currently being rendered. */
   pageSlug: string;
+  /** All pages in the snapshot — needed by action element to resolve page links. */
+  pages: CanvasPage[];
 }
 
 /**
@@ -115,7 +117,7 @@ function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): strin
 export const RENDER_DISPATCH: RenderDispatch = {
   text: (el) => renderText(el),
   media: (el, ctx) => renderMedia(el, { assetBasePath: ctx.assetBasePath }),
-  action: (el) => renderAction(el),
+  action: (el, ctx) => renderAction(el, { pages: ctx.pages }),
   shape: (el) => renderShape(el),
   container: (el) => renderContainer(el),
   // Phase 0 stubs — each throws until its wave agent lands.

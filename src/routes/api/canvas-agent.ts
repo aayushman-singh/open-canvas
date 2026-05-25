@@ -349,7 +349,7 @@ async function runOpsPipeline(
   // this Owner and matches the media element's expected kind. Per ADR 0004
   // the asset root is the Owner, not the site — so two sites under the
   // same Owner can share assets. The scoping below honours that.
-  const referencedAssetIds = collectReferencedAssetIds(next.pages);
+  const referencedAssetIds = collectReferencedAssetIds(next);
   if (referencedAssetIds.size > 0) {
     const database = db(c.env);
     const rows = await database
@@ -361,7 +361,7 @@ async function runOpsPipeline(
           inArray(ownerAsset.id, [...referencedAssetIds]),
         ),
       );
-    const referenceErrors = findAssetReferenceErrors(next.pages, rows);
+    const referenceErrors = findAssetReferenceErrors(next, rows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
       return {

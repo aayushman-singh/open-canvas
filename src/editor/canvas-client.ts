@@ -65,6 +65,47 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return false;
     }
   }
+  function isValidActionHref(href) {
+    if (!href || typeof href !== "object") return false;
+    if (href.type === "external") {
+      return typeof href.url === "string" && href.url.length > 0 && isAllowedHref(href.url);
+    }
+    if (href.type === "page") {
+      return typeof href.pageId === "string" && href.pageId.length > 0;
+    }
+    return false;
+  }
+
+  // -- State migration: old string hrefs -> ActionHref union ---------------
+  function migrateState(s) {
+    if (!s || !s.pages) return s;
+    function migrateSection(section) {
+      if (!section || !Array.isArray(section.elements)) return;
+      for (var k = 0; k < section.elements.length; k++) {
+        var el = section.elements[k];
+        if (el.type === "action" && typeof el.href === "string") {
+          el.href = { type: "external", url: el.href };
+        }
+      }
+    }
+    for (var i = 0; i < s.pages.length; i++) {
+      var page = s.pages[i];
+      for (var j = 0; j < page.sections.length; j++) {
+        migrateSection(page.sections[j]);
+      }
+    }
+    migrateSection(s.header);
+    migrateSection(s.footer);
+    if (Array.isArray(s.symbols)) {
+      for (var symIdx = 0; symIdx < s.symbols.length; symIdx++) {
+        if (s.symbols[symIdx]) {
+          migrateSection(s.symbols[symIdx].section);
+        }
+      }
+    }
+    return s;
+  }
+
   // Tag-name -> InlineMark factory used by the DOM-to-runs serializer.
   const MARK_TAGS = {
     STRONG: () => ({ type: "bold" }),
@@ -100,6 +141,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let temporaryPanPreviousMode = null;
   let isReelOpen = false;
   let reelViewMode = "tile";
+  let activePageId = null;
+  let pagePositions = [];
+  var PAGE_GAP = 120;
+  var ARTBOARD_LABEL_HEIGHT = 40;
   // The recipe-id list mirrors src/canvas/schema.ts SECTION_RECIPE_IDS.
   const SECTION_RECIPE_IDS = [
     "hero-split",
@@ -121,18 +166,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const publishButton = document.getElementById("canvas-publish");
   const saveTemplateButton = document.getElementById("canvas-save-template");
 
-  // -- Viewport + zoom ---------------------------------------------------
+  // -- Viewport + camera --------------------------------------------------
   // The route ships #canvas-root directly inside the editor shell. We wrap
   // it in a .rev01-viewport at boot so the viewport owns the dark
-  // background, horizontal centering, and dock-clearing margins, while
-  // #canvas-root receives the CSS transform that implements zoom. The
-  // viewport no longer scrolls — the browser's native body scroll handles
-  // vertical overflow when zoomed in. The wrap is purely client-side so
-  // the route shell stays untouched.
+  // background and dock-clearing margins, while #canvas-root receives the
+  // CSS transform that implements pan+zoom via the camera object. The
+  // viewport has overflow:hidden — no body scroll, the camera handles
+  // everything. The wrap is purely client-side so the route shell stays
+  // untouched.
   let viewport = null;
   let zoomToolbar = null;
   let zoomReadout = null;
-  let zoom = 1;
+  let camera = { x: 0, y: 0, zoom: 1 };
   const ZOOM_MIN = 0.25;
   const ZOOM_MAX_FIT = 1.0;     // "Fit" never auto-zooms past 100%
   const ZOOM_MAX_MANUAL = 2.0;  // manual +/- and wheel clamp here
@@ -140,53 +185,152 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function clampZoom(value, max) {
     if (!Number.isFinite(value)) return 1;
-    const upper = typeof max === "number" ? max : ZOOM_MAX_MANUAL;
+    var upper = typeof max === "number" ? max : ZOOM_MAX_MANUAL;
     if (value < ZOOM_MIN) return ZOOM_MIN;
     if (value > upper) return upper;
     // Snap to one-decimal precision so repeated +/- stays predictable.
     return Math.round(value * 10) / 10;
   }
 
-  function applyZoom() {
-    if (!root) return;
-    root.style.transform = "scale(" + zoom + ")";
-    root.style.transformOrigin = "top left";
-    // CSS transform doesn't change layout, so the viewport scrollWidth/
-    // scrollHeight would stay unchanged from zoom=1. We need the viewport
-    // to scroll proportionally to the scaled content. Compute the page's
-    // logical extent and set #canvas-root's width/height to its post-scale
-    // size so the viewport's scrollbars match what the Owner sees.
-    const page = currentPage();
-    if (page) {
-      let logicalHeight = 0;
-      for (let i = 0; i < page.sections.length; i++) {
-        logicalHeight += page.sections[i].height || 0;
-      }
-      root.style.width = page.width * zoom + "px";
-      root.style.height = logicalHeight * zoom + "px";
-    }
-    if (zoomReadout) zoomReadout.textContent = Math.round(zoom * 100) + "%";
+  function screenToWorld(screenX, screenY) {
+    if (!viewport) return { x: 0, y: 0 };
+    var rect = viewport.getBoundingClientRect();
+    return {
+      x: (screenX - rect.left - camera.x) / camera.zoom,
+      y: (screenY - rect.top - camera.y) / camera.zoom,
+    };
   }
 
-  function setZoom(value, max) {
-    zoom = clampZoom(value, max);
-    applyZoom();
+  function worldToScreen(worldX, worldY) {
+    if (!viewport) return { x: 0, y: 0 };
+    var rect = viewport.getBoundingClientRect();
+    return {
+      x: worldX * camera.zoom + camera.x + rect.left,
+      y: worldY * camera.zoom + camera.y + rect.top,
+    };
+  }
+
+  function applyCameraTransform() {
+    if (!root) return;
+    root.style.transform =
+      "translate(" + camera.x + "px, " + camera.y + "px) scale(" + camera.zoom + ")";
+    root.style.transformOrigin = "0 0";
+    if (zoomReadout) zoomReadout.textContent = Math.round(camera.zoom * 100) + "%";
+  }
+
+  function setZoom(newZoom, maxClamp) {
+    camera.zoom = clampZoom(newZoom, maxClamp);
+    applyCameraTransform();
+  }
+
+  function zoomAtPoint(newZoom, screenX, screenY) {
+    if (!viewport) return;
+    var rect = viewport.getBoundingClientRect();
+    var worldX = (screenX - rect.left - camera.x) / camera.zoom;
+    var worldY = (screenY - rect.top - camera.y) / camera.zoom;
+    camera.zoom = clampZoom(newZoom, ZOOM_MAX_MANUAL);
+    camera.x = (screenX - rect.left) - worldX * camera.zoom;
+    camera.y = (screenY - rect.top) - worldY * camera.zoom;
+    applyCameraTransform();
+  }
+
+  function fitToPage(pageId) {
+    if (!viewport) return;
+    var pos = typeof getPagePosition === "function" ? getPagePosition(pageId || (currentPage() && currentPage().id)) : null;
+    if (!pos) {
+      // Fallback for single-page mode before multi-page is wired
+      var page = currentPage();
+      if (!page) return;
+      var rect = viewport.getBoundingClientRect();
+      var totalHeight = 0;
+      for (var i = 0; i < page.sections.length; i++) {
+        totalHeight += page.sections[i].height || 0;
+      }
+      var availW = rect.width - 128;
+      var availH = rect.height - 128;
+      if (availW <= 0 || availH <= 0) return;
+      var scaleX = availW / page.width;
+      var scaleY = availH / totalHeight;
+      camera.zoom = clampZoom(Math.min(scaleX, scaleY), ZOOM_MAX_FIT);
+      camera.x = (rect.width - page.width * camera.zoom) / 2;
+      camera.y = (rect.height - totalHeight * camera.zoom) / 2;
+      applyCameraTransform();
+      return;
+    }
+    var rect2 = viewport.getBoundingClientRect();
+    var padX = 64;
+    var padY = 64;
+    var availW2 = rect2.width - padX * 2;
+    var availH2 = rect2.height - padY * 2;
+    if (availW2 <= 0 || availH2 <= 0) return;
+    var scaleX2 = availW2 / pos.width;
+    var scaleY2 = availH2 / pos.height;
+    var newZoom = clampZoom(Math.min(scaleX2, scaleY2), ZOOM_MAX_FIT);
+    camera.zoom = newZoom;
+    camera.x = (rect2.width - pos.width * newZoom) / 2 - pos.x * newZoom;
+    camera.y = (rect2.height - pos.height * newZoom) / 2 - pos.y * newZoom;
+    applyCameraTransform();
   }
 
   function fitZoom() {
-    if (!viewport) return;
-    const page = currentPage();
-    const pageWidth = page ? page.width : 1440;
-    if (pageWidth <= 0) return;
-    // Account for the viewport's horizontal padding so the fit zoom doesn't
-    // overflow into the scrollbar. clientWidth already excludes scrollbars.
-    const style = window.getComputedStyle(viewport);
-    const padX =
-      (parseFloat(style.paddingLeft) || 0) +
-      (parseFloat(style.paddingRight) || 0);
-    const available = Math.max(0, viewport.clientWidth - padX);
-    const raw = available / pageWidth;
-    setZoom(raw, ZOOM_MAX_FIT);
+    fitToPage(null);
+  }
+
+  function computePagePositions() {
+    if (!state || !state.pages) { pagePositions = []; return; }
+    var positions = [];
+    var x = 0;
+    for (var i = 0; i < state.pages.length; i++) {
+      var page = state.pages[i];
+      var totalHeight = 0;
+      for (var j = 0; j < page.sections.length; j++) {
+        totalHeight += page.sections[j].height || 0;
+      }
+      if (state.header) totalHeight += state.header.height || 0;
+      if (state.footer) totalHeight += state.footer.height || 0;
+      positions.push({
+        pageId: page.id,
+        x: x,
+        y: ARTBOARD_LABEL_HEIGHT,
+        width: page.width,
+        height: totalHeight,
+      });
+      x += page.width + PAGE_GAP;
+    }
+    pagePositions = positions;
+  }
+
+  function getPagePosition(pageId) {
+    for (var i = 0; i < pagePositions.length; i++) {
+      if (pagePositions[i].pageId === pageId) return pagePositions[i];
+    }
+    return null;
+  }
+
+  function fitAllPages() {
+    if (!viewport || pagePositions.length === 0) return;
+    var rect = viewport.getBoundingClientRect();
+    var pad = 64;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (var i = 0; i < pagePositions.length; i++) {
+      var p = pagePositions[i];
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x + p.width > maxX) maxX = p.x + p.width;
+      if (p.y + p.height > maxY) maxY = p.y + p.height;
+    }
+    var contentW = maxX - minX;
+    var contentH = maxY - minY;
+    if (contentW <= 0 || contentH <= 0) return;
+    var availW = rect.width - pad * 2;
+    var availH = rect.height - pad * 2;
+    var scaleX = availW / contentW;
+    var scaleY = availH / contentH;
+    var newZoom = clampZoom(Math.min(scaleX, scaleY), ZOOM_MAX_FIT);
+    camera.zoom = newZoom;
+    camera.x = (rect.width - contentW * newZoom) / 2 - minX * newZoom;
+    camera.y = (rect.height - contentH * newZoom) / 2 - minY * newZoom;
+    applyCameraTransform();
   }
 
   function mountViewport() {
@@ -255,18 +399,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const action = target.getAttribute("data-zoom-action");
       if (action === "fit") fitZoom();
       else if (action === "reset") setZoom(1, ZOOM_MAX_MANUAL);
-      else if (action === "in") setZoom(zoom + ZOOM_STEP, ZOOM_MAX_MANUAL);
-      else if (action === "out") setZoom(zoom - ZOOM_STEP, ZOOM_MAX_MANUAL);
+      else if (action === "in") setZoom(camera.zoom + ZOOM_STEP, ZOOM_MAX_MANUAL);
+      else if (action === "out") setZoom(camera.zoom - ZOOM_STEP, ZOOM_MAX_MANUAL);
     });
-    // Ctrl/Cmd + wheel zooms; plain wheel scrolls naturally. We must call
-    // preventDefault inside the zoom branch so the page doesn't also scroll.
+    // Plain wheel pans the canvas; Ctrl/Cmd + wheel zooms at pointer.
     viewport.addEventListener(
       "wheel",
-      (ev) => {
-        if (!ev.ctrlKey && !ev.metaKey) return;
+      function (ev) {
+        if (!ev.ctrlKey && !ev.metaKey) {
+          camera.x -= ev.deltaX;
+          camera.y -= ev.deltaY;
+          applyCameraTransform();
+          return;
+        }
         ev.preventDefault();
-        const direction = ev.deltaY > 0 ? -1 : 1;
-        setZoom(zoom + direction * ZOOM_STEP, ZOOM_MAX_MANUAL);
+        var direction = ev.deltaY > 0 ? -1 : 1;
+        zoomAtPoint(camera.zoom + direction * ZOOM_STEP, ev.clientX, ev.clientY);
       },
       { passive: false },
     );
@@ -276,12 +424,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ev.preventDefault();
       var startX = ev.clientX;
       var startY = ev.clientY;
-      var scrollX = window.scrollX;
-      var scrollY = window.scrollY;
+      var camStartX = camera.x;
+      var camStartY = camera.y;
       viewport.setAttribute("data-panning", "true");
       function onMove(e) {
         e.preventDefault();
-        window.scrollTo(scrollX - (e.clientX - startX), scrollY - (e.clientY - startY));
+        camera.x = camStartX + (e.clientX - startX);
+        camera.y = camStartY + (e.clientY - startY);
+        applyCameraTransform();
       }
       function onUp() {
         viewport.removeAttribute("data-panning");
@@ -294,23 +444,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       window.addEventListener("blur", onUp);
     });
     setInteractionMode("select");
-    applyZoom();
+    applyCameraTransform();
   }
 
   // -- Pointer-to-canvas coordinate helper -------------------------------
   // Single source of truth for converting a pointer event's clientX/clientY
-  // to coordinates inside the given section's local canvas space. The
-  // section element is the .rev01-section DOM node; its bounding rect
-  // already reflects the current CSS transform (zoom), so dividing the
-  // pointer delta by zoom yields native canvas units. Returning null on
-  // missing section is a loud signal — callers should bail out, not guess.
+  // to coordinates inside the given section's local canvas space. Uses the
+  // camera-aware screenToWorld helper to convert to world coordinates, then
+  // subtracts the section's world-space origin. Returning null on missing
+  // section is a loud signal — callers should bail out, not guess.
   function pointerToCanvas(event, sectionEl) {
     if (!sectionEl || typeof event.clientX !== "number") return null;
-    const rect = sectionEl.getBoundingClientRect();
-    const z = zoom || 1;
+    var world = screenToWorld(event.clientX, event.clientY);
+    var sectionRect = sectionEl.getBoundingClientRect();
+    var sectionWorld = screenToWorld(sectionRect.left, sectionRect.top);
     return {
-      x: (event.clientX - rect.left) / z,
-      y: (event.clientY - rect.top) / z,
+      x: world.x - sectionWorld.x,
+      y: world.y - sectionWorld.y,
     };
   }
 
@@ -603,24 +753,222 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function currentPage() {
     if (!state || !Array.isArray(state.pages) || state.pages.length === 0) return null;
+    if (activePageId) {
+      for (var i = 0; i < state.pages.length; i++) {
+        if (state.pages[i].id === activePageId) return state.pages[i];
+      }
+    }
     return state.pages[0];
   }
 
+  function setActivePage(pageId) {
+    activePageId = pageId;
+    selectedSectionId = null;
+    selectedElementId = null;
+    renderInspector();
+    renderReel();
+    renderSidebarSelection();
+    updatePageSidebar();
+    if (root) {
+      var artboards = root.querySelectorAll(".rev01-artboard");
+      for (var i = 0; i < artboards.length; i++) {
+        var isActive = artboards[i].getAttribute("data-page-id") === pageId;
+        artboards[i].setAttribute("data-active", isActive ? "true" : "false");
+      }
+    }
+  }
+
+  function updatePageSidebar() {
+    var listEl = document.getElementById("canvas-page-list");
+    if (!listEl || !state) return;
+    listEl.replaceChildren();
+
+    for (var i = 0; i < state.pages.length; i++) {
+      var page = state.pages[i];
+      var item = document.createElement("div");
+      item.className = "rev01-page-item";
+      item.setAttribute("data-page-id", page.id);
+      item.setAttribute("data-active", page.id === activePageId ? "true" : "false");
+
+      var title = document.createElement("span");
+      title.className = "rev01-page-item-title";
+      title.textContent = page.title;
+      item.appendChild(title);
+
+      var slug = document.createElement("span");
+      slug.className = "rev01-page-item-slug";
+      slug.textContent = "/" + page.slug;
+      item.appendChild(slug);
+
+      var actions = document.createElement("span");
+      actions.className = "rev01-page-item-actions";
+
+      var renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.textContent = "Rename";
+      renameBtn.setAttribute("data-page-action", "rename");
+      renameBtn.setAttribute("data-page-id", page.id);
+      actions.appendChild(renameBtn);
+
+      if (state.pages.length > 1) {
+        var deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Del";
+        deleteBtn.setAttribute("data-page-action", "delete");
+        deleteBtn.setAttribute("data-page-id", page.id);
+        deleteBtn.setAttribute("data-danger", "true");
+        actions.appendChild(deleteBtn);
+      }
+
+      item.appendChild(actions);
+      listEl.appendChild(item);
+    }
+  }
+
+  function createPage() {
+    if (!state) return;
+    var idx = state.pages.length + 1;
+    var newPage = {
+      id: "page-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+      slug: "page-" + idx,
+      title: "Page " + idx,
+      width: 1440,
+      sections: [
+        {
+          id: newSectionId(),
+          recipeId: "feature-grid",
+          name: "Blank section",
+          height: 640,
+          elements: [],
+        },
+      ],
+    };
+    state.pages.push(newPage);
+    captureForUndo();
+    setActivePage(newPage.id);
+    renderAll();
+    fitToPage(newPage.id);
+    scheduleSave();
+    setStatus("Page created: " + newPage.title, "ok");
+  }
+
+  function renamePage(pageId) {
+    if (!state) return;
+    var page = null;
+    for (var i = 0; i < state.pages.length; i++) {
+      if (state.pages[i].id === pageId) { page = state.pages[i]; break; }
+    }
+    if (!page) return;
+    var newTitle = window.prompt("Page title:", page.title);
+    if (!newTitle || newTitle.trim().length === 0) return;
+    newTitle = newTitle.trim();
+    page.title = newTitle;
+    var newSlug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (newSlug.length === 0) newSlug = "page";
+    var slugBase = newSlug;
+    var counter = 2;
+    while (state.pages.some(function(p) { return p.id !== pageId && p.slug === newSlug; })) {
+      newSlug = slugBase + "-" + counter;
+      counter++;
+    }
+    page.slug = newSlug;
+    captureForUndo();
+    renderAll();
+    updatePageSidebar();
+    scheduleSave();
+    setStatus("Renamed to: " + newTitle, "ok");
+  }
+
+  function findActionPageLinkReferences(pageId) {
+    var refs = [];
+    function scanSection(section, label) {
+      if (!section || !Array.isArray(section.elements)) return;
+      for (var i = 0; i < section.elements.length; i++) {
+        var el = section.elements[i];
+        if (
+          el.type === "action" &&
+          el.href &&
+          el.href.type === "page" &&
+          el.href.pageId === pageId
+        ) {
+          refs.push(label + " / " + (el.label || el.id));
+        }
+      }
+    }
+    if (!state) return refs;
+    for (var pageIdx = 0; pageIdx < state.pages.length; pageIdx++) {
+      var page = state.pages[pageIdx];
+      for (var sectionIdx = 0; sectionIdx < page.sections.length; sectionIdx++) {
+        scanSection(
+          page.sections[sectionIdx],
+          page.title + " / " + page.sections[sectionIdx].name,
+        );
+      }
+    }
+    scanSection(state.header, "Header");
+    scanSection(state.footer, "Footer");
+    if (Array.isArray(state.symbols)) {
+      for (var symIdx = 0; symIdx < state.symbols.length; symIdx++) {
+        var symbol = state.symbols[symIdx];
+        if (symbol) scanSection(symbol.section, "Symbol " + (symbol.name || symbol.id));
+      }
+    }
+    return refs;
+  }
+
+  function deletePage(pageId) {
+    if (!state || state.pages.length <= 1) return;
+    var idx = -1;
+    for (var i = 0; i < state.pages.length; i++) {
+      if (state.pages[i].id === pageId) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    var inboundPageLinks = findActionPageLinkReferences(pageId);
+    if (inboundPageLinks.length > 0) {
+      setStatus("Delete blocked: page is linked from " + inboundPageLinks[0], "error");
+      return;
+    }
+    if (!window.confirm('Delete page "' + state.pages[idx].title + '"? This cannot be undone.')) return;
+    state.pages.splice(idx, 1);
+    captureForUndo();
+    if (activePageId === pageId) {
+      activePageId = state.pages[0].id;
+    }
+    renderAll();
+    updatePageSidebar();
+    fitAllPages();
+    scheduleSave();
+    setStatus("Page deleted", "ok");
+  }
+
   function findSection(sectionId) {
-    const page = currentPage();
+    if (state.header && state.header.id === sectionId) return state.header;
+    if (state.footer && state.footer.id === sectionId) return state.footer;
+    var page = currentPage();
     if (!page) return null;
-    for (const section of page.sections) {
-      if (section.id === sectionId) return section;
+    for (var si = 0; si < page.sections.length; si++) {
+      if (page.sections[si].id === sectionId) return page.sections[si];
     }
     return null;
   }
 
   function findElement(elementId) {
-    const page = currentPage();
+    if (state.header) {
+      for (var hi = 0; hi < state.header.elements.length; hi++) {
+        if (state.header.elements[hi].id === elementId) return { section: state.header, element: state.header.elements[hi] };
+      }
+    }
+    if (state.footer) {
+      for (var fi = 0; fi < state.footer.elements.length; fi++) {
+        if (state.footer.elements[fi].id === elementId) return { section: state.footer, element: state.footer.elements[fi] };
+      }
+    }
+    var page = currentPage();
     if (!page) return null;
-    for (const section of page.sections) {
-      for (const element of section.elements) {
-        if (element.id === elementId) return { section, element };
+    for (var si = 0; si < page.sections.length; si++) {
+      var section = page.sections[si];
+      for (var ei = 0; ei < section.elements.length; ei++) {
+        if (section.elements[ei].id === elementId) return { section: section, element: section.elements[ei] };
       }
     }
     return null;
@@ -888,11 +1236,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function buildActionBody(element) {
-    const node = document.createElement("a");
+    var node = document.createElement("a");
     node.className = "rev01-action";
     node.setAttribute("data-variant", element.variant);
-    node.setAttribute("href", element.href);
-    node.addEventListener("click", (ev) => { ev.preventDefault(); });
+    var resolvedHref = "#";
+    if (element.href && element.href.type === "external") {
+      resolvedHref = element.href.url;
+    } else if (element.href && element.href.type === "page") {
+      var linkedPage = null;
+      for (var pi = 0; pi < state.pages.length; pi++) {
+        if (state.pages[pi].id === element.href.pageId) {
+          linkedPage = state.pages[pi];
+          break;
+        }
+      }
+      resolvedHref = linkedPage ? "/" + linkedPage.slug : "#";
+    } else if (typeof element.href === "string") {
+      resolvedHref = element.href;
+    }
+    node.setAttribute("href", resolvedHref);
+    node.addEventListener("click", function(ev) { ev.preventDefault(); });
     node.textContent = element.label;
     return node;
   }
@@ -1274,13 +1637,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function rebuildElement(elementId) {
     const found = findElement(elementId);
     if (!found) return;
-    const existing = root.querySelector('[data-rev01-element="' + cssEscape(elementId) + '"]');
-    if (!existing || !existing.parentNode) {
+    const existingNodes = root.querySelectorAll(
+      '[data-rev01-element="' + cssEscape(elementId) + '"]',
+    );
+    if (existingNodes.length === 0) {
       renderAll();
       return;
     }
-    const replacement = buildElementNode(found.element);
-    existing.parentNode.replaceChild(replacement, existing);
+    for (var i = 0; i < existingNodes.length; i++) {
+      const existing = existingNodes[i];
+      if (!existing.parentNode) continue;
+      const replacement = buildElementNode(found.element);
+      existing.parentNode.replaceChild(replacement, existing);
+    }
   }
 
   function cssEscape(value) {
@@ -1373,34 +1742,71 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function renderAll() {
     if (!state) return;
-    const page = currentPage();
-    if (!page) {
-      root.replaceChildren();
-      return;
+    computePagePositions();
+
+    var fragment = document.createDocumentFragment();
+
+    for (var pi = 0; pi < state.pages.length; pi++) {
+      var page = state.pages[pi];
+      var pos = getPagePosition(page.id);
+      if (!pos) continue;
+
+      var artboard = document.createElement("div");
+      artboard.className = "rev01-artboard";
+      artboard.setAttribute("data-page-id", page.id);
+      artboard.setAttribute("data-active", page.id === (activePageId || state.pages[0].id) ? "true" : "false");
+      artboard.style.transform = "translate(" + pos.x + "px, " + pos.y + "px)";
+
+      var label = document.createElement("div");
+      label.className = "rev01-artboard-label";
+      label.textContent = page.title || page.slug;
+      label.setAttribute("data-page-id", page.id);
+      artboard.appendChild(label);
+
+      var article = document.createElement("article");
+      article.className = "rev01-page";
+      article.setAttribute("data-rev01-page", page.id);
+      article.style.width = page.width + "px";
+      article.style.position = "relative";
+
+      if (state.header) {
+        article.appendChild(buildSectionNode(state.header, page.width));
+      }
+
+      for (var si = 0; si < page.sections.length; si++) {
+        article.appendChild(buildSectionNode(page.sections[si], page.width));
+      }
+
+      if (state.footer) {
+        article.appendChild(buildSectionNode(state.footer, page.width));
+      }
+
+      artboard.appendChild(article);
+
+      var outline = document.createElement("div");
+      outline.className = "rev01-artboard-outline";
+      artboard.appendChild(outline);
+
+      fragment.appendChild(artboard);
     }
-    const article = document.createElement("article");
-    article.className = "rev01-page";
-    article.setAttribute("data-rev01-page", page.id);
-    article.style.width = page.width + "px";
-    article.style.margin = "0 auto";
-    article.style.position = "relative";
-    for (const section of page.sections) {
-      article.appendChild(buildSectionNode(section, page.width));
-    }
-    root.replaceChildren(article);
+
+    root.replaceChildren(fragment);
+
     if (mainEl && state.styleKit) {
       mainEl.setAttribute("data-style-kit", state.styleKit);
     }
-    // Re-apply zoom so #canvas-root's width/height reflect the (possibly
-    // changed) section heights or page width that this render produced.
-    applyZoom();
+
+    applyCameraTransform();
     renderInspector();
     renderSidebarSelection();
     renderReel();
-    // If a cross-template import is pending, the article we just replaced
-    // wiped any previously-drawn slots; re-draw them now.
+
     if (pendingImport) {
       renderPlacementSlots();
+    }
+
+    if (!activePageId && state.pages.length > 0) {
+      activePageId = state.pages[0].id;
     }
   }
 
@@ -1914,20 +2320,75 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       inspector.appendChild(field("Label", label));
 
-      const href = document.createElement("input");
-      href.type = "text";
-      href.value = element.href;
-      href.addEventListener("change", () => {
-        if (href.value.length === 0) {
-          setStatus("Href can't be empty", "error");
-          href.value = element.href;
-          return;
+      var hrefTypeSelect = document.createElement("select");
+      var optExternal = document.createElement("option");
+      optExternal.value = "external";
+      optExternal.textContent = "External URL";
+      hrefTypeSelect.appendChild(optExternal);
+      var optPage = document.createElement("option");
+      optPage.value = "page";
+      optPage.textContent = "Page link";
+      hrefTypeSelect.appendChild(optPage);
+      hrefTypeSelect.value = element.href && element.href.type ? element.href.type : "external";
+
+      var hrefValueContainer = document.createElement("div");
+
+      function renderHrefValue() {
+        hrefValueContainer.replaceChildren();
+        if (hrefTypeSelect.value === "external") {
+          var urlInput = document.createElement("input");
+          urlInput.type = "text";
+          urlInput.value = element.href && element.href.type === "external" ? element.href.url : "";
+          urlInput.placeholder = "https://...";
+          urlInput.addEventListener("change", function() {
+            if (urlInput.value.length === 0) {
+              setStatus("URL can not be empty", "error");
+              return;
+            }
+            if (!isAllowedHref(urlInput.value)) {
+              setStatus("URL not allowed", "error");
+              return;
+            }
+            element.href = { type: "external", url: urlInput.value };
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          hrefValueContainer.appendChild(urlInput);
+        } else {
+          var pageSelect = document.createElement("select");
+          for (var pi = 0; pi < state.pages.length; pi++) {
+            var p = state.pages[pi];
+            var opt = document.createElement("option");
+            opt.value = p.id;
+            opt.textContent = p.title + " (/" + p.slug + ")";
+            pageSelect.appendChild(opt);
+          }
+          if (element.href && element.href.type === "page") {
+            pageSelect.value = element.href.pageId;
+          }
+          pageSelect.addEventListener("change", function() {
+            element.href = { type: "page", pageId: pageSelect.value };
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          hrefValueContainer.appendChild(pageSelect);
         }
-        element.href = href.value;
+      }
+
+      hrefTypeSelect.addEventListener("change", function() {
+        if (hrefTypeSelect.value === "external") {
+          element.href = { type: "external", url: "" };
+        } else {
+          element.href = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
+        }
+        renderHrefValue();
         rebuildElement(element.id);
         scheduleSave();
       });
-      inspector.appendChild(field("Href", href));
+
+      inspector.appendChild(field("Link Type", hrefTypeSelect));
+      renderHrefValue();
+      inspector.appendChild(field("Destination", hrefValueContainer));
     }
 
     if (element.type === "shape") {
@@ -3130,8 +3591,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     scheduleSave();
   }
 
-  function buildReelRoleSlot(role, page) {
-    const slot = document.createElement("button");
+  function buildReelRoleSlot(role) {
+    var slot = document.createElement("button");
     slot.type = "button";
     slot.className = "reel-role-slot";
     slot.setAttribute("data-reel-role-slot", role);
@@ -3146,12 +3607,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         elements: [],
       };
       if (role === "header") {
-        page.sections.unshift(section);
+        state.header = section;
       } else {
-        page.sections.push(section);
+        state.footer = section;
       }
       selectedSectionId = section.id;
       selectedElementId = null;
+      captureForUndo();
       renderAll();
       scheduleSave();
       setStatus((role === "header" ? "Header" : "Footer") + " added", "ok");
@@ -3176,74 +3638,135 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const isTile = reelViewMode === "tile";
     const thumbW = isTile ? 288 : 64;
 
-    const hasHeader = page.sections.length > 0 && page.sections[0].role === "header";
-    const hasFooter = page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer";
+    // -- Site-level header tile or slot ------------------------------------
+    if (state.header) {
+      var hTile = document.createElement("div");
+      hTile.className = isTile ? "reel-tile" : "reel-list-item";
+      hTile.classList.add("reel-locked");
+      hTile.setAttribute("data-reel-section", state.header.id);
 
-    if (!hasHeader) {
-      body.appendChild(buildReelRoleSlot("header", page));
-    }
+      var hThumb = buildSectionThumbnail(state.header, pageWidth, thumbW);
+      if (selectedSectionId === state.header.id) {
+        hThumb.setAttribute("data-reel-selected", "true");
+      }
+      hTile.appendChild(hThumb);
 
-    for (let i = 0; i < page.sections.length; i++) {
-      const section = page.sections[i];
-      const isSpecial = section.role === "header" || section.role === "footer";
-
-      if (!isSpecial) {
-        body.appendChild(buildReelInsertButton(i));
+      if (isTile) {
+        var hLabel = document.createElement("div");
+        hLabel.className = "reel-tile-label";
+        hLabel.textContent = "Header — " + (state.header.name || state.header.recipeId);
+        hTile.appendChild(hLabel);
+      } else {
+        var hInfo = document.createElement("div");
+        hInfo.className = "reel-list-info";
+        var hName = document.createElement("div");
+        hName.className = "reel-list-name";
+        hName.textContent = "Header — " + (state.header.name || "Untitled");
+        var hRecipe = document.createElement("div");
+        hRecipe.className = "reel-list-recipe";
+        hRecipe.textContent = state.header.recipeId;
+        hInfo.appendChild(hName);
+        hInfo.appendChild(hRecipe);
+        hTile.appendChild(hInfo);
       }
 
-      const tile = document.createElement("div");
+      hTile.addEventListener("click", (function(sectionId) {
+        return function() { selectSection(sectionId); };
+      })(state.header.id));
+
+      body.appendChild(hTile);
+    } else {
+      body.appendChild(buildReelRoleSlot("header"));
+    }
+
+    // -- Body section tiles (page.sections — no header/footer in array) ---
+    for (var i = 0; i < page.sections.length; i++) {
+      var section = page.sections[i];
+
+      body.appendChild(buildReelInsertButton(i));
+
+      var tile = document.createElement("div");
       tile.className = isTile ? "reel-tile" : "reel-list-item";
-      if (isSpecial) tile.classList.add("reel-locked");
       tile.setAttribute("data-reel-section", section.id);
       tile.setAttribute("data-reel-index", String(i));
 
-      const thumb = buildSectionThumbnail(section, pageWidth, thumbW);
+      var thumb = buildSectionThumbnail(section, pageWidth, thumbW);
       if (selectedSectionId === section.id) {
         thumb.setAttribute("data-reel-selected", "true");
       }
       tile.appendChild(thumb);
 
       if (isTile) {
-        const label = document.createElement("div");
-        label.className = "reel-tile-label";
-        label.textContent = (isSpecial ? (section.role === "header" ? "Header" : "Footer") + " — " : "") + (section.name || section.recipeId);
-        tile.appendChild(label);
+        var tLabel = document.createElement("div");
+        tLabel.className = "reel-tile-label";
+        tLabel.textContent = section.name || section.recipeId;
+        tile.appendChild(tLabel);
       } else {
-        const info = document.createElement("div");
-        info.className = "reel-list-info";
-        const name = document.createElement("div");
-        name.className = "reel-list-name";
-        name.textContent = (isSpecial ? (section.role === "header" ? "Header" : "Footer") + " — " : "") + (section.name || "Untitled");
-        const recipe = document.createElement("div");
-        recipe.className = "reel-list-recipe";
-        recipe.textContent = section.recipeId;
-        info.appendChild(name);
-        info.appendChild(recipe);
-        tile.appendChild(info);
+        var tInfo = document.createElement("div");
+        tInfo.className = "reel-list-info";
+        var tName = document.createElement("div");
+        tName.className = "reel-list-name";
+        tName.textContent = section.name || "Untitled";
+        var tRecipe = document.createElement("div");
+        tRecipe.className = "reel-list-recipe";
+        tRecipe.textContent = section.recipeId;
+        tInfo.appendChild(tName);
+        tInfo.appendChild(tRecipe);
+        tile.appendChild(tInfo);
       }
 
-      if (!isSpecial) {
-        tile.addEventListener("mousedown", (function(sectionId, idx) {
-          return function(ev) {
-            if (ev.button !== 0) return;
-            ev.preventDefault();
-            beginReelDrag(sectionId, idx, ev);
-          };
-        })(section.id, i));
-      } else {
-        tile.addEventListener("click", (function(sectionId) {
-          return function() { selectSection(sectionId); };
-        })(section.id));
-      }
+      tile.addEventListener("mousedown", (function(sectionId, idx) {
+        return function(ev) {
+          if (ev.button !== 0) return;
+          ev.preventDefault();
+          beginReelDrag(sectionId, idx, ev);
+        };
+      })(section.id, i));
 
       body.appendChild(tile);
     }
 
-    var trailingInsertIdx = hasFooter ? page.sections.length - 1 : page.sections.length;
-    body.appendChild(buildReelInsertButton(trailingInsertIdx));
+    body.appendChild(buildReelInsertButton(page.sections.length));
 
-    if (!hasFooter) {
-      body.appendChild(buildReelRoleSlot("footer", page));
+    // -- Site-level footer tile or slot ------------------------------------
+    if (state.footer) {
+      var fTile = document.createElement("div");
+      fTile.className = isTile ? "reel-tile" : "reel-list-item";
+      fTile.classList.add("reel-locked");
+      fTile.setAttribute("data-reel-section", state.footer.id);
+
+      var fThumb = buildSectionThumbnail(state.footer, pageWidth, thumbW);
+      if (selectedSectionId === state.footer.id) {
+        fThumb.setAttribute("data-reel-selected", "true");
+      }
+      fTile.appendChild(fThumb);
+
+      if (isTile) {
+        var fLabel = document.createElement("div");
+        fLabel.className = "reel-tile-label";
+        fLabel.textContent = "Footer — " + (state.footer.name || state.footer.recipeId);
+        fTile.appendChild(fLabel);
+      } else {
+        var fInfo = document.createElement("div");
+        fInfo.className = "reel-list-info";
+        var fName = document.createElement("div");
+        fName.className = "reel-list-name";
+        fName.textContent = "Footer — " + (state.footer.name || "Untitled");
+        var fRecipe = document.createElement("div");
+        fRecipe.className = "reel-list-recipe";
+        fRecipe.textContent = state.footer.recipeId;
+        fInfo.appendChild(fName);
+        fInfo.appendChild(fRecipe);
+        fTile.appendChild(fInfo);
+      }
+
+      fTile.addEventListener("click", (function(sectionId) {
+        return function() { selectSection(sectionId); };
+      })(state.footer.id));
+
+      body.appendChild(fTile);
+    } else {
+      body.appendChild(buildReelRoleSlot("footer"));
     }
 
     const tileBtn = reelEl.querySelector('[data-reel-view="tile"]');
@@ -4322,6 +4845,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       state = body.editableState;
+      if (state) state = migrateState(state);
       if (state && !Array.isArray(state.symbols)) state.symbols = [];
       selectedSectionId = null;
       selectedElementId = null;
@@ -4690,11 +5214,41 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function handleSectionAction(action, sectionId) {
-    const page = currentPage();
+    // Handle site-level header/footer delete before page lookup
+    if (action === "delete-section") {
+      if (state.header && state.header.id === sectionId) {
+        state.header = undefined;
+        selectedSectionId = null;
+        selectedElementId = null;
+        captureForUndo();
+        renderAll();
+        scheduleSave();
+        setStatus("Header removed", "ok");
+        return;
+      }
+      if (state.footer && state.footer.id === sectionId) {
+        state.footer = undefined;
+        selectedSectionId = null;
+        selectedElementId = null;
+        captureForUndo();
+        renderAll();
+        scheduleSave();
+        setStatus("Footer removed", "ok");
+        return;
+      }
+    }
+    // For add-* actions on site-level header/footer, resolve the section
+    var siteSection = null;
+    if (state.header && state.header.id === sectionId) siteSection = state.header;
+    if (state.footer && state.footer.id === sectionId) siteSection = state.footer;
+    if (siteSection && action.indexOf("add-") === 0) {
+      // Delegate add-element actions to the site-level section
+    }
+    var page = currentPage();
     if (!page) return;
-    const idx = page.sections.findIndex((s) => s.id === sectionId);
-    if (idx < 0) return;
-    const section = page.sections[idx];
+    var idx = page.sections.findIndex(function(s) { return s.id === sectionId; });
+    if (idx < 0 && !siteSection) return;
+    var section = siteSection || page.sections[idx];
 
     if (action === "add-text") {
       addElementToSection(section, {
@@ -4893,6 +5447,25 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (interactionMode === "pan") return;
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
+      // -- Artboard label click: switch active page and zoom to fit --------
+      var artboardLabel = target.closest(".rev01-artboard-label");
+      if (artboardLabel) {
+        var labelPageId = artboardLabel.getAttribute("data-page-id");
+        if (labelPageId && labelPageId !== activePageId) {
+          setActivePage(labelPageId);
+          fitToPage(labelPageId);
+        }
+        return;
+      }
+      // -- Inactive artboard click: activate it ---------------------------
+      var clickedArtboard = target.closest(".rev01-artboard");
+      if (clickedArtboard && clickedArtboard.getAttribute("data-active") === "false") {
+        var abPageId = clickedArtboard.getAttribute("data-page-id");
+        if (abPageId) {
+          setActivePage(abPageId);
+        }
+        return;
+      }
       var menuTrigger = target.closest("[data-element-menu-trigger]");
       if (menuTrigger) {
         var triggerId = menuTrigger.getAttribute("data-element-menu-trigger");
@@ -4933,6 +5506,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (sectionNode) {
         const sid = sectionNode.getAttribute('data-rev01-section');
         if (sid) { selectSection(sid); selectElement(null); }
+      }
+    });
+
+    root.addEventListener("dblclick", function(ev) {
+      var dblLabel = ev.target instanceof Element ? ev.target.closest(".rev01-artboard-label") : null;
+      if (dblLabel) {
+        var dblPageId = dblLabel.getAttribute("data-page-id");
+        if (dblPageId) {
+          setActivePage(dblPageId);
+          fitToPage(dblPageId);
+        }
       }
     });
 
@@ -5044,6 +5628,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       if (tabName === 'sections') {
         ensureSectionsPanelLoaded();
+      }
+      if (tabName === 'pages') {
+        updatePageSidebar();
       }
     }
 
@@ -5322,6 +5909,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       state = body.editableState;
+      if (state) state = migrateState(state);
       if (state && !Array.isArray(state.symbols)) state.symbols = [];
       selectedSectionId = null;
       selectedElementId = null;
@@ -5543,6 +6131,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         clearTemporaryPanState();
         setInteractionMode("select");
         return;
+      }
+      if (ev.key === "1" && !isEditableShortcutTarget(ev.target)) {
+        ev.preventDefault();
+        fitToPage(activePageId);
+      }
+      if (ev.key === "0" && !isEditableShortcutTarget(ev.target)) {
+        ev.preventDefault();
+        fitAllPages();
       }
     });
     window.addEventListener("keyup", (ev) => {
@@ -5880,6 +6476,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     if (tabName === "versions") {
       renderVersionsPanel();
+    }
+    if (tabName === "pages") {
+      updatePageSidebar();
     }
   }
 
@@ -6257,15 +6856,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       const body = await response.json();
       state = body.editableState;
+      if (state) state = migrateState(state);
       if (state && !Array.isArray(state.symbols)) state.symbols = [];
+      if (state && state.pages && state.pages.length > 0) {
+        activePageId = state.pages[0].id;
+      }
       initUndo();
       if (mainEl && state && state.styleKit) {
         mainEl.setAttribute("data-style-kit", state.styleKit);
       }
       // Mount the viewport BEFORE the first render so #canvas-root is in its
       // final DOM position when sections render in. The transform set by
-      // applyZoom() then persists across subsequent renderAll() calls (which
-      // only mutate root's children).
+      // applyCameraTransform() then persists across subsequent renderAll()
+      // calls (which only mutate root's children).
       mountViewport();
       renderAll();
       attachRootEvents();
@@ -6293,6 +6896,36 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ensureSymbolsTabMounted();
       ensureVersionsTabMounted();
       attachSidebarActions();
+      updatePageSidebar();
+
+      // -- Page CRUD event wiring -------------------------------------------
+      var addPageBtn = document.getElementById("canvas-add-page");
+      if (addPageBtn) {
+        addPageBtn.addEventListener("click", createPage);
+      }
+
+      var pageListEl = document.getElementById("canvas-page-list");
+      if (pageListEl) {
+        pageListEl.addEventListener("click", function(ev) {
+          var actionBtn = ev.target instanceof Element ? ev.target.closest("[data-page-action]") : null;
+          if (actionBtn) {
+            var action = actionBtn.getAttribute("data-page-action");
+            var pid = actionBtn.getAttribute("data-page-id");
+            if (action === "rename") renamePage(pid);
+            else if (action === "delete") deletePage(pid);
+            return;
+          }
+          var pageItem = ev.target instanceof Element ? ev.target.closest(".rev01-page-item") : null;
+          if (pageItem) {
+            var pid2 = pageItem.getAttribute("data-page-id");
+            if (pid2 && pid2 !== activePageId) {
+              setActivePage(pid2);
+              fitToPage(pid2);
+            }
+          }
+        });
+      }
+
       attachSaveButton();
       attachPublishButton();
       attachCoEdit();

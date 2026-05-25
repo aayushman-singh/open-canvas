@@ -628,7 +628,7 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
         type: 'action',
         box,
         label: d.label || 'Click',
-        href: d.href || '#',
+        href: { type: 'external', url: d.href || '#' },
         variant,
         ...(motion ? { motion } : {}),
       };

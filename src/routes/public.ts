@@ -637,7 +637,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     if (addr.length === 0 || addr.includes('/')) {
       return c.text('asset not found', 404);
     }
-    const referencedAssetIds = collectReferencedAssetIds(siteRow.publishedSnapshot.pages);
+    const referencedAssetIds = collectReferencedAssetIds(siteRow.publishedSnapshot);
     // Allow either the UUID or the content hash to satisfy the reachability
     // check. We accept either because the renderer emits UUID URLs, but
     // operators / cache warmers may probe by content hash directly.
@@ -726,8 +726,8 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const customKitCss =
     pageRenderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
   const snapshotHtml = injectInteractiveRuntime(
-    renderCanvasSnapshot(pageRenderSnapshot, '/assets', siteRow.id),
-    pageRenderSnapshot,
+    renderCanvasSnapshot(renderSnapshot, '/assets', siteRow.id, { renderPages: [currentPage] }),
+    renderSnapshot,
   );
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
   // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe

@@ -9,6 +9,49 @@
       "width": 1440,
       "sections": [
         {
+          "id": "section-header",
+          "recipeId": "custom",
+          "name": "Header",
+          "height": 72,
+          "role": "header",
+          "elements": [
+            {
+              "id": "header-logo",
+              "type": "text",
+              "box": { "x": 80, "y": 16, "w": 200, "h": 40, "z": 2 },
+              "content": [{ "text": "rev01", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "header-nav-1",
+              "type": "action",
+              "box": { "x": 1020, "y": 18, "w": 100, "h": 36, "z": 2 },
+              "label": "Features",
+              "href": { "type": "external", "url": "#features" },
+              "variant": "ghost"
+            },
+            {
+              "id": "header-nav-2",
+              "type": "action",
+              "box": { "x": 1130, "y": 18, "w": 100, "h": 36, "z": 2 },
+              "label": "Pricing",
+              "href": { "type": "external", "url": "#pricing" },
+              "variant": "ghost"
+            },
+            {
+              "id": "header-cta",
+              "type": "action",
+              "box": { "x": 1260, "y": 18, "w": 120, "h": 36, "z": 2 },
+              "label": "Get started",
+              "href": { "type": "external", "url": "/edit" },
+              "variant": "solid"
+            }
+          ]
+        },
+        {
           "id": "section-hero",
           "recipeId": "hero-split",
           "name": "Hero",
@@ -53,7 +96,7 @@
               "type": "action",
               "box": { "x": 80, "y": 480, "w": 200, "h": 56, "z": 3 },
               "label": "Start editing",
-              "href": "/edit",
+              "href": { "type": "external", "url": "/edit" },
               "variant": "solid"
             },
             {
@@ -157,7 +200,7 @@
               "type": "action",
               "box": { "x": 540, "y": 360, "w": 220, "h": 64, "z": 3 },
               "label": "Open the editor",
-              "href": "https://rev01.example.com/edit",
+              "href": { "type": "external", "url": "https://rev01.example.com/edit" },
               "variant": "pill"
             },
             {
@@ -165,8 +208,53 @@
               "type": "action",
               "box": { "x": 780, "y": 360, "w": 220, "h": 64, "z": 3 },
               "label": "Email us",
-              "href": "mailto:hello@rev01.example.com",
+              "href": { "type": "external", "url": "mailto:hello@rev01.example.com" },
               "variant": "underline"
+            }
+          ]
+        },
+        {
+          "id": "section-footer",
+          "recipeId": "custom",
+          "name": "Footer",
+          "height": 120,
+          "role": "footer",
+          "elements": [
+            {
+              "id": "footer-brand",
+              "type": "text",
+              "box": { "x": 80, "y": 24, "w": 200, "h": 32, "z": 2 },
+              "content": [{ "text": "rev01" }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "footer-copy",
+              "type": "text",
+              "box": { "x": 80, "y": 64, "w": 400, "h": 28, "z": 2 },
+              "content": [{ "text": "© 2026 rev01. All rights reserved." }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left"
+            },
+            {
+              "id": "footer-link-1",
+              "type": "action",
+              "box": { "x": 1100, "y": 24, "w": 100, "h": 32, "z": 2 },
+              "label": "Privacy",
+              "href": { "type": "external", "url": "/privacy" },
+              "variant": "ghost"
+            },
+            {
+              "id": "footer-link-2",
+              "type": "action",
+              "box": { "x": 1220, "y": 24, "w": 100, "h": 32, "z": 2 },
+              "label": "Terms",
+              "href": { "type": "external", "url": "/terms" },
+              "variant": "ghost"
             }
           ]
         }

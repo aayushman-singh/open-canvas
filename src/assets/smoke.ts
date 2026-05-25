@@ -27,7 +27,11 @@ import { deleteOwnerAsset } from './delete.js';
 import { sha256Hex } from './hash.js';
 import { readOwnerAsset, type CfImageFetcher, type CfImageOptions } from './read.js';
 import { createR2Client, type R2BucketLike, type R2PutOptions } from './r2-client.js';
-import { collectReferencedAssets, collectReferencedAssetIds } from './site-assets.js';
+import {
+  collectReferencedAssets,
+  collectReferencedAssetIds,
+  type AssetReferenceRoot,
+} from './site-assets.js';
 import type { CanvasPage } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
 
@@ -182,6 +186,50 @@ function runReferenceWalkTests(): void {
   assert(ids.has('og-image-id'), 'expected collectReferencedAssetIds to include ogImageAssetId');
   assert(ids.has('video-id'), 'expected collectReferencedAssetIds to keep media assetId');
   assert(ids.has('poster-id'), 'expected collectReferencedAssetIds to keep posterAssetId');
+
+  const siteRoot = {
+    pages,
+    header: {
+      id: 'site-header',
+      recipeId: 'custom',
+      name: 'Header',
+      role: 'header',
+      height: 80,
+      elements: [
+        {
+          id: 'header-logo',
+          type: 'nav',
+          box: { x: 0, y: 0, w: 400, h: 80, z: 1 },
+          logoAssetId: 'logo-id',
+          links: [],
+          layout: 'left-center-right',
+          sticky: false,
+        },
+      ],
+    },
+    footer: {
+      id: 'site-footer',
+      recipeId: 'custom',
+      name: 'Footer',
+      role: 'footer',
+      height: 120,
+      backgroundVideo: 'footer-bg-video-id',
+      elements: [
+        {
+          id: 'footer-carousel',
+          type: 'carousel',
+          box: { x: 0, y: 0, w: 400, h: 120, z: 1 },
+          slides: [{ id: 'slide-1', assetId: 'slide-image-id' }],
+          showArrows: true,
+          showDots: true,
+        },
+      ],
+    },
+  } satisfies AssetReferenceRoot;
+  const siteIds = collectReferencedAssetIds(siteRoot);
+  assert(siteIds.has('logo-id'), 'expected header nav logo asset to be reachable');
+  assert(siteIds.has('footer-bg-video-id'), 'expected footer background video asset to be reachable');
+  assert(siteIds.has('slide-image-id'), 'expected footer carousel slide asset to be reachable');
 }
 
 // ---------------------------------------------------------------------------

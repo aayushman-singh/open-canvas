@@ -5,7 +5,7 @@ import { collectReferencedAssets } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
-import type { CanvasSiteState, MediaKind } from '../../canvas/schema';
+import type { CanvasSection, CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, customTemplate, ownerAsset, site } from '../../db/schema';
@@ -150,7 +150,7 @@ export function prepareSeedAssetsForCustomer(
     actualKind: MediaKind;
   }> = [];
 
-  for (const reference of collectReferencedAssets(editableState.pages)) {
+  for (const reference of collectReferencedAssets(editableState)) {
     const seed = SEED_ASSET_REGISTRY[reference.assetId];
     if (!seed) {
       unknownSeedIds.add(reference.assetId);
@@ -185,24 +185,81 @@ export function prepareSeedAssetsForCustomer(
     return { ok: false, unknownSeedIds: [...unknownSeedIds], assetKindErrors };
   }
 
-  for (const page of editableState.pages) {
-    for (const section of page.sections) {
-      for (const element of section.elements) {
-        if (element.type !== 'media') continue;
-        const materializedAssetId = mappedIds.get(element.assetId);
-        if (!materializedAssetId) {
-          return { ok: false, unknownSeedIds: [element.assetId], assetKindErrors: [] };
-        }
-        element.assetId = materializedAssetId;
+  function materializeAssetId(assetId: string, path: string): string | { missing: string } {
+    const materializedAssetId = mappedIds.get(assetId);
+    if (!materializedAssetId) {
+      console.error(`[site-seed] missing materialized asset for ${path}: ${assetId}`);
+      return { missing: assetId };
+    }
+    return materializedAssetId;
+  }
+
+  function materializeSectionAssets(
+    section: CanvasSection | undefined,
+    sectionPath: string,
+  ): string | null {
+    if (!section) return null;
+    if (typeof section.backgroundVideo === 'string' && section.backgroundVideo.length > 0) {
+      const mapped = materializeAssetId(section.backgroundVideo, `${sectionPath}.backgroundVideo`);
+      if (typeof mapped !== 'string') return mapped.missing;
+      section.backgroundVideo = mapped;
+    }
+    for (let elementIdx = 0; elementIdx < section.elements.length; elementIdx++) {
+      const element = section.elements[elementIdx];
+      if (!element) continue;
+      const elementPath = `${sectionPath}.elements[${String(elementIdx)}]`;
+      if (element.type === 'media') {
+        const mapped = materializeAssetId(element.assetId, `${elementPath}.assetId`);
+        if (typeof mapped !== 'string') return mapped.missing;
+        element.assetId = mapped;
         if (element.posterAssetId !== undefined) {
-          const materializedPosterAssetId = mappedIds.get(element.posterAssetId);
-          if (!materializedPosterAssetId) {
-            return { ok: false, unknownSeedIds: [element.posterAssetId], assetKindErrors: [] };
-          }
-          element.posterAssetId = materializedPosterAssetId;
+          const posterMapped = materializeAssetId(
+            element.posterAssetId,
+            `${elementPath}.posterAssetId`,
+          );
+          if (typeof posterMapped !== 'string') return posterMapped.missing;
+          element.posterAssetId = posterMapped;
+        }
+      } else if (
+        element.type === 'nav' &&
+        typeof element.logoAssetId === 'string' &&
+        element.logoAssetId.length > 0
+      ) {
+        const mapped = materializeAssetId(element.logoAssetId, `${elementPath}.logoAssetId`);
+        if (typeof mapped !== 'string') return mapped.missing;
+        element.logoAssetId = mapped;
+      } else if (element.type === 'carousel') {
+        for (let slideIdx = 0; slideIdx < element.slides.length; slideIdx++) {
+          const slide = element.slides[slideIdx];
+          if (!slide) continue;
+          const mapped = materializeAssetId(
+            slide.assetId,
+            `${elementPath}.slides[${String(slideIdx)}].assetId`,
+          );
+          if (typeof mapped !== 'string') return mapped.missing;
+          slide.assetId = mapped;
         }
       }
     }
+    return null;
+  }
+
+  for (const [pageIdx, page] of editableState.pages.entries()) {
+    for (const [sectionIdx, section] of page.sections.entries()) {
+      const missing = materializeSectionAssets(
+        section,
+        `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+      );
+      if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
+    }
+  }
+  let missing = materializeSectionAssets(editableState.header, 'header');
+  if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
+  missing = materializeSectionAssets(editableState.footer, 'footer');
+  if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
+  for (const [idx, symbol] of editableState.symbols.entries()) {
+    missing = materializeSectionAssets(symbol.section, `symbols[${String(idx)}].section`);
+    if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
   }
 
   return { ok: true, editableState, seedRows };

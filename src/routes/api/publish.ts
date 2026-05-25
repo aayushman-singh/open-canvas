@@ -160,7 +160,7 @@ publishApi.post('/sites/:siteId', async (c) => {
     );
   }
 
-  const unfilledMediaSlots = collectUnfilledAssetReferences(row.editableState.pages);
+  const unfilledMediaSlots = collectUnfilledAssetReferences(row.editableState);
   if (unfilledMediaSlots.length > 0) {
     return c.json(
       {
@@ -181,14 +181,14 @@ publishApi.post('/sites/:siteId', async (c) => {
   // the root is the Owner, not the site — an asset uploaded against one of
   // this Owner's other sites still resolves here. No auto-fix, no
   // placeholder substitution.
-  const referenced = collectReferencedAssetIds(row.editableState.pages);
+  const referenced = collectReferencedAssetIds(row.editableState);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
     const presentRows = await database
       .select({ id: ownerAsset.id, kind: ownerAsset.kind })
       .from(ownerAsset)
       .where(and(eq(ownerAsset.customerId, customerId), inArray(ownerAsset.id, referencedList)));
-    const referenceErrors = findAssetReferenceErrors(row.editableState.pages, presentRows);
+    const referenceErrors = findAssetReferenceErrors(row.editableState, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
       return c.json(
@@ -221,6 +221,12 @@ publishApi.post('/sites/:siteId', async (c) => {
     publishedAt: new Date().toISOString(),
     styleKit: row.editableState.styleKit,
     pages: row.editableState.pages,
+    ...(row.editableState.header !== undefined
+      ? { header: row.editableState.header }
+      : {}),
+    ...(row.editableState.footer !== undefined
+      ? { footer: row.editableState.footer }
+      : {}),
     ...(row.editableState.customStyleKit !== undefined
       ? { customStyleKit: row.editableState.customStyleKit }
       : {}),

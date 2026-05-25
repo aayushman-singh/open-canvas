@@ -163,16 +163,23 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
-function renderPage(page: CanvasPage, ctx: Omit<ElementRenderCtx, 'pageSlug'>): string {
+function renderPage(
+  page: CanvasPage,
+  ctx: Omit<ElementRenderCtx, 'pageSlug'>,
+  header?: CanvasSection,
+  footer?: CanvasSection,
+): string {
   const style = styleFromEntries([
     ['width', `${String(page.width)}px`],
     ['margin', '0 auto'],
   ]);
   const pageCtx: ElementRenderCtx = { ...ctx, pageSlug: page.slug };
+  const headerHtml = header ? renderSection(header, page.width, pageCtx) : '';
   const sectionsHtml = page.sections
     .map((section) => renderSection(section, page.width, pageCtx))
     .join('');
-  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}" style="${style}">${sectionsHtml}</article>`;
+  const footerHtml = footer ? renderSection(footer, page.width, pageCtx) : '';
+  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}" style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
 /**
@@ -197,6 +204,12 @@ export interface RenderSnapshotOptions {
    * head emission per page through the same seam.
    */
   emitHeadMeta?: (page: CanvasPage) => string;
+  /**
+   * Optional body-page subset. Link resolution, responsive CSS, symbols, and
+   * other whole-site context still come from `snapshot`; only the emitted
+   * `<article>` list is narrowed.
+   */
+  renderPages?: CanvasPage[];
 }
 
 /**
@@ -237,8 +250,12 @@ export function renderCanvasSnapshot(
     assetBasePath,
     styleKit: snapshot.styleKit,
     siteId,
+    pages: snapshot.pages,
   };
-  const pagesHtml = snapshot.pages.map((page) => renderPage(page, baseCtx)).join('');
+  const pagesToRender = opts.renderPages ?? snapshot.pages;
+  const pagesHtml = pagesToRender
+    .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
+    .join('');
   const responsiveStyle = renderResponsiveCss(snapshot);
   // Wave 3 #21 — exercise the optional head-meta hook for every page so the
   // emitter contract is verified at render time. The renderer body does not
@@ -252,7 +269,7 @@ export function renderCanvasSnapshot(
   // The result is discarded — visitor-facing emission goes through the
   // sibling `renderCanvasHead` exported from `src/seo/meta-emit.ts`.
   if (opts.emitHeadMeta) {
-    for (const page of snapshot.pages) {
+    for (const page of pagesToRender) {
       // Drop the result — see note above. We invoke the hook for the side
       // effect of validating its shape and giving future renderers a place
       // to hook in.

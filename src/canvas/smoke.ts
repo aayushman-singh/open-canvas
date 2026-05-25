@@ -294,8 +294,12 @@ assert(
 // include at least one element wrapper with `aria-hidden="true"`. Anchor the
 // search to the hero section so we do not accept an aria-hidden somewhere
 // further down the page.
+// Skip past any <style> block so we search in the actual DOM output, not the
+// responsive CSS selectors which also reference section/element ids.
+const styleCloseIdx = html.lastIndexOf('</style>');
+const htmlBodyStart = styleCloseIdx >= 0 ? styleCloseIdx : 0;
 const heroSectionMarker = 'data-rev01-section="section-hero"';
-const heroSectionIdx = html.indexOf(heroSectionMarker);
+const heroSectionIdx = html.indexOf(heroSectionMarker, htmlBodyStart);
 assert(heroSectionIdx >= 0, 'expected section-hero marker present in rendered HTML');
 const heroSectionEnd = html.indexOf('</section>', heroSectionIdx);
 assert(heroSectionEnd > heroSectionIdx, 'expected section-hero to close after its marker');
@@ -307,7 +311,7 @@ assert(
 
 // The hero heading text element must NOT carry aria-hidden — text speaks for
 // itself. Find the hero-heading wrapper opening tag and check it.
-const headingWrapperIdx = html.indexOf('data-rev01-element="hero-heading"');
+const headingWrapperIdx = html.indexOf('data-rev01-element="hero-heading"', htmlBodyStart);
 assert(headingWrapperIdx >= 0, 'expected hero-heading element wrapper in rendered HTML');
 const headingWrapperOpenEnd = html.indexOf('>', headingWrapperIdx);
 assert(
@@ -320,23 +324,37 @@ assert(
   'expected hero-heading wrapper NOT to carry aria-hidden (text is semantic content)',
 );
 
-// Validator: a two-page state must be rejected with the single-page message.
-// Build it from the fixture so the second page is otherwise valid — the only
-// reason for rejection is the length rule.
+// Validator: a two-page state is valid when page ids/slugs are unique.
+// Build it from the fixture so the second page is otherwise valid.
 const fixtureClone = structuredClone(editable);
 const secondPage: CanvasPage = structuredClone(fixtureClone.pages[0] as CanvasPage);
+secondPage.id = 'page-second';
+secondPage.slug = 'second';
+secondPage.title = 'Second';
 const twoPageState: CanvasSiteState = {
   ...fixtureClone,
   pages: [fixtureClone.pages[0] as CanvasPage, secondPage],
 };
 const twoPageResult = validateCanvasSiteState(twoPageState);
 assert(
-  !twoPageResult.valid,
-  'expected validator to reject a two-page state (single-page POC invariant)',
+  twoPageResult.valid,
+  twoPageResult.valid
+    ? ''
+    : 'expected validator to accept a two-page state: ' + twoPageResult.errors.join('; '),
+);
+
+const duplicatePageState: CanvasSiteState = structuredClone(twoPageState);
+duplicatePageState.pages[1]!.id = duplicatePageState.pages[0]!.id;
+duplicatePageState.pages[1]!.slug = duplicatePageState.pages[0]!.slug;
+const duplicatePageResult = validateCanvasSiteState(duplicatePageState);
+assert(
+  !duplicatePageResult.valid,
+  'expected validator to reject duplicate page ids/slugs',
 );
 assert(
-  !twoPageResult.valid && twoPageResult.errors.some((m) => m.includes('exactly one canvas page')),
-  'expected two-page rejection to mention "exactly one canvas page"',
+  !duplicatePageResult.valid &&
+    duplicatePageResult.errors.some((m) => m.includes('duplicated across pages')),
+  'expected duplicate-page rejection to mention cross-page duplication',
 );
 
 // Validator: the existing empty-pages case must still reject (the new length
@@ -345,6 +363,159 @@ const noPagesResult = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] 
 assert(
   !noPagesResult.valid,
   'expected validator to still reject pages: [] (non-empty array required)',
+);
+
+const pageLinkState: CanvasSiteState = structuredClone(twoPageState);
+const linkSection = pageLinkState.pages[0]!.sections[0]!;
+const linkElement = linkSection.elements.find((el) => el.id === 'header-cta');
+if (!linkElement || linkElement.type !== 'action') {
+  throw new Error('fixture header must contain action element header-cta');
+}
+linkElement.href = { type: 'page', pageId: 'page-second', anchor: 'pricing' };
+const pageLinkResult = validateCanvasSiteState(pageLinkState);
+assert(
+  pageLinkResult.valid,
+  pageLinkResult.valid
+    ? ''
+    : 'expected validator to accept an internal page link: ' + pageLinkResult.errors.join('; '),
+);
+const pageLinkHtml = renderCanvasSnapshot(
+  {
+    version: 1,
+    publishedAt: '2026-05-25T00:00:00.000Z',
+    styleKit: pageLinkState.styleKit,
+    pages: pageLinkState.pages,
+    symbols: pageLinkState.symbols,
+  },
+  '/assets',
+);
+assert(
+  pageLinkHtml.includes('href="/second#pricing"'),
+  'expected internal page action href to resolve to the target page slug and anchor',
+);
+
+linkElement.href = { type: 'page', pageId: 'missing-page' };
+const brokenPageLinkResult = validateCanvasSiteState(pageLinkState);
+assert(
+  !brokenPageLinkResult.valid &&
+    brokenPageLinkResult.errors.some((m) => m.includes('must reference an existing page')),
+  'expected validator to reject internal page links to missing pages',
+);
+assert(
+  (() => {
+    try {
+      renderCanvasSnapshot(
+        {
+          version: 1,
+          publishedAt: '2026-05-25T00:00:00.000Z',
+          styleKit: pageLinkState.styleKit,
+          pages: pageLinkState.pages,
+          symbols: pageLinkState.symbols,
+        },
+        '/assets',
+      );
+      return false;
+    } catch {
+      return true;
+    }
+  })(),
+  'expected renderer to fail loudly for an internal page link to a missing page',
+);
+
+const headerMediaSnapshot: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-05-25T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-media-header',
+      slug: 'media-header',
+      title: 'Media Header',
+      width: 1440,
+      sections: [
+        {
+          id: 'body',
+          recipeId: 'custom',
+          name: 'Body',
+          height: 240,
+          elements: [],
+        },
+      ],
+    },
+  ],
+  header: {
+    id: 'header-media',
+    recipeId: 'custom',
+    name: 'Header Media',
+    role: 'header',
+    height: 72,
+    elements: [
+      {
+        id: 'header-media-el',
+        type: 'media',
+        mediaKind: 'image',
+        assetId: '',
+        alt: '',
+        fit: 'cover',
+        box: { x: 0, y: 0, w: 80, h: 60, z: 1 },
+      },
+    ],
+  },
+};
+const headerMediaResult = validatePublishedSnapshot(headerMediaSnapshot);
+assert(
+  !headerMediaResult.valid &&
+    headerMediaResult.errors.some((m) => m.includes('header.elements[0].assetId')),
+  'expected published header media with an empty assetId to be rejected',
+);
+
+const headerFormPages: CanvasPage[] = [
+  {
+    id: 'page-form-a',
+    slug: 'form-a',
+    title: 'Form A',
+    width: 960,
+    sections: [{ id: 'body-a', recipeId: 'custom', name: 'Body A', height: 240, elements: [] }],
+  },
+  {
+    id: 'page-form-b',
+    slug: 'form-b',
+    title: 'Form B',
+    width: 1280,
+    sections: [{ id: 'body-b', recipeId: 'custom', name: 'Body B', height: 240, elements: [] }],
+  },
+];
+const headerFormHtml = renderCanvasSnapshot(
+  {
+    version: 1,
+    publishedAt: '2026-05-25T00:00:00.000Z',
+    styleKit: 'charcoal',
+    pages: headerFormPages,
+    header: {
+      id: 'header-form',
+      recipeId: 'custom',
+      name: 'Header Form',
+      role: 'header',
+      height: 120,
+      elements: [
+        {
+          id: 'header-form-el',
+          type: 'form',
+          box: { x: 0, y: 0, w: 400, h: 100, z: 1 },
+          fields: [],
+          submitLabel: 'Send',
+          successMessage: 'Thanks',
+        },
+      ],
+    },
+  },
+  '/assets',
+  'site-form',
+);
+assert(
+  headerFormHtml.includes('name="pageSlug" value="form-a"') &&
+    headerFormHtml.includes('name="pageSlug" value="form-b"'),
+  'expected site-wide header forms to render with each page slug, not a shared blank slug',
 );
 
 // -- Task 6: seed-asset registry gating -----------------------------------

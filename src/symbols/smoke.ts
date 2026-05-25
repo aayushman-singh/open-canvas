@@ -83,7 +83,7 @@ function makeAction(id: string, label: string, x: number, y: number): ActionElem
     type: 'action',
     box: { x, y, w: 200, h: 48, z: 2 },
     label,
-    href: 'https://rev01.aayushman.dev',
+    href: { type: 'external', url: 'https://rev01.aayushman.dev' },
     variant: 'solid',
   };
 }

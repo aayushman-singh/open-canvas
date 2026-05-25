@@ -96,6 +96,8 @@ export async function renderSnapshotPreview(
     publishedAt: row.capturedAt.toISOString(),
     styleKit: state.styleKit,
     pages: state.pages,
+    ...(state.header !== undefined ? { header: state.header } : {}),
+    ...(state.footer !== undefined ? { footer: state.footer } : {}),
     ...(state.customStyleKit !== undefined ? { customStyleKit: state.customStyleKit } : {}),
     symbols: state.symbols,
     ...(state.defaultLocale !== undefined ? { defaultLocale: state.defaultLocale } : {}),

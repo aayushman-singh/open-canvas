@@ -218,6 +218,8 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
     publishedAt: '2026-05-22T00:00:00.000Z',
     styleKit: template.state.styleKit,
     pages: template.state.pages,
+    ...(template.state.header ? { header: template.state.header } : {}),
+    ...(template.state.footer ? { footer: template.state.footer } : {}),
   };
   const html = renderCanvasSnapshot(snapshot, `/dashboard/templates/${template.id}/assets`);
 

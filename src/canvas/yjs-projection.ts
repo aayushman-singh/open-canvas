@@ -252,11 +252,23 @@ function encodeMediaElement(el: MediaElement): Y.Map<unknown> {
   return out;
 }
 
+function encodeActionHref(href: ActionElement['href']): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  out.set('type', href.type);
+  if (href.type === 'external') {
+    out.set('url', href.url);
+  } else {
+    out.set('pageId', href.pageId);
+    setIfDefined(out, 'anchor', href.anchor);
+  }
+  return out;
+}
+
 function encodeActionElement(el: ActionElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
   out.set('label', el.label);
-  out.set('href', el.href);
+  out.set('href', encodeActionHref(el.href));
   out.set('variant', el.variant);
   return out;
 }
@@ -703,6 +715,9 @@ export function encodeYDoc(state: CanvasSiteState): Y.Doc {
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
     root.set('pages', pages);
+
+    if (state.header !== undefined) root.set('header', encodeSection(state.header));
+    if (state.footer !== undefined) root.set('footer', encodeSection(state.footer));
   });
   return doc;
 }
@@ -828,11 +843,21 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       return el;
     }
     case 'action': {
+      const hrefMap = map.get('href') as Y.Map<unknown>;
+      const hrefType = hrefMap.get('type') as string;
+      const href: ActionElement['href'] =
+        hrefType === 'page'
+          ? {
+              type: 'page',
+              pageId: hrefMap.get('pageId') as string,
+              ...(hrefMap.has('anchor') ? { anchor: hrefMap.get('anchor') as string } : {}),
+            }
+          : { type: 'external', url: hrefMap.get('url') as string };
       const el: ActionElement = {
         ...base,
         type,
         label: map.get('label') as string,
-        href: map.get('href') as string,
+        href,
         variant: map.get('variant') as ActionElement['variant'],
       };
       return el;
@@ -1226,6 +1251,12 @@ export function decodeYDoc(doc: Y.Doc): CanvasSiteState {
   if (root.has('siteNoIndex')) state.siteNoIndex = root.get('siteNoIndex') as boolean;
   if (root.has('darkModeEnabled')) {
     state.darkModeEnabled = root.get('darkModeEnabled') as boolean;
+  }
+  if (root.has('header')) {
+    state.header = decodeSection(root.get('header') as Y.Map<unknown>);
+  }
+  if (root.has('footer')) {
+    state.footer = decodeSection(root.get('footer') as Y.Map<unknown>);
   }
   return state;
 }
