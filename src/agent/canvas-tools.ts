@@ -6,20 +6,17 @@
 //   - `rewriteText` — replace the inline runs of a text element.
 //   - `replaceMedia` — swap a media element's asset id (LLM picks an
 //     EXISTING uploaded asset; the tool does not generate bytes).
-//   - `createSection` — append a new section using a recipe factory; the
-//     LLM picks a `recipeId` and a brief, never authors section JSON.
+//   - `designSection` — create a section from a semantic layout tree; the
+//     LLM describes structure while the layout engine computes geometry.
 //
-// Each schema is tight: marks are enumerated, link hrefs carry the same
-// allowlist hint the validator enforces, recipe ids are enumerated. The
-// descriptions explicitly call out the contracts the model must honour so
-// the LLM cannot drift into producing a plain string for `content` or
-// inventing a new `recipeId`.
+// Each schema is tight: marks and design tokens are enumerated, link hrefs
+// carry the same allowlist hint the validator enforces, and descriptions
+// call out the contracts the model must honour so the LLM cannot drift into
+// plain strings, invented tokens, or pixel positions.
 
 import {
-  AGENT_RECIPE_IDS,
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
-  ELEMENT_TYPES,
   INLINE_MARK_TYPES,
   MEDIA_KINDS,
   MOTION_PRESETS,
@@ -141,61 +138,6 @@ const replaceMediaSchema: JsonSchema = {
 };
 
 // ---------------------------------------------------------------------------
-// createSection
-// ---------------------------------------------------------------------------
-
-const assetIdsSchema: JsonSchema = {
-  type: 'object',
-  description:
-    'Existing uploaded asset ids that the recipe should slot into its media elements. ' +
-    'All ids MUST exist as uploaded assets on this site — invented ids are rejected.',
-  properties: {
-    hero: {
-      type: 'string',
-      description: 'Asset id for the recipe`s single hero media slot (hero-split, video-hero).',
-    },
-    cards: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Asset ids for card / grid recipes (feature-grid).',
-    },
-    gallery: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'Asset ids for gallery recipes (gallery-strip).',
-    },
-  },
-};
-
-const createSectionSchema: JsonSchema = {
-  type: 'object',
-  properties: {
-    recipeId: {
-      type: 'string',
-      enum: [...AGENT_RECIPE_IDS],
-      description:
-        'The section recipe to instantiate. recipeId MUST be one of [' +
-        AGENT_RECIPE_IDS.join(', ') +
-        ']; do not invent new ids.',
-    },
-    afterSectionId: {
-      type: 'string',
-      description:
-        'The id of the section after which the new section should be inserted. ' +
-        'Send an empty string to append at the end of the page.',
-    },
-    brief: {
-      type: 'string',
-      description:
-        'A short owner-supplied brief describing what the section should say. The recipe factory uses ' +
-        'the brief as the heading / body text verbatim — keep it concise.',
-    },
-    assetIds: assetIdsSchema,
-  },
-  required: ['recipeId', 'brief'],
-};
-
-// ---------------------------------------------------------------------------
 // designSection
 // ---------------------------------------------------------------------------
 
@@ -231,9 +173,14 @@ const mediaPropsSchema: JsonSchema = {
   properties: {
     imagePrompt: {
       type: 'string',
-      description: 'Text description of the image to generate. Be specific about style, subject, mood.',
+      description:
+        'Text description of the image to generate. Be specific about style, subject, mood.',
     },
-    fit: { type: 'string', enum: ['cover', 'contain'], description: 'How the image fills its box.' },
+    fit: {
+      type: 'string',
+      enum: ['cover', 'contain'],
+      description: 'How the image fills its box.',
+    },
   },
   required: ['imagePrompt', 'fit'],
 };
@@ -272,17 +219,27 @@ const containerPropsSchema: JsonSchema = {
   required: ['variant', 'padding'],
 };
 
-const elementNodeSchema: JsonSchema = {
+const layoutChildSchema: JsonSchema = {
   type: 'object',
   description:
-    'A leaf element in the layout tree. Exactly one of text/media/action/shape/container must match the element type.',
+    'A child node. Use either a nested layout node (type + children) or an element leaf (element + optional size). ' +
+    'For element leaves, exactly one of text/action/shape/container must match element.type.',
   properties: {
+    type: {
+      type: 'string',
+      enum: ['stack', 'grid', 'split'],
+      description: 'Nested layout node type when this child is a layout node.',
+    },
+    children: {
+      type: 'array',
+      description: 'Nested child nodes when this child is a layout node.',
+    },
     element: {
       type: 'object',
       properties: {
         type: {
           type: 'string',
-          enum: ['text', 'media', 'action', 'shape', 'container'],
+          enum: ['text', 'action', 'shape', 'container'],
           description: 'Element type. Must match exactly one of the property objects below.',
         },
         text: textPropsSchema,
@@ -329,7 +286,8 @@ const layoutNodeSchema: JsonSchema = {
     gap: {
       type: 'string',
       enum: [...GAP_TOKENS],
-      description: 'Spacing between children. tight=12px, normal=24px, loose=48px. Default: "normal".',
+      description:
+        'Spacing between children. tight=12px, normal=24px, loose=48px. Default: "normal".',
     },
     align: {
       type: 'string',
@@ -349,6 +307,7 @@ const layoutNodeSchema: JsonSchema = {
     },
     children: {
       type: 'array',
+      items: layoutChildSchema,
       description:
         'Child nodes — each is either an element node (has "element" key) or a nested layout node (has "type" key with stack/grid/split).',
     },
@@ -410,22 +369,12 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
     parameters: replaceMediaSchema,
   },
   {
-    name: 'createSection',
-    description:
-      'Append a new section to the page using a built-in recipe factory. The model picks a recipeId ' +
-      'from [' +
-      AGENT_RECIPE_IDS.join(', ') +
-      '] and supplies a short brief; the recipe factory authors the section shape. ' +
-      'The model never hand-writes section JSON.',
-    parameters: createSectionSchema,
-  },
-  {
     name: 'designSection',
     description:
       'Design a new section from scratch using a semantic layout tree. Describe the structure ' +
       'as nested stack/grid/split nodes with element leaves. The layout engine computes positions; ' +
-      'media elements with imagePrompt get AI-generated images. Output is previewed before applying. ' +
-      'Use this for any section shape that does not match a built-in recipe.',
+      'output is previewed before applying. Use this for any new section shape. ' +
+      'Do not include media leaves until image generation is wired into this preview flow.',
     parameters: designSectionSchema,
   },
 ];

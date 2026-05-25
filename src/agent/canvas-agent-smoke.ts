@@ -21,7 +21,6 @@ import {
   type RecipeFactoryInput,
 } from '../canvas/recipes.js';
 import {
-  AGENT_RECIPE_IDS,
   INLINE_MARK_TYPES,
   SECTION_RECIPE_IDS,
   type CanvasSiteState,
@@ -29,6 +28,7 @@ import {
 } from '../canvas/schema.js';
 import { validateCanvasSiteState } from '../canvas/validate.js';
 import type { DesignSectionInput } from '../canvas/layout/tree.js';
+import { parseDesignSectionToolArgs } from './design-section-parser.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -284,19 +284,14 @@ assert(insertUnknownAfterThrew, 'expected insertSection with unknown afterSectio
 
 const toolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
 assert(
-  JSON.stringify(toolNames) ===
-    JSON.stringify(['createSection', 'designSection', 'replaceMedia', 'rewriteText']),
-  `expected CANVAS_AGENT_TOOLS to expose [createSection, designSection, replaceMedia, rewriteText] (got [${toolNames.join(', ')}])`,
+  JSON.stringify(toolNames) === JSON.stringify(['designSection', 'replaceMedia', 'rewriteText']),
+  `expected CANVAS_AGENT_TOOLS to expose [designSection, replaceMedia, rewriteText] (got [${toolNames.join(', ')}])`,
 );
 
 const createSectionTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'createSection');
-assert(createSectionTool !== undefined, 'createSection tool must exist');
-const recipeIdEnum = createSectionTool?.parameters.properties?.recipeId?.enum;
 assert(
-  Array.isArray(recipeIdEnum) &&
-    recipeIdEnum.length === AGENT_RECIPE_IDS.length &&
-    [...AGENT_RECIPE_IDS].every((id) => recipeIdEnum.includes(id)),
-  `expected createSection.recipeId.enum to list every AGENT_RECIPE_IDS entry (not 'custom')`,
+  createSectionTool === undefined,
+  'createSection must not be exposed to the model; designSection is the section creation tool',
 );
 
 const rewriteTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'rewriteText');
@@ -336,6 +331,107 @@ assert(
 assert(
   designTool?.parameters.properties?.sectionName !== undefined,
   'designSection must have a sectionName parameter',
+);
+
+// designSection parser rejects invalid model output loudly instead of
+// substituting defaults that hide broken tool calls.
+const validDesignArgs = {
+  sectionName: 'Strict parser',
+  layout: {
+    type: 'stack',
+    direction: 'column',
+    children: [
+      {
+        element: {
+          type: 'text',
+          text: {
+            content: 'Hello',
+            role: 'heading',
+            color: 'text',
+            font: 'display',
+            size: 32,
+          },
+        },
+      },
+    ],
+  },
+};
+const parsedValidDesign = parseDesignSectionToolArgs(validDesignArgs);
+assert(
+  parsedValidDesign.ok && parsedValidDesign.input.sectionName === 'Strict parser',
+  'expected parseDesignSectionToolArgs to accept a complete designSection payload',
+);
+
+const missingTextProps = parseDesignSectionToolArgs({
+  sectionName: 'Bad text',
+  layout: {
+    type: 'stack',
+    children: [{ element: { type: 'text' } }],
+  },
+});
+assert(
+  !missingTextProps.ok && missingTextProps.error.includes('element.text must be an object'),
+  'expected designSection parser to reject text elements without text props',
+);
+
+const invalidToken = parseDesignSectionToolArgs({
+  sectionName: 'Bad token',
+  layout: {
+    type: 'stack',
+    children: [
+      {
+        element: {
+          type: 'text',
+          text: {
+            content: 'Hello',
+            role: 'heading',
+            color: 'purple',
+            font: 'display',
+            size: 32,
+          },
+        },
+      },
+    ],
+  },
+});
+assert(
+  !invalidToken.ok && invalidToken.error.includes('element.text.color'),
+  'expected designSection parser to reject unknown color tokens',
+);
+
+const unsafeActionHref = parseDesignSectionToolArgs({
+  sectionName: 'Bad href',
+  layout: {
+    type: 'stack',
+    children: [
+      {
+        element: {
+          type: 'action',
+          action: { label: 'Click', variant: 'solid', href: 'javascript:alert(1)' },
+        },
+      },
+    ],
+  },
+});
+assert(
+  !unsafeActionHref.ok && unsafeActionHref.error.includes('not allowed'),
+  'expected designSection parser to reject unsafe action hrefs',
+);
+
+const splitWithExtraChild = parseDesignSectionToolArgs({
+  sectionName: 'Bad split',
+  layout: {
+    type: 'split',
+    children: [
+      validDesignArgs.layout.children[0],
+      validDesignArgs.layout.children[0],
+      validDesignArgs.layout.children[0],
+    ],
+  },
+});
+assert(
+  !splitWithExtraChild.ok && splitWithExtraChild.error.includes('exactly 2 children'),
+  'expected designSection parser to reject split nodes with more than two children',
 );
 
 // ---------------------------------------------------------------------------
@@ -398,7 +494,11 @@ const designInput: DesignSectionInput = {
               {
                 element: {
                   type: 'action',
-                  action: { label: 'Get Started', variant: 'outline', href: '#' },
+                  action: {
+                    label: 'Get Started',
+                    variant: 'outline',
+                    href: { type: 'external', url: '#' },
+                  },
                 },
               },
             ],
@@ -430,7 +530,11 @@ const designInput: DesignSectionInput = {
               {
                 element: {
                   type: 'action',
-                  action: { label: 'Go Pro', variant: 'solid', href: '#' },
+                  action: {
+                    label: 'Go Pro',
+                    variant: 'solid',
+                    href: { type: 'external', url: '#' },
+                  },
                 },
               },
             ],
@@ -462,7 +566,11 @@ const designInput: DesignSectionInput = {
               {
                 element: {
                   type: 'action',
-                  action: { label: 'Contact us', variant: 'ghost', href: '#' },
+                  action: {
+                    label: 'Contact us',
+                    variant: 'ghost',
+                    href: { type: 'external', url: '#' },
+                  },
                 },
               },
             ],
@@ -550,10 +658,7 @@ try {
 } catch (err) {
   designUnknownAfterThrew = err instanceof Error && err.message.includes('sec-not-here');
 }
-assert(
-  designUnknownAfterThrew,
-  'expected designSection with unknown afterSectionId to throw',
-);
+assert(designUnknownAfterThrew, 'expected designSection with unknown afterSectionId to throw');
 
 // resolveDesignOp — returns section + imagePrompts without modifying state.
 const designWithImages: DesignSectionInput = {

@@ -44,38 +44,11 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type {
-  CanvasSiteState,
-  InlineMark,
-  InlineRun,
-  MediaKind,
-  StyleKit,
-} from '../../canvas/schema.js';
+import type { CanvasSiteState, InlineMark, InlineRun, MediaKind } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
-import {
-  ACTION_VARIANTS,
-  AGENT_RECIPE_IDS,
-  INLINE_MARK_TYPES,
-  MEDIA_KINDS,
-  BACKGROUND_EFFECTS,
-  MOTION_PRESETS,
-  SHAPE_VARIANTS,
-  SURFACE_VARIANTS,
-  type AgentRecipeId,
-  type BackgroundEffect,
-  type MotionPreset,
-} from '../../canvas/schema.js';
+import { INLINE_MARK_TYPES, MEDIA_KINDS } from '../../canvas/schema.js';
 import { isAllowedHref } from '../../canvas/validate.js';
-import type { RecipeFactoryInput } from '../../canvas/recipes.js';
-import type { DesignSectionInput, LayoutNode, ElementNode } from '../../canvas/layout/tree.js';
-import {
-  isElementNode as isElementNodeGuard,
-  COLOR_TOKENS,
-  FONT_TOKENS,
-  GAP_TOKENS,
-  SPLIT_RATIOS,
-  GRID_COLUMNS,
-} from '../../canvas/layout/tree.js';
+import { parseDesignSectionToolArgs } from '../design-section-parser.js';
 import {
   CHAT_AGENT_TOOLS,
   MUTATING_TOOL_NAMES,
@@ -208,7 +181,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         await dispatchReadOnlyTool({ call, writer, ctx, history });
       } else if (MUTATING_TOOL_NAMES.has(call.name)) {
         sawMutating = true;
-        const dispatched = dispatchMutatingTool({ call, ctx, history });
+        const dispatched = dispatchMutatingTool({ call, history });
         if (dispatched.preview) {
           await writer.write({
             kind: 'op-preview',
@@ -299,7 +272,9 @@ async function streamOnePass(
   return out;
 }
 
-function mapDoneReason(reason: Extract<LlmChunk, { type: 'done' }>['reason']): RunTurnResult['doneReason'] {
+function mapDoneReason(
+  reason: Extract<LlmChunk, { type: 'done' }>['reason'],
+): RunTurnResult['doneReason'] {
   if (reason === 'stop') return 'stop';
   if (reason === 'length') return 'length';
   if (reason === 'tool_use') return 'tool_use';
@@ -360,7 +335,6 @@ async function dispatchReadOnlyTool(input: ReadOnlyDispatchInput): Promise<void>
 
 interface MutatingDispatchInput {
   call: LlmAssistantToolCall;
-  ctx: OrchestratorContext;
   history: ChatMessage[];
 }
 
@@ -369,8 +343,8 @@ interface MutatingDispatchResult {
 }
 
 function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchResult {
-  const { call, ctx, history } = input;
-  const parsed = translateToolCall(call, ctx.state.styleKit);
+  const { call, history } = input;
+  const parsed = translateToolCall(call);
   if (!parsed.ok) {
     history.push({
       role: 'tool',
@@ -398,14 +372,12 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
 
 type ParseResult = { ok: true; op: CanvasAgentOp } | { ok: false; error: string };
 
-function translateToolCall(call: LlmAssistantToolCall, styleKit: StyleKit): ParseResult {
+function translateToolCall(call: LlmAssistantToolCall): ParseResult {
   switch (call.name) {
     case 'rewriteText':
       return parseRewriteText(call.arguments);
     case 'replaceMedia':
       return parseReplaceMedia(call.arguments);
-    case 'createSection':
-      return parseCreateSection(call.arguments, styleKit);
     case 'designSection':
       return parseDesignSection(call.arguments);
     default:
@@ -455,154 +427,13 @@ function parseReplaceMedia(args: unknown): ParseResult {
   };
 }
 
-function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'createSection arguments must be an object' };
-  if (!isOneOf<AgentRecipeId>(args.recipeId, AGENT_RECIPE_IDS)) {
-    return {
-      ok: false,
-      error: `createSection.recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}]`,
-    };
-  }
-  if (typeof args.brief !== 'string' || args.brief.length === 0) {
-    return { ok: false, error: 'createSection.brief must be a non-empty string' };
-  }
-  let afterSectionId: string | null = null;
-  if (typeof args.afterSectionId === 'string' && args.afterSectionId.length > 0) {
-    afterSectionId = args.afterSectionId;
-  }
-  const assetIds: RecipeFactoryInput['assetIds'] = {};
-  if (isRecord(args.assetIds)) {
-    if (typeof args.assetIds.hero === 'string' && args.assetIds.hero.length > 0) {
-      assetIds.hero = args.assetIds.hero;
-    }
-    if (Array.isArray(args.assetIds.cards)) {
-      const cards: string[] = [];
-      for (const id of args.assetIds.cards) {
-        if (typeof id === 'string' && id.length > 0) cards.push(id);
-      }
-      if (cards.length > 0) assetIds.cards = cards;
-    }
-    if (Array.isArray(args.assetIds.gallery)) {
-      const gallery: string[] = [];
-      for (const id of args.assetIds.gallery) {
-        if (typeof id === 'string' && id.length > 0) gallery.push(id);
-      }
-      if (gallery.length > 0) assetIds.gallery = gallery;
-    }
-  }
+function parseDesignSection(args: unknown): ParseResult {
+  const parsed = parseDesignSectionToolArgs(args);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
   return {
     ok: true,
-    op: {
-      kind: 'insertSection',
-      afterSectionId,
-      recipeId: args.recipeId,
-      input: { brief: args.brief, styleKit, assetIds },
-    },
+    op: { kind: 'designSection', afterSectionId: parsed.afterSectionId, input: parsed.input },
   };
-}
-
-function parseLayoutTree(value: unknown, depth: number): LayoutNode | ElementNode | string {
-  if (depth > 6) return 'layout tree exceeds maximum nesting depth (6)';
-  if (!isRecord(value)) return 'layout node must be an object';
-
-  if ('element' in value) {
-    const el = value.element;
-    if (!isRecord(el)) return 'element must be an object';
-    if (!isOneOf(el.type, ['text', 'media', 'action', 'shape', 'container'] as const)) {
-      return `element.type must be text|media|action|shape|container (got ${JSON.stringify(el.type)})`;
-    }
-    const node: ElementNode = { element: { type: el.type } };
-    if (el.text !== undefined && isRecord(el.text)) {
-      node.element.text = {
-        content: typeof el.text.content === 'string' ? el.text.content : '',
-        role: isOneOf(el.text.role, ['heading', 'body', 'label'] as const) ? el.text.role : 'body',
-        color: isOneOf(el.text.color, COLOR_TOKENS) ? el.text.color : 'text',
-        font: isOneOf(el.text.font, FONT_TOKENS) ? el.text.font : 'body',
-        size: typeof el.text.size === 'number' ? el.text.size : 16,
-      };
-    }
-    if (el.media !== undefined && isRecord(el.media)) {
-      node.element.media = {
-        imagePrompt: typeof el.media.imagePrompt === 'string' ? el.media.imagePrompt : '',
-        fit: isOneOf(el.media.fit, ['cover', 'contain'] as const) ? el.media.fit : 'cover',
-      };
-    }
-    if (el.action !== undefined && isRecord(el.action)) {
-      node.element.action = {
-        label: typeof el.action.label === 'string' ? el.action.label : 'Click',
-        variant: isOneOf(el.action.variant, ACTION_VARIANTS) ? el.action.variant : 'solid',
-        href: typeof el.action.href === 'string' ? el.action.href : '#',
-      };
-    }
-    if (el.shape !== undefined && isRecord(el.shape)) {
-      node.element.shape = {
-        variant: isOneOf(el.shape.variant, SHAPE_VARIANTS) ? el.shape.variant : 'rect',
-      };
-    }
-    if (el.container !== undefined && isRecord(el.container)) {
-      node.element.container = {
-        variant: isOneOf(el.container.variant, SURFACE_VARIANTS) ? el.container.variant : 'flat',
-        padding: typeof el.container.padding === 'number' ? el.container.padding : 24,
-      };
-    }
-    if (isOneOf(value.size, ['fill', 'hug'] as const)) {
-      node.size = value.size;
-    }
-    return node;
-  }
-
-  if (!isOneOf(value.type, ['stack', 'grid', 'split'] as const)) {
-    return `layout node type must be stack|grid|split (got ${JSON.stringify(value.type)})`;
-  }
-  if (!Array.isArray(value.children)) return 'layout node must have a children array';
-
-  const children: (LayoutNode | ElementNode)[] = [];
-  for (let i = 0; i < value.children.length; i++) {
-    const parsed = parseLayoutTree(value.children[i], depth + 1);
-    if (typeof parsed === 'string') return `children[${String(i)}]: ${parsed}`;
-    children.push(parsed);
-  }
-
-  const node: LayoutNode = { type: value.type, children };
-  if (isOneOf(value.direction, ['row', 'column'] as const)) node.direction = value.direction;
-  if (isOneOf(value.gap, GAP_TOKENS)) node.gap = value.gap;
-  if (isOneOf(value.align, ['start', 'center', 'end'] as const)) node.align = value.align;
-  if (typeof value.columns === 'number' && (GRID_COLUMNS as readonly number[]).includes(value.columns)) {
-    node.columns = value.columns as 2 | 3 | 4;
-  }
-  if (isOneOf(value.ratio, SPLIT_RATIOS)) node.ratio = value.ratio;
-
-  return node;
-}
-
-function parseDesignSection(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'designSection arguments must be an object' };
-  if (typeof args.sectionName !== 'string' || args.sectionName.length === 0) {
-    return { ok: false, error: 'designSection.sectionName must be a non-empty string' };
-  }
-  if (args.layout === undefined || !isRecord(args.layout)) {
-    return { ok: false, error: 'designSection.layout must be an object' };
-  }
-  const layoutParsed = parseLayoutTree(args.layout, 0);
-  if (typeof layoutParsed === 'string') {
-    return { ok: false, error: `designSection.layout: ${layoutParsed}` };
-  }
-  if ('element' in layoutParsed) {
-    return { ok: false, error: 'designSection.layout root must be a layout node, not an element' };
-  }
-  let afterSectionId: string | null = null;
-  if (typeof args.afterSectionId === 'string' && args.afterSectionId.length > 0) {
-    afterSectionId = args.afterSectionId;
-  }
-  const input: DesignSectionInput = { sectionName: args.sectionName, layout: layoutParsed };
-  if (typeof args.height === 'number') input.height = args.height;
-  if (isOneOf<BackgroundEffect>(args.backgroundEffect, BACKGROUND_EFFECTS)) {
-    input.backgroundEffect = args.backgroundEffect;
-  }
-  if (isOneOf<MotionPreset>(args.entrance, MOTION_PRESETS)) {
-    input.entrance = args.entrance;
-  }
-  return { ok: true, op: { kind: 'designSection', afterSectionId, input } };
 }
 
 function parseInlineRuns(
@@ -749,11 +580,8 @@ export function buildSystemPrompt(state: CanvasSiteState): string {
     '  - replaceMedia: swap a Media Element to an EXISTING uploaded Owner Asset. The tool does NOT generate media bytes.',
   );
   lines.push(
-    `  - createSection: append a new Canvas Section using a built-in Section Recipe. recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}]. Prefer this when a recipe matches — it is faster and more reliable.`,
-  );
-  lines.push(
     '  - designSection: design a custom section from scratch using a semantic layout tree (stack/grid/split). ' +
-      'Use this for any section shape that does not match a built-in recipe (e.g. pricing tiers, FAQ, team grid, stats).',
+      'Use this for new Canvas Sections such as pricing tiers, FAQ, team grids, stats, and CTAs.',
   );
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent ids — call query_site first when you are unsure.');
@@ -786,9 +614,7 @@ async function summariseIfNeeded(
       role: 'user',
       content:
         'Summarise the following Owner ↔ Agent conversation in 6-10 short bullets. Preserve any element / section / asset ids the Agent mentioned. Output plain text.\n\n' +
-        toSummarise
-          .map((m) => `[${m.role}] ${truncate(m.content, 600)}`)
-          .join('\n'),
+        toSummarise.map((m) => `[${m.role}] ${truncate(m.content, 600)}`).join('\n'),
     },
   ];
 

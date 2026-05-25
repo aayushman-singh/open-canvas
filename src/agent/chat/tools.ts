@@ -2,8 +2,8 @@
 //
 // Tool surface for the chat orchestrator.
 //
-// The chat agent consumes the three existing canvas tools (rewriteText,
-// replaceMedia, createSection) verbatim from `src/agent/canvas-tools.ts` and
+// The chat agent consumes the existing canvas tools (rewriteText,
+// replaceMedia, designSection) verbatim from `src/agent/canvas-tools.ts` and
 // adds two new tools owned here:
 //
 //   - `query_site` — read-only. Returns a token-bounded summary of the
@@ -15,7 +15,7 @@
 //     apply happens through the existing `POST /api/canvas-agent/sites/:id/apply`
 //     route — owned by the canvas-agent module — once the Owner accepts.
 //
-// The existing canvas tools (rewriteText, replaceMedia, createSection) are
+// The existing canvas tools (rewriteText, replaceMedia, designSection) are
 // re-exported as part of CHAT_AGENT_TOOLS so the orchestrator dispatches
 // them as `propose_op`-equivalent previews. The model sees a single
 // extended tool catalogue.
@@ -67,7 +67,6 @@ export const CHAT_AGENT_TOOLS: LlmTool[] = [QUERY_SITE_TOOL, ...CANVAS_AGENT_TOO
 export const MUTATING_TOOL_NAMES = new Set<string>([
   'rewriteText',
   'replaceMedia',
-  'createSection',
   'designSection',
 ]);
 
@@ -135,9 +134,7 @@ export interface QuerySiteInput {
 export function buildQuerySiteSummary(input: QuerySiteInput): QuerySiteSummary {
   const { state, detail, fonts = [] } = input;
 
-  const pages: QuerySitePageSummary[] = state.pages.map((page) =>
-    summarisePage(page, detail),
-  );
+  const pages: QuerySitePageSummary[] = state.pages.map((page) => summarisePage(page, detail));
 
   const customFonts: QuerySiteFontRef[] = fonts.map((f) => ({
     id: f.id,
@@ -172,7 +169,10 @@ function summarisePage(page: CanvasPage, detail: QuerySiteDetail): QuerySitePage
   return out;
 }
 
-function summariseSection(section: CanvasSection, detail: QuerySiteDetail): QuerySiteSectionSummary {
+function summariseSection(
+  section: CanvasSection,
+  detail: QuerySiteDetail,
+): QuerySiteSectionSummary {
   const counts: Partial<Record<ElementType, number>> = {};
   for (const t of ELEMENT_TYPES) {
     // initialise lazily — only emit present types in the output to avoid

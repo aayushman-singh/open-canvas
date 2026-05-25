@@ -1284,11 +1284,11 @@ assert(
 );
 
 // Every recipe in the registry is exercised by canvas-agent-smoke.ts; here we
-// only smoke that the entry point + tool set still names every recipe so the
-// LLM cannot reach for a missing factory.
+// smoke that the model-facing tool set exposes semantic section design rather
+// than the fixed recipe picker.
 const t7ToolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
 assert(
-  JSON.stringify(t7ToolNames) === JSON.stringify(['createSection', 'replaceMedia', 'rewriteText']),
+  JSON.stringify(t7ToolNames) === JSON.stringify(['designSection', 'replaceMedia', 'rewriteText']),
   `expected CANVAS_AGENT_TOOLS to expose three tools (got [${t7ToolNames.join(', ')}])`,
 );
 for (const recipeId of SECTION_RECIPE_IDS as readonly SectionRecipeId[]) {

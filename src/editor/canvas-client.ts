@@ -145,17 +145,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let pagePositions = [];
   var PAGE_GAP = 120;
   var ARTBOARD_LABEL_HEIGHT = 40;
-  // The recipe-id list mirrors src/canvas/schema.ts SECTION_RECIPE_IDS.
-  const SECTION_RECIPE_IDS = [
-    "hero-split",
-    "feature-grid",
-    "gallery-strip",
-    "cta-band",
-    "logo-strip",
-    "testimonial-row",
-    "video-hero",
-  ];
-
   const root = document.getElementById("canvas-root");
   const inspector = document.getElementById("canvas-inspector");
   const statusEl = document.getElementById("canvas-status");
@@ -1698,7 +1687,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bar.appendChild(button);
     }
     // AI section button \u2014 drives /api/canvas-agent/sites/.../preview with a
-    // createSection prompt. The button shares the disabled-while-busy
+    // designSection prompt. The button shares the disabled-while-busy
     // contract with the other AI controls via data-ai-button.
     const aiBtn = document.createElement("button");
     aiBtn.type = "button";
@@ -4809,6 +4798,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const brief = op.input && typeof op.input.brief === "string" ? op.input.brief : "";
       return "Insert section recipe=" + op.recipeId + after + (brief.length > 0 ? " — " + JSON.stringify(brief) : "");
     }
+    if (op.kind === "designSection") {
+      const after = op.afterSectionId ? " after " + op.afterSectionId : " at end";
+      const name = op.input && typeof op.input.sectionName === "string" ? op.input.sectionName : "Custom section";
+      return "Design section " + JSON.stringify(name) + after;
+    }
     return "Unknown op";
   }
 
@@ -4980,22 +4974,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   async function aiCreateSection(afterSectionId) {
     if (aiBusy) return;
-    const recipeId = await openSelectModal({
-      title: "AI section",
-      label: "Recipe",
-      options: SECTION_RECIPE_IDS.map((id) => ({ value: id, label: id })),
-      defaultValue: "feature-grid",
-    });
-    if (recipeId === null) return;
-    const normalised = recipeId.trim();
-    if (SECTION_RECIPE_IDS.indexOf(normalised) < 0) {
-      setStatus("Unknown recipe id: " + normalised, "error");
-      return;
-    }
     const brief = await openTextModal({
-      title: "Section brief",
+      title: "AI section",
       label: "What goes in this section?",
-      placeholder: "three reasons to migrate",
+      placeholder: "pricing tiers for a launch plan",
       multiline: true,
     });
     if (brief === null || brief.trim().length === 0) return;
@@ -5003,7 +4985,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ? "Insert it after section id=" + afterSectionId + "."
       : "Append it at the end of the page.";
     const prompt =
-      "Create a new section using the createSection tool with recipeId=" + normalised + ". " +
+      "Create a new section using the designSection tool. " +
+      "Use a semantic layout tree with stack, grid, or split nodes; avoid media leaves. " +
       afterClause + " Owner brief: " + brief;
     runAiPreview(prompt);
   }

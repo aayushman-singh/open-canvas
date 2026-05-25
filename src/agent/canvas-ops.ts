@@ -125,6 +125,11 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
   const preset = getStyleKitPreset(next.styleKit);
   const pageWidth = page.width;
   const result = resolveDesignSection(op.input, pageWidth, preset);
+  if (result.imagePrompts.size > 0) {
+    throw new Error(
+      `applyCanvasAgentOp(designSection): image generation is not wired for media prompts (${[...result.imagePrompts.values()].join('; ')})`,
+    );
+  }
   if (op.afterSectionId === null) {
     page.sections.push(result.section);
     return next;

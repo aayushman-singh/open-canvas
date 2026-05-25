@@ -8,6 +8,7 @@
 
 import type {
   ActionVariant,
+  ActionHref,
   BackgroundEffect,
   ElementType,
   MotionPreset,
@@ -15,7 +16,7 @@ import type {
   SurfaceVariant,
 } from '../schema.js';
 
-export const COLOR_TOKENS = ['accent', 'text', 'muted', 'bg', 'panel', 'emphasis'] as const;
+export const COLOR_TOKENS = ['accent', 'text', 'muted', 'bg', 'panel'] as const;
 export type ColorToken = (typeof COLOR_TOKENS)[number];
 
 export const FONT_TOKENS = ['display', 'body', 'mono'] as const;
@@ -55,7 +56,7 @@ export interface MediaProps {
 export interface ActionProps {
   label: string;
   variant: ActionVariant;
-  href: string;
+  href: ActionHref;
 }
 
 export interface ShapeProps {

@@ -53,7 +53,13 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
         {
           element: {
             type: 'text',
-            text: { content: 'Hello World', role: 'heading', color: 'text', font: 'display', size: 48 },
+            text: {
+              content: 'Hello World',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 48,
+            },
           },
         },
         {
@@ -65,7 +71,11 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
         {
           element: {
             type: 'action',
-            action: { label: 'Get started', variant: 'solid', href: '#' },
+            action: {
+              label: 'Get started',
+              variant: 'solid',
+              href: { type: 'external', url: '#' },
+            },
           },
         },
       ],
@@ -79,7 +89,10 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
   assert(section.backgroundEffect === 'grain', 'background effect');
   assert(section.entrance === 'fade-up', 'entrance');
   assert(section.recipeId === 'custom', 'recipeId must be custom');
-  assert(section.elements.length === 3, `expected 3 elements, got ${String(section.elements.length)}`);
+  assert(
+    section.elements.length === 3,
+    `expected 3 elements, got ${String(section.elements.length)}`,
+  );
   assert(imagePrompts.size === 0, 'no image prompts expected');
 
   // Elements should be positioned within the section bounds
@@ -132,9 +145,42 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
       columns: 3,
       gap: 'normal',
       children: [
-        { element: { type: 'text', text: { content: 'Feature A', role: 'heading', color: 'text', font: 'display', size: 24 } } },
-        { element: { type: 'text', text: { content: 'Feature B', role: 'heading', color: 'text', font: 'display', size: 24 } } },
-        { element: { type: 'text', text: { content: 'Feature C', role: 'heading', color: 'text', font: 'display', size: 24 } } },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Feature A',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 24,
+            },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Feature B',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 24,
+            },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Feature C',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 24,
+            },
+          },
+        },
       ],
     },
   };
@@ -169,8 +215,30 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
           direction: 'column',
           gap: 'normal',
           children: [
-            { element: { type: 'text', text: { content: 'Left side heading', role: 'heading', color: 'text', font: 'display', size: 48 } } },
-            { element: { type: 'text', text: { content: 'Body text here', role: 'body', color: 'muted', font: 'body', size: 16 } } },
+            {
+              element: {
+                type: 'text',
+                text: {
+                  content: 'Left side heading',
+                  role: 'heading',
+                  color: 'text',
+                  font: 'display',
+                  size: 48,
+                },
+              },
+            },
+            {
+              element: {
+                type: 'text',
+                text: {
+                  content: 'Body text here',
+                  role: 'body',
+                  color: 'muted',
+                  font: 'body',
+                  size: 16,
+                },
+              },
+            },
           ],
         },
         {
@@ -186,7 +254,10 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
 
   const { section, imagePrompts } = resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
 
-  assert(section.elements.length === 3, `split should produce 3 elements (2 text + 1 media), got ${String(section.elements.length)}`);
+  assert(
+    section.elements.length === 3,
+    `split should produce 3 elements (2 text + 1 media), got ${String(section.elements.length)}`,
+  );
 
   // Image prompt should be collected
   assert(imagePrompts.size === 1, 'one image prompt expected');
@@ -215,8 +286,24 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
       ratio: '2:1',
       gap: 'normal',
       children: [
-        { element: { type: 'text', text: { content: 'Wide side', role: 'heading', color: 'text', font: 'display', size: 36 } } },
-        { element: { type: 'text', text: { content: 'Narrow', role: 'body', color: 'text', font: 'body', size: 16 } } },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Wide side',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 36,
+            },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Narrow', role: 'body', color: 'text', font: 'body', size: 16 },
+          },
+        },
       ],
     },
   };
@@ -226,10 +313,16 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
 
   const leftW = section.elements[0]!.box.w;
   const rightW = section.elements[1]!.box.w;
-  assert(leftW > rightW, `2:1 ratio: left (${String(leftW)}) should be wider than right (${String(rightW)})`);
+  assert(
+    leftW > rightW,
+    `2:1 ratio: left (${String(leftW)}) should be wider than right (${String(rightW)})`,
+  );
 
   const result = validateCanvasSiteState(wrapInState(section));
-  assert(result.valid, result.valid ? '' : `2:1 split validation failed: ${result.errors.join('; ')}`);
+  assert(
+    result.valid,
+    result.valid ? '' : `2:1 split validation failed: ${result.errors.join('; ')}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -250,10 +343,28 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
           size: 'fill',
         },
         {
-          element: { type: 'text', text: { content: 'Card title', role: 'heading', color: 'text', font: 'display', size: 24 } },
+          element: {
+            type: 'text',
+            text: {
+              content: 'Card title',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 24,
+            },
+          },
         },
         {
-          element: { type: 'text', text: { content: 'Card body text', role: 'body', color: 'muted', font: 'body', size: 16 } },
+          element: {
+            type: 'text',
+            text: {
+              content: 'Card body text',
+              role: 'body',
+              color: 'muted',
+              font: 'body',
+              size: 16,
+            },
+          },
         },
       ],
     },
@@ -284,7 +395,10 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
   }
 
   const result = validateCanvasSiteState(wrapInState(section));
-  assert(result.valid, result.valid ? '' : `bg container validation failed: ${result.errors.join('; ')}`);
+  assert(
+    result.valid,
+    result.valid ? '' : `bg container validation failed: ${result.errors.join('; ')}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -297,10 +411,32 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     direction: 'column',
     gap: 'tight',
     children: [
-      { element: { type: 'container', container: { variant: 'outlined', padding: 24 } }, size: 'fill' },
-      { element: { type: 'text', text: { content: name, role: 'heading', color: 'text', font: 'display', size: 24 } } },
-      { element: { type: 'text', text: { content: price, role: 'heading', color: 'accent', font: 'display', size: 36 } } },
-      { element: { type: 'action', action: { label: 'Get Started', variant: 'outline', href: '#' } } },
+      {
+        element: { type: 'container', container: { variant: 'outlined', padding: 24 } },
+        size: 'fill',
+      },
+      {
+        element: {
+          type: 'text',
+          text: { content: name, role: 'heading', color: 'text', font: 'display', size: 24 },
+        },
+      },
+      {
+        element: {
+          type: 'text',
+          text: { content: price, role: 'heading', color: 'accent', font: 'display', size: 36 },
+        },
+      },
+      {
+        element: {
+          type: 'action',
+          action: {
+            label: 'Get Started',
+            variant: 'outline',
+            href: { type: 'external', url: '#' },
+          },
+        },
+      },
     ],
   });
 
@@ -316,14 +452,24 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
         {
           element: {
             type: 'text',
-            text: { content: 'Simple, transparent pricing', role: 'heading', color: 'text', font: 'display', size: 48 },
+            text: {
+              content: 'Simple, transparent pricing',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 48,
+            },
           },
         },
         {
           type: 'grid',
           columns: 3,
           gap: 'normal',
-          children: [makeTier('Starter', '$9/mo'), makeTier('Pro', '$29/mo'), makeTier('Enterprise', '$99/mo')],
+          children: [
+            makeTier('Starter', '$9/mo'),
+            makeTier('Pro', '$29/mo'),
+            makeTier('Enterprise', '$99/mo'),
+          ],
         },
       ],
     },
@@ -339,10 +485,16 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
 
   // Heading text should be center-aligned
   const heading = section.elements[0]!;
-  assert(heading.type === 'text' && heading.align === 'center', 'pricing heading should be center-aligned');
+  assert(
+    heading.type === 'text' && heading.align === 'center',
+    'pricing heading should be center-aligned',
+  );
 
   const result = validateCanvasSiteState(wrapInState(section));
-  assert(result.valid, result.valid ? '' : `pricing validation failed: ${result.errors.join('; ')}`);
+  assert(
+    result.valid,
+    result.valid ? '' : `pricing validation failed: ${result.errors.join('; ')}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -358,15 +510,30 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
       direction: 'row',
       gap: 'normal',
       children: [
-        { element: { type: 'text', text: { content: 'Left', role: 'heading', color: 'text', font: 'display', size: 36 } }, size: 'fill' },
-        { element: { type: 'text', text: { content: 'Right', role: 'heading', color: 'text', font: 'display', size: 36 } }, size: 'fill' },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Left', role: 'heading', color: 'text', font: 'display', size: 36 },
+          },
+          size: 'fill',
+        },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Right', role: 'heading', color: 'text', font: 'display', size: 36 },
+          },
+          size: 'fill',
+        },
       ],
     },
   };
 
   const { section } = resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
   assert(section.elements.length === 2, 'row stack should produce 2 elements');
-  assert(section.elements[0]!.box.x < section.elements[1]!.box.x, 'left element should be left of right');
+  assert(
+    section.elements[0]!.box.x < section.elements[1]!.box.x,
+    'left element should be left of right',
+  );
 
   const result = validateCanvasSiteState(wrapInState(section));
   assert(result.valid, result.valid ? '' : `row validation failed: ${result.errors.join('; ')}`);
@@ -384,13 +551,21 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
       type: 'stack',
       direction: 'column',
       children: [
-        { element: { type: 'text', text: { content: 'Short', role: 'body', color: 'text', font: 'body', size: 14 } } },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Short', role: 'body', color: 'text', font: 'body', size: 14 },
+          },
+        },
       ],
     },
   };
 
   const { section } = resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
-  assert(section.height >= 240, `height should be clamped to >= 240, got ${String(section.height)}`);
+  assert(
+    section.height >= 240,
+    `height should be clamped to >= 240, got ${String(section.height)}`,
+  );
 
   const result = validateCanvasSiteState(wrapInState(section));
   assert(result.valid, result.valid ? '' : `clamped validation: ${result.errors.join('; ')}`);
@@ -404,13 +579,21 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
       type: 'stack',
       direction: 'column',
       children: [
-        { element: { type: 'text', text: { content: 'Tall', role: 'body', color: 'text', font: 'body', size: 14 } } },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Tall', role: 'body', color: 'text', font: 'body', size: 14 },
+          },
+        },
       ],
     },
   };
 
   const { section } = resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
-  assert(section.height <= 1200, `height should be clamped to <= 1200, got ${String(section.height)}`);
+  assert(
+    section.height <= 1200,
+    `height should be clamped to <= 1200, got ${String(section.height)}`,
+  );
 
   const result = validateCanvasSiteState(wrapInState(section));
   assert(result.valid, result.valid ? '' : `clamped high validation: ${result.errors.join('; ')}`);
@@ -424,7 +607,10 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
   const children: ElementNode[] = [];
   for (let i = 0; i < 40; i++) {
     children.push({
-      element: { type: 'text', text: { content: `Item ${String(i)}`, role: 'body', color: 'text', font: 'body', size: 14 } },
+      element: {
+        type: 'text',
+        text: { content: `Item ${String(i)}`, role: 'body', color: 'text', font: 'body', size: 14 },
+      },
     });
   }
 
@@ -434,11 +620,13 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     layout: { type: 'stack', direction: 'column', gap: 'tight', children },
   };
 
-  const { section } = resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
-  assert(section.elements.length <= 30, `element count capped: got ${String(section.elements.length)}`);
-
-  const result = validateCanvasSiteState(wrapInState(section));
-  assert(result.valid, result.valid ? '' : `cap validation: ${result.errors.join('; ')}`);
+  let threw = false;
+  try {
+    resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
+  } catch (err) {
+    threw = err instanceof Error && err.message.includes('maximum element count');
+  }
+  assert(threw, 'layout engine must reject layouts that exceed the maximum element count');
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +641,12 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
       type: 'stack',
       direction: 'column',
       children: [
-        { element: { type: 'text', text: { content: 'Code-like', role: 'heading', color: 'text', font: 'mono', size: 32 } } },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Code-like', role: 'heading', color: 'text', font: 'mono', size: 32 },
+          },
+        },
       ],
     },
   };
@@ -485,8 +678,16 @@ for (const kit of BUILT_IN_STYLE_KITS) {
       type: 'split',
       ratio: '1:1',
       children: [
-        { element: { type: 'text', text: { content: 'Hello', role: 'heading', color: 'accent', font: 'display', size: 48 } } },
-        { element: { type: 'media', media: { imagePrompt: 'test image', fit: 'cover' } }, size: 'fill' },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Hello', role: 'heading', color: 'accent', font: 'display', size: 48 },
+          },
+        },
+        {
+          element: { type: 'media', media: { imagePrompt: 'test image', fit: 'cover' } },
+          size: 'fill',
+        },
       ],
     },
   };
@@ -500,7 +701,10 @@ for (const kit of BUILT_IN_STYLE_KITS) {
     pages: [{ id: 'page-1', slug: 'home', title: 'Smoke', width: PAGE_WIDTH, sections: [section] }],
   };
   const result = validateCanvasSiteState(state);
-  assert(result.valid, result.valid ? '' : `kit ${kit} validation failed: ${result.errors.join('; ')}`);
+  assert(
+    result.valid,
+    result.valid ? '' : `kit ${kit} validation failed: ${result.errors.join('; ')}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -520,15 +724,30 @@ for (const kit of BUILT_IN_STYLE_KITS) {
             type: 'split',
             ratio: '1:1',
             children: [
-              { element: { type: 'text', text: { content: 'Deep 1', role: 'body', color: 'text', font: 'body', size: 14 } } },
-              { element: { type: 'text', text: { content: 'Deep 2', role: 'body', color: 'text', font: 'body', size: 14 } } },
+              {
+                element: {
+                  type: 'text',
+                  text: { content: 'Deep 1', role: 'body', color: 'text', font: 'body', size: 14 },
+                },
+              },
+              {
+                element: {
+                  type: 'text',
+                  text: { content: 'Deep 2', role: 'body', color: 'text', font: 'body', size: 14 },
+                },
+              },
             ],
           },
           {
             type: 'stack',
             direction: 'column',
             children: [
-              { element: { type: 'text', text: { content: 'Deep 3', role: 'body', color: 'text', font: 'body', size: 14 } } },
+              {
+                element: {
+                  type: 'text',
+                  text: { content: 'Deep 3', role: 'body', color: 'text', font: 'body', size: 14 },
+                },
+              },
             ],
           },
           { element: { type: 'shape', shape: { variant: 'circle' } } },
@@ -539,7 +758,10 @@ for (const kit of BUILT_IN_STYLE_KITS) {
 
   const input: DesignSectionInput = { sectionName: 'Deep', height: 600, layout: deepNested };
   const { section } = resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
-  assert(section.elements.length === 4, `deep nested: expected 4 elements, got ${String(section.elements.length)}`);
+  assert(
+    section.elements.length === 4,
+    `deep nested: expected 4 elements, got ${String(section.elements.length)}`,
+  );
 
   const result = validateCanvasSiteState(wrapInState(section));
   assert(result.valid, result.valid ? '' : `deep nested validation: ${result.errors.join('; ')}`);
@@ -557,8 +779,18 @@ for (const kit of BUILT_IN_STYLE_KITS) {
       type: 'stack',
       direction: 'column',
       children: [
-        { element: { type: 'text', text: { content: 'Tiny', role: 'body', color: 'text', font: 'body', size: 2 } } },
-        { element: { type: 'text', text: { content: 'Huge', role: 'heading', color: 'text', font: 'display', size: 200 } } },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Tiny', role: 'body', color: 'text', font: 'body', size: 2 },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Huge', role: 'heading', color: 'text', font: 'display', size: 200 },
+          },
+        },
       ],
     },
   };
@@ -586,11 +818,55 @@ for (const kit of BUILT_IN_STYLE_KITS) {
       direction: 'column',
       gap: 'loose',
       children: [
-        { element: { type: 'text', text: { content: 'A very long text element that should not exceed section boundaries regardless of content length', role: 'body', color: 'text', font: 'body', size: 16 } } },
-        { element: { type: 'text', text: { content: 'Another element', role: 'body', color: 'text', font: 'body', size: 16 } } },
-        { element: { type: 'text', text: { content: 'Third element', role: 'body', color: 'text', font: 'body', size: 16 } } },
-        { element: { type: 'text', text: { content: 'Fourth element', role: 'body', color: 'text', font: 'body', size: 16 } } },
-        { element: { type: 'text', text: { content: 'Fifth element', role: 'body', color: 'text', font: 'body', size: 16 } } },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content:
+                'A very long text element that should not exceed section boundaries regardless of content length',
+              role: 'body',
+              color: 'text',
+              font: 'body',
+              size: 16,
+            },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Another element',
+              role: 'body',
+              color: 'text',
+              font: 'body',
+              size: 16,
+            },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Third element', role: 'body', color: 'text', font: 'body', size: 16 },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Fourth element',
+              role: 'body',
+              color: 'text',
+              font: 'body',
+              size: 16,
+            },
+          },
+        },
+        {
+          element: {
+            type: 'text',
+            text: { content: 'Fifth element', role: 'body', color: 'text', font: 'body', size: 16 },
+          },
+        },
       ],
     },
   };
@@ -619,9 +895,27 @@ for (const kit of BUILT_IN_STYLE_KITS) {
       type: 'grid',
       columns: 3,
       children: [
-        { element: { type: 'media', media: { imagePrompt: 'A sunset over mountains', fit: 'cover' } }, size: 'fill' },
-        { element: { type: 'media', media: { imagePrompt: 'A city skyline at night', fit: 'cover' } }, size: 'fill' },
-        { element: { type: 'media', media: { imagePrompt: 'A forest path in autumn', fit: 'contain' } }, size: 'fill' },
+        {
+          element: {
+            type: 'media',
+            media: { imagePrompt: 'A sunset over mountains', fit: 'cover' },
+          },
+          size: 'fill',
+        },
+        {
+          element: {
+            type: 'media',
+            media: { imagePrompt: 'A city skyline at night', fit: 'cover' },
+          },
+          size: 'fill',
+        },
+        {
+          element: {
+            type: 'media',
+            media: { imagePrompt: 'A forest path in autumn', fit: 'contain' },
+          },
+          size: 'fill',
+        },
       ],
     },
   };
@@ -654,6 +948,29 @@ for (const kit of BUILT_IN_STYLE_KITS) {
 
   // Empty section won't pass validation (needs at least one section in the page)
   // but the engine itself shouldn't crash.
+}
+
+// ---------------------------------------------------------------------------
+// 17. Missing element props — loud failure, no invented defaults
+// ---------------------------------------------------------------------------
+
+{
+  const input = {
+    sectionName: 'Missing props',
+    layout: {
+      type: 'stack',
+      direction: 'column',
+      children: [{ element: { type: 'text' } }],
+    },
+  } as unknown as DesignSectionInput;
+
+  let threw = false;
+  try {
+    resolveDesignSection(input, PAGE_WIDTH, CHARCOAL);
+  } catch (err) {
+    threw = err instanceof Error && err.message.includes('text element requires text props');
+  }
+  assert(threw, 'layout engine must reject text elements without text props');
 }
 
 console.log('[layout-engine:smoke] OK');

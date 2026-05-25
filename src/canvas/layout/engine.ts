@@ -74,8 +74,6 @@ function resolveColor(token: ColorToken, preset: StyleKitPreset): string {
       return preset.bg;
     case 'panel':
       return preset.panel;
-    case 'emphasis':
-      return preset.accent;
   }
 }
 
@@ -164,6 +162,64 @@ function isBackgroundContainer(node: ElementNode): boolean {
   return node.element.type === 'container' && (node.size ?? 'hug') === 'fill';
 }
 
+function requireTextProps(node: ElementNode): NonNullable<ElementNode['element']['text']> {
+  const props = node.element.text;
+  if (!props) throw new Error('text element requires text props');
+  if (props.content.trim().length === 0) throw new Error('text element content must be non-empty');
+  return props;
+}
+
+function requireMediaProps(node: ElementNode): NonNullable<ElementNode['element']['media']> {
+  const props = node.element.media;
+  if (!props) throw new Error('media element requires media props');
+  if (props.imagePrompt.trim().length === 0) {
+    throw new Error('media element imagePrompt must be non-empty');
+  }
+  return props;
+}
+
+function requireActionProps(node: ElementNode): NonNullable<ElementNode['element']['action']> {
+  const props = node.element.action;
+  if (!props) throw new Error('action element requires action props');
+  if (props.label.trim().length === 0) throw new Error('action element label must be non-empty');
+  if (props.href.type === 'external') {
+    if (props.href.url.trim().length === 0) {
+      throw new Error('action element external href url must be non-empty');
+    }
+  } else if (props.href.type === 'page') {
+    if (props.href.pageId.trim().length === 0) {
+      throw new Error('action element page href pageId must be non-empty');
+    }
+  } else {
+    const href = props.href as { type?: unknown };
+    throw new Error(`action element href type is unsupported: ${String(href.type)}`);
+  }
+  return props;
+}
+
+function requireShapeProps(node: ElementNode): NonNullable<ElementNode['element']['shape']> {
+  const props = node.element.shape;
+  if (!props) throw new Error('shape element requires shape props');
+  return props;
+}
+
+function requireContainerProps(
+  node: ElementNode,
+): NonNullable<ElementNode['element']['container']> {
+  const props = node.element.container;
+  if (!props) throw new Error('container element requires container props');
+  return props;
+}
+
+function countElementNodes(node: LayoutNode | ElementNode): number {
+  if (isElementNode(node)) return 1;
+  let count = 0;
+  for (const child of node.children) {
+    count += countElementNodes(child);
+  }
+  return count;
+}
+
 function createCanvasElement(
   node: ElementNode,
   box: PositionedBox,
@@ -174,13 +230,7 @@ function createCanvasElement(
 
   switch (el.type) {
     case 'text': {
-      const text = el.text ?? {
-        content: 'Text',
-        role: 'body' as const,
-        color: 'text' as const,
-        font: 'body' as const,
-        size: 16,
-      };
+      const text = requireTextProps(node);
       const fontSize = clamp(text.size, FONT_SIZE_MIN, FONT_SIZE_MAX);
       const fontWeight = text.role === 'heading' ? 700 : text.role === 'label' ? 500 : 400;
 
@@ -208,10 +258,8 @@ function createCanvasElement(
       return result;
     }
     case 'media': {
-      const media = el.media ?? { imagePrompt: '', fit: 'cover' as const };
-      if (media.imagePrompt.length > 0) {
-        ctx.imagePrompts.set(id, media.imagePrompt);
-      }
+      const media = requireMediaProps(node);
+      ctx.imagePrompts.set(id, media.imagePrompt);
       return {
         id,
         type: 'media',
@@ -223,7 +271,7 @@ function createCanvasElement(
       };
     }
     case 'action': {
-      const action = el.action ?? { label: 'Click', variant: 'solid' as const, href: '#' };
+      const action = requireActionProps(node);
       return {
         id,
         type: 'action',
@@ -234,7 +282,7 @@ function createCanvasElement(
       };
     }
     case 'shape': {
-      const shape = el.shape ?? { variant: 'rect' as const };
+      const shape = requireShapeProps(node);
       return {
         id,
         type: 'shape',
@@ -243,7 +291,7 @@ function createCanvasElement(
       };
     }
     case 'container': {
-      const container = el.container ?? { variant: 'flat' as const, padding: 24 };
+      const container = requireContainerProps(node);
       return {
         id,
         type: 'container',
@@ -252,23 +300,12 @@ function createCanvasElement(
       };
     }
     default: {
-      return {
-        id,
-        type: 'shape',
-        box,
-        variant: 'rect',
-      };
+      throw new Error(`unsupported designSection element type: ${String(el.type)}`);
     }
   }
 }
 
-function resolveNode(
-  node: LayoutNode | ElementNode,
-  box: BoundingBox,
-  ctx: ResolveContext,
-): void {
-  if (ctx.elements.length >= MAX_ELEMENTS) return;
-
+function resolveNode(node: LayoutNode | ElementNode, box: BoundingBox, ctx: ResolveContext): void {
   if (isElementNode(node)) {
     const posBox: PositionedBox = {
       x: Math.round(box.x),
@@ -317,7 +354,6 @@ function resolveStack(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): 
 
   // Background containers span the full parent box at lower z.
   for (const bg of bgContainers) {
-    if (ctx.elements.length >= MAX_ELEMENTS) break;
     const posBox: PositionedBox = {
       x: Math.round(box.x),
       y: Math.round(box.y),
@@ -451,7 +487,6 @@ function resolveGrid(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): v
   const rowHeight = (box.h - totalRowGap) / rows;
 
   for (let i = 0; i < children.length; i++) {
-    if (ctx.elements.length >= MAX_ELEMENTS) break;
     const col = i % columns;
     const row = Math.floor(i / columns);
     const child = children[i]!;
@@ -484,10 +519,9 @@ function resolveSplit(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): 
     ctx.parentAlign = prevAlign;
     return;
   }
-  if (children.length === 1) {
-    resolveNode(children[0]!, box, ctx);
+  if (children.length !== 2) {
     ctx.parentAlign = prevAlign;
-    return;
+    throw new Error(`split layout requires exactly 2 children (got ${String(children.length)})`);
   }
 
   const [leftRatio, rightRatio] = parseSplitRatio(ratio);
@@ -497,11 +531,7 @@ function resolveSplit(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): 
   const rightWidth = (availableWidth * rightRatio) / totalRatio;
 
   resolveNode(children[0]!, { x: box.x, y: box.y, w: leftWidth, h: box.h }, ctx);
-  resolveNode(
-    children[1]!,
-    { x: box.x + leftWidth + gap, y: box.y, w: rightWidth, h: box.h },
-    ctx,
-  );
+  resolveNode(children[1]!, { x: box.x + leftWidth + gap, y: box.y, w: rightWidth, h: box.h }, ctx);
 
   ctx.parentAlign = prevAlign;
 }
@@ -522,6 +552,13 @@ export function resolveDesignSection(
   pageWidth: number,
   preset: StyleKitPreset,
 ): DesignSectionResult {
+  const elementCount = countElementNodes(input.layout);
+  if (elementCount > MAX_ELEMENTS) {
+    throw new Error(
+      `designSection layout exceeds maximum element count (${String(MAX_ELEMENTS)}): ${String(elementCount)}`,
+    );
+  }
+
   const height = clamp(input.height ?? 720, SECTION_HEIGHT_MIN, SECTION_HEIGHT_MAX);
   const sectionId = `sec-custom-${shortRand()}`;
 
