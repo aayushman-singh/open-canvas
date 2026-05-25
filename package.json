@@ -38,6 +38,7 @@
     "interactive:smoke": "bun run src/interactive/smoke.ts",
     "code:smoke": "bun run src/code/smoke.ts",
     "seo:smoke": "bun run src/seo/smoke.ts",
+    "jsonld:smoke": "bun run src/seo/json-ld.smoke.ts",
     "sitemap:smoke": "bun run src/seo/sitemap/smoke.ts",
     "nav:smoke": "bun run src/canvas/elements/nav-smoke.ts",
     "table:smoke": "bun run src/canvas/elements/table-smoke.ts",

@@ -215,6 +215,25 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
     lines.push(`<meta name="twitter:image" content="${ogImageAttr}">`);
   }
 
+  // -- Schema.org JSON-LD ----------------------------------------------------
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: title,
+  };
+  if (hasDescription) {
+    jsonLd.description = page.description;
+  }
+  if (canonical !== null) {
+    jsonLd.url = canonical;
+  }
+  if (ogImageUrl !== null) {
+    jsonLd.image = ogImageUrl;
+  }
+  // Escape all `<` as `<` to prevent `</script>` injection in the JSON body.
+  const jsonLdStr = JSON.stringify(jsonLd).replace(/</g, '\\u003c');
+  lines.push(`<script type="application/ld+json">${jsonLdStr}</script>`);
+
   return lines.join('\n');
 }
 
