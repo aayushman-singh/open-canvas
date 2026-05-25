@@ -301,6 +301,7 @@ export interface CanvasSection {
   role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
   entrance?: MotionPreset;
+  backgroundVideo?: string;
   elements: CanvasElement[];
 }
 
