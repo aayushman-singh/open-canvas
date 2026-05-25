@@ -76,6 +76,8 @@ interface SiteRoomEnv {
 interface BroadcastPayload {
   version: number;
   html: string;
+  htmlBySlug?: Record<string, string>;
+  defaultSlug?: string;
 }
 
 type SocketRole = 'visitor' | 'editor';
@@ -94,6 +96,23 @@ function isBroadcastPayload(value: unknown): value is BroadcastPayload {
   if (!Number.isInteger(version)) return false;
   if (version < 1) return false;
   if (typeof candidate.html !== 'string') return false;
+  if (candidate.htmlBySlug !== undefined) {
+    if (
+      typeof candidate.htmlBySlug !== 'object' ||
+      candidate.htmlBySlug === null ||
+      Array.isArray(candidate.htmlBySlug)
+    ) {
+      return false;
+    }
+    const htmlBySlug = candidate.htmlBySlug as Record<string, unknown>;
+    if (typeof candidate.defaultSlug !== 'string') return false;
+    if (!(candidate.defaultSlug in htmlBySlug)) return false;
+    for (const value of Object.values(htmlBySlug)) {
+      if (typeof value !== 'string') return false;
+    }
+  } else if (candidate.defaultSlug !== undefined) {
+    return false;
+  }
   return true;
 }
 
@@ -165,9 +184,7 @@ interface EditableStateReplacedBroadcast {
   newState: CanvasSiteState;
 }
 
-function isEditableStateReplacedBroadcast(
-  value: unknown,
-): value is EditableStateReplacedBroadcast {
+function isEditableStateReplacedBroadcast(value: unknown): value is EditableStateReplacedBroadcast {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   if (v.kind !== 'editable-state-replaced') return false;

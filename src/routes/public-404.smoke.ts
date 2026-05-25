@@ -12,7 +12,10 @@
 //      the _404 render path (simulated logic match).
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
+import { resolvePrimaryPage, snapshotForPageSlug } from '../canvas/page-routing.js';
+import { validateCanvasSiteState } from '../canvas/validate.js';
 import { prepareRender } from '../i18n/render-hook.js';
+import { resolveNoIndex } from '../seo/meta-emit.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -60,10 +63,33 @@ const homePage = makePage('home');
 const notFoundPage = makePage('_404');
 const snapshotWith404 = makeSnapshot([homePage, notFoundPage]);
 
+const validSnapshotWith404 = validateCanvasSiteState(snapshotWith404);
+assert(
+  validSnapshotWith404.valid,
+  'setup: snapshot with one primary page plus _404 must pass validation',
+);
+
+const invalidOnly404 = validateCanvasSiteState(makeSnapshot([notFoundPage]));
+assert(
+  !invalidOnly404.valid,
+  'setup: a lone _404 page must fail validation because the site needs a primary page',
+);
+
 const result1 = prepareRender('/_404', snapshotWith404);
 assert(result1.page !== null, '1: prepareRender(/_404) must find the _404 page');
 assert(result1.page!.slug === '_404', '1: resolved page slug must be _404');
 assert(result1.pageSlug === '_404', '1: pageSlug must be _404');
+
+const active404Snapshot = snapshotForPageSlug(result1.renderSnapshot, result1.pageSlug);
+assert(
+  active404Snapshot.pages.length === 1,
+  '1: active _404 render snapshot must contain one page',
+);
+assert(
+  active404Snapshot.pages[0]?.slug === '_404',
+  '1: active render snapshot must only contain _404',
+);
+assert(resolvePrimaryPage(snapshotWith404).slug === 'home', '1: primary page must exclude _404');
 
 // ---------------------------------------------------------------------------
 // Assertion 2 — snapshot WITHOUT a _404 page returns page: null.
@@ -90,6 +116,15 @@ const notFoundRender = prepareRender('/_404', snapshotWith404);
 assert(
   notFoundRender.page !== null,
   '3: _404 fallback render must find the _404 page for the 404 response',
+);
+
+// ---------------------------------------------------------------------------
+// Assertion 4 — _404 page is never crawlable.
+// ---------------------------------------------------------------------------
+
+assert(
+  resolveNoIndex(notFoundPage, snapshotWith404) === true,
+  '4: _404 page must resolve noIndex so it is omitted from crawler surfaces',
 );
 
 // ---------------------------------------------------------------------------

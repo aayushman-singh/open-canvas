@@ -27,6 +27,7 @@ var type=sec.getAttribute('data-rev01-trigger-type');
 var val=parseInt(sec.getAttribute('data-rev01-trigger-value')||'0',10);
 var key='rev01-popup-dismissed-'+id;
 if(localStorage.getItem(key))return;
+var originalStyle=sec.getAttribute('style');
 var fired=false;
 function show(){
 if(fired)return;fired=true;
@@ -35,13 +36,21 @@ bg.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.5
 var btn=document.createElement('button');
 btn.setAttribute('aria-label','Close popup');
 btn.style.cssText='position:fixed;top:16px;right:16px;z-index:100000;background:none;border:none;color:#fff;font-size:24px;cursor:pointer';
-btn.textContent='×';
-sec.style.cssText='display:block;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:99999;max-width:90vw;max-height:90vh;overflow:auto';
+btn.textContent='x';
+sec.style.display='block';
+sec.style.position='fixed';
+sec.style.top='50%';
+sec.style.left='50%';
+sec.style.transform='translate(-50%,-50%)';
+sec.style.zIndex='99999';
+sec.style.maxWidth='90vw';
+sec.style.maxHeight='90vh';
+sec.style.overflow='auto';
 document.body.appendChild(bg);
 document.body.appendChild(btn);
 function close(){
 localStorage.setItem(key,'1');
-sec.style.display='none';
+if(originalStyle===null){sec.removeAttribute('style');}else{sec.setAttribute('style',originalStyle);}
 bg.parentNode.removeChild(bg);
 btn.parentNode.removeChild(btn);
 }

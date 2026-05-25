@@ -128,7 +128,7 @@ async function testSectionRenderProducesSvg(): Promise<void> {
 // Test 2 — scale factor positions elements within 1200x630.
 // ---------------------------------------------------------------------------
 
-async function testScaleFactorApplied(): Promise<void> {
+function testScaleFactorApplied(): void {
   const scaleX = OG_WIDTH / PAGE_WIDTH;
   const scaleY = OG_HEIGHT / SECTION_HEIGHT;
   const scale = Math.min(scaleX, scaleY);
@@ -182,7 +182,7 @@ async function testMediaElementsSkipped(): Promise<void> {
 // Test 4 — on-publish fallback: empty section uses card renderer.
 // ---------------------------------------------------------------------------
 
-async function testEmptySectionFallback(): Promise<void> {
+function testEmptySectionFallback(): void {
   // Import dynamically to avoid pulling in resvg wasm for this test.
   // Instead, we just verify that renderOgFromSectionSvg is not called for
   // empty sections — the on-publish.ts logic gates on elements.length > 0.
@@ -203,10 +203,7 @@ async function testEmptySectionFallback(): Promise<void> {
   );
 
   // Also verify that a section with elements passes the gate.
-  assert(
-    heroSection.elements.length > 0,
-    'expected hero section to pass the non-empty gate',
-  );
+  assert(heroSection.elements.length > 0, 'expected hero section to pass the non-empty gate');
 }
 
 // ---------------------------------------------------------------------------
@@ -214,8 +211,8 @@ async function testEmptySectionFallback(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 await testSectionRenderProducesSvg();
-await testScaleFactorApplied();
+testScaleFactorApplied();
 await testMediaElementsSkipped();
-await testEmptySectionFallback();
+testEmptySectionFallback();
 
 console.log('[section-og:smoke] OK');

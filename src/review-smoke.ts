@@ -221,8 +221,10 @@ assert(
 );
 assert(
   !twoPageResult.valid &&
-    twoPageResult.errors.some((message) => message.includes('exactly one canvas page')),
-  'expected two-page rejection to mention "exactly one canvas page"',
+    twoPageResult.errors.some((message) =>
+      message.includes('exactly one primary canvas page plus optional _404 page'),
+    ),
+  'expected two-page rejection to mention the primary page plus optional _404 invariant',
 );
 
 const overWidePage = validateCanvasSiteState({
@@ -481,14 +483,22 @@ const siteRoomSource = await readSource('./live/site-room.ts');
 const unlockRouteSource = await readSource('./password/unlock-route.ts');
 const renderSource = await readSource('./canvas/render.ts');
 assert(
-  /renderCanvasSnapshot\(\s*renderSnapshot,\s*'\/assets',\s*siteRow\.id\s*\)/.test(
-    publicRouteSource,
-  ),
-  'expected public render to pass site id through so Form elements post to /__rev01/forms/:siteId/:formId',
+  publicRouteSource.includes('snapshotForPageSlug(renderSnapshot, pageSlug)') &&
+    /renderCanvasSnapshot\(\s*pageRenderSnapshot,\s*'\/assets',\s*siteRow\.id\s*\)/.test(
+      publicRouteSource,
+    ),
+  'expected public render to select one page and pass site id through so Form elements post to /__rev01/forms/:siteId/:formId',
 );
 assert(
-  /renderCanvasSnapshot\(\s*snapshot,\s*'\/assets',\s*row\.id\s*\)/.test(publishRouteSource),
-  'expected publish broadcast render to pass site id through so live-updated forms keep a valid action',
+  publishRouteSource.includes('buildPublishBroadcastPayload') &&
+    publishRouteSource.includes('htmlBySlug') &&
+    /renderCanvasSnapshot\(\s*pageSnapshot,\s*'\/assets',\s*siteId\s*\)/.test(publishRouteSource),
+  'expected publish broadcast render to emit page-scoped html and pass site id through so live-updated forms keep a valid action',
+);
+assert(
+  publishRouteSource.includes('throw new Error(message)') &&
+    publishRouteSource.includes('[publish]'),
+  'expected publish broadcast failure to throw after logging instead of returning ok',
 );
 assert(
   publicRouteSource.includes('prepareRender(path, snapshot)') &&

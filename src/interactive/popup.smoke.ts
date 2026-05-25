@@ -14,13 +14,12 @@
 //
 // All assertions are pure-CPU; no network, no jsdom, no Workers globals.
 
-import type { PublishedSnapshot } from '../canvas/schema.js';
+import type { CanvasSiteState, PublishedSnapshot } from '../canvas/schema.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
+import { validateCanvasSiteState } from '../canvas/validate.js';
+import { decodeYDoc, encodeYDoc } from '../canvas/yjs-projection.js';
 import { INTERACTIVE_RUNTIME_SRC } from './build.js';
-import {
-  injectInteractiveRuntime,
-  snapshotNeedsInteractiveRuntime,
-} from './inject.js';
+import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[popup:smoke] ${message}`);
@@ -79,10 +78,7 @@ assert(
   popupHtml.includes('data-rev01-trigger-value=""'),
   'popup section must have data-rev01-trigger-value attribute (empty for exit-intent)',
 );
-assert(
-  popupHtml.includes('display:none'),
-  'popup section must render with display:none in style',
-);
+assert(popupHtml.includes('display:none'), 'popup section must render with display:none in style');
 
 // ---------------------------------------------------------------------------
 // (2) Section WITHOUT trigger renders normally — no popup attrs, no hide.
@@ -132,10 +128,7 @@ assert(
   !normalHtml.includes('data-rev01-trigger-type'),
   'normal section must NOT have data-rev01-trigger-type attribute',
 );
-assert(
-  !normalHtml.includes('display:none'),
-  'normal section must NOT have display:none',
-);
+assert(!normalHtml.includes('display:none'), 'normal section must NOT have display:none');
 
 // ---------------------------------------------------------------------------
 // (3) The popup runtime source string contains the expected function name.
@@ -144,6 +137,14 @@ assert(
 assert(
   INTERACTIVE_RUNTIME_SRC.includes('initPopups'),
   'assembled runtime must contain initPopups function',
+);
+assert(
+  INTERACTIVE_RUNTIME_SRC.includes("sec.style.display='block'"),
+  'popup runtime must reveal the section without replacing the rendered section style',
+);
+assert(
+  !INTERACTIVE_RUNTIME_SRC.includes("sec.style.cssText='display:block"),
+  'popup runtime must not overwrite the rendered section dimensions',
 );
 
 // ---------------------------------------------------------------------------
@@ -209,10 +210,7 @@ assert(
   delayHtml.includes('data-rev01-trigger-value="5000"'),
   'delay popup must have trigger-value="5000"',
 );
-assert(
-  delayHtml.includes('display:none'),
-  'delay popup must have display:none',
-);
+assert(delayHtml.includes('display:none'), 'delay popup must have display:none');
 
 // ---------------------------------------------------------------------------
 // (6) Runtime injection works for popup-only snapshot.
@@ -224,9 +222,68 @@ assert(
   injected.includes('<script data-rev01-interactive-runtime>'),
   'popup-only snapshot must get the runtime <script> tag injected',
 );
+assert(injected.includes('initPopups'), 'injected runtime must contain initPopups');
+
+// ---------------------------------------------------------------------------
+// (7) Validator rejects malformed trigger configs.
+// ---------------------------------------------------------------------------
+
+const validPopup = validateCanvasSiteState(popupSnapshot);
+assert(validPopup.valid, 'valid popup trigger snapshot must pass validation');
+
+const invalidDelaySnapshot: PublishedSnapshot = {
+  ...popupSnapshot,
+  pages: [
+    {
+      ...popupSnapshot.pages[0]!,
+      sections: [
+        {
+          ...popupSnapshot.pages[0]!.sections[0]!,
+          trigger: { type: 'delay' },
+        },
+      ],
+    },
+  ],
+};
+const invalidDelay = validateCanvasSiteState(invalidDelaySnapshot);
 assert(
-  injected.includes('initPopups'),
-  'injected runtime must contain initPopups',
+  !invalidDelay.valid && invalidDelay.errors.some((error) => error.includes('trigger.value')),
+  'delay trigger without numeric value must fail validation',
+);
+
+const invalidScrollSnapshot: PublishedSnapshot = {
+  ...popupSnapshot,
+  pages: [
+    {
+      ...popupSnapshot.pages[0]!,
+      sections: [
+        {
+          ...popupSnapshot.pages[0]!.sections[0]!,
+          trigger: { type: 'scroll', value: 120 },
+        },
+      ],
+    },
+  ],
+};
+const invalidScroll = validateCanvasSiteState(invalidScrollSnapshot);
+assert(
+  !invalidScroll.valid && invalidScroll.errors.some((error) => error.includes('[0, 100]')),
+  'scroll trigger beyond 100 must fail validation',
+);
+
+// ---------------------------------------------------------------------------
+// (8) Yjs projection preserves section triggers.
+// ---------------------------------------------------------------------------
+
+const popupState: CanvasSiteState = {
+  styleKit: popupSnapshot.styleKit,
+  pages: popupSnapshot.pages,
+  symbols: [],
+};
+const popupRoundTrip = decodeYDoc(encodeYDoc(popupState));
+assert(
+  popupRoundTrip.pages[0]?.sections[0]?.trigger?.type === 'exit-intent',
+  'Yjs round-trip must preserve exit-intent trigger type',
 );
 
 // ---------------------------------------------------------------------------

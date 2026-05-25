@@ -5,6 +5,7 @@
 // the full picture so the Owner can fix every issue at once.
 
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
+import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
@@ -44,6 +45,7 @@ const PINNED_SECTION_HEIGHT_MIN = 48;
 const SECTION_HEIGHT_MAX = 1400;
 
 const ALLOWED_HREF_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'] as const;
+const POPUP_TRIGGER_TYPES = ['exit-intent', 'delay', 'scroll'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -401,9 +403,7 @@ function validateElement(
     }
     case 'collection': {
       if (!isOneOf(element.mode, ['manual', 'page-bound'] as const)) {
-        errors.push(
-          `${basePath}.mode must be manual|page-bound (got ${describe(element.mode)})`,
-        );
+        errors.push(`${basePath}.mode must be manual|page-bound (got ${describe(element.mode)})`);
       }
       if (!Array.isArray(element.entryTemplate)) {
         errors.push(`${basePath}.entryTemplate must be an array`);
@@ -514,6 +514,8 @@ function validateSection(
       `${basePath}.entrance must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(section.entrance)})`,
     );
   }
+  validateSectionTrigger(section.trigger, pathJoin(basePath, 'trigger'), errors);
+  validateBackgroundVideo(section.backgroundVideo, pathJoin(basePath, 'backgroundVideo'), errors);
   if (!Array.isArray(section.elements)) {
     errors.push(`${basePath}.elements must be an array`);
     return;
@@ -533,6 +535,47 @@ function validateSection(
     }
     validateElement(element, pageWidth, effectiveHeight, elementPath, errors);
   });
+}
+
+function validateSectionTrigger(trigger: unknown, basePath: string, errors: string[]): void {
+  if (trigger === undefined) return;
+  if (!isRecord(trigger)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  if (!isOneOf(trigger.type, POPUP_TRIGGER_TYPES)) {
+    errors.push(
+      `${basePath}.type must be one of [${POPUP_TRIGGER_TYPES.join(', ')}] (got ${describe(trigger.type)})`,
+    );
+    return;
+  }
+  if (trigger.type === 'exit-intent') {
+    if (trigger.value !== undefined) {
+      errors.push(`${basePath}.value must be absent for exit-intent triggers`);
+    }
+    return;
+  }
+  if (!isFiniteNumber(trigger.value)) {
+    errors.push(`${basePath}.value must be a finite number for ${trigger.type} triggers`);
+    return;
+  }
+  if (trigger.type === 'delay' && trigger.value < 0) {
+    errors.push(`${basePath}.value must be >= 0 for delay triggers`);
+  }
+  if (trigger.type === 'scroll' && (trigger.value < 0 || trigger.value > 100)) {
+    errors.push(`${basePath}.value must be in [0, 100] for scroll triggers`);
+  }
+}
+
+function validateBackgroundVideo(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isNonEmptyString(value)) {
+    errors.push(`${basePath} must be a non-empty asset id when present`);
+    return;
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(value)) {
+    errors.push(`${basePath} must be an asset id, not a path or URL`);
+  }
 }
 
 function validateSectionRolePlacement(
@@ -602,6 +645,16 @@ function validatePage(page: unknown, basePath: string, errors: string[]): void {
   });
 }
 
+function validatePageSetShape(pages: unknown[], errors: string[]): void {
+  const custom404Count = pages.filter(
+    (page) => isRecord(page) && page.slug === CUSTOM_404_PAGE_SLUG,
+  ).length;
+  const primaryPageCount = pages.length - custom404Count;
+  if (pages.length === 1 && primaryPageCount === 1) return;
+  if (pages.length === 2 && primaryPageCount === 1 && custom404Count === 1) return;
+  errors.push('state.pages must contain exactly one primary canvas page plus optional _404 page');
+}
+
 function validateEditableShape(state: unknown, errors: string[]): void {
   if (!isRecord(state)) {
     errors.push('state must be an object');
@@ -616,14 +669,7 @@ function validateEditableShape(state: unknown, errors: string[]): void {
     errors.push('pages must be a non-empty array');
     return;
   }
-  // Single-page POC invariant: the validator pins state.pages to length 1.
-  // Applies to both editable and published states because
-  // validatePublishedSnapshot calls back into validateEditableShape.
-  if (state.pages.length !== 1) {
-    errors.push(
-      'state.pages must contain exactly one canvas page (POC enforces single-page sites)',
-    );
-  }
+  validatePageSetShape(state.pages, errors);
   state.pages.forEach((page, idx) => {
     validatePage(page, `pages[${String(idx)}]`, errors);
   });

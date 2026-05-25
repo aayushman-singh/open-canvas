@@ -6,9 +6,11 @@
 // Run with `bun.cmd run video-bg:smoke`.
 
 import { renderCanvasSnapshot } from './render.js';
-import type { CanvasSection, PublishedSnapshot, TextElement } from './schema.js';
+import type { CanvasSection, CanvasSiteState, PublishedSnapshot, TextElement } from './schema.js';
+import { validateCanvasSiteState } from './validate.js';
+import { decodeYDoc, encodeYDoc } from './yjs-projection.js';
 
-function assert(condition: boolean, message: string): void {
+function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
@@ -39,7 +41,7 @@ const sectionWithoutVideo: CanvasSection = {
   recipeId: 'hero-split',
   name: 'Plain Section',
   height: 400,
-  elements: [textElement],
+  elements: [{ ...textElement, id: 'el-text-2' }],
 };
 
 const snapshot: PublishedSnapshot = {
@@ -58,6 +60,9 @@ const snapshot: PublishedSnapshot = {
 };
 
 const html = renderCanvasSnapshot(snapshot, '/assets');
+
+const validation = validateCanvasSiteState(snapshot);
+assert(validation.valid, 'expected video background snapshot to pass validation');
 
 // 1. Section with backgroundVideo renders a <video> tag
 assert(html.includes('<video'), 'expected a <video> tag in rendered HTML');
@@ -96,7 +101,10 @@ const noVideoIdx = html.indexOf(noVideoSectionTag);
 assert(noVideoIdx >= 0, 'expected section-no-video element in rendered HTML');
 const noVideoSectionEnd = html.indexOf('</section>', noVideoIdx);
 const noVideoBlock = html.slice(noVideoIdx, noVideoSectionEnd);
-assert(!noVideoBlock.includes('<video'), 'expected no <video> tag in section without backgroundVideo');
+assert(
+  !noVideoBlock.includes('<video'),
+  'expected no <video> tag in section without backgroundVideo',
+);
 
 // 7. Video appears BEFORE element divs (first child of section)
 const videoSectionTag = '<section class="rev01-section" data-rev01-section="section-video"';
@@ -109,6 +117,34 @@ const afterSectionTag = html.slice(sectionTagClose + 1);
 assert(
   afterSectionTag.trimStart().startsWith('<video'),
   'expected <video> to be the first child of the section (before element divs)',
+);
+
+// 8. Validator rejects path/URL-shaped backgroundVideo values
+const invalidVideoSnapshot: PublishedSnapshot = {
+  ...snapshot,
+  pages: [
+    {
+      ...snapshot.pages[0]!,
+      sections: [{ ...sectionWithVideo, backgroundVideo: '../asset-123' }],
+    },
+  ],
+};
+const invalidVideo = validateCanvasSiteState(invalidVideoSnapshot);
+assert(
+  !invalidVideo.valid && invalidVideo.errors.some((error) => error.includes('backgroundVideo')),
+  'expected path-shaped backgroundVideo to fail validation',
+);
+
+// 9. Yjs projection preserves section backgroundVideo
+const state: CanvasSiteState = {
+  styleKit: snapshot.styleKit,
+  pages: snapshot.pages,
+  symbols: [],
+};
+const roundTrip = decodeYDoc(encodeYDoc(state));
+assert(
+  roundTrip.pages[0]?.sections[0]?.backgroundVideo === 'asset-123',
+  'expected Yjs round-trip to preserve backgroundVideo',
 );
 
 console.log('video-bg.smoke.ts: all assertions passed');

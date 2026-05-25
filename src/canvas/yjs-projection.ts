@@ -53,6 +53,8 @@
 //   'role'?             -> string
 //   'backgroundEffect'? -> string
 //   'entrance'?         -> string
+//   'trigger'?          -> Y.Map<unknown>
+//   'backgroundVideo'?  -> string
 //   'elements'          -> Y.Array<Y.Map<unknown>>   (CanvasElement[])
 //
 // Each CanvasElement Y.Map mirrors its TS interface field-for-field.
@@ -587,6 +589,13 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   setIfDefined(out, 'role', section.role);
   setIfDefined(out, 'backgroundEffect', section.backgroundEffect);
   setIfDefined(out, 'entrance', section.entrance);
+  if (section.trigger !== undefined) {
+    const trigger = new Y.Map<unknown>();
+    trigger.set('type', section.trigger.type);
+    setIfDefined(trigger, 'value', section.trigger.value);
+    out.set('trigger', trigger);
+  }
+  setIfDefined(out, 'backgroundVideo', section.backgroundVideo);
   const elements = new Y.Array<Y.Map<unknown>>();
   for (const el of section.elements) elements.push([encodeElement(el)]);
   out.set('elements', elements);
@@ -947,7 +956,9 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       return el;
     }
     case 'collection': {
-      const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
+      const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(
+        decodeElement,
+      );
       const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
       const entries = rawEntries.map((row) => row.map(decodeElement));
       const layoutMap = map.get('layout') as Y.Map<unknown>;
@@ -955,8 +966,8 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
         ...base,
         type,
         mode: map.get('mode') as CollectionElement['mode'],
-        entryTemplate: entryTemplate as CanvasElement[],
-        entries: entries as CanvasElement[][],
+        entryTemplate,
+        entries,
         layout: {
           columns: layoutMap.get('columns') as number,
           gap: layoutMap.get('gap') as number,
@@ -975,12 +986,14 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       if (map.has('sort')) {
         const sortMap = map.get('sort') as Y.Map<unknown>;
         el.sort = {
-          field: sortMap.get('field') as CollectionElement['sort'] extends undefined ? never : NonNullable<CollectionElement['sort']>['field'],
+          field: sortMap.get('field') as CollectionElement['sort'] extends undefined
+            ? never
+            : NonNullable<CollectionElement['sort']>['field'],
           order: sortMap.get('order') as 'asc' | 'desc',
         };
       }
       if (map.has('cardTemplate')) {
-        el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement) as CanvasElement[];
+        el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
       }
       if (map.has('fieldBindings')) {
         const bindingsMap = map.get('fieldBindings') as Y.Map<string>;
@@ -988,7 +1001,10 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
         for (const [elementId, field] of bindingsMap.entries()) {
           bindings[elementId] = field;
         }
-        el.fieldBindings = bindings as Record<string, NonNullable<CollectionElement['fieldBindings']>[string]>;
+        el.fieldBindings = bindings as Record<
+          string,
+          NonNullable<CollectionElement['fieldBindings']>[string]
+        >;
       }
       return el;
     }
@@ -1116,6 +1132,18 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   }
   if (map.has('entrance')) {
     section.entrance = map.get('entrance') as NonNullable<CanvasSection['entrance']>;
+  }
+  if (map.has('trigger')) {
+    const triggerMap = map.get('trigger') as Y.Map<unknown>;
+    section.trigger = {
+      type: triggerMap.get('type') as NonNullable<CanvasSection['trigger']>['type'],
+    };
+    if (triggerMap.has('value')) {
+      section.trigger.value = triggerMap.get('value') as number;
+    }
+  }
+  if (map.has('backgroundVideo')) {
+    section.backgroundVideo = map.get('backgroundVideo') as string;
   }
   return section;
 }

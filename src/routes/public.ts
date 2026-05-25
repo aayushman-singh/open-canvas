@@ -19,6 +19,7 @@ import { html, raw } from 'hono/html';
 import { createR2Client } from '../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
 import { collectReferencedAssetIds } from '../assets/site-assets';
+import { snapshotForPageSlug } from '../canvas/page-routing';
 import { resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
 import {
   verifyEditToken,
@@ -139,6 +140,37 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   const url = scheme + '//' + location.host + '/__live';
   let currentVersion = ${versionLiteral};
 
+  function currentSlug(defaultSlug) {
+    const raw = location.pathname.replace(/^\/+|\/+$/g, '');
+    if (raw === '') return defaultSlug;
+    try {
+      return decodeURIComponent(raw);
+    } catch (err) {
+      console.error('[rev01-visitor] cannot decode current path for live update', err);
+      return null;
+    }
+  }
+
+  function selectPayloadHtml(payload) {
+    if (Object.prototype.hasOwnProperty.call(payload, 'htmlBySlug')) {
+      if (!payload.htmlBySlug || typeof payload.htmlBySlug !== 'object') {
+        console.error('[rev01-visitor] broadcast htmlBySlug is invalid', payload);
+        return null;
+      }
+      if (typeof payload.defaultSlug !== 'string') {
+        console.error('[rev01-visitor] broadcast missing defaultSlug', payload);
+        return null;
+      }
+      const slug = currentSlug(payload.defaultSlug);
+      if (slug === null) return null;
+      if (typeof payload.htmlBySlug[slug] === 'string') return payload.htmlBySlug[slug];
+      if (typeof payload.htmlBySlug._404 === 'string') return payload.htmlBySlug._404;
+      console.error('[rev01-visitor] broadcast missing html for current path', { slug, payload });
+      return null;
+    }
+    return typeof payload.html === 'string' ? payload.html : null;
+  }
+
   function connect() {
     const ws = new WebSocket(url);
     ws.addEventListener('message', (event) => {
@@ -150,7 +182,8 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
         return;
       }
       if (payload && typeof payload === 'object') {
-        if (typeof payload.html === 'string') {
+        const selectedHtml = selectPayloadHtml(payload);
+        if (selectedHtml !== null) {
           // Stale-version filter: strict > comparison. An equal version is
           // also stale (the visitor has already rendered it on first load
           // or via a previous broadcast).
@@ -166,7 +199,7 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
             // The server-rendered HTML is the only writer. The publish
             // endpoint validates the snapshot before broadcast; there is no
             // visitor-controlled path into this assignment.
-            root.innerHTML = payload.html;
+            root.innerHTML = selectedHtml;
           }
           currentVersion = payload.version;
           return;
@@ -672,11 +705,12 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const renderSnapshot = activeRender.renderSnapshot;
   // After the null-check above, page is guaranteed non-null (we either found a
   // page originally, replaced activeRender with the _404 render, or returned).
-  const currentPage = activeRender.page!;
   const pageSlug = activeRender.pageSlug;
   const dir = activeRender.dir;
+  const pageRenderSnapshot = snapshotForPageSlug(renderSnapshot, pageSlug);
+  const currentPage = pageRenderSnapshot.pages[0]!;
 
-  const baseKit = resolveStyleKitWithCustom(renderSnapshot);
+  const baseKit = resolveStyleKitWithCustom(pageRenderSnapshot);
   const fontRows = await db(c.env)
     .select({
       contentHash: siteFont.contentHash,
@@ -690,16 +724,16 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const fontFaceCss = emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
   const resolvedKit = resolveFontTokens(baseKit, makeFontLookup(fontRows));
   const customKitCss =
-    renderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
+    pageRenderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
   const snapshotHtml = injectInteractiveRuntime(
-    renderCanvasSnapshot(renderSnapshot, '/assets', siteRow.id),
-    renderSnapshot,
+    renderCanvasSnapshot(pageRenderSnapshot, '/assets', siteRow.id),
+    pageRenderSnapshot,
   );
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src
   // origins from embedded media (YouTube, Loom, Figma, etc.) so the iframe
   // sandbox can only load those origins. Header is set once per snapshot
   // response; the value is deterministic given the same snapshot.
-  c.header('Content-Security-Policy', buildEmbedCsp(renderSnapshot));
+  c.header('Content-Security-Policy', buildEmbedCsp(pageRenderSnapshot));
   // Canonical URL is emitted by Wave 3 #21's `renderCanvasHead` (below). It
   // derives the canonical from the visitor-hit host, which is the custom
   // hostname when the visitor used one and the subdomain otherwise.
@@ -707,13 +741,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   // Wave 3 #21 + Wave 5 #25 — use the locale-aware render hook so the page
   // selected for body, head metadata, lang, and dir is one decision.
-  const headMeta = renderCanvasHead(renderSnapshot, {
+  const headMeta = renderCanvasHead(pageRenderSnapshot, {
     siteId: siteRow.id,
     host,
     protocol: requestUrl.protocol === 'http:' ? 'http' : 'https',
     pageSlug,
   });
-  const lang = resolveLang(currentPage, renderSnapshot);
+  const lang = resolveLang(currentPage, pageRenderSnapshot);
 
   // Wave 3 #20 — light/dark visitor toggle. Only emit dual-palette CSS +
   // early mode setter when the Owner has enabled dark mode for this site.

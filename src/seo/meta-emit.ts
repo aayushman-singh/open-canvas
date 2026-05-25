@@ -25,6 +25,7 @@
 // boundary.
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
+import { CUSTOM_404_PAGE_SLUG } from '../canvas/page-routing.js';
 import { resolveOgUrl, type OgResolveContext } from './og-resolve.js';
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,7 @@ export function resolveLang(page: CanvasPage, snapshot: PublishedSnapshot): stri
  * site switch is on, every page is noindex regardless of per-page setting.
  */
 export function resolveNoIndex(page: CanvasPage, snapshot: PublishedSnapshot): boolean {
+  if (page.slug === CUSTOM_404_PAGE_SLUG) return true;
   // Same structural probe as `resolveLang` — `siteNoIndex` is declared on
   // `CanvasSiteState`, not on the snapshot type today. Wave 5 / publish-path
   // changes may surface it; we honour it whenever it is present.
@@ -267,10 +269,7 @@ export interface RenderHeadContext {
  * (defensive: the caller already resolved the page slug from the request
  * path, but a stale link to a deleted page should not crash the render).
  */
-export function renderCanvasHead(
-  snapshot: PublishedSnapshot,
-  ctx: RenderHeadContext,
-): string {
+export function renderCanvasHead(snapshot: PublishedSnapshot, ctx: RenderHeadContext): string {
   const page = snapshot.pages.find((p) => p.slug === ctx.pageSlug);
   if (!page) {
     // Defensive fallback — emit minimal meta from the first page of the

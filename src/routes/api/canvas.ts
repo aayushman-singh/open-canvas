@@ -137,21 +137,13 @@ canvasApi.put('/sites/:siteId', async (c) => {
     return c.json({ error: 'editable state invalid', errors: ['body must be a JSON object'] }, 400);
   }
   const editableState = body.editableState;
-  // Single-page POC guardrail: reject multi-page payloads loudly before
-  // dropping into the full validator. The validator still runs below as the
-  // comprehensive check — this pre-check is an additional defence so the
-  // wire-level error is specific even when the rest of the state is broken.
-  if (
-    !isRecord(editableState) ||
-    !Array.isArray(editableState.pages) ||
-    editableState.pages.length !== 1
-  ) {
+  // Shape guardrail before the full validator, so malformed wire payloads get
+  // a specific error while page-count rules stay owned by validate.ts.
+  if (!isRecord(editableState) || !Array.isArray(editableState.pages)) {
     return c.json(
       {
         error: 'editable state invalid',
-        errors: [
-          'state.pages must contain exactly one canvas page (POC enforces single-page sites)',
-        ],
+        errors: ['editableState.pages must be an array'],
       },
       400,
     );

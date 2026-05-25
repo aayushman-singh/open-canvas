@@ -13,9 +13,9 @@
 //   4. Build PublishedSnapshot { version: prev+1, publishedAt, styleKit,
 //      pages } and re-validate it (defence in depth).
 //   5. UPDATE the row: publishedSnapshot, publishedVersion, updatedAt.
-//   6. Render snapshot HTML and POST it to SITE_ROOM/broadcast keyed by the
-//      site id. Broadcast errors throw so the route never reports success
-//      while open visitor tabs missed the update.
+//   6. Render page-scoped snapshot HTML and POST it to SITE_ROOM/broadcast
+//      keyed by the site id. Broadcast errors throw so the route never reports
+//      success while open visitor tabs missed the update.
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -26,6 +26,7 @@ import {
 } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { resolvePrimaryPage, snapshotForPageSlug } from '../../canvas/page-routing';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
@@ -59,6 +60,43 @@ interface Bindings {
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
 const publishApi = new Hono<Env>();
+
+interface PublishBroadcastPayload {
+  version: number;
+  html: string;
+  htmlBySlug: Record<string, string>;
+  defaultSlug: string;
+}
+
+function renderPublishedPageHtml(
+  snapshot: PublishedSnapshot,
+  pageSlug: string,
+  siteId: string,
+): string {
+  const pageSnapshot = snapshotForPageSlug(snapshot, pageSlug);
+  return injectInteractiveRuntime(
+    renderCanvasSnapshot(pageSnapshot, '/assets', siteId),
+    pageSnapshot,
+  );
+}
+
+function buildPublishBroadcastPayload(
+  snapshot: PublishedSnapshot,
+  siteId: string,
+): PublishBroadcastPayload {
+  const defaultSlug = resolvePrimaryPage(snapshot).slug;
+  const htmlBySlug: Record<string, string> = {};
+  for (const page of snapshot.pages) {
+    htmlBySlug[page.slug] = renderPublishedPageHtml(snapshot, page.slug, siteId);
+  }
+  const html = htmlBySlug[defaultSlug];
+  if (html === undefined) {
+    throw new Error(
+      `publish broadcast missing default page html for ${JSON.stringify(defaultSlug)}`,
+    );
+  }
+  return { version: snapshot.version, html, htmlBySlug, defaultSlug };
+}
 
 publishApi.use('*', clerkAuth());
 publishApi.use('*', requireAuth());
@@ -208,12 +246,9 @@ publishApi.post('/sites/:siteId', async (c) => {
 
   configureSymbolInstanceRender({ symbols: snapshot.symbols ?? [] });
 
-  let html: string;
+  let broadcastPayload: PublishBroadcastPayload;
   try {
-    html = injectInteractiveRuntime(
-      renderCanvasSnapshot(snapshot, '/assets', row.id),
-      snapshot,
-    );
+    broadcastPayload = buildPublishBroadcastPayload(snapshot, row.id);
   } catch (renderErr) {
     const msg = renderErr instanceof Error ? renderErr.message : String(renderErr);
     console.error('[publish] render failed:', msg);
@@ -255,11 +290,13 @@ publishApi.post('/sites/:siteId', async (c) => {
   const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ version: snapshot.version, html }),
+    body: JSON.stringify(broadcastPayload),
   });
   if (!broadcastResponse.ok) {
     const body = await broadcastResponse.text();
-    console.error(`[publish] SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`);
+    const message = `SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`;
+    console.error(`[publish] ${message}`);
+    throw new Error(message);
   }
 
   return c.json({
