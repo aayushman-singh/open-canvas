@@ -85,7 +85,7 @@ export async function extractFonts(page: Page): Promise<ExtractedFonts> {
 }
 
 export async function extractFontAssetReferences(page: Page): Promise<FontAssetReference[]> {
-  return page.evaluate(() => {
+  const { refs: inlineRefs, crossOriginHrefs } = await page.evaluate(() => {
     function cleanFamily(value: string): string {
       return value.trim().replace(/^['"]|['"]$/g, '');
     }
@@ -121,12 +121,14 @@ export async function extractFontAssetReferences(page: Page): Promise<FontAssetR
 
     const refs: FontAssetReference[] = [];
     const seen = new Set<string>();
+    const crossOriginHrefs: string[] = [];
 
     for (const sheet of Array.from(document.styleSheets)) {
       let rules: CSSRuleList;
       try {
         rules = sheet.cssRules;
       } catch {
+        if (sheet.href) crossOriginHrefs.push(sheet.href);
         continue;
       }
 
@@ -153,8 +155,79 @@ export async function extractFontAssetReferences(page: Page): Promise<FontAssetR
       }
     }
 
-    return refs;
+    return { refs, crossOriginHrefs };
   });
+
+  const crossOriginRefs = await fetchCrossOriginFontRefs(crossOriginHrefs);
+  return [...inlineRefs, ...crossOriginRefs];
+}
+
+async function fetchCrossOriginFontRefs(hrefs: string[]): Promise<FontAssetReference[]> {
+  const refs: FontAssetReference[] = [];
+  const seen = new Set<string>();
+
+  for (const href of hrefs) {
+    if (!href.startsWith('https://')) continue;
+    let css: string;
+    try {
+      const resp = await fetch(href, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      });
+      if (!resp.ok) continue;
+      css = await resp.text();
+    } catch {
+      continue;
+    }
+
+    const fontFaceRe =
+      /@font-face\s*\{([^}]+)\}/g;
+    let block: RegExpExecArray | null;
+    while ((block = fontFaceRe.exec(css)) !== null) {
+      const body = block[1]!;
+      const familyMatch = body.match(/font-family:\s*['"]?([^;'"]+)['"]?\s*;/);
+      const srcMatch = body.match(/src:\s*([^;]+);/);
+      if (!familyMatch?.[1] || !srcMatch?.[1]) continue;
+
+      const family = familyMatch[1].trim().replace(/^['"]|['"]$/g, '');
+      const src = srcMatch[1];
+
+      if (!src.toLowerCase().includes('woff2')) continue;
+
+      const weightMatch = body.match(/font-weight:\s*(\d+)/);
+      const styleMatch = body.match(/font-style:\s*(normal|italic)/);
+      const fontWeight = weightMatch ? parseInt(weightMatch[1]!, 10) : undefined;
+      const fontStyle = styleMatch
+        ? (styleMatch[1] as 'normal' | 'italic')
+        : undefined;
+
+      const urlRe = /url\(\s*["']?([^"')]+)["']?\s*\)/g;
+      let urlMatch: RegExpExecArray | null;
+      while ((urlMatch = urlRe.exec(src)) !== null) {
+        const raw = urlMatch[1];
+        if (!raw || !raw.toLowerCase().includes('woff2')) continue;
+        let resolved: string;
+        try {
+          resolved = new URL(raw, href).href;
+        } catch {
+          continue;
+        }
+        const key = `${family}\n${resolved}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        refs.push({
+          url: resolved,
+          fontFamily: family,
+          ...(fontWeight !== undefined ? { fontWeight } : {}),
+          ...(fontStyle !== undefined ? { fontStyle } : {}),
+        });
+      }
+    }
+  }
+
+  return refs;
 }
 
 function wrapFontFamily(font: string): string {
@@ -165,6 +238,9 @@ function wrapFontFamily(font: string): string {
 }
 
 function parseRgba(str: string): RGBColor | null {
+  const oklchResult = parseOklch(str);
+  if (oklchResult) return oklchResult;
+
   const rgbaMatch = str.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*[\d.]+)?\s*\)/);
   if (!rgbaMatch) return null;
   const r = parseInt(rgbaMatch[1]!, 10);
@@ -179,6 +255,66 @@ function parseRgba(str: string): RGBColor | null {
   }
 
   return { r, g, b };
+}
+
+function parseOklch(str: string): RGBColor | null {
+  const match = str.match(
+    /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\s*\)/,
+  );
+  if (!match) return null;
+  const l = parseFloat(match[1]!);
+  const c = parseFloat(match[2]!);
+  const h = parseFloat(match[3]!);
+  if (!isFinite(l) || !isFinite(c) || !isFinite(h)) return null;
+
+  if (match[4] !== undefined) {
+    const a = parseFloat(match[4]);
+    if (isFinite(a) && a < 0.1) return null;
+  }
+
+  const rgb = oklchToSrgb(l, c, h);
+  return {
+    r: Math.round(rgb.r * 255),
+    g: Math.round(rgb.g * 255),
+    b: Math.round(rgb.b * 255),
+  };
+}
+
+function oklchToSrgb(
+  l: number,
+  c: number,
+  h: number,
+): { r: number; g: number; b: number } {
+  const hr = (h * Math.PI) / 180;
+  const a = c * Math.cos(hr);
+  const b = c * Math.sin(hr);
+
+  const l_ = l + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = l - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = l - 0.0894841775 * a - 1.291485548 * b;
+  const ll = l_ * l_ * l_;
+  const mm = m_ * m_ * m_;
+  const ss = s_ * s_ * s_;
+
+  const lr = 4.0767416621 * ll - 3.3077115913 * mm + 0.2309699292 * ss;
+  const lg = -1.2684380046 * ll + 2.6097574011 * mm - 0.3413193965 * ss;
+  const lb = -0.0041960863 * ll - 0.7034186147 * mm + 1.707614701 * ss;
+
+  return {
+    r: clamp01(linearToSrgb(lr)),
+    g: clamp01(linearToSrgb(lg)),
+    b: clamp01(linearToSrgb(lb)),
+  };
+}
+
+function linearToSrgb(c: number): number {
+  return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+}
+
+function clamp01(v: number): number {
+  if (v < 0) return 0;
+  if (v > 1) return 1;
+  return v;
 }
 
 function isNearWhite(c: RGBColor): boolean {

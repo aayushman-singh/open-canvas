@@ -44,6 +44,7 @@ import siteAddonsRoute from './routes/dashboard/site-addons';
 import addonsApi from './routes/api/addons';
 import profileRoute from './routes/dashboard/profile';
 import accountSettingsRoute from './routes/dashboard/settings';
+import { domainsRoute } from './routes/dashboard/domains';
 import profileApi from './routes/api/profile';
 // Section library + custom template routes
 import {
@@ -227,6 +228,7 @@ app.route('/api/addons', addonsApi);
 // Profile & account settings
 app.route('/dashboard', profileRoute);
 app.route('/dashboard', accountSettingsRoute);
+app.route('/dashboard', domainsRoute);
 app.route('/api/profile', profileApi);
 // On-site editor auth popup — main domain endpoint that sets the edit token
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
