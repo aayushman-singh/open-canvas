@@ -87,6 +87,7 @@ export function findSymbolMaster(
   state: CanvasSiteState,
   symbolId: string,
 ): SymbolMaster | undefined {
+  if (!state.symbols) state.symbols = [];
   return state.symbols.find((s) => s.id === symbolId);
 }
 
@@ -137,6 +138,7 @@ export function createSymbolMaster(
   }
 
   const id = input.id ?? newSymbolId();
+  if (!state.symbols) state.symbols = [];
   if (state.symbols.some((s) => s.id === id)) {
     throw new Error(`[symbols/master] createSymbolMaster: symbol id "${id}" already exists`);
   }
@@ -208,6 +210,7 @@ export function deleteSymbolMaster(
   state: CanvasSiteState,
   symbolId: string,
 ): SymbolMaster {
+  if (!state.symbols) state.symbols = [];
   const idx = state.symbols.findIndex((s) => s.id === symbolId);
   if (idx < 0) {
     throw new Error(`[symbols/master] deleteSymbolMaster: unknown symbol id "${symbolId}"`);
