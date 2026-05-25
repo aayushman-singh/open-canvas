@@ -676,12 +676,62 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function scheduleSave() {
+    captureForUndo();
     coEditSync();
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
       void saveStateNow();
     }, 500);
+  }
+
+  // -- Undo / Redo --------------------------------------------------------
+  var undoStack = [];
+  var redoStack = [];
+  var undoTimer = null;
+  var undoRedoing = false;
+  var UNDO_MAX = 60;
+
+  function initUndo() {
+    if (state) undoStack.push(structuredClone(state));
+  }
+
+  function captureForUndo() {
+    if (undoRedoing || !state) return;
+    if (undoTimer) clearTimeout(undoTimer);
+    undoTimer = setTimeout(function() {
+      undoTimer = null;
+      if (!state) return;
+      var snap = structuredClone(state);
+      undoStack.push(snap);
+      if (undoStack.length > UNDO_MAX) undoStack.shift();
+      redoStack = [];
+    }, 800);
+  }
+
+  function undo() {
+    if (undoStack.length <= 1 || !state) return;
+    undoRedoing = true;
+    redoStack.push(structuredClone(state));
+    undoStack.pop();
+    state = structuredClone(undoStack[undoStack.length - 1]);
+    if (state && !Array.isArray(state.symbols)) state.symbols = [];
+    renderAll();
+    scheduleSave();
+    undoRedoing = false;
+    setStatus("Undo", "ok");
+  }
+
+  function redo() {
+    if (redoStack.length === 0 || !state) return;
+    undoRedoing = true;
+    undoStack.push(structuredClone(state));
+    state = structuredClone(redoStack.pop());
+    if (state && !Array.isArray(state.symbols)) state.symbols = [];
+    renderAll();
+    scheduleSave();
+    undoRedoing = false;
+    setStatus("Redo", "ok");
   }
 
   // -- Rendering ----------------------------------------------------------
@@ -5366,7 +5416,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         exitPlacementMode();
         return;
       }
-      const isSave = (ev.ctrlKey || ev.metaKey) && (ev.key === "s" || ev.key === "S");
+      var mod = ev.ctrlKey || ev.metaKey;
+      if (mod && (ev.key === "z" || ev.key === "Z") && !ev.shiftKey) {
+        ev.preventDefault();
+        undo();
+        return;
+      }
+      if (mod && ((ev.key === "y" || ev.key === "Y") || ((ev.key === "z" || ev.key === "Z") && ev.shiftKey))) {
+        ev.preventDefault();
+        redo();
+        return;
+      }
+      var isSave = mod && (ev.key === "s" || ev.key === "S");
       if (isSave) {
         ev.preventDefault();
         if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
@@ -6114,6 +6175,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const body = await response.json();
       state = body.editableState;
       if (state && !Array.isArray(state.symbols)) state.symbols = [];
+      initUndo();
       if (mainEl && state && state.styleKit) {
         mainEl.setAttribute("data-style-kit", state.styleKit);
       }
