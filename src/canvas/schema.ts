@@ -49,6 +49,7 @@ export const ELEMENT_TYPES = [
   'table',
   'code',
   'nav',
+  'collection',
 ] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
@@ -274,6 +275,7 @@ import type { FormElement } from './elements/form.js';
 import type { NavElement } from './elements/nav.js';
 import type { SymbolInstanceElement } from './elements/symbol-instance.js';
 import type { TableElement } from './elements/table.js';
+import type { CollectionElement } from './elements/collection.js';
 
 export type CanvasElement =
   | TextElement
@@ -289,9 +291,11 @@ export type CanvasElement =
   | CarouselElement
   | TableElement
   | CodeElement
-  | NavElement;
+  | NavElement
+  | CollectionElement;
 
-export type SectionRole = 'header' | 'footer' | 'body';
+export const SECTION_ROLES = ['header', 'footer', 'body'] as const;
+export type SectionRole = (typeof SECTION_ROLES)[number];
 
 export interface CanvasSection {
   id: string;
@@ -344,6 +348,11 @@ export interface CanvasPage {
   noIndex?: boolean;
   /** BCP-47 locale (e.g. 'en', 'ar') — drives `<html lang>` and i18n (Wave 5 #25). */
   locale?: string;
+  // -- Page metadata (CMS collections) ----------------------------------------
+  publishedDate?: string;
+  author?: string;
+  tags?: string[];
+  category?: string;
 }
 
 export interface CanvasSiteState {

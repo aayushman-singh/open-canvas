@@ -50,6 +50,7 @@
 //   'recipeId'          -> string
 //   'name'              -> string
 //   'height'            -> number
+//   'role'?             -> string
 //   'backgroundEffect'? -> string
 //   'entrance'?         -> string
 //   'elements'          -> Y.Array<Y.Map<unknown>>   (CanvasElement[])
@@ -111,6 +112,7 @@ import type {
   ChartElement,
   ChartSeries,
   CodeElement,
+  CollectionElement,
   EmbedElement,
   FormElement,
   FormFieldDef,
@@ -484,6 +486,56 @@ function encodeNavElement(el: NavElement): Y.Map<unknown> {
   return out;
 }
 
+function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  encodeBaseElementFields(out, el);
+  out.set('mode', el.mode);
+  const entryTemplate = new Y.Array<Y.Map<unknown>>();
+  for (const child of el.entryTemplate) entryTemplate.push([encodeElement(child)]);
+  out.set('entryTemplate', entryTemplate);
+  const entries = new Y.Array<Y.Array<Y.Map<unknown>>>();
+  for (const entry of el.entries) {
+    const row = new Y.Array<Y.Map<unknown>>();
+    for (const child of entry) row.push([encodeElement(child)]);
+    entries.push([row]);
+  }
+  out.set('entries', entries);
+  if (el.filter !== undefined) {
+    const filterMap = new Y.Map<unknown>();
+    if (el.filter.category !== undefined) filterMap.set('category', el.filter.category);
+    if (el.filter.tags !== undefined) {
+      const tagsArr = new Y.Array<string>();
+      for (const tag of el.filter.tags) tagsArr.push([tag]);
+      filterMap.set('tags', tagsArr);
+    }
+    if (el.filter.limit !== undefined) filterMap.set('limit', el.filter.limit);
+    out.set('filter', filterMap);
+  }
+  if (el.sort !== undefined) {
+    const sortMap = new Y.Map<unknown>();
+    sortMap.set('field', el.sort.field);
+    sortMap.set('order', el.sort.order);
+    out.set('sort', sortMap);
+  }
+  if (el.cardTemplate !== undefined) {
+    const cardTemplate = new Y.Array<Y.Map<unknown>>();
+    for (const child of el.cardTemplate) cardTemplate.push([encodeElement(child)]);
+    out.set('cardTemplate', cardTemplate);
+  }
+  if (el.fieldBindings !== undefined) {
+    const bindingsMap = new Y.Map<string>();
+    for (const [elementId, field] of Object.entries(el.fieldBindings)) {
+      bindingsMap.set(elementId, field);
+    }
+    out.set('fieldBindings', bindingsMap);
+  }
+  const layoutMap = new Y.Map<unknown>();
+  layoutMap.set('columns', el.layout.columns);
+  layoutMap.set('gap', el.layout.gap);
+  out.set('layout', layoutMap);
+  return out;
+}
+
 function encodeElement(el: CanvasElement): Y.Map<unknown> {
   switch (el.type) {
     case 'text':
@@ -514,6 +566,8 @@ function encodeElement(el: CanvasElement): Y.Map<unknown> {
       return encodeCodeElement(el);
     case 'nav':
       return encodeNavElement(el);
+    case 'collection':
+      return encodeCollectionElement(el);
     default: {
       // Exhaustiveness — TS narrows `el` to `never` here. If a new
       // ElementType is added to the schema without an encode case, the
@@ -530,6 +584,7 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   out.set('recipeId', section.recipeId);
   out.set('name', section.name);
   out.set('height', section.height);
+  setIfDefined(out, 'role', section.role);
   setIfDefined(out, 'backgroundEffect', section.backgroundEffect);
   setIfDefined(out, 'entrance', section.entrance);
   const elements = new Y.Array<Y.Map<unknown>>();
@@ -549,6 +604,14 @@ function encodePage(page: CanvasPage): Y.Map<unknown> {
   setIfDefined(out, 'canonical', page.canonical);
   setIfDefined(out, 'noIndex', page.noIndex);
   setIfDefined(out, 'locale', page.locale);
+  setIfDefined(out, 'publishedDate', page.publishedDate);
+  setIfDefined(out, 'author', page.author);
+  if (page.tags !== undefined) {
+    const tags = new Y.Array<string>();
+    for (const tag of page.tags) tags.push([tag]);
+    out.set('tags', tags);
+  }
+  setIfDefined(out, 'category', page.category);
   const sections = new Y.Array<Y.Map<unknown>>();
   for (const section of page.sections) sections.push([encodeSection(section)]);
   out.set('sections', sections);
@@ -883,6 +946,52 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       if (map.has('logoAssetId')) el.logoAssetId = map.get('logoAssetId') as string;
       return el;
     }
+    case 'collection': {
+      const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
+      const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
+      const entries = rawEntries.map((row) => row.map(decodeElement));
+      const layoutMap = map.get('layout') as Y.Map<unknown>;
+      const el: CollectionElement = {
+        ...base,
+        type,
+        mode: map.get('mode') as CollectionElement['mode'],
+        entryTemplate: entryTemplate as CanvasElement[],
+        entries: entries as CanvasElement[][],
+        layout: {
+          columns: layoutMap.get('columns') as number,
+          gap: layoutMap.get('gap') as number,
+        },
+      };
+      if (map.has('filter')) {
+        const filterMap = map.get('filter') as Y.Map<unknown>;
+        const filter: CollectionElement['filter'] = {};
+        if (filterMap.has('category')) filter.category = filterMap.get('category') as string;
+        if (filterMap.has('tags')) {
+          filter.tags = (filterMap.get('tags') as Y.Array<string>).toArray();
+        }
+        if (filterMap.has('limit')) filter.limit = filterMap.get('limit') as number;
+        el.filter = filter;
+      }
+      if (map.has('sort')) {
+        const sortMap = map.get('sort') as Y.Map<unknown>;
+        el.sort = {
+          field: sortMap.get('field') as CollectionElement['sort'] extends undefined ? never : NonNullable<CollectionElement['sort']>['field'],
+          order: sortMap.get('order') as 'asc' | 'desc',
+        };
+      }
+      if (map.has('cardTemplate')) {
+        el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement) as CanvasElement[];
+      }
+      if (map.has('fieldBindings')) {
+        const bindingsMap = map.get('fieldBindings') as Y.Map<string>;
+        const bindings: Record<string, string> = {};
+        for (const [elementId, field] of bindingsMap.entries()) {
+          bindings[elementId] = field;
+        }
+        el.fieldBindings = bindings as Record<string, NonNullable<CollectionElement['fieldBindings']>[string]>;
+      }
+      return el;
+    }
     default: {
       const _exhaustive: never = type;
       throw new Error(`yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`);
@@ -997,6 +1106,9 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
     height: map.get('height') as number,
     elements: (map.get('elements') as Y.Array<Y.Map<unknown>>).map(decodeElement),
   };
+  if (map.has('role')) {
+    section.role = map.get('role') as NonNullable<CanvasSection['role']>;
+  }
   if (map.has('backgroundEffect')) {
     section.backgroundEffect = map.get('backgroundEffect') as NonNullable<
       CanvasSection['backgroundEffect']
@@ -1021,6 +1133,10 @@ function decodePage(map: Y.Map<unknown>): CanvasPage {
   if (map.has('canonical')) page.canonical = map.get('canonical') as string;
   if (map.has('noIndex')) page.noIndex = map.get('noIndex') as boolean;
   if (map.has('locale')) page.locale = map.get('locale') as string;
+  if (map.has('publishedDate')) page.publishedDate = map.get('publishedDate') as string;
+  if (map.has('author')) page.author = map.get('author') as string;
+  if (map.has('tags')) page.tags = (map.get('tags') as Y.Array<string>).toArray();
+  if (map.has('category')) page.category = map.get('category') as string;
   return page;
 }
 

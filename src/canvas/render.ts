@@ -90,6 +90,7 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
     case 'table':
     case 'code':
     case 'nav':
+    case 'collection':
       return '';
   }
 }
@@ -118,6 +119,7 @@ function variantAttr(element: CanvasElement): string {
     case 'carousel':
     case 'table':
     case 'nav':
+    case 'collection':
       return '';
   }
 }

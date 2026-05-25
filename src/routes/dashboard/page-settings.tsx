@@ -249,6 +249,58 @@ function clientScript(siteId: string, pageId: string): string {
     }
   });
 })();
+
+// -- Metadata form (page metadata for collections) --
+(() => {
+  const SITE_ID = ${sid};
+  const PAGE_ID = ${pid};
+  const form = document.querySelector('#metadata-form');
+  if (!form) return;
+  const err = form.querySelector('.err');
+  const ok = form.querySelector('.ok');
+  function clearStatus() {
+    if (err) err.textContent = '';
+    if (ok) ok.textContent = '';
+  }
+  function showError(msg) { clearStatus(); if (err) err.textContent = msg; }
+  function showOk(msg) { clearStatus(); if (ok) ok.textContent = msg; }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    clearStatus();
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    const rawTags = form.tags.value.trim();
+    const data = {
+      publishedDate: form.publishedDate.value.trim() || null,
+      author: form.author.value.trim() || null,
+      tags: rawTags.length > 0 ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : null,
+      category: form.category.value.trim() || null,
+    };
+    try {
+      const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/pages/' + encodeURIComponent(PAGE_ID) + '/metadata', {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        let detail = response.statusText;
+        try {
+          const body = await response.json();
+          if (body && body.error) detail = body.error;
+        } catch (_) { /* noop */ }
+        showError(detail);
+        if (button) button.disabled = false;
+        return;
+      }
+      showOk('Saved.');
+    } catch (e) {
+      showError('Network error: ' + (e && e.message ? e.message : String(e)));
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+})();
 `;
 }
 
@@ -273,6 +325,10 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const ogImageVal = esc(page.ogImageAssetId ?? '');
   const canonicalVal = esc(page.canonical ?? '');
   const localeVal = esc(page.locale ?? '');
+  const publishedDateVal = esc(page.publishedDate ?? '');
+  const authorVal = esc(page.author ?? '');
+  const tagsVal = esc((page.tags ?? []).join(', '));
+  const categoryVal = esc(page.category ?? '');
 
   return c.html(
     <DashboardShell
@@ -366,6 +422,59 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
           </div>
           <div class="save-row">
             <Button variant="primary" type="submit">Save</Button>
+          </div>
+          <p class="err" role="alert" aria-live="polite"></p>
+          <p class="ok" role="status" aria-live="polite"></p>
+        </form>
+      </Card>
+
+      <Card>
+        <h2>Page metadata</h2>
+        <p class="sub">
+          Used by page-bound collections for filtering, sorting, and display.
+          These fields are optional — fill them in when this page should appear
+          in collection listings (blog, portfolio, etc.).
+        </p>
+        <form class="seo" id="metadata-form" autocomplete="off">
+          <label>
+            <span>Published date</span>
+            <input
+              type="date"
+              name="publishedDate"
+              value={publishedDateVal}
+            />
+          </label>
+          <label>
+            <span>Author</span>
+            <input
+              type="text"
+              name="author"
+              value={authorVal}
+              maxlength={200}
+            />
+          </label>
+          <label>
+            <span>Tags (comma-separated)</span>
+            <input
+              type="text"
+              name="tags"
+              value={tagsVal}
+              maxlength={500}
+              placeholder="design, launch, case-study"
+            />
+          </label>
+          <label>
+            <span>Category</span>
+            <input
+              type="text"
+              name="category"
+              value={categoryVal}
+              maxlength={100}
+              placeholder="blog, portfolio, news"
+            />
+          </label>
+          <div class="save-row">
+            <Button variant="primary" type="submit">Save metadata</Button>
           </div>
           <p class="err" role="alert" aria-live="polite"></p>
           <p class="ok" role="status" aria-live="polite"></p>

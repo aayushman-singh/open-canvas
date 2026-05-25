@@ -30,6 +30,7 @@ import { renderAction } from './action.js';
 import { renderCarousel } from './carousel.js';
 import { renderChart } from './chart.js';
 import { renderCode } from './code.js';
+import { renderCollection } from './collection.js';
 import { renderContainer } from './container.js';
 import { renderEmbed } from './embed.js';
 import { renderForm } from './form.js';
@@ -59,6 +60,14 @@ export type { FormElement, FormFieldDef, FormFieldKind } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
 export type { SymbolInstanceElement, SymbolInstanceOverrides } from './symbol-instance.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
+export type {
+  CollectionElement,
+  CollectionFilter,
+  CollectionLayout,
+  CollectionMode,
+  CollectionSort,
+  PageMetadataField,
+} from './collection.js';
 
 // Re-export recipe id constants so the recipes module + smoke tests can
 // reference them without depending directly on individual element files.
@@ -70,6 +79,7 @@ export { EMBED_RECIPE_ID } from './embed.js';
 export { FORM_RECIPE_ID } from './form.js';
 export { NAV_RECIPE_ID } from './nav.js';
 export { TABLE_RECIPE_ID } from './table.js';
+export { COLLECTION_RECIPE_ID } from './collection.js';
 
 /**
  * Single shared context shape passed to every render function. Element files
@@ -127,6 +137,11 @@ export const RENDER_DISPATCH: RenderDispatch = {
   code: (el, ctx) => renderCode(el, { styleKit: ctx.styleKit }),
   nav: (el, ctx) =>
     renderNav(el, {
+      styleKit: ctx.styleKit,
+      assetBasePath: ctx.assetBasePath,
+    }),
+  collection: (el, ctx) =>
+    renderCollection(el, {
       styleKit: ctx.styleKit,
       assetBasePath: ctx.assetBasePath,
     }),

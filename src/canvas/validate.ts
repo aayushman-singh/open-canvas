@@ -13,6 +13,7 @@ import {
   MEDIA_KINDS,
   MOTION_PRESETS,
   SECTION_RECIPE_IDS,
+  SECTION_ROLES,
   SHAPE_VARIANTS,
   STYLE_KITS,
   SURFACE_VARIANTS,
@@ -28,6 +29,7 @@ import {
   type MotionPreset,
   type PublishedSnapshot,
   type SectionRecipeId,
+  type SectionRole,
   type ShapeVariant,
   type StyleKit,
   type SurfaceVariant,
@@ -38,6 +40,7 @@ export type ValidationResult = { valid: true } | { valid: false; errors: string[
 const PAGE_WIDTH_MIN = 960;
 const PAGE_WIDTH_MAX = 1920;
 const SECTION_HEIGHT_MIN = 240;
+const PINNED_SECTION_HEIGHT_MIN = 48;
 const SECTION_HEIGHT_MAX = 1400;
 
 const ALLOWED_HREF_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'] as const;
@@ -260,10 +263,7 @@ function validateTextContent(content: unknown, idLabel: string, errors: string[]
             `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].href "${mark.href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
           );
         }
-        if (
-          mark.target !== undefined &&
-          mark.target !== '_blank'
-        ) {
+        if (mark.target !== undefined && mark.target !== '_blank') {
           errors.push(
             `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].target must be "_blank" when present (got ${describe(mark.target)})`,
           );
@@ -399,6 +399,57 @@ function validateElement(
       }
       break;
     }
+    case 'collection': {
+      if (!isOneOf(element.mode, ['manual', 'page-bound'] as const)) {
+        errors.push(
+          `${basePath}.mode must be manual|page-bound (got ${describe(element.mode)})`,
+        );
+      }
+      if (!Array.isArray(element.entryTemplate)) {
+        errors.push(`${basePath}.entryTemplate must be an array`);
+      }
+      if (!Array.isArray(element.entries)) {
+        errors.push(`${basePath}.entries must be an array`);
+      } else {
+        element.entries.forEach((entry, entryIdx) => {
+          if (!Array.isArray(entry)) {
+            errors.push(`${basePath}.entries[${String(entryIdx)}] must be an array`);
+          }
+        });
+      }
+      if (!isRecord(element.layout)) {
+        errors.push(`${basePath}.layout must be an object`);
+      } else {
+        if (!isFiniteNumber(element.layout.columns) || element.layout.columns < 1) {
+          errors.push(`${basePath}.layout.columns must be a positive number`);
+        }
+        if (!isFiniteNumber(element.layout.gap) || element.layout.gap < 0) {
+          errors.push(`${basePath}.layout.gap must be >= 0`);
+        }
+      }
+      if (element.mode === 'page-bound') {
+        if (element.filter !== undefined && !isRecord(element.filter)) {
+          errors.push(`${basePath}.filter must be an object when present`);
+        }
+        if (element.sort !== undefined) {
+          if (!isRecord(element.sort)) {
+            errors.push(`${basePath}.sort must be an object when present`);
+          } else {
+            if (!isOneOf(element.sort.field, ['publishedDate', 'title'] as const)) {
+              errors.push(
+                `${basePath}.sort.field must be publishedDate|title (got ${describe(element.sort.field)})`,
+              );
+            }
+            if (!isOneOf(element.sort.order, ['asc', 'desc'] as const)) {
+              errors.push(
+                `${basePath}.sort.order must be asc|desc (got ${describe(element.sort.order)})`,
+              );
+            }
+          }
+        }
+      }
+      break;
+    }
     default: {
       // Unknown discriminant — already reported above.
       break;
@@ -432,13 +483,22 @@ function validateSection(
   if (!isNonEmptyString(section.name)) {
     errors.push(`${basePath}.name must be a non-empty string`);
   }
+  if (section.role !== undefined && !isOneOf<SectionRole>(section.role, SECTION_ROLES)) {
+    errors.push(
+      `${basePath}.role must be header|footer|body when present (got ${describe(section.role)})`,
+    );
+  }
+  const minHeight =
+    section.role === 'header' || section.role === 'footer'
+      ? PINNED_SECTION_HEIGHT_MIN
+      : SECTION_HEIGHT_MIN;
   const heightValid =
     isFiniteNumber(section.height) &&
-    section.height >= SECTION_HEIGHT_MIN &&
+    section.height >= minHeight &&
     section.height <= SECTION_HEIGHT_MAX;
   if (!heightValid) {
     errors.push(
-      `${basePath}.height must be a finite number in [${String(SECTION_HEIGHT_MIN)}, ${String(SECTION_HEIGHT_MAX)}] (got ${describe(section.height)})`,
+      `${basePath}.height must be a finite number in [${String(minHeight)}, ${String(SECTION_HEIGHT_MAX)}] (got ${describe(section.height)})`,
     );
   }
   if (
@@ -475,6 +535,38 @@ function validateSection(
   });
 }
 
+function validateSectionRolePlacement(
+  sections: unknown[],
+  basePath: string,
+  errors: string[],
+): void {
+  let headerCount = 0;
+  let footerCount = 0;
+  for (let idx = 0; idx < sections.length; idx += 1) {
+    const section = sections[idx];
+    if (!isRecord(section)) continue;
+    const sectionPath = pathJoin(pathJoin(basePath, 'sections'), idx);
+    if (section.role === 'header') {
+      headerCount += 1;
+      if (idx !== 0) {
+        errors.push(`${sectionPath}.role header role must be at sections[0]`);
+      }
+    }
+    if (section.role === 'footer') {
+      footerCount += 1;
+      if (idx !== sections.length - 1) {
+        errors.push(`${sectionPath}.role footer role must be at sections[last]`);
+      }
+    }
+  }
+  if (headerCount > 1) {
+    errors.push(`${basePath}.sections must contain at most one Header Section`);
+  }
+  if (footerCount > 1) {
+    errors.push(`${basePath}.sections must contain at most one Footer Section`);
+  }
+}
+
 function validatePage(page: unknown, basePath: string, errors: string[]): void {
   if (!isRecord(page)) {
     errors.push(`${basePath} must be an object`);
@@ -500,6 +592,7 @@ function validatePage(page: unknown, basePath: string, errors: string[]): void {
     errors.push(`${basePath}.sections must be a non-empty array`);
     return;
   }
+  validateSectionRolePlacement(page.sections, basePath, errors);
   const ids = new Set<string>();
   if (isNonEmptyString(page.id)) ids.add(page.id);
   const effectiveWidth = widthValid ? (page.width as number) : PAGE_WIDTH_MAX;
