@@ -291,11 +291,14 @@ export type CanvasElement =
   | CodeElement
   | NavElement;
 
+export type SectionRole = 'header' | 'footer' | 'body';
+
 export interface CanvasSection {
   id: string;
   recipeId: SectionRecipeId;
   name: string;
   height: number;
+  role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
   entrance?: MotionPreset;
   elements: CanvasElement[];
