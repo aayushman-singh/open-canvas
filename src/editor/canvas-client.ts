@@ -1648,17 +1648,38 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return value.replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
   }
 
+  function isPinnedSection(section) {
+    return !!section && (section.role === "header" || section.role === "footer");
+  }
+
+  function hasHeaderSection(page) {
+    return page.sections.length > 0 && page.sections[0].role === "header";
+  }
+
+  function hasFooterSection(page) {
+    return page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer";
+  }
+
+  function pinnedSectionLabel(section) {
+    if (section.role === "header") return "Header";
+    if (section.role === "footer") return "Footer";
+    return "";
+  }
+
+  function sectionDisplayName(section, fallback) {
+    const label = pinnedSectionLabel(section);
+    const name = section.name || fallback;
+    return label ? label + " \\u2014 " + name : name;
+  }
+
   function buildSectionToolbar(section) {
     const bar = document.createElement("div");
     bar.className = "section-toolbar";
-    // Wave 3 #14 \u2014 Symbol controls. We surface "Sym" (convert-to-symbol) for
-    // every section, and "Det" (detach-instance) only when the section
-    // contains a symbol-instance element. The Owner cannot "convert" a
-    // section whose only element is already a symbol-instance \u2014 that would
-    // require nested symbols (forbidden by scope).
+    // Wave 3 #14 \u2014 Symbol controls. A section that already hosts an instance
+    // cannot become a symbol master because that would require nested symbols
+    // (forbidden by scope).
     const hasInstance = section.elements.some((e) => e && e.type === "symbol-instance");
-    const onlyInstance = section.elements.length === 1 && hasInstance;
-    const isSpecial = section.role === "header" || section.role === "footer";
+    const isPinned = isPinnedSection(section);
     const buttons = [
       { label: "+T", action: "add-text" },
       { label: "+Img", action: "add-image" },
@@ -1668,9 +1689,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       { label: "+\u25a1", action: "add-container" },
       // Wave 2 #11 \u2014 chart element. Additive entry; existing buttons unchanged.
       { label: "+\ud83d\udcca", action: "add-chart" },
-      ...(!isSpecial ? [{ label: "Dup", action: "duplicate-section" }] : []),
-      ...(!isSpecial ? [{ label: "\u2191", action: "move-up" }] : []),
-      ...(!isSpecial ? [{ label: "\u2193", action: "move-down" }] : []),
+      ...(!isPinned ? [{ label: "Dup", action: "duplicate-section" }] : []),
+      ...(!isPinned ? [{ label: "\u2191", action: "move-up" }] : []),
+      ...(!isPinned ? [{ label: "\u2193", action: "move-down" }] : []),
       { label: "Save", action: "save-to-library" },
       { label: "Del", action: "delete-section", danger: true },
     ];
@@ -1708,7 +1729,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     node.className = "rev01-section";
     node.setAttribute("data-rev01-section", section.id);
     node.setAttribute("data-recipe", section.recipeId);
-    if (section.role && section.role !== "body") node.setAttribute("data-section-role", section.role);
+    if (isPinnedSection(section)) node.setAttribute("data-section-role", section.role);
     if (section.backgroundEffect) node.setAttribute("data-bg-effect", section.backgroundEffect);
     if (section.entrance) node.setAttribute("data-entrance", section.entrance);
     node.style.position = "relative";
@@ -3536,8 +3557,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function clampInsertIndex(page, insertAt) {
-    var lo = page.sections.length > 0 && page.sections[0].role === "header" ? 1 : 0;
-    var hi = page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer" ? page.sections.length - 1 : page.sections.length;
+    var lo = hasHeaderSection(page) ? 1 : 0;
+    var hi = hasFooterSection(page) ? page.sections.length - 1 : page.sections.length;
     if (insertAt < lo) return lo;
     if (insertAt > hi) return hi;
     return insertAt;
@@ -3565,17 +3586,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function moveSectionToIndex(fromIdx, toIdx) {
     const page = currentPage();
     if (!page) return;
+    if (fromIdx < 0 || fromIdx >= page.sections.length) return;
     if (fromIdx === toIdx || fromIdx + 1 === toIdx) return;
     const section = page.sections[fromIdx];
-    if (section.role === "header" || section.role === "footer") return;
-    const headerAt = page.sections[0] && page.sections[0].role === "header" ? 0 : -1;
-    const footerAt = page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer" ? page.sections.length - 1 : -1;
+    if (isPinnedSection(section)) return;
     const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
-    if (headerAt >= 0 && adjustedTo <= headerAt) return;
-    if (footerAt >= 0 && adjustedTo >= footerAt) return;
+    const min = hasHeaderSection(page) ? 1 : 0;
+    const max = hasFooterSection(page) ? page.sections.length - 2 : page.sections.length - 1;
+    if (adjustedTo < min || adjustedTo > max) return;
     page.sections.splice(fromIdx, 1);
-    const finalTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
-    page.sections.splice(finalTo, 0, section);
+    page.sections.splice(adjustedTo, 0, section);
     renderAll();
     scheduleSave();
   }
@@ -3585,12 +3605,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     slot.type = "button";
     slot.className = "reel-role-slot";
     slot.setAttribute("data-reel-role-slot", role);
-    slot.textContent = role === "header" ? "+ Add Header" : "+ Add Footer";
+    var label = role === "header" ? "Header" : "Footer";
+    slot.textContent = "+ Add " + label;
     slot.addEventListener("click", function() {
       var section = {
         id: newSectionId(),
         recipeId: "custom",
-        name: role === "header" ? "Header" : "Footer",
+        name: label,
         height: role === "header" ? 80 : 120,
         role: role,
         elements: [],
@@ -3605,7 +3626,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       captureForUndo();
       renderAll();
       scheduleSave();
-      setStatus((role === "header" ? "Header" : "Footer") + " added", "ok");
+      setStatus(label + " added", "ok");
     });
     return slot;
   }
@@ -3671,11 +3692,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // -- Body section tiles (page.sections — no header/footer in array) ---
     for (var i = 0; i < page.sections.length; i++) {
       var section = page.sections[i];
+      var isPinned = isPinnedSection(section);
 
-      body.appendChild(buildReelInsertButton(i));
+      if (!isPinned) {
+        body.appendChild(buildReelInsertButton(i));
+      }
 
       var tile = document.createElement("div");
       tile.className = isTile ? "reel-tile" : "reel-list-item";
+      if (isPinned) tile.classList.add("reel-locked");
       tile.setAttribute("data-reel-section", section.id);
       tile.setAttribute("data-reel-index", String(i));
 
@@ -3688,14 +3713,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (isTile) {
         var tLabel = document.createElement("div");
         tLabel.className = "reel-tile-label";
-        tLabel.textContent = section.name || section.recipeId;
+        tLabel.textContent = sectionDisplayName(section, section.recipeId);
         tile.appendChild(tLabel);
       } else {
         var tInfo = document.createElement("div");
         tInfo.className = "reel-list-info";
         var tName = document.createElement("div");
         tName.className = "reel-list-name";
-        tName.textContent = section.name || "Untitled";
+        tName.textContent = sectionDisplayName(section, "Untitled");
         var tRecipe = document.createElement("div");
         tRecipe.className = "reel-list-recipe";
         tRecipe.textContent = section.recipeId;
@@ -3704,18 +3729,25 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         tile.appendChild(tInfo);
       }
 
-      tile.addEventListener("mousedown", (function(sectionId, idx) {
-        return function(ev) {
-          if (ev.button !== 0) return;
-          ev.preventDefault();
-          beginReelDrag(sectionId, idx, ev);
-        };
-      })(section.id, i));
+      if (!isPinned) {
+        tile.addEventListener("mousedown", (function(sectionId, idx) {
+          return function(ev) {
+            if (ev.button !== 0) return;
+            ev.preventDefault();
+            beginReelDrag(sectionId, idx, ev);
+          };
+        })(section.id, i));
+      } else {
+        tile.addEventListener("click", (function(sectionId) {
+          return function() { selectSection(sectionId); };
+        })(section.id));
+      }
 
       body.appendChild(tile);
     }
 
-    body.appendChild(buildReelInsertButton(page.sections.length));
+    var trailingInsertIdx = hasFooterSection(page) ? page.sections.length - 1 : page.sections.length;
+    body.appendChild(buildReelInsertButton(trailingInsertIdx));
 
     // -- Site-level footer tile or slot ------------------------------------
     if (state.footer) {
@@ -3834,6 +3866,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const fromIdx = page.sections.findIndex(function(s) { return s.id === sectionId; });
     if (fromIdx < 0) return;
     const section = page.sections[fromIdx];
+    if (isPinnedSection(section)) return;
 
     const sectionEl = root.querySelector('[data-rev01-section="' + cssEscape(sectionId) + '"]');
     if (sectionEl) sectionEl.style.opacity = "0.5";
@@ -5305,7 +5338,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         box: defaultBox(section, 480, 320),
       });
     } else if (action === "duplicate-section") {
-      if (section.role === "header" || section.role === "footer") return;
+      if (isPinnedSection(section)) return;
       const copy = JSON.parse(JSON.stringify(section));
       copy.id = newSectionId();
       copy.name = section.name + " copy";
@@ -5327,7 +5360,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       scheduleSave();
     } else if (action === "move-up") {
       if (idx === 0) return;
-      if (section.role === "header" || section.role === "footer") return;
+      if (isPinnedSection(section)) return;
       const prev = page.sections[idx - 1];
       if (prev.role === "header") return;
       page.sections[idx - 1] = section;
@@ -5336,7 +5369,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       scheduleSave();
     } else if (action === "move-down") {
       if (idx >= page.sections.length - 1) return;
-      if (section.role === "header" || section.role === "footer") return;
+      if (isPinnedSection(section)) return;
       const next = page.sections[idx + 1];
       if (next.role === "footer") return;
       page.sections[idx + 1] = section;
@@ -5838,8 +5871,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
 
-    const hasHeader = sections[0] && sections[0].role === "header";
-    const hasFooter = sections.length > 0 && sections[sections.length - 1].role === "footer";
+    const hasHeader = hasHeaderSection(page);
+    const hasFooter = hasFooterSection(page);
 
     // Section nodes carry data-rev01-section (see buildSectionNode); the
     // [data-section-id] attribute is used by toolbar buttons, not the section
@@ -5852,12 +5885,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (node.parentNode) node.parentNode.insertBefore(makeSlot(i), node);
     }
     const lastNode = sectionNodes[sectionNodes.length - 1];
-    if (lastNode && lastNode.parentNode) {
-      var endIdx = hasFooter ? sections.length - 1 : sections.length;
+    var endIdx = hasFooter ? sections.length - 1 : sections.length;
+    if (hasFooter && sectionNodes[endIdx]) {
+      const footerNode = sectionNodes[endIdx];
+      if (footerNode.parentNode) footerNode.parentNode.insertBefore(makeSlot(endIdx), footerNode);
+    } else if (lastNode && lastNode.parentNode) {
       if (lastNode.nextSibling) {
-        lastNode.parentNode.insertBefore(makeSlot(endIdx), hasFooter ? lastNode : lastNode.nextSibling);
+        lastNode.parentNode.insertBefore(makeSlot(endIdx), lastNode.nextSibling);
       } else {
-        if (!hasFooter) lastNode.parentNode.appendChild(makeSlot(endIdx));
+        lastNode.parentNode.appendChild(makeSlot(endIdx));
       }
     }
   }
@@ -6134,8 +6170,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //
   // The server-side authoritative store is CanvasSiteState.symbols plus the
   // 'symbol-instance' element type. This editor surface is additive: it adds
-  // a "Symbols" tab to the sidebar, a "Sym" / "Det" button to every section
-  // toolbar, an "Add symbol instance" entry to the Add panel, and a small
+  // a "Symbols" tab to the sidebar, a "Sym" button to eligible section
+  // toolbars, an "Add symbol instance" entry to the Add panel, and a small
   // visual placeholder for symbol-instance elements.
   //
   // All persistence flows through the same PUT /api/canvas/sites/:siteId path

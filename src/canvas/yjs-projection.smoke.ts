@@ -239,6 +239,7 @@ const syntheticSection: CanvasSection = {
   recipeId: 'feature-grid',
   name: 'Synthetic',
   height: 3040,
+  role: 'body',
   backgroundEffect: 'grid',
   entrance: 'fade-up',
   elements: syntheticElements,

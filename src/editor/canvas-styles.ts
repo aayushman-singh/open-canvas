@@ -1105,6 +1105,10 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-section:hover .section-grip-handle {
   display: flex;
 }
+.rev01-section[data-section-role="header"] .section-grip-handle,
+.rev01-section[data-section-role="footer"] .section-grip-handle {
+  display: none;
+}
 .section-grip-handle:hover {
   color: var(--rev01-fg);
   background: var(--rev01-accent-soft);

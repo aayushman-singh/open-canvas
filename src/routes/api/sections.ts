@@ -11,6 +11,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { importLibrarySectionIntoSite } from '../../canvas/library-section-import';
 import { importSectionIntoSite } from '../../canvas/section-import';
+import type { CanvasPage } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, librarySection, ownerAsset, site } from '../../db/schema';
@@ -40,6 +41,7 @@ type LibraryImportBody = { source: 'library'; librarySectionId: string; insertAt
 type ImportBody = SeedImportBody | LibraryImportBody;
 
 type ParsedBody = { ok: true; body: ImportBody } | { ok: false; error: string };
+type InsertAtValidation = { ok: true } | { ok: false; error: string };
 
 function parseImportBody(value: unknown): ParsedBody {
   if (!value || typeof value !== 'object') return { ok: false, error: 'body must be an object' };
@@ -52,7 +54,10 @@ function parseImportBody(value: unknown): ParsedBody {
     if (typeof v.librarySectionId !== 'string' || v.librarySectionId.length === 0) {
       return { ok: false, error: 'librarySectionId is required for library source' };
     }
-    return { ok: true, body: { source: 'library', librarySectionId: v.librarySectionId, insertAt: v.insertAt } };
+    return {
+      ok: true,
+      body: { source: 'library', librarySectionId: v.librarySectionId, insertAt: v.insertAt },
+    };
   }
 
   if (typeof v.templateId !== 'string' || v.templateId.length === 0) {
@@ -63,8 +68,29 @@ function parseImportBody(value: unknown): ParsedBody {
   }
   return {
     ok: true,
-    body: { source: 'seed', templateId: v.templateId, sectionId: v.sectionId, insertAt: v.insertAt },
+    body: {
+      source: 'seed',
+      templateId: v.templateId,
+      sectionId: v.sectionId,
+      insertAt: v.insertAt,
+    },
   };
+}
+
+export function validateBodySectionInsertAt(
+  page: Pick<CanvasPage, 'sections'>,
+  insertAt: number,
+): InsertAtValidation {
+  const min = page.sections[0]?.role === 'header' ? 1 : 0;
+  const last = page.sections[page.sections.length - 1];
+  const max = last?.role === 'footer' ? page.sections.length - 1 : page.sections.length;
+  if (insertAt < min || insertAt > max) {
+    return {
+      ok: false,
+      error: `insertAt must be between ${String(min)} and ${String(max)} for body sections (got ${String(insertAt)})`,
+    };
+  }
+  return { ok: true };
 }
 
 sections.post('/sites/:siteId/sections/import', async (c) => {
@@ -107,11 +133,9 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   if (!page) {
     return c.json({ error: 'site editable state has no page' }, 500);
   }
-  if (insertAt > page.sections.length) {
-    return c.json(
-      { error: `insertAt ${insertAt} exceeds section count ${page.sections.length}` },
-      400,
-    );
+  const insertAtValidation = validateBodySectionInsertAt(page, insertAt);
+  if (!insertAtValidation.ok) {
+    return c.json({ error: insertAtValidation.error }, 400);
   }
 
   // Owner Asset rows are scoped to the customer per ADR 0004, not the site.
@@ -157,9 +181,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     if (!seed) {
       return c.json({ error: `unknown templateId: ${body.templateId}` }, 404);
     }
-    const sourceSection = seed.state.pages[0]?.sections.find(
-      (s) => s.id === body.sectionId,
-    );
+    const sourceSection = seed.state.pages[0]?.sections.find((s) => s.id === body.sectionId);
     if (!sourceSection) {
       return c.json({ error: `unknown sectionId in template: ${body.sectionId}` }, 404);
     }
@@ -194,10 +216,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   if (newAssetRows.length === 0) {
     await siteUpdate;
   } else {
-    const assetInsert = database
-      .insert(ownerAsset)
-      .values(newAssetRows)
-      .onConflictDoNothing();
+    const assetInsert = database.insert(ownerAsset).values(newAssetRows).onConflictDoNothing();
     await database.batch([siteUpdate, assetInsert]);
   }
 

@@ -75,12 +75,8 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
   delete cloned.role;
   const errors: string[] = [];
 
-  const idMap = new Map<string, string>();
   for (const element of cloned.elements) {
-    const original = element.id;
-    const fresh = newId(rolePrefix(original));
-    idMap.set(original, fresh);
-    element.id = fresh;
+    element.id = newId(rolePrefix(element.id));
   }
 
   const recipeSlug = cloned.recipeId;

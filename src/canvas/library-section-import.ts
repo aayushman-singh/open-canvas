@@ -51,6 +51,7 @@ function newId(prefix: string): string {
 export function importLibrarySectionIntoSite(input: LibraryImportInput): LibraryImportResult {
   const { targetCustomerId, sourceSection, assetManifest, existingAssetsByHash } = input;
   const cloned = structuredClone(sourceSection);
+  delete cloned.role;
   const errors: string[] = [];
 
   for (const element of cloned.elements) {

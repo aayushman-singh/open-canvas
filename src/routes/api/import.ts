@@ -374,9 +374,11 @@ export function buildCanvasSiteState(
     const name = s.name || `section-${i}`;
     const nameLower = name.toLowerCase();
     const role: CanvasSection['role'] =
-      i === 0 && nameLower.includes('header') ? 'header'
-      : i === data.sections.length - 1 && nameLower.includes('footer') ? 'footer'
-      : undefined;
+      i === 0 && nameLower.includes('header')
+        ? 'header'
+        : i === data.sections.length - 1 && nameLower.includes('footer')
+          ? 'footer'
+          : undefined;
     return {
       id: crypto.randomUUID(),
       recipeId: 'custom' as const,

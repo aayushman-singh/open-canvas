@@ -9,6 +9,7 @@ import { renderCanvasSnapshot } from './render.js';
 import type {
   BuiltInStyleKit,
   CanvasPage,
+  CanvasSection,
   CanvasSiteState,
   PublishedSnapshot,
   StyleKit,
@@ -201,13 +202,9 @@ const badTargetState: CanvasSiteState = {
   ],
 };
 const badTargetResult = validateCanvasSiteState(badTargetState);
+assert(!badTargetResult.valid, 'expected validator to reject link mark with target="_self"');
 assert(
-  !badTargetResult.valid,
-  'expected validator to reject link mark with target="_self"',
-);
-assert(
-  !badTargetResult.valid &&
-    badTargetResult.errors.some((m) => m.includes('target')),
+  !badTargetResult.valid && badTargetResult.errors.some((m) => m.includes('target')),
   'expected bad-target rejection error to mention "target"',
 );
 
@@ -216,9 +213,7 @@ const noTargetText: TextElement = {
   id: 'link-no-target',
   type: 'text',
   box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
-  content: [
-    { text: 'old link', marks: [{ type: 'link', href: 'https://example.com' }] },
-  ],
+  content: [{ text: 'old link', marks: [{ type: 'link', href: 'https://example.com' }] }],
   role: 'body',
   fontSize: 16,
   fontWeight: 400,
@@ -516,6 +511,101 @@ assert(
   headerFormHtml.includes('name="pageSlug" value="form-a"') &&
     headerFormHtml.includes('name="pageSlug" value="form-b"'),
   'expected site-wide header forms to render with each page slug, not a shared blank slug',
+);
+
+function roleTestSection(
+  id: string,
+  role?: CanvasSection['role'],
+  height: number = 240,
+): CanvasSection {
+  return {
+    id,
+    recipeId: 'custom',
+    name: id,
+    height,
+    ...(role ? { role } : {}),
+    elements: [],
+  };
+}
+
+function roleTestState(sections: CanvasSection[]): CanvasSiteState {
+  return {
+    styleKit: 'charcoal',
+    symbols: [],
+    pages: [
+      {
+        id: 'page-role-test',
+        slug: 'role-test',
+        title: 'Role Test',
+        width: 1440,
+        sections,
+      },
+    ],
+  };
+}
+
+const shortFrameRoleState = roleTestState([
+  roleTestSection('section-header-short', 'header', 72),
+  roleTestSection('section-body-ok'),
+  roleTestSection('section-footer-short', 'footer', 120),
+]);
+const shortFrameRoleResult = validateCanvasSiteState(shortFrameRoleState);
+assert(
+  shortFrameRoleResult.valid,
+  shortFrameRoleResult.valid
+    ? ''
+    : 'expected short header/footer sections to validate: ' +
+        shortFrameRoleResult.errors.join('; '),
+);
+
+const duplicateHeaderResult = validateCanvasSiteState(
+  roleTestState([
+    roleTestSection('section-header-a', 'header', 72),
+    roleTestSection('section-header-b', 'header', 72),
+    roleTestSection('section-body-after-duplicate'),
+  ]),
+);
+assert(!duplicateHeaderResult.valid, 'expected validator to reject duplicate header sections');
+assert(
+  !duplicateHeaderResult.valid &&
+    duplicateHeaderResult.errors.some((m) => m.includes('at most one Header Section')),
+  'expected duplicate-header rejection to mention at most one Header Section',
+);
+
+const misplacedHeaderResult = validateCanvasSiteState(
+  roleTestState([
+    roleTestSection('section-body-before-header'),
+    roleTestSection('section-header-misplaced', 'header', 72),
+  ]),
+);
+assert(!misplacedHeaderResult.valid, 'expected validator to reject a header after index 0');
+assert(
+  !misplacedHeaderResult.valid &&
+    misplacedHeaderResult.errors.some((m) => m.includes('header role must be at sections[0]')),
+  'expected misplaced-header rejection to mention sections[0]',
+);
+
+const misplacedFooterResult = validateCanvasSiteState(
+  roleTestState([
+    roleTestSection('section-footer-misplaced', 'footer', 120),
+    roleTestSection('section-body-after-footer'),
+  ]),
+);
+assert(!misplacedFooterResult.valid, 'expected validator to reject a footer before the last slot');
+assert(
+  !misplacedFooterResult.valid &&
+    misplacedFooterResult.errors.some((m) => m.includes('footer role must be at sections[last]')),
+  'expected misplaced-footer rejection to mention sections[last]',
+);
+
+const badSectionRoleState = roleTestState([roleTestSection('section-bad-role')]);
+(badSectionRoleState.pages[0]!.sections[0]! as unknown as { role: string }).role = 'sidebar';
+const badSectionRoleResult = validateCanvasSiteState(badSectionRoleState);
+assert(!badSectionRoleResult.valid, 'expected validator to reject an unknown section role');
+assert(
+  !badSectionRoleResult.valid &&
+    badSectionRoleResult.errors.some((m) => m.includes('role must be header|footer|body')),
+  'expected bad-section-role rejection to mention the allowed roles',
 );
 
 // -- Task 6: seed-asset registry gating -----------------------------------

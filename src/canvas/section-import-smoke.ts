@@ -89,6 +89,43 @@ if (firstImport.ok) {
 }
 
 {
+  const headerSection: CanvasSection = {
+    id: 'section-reusable-header',
+    recipeId: 'custom',
+    name: 'Reusable Header',
+    height: 80,
+    role: 'header',
+    elements: [],
+  };
+  const seedImport = importSectionIntoSite({
+    targetCustomerId,
+    sourceSection: headerSection,
+    existingAssetIds: new Set<string>(),
+  });
+  assert(seedImport.ok, 'seed import with header role must succeed');
+  if (seedImport.ok) {
+    assert(
+      seedImport.section.role === undefined,
+      'seed section import must strip header/footer role from cloned reusable content',
+    );
+  }
+
+  const libraryImport = importLibrarySectionIntoSite({
+    targetCustomerId,
+    sourceSection: headerSection,
+    assetManifest: [],
+    existingAssetsByHash: new Map(),
+  });
+  assert(libraryImport.ok, 'library import with header role must succeed');
+  if (libraryImport.ok) {
+    assert(
+      libraryImport.section.role === undefined,
+      'library section import must strip header/footer role from cloned reusable content',
+    );
+  }
+}
+
+{
   const section: CanvasSection = {
     id: 'section-library-duplicate-hash',
     recipeId: 'feature-grid',
