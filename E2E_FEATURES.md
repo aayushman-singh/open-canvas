@@ -10,17 +10,17 @@ Exhaustive inventory of testable features for end-to-end coverage.
 
 | # | Area | Finding | Severity |
 |---|------|---------|----------|
-| G1 | Editor console | Clerk publishableKey error on editor page load — client-side `@clerk/clerk-js` receives empty key | warning |
-| G2 | Editor console | 500 on legacy asset bridge `/api/canvas/sites/:id/assets/:assetId` — R2 asset missing | error |
-| G3 | Sidebar Add panel | No "Chart" button in sidebar — only available in section toolbar (+📊) | discrepancy |
-| G4 | Section toolbar | No "Sym" (convert to symbol) button visible in section toolbar | discrepancy |
-| G5 | Templates page | 5 templates (Starter Canvas, Launch Page, Enterprise Scale, Studio Portfolio, Local Business) — spec said 3 seed names | outdated-spec |
-| G6 | Dashboard card | Expanded card backdrop intercepts all clicks until Escape pressed — potential UX trap | minor |
-| G7 | Editor topbar | No "Translate" button visible (FLOWS.md line 37 mentions it) | discrepancy |
-| G8 | Sidebar overlap | Sidebar covers first section elements at 100% zoom — user must toggle sidebar to select leftmost elements | UX |
-| G9 | Editor boot | `state.symbols` not iterable when site predates symbols feature — crash on boot | **fixed** |
-| G10 | Template previews | Iframe thumbnails on templates page garbled — positioned elements overlap at preview scale | cosmetic |
-| G11 | Clerk handshake | Style kit switch during Clerk session refresh causes full page reload → 401 → empty canvas | session-race |
+| G1 | Editor console | Clerk publishableKey missing on public-site editor | **fixed** |
+| G2 | Editor console | 500 on legacy asset bridge — unhandled readOwnerAsset throw | **fixed** |
+| G3 | Sidebar Add panel | No "Chart" button in sidebar | **fixed** |
+| G4 | Section toolbar | No "Sym" (convert to symbol) button | **fixed** |
+| G5 | Templates page | 5 templates — spec said 3 seed names | outdated-spec |
+| G6 | Dashboard card | Expanded card backdrop intercepts all clicks until Escape | minor |
+| G7 | Editor topbar | No "Translate" button | **fixed** |
+| G8 | Sidebar overlap | Sidebar covers leftmost canvas elements at 100% zoom | **fixed** |
+| G9 | Editor boot | `state.symbols` not iterable on pre-symbol sites | **fixed** |
+| G10 | Template previews | Iframe thumbnails garbled at preview scale | cosmetic |
+| G11 | Clerk handshake | Style kit switch during session refresh → 401 → empty canvas | session-race |
 
 ---
 
@@ -80,6 +80,11 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 2.20 | API 401 (library sections) | Unauthenticated library sections API returns 401 | PASS |
 | 2.21 | API 401 (on-site-edit) | Unauthenticated on-site-edit API returns 401 | PASS |
 | 2.22 | Edit token missing | `/__api/*` without edit token cookie returns 401 | PASS |
+| 2.23a | API 401 (addon shop page) | Unauthenticated `/dashboard/shop` redirects to sign-in | PASS |
+| 2.23b | API 401 (addon acquire) | Unauthenticated `POST /api/addons/:id/acquire` returns 401 | PASS |
+| 2.23c | API 401 (site addons) | Unauthenticated `GET /api/addons/sites/:id` returns 401 | PASS |
+| 2.23d | API 401 (addon config) | Unauthenticated `PUT /api/addons/sites/:id/:addonId` returns 401 | PASS |
+| 2.23e | API 401 (translate) | Unauthenticated `POST /api/sites/:id/translate` returns 401 | PASS |
 | 2.23 | Edit token expiry | Expired edit token (4hr TTL) forces re-auth | — |
 | 2.24 | Session expiration | 401 response locks editor UI and reloads | — |
 | 2.25 | Admin gate | Non-admin users blocked from admin endpoints | — |
@@ -718,6 +723,24 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 43.3 | Image optimization | CF Image Resizing delivers optimized assets | — |
 | 43.4 | Font caching | WOFF2 served with cache headers | — |
 | 43.5 | WebSocket stability | Connection maintained during long sessions | — |
+
+---
+
+## 44. Addon System
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 44.1 | Addon shop page | `/dashboard/shop` lists all available addons with name, tagline, price | — |
+| 44.2 | Acquire addon | Click "Get addon" → `POST /api/addons/:addonId/acquire` grants entitlement | — |
+| 44.3 | Owned badge | Acquired addons show "Owned" badge in shop | — |
+| 44.4 | Revoke addon | `DELETE /api/addons/:addonId/acquire` removes entitlement | — |
+| 44.5 | Site addons page | `/dashboard/sites/:siteId/addons` shows per-site addon config | — |
+| 44.6 | Enable addon on site | Toggle enable → `PUT /api/addons/sites/:siteId/:addonId` | — |
+| 44.7 | Configure addon | Fill config fields (API keys, URLs) and save | — |
+| 44.8 | Config validation | Invalid config values rejected by pattern | — |
+| 44.9 | List site addons | `GET /api/addons/sites/:siteId` returns addon configs | — |
+| 44.10 | Unauthenticated shop returns 401 | Auth guard on `/api/addons/*` | PASS |
+| 44.11 | Unauthenticated addon acquire returns 401 | Auth guard on `POST /api/addons/:id/acquire` | PASS |
 
 ---
 

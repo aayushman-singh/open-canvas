@@ -134,6 +134,43 @@ test.describe('Authentication & Authorization', () => {
     expect(url).toContain('sign-in');
   });
 
+  test('unauthenticated addon shop page redirects to sign-in', async ({ page }) => {
+    await page.goto('/dashboard/shop');
+    const url = page.url();
+    expect(url).toContain('accounts');
+    expect(url).toContain('sign-in');
+  });
+
+  test('unauthenticated addon acquire returns 401', async ({ request }) => {
+    const resp = await request.post('/api/addons/fake-addon/acquire', {
+      headers: { accept: 'application/json' },
+    });
+    expect(resp.status()).toBe(401);
+  });
+
+  test('unauthenticated site addons API returns 401', async ({ request }) => {
+    const resp = await request.get('/api/addons/sites/fake-id', {
+      headers: { accept: 'application/json' },
+    });
+    expect(resp.status()).toBe(401);
+  });
+
+  test('unauthenticated addon config PUT returns 401', async ({ request }) => {
+    const resp = await request.put('/api/addons/sites/fake-id/fake-addon', {
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      data: {},
+    });
+    expect(resp.status()).toBe(401);
+  });
+
+  test('unauthenticated translate API returns 401', async ({ request }) => {
+    const resp = await request.post('/api/sites/fake-id/translate', {
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      data: { targetLocale: 'es' },
+    });
+    expect(resp.status()).toBe(401);
+  });
+
   test('edit token auth — missing cookie returns 401', async ({ request }) => {
     const resp = await request.get('/__api/canvas/sites/fake-id', {
       headers: { accept: 'application/json' },
