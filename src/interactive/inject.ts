@@ -39,6 +39,7 @@ const INTERACTIVE_ELEMENT_TYPES: ReadonlySet<ElementType> = new Set<ElementType>
 export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): boolean {
   for (const page of snapshot.pages) {
     for (const section of page.sections) {
+      if (section.trigger) return true;
       for (const element of section.elements) {
         if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
       }

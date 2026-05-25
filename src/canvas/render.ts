@@ -137,18 +137,25 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
 function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
   const bgEffect = section.backgroundEffect ?? 'none';
   const entrance = section.entrance ?? 'none';
-  const style = styleFromEntries([
+  const styleEntries: Array<[string, string]> = [
     ['position', 'relative'],
     ['width', `${String(pageWidth)}px`],
     ['height', `${String(section.height)}px`],
-  ]);
+  ];
+  if (section.trigger) {
+    styleEntries.push(['display', 'none']);
+  }
+  const style = styleFromEntries(styleEntries);
   // Reading order = `section.elements[]` storage order. The renderer is the
   // contract: whatever order elements appear in the array is the order DOM
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
   const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
   const roleAttr = section.role && section.role !== 'body' ? ` data-section-role="${escapeAttr(section.role)}"` : '';
-  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${elementsHtml}</section>`;
+  const triggerAttrs = section.trigger
+    ? ` data-rev01-popup="true" data-rev01-trigger-type="${escapeAttr(section.trigger.type)}" data-rev01-trigger-value="${escapeAttr(String(section.trigger.value ?? ''))}"`
+    : '';
+  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${elementsHtml}</section>`;
 }
 
 function renderPage(page: CanvasPage, ctx: Omit<ElementRenderCtx, 'pageSlug'>): string {
