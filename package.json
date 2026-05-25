@@ -26,6 +26,7 @@
     "coedit:smoke": "bun run src/live/co-edit/smoke.ts",
     "customdomain:smoke": "bun run src/custom-domain/smoke.ts",
     "og:smoke": "bun run src/og-image/smoke.ts",
+    "og:section-smoke": "bun run src/og-image/section-og.smoke.ts",
     "forms:smoke": "bun run src/forms/smoke.ts",
     "embed:smoke": "bun run src/embed/smoke.ts",
     "password:smoke": "bun run src/password/smoke.ts",

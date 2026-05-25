@@ -26,7 +26,7 @@
 
 import satori from 'satori';
 import { loadOgFonts } from './fonts/fonts.js';
-import type { StyleKitPreset } from '../canvas/schema.js';
+import type { CanvasElement, CanvasSection, StyleKitPreset } from '../canvas/schema.js';
 
 // File extension `.tsx` is kept so the convention matches the plan (the
 // brief lists `src/og-image/render.tsx`), even though we don't emit JSX
@@ -204,4 +204,153 @@ export async function renderOgCardSvg(input: RenderOgCardInput): Promise<string>
     ],
     embedFont: true,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Section-based OG render — uses the actual hero section layout as the card.
+// ---------------------------------------------------------------------------
+
+export interface RenderOgFromSectionInput {
+  section: CanvasSection;
+  pageWidth: number;
+  preset: StyleKitPreset;
+}
+
+/**
+ * Render the first section's positioned elements as an OG image via Satori.
+ * The output is a 1200×630 SVG that mirrors the hero section's visual layout,
+ * giving the OG preview the look of the actual site design rather than a
+ * generic text card.
+ *
+ * MediaElements are skipped — Satori cannot fetch arbitrary image URLs during
+ * render and we don't have asset bytes available here.
+ */
+export async function renderOgFromSectionSvg(input: RenderOgFromSectionInput): Promise<string> {
+  const tree = buildSectionTree(input);
+  const fonts = await loadOgFonts();
+  return satori(tree, {
+    width: OG_WIDTH,
+    height: OG_HEIGHT,
+    fonts: [
+      { name: 'Inter', data: fonts.regular, weight: 400, style: 'normal' },
+      { name: 'Inter', data: fonts.bold, weight: 700, style: 'normal' },
+    ],
+    embedFont: true,
+  });
+}
+
+/**
+ * Build the Satori node tree for a section-based OG card. Scales the section's
+ * coordinate space (designed at `pageWidth × section.height`) down to fit
+ * 1200×630, preserving aspect ratio.
+ */
+function buildSectionTree(input: RenderOgFromSectionInput): SatoriNode {
+  const { section, pageWidth, preset } = input;
+  const scaleX = OG_WIDTH / pageWidth;
+  const scaleY = OG_HEIGHT / section.height;
+  const scale = Math.min(scaleX, scaleY);
+
+  const children: SatoriNode[] = [];
+
+  // Sort by z-index for correct layering.
+  const sorted = [...section.elements].sort((a, b) => a.box.z - b.box.z);
+
+  for (const el of sorted) {
+    const node = elementToSatoriNode(el, scale, preset);
+    if (node) children.push(node);
+  }
+
+  return h(
+    'div',
+    {
+      style: {
+        width: `${String(OG_WIDTH)}px`,
+        height: `${String(OG_HEIGHT)}px`,
+        display: 'flex',
+        position: 'relative',
+        backgroundColor: preset.bg,
+        overflow: 'hidden',
+        fontFamily: 'Inter',
+      },
+    },
+    ...children,
+  );
+}
+
+/**
+ * Map a single CanvasElement to a Satori node. Returns null for element types
+ * that cannot be meaningfully rendered in a static OG context (media, embeds,
+ * etc.).
+ */
+function elementToSatoriNode(
+  el: CanvasElement,
+  scale: number,
+  preset: StyleKitPreset,
+): SatoriNode | null {
+  const baseStyle: Record<string, string | number> = {
+    position: 'absolute',
+    left: `${String(Math.round(el.box.x * scale))}px`,
+    top: `${String(Math.round(el.box.y * scale))}px`,
+    width: `${String(Math.round(el.box.w * scale))}px`,
+    height: `${String(Math.round(el.box.h * scale))}px`,
+    display: 'flex',
+  };
+
+  switch (el.type) {
+    case 'text': {
+      const plainText = el.content.map((r) => r.text).join('');
+      return h(
+        'div',
+        {
+          style: {
+            ...baseStyle,
+            fontSize: `${String(Math.round(el.fontSize * scale))}px`,
+            fontWeight: el.fontWeight,
+            color: el.role === 'heading' ? preset.text : preset.muted,
+            alignItems: 'center',
+            overflow: 'hidden',
+          },
+        },
+        plainText,
+      );
+    }
+    case 'shape':
+      return h('div', {
+        style: {
+          ...baseStyle,
+          backgroundColor: preset.shapeFill,
+          borderRadius:
+            el.variant === 'circle' || el.variant === 'pill'
+              ? '9999px'
+              : preset.radius,
+        },
+      });
+    case 'container':
+      return h('div', {
+        style: {
+          ...baseStyle,
+          backgroundColor: preset.panel,
+          borderRadius: preset.radius,
+        },
+      });
+    case 'action':
+      return h(
+        'div',
+        {
+          style: {
+            ...baseStyle,
+            backgroundColor: preset.accent,
+            color: preset.accentText,
+            borderRadius: preset.actionRadius,
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: `${String(Math.round(16 * scale))}px`,
+            fontWeight: 600,
+          },
+        },
+        el.label,
+      );
+    default:
+      return null;
+  }
 }
