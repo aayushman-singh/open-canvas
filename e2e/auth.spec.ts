@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Authentication & Authorization', () => {
-  test('unauthenticated /dashboard redirects to Clerk sign-in', async ({ page }) => {
-    const response = await page.goto('/dashboard');
-    const url = page.url();
-    // Should redirect to Clerk's account portal
-    expect(url).toContain('accounts');
-    expect(url).toContain('sign-in');
+  test('unauthenticated /dashboard redirects to Clerk sign-in', async ({ request }) => {
+    const resp = await request.get('/dashboard', { maxRedirects: 0 });
+    expect(resp.status()).toBe(302);
+    const location = resp.headers()['location'] ?? '';
+    expect(location).toContain('accounts');
+    expect(location).toContain('sign-in');
   });
 
   test('unauthenticated API request returns 401 JSON', async ({ request }) => {
@@ -120,25 +120,28 @@ test.describe('Authentication & Authorization', () => {
     expect(resp.status()).toBe(401);
   });
 
-  test('unauthenticated editor page redirects to sign-in', async ({ page }) => {
-    await page.goto('/dashboard/sites/fake-id/edit');
-    const url = page.url();
-    expect(url).toContain('accounts');
-    expect(url).toContain('sign-in');
+  test('unauthenticated editor page redirects to sign-in', async ({ request }) => {
+    const resp = await request.get('/dashboard/sites/fake-id/edit', { maxRedirects: 0 });
+    expect(resp.status()).toBe(302);
+    const location = resp.headers()['location'] ?? '';
+    expect(location).toContain('accounts');
+    expect(location).toContain('sign-in');
   });
 
-  test('unauthenticated templates page redirects to sign-in', async ({ page }) => {
-    await page.goto('/dashboard/templates');
-    const url = page.url();
-    expect(url).toContain('accounts');
-    expect(url).toContain('sign-in');
+  test('unauthenticated templates page redirects to sign-in', async ({ request }) => {
+    const resp = await request.get('/dashboard/templates', { maxRedirects: 0 });
+    expect(resp.status()).toBe(302);
+    const location = resp.headers()['location'] ?? '';
+    expect(location).toContain('accounts');
+    expect(location).toContain('sign-in');
   });
 
-  test('unauthenticated addon shop page redirects to sign-in', async ({ page }) => {
-    await page.goto('/dashboard/shop');
-    const url = page.url();
-    expect(url).toContain('accounts');
-    expect(url).toContain('sign-in');
+  test('unauthenticated addon shop page redirects to sign-in', async ({ request }) => {
+    const resp = await request.get('/dashboard/shop', { maxRedirects: 0 });
+    expect(resp.status()).toBe(302);
+    const location = resp.headers()['location'] ?? '';
+    expect(location).toContain('accounts');
+    expect(location).toContain('sign-in');
   });
 
   test('unauthenticated addon acquire returns 401', async ({ request }) => {

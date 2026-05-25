@@ -6,11 +6,11 @@ test.describe('Landing Page', () => {
   });
 
   test('1.1 — page loads with correct title and meta', async ({ page }) => {
-    await expect(page).toHaveTitle('rev01 — multiplayer site builder');
+    await expect(page).toHaveTitle('rev01 — build client sites, not code');
     const description = page.locator('meta[name="description"]');
     await expect(description).toHaveAttribute(
       'content',
-      /multiplayer.*AI-native site builder/,
+      /canvas-first site builder/,
     );
   });
 
@@ -23,9 +23,7 @@ test.describe('Landing Page', () => {
 
   test('1.3 — tagline heading renders', async ({ page }) => {
     const heading = page.locator('section.tagline h1');
-    await expect(heading).toContainText(
-      'multiplayer site builder with an agent at the cursor.',
-    );
+    await expect(heading).toContainText('ship client sites at the speed of your');
   });
 
   test('1.4 — three differentiator cards (01, 02, 03)', async ({ page }) => {
@@ -40,27 +38,26 @@ test.describe('Landing Page', () => {
 
   test('1.5 — feature card headings match spec', async ({ page }) => {
     const titles = page.locator('section.features article.feature h2');
-    await expect(titles.nth(0)).toHaveText('One canvas, not a tree of widgets.');
-    await expect(titles.nth(1)).toHaveText('Style Kits change the whole surface.');
-    await expect(titles.nth(2)).toHaveText('The agent proposes, the owner accepts.');
+    await expect(titles.nth(0)).toHaveText('Place anything, anywhere.');
+    await expect(titles.nth(1)).toHaveText('Rebrand a site in seconds.');
+    await expect(titles.nth(2)).toHaveText('AI drafts it. You approve it.');
   });
 
   test('1.6 — stat line renders runtime counters', async ({ page }) => {
     const statline = page.locator('section.statline');
     await expect(statline).toBeVisible();
     await expect(statline.locator('.k')).toHaveCount(4);
-    await expect(statline.locator('text=LOC')).toBeVisible();
-    await expect(statline.locator('text=demo edit ops')).toBeVisible();
-    await expect(statline.locator('text=demo agent ops')).toBeVisible();
-    await expect(statline.locator('text=published sites')).toBeVisible();
+    await expect(statline.locator('text=creators')).toBeVisible();
+    await expect(statline.locator('text=sites shipped')).toBeVisible();
+    await expect(statline.locator('text=avg build time')).toBeVisible();
+    await expect(statline.locator('text=uptime')).toBeVisible();
   });
 
-  test('1.7 — footer renders with links and license', async ({ page }) => {
+  test('1.7 — footer renders with heading and CTA', async ({ page }) => {
     const footer = page.locator('footer');
     await expect(footer).toBeVisible();
-    await expect(footer.locator('text=license: MIT')).toBeVisible();
-    await expect(footer.locator('a[href="https://github.com/aayushman-singh/rev01"]')).toBeVisible();
-    await expect(footer.locator('text=Ready to build?')).toBeVisible();
+    await expect(footer.locator('text=Your next client site starts here.')).toBeVisible();
+    await expect(footer.locator('a[href="/dashboard"]')).toBeVisible();
   });
 
   test('1.8 — status bar renders with brand and nav', async ({ page }) => {
@@ -69,28 +66,15 @@ test.describe('Landing Page', () => {
     await expect(statusbar.locator('.brand-name')).toHaveText('rev01');
 
     const nav = statusbar.locator('nav');
-    await expect(nav.locator('a[href*="/docs"]')).toBeVisible();
-    await expect(nav.locator('a[href="https://github.com/aayushman-singh/rev01"]')).toBeVisible();
+    await expect(nav.locator('a[href="/dashboard"]')).toBeVisible();
   });
 
-  test('1.9 — "Start building" CTA links to /dashboard', async ({ page }) => {
+  test('1.9 — tagline CTA links to /dashboard', async ({ page }) => {
     const cta = page.locator('section.tagline a[href="/dashboard"]');
     await expect(cta).toBeVisible();
   });
 
-  test('1.10 — "Launch dashboard" nav button links to /dashboard', async ({ page }) => {
-    const launchBtn = page.locator('header.statusbar a[href="/dashboard"]');
-    await expect(launchBtn).toBeVisible();
-  });
-
-  test('1.11 — "View source" button links to GitHub repo', async ({ page }) => {
-    const sourceBtn = page.locator(
-      'section.tagline a[href="https://github.com/aayushman-singh/rev01"]',
-    );
-    await expect(sourceBtn).toBeVisible();
-  });
-
-  test('1.12 — no console errors on landing', async ({ page }) => {
+  test('1.10 — no console errors on landing', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') errors.push(msg.text());
@@ -100,13 +84,8 @@ test.describe('Landing Page', () => {
     expect(errors).toEqual([]);
   });
 
-  test('1.13 — page has dark color scheme', async ({ page }) => {
+  test('1.11 — page has dark color scheme', async ({ page }) => {
     const colorScheme = page.locator('meta[name="color-scheme"]');
     await expect(colorScheme).toHaveAttribute('content', 'dark');
-  });
-
-  test('1.14 — footer CTA "Launch dashboard" links to /dashboard', async ({ page }) => {
-    const footerCta = page.locator('footer a[href="/dashboard"]');
-    await expect(footerCta).toBeVisible();
   });
 });
