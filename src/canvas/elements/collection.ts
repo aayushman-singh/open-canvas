@@ -8,13 +8,12 @@
 //     (category, tags, limit) sorted by a field. Used for blog listings,
 //     portfolio grids.
 //
-// The renderer loops `entries` in manual mode. In page-bound mode the
-// renderer emits a placeholder grid — the actual page query runs at
-// publish time in the snapshot builder, which populates `entries` before
-// the renderer ever sees the snapshot.
+// The renderer loops `entries` in both modes. Page-bound collections use the
+// same render contract after an upstream materializer has populated entries
+// from matching page metadata.
 
 import type { BaseElement, CanvasElement } from '../schema.js';
-import { escapeAttr } from './render-utils.js';
+import { escapeAttr, styleFromEntries } from './render-utils.js';
 
 export type CollectionMode = 'manual' | 'page-bound';
 
@@ -25,6 +24,7 @@ export const PAGE_METADATA_FIELDS = [
   'publishedDate',
   'author',
   'tags',
+  'category',
 ] as const;
 export type PageMetadataField = (typeof PAGE_METADATA_FIELDS)[number];
 
@@ -62,21 +62,44 @@ export interface CollectionElement extends BaseElement {
 export interface CollectionRenderCtx {
   styleKit: string;
   assetBasePath: string;
+  renderChild: (element: CanvasElement) => string;
+}
+
+function childWrapperStyle(child: CanvasElement): string {
+  return styleFromEntries([
+    ['position', 'absolute'],
+    ['left', `${String(child.box.x)}px`],
+    ['top', `${String(child.box.y)}px`],
+    ['width', `${String(child.box.w)}px`],
+    ['height', `${String(child.box.h)}px`],
+    ['z-index', String(child.box.z)],
+  ]);
+}
+
+function entryHeight(entryElements: CanvasElement[]): number {
+  let bottom = 0;
+  for (const child of entryElements) {
+    bottom = Math.max(bottom, child.box.y + child.box.h);
+  }
+  return bottom;
 }
 
 export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx): string {
-  void ctx;
   const gridStyle = `display:grid;grid-template-columns:repeat(${String(el.layout.columns)},1fr);gap:${String(el.layout.gap)}px`;
 
   const entriesHtml = el.entries
     .map((entryElements, entryIdx) => {
+      const rowStyle = styleFromEntries([
+        ['position', 'relative'],
+        ['min-height', `${String(entryHeight(entryElements))}px`],
+      ]);
       const cellsHtml = entryElements
         .map(
           (child) =>
-            `<div class="rev01-collection-child" data-element-type="${escapeAttr(child.type)}" data-rev01-element="${escapeAttr(child.id)}"></div>`,
+            `<div class="rev01-collection-child" data-element-type="${escapeAttr(child.type)}" data-rev01-element="${escapeAttr(child.id)}" style="${escapeAttr(childWrapperStyle(child))}">${ctx.renderChild(child)}</div>`,
         )
         .join('');
-      return `<div class="rev01-collection-entry" data-rev01-entry="${String(entryIdx)}">${cellsHtml}</div>`;
+      return `<div class="rev01-collection-entry" data-rev01-entry="${String(entryIdx)}" style="${escapeAttr(rowStyle)}">${cellsHtml}</div>`;
     })
     .join('');
 

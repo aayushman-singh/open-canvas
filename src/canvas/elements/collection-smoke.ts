@@ -8,25 +8,29 @@
 //   5. Yjs round-trip preserves collection + page metadata
 
 import type {
+  CanvasElement,
   CanvasPage,
   CanvasSection,
   CanvasSiteState,
   TextElement,
 } from '../schema.js';
-import {
-  validateCanvasSiteState,
-} from '../validate.js';
-import {
-  renderCollection,
-  type CollectionElement,
-} from './collection.js';
+import { validateCanvasSiteState } from '../validate.js';
+import { renderCollection, type CollectionElement } from './collection.js';
 import { encodeYDoc, decodeYDoc } from '../yjs-projection.js';
+import { renderText } from './text.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[collection:smoke] ${message}`);
 }
 
-const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
+const RENDER_CTX = {
+  styleKit: 'charcoal',
+  assetBasePath: '/assets',
+  renderChild: (element: CanvasElement): string => {
+    if (element.type === 'text') return renderText(element);
+    throw new Error(`[collection:smoke] unsupported fixture child type ${element.type}`);
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Fixture builders
@@ -87,7 +91,10 @@ function makeSection(elements: CollectionElement[]): CanvasSection {
   };
 }
 
-function makeSiteState(collection: CollectionElement, pageMetadata?: Partial<CanvasPage>): CanvasSiteState {
+function makeSiteState(
+  collection: CollectionElement,
+  pageMetadata?: Partial<CanvasPage>,
+): CanvasSiteState {
   const page: CanvasPage = {
     id: 'page-home',
     slug: 'home',
@@ -115,16 +122,15 @@ function makeSiteState(collection: CollectionElement, pageMetadata?: Partial<Can
   assert(html.includes('gap:24px'), '(1) gap matches layout.gap=24');
 
   const entryMatches = html.match(/data-rev01-entry="/g) ?? [];
-  assert(
-    entryMatches.length === 3,
-    `(1) renders 3 entries (got ${String(entryMatches.length)})`,
-  );
+  assert(entryMatches.length === 3, `(1) renders 3 entries (got ${String(entryMatches.length)})`);
 
   const childMatches = html.match(/rev01-collection-child/g) ?? [];
   assert(
     childMatches.length === 6,
     `(1) renders 6 children total (2 per entry × 3 entries, got ${String(childMatches.length)})`,
   );
+  assert(html.includes('Alice'), '(1) renders entry text content, not placeholder divs only');
+  assert(html.includes('CEO'), '(1) renders all text children for an entry');
 }
 
 // ---------------------------------------------------------------------------
@@ -155,11 +161,17 @@ function makeSiteState(collection: CollectionElement, pageMetadata?: Partial<Can
 {
   const goodState = makeSiteState(makeManualCollection());
   const goodResult = validateCanvasSiteState(goodState);
-  assert(goodResult.valid, `(3) valid manual collection passes validation: ${goodResult.valid ? '' : goodResult.errors.join('; ')}`);
+  assert(
+    goodResult.valid,
+    `(3) valid manual collection passes validation: ${goodResult.valid ? '' : goodResult.errors.join('; ')}`,
+  );
 
   const pageBoundState = makeSiteState(makePageBoundCollection());
   const pbResult = validateCanvasSiteState(pageBoundState);
-  assert(pbResult.valid, `(3) valid page-bound collection passes validation: ${pbResult.valid ? '' : pbResult.errors.join('; ')}`);
+  assert(
+    pbResult.valid,
+    `(3) valid page-bound collection passes validation: ${pbResult.valid ? '' : pbResult.errors.join('; ')}`,
+  );
 
   // Bad: missing mode
   const badMode = makeSiteState({
@@ -184,6 +196,23 @@ function makeSiteState(collection: CollectionElement, pageMetadata?: Partial<Can
   });
   const badGapResult = validateCanvasSiteState(badGap);
   assert(!badGapResult.valid, '(3) layout.gap=-1 rejected');
+
+  const badNestedText = makeManualCollection();
+  badNestedText.entries = [[{ ...makeText('entry-bad-title', ''), content: [] }]];
+  const badNestedResult = validateCanvasSiteState(makeSiteState(badNestedText));
+  assert(!badNestedResult.valid, '(3) invalid nested entry element rejected');
+
+  const badBinding = makePageBoundCollection();
+  badBinding.fieldBindings = {
+    'card-title': 'slug' as NonNullable<CollectionElement['fieldBindings']>[string],
+  };
+  const badBindingResult = validateCanvasSiteState(makeSiteState(badBinding));
+  assert(!badBindingResult.valid, '(3) invalid field binding rejected');
+
+  const badMetadataResult = validateCanvasSiteState(
+    makeSiteState(makeManualCollection(), { publishedDate: 'not-a-date' }),
+  );
+  assert(!badMetadataResult.valid, '(3) invalid page metadata date rejected');
 }
 
 // ---------------------------------------------------------------------------
@@ -198,8 +227,14 @@ function makeSiteState(collection: CollectionElement, pageMetadata?: Partial<Can
     category: 'blog',
   });
   const result = validateCanvasSiteState(state);
-  assert(result.valid, `(4) page metadata passes validation: ${result.valid ? '' : result.errors.join('; ')}`);
-  assert(state.pages[0]!.publishedDate === '2026-05-25T00:00:00.000Z', '(4) publishedDate preserved');
+  assert(
+    result.valid,
+    `(4) page metadata passes validation: ${result.valid ? '' : result.errors.join('; ')}`,
+  );
+  assert(
+    state.pages[0]!.publishedDate === '2026-05-25T00:00:00.000Z',
+    '(4) publishedDate preserved',
+  );
   assert(state.pages[0]!.author === 'Alice', '(4) author preserved');
   assert(state.pages[0]!.tags!.length === 2, '(4) tags preserved');
   assert(state.pages[0]!.category === 'blog', '(4) category preserved');

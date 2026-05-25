@@ -107,6 +107,11 @@ export type RenderDispatch = {
   ) => string;
 };
 
+function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
+  const fn = RENDER_DISPATCH[element.type] as (el: CanvasElement, ctx: ElementRenderCtx) => string;
+  return fn(element, ctx);
+}
+
 export const RENDER_DISPATCH: RenderDispatch = {
   text: (el) => renderText(el),
   media: (el, ctx) => renderMedia(el, { assetBasePath: ctx.assetBasePath }),
@@ -144,5 +149,6 @@ export const RENDER_DISPATCH: RenderDispatch = {
     renderCollection(el, {
       styleKit: ctx.styleKit,
       assetBasePath: ctx.assetBasePath,
+      renderChild: (child) => renderElementBody(child, ctx),
     }),
 };

@@ -6,6 +6,7 @@
 
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
+import { PAGE_METADATA_FIELDS } from './elements/collection.js';
 import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
@@ -197,6 +198,20 @@ function validatePinnedStyle(value: unknown, basePath: string, errors: string[])
   }
 }
 
+function registerElementId(
+  element: unknown,
+  elementPath: string,
+  pageIds: Set<string>,
+  errors: string[],
+): void {
+  if (!isRecord(element) || !isNonEmptyString(element.id)) return;
+  if (pageIds.has(element.id)) {
+    errors.push(`${elementPath}.id "${element.id}" is duplicated within page`);
+  } else {
+    pageIds.add(element.id);
+  }
+}
+
 /**
  * Validate the rich text payload of a TextElement: a non-empty array of
  * inline runs whose marks are well-formed and whose concatenated text is not
@@ -278,12 +293,50 @@ function validateTextContent(content: unknown, idLabel: string, errors: string[]
   }
 }
 
+function validateCollectionChildren(
+  children: unknown,
+  childWidth: number,
+  childHeight: number,
+  basePath: string,
+  errors: string[],
+  pageIds?: Set<string>,
+): void {
+  if (!Array.isArray(children)) {
+    errors.push(`${basePath} must be an array`);
+    return;
+  }
+  children.forEach((child, idx) => {
+    const childPath = pathJoin(basePath, idx);
+    if (pageIds) registerElementId(child, childPath, pageIds, errors);
+    validateElement(child, childWidth, childHeight, childPath, errors, pageIds);
+  });
+}
+
+function validateCollectionEntries(
+  entries: unknown,
+  childWidth: number,
+  childHeight: number,
+  basePath: string,
+  errors: string[],
+  pageIds?: Set<string>,
+): void {
+  if (!Array.isArray(entries)) {
+    errors.push(`${basePath} must be an array`);
+    return;
+  }
+  entries.forEach((entry, entryIdx) => {
+    const entryPath = pathJoin(basePath, entryIdx);
+    validateCollectionChildren(entry, childWidth, childHeight, entryPath, errors, pageIds);
+  });
+}
+
 function validateElement(
   element: unknown,
   pageWidth: number,
   sectionHeight: number,
   basePath: string,
   errors: string[],
+  pageIds?: Set<string>,
 ): void {
   if (!isRecord(element)) {
     errors.push(`${basePath} must be an object`);
@@ -405,31 +458,77 @@ function validateElement(
       if (!isOneOf(element.mode, ['manual', 'page-bound'] as const)) {
         errors.push(`${basePath}.mode must be manual|page-bound (got ${describe(element.mode)})`);
       }
-      if (!Array.isArray(element.entryTemplate)) {
-        errors.push(`${basePath}.entryTemplate must be an array`);
-      }
-      if (!Array.isArray(element.entries)) {
-        errors.push(`${basePath}.entries must be an array`);
-      } else {
-        element.entries.forEach((entry, entryIdx) => {
-          if (!Array.isArray(entry)) {
-            errors.push(`${basePath}.entries[${String(entryIdx)}] must be an array`);
-          }
-        });
-      }
+      const childWidth =
+        isRecord(element.box) && isFiniteNumber(element.box.w) && element.box.w > 0
+          ? element.box.w
+          : pageWidth;
+      const childHeight =
+        isRecord(element.box) && isFiniteNumber(element.box.h) && element.box.h > 0
+          ? element.box.h
+          : sectionHeight;
+      validateCollectionChildren(
+        element.entryTemplate,
+        childWidth,
+        childHeight,
+        `${basePath}.entryTemplate`,
+        errors,
+        pageIds,
+      );
+      validateCollectionEntries(
+        element.entries,
+        childWidth,
+        childHeight,
+        `${basePath}.entries`,
+        errors,
+        pageIds,
+      );
       if (!isRecord(element.layout)) {
         errors.push(`${basePath}.layout must be an object`);
       } else {
-        if (!isFiniteNumber(element.layout.columns) || element.layout.columns < 1) {
-          errors.push(`${basePath}.layout.columns must be a positive number`);
+        if (
+          !isFiniteNumber(element.layout.columns) ||
+          !Number.isInteger(element.layout.columns) ||
+          element.layout.columns < 1
+        ) {
+          errors.push(`${basePath}.layout.columns must be a positive integer`);
         }
         if (!isFiniteNumber(element.layout.gap) || element.layout.gap < 0) {
           errors.push(`${basePath}.layout.gap must be >= 0`);
         }
       }
       if (element.mode === 'page-bound') {
-        if (element.filter !== undefined && !isRecord(element.filter)) {
-          errors.push(`${basePath}.filter must be an object when present`);
+        if (element.filter !== undefined) {
+          if (!isRecord(element.filter)) {
+            errors.push(`${basePath}.filter must be an object when present`);
+          } else {
+            if (
+              element.filter.category !== undefined &&
+              !isNonEmptyString(element.filter.category)
+            ) {
+              errors.push(`${basePath}.filter.category must be a non-empty string when present`);
+            }
+            if (element.filter.tags !== undefined) {
+              if (!Array.isArray(element.filter.tags)) {
+                errors.push(`${basePath}.filter.tags must be an array when present`);
+              } else {
+                element.filter.tags.forEach((tag, tagIdx) => {
+                  if (!isNonEmptyString(tag)) {
+                    errors.push(
+                      `${basePath}.filter.tags[${String(tagIdx)}] must be a non-empty string`,
+                    );
+                  }
+                });
+              }
+            }
+            if (
+              element.filter.limit !== undefined &&
+              (!isFiniteNumber(element.filter.limit) ||
+                !Number.isInteger(element.filter.limit) ||
+                element.filter.limit < 1)
+            ) {
+              errors.push(`${basePath}.filter.limit must be a positive integer when present`);
+            }
+          }
         }
         if (element.sort !== undefined) {
           if (!isRecord(element.sort)) {
@@ -444,6 +543,32 @@ function validateElement(
               errors.push(
                 `${basePath}.sort.order must be asc|desc (got ${describe(element.sort.order)})`,
               );
+            }
+          }
+        }
+        if (element.cardTemplate !== undefined) {
+          validateCollectionChildren(
+            element.cardTemplate,
+            childWidth,
+            childHeight,
+            `${basePath}.cardTemplate`,
+            errors,
+            pageIds,
+          );
+        }
+        if (element.fieldBindings !== undefined) {
+          if (!isRecord(element.fieldBindings)) {
+            errors.push(`${basePath}.fieldBindings must be an object when present`);
+          } else {
+            for (const [elementId, field] of Object.entries(element.fieldBindings)) {
+              if (!isNonEmptyString(elementId)) {
+                errors.push(`${basePath}.fieldBindings keys must be non-empty element ids`);
+              }
+              if (!isOneOf(field, PAGE_METADATA_FIELDS)) {
+                errors.push(
+                  `${basePath}.fieldBindings["${elementId}"] must be one of [${PAGE_METADATA_FIELDS.join(', ')}] (got ${describe(field)})`,
+                );
+              }
             }
           }
         }
@@ -526,14 +651,8 @@ function validateSection(
   section.elements.forEach((element, idx) => {
     const path = pathJoin(basePath, 'elements');
     const elementPath = pathJoin(path, idx);
-    if (isRecord(element) && isNonEmptyString(element.id)) {
-      if (pageIds.has(element.id)) {
-        errors.push(`${elementPath}.id "${element.id}" is duplicated within page`);
-      } else {
-        pageIds.add(element.id);
-      }
-    }
-    validateElement(element, pageWidth, effectiveHeight, elementPath, errors);
+    registerElementId(element, elementPath, pageIds, errors);
+    validateElement(element, pageWidth, effectiveHeight, elementPath, errors, pageIds);
   });
 }
 
@@ -623,6 +742,30 @@ function validatePage(page: unknown, basePath: string, errors: string[]): void {
   }
   if (!isNonEmptyString(page.title)) {
     errors.push(`${basePath}.title must be a non-empty string`);
+  }
+  if (page.publishedDate !== undefined) {
+    if (!isNonEmptyString(page.publishedDate)) {
+      errors.push(`${basePath}.publishedDate must be a non-empty string when present`);
+    } else if (!Number.isFinite(Date.parse(page.publishedDate))) {
+      errors.push(`${basePath}.publishedDate must be parseable as a date`);
+    }
+  }
+  if (page.author !== undefined && !isNonEmptyString(page.author)) {
+    errors.push(`${basePath}.author must be a non-empty string when present`);
+  }
+  if (page.tags !== undefined) {
+    if (!Array.isArray(page.tags)) {
+      errors.push(`${basePath}.tags must be an array when present`);
+    } else {
+      page.tags.forEach((tag, tagIdx) => {
+        if (!isNonEmptyString(tag)) {
+          errors.push(`${basePath}.tags[${String(tagIdx)}] must be a non-empty string`);
+        }
+      });
+    }
+  }
+  if (page.category !== undefined && !isNonEmptyString(page.category)) {
+    errors.push(`${basePath}.category must be a non-empty string when present`);
   }
   const widthValid =
     isFiniteNumber(page.width) && page.width >= PAGE_WIDTH_MIN && page.width <= PAGE_WIDTH_MAX;

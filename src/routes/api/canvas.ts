@@ -6,7 +6,12 @@ import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../asset
 import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import { STYLE_KITS, type CanvasSiteState, type StyleKit } from '../../canvas/schema';
+import {
+  STYLE_KITS,
+  type CanvasPage,
+  type CanvasSiteState,
+  type StyleKit,
+} from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site, siteCollaborator } from '../../db/schema';
@@ -32,6 +37,68 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isStyleKit(value: unknown): value is StyleKit {
   return typeof value === 'string' && (STYLE_KITS as readonly string[]).includes(value);
+}
+
+type OptionalStringPatch = { present: false } | { present: true; value: string | undefined };
+
+function optionalStringPatch(
+  body: Record<string, unknown>,
+  key: string,
+): OptionalStringPatch | { error: string } {
+  if (!(key in body)) return { present: false };
+  const value = body[key];
+  if (value === null) return { present: true, value: undefined };
+  if (typeof value !== 'string') return { error: `${key} must be a string or null` };
+  const trimmed = value.trim();
+  return { present: true, value: trimmed.length > 0 ? trimmed : undefined };
+}
+
+function setOptionalPageField<K extends keyof CanvasPage>(
+  page: CanvasPage,
+  key: K,
+  value: CanvasPage[K] | undefined,
+): void {
+  if (value === undefined) {
+    delete page[key];
+    return;
+  }
+  page[key] = value;
+}
+
+function patchEditablePage(
+  state: CanvasSiteState,
+  pageId: string,
+  patch: (page: CanvasPage) => CanvasPage,
+): CanvasSiteState | null {
+  let found = false;
+  const pages = state.pages.map((page) => {
+    if (page.id !== pageId) return page;
+    found = true;
+    return patch(page);
+  });
+  if (!found) return null;
+  return { ...state, pages };
+}
+
+async function persistEditableState(
+  c: Context<Env>,
+  siteId: string,
+  customerId: string,
+  nextState: CanvasSiteState,
+): Promise<Response | null> {
+  const validation = validateCanvasSiteState(nextState);
+  if (!validation.valid) {
+    return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
+  }
+
+  await db(c.env)
+    .update(site)
+    .set({
+      editableState: nextState,
+      updatedAt: sql`now()`,
+    })
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
+  return null;
 }
 
 async function loadOwnedSite(
@@ -200,6 +267,121 @@ canvasApi.put('/sites/:siteId', async (c) => {
     })
     .where(and(eq(site.id, siteId), eq(site.customerId, result.customerId)));
 
+  return c.json({ ok: true });
+});
+
+canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
+  const siteId = c.req.param('siteId');
+  const pageId = c.req.param('pageId');
+  const result = await loadOwnedSite(c, siteId);
+  if (!result.found) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const body: unknown = await c.req.json();
+  if (!isRecord(body)) {
+    return c.json({ error: 'request body must be a JSON object' }, 400);
+  }
+  if (typeof body.title !== 'string' || body.title.trim().length === 0) {
+    return c.json({ error: 'title is required' }, 400);
+  }
+  const title = body.title.trim();
+
+  const description = optionalStringPatch(body, 'description');
+  if ('error' in description) return c.json({ error: description.error }, 400);
+  const ogImageAssetId = optionalStringPatch(body, 'ogImageAssetId');
+  if ('error' in ogImageAssetId) return c.json({ error: ogImageAssetId.error }, 400);
+  const canonical = optionalStringPatch(body, 'canonical');
+  if ('error' in canonical) return c.json({ error: canonical.error }, 400);
+  const locale = optionalStringPatch(body, 'locale');
+  if ('error' in locale) return c.json({ error: locale.error }, 400);
+  if ('noIndex' in body && typeof body.noIndex !== 'boolean') {
+    return c.json({ error: 'noIndex must be a boolean when present' }, 400);
+  }
+
+  const nextState = patchEditablePage(result.site.editableState, pageId, (page) => {
+    const nextPage: CanvasPage = { ...page, title };
+    if (description.present) setOptionalPageField(nextPage, 'description', description.value);
+    if (ogImageAssetId.present)
+      setOptionalPageField(nextPage, 'ogImageAssetId', ogImageAssetId.value);
+    if (canonical.present) setOptionalPageField(nextPage, 'canonical', canonical.value);
+    if (locale.present) setOptionalPageField(nextPage, 'locale', locale.value);
+    if ('noIndex' in body) {
+      setOptionalPageField(nextPage, 'noIndex', body.noIndex === true ? true : undefined);
+    }
+    return nextPage;
+  });
+  if (nextState === null) {
+    return c.json({ error: 'page not found' }, 404);
+  }
+
+  const failure = await persistEditableState(c, siteId, result.customerId, nextState);
+  if (failure) return failure;
+  return c.json({ ok: true });
+});
+
+canvasApi.put('/sites/:siteId/pages/:pageId/metadata', async (c) => {
+  const siteId = c.req.param('siteId');
+  const pageId = c.req.param('pageId');
+  const result = await loadOwnedSite(c, siteId);
+  if (!result.found) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const body: unknown = await c.req.json();
+  if (!isRecord(body)) {
+    return c.json({ error: 'request body must be a JSON object' }, 400);
+  }
+
+  const publishedDate = optionalStringPatch(body, 'publishedDate');
+  if ('error' in publishedDate) return c.json({ error: publishedDate.error }, 400);
+  const author = optionalStringPatch(body, 'author');
+  if ('error' in author) return c.json({ error: author.error }, 400);
+  const category = optionalStringPatch(body, 'category');
+  if ('error' in category) return c.json({ error: category.error }, 400);
+
+  let tags: { present: false } | { present: true; value: string[] | undefined } | { error: string };
+  if (!('tags' in body) || body.tags === undefined) {
+    tags = { present: false };
+  } else if (body.tags === null) {
+    tags = { present: true, value: undefined };
+  } else if (Array.isArray(body.tags)) {
+    const parsedTags: string[] = [];
+    let tagError: string | null = null;
+    for (const [idx, rawTag] of body.tags.entries()) {
+      if (typeof rawTag !== 'string') {
+        tagError = `tags[${String(idx)}] must be a string`;
+        break;
+      }
+      const tag = rawTag.trim();
+      if (tag.length > 0) parsedTags.push(tag);
+    }
+    tags =
+      tagError === null
+        ? { present: true, value: parsedTags.length > 0 ? parsedTags : undefined }
+        : { error: tagError };
+  } else {
+    tags = { error: 'tags must be an array or null' };
+  }
+  const tagsPatch = tags;
+  if ('error' in tagsPatch) return c.json({ error: tagsPatch.error }, 400);
+
+  const nextState = patchEditablePage(result.site.editableState, pageId, (page) => {
+    const nextPage: CanvasPage = { ...page };
+    if (publishedDate.present) {
+      setOptionalPageField(nextPage, 'publishedDate', publishedDate.value);
+    }
+    if (author.present) setOptionalPageField(nextPage, 'author', author.value);
+    if (category.present) setOptionalPageField(nextPage, 'category', category.value);
+    if (tagsPatch.present) setOptionalPageField(nextPage, 'tags', tagsPatch.value);
+    return nextPage;
+  });
+  if (nextState === null) {
+    return c.json({ error: 'page not found' }, 404);
+  }
+
+  const failure = await persistEditableState(c, siteId, result.customerId, nextState);
+  if (failure) return failure;
   return c.json({ ok: true });
 });
 
