@@ -112,6 +112,7 @@ type Props = {
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Sites' },
   { href: '/dashboard/templates', label: 'Templates' },
+  { href: '/dashboard/shop', label: 'Shop' },
 ];
 
 export function DashboardShell({ title, crumbs, activePath, pageStyles, children }: Props) {
