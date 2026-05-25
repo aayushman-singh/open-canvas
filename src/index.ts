@@ -38,11 +38,13 @@ import sitemapRouter from './seo/sitemap/route';
 // Wave 5 routers wired by main thread after parallel-agent merge.
 import fontsRouter from './fonts/route';
 import chatApi from './agent/chat/route';
-import translateApi from './i18n/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
 import addonShopRoute from './routes/dashboard/addon-shop';
 import siteAddonsRoute from './routes/dashboard/site-addons';
 import addonsApi from './routes/api/addons';
+import profileRoute from './routes/dashboard/profile';
+import accountSettingsRoute from './routes/dashboard/settings';
+import profileApi from './routes/api/profile';
 // Section library + custom template routes
 import {
   librarySectionsOwner,
@@ -217,12 +219,15 @@ app.route('/', fontsRouter);
 // /api/sites so the inner routes become /api/sites/:siteId/chat and
 // /api/sites/:siteId/chat/stream.
 app.route('/api/sites', chatApi);
-app.route('/api/sites', translateApi);
 app.route('/dashboard', chatPanelRoute);
 // Addon system (ADR 0009)
 app.route('/dashboard', addonShopRoute);
 app.route('/dashboard', siteAddonsRoute);
 app.route('/api/addons', addonsApi);
+// Profile & account settings
+app.route('/dashboard', profileRoute);
+app.route('/dashboard', accountSettingsRoute);
+app.route('/api/profile', profileApi);
 // On-site editor auth popup — main domain endpoint that sets the edit token
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
 app.route('/api/on-site-edit', onSiteEditRoute);

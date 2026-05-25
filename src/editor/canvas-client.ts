@@ -5343,68 +5343,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
-  // -- Translate (i18n) ----------------------------------------------------
-
-  const translateButton = document.getElementById("canvas-translate");
-
-  async function translateSite() {
-    if (!translateButton) return;
-    const lang = await openSelectModal({
-      title: "Translate site",
-      label: "Target language",
-      options: [
-        { value: "es", label: "Spanish" },
-        { value: "fr", label: "French" },
-        { value: "de", label: "German" },
-        { value: "pt", label: "Portuguese" },
-        { value: "ja", label: "Japanese" },
-        { value: "zh", label: "Chinese (Simplified)" },
-        { value: "ar", label: "Arabic" },
-        { value: "hi", label: "Hindi" },
-        { value: "ko", label: "Korean" },
-        { value: "it", label: "Italian" },
-      ],
-      defaultValue: "es",
-    });
-    if (!lang) return;
-    translateButton.disabled = true;
-    try {
-      const saved = await flushPendingSave();
-      if (!saved) return;
-      setStatus("Translating to " + lang + "...");
-      const response = await authFetch(API_BASE + "/sites/" + SITE_ID + "/translate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ targetLocale: lang }),
-      });
-      if (!response.ok) {
-        const body = await response.json().catch(() => null);
-        const detail = (body && body.error) || response.statusText;
-        setStatus("Translation failed: " + detail, "error");
-        return;
-      }
-      const body = await response.json();
-      if (body && body.state) {
-        state = body.state;
-        if (state && !Array.isArray(state.symbols)) state.symbols = [];
-        renderAll();
-        scheduleSave();
-        setStatus("Translated to " + lang, "ok");
-      }
-    } catch (err) {
-      setStatus("Translation failed: " + (err && err.message ? err.message : String(err)), "error");
-    } finally {
-      translateButton.disabled = false;
-    }
-  }
-
-  function attachTranslateButton() {
-    if (!translateButton) return;
-    translateButton.addEventListener("click", () => {
-      void translateSite();
-    });
-  }
-
   // -- Save & keyboard ----------------------------------------------------
 
   function attachSaveButton() {
@@ -5993,16 +5931,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
-      attachTranslateButton();
       attachCoEdit();
       setStatus("Ready", "ok");
 
-      // Proactive edit-token refresh — only relevant when the editor runs on a
-      // published-site subdomain (API_BASE === "/__api") where auth is via a
-      // 4-hour edit token cookie. Dashboard editors use Clerk sessions and do
-      // not need this. The refresh fires ~15 min before expiry and reschedules
-      // itself indefinitely, so long editing sessions never hit a 401.
-      if (API_BASE === "/__api") {
+      // Session keepalive — prevents auth expiry during long editing sessions.
+      // Dashboard editors (Clerk sessions) get a periodic heartbeat that keeps
+      // the Clerk cookie alive. Published-site editors (edit tokens) get a
+      // proactive token refresh ~15 min before expiry.
+      if (API_BASE === "/api") {
+        setInterval(function() {
+          fetch(SITE_BASE, { method: "HEAD" }).catch(function() {});
+        }, 5 * 60 * 1000);
+      } else if (API_BASE === "/__api") {
         var REFRESH_BUFFER = 900; // seconds before expiry to refresh
         function scheduleTokenRefresh(ttl) {
           var delay = Math.max((ttl - REFRESH_BUFFER) * 1000, 60000);
