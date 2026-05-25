@@ -28,21 +28,34 @@ import { GeminiAdapter } from '../../agent/llm-gemini';
 import type { LlmAssistantToolCall, LlmMessage, LlmTool } from '../../agent/llm';
 import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
+import { generateDesignSectionImages, patchAssetIds } from '../../agent/design-section-images';
+import { resolveDesignSection } from '../../canvas/layout/engine';
+import type { DesignSectionInput, LayoutNode, ElementNode } from '../../canvas/layout/tree';
+import { isElementNode, COLOR_TOKENS, FONT_TOKENS, GAP_TOKENS, SPLIT_RATIOS, GRID_COLUMNS } from '../../canvas/layout/tree';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import type { RecipeFactoryInput } from '../../canvas/recipes';
 import {
+  ACTION_VARIANTS,
   AGENT_RECIPE_IDS,
+  BACKGROUND_EFFECTS,
+  ELEMENT_TYPES,
   INLINE_MARK_TYPES,
   MEDIA_KINDS,
+  MOTION_PRESETS,
+  SHAPE_VARIANTS,
+  SURFACE_VARIANTS,
   type AgentRecipeId,
+  type BackgroundEffect,
   type CanvasSiteState,
   type InlineMark,
   type InlineRun,
   type MediaKind,
+  type MotionPreset,
   type StyleKit,
 } from '../../canvas/schema';
+import { getStyleKitPreset } from '../../canvas/style-kits';
 import { validateCanvasSiteState, isAllowedHref } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
@@ -269,6 +282,127 @@ function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResult {
   };
 }
 
+function parseLayoutTree(value: unknown, depth: number): LayoutNode | ElementNode | string {
+  if (depth > 6) return 'layout tree exceeds maximum nesting depth (6)';
+  if (!isRecord(value)) return 'layout node must be an object';
+
+  if ('element' in value) {
+    const el = value.element;
+    if (!isRecord(el)) return 'element must be an object';
+    if (!isOneOf(el.type, ['text', 'media', 'action', 'shape', 'container'] as const)) {
+      return `element.type must be text|media|action|shape|container (got ${JSON.stringify(el.type)})`;
+    }
+    const node: ElementNode = {
+      element: { type: el.type },
+    };
+    if (el.text !== undefined && isRecord(el.text)) {
+      if (typeof el.text.content !== 'string' || el.text.content.length === 0) {
+        return 'element.text.content must be a non-empty string';
+      }
+      node.element.text = {
+        content: el.text.content,
+        role: isOneOf(el.text.role, ['heading', 'body', 'label'] as const) ? el.text.role : 'body',
+        color: isOneOf(el.text.color, COLOR_TOKENS) ? el.text.color : 'text',
+        font: isOneOf(el.text.font, FONT_TOKENS) ? el.text.font : 'body',
+        size: typeof el.text.size === 'number' ? el.text.size : 16,
+      };
+    }
+    if (el.media !== undefined && isRecord(el.media)) {
+      node.element.media = {
+        imagePrompt: typeof el.media.imagePrompt === 'string' ? el.media.imagePrompt : '',
+        fit: isOneOf(el.media.fit, ['cover', 'contain'] as const) ? el.media.fit : 'cover',
+      };
+    }
+    if (el.action !== undefined && isRecord(el.action)) {
+      node.element.action = {
+        label: typeof el.action.label === 'string' ? el.action.label : 'Click',
+        variant: isOneOf(el.action.variant, ACTION_VARIANTS) ? el.action.variant : 'solid',
+        href: typeof el.action.href === 'string' ? el.action.href : '#',
+      };
+    }
+    if (el.shape !== undefined && isRecord(el.shape)) {
+      node.element.shape = {
+        variant: isOneOf(el.shape.variant, SHAPE_VARIANTS) ? el.shape.variant : 'rect',
+      };
+    }
+    if (el.container !== undefined && isRecord(el.container)) {
+      node.element.container = {
+        variant: isOneOf(el.container.variant, SURFACE_VARIANTS) ? el.container.variant : 'flat',
+        padding: typeof el.container.padding === 'number' ? el.container.padding : 24,
+      };
+    }
+    if (isOneOf(value.size, ['fill', 'hug'] as const)) {
+      node.size = value.size;
+    }
+    return node;
+  }
+
+  if (!isOneOf(value.type, ['stack', 'grid', 'split'] as const)) {
+    return `layout node type must be stack|grid|split (got ${JSON.stringify(value.type)})`;
+  }
+  if (!Array.isArray(value.children)) {
+    return 'layout node must have a children array';
+  }
+
+  const children: (LayoutNode | ElementNode)[] = [];
+  for (let i = 0; i < value.children.length; i++) {
+    const parsed = parseLayoutTree(value.children[i], depth + 1);
+    if (typeof parsed === 'string') return `children[${String(i)}]: ${parsed}`;
+    children.push(parsed);
+  }
+
+  const node: LayoutNode = { type: value.type, children };
+  if (isOneOf(value.direction, ['row', 'column'] as const)) node.direction = value.direction;
+  if (isOneOf(value.gap, GAP_TOKENS)) node.gap = value.gap;
+  if (isOneOf(value.align, ['start', 'center', 'end'] as const)) node.align = value.align;
+  if (typeof value.columns === 'number' && (GRID_COLUMNS as readonly number[]).includes(value.columns)) {
+    node.columns = value.columns as 2 | 3 | 4;
+  }
+  if (isOneOf(value.ratio, SPLIT_RATIOS)) node.ratio = value.ratio;
+
+  return node;
+}
+
+function parseDesignSection(args: unknown): ParseResult {
+  if (!isRecord(args)) return { ok: false, error: 'designSection arguments must be an object' };
+  if (typeof args.sectionName !== 'string' || args.sectionName.length === 0) {
+    return { ok: false, error: 'designSection.sectionName must be a non-empty string' };
+  }
+  if (args.layout === undefined || !isRecord(args.layout)) {
+    return { ok: false, error: 'designSection.layout must be an object' };
+  }
+
+  const layoutParsed = parseLayoutTree(args.layout, 0);
+  if (typeof layoutParsed === 'string') {
+    return { ok: false, error: `designSection.layout: ${layoutParsed}` };
+  }
+  if ('element' in layoutParsed) {
+    return { ok: false, error: 'designSection.layout root must be a layout node, not an element' };
+  }
+
+  let afterSectionId: string | null = null;
+  if (typeof args.afterSectionId === 'string' && args.afterSectionId.length > 0) {
+    afterSectionId = args.afterSectionId;
+  }
+
+  const input: DesignSectionInput = {
+    sectionName: args.sectionName,
+    layout: layoutParsed,
+  };
+  if (typeof args.height === 'number') input.height = args.height;
+  if (isOneOf<BackgroundEffect>(args.backgroundEffect, BACKGROUND_EFFECTS)) {
+    input.backgroundEffect = args.backgroundEffect;
+  }
+  if (isOneOf<MotionPreset>(args.entrance, MOTION_PRESETS)) {
+    input.entrance = args.entrance;
+  }
+
+  return {
+    ok: true,
+    op: { kind: 'designSection', afterSectionId, input },
+  };
+}
+
 function translateToolCall(call: LlmAssistantToolCall, styleKit: StyleKit): ParseResult {
   switch (call.name) {
     case 'rewriteText':
@@ -277,6 +411,8 @@ function translateToolCall(call: LlmAssistantToolCall, styleKit: StyleKit): Pars
       return parseReplaceMedia(call.arguments);
     case 'createSection':
       return parseCreateSection(call.arguments, styleKit);
+    case 'designSection':
+      return parseDesignSection(call.arguments);
     default:
       return { ok: false, error: `unknown tool name: ${call.name}` };
   }
@@ -302,6 +438,17 @@ function parseApplyOp(value: unknown, styleKit: StyleKit): ParseResult {
       assetIds: isRecord(value.input) ? value.input.assetIds : undefined,
     };
     return parseCreateSection(flattened, styleKit);
+  }
+  if (value.kind === 'designSection') {
+    const flattened = {
+      sectionName: isRecord(value.input) ? value.input.sectionName : undefined,
+      layout: isRecord(value.input) ? value.input.layout : undefined,
+      height: isRecord(value.input) ? value.input.height : undefined,
+      backgroundEffect: isRecord(value.input) ? value.input.backgroundEffect : undefined,
+      entrance: isRecord(value.input) ? value.input.entrance : undefined,
+      afterSectionId: value.afterSectionId,
+    };
+    return parseDesignSection(flattened);
   }
   return { ok: false, error: `unknown op kind: ${JSON.stringify(value.kind)}` };
 }
@@ -422,7 +569,26 @@ function buildSystemPrompt(state: CanvasSiteState): string {
     'For replaceMedia: assetId must already exist as an uploaded asset on this site. The tool does not generate media.',
   );
   lines.push(
-    `For createSection: recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}]. Send a short brief.`,
+    `For createSection: recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}]. Send a short brief. Use this when a built-in recipe matches the Owner request — it is faster and more reliable than designSection.`,
+  );
+  lines.push(
+    'For designSection: describe the section structure as a semantic layout tree. Use stack (column or row), grid (2-4 columns), or split (ratio 1:1, 1:2, 2:1) nodes. ' +
+      'Each leaf is an element node with type + matching props (text, media, action, shape, container). ' +
+      'Colors use semantic tokens (accent, text, muted, bg, panel, emphasis). Fonts use kit slots (display, body, mono). ' +
+      'Containers with size="fill" become background panels spanning their parent layout node. ' +
+      'Media elements carry an imagePrompt describing the image to generate.',
+  );
+  lines.push(
+    'Example designSection layout for a pricing section: ' +
+      '{ "type": "stack", "direction": "column", "align": "center", "gap": "loose", "children": [' +
+      '{ "element": { "type": "text", "text": { "content": "Pricing", "role": "heading", "color": "text", "font": "display", "size": 48 } } }, ' +
+      '{ "type": "grid", "columns": 3, "gap": "normal", "children": [' +
+      '{ "type": "stack", "direction": "column", "gap": "tight", "children": [' +
+      '{ "element": { "type": "container", "container": { "variant": "outlined", "padding": 24 } }, "size": "fill" }, ' +
+      '{ "element": { "type": "text", "text": { "content": "Starter", "role": "heading", "color": "text", "font": "display", "size": 24 } } }, ' +
+      '{ "element": { "type": "text", "text": { "content": "$9/mo", "role": "heading", "color": "accent", "font": "display", "size": 36 } } }, ' +
+      '{ "element": { "type": "action", "action": { "label": "Get Started", "variant": "outline", "href": "#" } } }' +
+      '] } ] } ] }',
   );
   return lines.join('\n');
 }

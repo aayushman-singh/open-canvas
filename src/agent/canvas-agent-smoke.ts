@@ -13,7 +13,7 @@
 // without GEMINI_API_KEY / DATABASE_URL. The route shell is exercised by
 // review-smoke.ts.
 
-import { applyCanvasAgentOp, type CanvasAgentOp } from './canvas-ops.js';
+import { applyCanvasAgentOp, resolveDesignOp, type CanvasAgentOp } from './canvas-ops.js';
 import { CANVAS_AGENT_TOOLS } from './canvas-tools.js';
 import {
   RECIPE_REGISTRY,
@@ -28,6 +28,7 @@ import {
   type SectionRecipeId,
 } from '../canvas/schema.js';
 import { validateCanvasSiteState } from '../canvas/validate.js';
+import type { DesignSectionInput } from '../canvas/layout/tree.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -283,8 +284,9 @@ assert(insertUnknownAfterThrew, 'expected insertSection with unknown afterSectio
 
 const toolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
 assert(
-  JSON.stringify(toolNames) === JSON.stringify(['createSection', 'replaceMedia', 'rewriteText']),
-  `expected CANVAS_AGENT_TOOLS to expose [createSection, replaceMedia, rewriteText] (got [${toolNames.join(', ')}])`,
+  JSON.stringify(toolNames) ===
+    JSON.stringify(['createSection', 'designSection', 'replaceMedia', 'rewriteText']),
+  `expected CANVAS_AGENT_TOOLS to expose [createSection, designSection, replaceMedia, rewriteText] (got [${toolNames.join(', ')}])`,
 );
 
 const createSectionTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'createSection');
@@ -322,6 +324,274 @@ assert(
 assert(
   replaceTool !== undefined && replaceTool.description.includes('does NOT generate media bytes'),
   'expected replaceMedia description to flag that the tool does not generate media',
+);
+
+// designSection tool schema
+const designTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'designSection');
+assert(designTool !== undefined, 'designSection tool must exist');
+assert(
+  designTool?.parameters.properties?.layout !== undefined,
+  'designSection must have a layout parameter',
+);
+assert(
+  designTool?.parameters.properties?.sectionName !== undefined,
+  'designSection must have a sectionName parameter',
+);
+
+// ---------------------------------------------------------------------------
+// applyCanvasAgentOp — designSection op
+// ---------------------------------------------------------------------------
+
+// 4. designSection: layout engine produces a valid section.
+const designInput: DesignSectionInput = {
+  sectionName: 'Smoke Pricing',
+  height: 720,
+  backgroundEffect: 'grain',
+  entrance: 'fade-up',
+  layout: {
+    type: 'stack',
+    direction: 'column',
+    align: 'center',
+    gap: 'loose',
+    children: [
+      {
+        element: {
+          type: 'text',
+          text: {
+            content: 'Simple pricing',
+            role: 'heading',
+            color: 'text',
+            font: 'display',
+            size: 48,
+          },
+        },
+      },
+      {
+        type: 'grid',
+        columns: 3,
+        gap: 'normal',
+        children: [
+          {
+            type: 'stack',
+            direction: 'column',
+            gap: 'tight',
+            children: [
+              {
+                element: {
+                  type: 'container',
+                  container: { variant: 'outlined', padding: 24 },
+                },
+                size: 'fill',
+              },
+              {
+                element: {
+                  type: 'text',
+                  text: {
+                    content: 'Starter',
+                    role: 'heading',
+                    color: 'text',
+                    font: 'display',
+                    size: 24,
+                  },
+                },
+              },
+              {
+                element: {
+                  type: 'action',
+                  action: { label: 'Get Started', variant: 'outline', href: '#' },
+                },
+              },
+            ],
+          },
+          {
+            type: 'stack',
+            direction: 'column',
+            gap: 'tight',
+            children: [
+              {
+                element: {
+                  type: 'container',
+                  container: { variant: 'raised', padding: 24 },
+                },
+                size: 'fill',
+              },
+              {
+                element: {
+                  type: 'text',
+                  text: {
+                    content: 'Pro',
+                    role: 'heading',
+                    color: 'accent',
+                    font: 'display',
+                    size: 24,
+                  },
+                },
+              },
+              {
+                element: {
+                  type: 'action',
+                  action: { label: 'Go Pro', variant: 'solid', href: '#' },
+                },
+              },
+            ],
+          },
+          {
+            type: 'stack',
+            direction: 'column',
+            gap: 'tight',
+            children: [
+              {
+                element: {
+                  type: 'container',
+                  container: { variant: 'outlined', padding: 24 },
+                },
+                size: 'fill',
+              },
+              {
+                element: {
+                  type: 'text',
+                  text: {
+                    content: 'Enterprise',
+                    role: 'heading',
+                    color: 'text',
+                    font: 'display',
+                    size: 24,
+                  },
+                },
+              },
+              {
+                element: {
+                  type: 'action',
+                  action: { label: 'Contact us', variant: 'ghost', href: '#' },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+const designOp: CanvasAgentOp = {
+  kind: 'designSection',
+  afterSectionId: baseSection.id,
+  input: designInput,
+};
+const afterDesign = applyCanvasAgentOp(baseState, designOp);
+const designValidation = validateCanvasSiteState(afterDesign);
+assert(
+  designValidation.valid,
+  designValidation.valid
+    ? ''
+    : `designSection apply produced invalid state: ${designValidation.errors.join('; ')}`,
+);
+const designedPage = afterDesign.pages[0];
+assert(
+  designedPage !== undefined && designedPage.sections.length === 2,
+  'expected designSection to add exactly one section',
+);
+const designedSection = designedPage?.sections[1];
+assert(
+  designedSection?.recipeId === 'custom',
+  `expected designed section recipeId to be 'custom' (got ${String(designedSection?.recipeId)})`,
+);
+assert(
+  designedSection?.name === 'Smoke Pricing',
+  `expected designed section name to be 'Smoke Pricing'`,
+);
+assert(
+  designedSection !== undefined && designedSection.elements.length > 0,
+  'expected designed section to have elements',
+);
+
+// designSection with null afterSectionId → appended at end.
+const designAppendOp: CanvasAgentOp = {
+  kind: 'designSection',
+  afterSectionId: null,
+  input: {
+    sectionName: 'CTA',
+    layout: {
+      type: 'stack',
+      direction: 'column',
+      align: 'center',
+      children: [
+        {
+          element: {
+            type: 'text',
+            text: {
+              content: 'Ready?',
+              role: 'heading',
+              color: 'text',
+              font: 'display',
+              size: 48,
+            },
+          },
+        },
+      ],
+    },
+  },
+};
+const afterDesignAppend = applyCanvasAgentOp(baseState, designAppendOp);
+assert(
+  afterDesignAppend.pages[0]?.sections.length === 2 &&
+    afterDesignAppend.pages[0].sections[1]?.name === 'CTA',
+  'expected null afterSectionId to append the designed section',
+);
+
+// designSection with unknown afterSectionId → throws.
+let designUnknownAfterThrew = false;
+try {
+  applyCanvasAgentOp(baseState, {
+    kind: 'designSection',
+    afterSectionId: 'sec-not-here',
+    input: designInput,
+  });
+} catch (err) {
+  designUnknownAfterThrew = err instanceof Error && err.message.includes('sec-not-here');
+}
+assert(
+  designUnknownAfterThrew,
+  'expected designSection with unknown afterSectionId to throw',
+);
+
+// resolveDesignOp — returns section + imagePrompts without modifying state.
+const designWithImages: DesignSectionInput = {
+  sectionName: 'Image test',
+  layout: {
+    type: 'split',
+    ratio: '1:1',
+    children: [
+      {
+        element: {
+          type: 'text',
+          text: {
+            content: 'Hello',
+            role: 'heading',
+            color: 'text',
+            font: 'display',
+            size: 48,
+          },
+        },
+      },
+      {
+        element: {
+          type: 'media',
+          media: { imagePrompt: 'A workspace photo', fit: 'cover' },
+        },
+        size: 'fill',
+      },
+    ],
+  },
+};
+const resolveResult = resolveDesignOp(baseState, designWithImages);
+assert(
+  resolveResult.imagePrompts.size === 1,
+  `expected 1 image prompt, got ${String(resolveResult.imagePrompts.size)}`,
+);
+assert(
+  resolveResult.section.elements.length === 2,
+  `expected 2 elements in resolved section, got ${String(resolveResult.section.elements.length)}`,
 );
 
 console.log('[canvas-agent:smoke] OK');

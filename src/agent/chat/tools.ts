@@ -68,6 +68,7 @@ export const MUTATING_TOOL_NAMES = new Set<string>([
   'rewriteText',
   'replaceMedia',
   'createSection',
+  'designSection',
 ]);
 
 /** Tool names that are read-only; the orchestrator dispatches and feeds the result back into the model. */

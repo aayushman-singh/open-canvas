@@ -16,8 +16,11 @@
 // type mismatches, and unknown recipe ids all throw with a context-rich
 // message that the route turns into a 400 with the message body.
 
+import { resolveDesignSection } from '../canvas/layout/engine.js';
+import type { DesignSectionInput, DesignSectionResult } from '../canvas/layout/tree.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../canvas/recipes.js';
 import type { CanvasSiteState, InlineRun, MediaKind, SectionRecipeId } from '../canvas/schema.js';
+import { getStyleKitPreset } from '../canvas/style-kits.js';
 
 export type CanvasAgentOp =
   | { kind: 'rewriteText'; elementId: string; content: InlineRun[] }
@@ -33,6 +36,11 @@ export type CanvasAgentOp =
       afterSectionId: string | null;
       recipeId: SectionRecipeId;
       input: RecipeFactoryInput;
+    }
+  | {
+      kind: 'designSection';
+      afterSectionId: string | null;
+      input: DesignSectionInput;
     };
 
 /**
@@ -96,19 +104,53 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     throw new Error(`applyCanvasAgentOp(replaceMedia): media element not found: ${op.elementId}`);
   }
 
-  // insertSection — the factory authors the section so the LLM cannot smuggle
-  // a hand-rolled shape past the validator.
-  const section = createSectionFromRecipe(op.recipeId, op.input);
-  if (op.afterSectionId === null) {
-    page.sections.push(section);
+  if (op.kind === 'insertSection') {
+    const section = createSectionFromRecipe(op.recipeId, op.input);
+    if (op.afterSectionId === null) {
+      page.sections.push(section);
+      return next;
+    }
+    const idx = page.sections.findIndex((s) => s.id === op.afterSectionId);
+    if (idx < 0) {
+      throw new Error(
+        `applyCanvasAgentOp(insertSection): afterSectionId not found: ${op.afterSectionId}`,
+      );
+    }
+    page.sections.splice(idx + 1, 0, section);
     return next;
   }
-  const idx = page.sections.findIndex((s) => s.id === op.afterSectionId);
-  if (idx < 0) {
+
+  // designSection — layout engine resolves a semantic tree into positioned
+  // elements. The LLM describes structure; the engine computes geometry.
+  const preset = getStyleKitPreset(next.styleKit);
+  const pageWidth = page.width;
+  const result = resolveDesignSection(op.input, pageWidth, preset);
+  if (op.afterSectionId === null) {
+    page.sections.push(result.section);
+    return next;
+  }
+  const insertIdx = page.sections.findIndex((s) => s.id === op.afterSectionId);
+  if (insertIdx < 0) {
     throw new Error(
-      `applyCanvasAgentOp(insertSection): afterSectionId not found: ${op.afterSectionId}`,
+      `applyCanvasAgentOp(designSection): afterSectionId not found: ${op.afterSectionId}`,
     );
   }
-  page.sections.splice(idx + 1, 0, section);
+  page.sections.splice(insertIdx + 1, 0, result.section);
   return next;
+}
+
+/**
+ * Resolve a designSection input against the current site state WITHOUT
+ * applying it. The orchestrator uses this to get the resolved section +
+ * image prompts, generate images, patch assetIds, then show a preview.
+ * On accept the orchestrator inserts the already-resolved section.
+ */
+export function resolveDesignOp(
+  state: CanvasSiteState,
+  input: DesignSectionInput,
+): DesignSectionResult {
+  const page = state.pages[0];
+  if (!page) throw new Error('resolveDesignOp: state must have at least one page');
+  const preset = getStyleKitPreset(state.styleKit);
+  return resolveDesignSection(input, page.width, preset);
 }
