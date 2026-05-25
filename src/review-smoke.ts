@@ -1226,8 +1226,14 @@ try {
 const baseT7State: CanvasSiteState = structuredClone(starterTemplate.state);
 const baseT7Page = baseT7State.pages[0];
 if (!baseT7Page) throw new Error('starterTemplate must have at least one page');
-const baseT7Section = baseT7Page.sections[0];
-if (!baseT7Section) throw new Error('starterTemplate first page must have at least one section');
+const baseT7Section = baseT7Page.sections.find(
+  (section) =>
+    section.elements.some((e) => e.type === 'text') &&
+    section.elements.some((e) => e.type === 'media'),
+);
+if (!baseT7Section) {
+  throw new Error('starterTemplate first page must have a section with text and media elements');
+}
 const t7TextElement = baseT7Section.elements.find((e) => e.type === 'text');
 if (!t7TextElement) throw new Error('starterTemplate hero must have a text element');
 const t7MediaElement = baseT7Section.elements.find((e) => e.type === 'media');
