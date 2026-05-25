@@ -147,7 +147,8 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   // emits them, which is what assistive tech reads. Owner-side reorder tools
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
   const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
-  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}" data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${elementsHtml}</section>`;
+  const roleAttr = section.role && section.role !== 'body' ? ` data-section-role="${escapeAttr(section.role)}"` : '';
+  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${elementsHtml}</section>`;
 }
 
 function renderPage(page: CanvasPage, ctx: Omit<ElementRenderCtx, 'pageSlug'>): string {
