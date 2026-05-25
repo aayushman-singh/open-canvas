@@ -302,6 +302,7 @@ export interface CanvasSection {
   backgroundEffect?: BackgroundEffect;
   entrance?: MotionPreset;
   trigger?: { type: 'exit-intent' | 'delay' | 'scroll'; value?: number };
+  backgroundVideo?: string;
   elements: CanvasElement[];
 }
 

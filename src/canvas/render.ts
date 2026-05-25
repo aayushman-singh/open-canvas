@@ -155,7 +155,10 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   const triggerAttrs = section.trigger
     ? ` data-rev01-popup="true" data-rev01-trigger-type="${escapeAttr(section.trigger.type)}" data-rev01-trigger-value="${escapeAttr(String(section.trigger.value ?? ''))}"`
     : '';
-  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${elementsHtml}</section>`;
+  const bgVideoHtml = section.backgroundVideo
+    ? `<video autoplay loop muted playsinline aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none"><source src="${escapeAttr(`${ctx.assetBasePath}/${section.backgroundVideo}`)}" type="video/mp4"></video>`
+    : '';
+  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
 function renderPage(page: CanvasPage, ctx: Omit<ElementRenderCtx, 'pageSlug'>): string {

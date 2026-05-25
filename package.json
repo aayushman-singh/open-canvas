@@ -48,6 +48,7 @@
     "i18n:smoke": "bun run src/i18n/smoke.ts",
     "public-404:smoke": "bun run src/routes/public-404.smoke.ts",
     "wishlist:smoke": "bun run src/wishlist-smoke.ts",
+    "video-bg:smoke": "bun run src/canvas/video-bg.smoke.ts",
     "e2e": "npx playwright test",
     "e2e:headed": "npx playwright test --headed",
     "e2e:ui": "npx playwright test --ui"
