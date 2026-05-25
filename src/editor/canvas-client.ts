@@ -5996,6 +5996,38 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachTranslateButton();
       attachCoEdit();
       setStatus("Ready", "ok");
+
+      // Proactive edit-token refresh — only relevant when the editor runs on a
+      // published-site subdomain (API_BASE === "/__api") where auth is via a
+      // 4-hour edit token cookie. Dashboard editors use Clerk sessions and do
+      // not need this. The refresh fires ~15 min before expiry and reschedules
+      // itself indefinitely, so long editing sessions never hit a 401.
+      if (API_BASE === "/__api") {
+        var REFRESH_BUFFER = 900; // seconds before expiry to refresh
+        function scheduleTokenRefresh(ttl) {
+          var delay = Math.max((ttl - REFRESH_BUFFER) * 1000, 60000);
+          setTimeout(function() {
+            fetch(API_BASE + "/edit-token/refresh", { method: "POST" })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d && d.ok && d.ttl) scheduleTokenRefresh(d.ttl);
+              })
+              .catch(function() {
+                // Refresh failed — do nothing. The existing 401 detection in
+                // authFetch will handle it on the next real API call.
+              });
+          }, delay);
+        }
+        // Kick off the first refresh cycle. Call the endpoint immediately to
+        // learn the current TTL (and get a fresh token), then schedule based
+        // on the response.
+        fetch(API_BASE + "/edit-token/refresh", { method: "POST" })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d && d.ok && d.ttl) scheduleTokenRefresh(d.ttl);
+          })
+          .catch(function() {});
+      }
     } catch (err) {
       setStatus("Failed to load site: " + (err && err.message ? err.message : String(err)), "error");
     }

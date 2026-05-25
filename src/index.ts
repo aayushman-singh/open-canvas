@@ -53,6 +53,7 @@ import {
   customTemplatesAdmin,
 } from './routes/api/custom-templates';
 import { clerkAuth, editTokenAuth } from './auth/middleware';
+import editTokenRefreshRoute from './auth/refresh-route';
 import { requireAuth } from './auth/require-auth';
 import { db } from './db/client';
 import { customer, site } from './db/schema';
@@ -233,6 +234,7 @@ app.route('/api/on-site-edit', onSiteEditRoute);
 // auth context variables that clerkAuth()+requireAuth() would, so the
 // sub-apps' built-in clerkAuth() short-circuits (auth already set).
 app.use('/__api/*', editTokenAuth());
+app.route('/__api/edit-token', editTokenRefreshRoute);
 app.route('/__api/canvas', canvasApi);
 app.route('/__api/canvas-agent', canvasAgentApi);
 app.route('/__api/publish', publishApi);
