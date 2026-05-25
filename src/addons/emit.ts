@@ -5,10 +5,7 @@ import type { Db } from '../db/client';
 import { addonEntitlement, site, siteAddon } from '../db/schema';
 import { getAddon } from './registry';
 
-export async function emitAddonHeadScripts(
-  database: Db,
-  siteId: string,
-): Promise<string> {
+async function fetchEntitledSiteAddons(database: Db, siteId: string) {
   const rows = await database
     .select({
       addonId: siteAddon.addonId,
@@ -19,7 +16,7 @@ export async function emitAddonHeadScripts(
     .innerJoin(site, eq(siteAddon.siteId, site.id))
     .where(and(eq(siteAddon.siteId, siteId), eq(siteAddon.enabled, true)));
 
-  if (rows.length === 0) return '';
+  if (rows.length === 0) return [];
 
   const customerId = rows[0]!.customerId;
 
@@ -30,12 +27,38 @@ export async function emitAddonHeadScripts(
 
   const entitled = new Set(entitlements.map((e) => e.addonId));
 
+  return rows.filter((row) => entitled.has(row.addonId));
+}
+
+export async function emitAddonHeadScripts(
+  database: Db,
+  siteId: string,
+): Promise<string> {
+  const rows = await fetchEntitledSiteAddons(database, siteId);
+
   const parts: string[] = [];
   for (const row of rows) {
-    if (!entitled.has(row.addonId)) continue;
     const addon = getAddon(row.addonId);
     if (!addon) continue;
     const html = addon.emitHeadScripts(row.config);
+    if (html) parts.push(html);
+  }
+
+  return parts.join('\n');
+}
+
+export async function emitAddonBodyScripts(
+  database: Db,
+  siteId: string,
+): Promise<string> {
+  const rows = await fetchEntitledSiteAddons(database, siteId);
+
+  const parts: string[] = [];
+  for (const row of rows) {
+    const addon = getAddon(row.addonId);
+    if (!addon) continue;
+    if (!addon.emitBodyScripts) continue;
+    const html = addon.emitBodyScripts(row.config);
     if (html) parts.push(html);
   }
 

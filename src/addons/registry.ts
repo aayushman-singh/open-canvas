@@ -16,6 +16,7 @@ export interface AddonDefinition {
   description: string;
   configFields: AddonConfigField[];
   emitHeadScripts: (config: Record<string, string>) => string;
+  emitBodyScripts?: (config: Record<string, string>) => string;
 }
 
 function emitGoogleAnalytics(config: Record<string, string>): string {
@@ -52,7 +53,40 @@ const googleAnalytics: AddonDefinition = {
   emitHeadScripts: emitGoogleAnalytics,
 };
 
-export const allAddons = [googleAnalytics] as const satisfies readonly AddonDefinition[];
+function emitCustomHeadScripts(config: Record<string, string>): string {
+  return config['headScripts'] ?? '';
+}
+
+function emitCustomBodyScripts(config: Record<string, string>): string {
+  return config['bodyScripts'] ?? '';
+}
+
+const customScripts: AddonDefinition = {
+  id: 'addon_custom_scripts',
+  slug: 'custom-scripts',
+  name: 'Custom Scripts',
+  tagline: 'Inject third-party scripts like Intercom, Hotjar, or Meta Pixel.',
+  description:
+    'Paste any <script> or tracking snippet into your published site. ' +
+    'Head scripts load before the page renders; body scripts load after. ' +
+    'Use this for chat widgets, analytics, pixels, or any third-party integration.',
+  configFields: [
+    {
+      key: 'headScripts',
+      label: 'Head Scripts',
+      placeholder: '<script src="https://example.com/widget.js"></script>',
+    },
+    {
+      key: 'bodyScripts',
+      label: 'Body Scripts',
+      placeholder: '<script>console.log("loaded")</script>',
+    },
+  ],
+  emitHeadScripts: emitCustomHeadScripts,
+  emitBodyScripts: emitCustomBodyScripts,
+};
+
+export const allAddons = [googleAnalytics, customScripts] as const satisfies readonly AddonDefinition[];
 
 const addonsById = new Map(allAddons.map((a) => [a.id, a]));
 const addonsBySlug = new Map(allAddons.map((a) => [a.slug, a]));
