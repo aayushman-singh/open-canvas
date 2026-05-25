@@ -301,6 +301,7 @@ export interface CanvasSection {
   role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
   entrance?: MotionPreset;
+  trigger?: { type: 'exit-intent' | 'delay' | 'scroll'; value?: number };
   elements: CanvasElement[];
 }
 
