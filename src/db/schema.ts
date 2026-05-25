@@ -454,3 +454,64 @@ export const customTemplate = pgTable('custom_template', {
 
 export type CustomTemplate = typeof customTemplate.$inferSelect;
 export type NewCustomTemplate = typeof customTemplate.$inferInsert;
+
+// -- addonEntitlement (ADR 0009 — addon entitlement model) --------------------
+//
+// One row per (customer, addon) pair. Represents the fact that an Owner has
+// acquired an addon and may enable it on any of their sites. The `addonId`
+// matches an entry in the hardcoded addon registry (`src/addons/registry.ts`).
+// Rows are never cascade-deleted from site deletion — entitlements are
+// account-scoped.
+export const addonEntitlement = pgTable(
+  'addon_entitlement',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    addonId: text('addon_id').notNull(),
+    grantedAt: timestamp('granted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerAddonUnique: uniqueIndex('addon_entitlement_customer_addon_unique').on(
+      t.customerId,
+      t.addonId,
+    ),
+  }),
+);
+
+export type AddonEntitlement = typeof addonEntitlement.$inferSelect;
+export type NewAddonEntitlement = typeof addonEntitlement.$inferInsert;
+
+// -- siteAddon (ADR 0009 — addon entitlement model) --------------------------
+//
+// One row per (site, addon) pair. Stores per-site activation state and
+// configuration for an addon the Owner has acquired. The `config` JSONB
+// column holds addon-specific key-value pairs (e.g. `{ measurementId: "G-..." }`
+// for Google Analytics). Rows are NOT cascade-deleted when an entitlement is
+// removed — the config becomes inert until the entitlement is restored.
+// Rows ARE cascade-deleted when the site is deleted.
+export const siteAddon = pgTable(
+  'site_addon',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    addonId: text('addon_id').notNull(),
+    enabled: boolean('enabled').notNull().default(false),
+    config: jsonb('config').notNull().$type<Record<string, string>>().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    siteAddonUnique: uniqueIndex('site_addon_site_addon_unique').on(t.siteId, t.addonId),
+  }),
+);
+
+export type SiteAddon = typeof siteAddon.$inferSelect;
+export type NewSiteAddon = typeof siteAddon.$inferInsert;
