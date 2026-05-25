@@ -17,6 +17,8 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0005 | Custom domains via Cloudflare for SaaS Custom Hostnames | Accepted | [`docs/adr/0005-custom-domains.md`](0005-custom-domains.md) |
 | 0006 | Owner Asset storage backend: R2 originals + Cloudflare image transforms | Accepted | [`docs/adr/0006-asset-storage-backend.md`](0006-asset-storage-backend.md) |
 | 0007 | Yjs revival as canonical operation model for co-edit and version history | Accepted | [`docs/adr/0007-yjs-revival.md`](0007-yjs-revival.md) |
+| 0008 | Site import architecture | Accepted | [`docs/adr/0008-site-import-architecture.md`](0008-site-import-architecture.md) |
+| 0009 | Addon entitlement model: account-scoped purchase, site-scoped configuration | Accepted | [`docs/adr/0009-addon-entitlement-model.md`](0009-addon-entitlement-model.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

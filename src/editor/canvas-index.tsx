@@ -12,7 +12,7 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware';
+import { clerkAuth, resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
 import { requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
@@ -24,6 +24,8 @@ import { customer, site } from '../db/schema';
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_TEST_PUBLISHABLE_KEY?: string;
+  CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
 }
 
@@ -49,6 +51,7 @@ export interface EditorPageOptions {
   subdomain: string;
   styleKit: StyleKit;
   context?: 'dashboard' | 'public';
+  clerkPublishableKey?: string;
 }
 
 async function lookupOwnedSite(
@@ -79,7 +82,7 @@ async function lookupOwnedSite(
 }
 
 export function editorPageJsx(opts: EditorPageOptions) {
-  const { siteId, siteName, subdomain, styleKit, context = 'dashboard' } = opts;
+  const { siteId, siteName, subdomain, styleKit, context = 'dashboard', clerkPublishableKey } = opts;
   const apiBase = context === 'public' ? '/__api' : '/api';
   const inlineScript = canvasClientScript({ siteId, apiBase });
   const publicAddress = `${subdomain}.rev01.aayushman.dev`;
@@ -113,6 +116,19 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <meta name="color-scheme" content="dark" />
         <title>rev01 — editing {siteName}</title>
         <style>{raw(canvasEditorStyles)}</style>
+        {clerkPublishableKey && raw(`<script>
+(function(){
+  var pk = "${clerkPublishableKey}";
+  var raw = atob(pk.replace(/^pk_(test|live)_/, ""));
+  if (raw.endsWith("$")) raw = raw.slice(0, -1);
+  var s = document.createElement("script");
+  s.src = "https://" + raw + "/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+  s.crossOrigin = "anonymous";
+  s.async = true;
+  s.onload = function() { if (window.Clerk) window.Clerk.load(); };
+  document.head.appendChild(s);
+})();
+</script>`)}
       </head>
       <body>
         <main class="rev01-editor" data-style-kit={styleKit}>
@@ -122,6 +138,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <span class="spacer" />
             <button id="canvas-save" type="button">
               Save
+            </button>
+            <button id="canvas-translate" type="button">
+              Translate
             </button>
             <button id="canvas-publish" type="button">
               Publish
@@ -221,6 +240,13 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   >
                     Container
                   </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="chart"
+                  >
+                    Chart
+                  </button>
                 </div>
               </section>
               <section class="rev01-sidebar-group">
@@ -284,6 +310,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
     return c.text('site not found', 404);
   }
 
+  const { publishableKey } = resolveClerkKeys(c.env);
   return c.html(
     editorPageJsx({
       siteId: owned.id,
@@ -291,6 +318,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       subdomain: owned.subdomain,
       styleKit: owned.styleKit,
       context: 'dashboard',
+      clerkPublishableKey: publishableKey,
     }),
   );
 });

@@ -19,7 +19,7 @@ import { html, raw } from 'hono/html';
 import { createR2Client } from '../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
 import { collectReferencedAssetIds } from '../assets/site-assets';
-import type { ClerkAuthVariables } from '../auth/middleware';
+import { resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
 import {
   verifyEditToken,
   EDIT_TOKEN_COOKIE,
@@ -340,6 +340,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     subdomain: siteRow.subdomain,
     styleKit: siteRow.styleKit as EditorPageOptions['styleKit'],
     context: 'public',
+    clerkPublishableKey: resolveClerkKeys(c.env).publishableKey,
   };
   return c.html(editorPageJsx(opts));
 }

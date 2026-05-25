@@ -35,7 +35,7 @@ export async function listOwnerAssets(
   const lastUsedSubquery = db
     .select({
       ownerAssetId: slotHistory.ownerAssetId,
-      maxUsedAt: sql<Date>`max(${slotHistory.usedAt})`.as('max_used_at'),
+      maxUsedAt: sql<string>`max(${slotHistory.usedAt})`.as('max_used_at'),
     })
     .from(slotHistory)
     .groupBy(slotHistory.ownerAssetId)
@@ -71,6 +71,6 @@ export async function listOwnerAssets(
     height: row.height,
     byteSize: row.byteSize,
     createdAt: row.createdAt.toISOString(),
-    lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+    lastUsedAt: row.lastUsedAt ?? null,
   }));
 }

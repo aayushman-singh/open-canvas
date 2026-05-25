@@ -44,7 +44,10 @@
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",
     "chat:smoke": "bun run src/agent/chat/smoke.ts",
     "i18n:smoke": "bun run src/i18n/smoke.ts",
-    "wishlist:smoke": "bun run src/wishlist-smoke.ts"
+    "wishlist:smoke": "bun run src/wishlist-smoke.ts",
+    "e2e": "npx playwright test",
+    "e2e:headed": "npx playwright test --headed",
+    "e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "@clerk/backend": "^3.4.11",

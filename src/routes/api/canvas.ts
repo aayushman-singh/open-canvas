@@ -541,19 +541,24 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   const cfImageFetch: CfImageFetcher | null =
     typeof fetch === 'function' ? (url, options) => fetch(url, options as RequestInit) : null;
   const requestUrl = new URL(c.req.url);
-  const response = await readOwnerAsset(
-    {
-      db: shimDb,
-      r2,
-      cfImageFetch,
-      publicOrigin: `${requestUrl.protocol}//${requestUrl.host}`,
-    },
-    { addr: assetId, url: requestUrl },
-  );
-  if (!response) {
+  try {
+    const response = await readOwnerAsset(
+      {
+        db: shimDb,
+        r2,
+        cfImageFetch,
+        publicOrigin: `${requestUrl.protocol}//${requestUrl.host}`,
+      },
+      { addr: assetId, url: requestUrl },
+    );
+    if (!response) {
+      return c.json({ error: 'asset not found' }, 404);
+    }
+    return response;
+  } catch (error) {
+    console.error('[canvas/assets] legacy bridge failed:', error);
     return c.json({ error: 'asset not found' }, 404);
   }
-  return response;
 });
 
 canvasApi.post('/sites/:siteId/style-kit', async (c) => {

@@ -128,12 +128,35 @@ const cardStyles = `
     padding: 28px;
     box-shadow: 0 24px 80px rgba(0,0,0,0.6);
   }
+  .import-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .import-modal h2 {
     margin: 0 0 4px;
     font-size: 20px;
     font-weight: 600;
     color: var(--text);
   }
+  .import-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: rgba(255,255,255,0.06);
+    color: var(--muted);
+    border-radius: 6px;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+  .import-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
   .import-modal .import-sub {
     margin: 0 0 20px;
     font-size: 13px;
@@ -543,10 +566,18 @@ const importScript = raw(`<script>
     overlay.setAttribute('data-open', 'false');
   }
 
+  var closeBtn = document.getElementById('import-close');
+
   openBtn.addEventListener('click', openModal);
   cancelBtn.addEventListener('click', closeModal);
+  closeBtn.addEventListener('click', closeModal);
+  var overlayMouseDown = false;
+  overlay.addEventListener('mousedown', function(e) {
+    overlayMouseDown = e.target === overlay;
+  });
   overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) closeModal();
+    if (e.target === overlay && overlayMouseDown) closeModal();
+    overlayMouseDown = false;
   });
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && overlay.getAttribute('data-open') === 'true') closeModal();
@@ -909,8 +940,13 @@ dashboard.get('/', async (c) => {
 
       <div class="import-modal-overlay" id="import-overlay" data-open="false">
         <div class="import-modal">
-          <h2>Import a website</h2>
-          <p class="import-sub">Paste any public URL to import it as an editable site.</p>
+          <div class="import-modal-header">
+            <div>
+              <h2>Import a website</h2>
+              <p class="import-sub">Paste any public URL to import it as an editable site.</p>
+            </div>
+            <button type="button" class="import-close" id="import-close" aria-label="Close">&times;</button>
+          </div>
           <div class="import-field">
             <label for="import-url">URL to import</label>
             <input type="url" id="import-url" placeholder="https://example.com" required />

@@ -1265,8 +1265,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       { label: "Save", action: "save-to-library" },
       { label: "Del", action: "delete-section", danger: true },
     ];
-    void onlyInstance;
-    void hasInstance;
+    if (!hasInstance) {
+      buttons.splice(buttons.length - 1, 0, { label: "Sym", action: "convert-to-symbol" });
+    }
     for (const def of buttons) {
       const button = document.createElement("button");
       button.type = "button";
@@ -4200,6 +4201,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       state = body.editableState;
+      if (state && !Array.isArray(state.symbols)) state.symbols = [];
       selectedSectionId = null;
       selectedElementId = null;
       if (mainEl && state && state.styleKit) {
@@ -5187,6 +5189,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       state = body.editableState;
+      if (state && !Array.isArray(state.symbols)) state.symbols = [];
       selectedSectionId = null;
       selectedElementId = null;
       pendingImport = null;
@@ -5337,6 +5340,68 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!publishButton) return;
     publishButton.addEventListener("click", () => {
       void publishSite();
+    });
+  }
+
+  // -- Translate (i18n) ----------------------------------------------------
+
+  const translateButton = document.getElementById("canvas-translate");
+
+  async function translateSite() {
+    if (!translateButton) return;
+    const lang = await openSelectModal({
+      title: "Translate site",
+      label: "Target language",
+      options: [
+        { value: "es", label: "Spanish" },
+        { value: "fr", label: "French" },
+        { value: "de", label: "German" },
+        { value: "pt", label: "Portuguese" },
+        { value: "ja", label: "Japanese" },
+        { value: "zh", label: "Chinese (Simplified)" },
+        { value: "ar", label: "Arabic" },
+        { value: "hi", label: "Hindi" },
+        { value: "ko", label: "Korean" },
+        { value: "it", label: "Italian" },
+      ],
+      defaultValue: "es",
+    });
+    if (!lang) return;
+    translateButton.disabled = true;
+    try {
+      const saved = await flushPendingSave();
+      if (!saved) return;
+      setStatus("Translating to " + lang + "...");
+      const response = await authFetch(API_BASE + "/sites/" + SITE_ID + "/translate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ targetLocale: lang }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        const detail = (body && body.error) || response.statusText;
+        setStatus("Translation failed: " + detail, "error");
+        return;
+      }
+      const body = await response.json();
+      if (body && body.state) {
+        state = body.state;
+        if (state && !Array.isArray(state.symbols)) state.symbols = [];
+        renderAll();
+        scheduleSave();
+        setStatus("Translated to " + lang, "ok");
+      }
+    } catch (err) {
+      setStatus("Translation failed: " + (err && err.message ? err.message : String(err)), "error");
+    } finally {
+      translateButton.disabled = false;
+    }
+  }
+
+  function attachTranslateButton() {
+    if (!translateButton) return;
+    translateButton.addEventListener("click", () => {
+      void translateSite();
     });
   }
 
@@ -5892,6 +5957,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       const body = await response.json();
       state = body.editableState;
+      if (state && !Array.isArray(state.symbols)) state.symbols = [];
       if (mainEl && state && state.styleKit) {
         mainEl.setAttribute("data-style-kit", state.styleKit);
       }
@@ -5927,6 +5993,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
+      attachTranslateButton();
       attachCoEdit();
       setStatus("Ready", "ok");
     } catch (err) {

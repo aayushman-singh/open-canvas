@@ -38,6 +38,7 @@ import sitemapRouter from './seo/sitemap/route';
 // Wave 5 routers wired by main thread after parallel-agent merge.
 import fontsRouter from './fonts/route';
 import chatApi from './agent/chat/route';
+import translateApi from './i18n/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
 // Section library + custom template routes
 import {
@@ -212,6 +213,7 @@ app.route('/', fontsRouter);
 // /api/sites so the inner routes become /api/sites/:siteId/chat and
 // /api/sites/:siteId/chat/stream.
 app.route('/api/sites', chatApi);
+app.route('/api/sites', translateApi);
 app.route('/dashboard', chatPanelRoute);
 // On-site editor auth popup — main domain endpoint that sets the edit token
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.

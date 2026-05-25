@@ -235,10 +235,18 @@ export function clerkAuth() {
       return new Response(null, { status, headers: requestState.headers });
     }
 
-    // Forward any Set-Cookie / Clerk-* headers Clerk attached to the response
-    // (used by the SDK to refresh the session cookie when it's nearing expiry).
+    // Forward any Clerk-* headers Clerk attached to the response. Set-Cookie
+    // headers are forwarded individually via getSetCookie() because
+    // Headers.entries() merges them into one comma-separated value, which
+    // corrupts cookies and breaks Clerk's session-token refresh cycle.
     for (const [key, value] of requestState.headers.entries()) {
+      if (key === 'set-cookie') continue;
       c.header(key, value, { append: true });
+    }
+    const getSetCookie = (requestState.headers as Headers & { getSetCookie(): string[] })
+      .getSetCookie;
+    for (const cookie of getSetCookie.call(requestState.headers)) {
+      c.header('set-cookie', cookie, { append: true });
     }
 
     if (!requestState.isAuthenticated) {

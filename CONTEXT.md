@@ -181,6 +181,38 @@ _Avoid_: Primary color, theme color, dominant color
 - A **Site Import** downloads external assets and stores them as **Owner Assets**
 - A **Site Import** replaces source animations with the nearest **Motion Preset**
 
+**Addon**:
+A purchasable capability that can be enabled per-site after an Owner acquires it. Each addon has its own integration logic that determines how it affects the Published Site.
+_Avoid_: Plugin, extension, module, feature flag
+
+**Addon Entitlement**:
+The fact that an Owner has acquired an Addon, granting them the right to enable it on any of their sites.
+_Avoid_: License, subscription, purchase record
+
+**Site Addon**:
+The per-site activation and configuration of an acquired Addon. Only meaningful when the Owner holds the corresponding Addon Entitlement.
+_Avoid_: Site plugin, site integration, site feature
+
+**Addon Registry**:
+The curated catalog of available Addons defined in code. Each entry declares the addon's identity, its configuration shape, and its integration logic.
+_Avoid_: Marketplace, store, addon database
+
+**Addon Shop**:
+The dashboard tab where an Owner browses the Addon Registry and acquires Addon Entitlements.
+_Avoid_: Marketplace, store, catalog page
+
+## Relationships (Addons)
+
+- An **Addon Registry** lists all available **Addons**
+- An **Owner** acquires an **Addon** through the **Addon Shop**, creating an **Addon Entitlement**
+- An **Addon Entitlement** belongs to one **Owner** and one **Addon**
+- An **Owner** may hold at most one **Addon Entitlement** per **Addon**
+- A **Site Addon** belongs to one **Editable Site** and one **Addon**
+- A **Site Addon** is only valid when the site's **Owner** holds the corresponding **Addon Entitlement**
+- A **Site Addon** carries per-site configuration (e.g. a Measurement ID for Google Analytics)
+- A **Site Addon** affects the **Published Site** only after a publish
+- Removing an **Addon Entitlement** does not cascade-delete **Site Addons** — it disables their effect at render time
+
 ## Flagged ambiguities
 
 - "subdomain" was used as one possible form of **Published Address**. The product concept is **Published Address**; subdomain routing is only one way to provide it.

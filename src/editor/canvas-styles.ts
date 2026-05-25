@@ -406,7 +406,7 @@ body[data-placement-active="true"] .rev01-section-slot {
   background:
     radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
     linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
-  margin-left: 248px;
+  margin-left: 268px;
   margin-right: 320px;
   padding: 32px;
   padding-bottom: 60px;

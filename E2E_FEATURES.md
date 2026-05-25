@@ -1,0 +1,733 @@
+# E2E Feature List — rev01 (Playwright)
+
+Exhaustive inventory of testable features for end-to-end coverage.
+
+**Status key:** PASS = automated and green, FAIL = automated/observed failure, `—` = not yet automated.
+
+---
+
+## Gaps & Failures Found via MCP Browser Exploration
+
+| # | Area | Finding | Severity |
+|---|------|---------|----------|
+| G1 | Editor console | Clerk publishableKey error on editor page load — client-side `@clerk/clerk-js` receives empty key | warning |
+| G2 | Editor console | 500 on legacy asset bridge `/api/canvas/sites/:id/assets/:assetId` — R2 asset missing | error |
+| G3 | Sidebar Add panel | No "Chart" button in sidebar — only available in section toolbar (+📊) | discrepancy |
+| G4 | Section toolbar | No "Sym" (convert to symbol) button visible in section toolbar | discrepancy |
+| G5 | Templates page | 5 templates (Starter Canvas, Launch Page, Enterprise Scale, Studio Portfolio, Local Business) — spec said 3 seed names | outdated-spec |
+| G6 | Dashboard card | Expanded card backdrop intercepts all clicks until Escape pressed — potential UX trap | minor |
+| G7 | Editor topbar | No "Translate" button visible (FLOWS.md line 37 mentions it) | discrepancy |
+| G8 | Sidebar overlap | Sidebar covers first section elements at 100% zoom — user must toggle sidebar to select leftmost elements | UX |
+| G9 | Editor boot | `state.symbols` not iterable when site predates symbols feature — crash on boot | **fixed** |
+| G10 | Template previews | Iframe thumbnails on templates page garbled — positioned elements overlap at preview scale | cosmetic |
+| G11 | Clerk handshake | Style kit switch during Clerk session refresh causes full page reload → 401 → empty canvas | session-race |
+
+---
+
+## 1. Landing Page
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 1.1 | Page load + title | Landing page renders at `/` with correct `<title>` and meta description | PASS |
+| 1.2 | Hero panels | 3-panel mockup (editor, preview, agent) renders correctly | PASS |
+| 1.3 | Tagline heading | h1 contains "multiplayer site builder with an agent at the cursor." | PASS |
+| 1.4 | Differentiator cards | 3 feature cards with nums 01/02/03 and correct headings | PASS |
+| 1.5 | Feature card headings | Exact heading text for all 3 cards matches spec | PASS |
+| 1.6 | Stat line counters | Runtime section shows LOC, demo edit ops, demo agent ops, published sites | PASS |
+| 1.7 | Footer rendering | Footer has links, license: MIT, "Ready to build?" CTA | PASS |
+| 1.8 | Status bar | Brand name "rev01", docs link, github link render in header | PASS |
+| 1.9 | Start building CTA | Links to /dashboard | PASS |
+| 1.10 | Launch dashboard nav | Header button links to /dashboard | PASS |
+| 1.11 | View source button | Links to GitHub repo | PASS |
+| 1.12 | No console errors | Zero console errors on full page load | PASS |
+| 1.13 | Dark color scheme | Meta color-scheme is "dark" | PASS |
+| 1.14 | Footer CTA | Footer "Launch dashboard" links to /dashboard | PASS |
+| 1.15 | Responsive layout | Landing page is mobile-responsive | — |
+
+## 1b. Health & Favicon Endpoints
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 1b.1 | Health endpoint | `GET /health` returns `{ok: true, ts: <number>}` | PASS |
+| 1b.2 | Favicon SVG | `GET /favicon.ico` returns SVG with "r1" text | PASS |
+| 1b.3 | Favicon cache | Cache-Control header is `public, max-age=86400` | PASS |
+
+---
+
+## 2. Authentication & Authorization
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 2.1 | Clerk sign-up | New user can sign up via Clerk OAuth | — |
+| 2.2 | Clerk sign-in | Existing user can sign in | — |
+| 2.3 | Session persistence | Authenticated session persists across page reload | — |
+| 2.4 | Auth redirect (dashboard) | Unauthenticated `/dashboard` access redirects to Clerk sign-in | PASS |
+| 2.5 | Auth redirect (editor) | Unauthenticated editor page redirects to sign-in | PASS |
+| 2.6 | Auth redirect (templates) | Unauthenticated templates page redirects to sign-in | PASS |
+| 2.7 | API 401 (sites) | Unauthenticated `GET /api/sites` returns 401 JSON | PASS |
+| 2.8 | API 401 (canvas) | Unauthenticated canvas API returns 401 | PASS |
+| 2.9 | API 401 (publish) | Unauthenticated publish API returns 401 | PASS |
+| 2.10 | API 401 (owner assets) | Unauthenticated owner assets API returns 401 | PASS |
+| 2.11 | API 401 (custom templates) | Unauthenticated template creation returns 401 | PASS |
+| 2.12 | API 401 (collaborators) | Unauthenticated collaborators API returns 401 | PASS |
+| 2.13 | API 401 (version history) | Unauthenticated snapshots API returns 401 | PASS |
+| 2.14 | API 401 (custom domains) | Unauthenticated domains API returns 401 | PASS |
+| 2.15 | API 401 (password admin) | Unauthenticated password admin API returns 401 | PASS |
+| 2.16 | API 401 (chat) | Unauthenticated chat API returns 401 | PASS |
+| 2.17 | API 401 (symbols) | Unauthenticated symbols API returns 401 | PASS |
+| 2.18 | API 401 (fonts) | Unauthenticated fonts API returns 401 | PASS |
+| 2.19 | API 401 (import) | Unauthenticated import API returns 401 | PASS |
+| 2.20 | API 401 (library sections) | Unauthenticated library sections API returns 401 | PASS |
+| 2.21 | API 401 (on-site-edit) | Unauthenticated on-site-edit API returns 401 | PASS |
+| 2.22 | Edit token missing | `/__api/*` without edit token cookie returns 401 | PASS |
+| 2.23 | Edit token expiry | Expired edit token (4hr TTL) forces re-auth | — |
+| 2.24 | Session expiration | 401 response locks editor UI and reloads | — |
+| 2.25 | Admin gate | Non-admin users blocked from admin endpoints | — |
+| 2.26 | Collaborator invite token | Valid invite token allows acceptance | — |
+| 2.27 | Invalid invite token | Invalid/expired invite token rejected | — |
+
+---
+
+## 3. Dashboard — Site Management
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 3.1 | Dashboard load | `/dashboard` shows site list with thumbnails | PASS (MCP) |
+| 3.2 | Empty state | New user sees empty state with create CTA | — |
+| 3.3 | Create site from template | Pick template seed → new site appears in list | — |
+| 3.4 | Template picker grid | `/dashboard/templates` shows all available templates | PASS (MCP) |
+| 3.5 | Site card actions | Rename, delete from site card context menu | — |
+| 3.6 | Delete site | Confirm dialog → site removed from list | — |
+| 3.7 | Navigate to editor | Click site card → opens canvas editor | — |
+| 3.8 | Site thumbnails | Thumbnail previews render for each site | PASS (MCP) |
+| 3.9 | Multiple sites | User can create and manage multiple sites | — |
+| 3.10 | Subdomain uniqueness | Duplicate subdomain rejected on create | — |
+
+---
+
+## 4. Dashboard — Site Settings
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 4.1 | Site name edit | Change site name persists | — |
+| 4.2 | Subdomain edit | Change subdomain persists and validates uniqueness | — |
+| 4.3 | Password protection enable | Toggle password gate on, set password | — |
+| 4.4 | Password protection disable | Disable password gate removes protection | — |
+| 4.5 | Password update | Update existing password | — |
+| 4.6 | Style kit selection | Choose between charcoal, orange-editorial, blue-saas, green-organic | — |
+| 4.7 | Custom theme | Create custom theme from seed color | — |
+
+---
+
+## 5. Dashboard — Page Settings (SEO)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 5.1 | Page title edit | Set/update page title | — |
+| 5.2 | Meta description edit | Set/update meta description | — |
+| 5.3 | OG image selection | Set/update Open Graph image | — |
+| 5.4 | Canonical URL | Set canonical URL | — |
+| 5.5 | Page slug edit | Change page slug | — |
+
+---
+
+## 6. Dashboard — Navigation Editor
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 6.1 | Nav editor load | Navigation editor page renders | — |
+| 6.2 | Layout selection | Switch between left-center-right, left-right | — |
+| 6.3 | Sticky toggle | Enable/disable sticky navigation | — |
+| 6.4 | Add internal link | Add link with label pointing to internal page slug | — |
+| 6.5 | Add external link | Add link with label pointing to external URL | — |
+| 6.6 | Reorder links | Drag/reorder navigation links | — |
+| 6.7 | Remove link | Delete a navigation link | — |
+| 6.8 | Logo assignment | Set/change logo asset for nav | — |
+| 6.9 | Save navigation | Persist navigation changes | — |
+
+---
+
+## 7. Dashboard — Forms Inbox
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 7.1 | Inbox load | Forms inbox renders with submission table | — |
+| 7.2 | Submission list | All form submissions display with payload data | — |
+| 7.3 | CSV export | Download submissions as CSV file | — |
+| 7.4 | Delete submission | Remove individual form submission | — |
+| 7.5 | Empty state | No submissions shows appropriate message | — |
+
+---
+
+## 8. Dashboard — Custom Domains
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 8.1 | Domain list | Show registered custom domains with status | — |
+| 8.2 | Register domain | Add new custom hostname | — |
+| 8.3 | Domain status badges | Pending/verifying/active/failed status display | — |
+| 8.4 | Delete domain | Remove custom domain | — |
+| 8.5 | DNS instructions | Show required DNS records for verification | — |
+
+---
+
+## 9. Dashboard — Version History
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 9.1 | Version timeline | List of published snapshots with timestamps | — |
+| 9.2 | Snapshot preview | Preview a historical version | — |
+| 9.3 | Restore snapshot | Restore site to previous version | — |
+| 9.4 | Version labels | Snapshots show reason (publish/manual) | — |
+
+---
+
+## 10. Dashboard — Accessibility Report
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 10.1 | A11y report load | Report page renders with severity-grouped issues | — |
+| 10.2 | Issue categories | Contrast, alt text, form labels, heading order | — |
+| 10.3 | Severity levels | Critical/warning/info grouping | — |
+| 10.4 | Run audit | Trigger new accessibility audit | — |
+
+---
+
+## 11. Dashboard — Collaborators
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 11.1 | Collaborator list | Show invited/accepted collaborators | — |
+| 11.2 | Invite by email | Send collaborator invitation | — |
+| 11.3 | Role assignment | Assign editor or viewer role | — |
+| 11.4 | Remove collaborator | Revoke access | — |
+| 11.5 | Accept invitation | Invited user accepts and gains access | — |
+| 11.6 | Duplicate invite | Re-inviting same email handled gracefully | — |
+
+---
+
+## 12. Dashboard — AI Chat Panel
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 12.1 | Chat panel open | Chat panel UI renders | — |
+| 12.2 | Send message | User types and sends a message | — |
+| 12.3 | AI response | AI response streams and displays | — |
+| 12.4 | Multi-turn conversation | Context maintained across messages | — |
+| 12.5 | Preview cards | AI suggestions show preview cards | — |
+| 12.6 | Chat session persistence | Chat history survives page reload | — |
+
+---
+
+## 13. Canvas Editor — Core Layout
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 13.1 | Editor load | Canvas editor renders with topbar, sidebar, canvas, inspector, status | PASS (MCP) |
+| 13.2 | Site state load | Editable state fetched and rendered on canvas | PASS (MCP) |
+| 13.3 | Topbar buttons | Save, Publish, Save-as-Template buttons visible | PASS (MCP) |
+| 13.4 | Sidebar tabs | Add tab and Sections tab functional | PASS (MCP) |
+| 13.5 | Inspector panel | Right panel updates based on selection | PASS (MCP) |
+| 13.6 | Status line | Footer shows ready/saving/error status | — |
+| 13.7 | Presence badge | Live collaborator count in topbar | — |
+
+---
+
+## 14. Canvas Editor — Viewport & Zoom
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 14.1 | Zoom in | Ctrl+Wheel up increases zoom | — |
+| 14.2 | Zoom out | Ctrl+Wheel down decreases zoom | — |
+| 14.3 | Zoom to fit | Fit button scales canvas to viewport | PASS (MCP) |
+| 14.4 | Zoom 100% | 100% button resets to actual size | — |
+| 14.5 | Zoom limits | Zoom clamped between 25% and 200% | — |
+| 14.6 | Zoom readout | Current zoom percentage displayed | PASS (MCP) |
+| 14.7 | Pan mode | Space key activates pan (click+drag to scroll) | — |
+| 14.8 | Select mode | V key returns to select mode | — |
+| 14.9 | Temporary pan | Hold Space in select mode → release returns | — |
+
+---
+
+## 15. Canvas Editor — Element Creation
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 15.1 | Add text (sidebar) | Click Text in Add panel → text element appears | PASS (MCP) |
+| 15.2 | Add image (sidebar) | Click Image → media element (image) appears | PASS (MCP) |
+| 15.3 | Add video (sidebar) | Click Video → media element (video) appears | PASS (MCP) |
+| 15.4 | Add button (sidebar) | Click Button → action element appears | PASS (MCP) |
+| 15.5 | Add shape (sidebar) | Click Shape → shape element appears | PASS (MCP) |
+| 15.6 | Add container (sidebar) | Click Container → container element appears | PASS (MCP) |
+| 15.7 | Add chart (sidebar) | Click Chart → chart element appears | FAIL — Chart button absent from sidebar Add panel; only in section toolbar |
+| 15.8 | Add text (section toolbar) | +T button on section → text in that section | PASS (MCP) |
+| 15.9 | Add image (section toolbar) | +Img button on section → image in that section | PASS (MCP) |
+| 15.10 | Add video (section toolbar) | +Vid button on section → video in that section | PASS (MCP) |
+| 15.11 | Add button (section toolbar) | +Btn button on section → action in that section | PASS (MCP) |
+| 15.12 | Add shape (section toolbar) | +◇ button on section → shape in that section | PASS (MCP) |
+| 15.13 | Add container (section toolbar) | +▢ button on section → container in that section | PASS (MCP) |
+| 15.14 | Add chart (section toolbar) | +📊 button on section → chart in that section | PASS (MCP) |
+| 15.15 | Add blank section | "Blank section" from sidebar Add panel | PASS (MCP) |
+
+---
+
+## 16. Canvas Editor — Element Selection & Manipulation
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 16.1 | Click to select | Click element → selected state (border highlight) | — |
+| 16.2 | Section selection | Click section grip → section selected | — |
+| 16.3 | Deselect | Click empty canvas area → nothing selected | — |
+| 16.4 | Drag element | Select + drag → repositions (updates box.x, box.y) | — |
+| 16.5 | Resize N handle | Drag north handle → changes height | — |
+| 16.6 | Resize S handle | Drag south handle → changes height | — |
+| 16.7 | Resize E handle | Drag east handle → changes width | — |
+| 16.8 | Resize W handle | Drag west handle → changes width | — |
+| 16.9 | Resize corner | Drag corner handle → changes both dimensions | — |
+| 16.10 | Bring to front | Context menu → element z-index becomes max | PASS (MCP) |
+| 16.11 | Send to back | Context menu → element z-index becomes min | PASS (MCP) |
+| 16.12 | Move forward | Context menu → z-index incremented | PASS (MCP) |
+| 16.13 | Move backward | Context menu → z-index decremented | PASS (MCP) |
+| 16.14 | Duplicate element | Context menu → clone offset +20px | — |
+| 16.15 | Delete element | Context menu → element removed | — |
+| 16.16 | Reading order up | Inspector → element moves up in array | PASS (MCP) |
+| 16.17 | Reading order down | Inspector → element moves down in array | PASS (MCP) |
+
+---
+
+## 17. Canvas Editor — Inline Text Editing
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 17.1 | Enter edit mode | Single click on text element → contenteditable | — |
+| 17.2 | Exit edit (Escape) | Escape key → exits edit, restores snapshot if unchanged | — |
+| 17.3 | Type text | Keyboard input appears in element | — |
+| 17.4 | Bold (Ctrl+B) | Select text → Ctrl+B → bold applied | — |
+| 17.5 | Italic (Ctrl+I) | Select text → Ctrl+I → italic applied | — |
+| 17.6 | Underline (Ctrl+U) | Select text → Ctrl+U → underline applied | — |
+| 17.7 | Strikethrough (Ctrl+Shift+X) | Select text → strikethrough applied | — |
+| 17.8 | Code mark | Mark toolbar → code button toggles inline code | — |
+| 17.9 | Highlight mark | Mark toolbar → highlight button toggles highlight | — |
+| 17.10 | Add link (Ctrl+K) | Opens link modal → sets href on selection | — |
+| 17.11 | Mark toolbar appears | Floating toolbar visible when text selected in edit mode | — |
+| 17.12 | Link hover popover | Hover inline link → shows Open/Edit/Unlink | — |
+| 17.13 | Unlink | Popover Unlink button removes link mark | — |
+| 17.14 | Edit link | Popover Edit button opens link modal | — |
+| 17.15 | Link validation | javascript: URLs rejected | — |
+| 17.16 | Empty text rejection | Submitting empty text shows error | — |
+| 17.17 | Serialization round-trip | Edited text → InlineRun[] → re-render matches | — |
+
+---
+
+## 18. Canvas Editor — Inspector (Element Properties)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 18.1 | Text: role | Change heading/body/label role | PASS (MCP) |
+| 18.2 | Text: font size | Adjust font size (12-96px) | PASS (MCP) |
+| 18.3 | Text: font weight | Select weight (400-700) | PASS (MCP) |
+| 18.4 | Text: alignment | Toggle left/center/right | PASS (MCP) |
+| 18.5 | Text: color pin | Set hex color override | — |
+| 18.6 | Text: AI rewrite | Trigger AI text rewrite prompt | — |
+| 18.7 | Media: upload image | Upload new image via file picker | — |
+| 18.8 | Media: upload video | Upload new video via file picker | — |
+| 18.9 | Media: alt text | Set/edit alt text | — |
+| 18.10 | Media: object fit | Toggle cover/contain | — |
+| 18.11 | Media: video autoplay | Toggle autoplay (forces muted) | — |
+| 18.12 | Media: video loop | Toggle loop | — |
+| 18.13 | Media: video controls | Toggle player controls | — |
+| 18.14 | Media: AI generate | Prompt-based image generation | — |
+| 18.15 | Media: slot history | Recent-in-slot picker shows MRU | — |
+| 18.16 | Media: gallery picker | Owner asset gallery for selection | — |
+| 18.17 | Action: label edit | Change button label text | — |
+| 18.18 | Action: href edit | Change button link target | — |
+| 18.19 | Action: variant | Switch solid/outline/ghost/pill/glass/brutalist/underline | — |
+| 18.20 | Shape: variant | Switch rect/pill/circle/line/badge/blob | — |
+| 18.21 | Container: variant | Switch flat/raised/glass/outlined/sticker/editorial-frame/soft-panel | — |
+| 18.22 | Chart: kind | Switch bar/line/pie/donut/area | — |
+| 18.23 | Chart: axis titles | Set X/Y axis labels | — |
+| 18.24 | Chart: legend toggle | Show/hide legend | — |
+| 18.25 | Chart: data grid | Edit values in spreadsheet UI | — |
+| 18.26 | Chart: add series | Add new data series | — |
+| 18.27 | Chart: remove series | Remove data series | — |
+| 18.28 | Chart: add category | Add new category | — |
+| 18.29 | Chart: remove category | Remove category | — |
+| 18.30 | Motion: preset | Select animation preset (fade-up, slide-left, etc.) | PASS (MCP) |
+| 18.31 | Motion: delay | Set animation delay (0-2000ms) | PASS (MCP) |
+
+---
+
+## 19. Canvas Editor — Sections
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 19.1 | Section toolbar visible | Toolbar at bottom of each section | — |
+| 19.2 | Duplicate section | Dup button → section cloned | PASS (MCP) |
+| 19.3 | Move section up | ↑ button → section moves up in page | PASS (MCP) |
+| 19.4 | Move section down | ↓ button → section moves down in page | PASS (MCP) |
+| 19.5 | Delete section | Del button (with confirmation) → removed | PASS (MCP) |
+| 19.6 | Save section to library | Save button → section stored in library | PASS (MCP) |
+| 19.7 | AI section creation | AI button → recipe picker → prompt → new section | PASS (MCP) |
+| 19.8 | Section grip handle | Left grip visible on hover | — |
+| 19.9 | Drag section (canvas) | Drag grip to reorder in canvas | — |
+| 19.10 | Drag section (film reel) | Drag within film reel to reorder | — |
+
+---
+
+## 20. Canvas Editor — Film Reel
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 20.1 | Toggle reel | Section grip click opens/closes film reel | — |
+| 20.2 | Tile view | Thumbnail view with section labels | — |
+| 20.3 | List view | Compact list with mini thumbnails | — |
+| 20.4 | View mode toggle | Switch between tile and list | — |
+| 20.5 | Insert button | "+" between sections inserts at index | — |
+| 20.6 | Drag reorder | Drag tiles/items to reorder | — |
+| 20.7 | Cross-zone drag | Drag from reel to canvas (and vice versa) | — |
+| 20.8 | Drop indicator | Visual line shows insertion point during drag | — |
+
+---
+
+## 21. Canvas Editor — Asset Management
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 21.1 | Image upload | File picker → Cropper.js modal → upload | — |
+| 21.2 | Image crop | Pan + zoom in crop modal → confirm | — |
+| 21.3 | Video upload | File picker → extract poster → upload both | — |
+| 21.4 | AI image generation | Prompt → Replicate flux-schnell → preview → apply | — |
+| 21.5 | Asset gallery | Grid of owner's assets in media picker | — |
+| 21.6 | Asset selection | Click gallery thumbnail → applied to element | — |
+| 21.7 | Asset deletion | Delete from gallery (check references first) | — |
+| 21.8 | Deletion blocked | 412 if asset in use (shows reference list) | — |
+| 21.9 | Content-hash dedup | Re-uploading same file reuses existing asset | — |
+| 21.10 | Slot history | MRU per element shows recent 4 assets | — |
+
+---
+
+## 22. Canvas Editor — Save & Publish
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 22.1 | Autosave (debounced) | Changes auto-saved after 500ms idle | — |
+| 22.2 | Manual save (Ctrl+S) | Keyboard shortcut flushes pending save | — |
+| 22.3 | Save button | Topbar Save button triggers save | — |
+| 22.4 | Save status feedback | "Saving..." → "Saved" in status line | — |
+| 22.5 | Save error feedback | Failed save shows error in status line | — |
+| 22.6 | Publish | Publish button → site available at subdomain | — |
+| 22.7 | Publish flushes save | Pending saves completed before publish | — |
+| 22.8 | Publish creates snapshot | Version history updated after publish | — |
+| 22.9 | Publish triggers OG image | OG image regenerated on publish | — |
+| 22.10 | Publish rebuilds search index | Full-text index updated | — |
+| 22.11 | Save as template | Topbar button saves current state as template | — |
+
+---
+
+## 23. Canvas Editor — AI Agent (Preview/Apply)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 23.1 | AI text rewrite | Inspector button → prompt → preview ops | — |
+| 23.2 | AI media replacement | Inspector button → prompt → asset suggestion | — |
+| 23.3 | AI section generation | Section toolbar → recipe + prompt → new section | — |
+| 23.4 | Preview panel | AI ops shown in side panel before apply | — |
+| 23.5 | Accept preview | Accept button applies ops to state | — |
+| 23.6 | Dismiss preview | Dismiss button cancels, state unchanged | — |
+| 23.7 | AI busy lock | All AI buttons disabled while preview open | — |
+| 23.8 | Save flush before AI | Pending saves completed before AI request | — |
+
+---
+
+## 24. Canvas Editor — Symbols
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 24.1 | Convert section to symbol | "Sym" button → name prompt → symbol created | — |
+| 24.2 | Symbol master stored | state.symbols[] contains new master | — |
+| 24.3 | Symbol instance replaces | Original section replaced with instance | — |
+| 24.4 | Nested symbol rejected | Section with existing instance can't convert | — |
+| 24.5 | Symbol placeholder | Editor shows master name + counts | — |
+| 24.6 | Symbol in published | Published site inlines symbol content | — |
+
+---
+
+## 25. Canvas Editor — Real-Time Collaboration
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 25.1 | WebSocket connect | Editor connects to SiteRoom DO | — |
+| 25.2 | Presence indicator | Collaborator count badge updates | — |
+| 25.3 | Cursor awareness | Remote cursor positions visible | — |
+| 25.4 | Live sync | Edits from one user appear in another's canvas | — |
+| 25.5 | Conflict resolution | Concurrent edits merge via CRDT | — |
+| 25.6 | Presence timeout | Stale presence (30s) auto-cleaned | — |
+| 25.7 | Disconnect/reconnect | WebSocket reconnects gracefully | — |
+
+---
+
+## 26. Canvas Editor — Modals
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 26.1 | Text modal | Single-line input with submit/cancel | — |
+| 26.2 | Multiline text modal | Textarea with Ctrl+Enter submit | — |
+| 26.3 | Select modal | Dropdown selection with confirm | — |
+| 26.4 | Escape closes modal | Escape key dismisses without action | — |
+| 26.5 | Backdrop closes modal | Click outside dismisses without action | — |
+| 26.6 | Autofocus | Modal input focused and selected on open | — |
+| 26.7 | Link modal | Text preview + href input + target toggle | — |
+
+---
+
+## 27. Published Site — Rendering
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 27.1 | Subdomain access | `subdomain.rev01.aayushman.dev` serves published HTML | — |
+| 27.2 | Custom domain access | Custom domain resolves to published site | — |
+| 27.3 | Text rendering | Text elements render with correct styles/marks | — |
+| 27.4 | Image rendering | Images load from R2 with correct dimensions | — |
+| 27.5 | Video rendering | Videos render with correct playback attributes | — |
+| 27.6 | Button rendering | Action elements render as clickable links | — |
+| 27.7 | Shape rendering | SVG shapes render correctly | — |
+| 27.8 | Container rendering | Layout containers render with children | — |
+| 27.9 | Chart rendering | Charts render with data visualization | — |
+| 27.10 | Code block rendering | Syntax-highlighted code blocks | — |
+| 27.11 | Symbol instance rendering | Symbol instances resolve to inlined content | — |
+| 27.12 | Navigation rendering | Site-wide nav renders on all pages | — |
+| 27.13 | Custom fonts | @font-face declarations load custom WOFF2 | — |
+| 27.14 | Style kit applied | Correct color/typography theme | — |
+| 27.15 | Responsive layout | Mobile viewport renders correctly | — |
+| 27.16 | Motion animations | Entrance animations trigger on scroll | — |
+
+---
+
+## 28. Published Site — Interactive Elements
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 28.1 | Accordion expand/collapse | Click header toggles content visibility | — |
+| 28.2 | Carousel navigation | Next/prev buttons cycle slides | — |
+| 28.3 | Carousel autoplay | Auto-advances if configured | — |
+| 28.4 | Form submission | Fill fields + submit → stored in DB | — |
+| 28.5 | Form Turnstile | Bot protection challenge appears | — |
+| 28.6 | Form validation | Required fields enforced | — |
+| 28.7 | Form success redirect | After submit, redirects to configured URL | — |
+| 28.8 | Embed iframe | Embedded content loads in iframe | — |
+
+---
+
+## 29. Published Site — Password Protection
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 29.1 | Password gate | Protected site shows unlock form | — |
+| 29.2 | Correct password | Valid password → cookie set → content visible | — |
+| 29.3 | Wrong password | Invalid password → error message | — |
+| 29.4 | Unlock cookie persistence | Subsequent visits skip gate (cookie valid) | — |
+| 29.5 | Gate on all pages | All pages of protected site gated | — |
+
+---
+
+## 30. Published Site — Search
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 30.1 | Search query | `GET /__rev01/search?q=term` returns results | — |
+| 30.2 | Result relevance | Results match published text content | — |
+| 30.3 | Result metadata | Results include page slug + element ID | — |
+| 30.4 | Empty query | Empty/short query handled gracefully | — |
+| 30.5 | No results | Non-matching query returns empty set | — |
+
+---
+
+## 31. Published Site — SEO & Social
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 31.1 | Meta title | `<title>` matches page settings | — |
+| 31.2 | Meta description | `<meta name="description">` present | — |
+| 31.3 | OG image | `<meta property="og:image">` with valid URL | — |
+| 31.4 | OG image render | `/og` endpoint returns PNG image | — |
+| 31.5 | Canonical URL | `<link rel="canonical">` present | — |
+| 31.6 | Sitemap | `/sitemap.xml` lists published pages | PASS |
+| 31.7 | Robots.txt | `/robots.txt` references sitemap | PASS |
+
+---
+
+## 32. Published Site — Live Updates
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 32.1 | WebSocket connect | Visitor page connects to `/__live` | — |
+| 32.2 | Publish broadcast | Publish triggers update to open visitor tabs | — |
+| 32.3 | Live content refresh | Visitor sees updated content without reload | — |
+
+---
+
+## 33. Templates & Library
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 33.1 | Template seeds | Starter Canvas, Launch Page, Enterprise Scale, Studio Portfolio, Local Business available | — |
+| 33.2 | Create from template | Site created with template's sections/elements | — |
+| 33.3 | Custom template save | Save site as reusable template | — |
+| 33.4 | Custom template list | Owner's saved templates appear in picker | — |
+| 33.5 | Custom template delete | Remove saved template | — |
+| 33.6 | Global templates | Admin-created templates visible to all | — |
+| 33.7 | Library section save | Save section to library | — |
+| 33.8 | Library section import | Import library section into site | — |
+| 33.9 | Library section delete | Remove from library | — |
+| 33.10 | Section recipes | hero-split, feature-grid, gallery-strip, cta-band, etc. | — |
+
+---
+
+## 34. Owner Assets (Media Library)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 34.1 | List assets | `GET /api/owner/assets` returns all owner media | — |
+| 34.2 | Upload image | POST multipart → stored in R2, record in DB | — |
+| 34.3 | Upload video | POST multipart → stored in R2 | — |
+| 34.4 | Content-hash dedup | Same file uploaded twice → single record | — |
+| 34.5 | Delete asset | Remove asset (check references) | — |
+| 34.6 | Delete blocked if in-use | 412 response with reference list | — |
+| 34.7 | Cross-site usage | Asset usable across multiple owner sites | — |
+| 34.8 | Image dimensions | Width/height probed and stored | — |
+| 34.9 | MIME type detection | Correct media type stored | — |
+
+---
+
+## 35. Custom Fonts
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 35.1 | Upload WOFF2 | POST font file → stored in R2 | — |
+| 35.2 | List site fonts | GET returns uploaded fonts | — |
+| 35.3 | Delete font | Remove custom font | — |
+| 35.4 | @font-face emission | Published CSS includes font declarations | — |
+| 35.5 | Font delivery | `/fonts/:contentHash` serves WOFF2 | — |
+| 35.6 | Font in style kit | Custom font usable in typography settings | — |
+
+---
+
+## 36. Site Import
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 36.1 | Import from URL | Provide URL → scraper extracts content | — |
+| 36.2 | Sections mapped | Scraped DOM converted to CanvasSections | — |
+| 36.3 | Assets materialized | Imported images saved as OwnerAssets | — |
+| 36.4 | Seed color extracted | Dominant color used for custom theme | — |
+| 36.5 | Fonts mapped | Imported fonts mapped to tokens | — |
+| 36.6 | Import warnings | Scraper warnings surfaced to user | — |
+
+---
+
+## 37. Internationalization (i18n)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 37.1 | Auto-translate | Gemini-powered translation of site content | — |
+| 37.2 | Language selection | Choose target language | — |
+| 37.3 | Translation applied | Translated content replaces/augments original | — |
+
+---
+
+## 38. Themes & Style Kits
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 38.1 | Kit switcher | Switch between 4 built-in style kits | PASS (MCP) |
+| 38.2 | Immediate UI update | Canvas reflects kit change instantly | — |
+| 38.3 | Custom theme editor | Color, typography, surface customization panel | — |
+| 38.4 | Type pair selector | 7 curated font stacks available | — |
+| 38.5 | Preset switcher | Quick-switch between kit presets | — |
+| 38.6 | Dark/light mode | Dual-palette CSS for visitor mode toggle | — |
+| 38.7 | Theme persistence | Custom theme saved via API | — |
+
+---
+
+## 39. Forms System (End-to-End)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 39.1 | Form element in editor | Add form element with field configuration | — |
+| 39.2 | Form fields setup | Add/remove/configure form fields | — |
+| 39.3 | Form published render | Form renders with all fields on published site | — |
+| 39.4 | Visitor submission | Fill + submit → stored in DB | — |
+| 39.5 | Turnstile verification | Bot check passes for legitimate users | — |
+| 39.6 | Rate limiting | Rapid submissions throttled | — |
+| 39.7 | Webhook fire | Submission triggers outbound POST webhook | — |
+| 39.8 | Webhook signature | `X-Rev01-Signature` HMAC header present | — |
+| 39.9 | Owner views submissions | Forms inbox shows all entries | — |
+| 39.10 | CSV download | Export submissions as CSV | — |
+
+---
+
+## 40. Collaborators (End-to-End)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 40.1 | Invite flow | Owner invites → email sent → user accepts | — |
+| 40.2 | Editor role access | Editor collaborator can edit site | — |
+| 40.3 | Viewer role access | Viewer collaborator has read-only access | — |
+| 40.4 | Revoke access | Owner removes collaborator → access lost | — |
+| 40.5 | Email delivery | Resend API sends invitation email | — |
+
+---
+
+## 41. On-Site Editing
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 41.1 | Edit token generation | `POST /api/on-site-edit` signs JWT | — |
+| 41.2 | Cookie scoped | Cookie set for `.rev01.aayushman.dev` | — |
+| 41.3 | Subdomain editor | Published site opens in edit mode with token | — |
+| 41.4 | API access via token | `/__api/*` routes work with edit token auth | — |
+| 41.5 | Token expiry | 4-hour TTL enforced | — |
+
+---
+
+## 42. Error Handling & Edge Cases
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 42.1 | 404 published site | Non-existent subdomain → appropriate error | PASS |
+| 42.1b | Search without site | `/__rev01/search` without valid site host returns error | PASS |
+| 42.1c | Form submit without site | `/__rev01/forms` without valid site context returns error | PASS |
+| 42.1d | Unlock without site | `/__rev01/unlock` without valid site context returns error | PASS |
+| 42.2 | Invalid site ID | API requests with bad ID → 404/400 | — |
+| 42.3 | Unauthorized access | Accessing other user's site → 403 | — |
+| 42.4 | Network failure recovery | Offline → reconnect → state syncs | — |
+| 42.5 | Concurrent edit conflict | Two users edit same element → CRDT resolves | — |
+| 42.6 | Large file upload | Oversized upload → appropriate error | — |
+| 42.7 | Invalid file type | Non-image/video upload rejected | — |
+| 42.8 | Rate limit hit | Form rate limiter returns 429 | — |
+| 42.9 | CSP enforcement | Embeds respect allowlist | — |
+
+---
+
+## 43. Performance & Loading
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 43.1 | Editor cold start | Canvas loads within acceptable time | — |
+| 43.2 | Published page load | Visitor page renders quickly | — |
+| 43.3 | Image optimization | CF Image Resizing delivers optimized assets | — |
+| 43.4 | Font caching | WOFF2 served with cache headers | — |
+| 43.5 | WebSocket stability | Connection maintained during long sessions | — |
+
+---
+
+## Test Environment Notes
+
+- **Auth**: Tests will need Clerk test mode or mock auth tokens
+- **Database**: Neon branch per test suite recommended
+- **AI**: Gemini calls should be stubbed in most tests (test integration separately)
+- **R2 Storage**: Use Miniflare/local R2 emulation
+- **WebSocket**: Playwright supports WebSocket interception
+- **Turnstile**: Use Cloudflare's test keys for always-pass
+- **Email**: Mock Resend API or use test mode
+- **Scraper**: Mock scraper service for import tests
