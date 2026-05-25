@@ -12,7 +12,7 @@
 // origin is the special `'none'` token, signalling the renderer to emit a
 // failure placeholder.
 //
-// Provider list (8 named providers per the plan):
+// Provider list (9 named providers):
 //
 //   1. YouTube         — youtube.com/watch?v=ID, youtu.be/ID, youtube.com/shorts/ID
 //   2. Vimeo           — vimeo.com/ID
@@ -22,6 +22,7 @@
 //   6. SoundCloud      — soundcloud.com/{user}/{track}
 //   7. CodePen         — codepen.io/{user}/pen/ID
 //   8. Twitter / X     — twitter.com/{user}/status/ID, x.com/{user}/status/ID
+//   9. Google Maps     — google.com/maps/..., maps.google.com/..., goo.gl/maps/...
 //
 // For known providers the iframe URL is derived purely from the pattern —
 // NO external HTTP fetch is required. SoundCloud, Twitter, and CodePen are
@@ -47,6 +48,7 @@ export const EMBED_PROVIDERS = [
   'soundcloud',
   'codepen',
   'twitter',
+  'google-maps',
   'generic',
   'invalid',
 ] as const;
@@ -226,6 +228,55 @@ function matchTwitter(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   };
 }
 
+const GOOGLE_MAPS_PLACE = /^\/maps\/place\/([^/]+)/;
+const GOOGLE_MAPS_AT = /^\/maps\/@(-?[\d.]+),(-?[\d.]+)/;
+
+function matchGoogleMaps(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
+  const isGoogleMaps =
+    parsed.host === 'maps.google.com' ||
+    parsed.host === 'www.maps.google.com' ||
+    ((parsed.host === 'google.com' || parsed.host === 'www.google.com') &&
+      parsed.pathname.startsWith('/maps'));
+  const isGooGl = parsed.host === 'goo.gl' && parsed.pathname.startsWith('/maps');
+
+  if (!isGoogleMaps && !isGooGl) return null;
+
+  // Extract query from various URL formats.
+  let query: string | null = null;
+
+  // /maps/place/PLACE_NAME/...
+  const placeMatch = GOOGLE_MAPS_PLACE.exec(parsed.pathname);
+  if (placeMatch && placeMatch[1]) {
+    query = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+  }
+
+  // /maps/@LAT,LNG,...
+  if (!query) {
+    const atMatch = GOOGLE_MAPS_AT.exec(parsed.pathname);
+    if (atMatch && atMatch[1] && atMatch[2]) {
+      query = `${atMatch[1]},${atMatch[2]}`;
+    }
+  }
+
+  // ?q=QUERY in search params
+  if (!query) {
+    const params = new URLSearchParams(parsed.search);
+    const q = params.get('q');
+    if (q) query = q;
+  }
+
+  // For goo.gl short links or unrecognized formats, use the raw URL.
+  if (!query) {
+    query = parsed.raw;
+  }
+
+  return {
+    embedUrl: `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`,
+    frameSrcOrigin: 'https://maps.google.com',
+    providerName: 'google-maps',
+  };
+}
+
 const PROVIDER_MATCHERS: ProviderMatcher[] = [
   matchYouTube,
   matchVimeo,
@@ -235,6 +286,7 @@ const PROVIDER_MATCHERS: ProviderMatcher[] = [
   matchSoundCloud,
   matchCodePen,
   matchTwitter,
+  matchGoogleMaps,
 ];
 
 /**
