@@ -5734,6 +5734,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (tabName === "symbols") {
       renderSymbolsPanel();
     }
+    if (tabName === "versions") {
+      renderVersionsPanel();
+    }
   }
 
   function renderSymbolsPanelIfMounted() {
@@ -5884,6 +5887,221 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     setStatus("Deleted symbol: " + sym.name, "ok");
   }
 
+  // -- Version History sidebar tab -----------------------------------------
+
+  var versionsLoaded = false;
+  var versionsList = [];
+
+  function ensureVersionsTabMounted() {
+    if (!sidebar) return null;
+    var tabsRow = sidebar.querySelector(".rev01-sidebar-tabs");
+    if (!tabsRow) return null;
+    if (sidebar.querySelector('[data-sidebar-tab="versions"]')) {
+      return sidebar.querySelector('[data-sidebar-panel="versions"]');
+    }
+
+    var tabButton = document.createElement("button");
+    tabButton.type = "button";
+    tabButton.setAttribute("role", "tab");
+    tabButton.setAttribute("aria-selected", "false");
+    tabButton.setAttribute("data-sidebar-tab", "versions");
+    tabButton.textContent = "Versions";
+    tabsRow.appendChild(tabButton);
+
+    var panel = document.createElement("div");
+    panel.className = "rev01-sidebar-panel";
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-label", "Versions");
+    panel.setAttribute("data-sidebar-panel", "versions");
+    panel.hidden = true;
+    sidebar.appendChild(panel);
+
+    tabButton.addEventListener("click", function() {
+      activateSidebarTab("versions");
+    });
+
+    return panel;
+  }
+
+  function formatVersionDate(iso) {
+    var d = new Date(iso);
+    var months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    var h = d.getHours();
+    var m = String(d.getMinutes()).padStart(2, "0");
+    var ampm = h >= 12 ? "pm" : "am";
+    h = h % 12 || 12;
+    return months[d.getMonth()] + " " + d.getDate() + ", " + h + ":" + m + ampm;
+  }
+
+  function renderVersionsPanel() {
+    var panel = ensureVersionsTabMounted();
+    if (!panel) return;
+    panel.replaceChildren();
+
+    var group = document.createElement("section");
+    group.className = "rev01-sidebar-group";
+
+    var heading = document.createElement("h2");
+    heading.textContent = "Version History";
+    group.appendChild(heading);
+
+    var saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "rev01-sidebar-command";
+    saveBtn.textContent = "Save snapshot";
+    saveBtn.style.marginBottom = "12px";
+    saveBtn.addEventListener("click", function() {
+      var label = prompt("Snapshot label:");
+      if (!label || !label.trim()) return;
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving...";
+      authFetch(API_BASE + "/sites/" + SITE_ID + "/snapshots", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ label: label.trim() }),
+      })
+      .then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Failed"); });
+        setStatus("Snapshot saved", "ok");
+        versionsLoaded = false;
+        renderVersionsPanel();
+      })
+      .catch(function(err) {
+        setStatus("Snapshot failed: " + (err.message || err), "error");
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save snapshot";
+      });
+    });
+    group.appendChild(saveBtn);
+
+    if (!versionsLoaded) {
+      var loading = document.createElement("p");
+      loading.style.opacity = "0.5";
+      loading.style.fontSize = "12px";
+      loading.textContent = "Loading versions...";
+      group.appendChild(loading);
+      panel.appendChild(group);
+
+      authFetch(API_BASE + "/sites/" + SITE_ID + "/snapshots?limit=30")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          versionsList = data.items || [];
+          versionsLoaded = true;
+          renderVersionsPanel();
+        })
+        .catch(function() {
+          loading.textContent = "Failed to load versions.";
+        });
+      return;
+    }
+
+    if (versionsList.length === 0) {
+      var empty = document.createElement("p");
+      empty.style.opacity = "0.7";
+      empty.style.fontSize = "12px";
+      empty.textContent = "No snapshots yet. Publish or save a snapshot.";
+      group.appendChild(empty);
+      panel.appendChild(group);
+      return;
+    }
+
+    var list = document.createElement("ul");
+    list.style.listStyle = "none";
+    list.style.margin = "0";
+    list.style.padding = "0";
+    list.style.display = "flex";
+    list.style.flexDirection = "column";
+    list.style.gap = "6px";
+
+    for (var i = 0; i < versionsList.length; i++) {
+      (function(snap) {
+        var li = document.createElement("li");
+        li.style.padding = "8px 10px";
+        li.style.borderRadius = "6px";
+        li.style.background = "rgba(255,255,255,0.04)";
+        li.style.border = "1px solid rgba(255,255,255,0.08)";
+        li.style.fontSize = "12px";
+
+        var top = document.createElement("div");
+        top.style.display = "flex";
+        top.style.justifyContent = "space-between";
+        top.style.alignItems = "center";
+        top.style.marginBottom = "4px";
+
+        var dateEl = document.createElement("span");
+        dateEl.style.color = "#f6f7fb";
+        dateEl.style.fontWeight = "500";
+        dateEl.textContent = formatVersionDate(snap.capturedAt);
+        top.appendChild(dateEl);
+
+        var badge = document.createElement("span");
+        badge.style.fontSize = "10px";
+        badge.style.padding = "2px 6px";
+        badge.style.borderRadius = "4px";
+        badge.style.fontWeight = "500";
+        if (snap.reason === "publish") {
+          badge.style.background = "rgba(74,222,128,0.12)";
+          badge.style.color = "#4ade80";
+          badge.textContent = "v" + (snap.publishedVersion || "?");
+        } else {
+          badge.style.background = "rgba(125,211,252,0.12)";
+          badge.style.color = "#7dd3fc";
+          badge.textContent = "manual";
+        }
+        top.appendChild(badge);
+        li.appendChild(top);
+
+        if (snap.label) {
+          var labelEl = document.createElement("div");
+          labelEl.style.color = "#aeb7c8";
+          labelEl.style.fontSize = "11px";
+          labelEl.style.marginBottom = "6px";
+          labelEl.textContent = snap.label;
+          li.appendChild(labelEl);
+        }
+
+        var restoreBtn = document.createElement("button");
+        restoreBtn.type = "button";
+        restoreBtn.textContent = "Restore";
+        restoreBtn.style.fontSize = "11px";
+        restoreBtn.style.padding = "3px 10px";
+        restoreBtn.style.borderRadius = "4px";
+        restoreBtn.style.border = "1px solid rgba(255,255,255,0.12)";
+        restoreBtn.style.background = "rgba(255,255,255,0.06)";
+        restoreBtn.style.color = "#f6f7fb";
+        restoreBtn.style.cursor = "pointer";
+        restoreBtn.style.fontFamily = "inherit";
+        restoreBtn.addEventListener("click", function() {
+          if (!confirm("Restore to this version? Current state will be saved as a snapshot first.")) return;
+          restoreBtn.disabled = true;
+          restoreBtn.textContent = "Restoring...";
+          authFetch(API_BASE + "/sites/" + SITE_ID + "/snapshots/" + snap.id + "/restore", {
+            method: "POST",
+          })
+          .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Restore failed"); });
+            return r.json();
+          })
+          .then(function() {
+            setStatus("Restored — reloading editor...", "ok");
+            setTimeout(function() { location.reload(); }, 800);
+          })
+          .catch(function(err) {
+            setStatus("Restore failed: " + (err.message || err), "error");
+            restoreBtn.disabled = false;
+            restoreBtn.textContent = "Restore";
+          });
+        });
+        li.appendChild(restoreBtn);
+
+        list.appendChild(li);
+      })(versionsList[i]);
+    }
+
+    group.appendChild(list);
+    panel.appendChild(group);
+  }
+
   // -- Boot ---------------------------------------------------------------
 
   (async () => {
@@ -5928,6 +6146,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // mount immediately so the Owner can click into it; the panel's
       // contents render lazily on first activation.
       ensureSymbolsTabMounted();
+      ensureVersionsTabMounted();
       attachSidebarActions();
       attachSaveButton();
       attachPublishButton();
