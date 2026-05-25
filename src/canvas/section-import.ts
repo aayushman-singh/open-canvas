@@ -72,6 +72,7 @@ function materialisedAssetId(targetCustomerId: string, rawSeedId: string): strin
 export function importSectionIntoSite(input: ImportSectionInput): ImportSectionResult {
   const { targetCustomerId, sourceSection, existingAssetIds } = input;
   const cloned = structuredClone(sourceSection);
+  delete cloned.role;
   const errors: string[] = [];
 
   const idMap = new Map<string, string>();
