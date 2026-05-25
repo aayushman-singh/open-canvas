@@ -44,6 +44,7 @@
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",
     "chat:smoke": "bun run src/agent/chat/smoke.ts",
     "i18n:smoke": "bun run src/i18n/smoke.ts",
+    "public-404:smoke": "bun run src/routes/public-404.smoke.ts",
     "wishlist:smoke": "bun run src/wishlist-smoke.ts",
     "e2e": "npx playwright test",
     "e2e:headed": "npx playwright test --headed",

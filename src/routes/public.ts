@@ -658,12 +658,21 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     prepared.page === null && (path === '/' || path === '') && snapshot.pages[0]
       ? prepareRender(`/${snapshot.pages[0].slug}`, snapshot)
       : null;
-  const activeRender = fallbackPrepared ?? prepared;
+  let activeRender = fallbackPrepared ?? prepared;
+  let statusCode: 200 | 404 = 200;
   if (activeRender.page === null) {
-    return c.text('page not found', 404);
+    const notFoundRender = prepareRender('/_404', snapshot);
+    if (notFoundRender.page !== null) {
+      activeRender = notFoundRender;
+      statusCode = 404;
+    } else {
+      return c.text('page not found', 404);
+    }
   }
   const renderSnapshot = activeRender.renderSnapshot;
-  const currentPage = activeRender.page;
+  // After the null-check above, page is guaranteed non-null (we either found a
+  // page originally, replaced activeRender with the _404 render, or returned).
+  const currentPage = activeRender.page!;
   const pageSlug = activeRender.pageSlug;
   const dir = activeRender.dir;
 
@@ -752,5 +761,6 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           </script>
         </body>
       </html>`,
+    statusCode,
   );
 }
