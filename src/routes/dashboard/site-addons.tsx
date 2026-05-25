@@ -238,7 +238,7 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
         const hasEntitlement = entitled.has(addon.id);
         const sa = siteAddonMap.get(addon.id);
         const isEnabled = sa?.enabled ?? false;
-        const config = (sa?.config ?? {}) as Record<string, string>;
+        const config: Record<string, string> = sa?.config ?? {};
 
         return (
           <div class="addon-section" data-addon-form={addon.id}>

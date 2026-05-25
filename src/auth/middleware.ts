@@ -40,7 +40,9 @@ function isNonEmptyString(value: string | undefined): value is string {
 
 const AUTHORIZED_PARTIES = [
   'http://localhost:8787',
+  'http://localhost:8788',
   'http://127.0.0.1:8787',
+  'http://127.0.0.1:8788',
   'https://rev01.aayushman.dev',
 ];
 
@@ -244,8 +246,8 @@ export function clerkAuth() {
       c.header(key, value, { append: true });
     }
     const getSetCookie = (requestState.headers as Headers & { getSetCookie(): string[] })
-      .getSetCookie;
-    for (const cookie of getSetCookie.call(requestState.headers)) {
+      .getSetCookie.bind(requestState.headers);
+    for (const cookie of getSetCookie()) {
       c.header('set-cookie', cookie, { append: true });
     }
 

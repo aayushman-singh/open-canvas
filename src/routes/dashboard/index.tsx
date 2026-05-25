@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { desc, eq, sql } from 'drizzle-orm';
+import { desc, eq, sql, sum } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/middleware';
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
@@ -34,6 +34,13 @@ function formatDate(d: Date): string {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   return `${months[d.getUTCMonth()]} ${String(d.getUTCDate())}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
 function buildThumbHtml(
@@ -536,6 +543,110 @@ const cardStyles = `
     padding: 4px 0;
     letter-spacing: 0.03em;
   }
+
+  .dash-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .dash-stat-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .dash-stat-card .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--faint);
+    margin-bottom: 6px;
+  }
+  .dash-stat-card .stat-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+  .dash-stat-card .stat-sub {
+    font-size: 12px;
+    color: var(--faint);
+    margin-top: 4px;
+  }
+  .dash-stat-card .stat-value .accent {
+    color: var(--accent);
+  }
+
+  .dash-welcome {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .dash-welcome h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+  }
+  .dash-welcome p {
+    margin: 0 0 20px;
+    font-size: 14px;
+    color: var(--faint);
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .dash-welcome-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+  .dash-quick {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .dash-quick-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .dash-quick-card:hover {
+    border-color: rgba(125,211,252,0.35);
+    transform: translateY(-2px);
+  }
+  .dash-quick-card .qicon {
+    font-size: 20px;
+    margin-bottom: 8px;
+    display: block;
+  }
+  .dash-quick-card h3 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .dash-quick-card p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  @media (max-width: 768px) {
+    .dash-stats {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-quick {
+      grid-template-columns: 1fr;
+    }
+  }
 `;
 
 const importScript = raw(`<script>
@@ -892,7 +1003,7 @@ dashboard.get('/', async (c) => {
     });
 
   const customerRow = await database
-    .select({ id: customer.id })
+    .select({ id: customer.id, displayName: customer.displayName })
     .from(customer)
     .where(eq(customer.clerkUserId, user.id))
     .limit(1);
@@ -901,6 +1012,8 @@ dashboard.get('/', async (c) => {
   const origin = new URL(c.req.url).origin;
 
   let cards: SiteCard[] = [];
+  let publishedCount = 0;
+  let storageBytes = 0;
   if (customerId) {
     const rows = await database
       .select({
@@ -918,10 +1031,20 @@ dashboard.get('/', async (c) => {
       .orderBy(desc(site.createdAt));
 
     cards = buildCards(rows, origin);
+    publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
+
+    const sb = await database
+      .select({ total: sum(ownerAsset.byteSize) })
+      .from(ownerAsset)
+      .where(eq(ownerAsset.customerId, customerId));
+    storageBytes = Number(sb[0]?.total ?? 0);
   }
 
   const { publishableKey } = resolveClerkKeys(c.env);
   const signOutUrl = buildSignOutUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url, '/'));
+
+  const avatarUrl = user.imageUrl;
+  const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
 
   return c.html(
     <DashboardShell
@@ -929,7 +1052,30 @@ dashboard.get('/', async (c) => {
       crumbs={[{ label: 'Dashboard' }]}
       activePath="/dashboard"
       pageStyles={cardStyles}
+      userMeta={{ avatarUrl, displayName, email: primaryEmail }}
     >
+      <div class="dash-stats">
+        <div class="dash-stat-card">
+          <div class="stat-label">Total sites</div>
+          <div class="stat-value">{String(cards.length)}</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-label">Published</div>
+          <div class="stat-value"><span class="accent">{String(publishedCount)}</span></div>
+          <div class="stat-sub">{cards.length > 0 ? `${Math.round((publishedCount / cards.length) * 100)}% of sites` : 'No sites yet'}</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-label">Storage used</div>
+          <div class="stat-value">{formatBytes(storageBytes)}</div>
+          <div class="stat-sub">of 100 MB on Free</div>
+        </div>
+        <div class="dash-stat-card">
+          <div class="stat-label">Plan</div>
+          <div class="stat-value">Free</div>
+          <div class="stat-sub"><a href="/dashboard/settings" style="font-size:12px">Upgrade</a></div>
+        </div>
+      </div>
+
       <div class="dash-header">
         <h1>Your sites</h1>
         <div class="dash-header-actions">
@@ -1040,9 +1186,33 @@ dashboard.get('/', async (c) => {
           ))}
         </div>
       ) : (
-        <p>
-          No sites yet — <a href="/dashboard/templates">pick a template</a> to start.
-        </p>
+        <>
+          <div class="dash-welcome">
+            <h2>Welcome to rev01</h2>
+            <p>Build your first client site in minutes. Pick a template, customize with the canvas editor, and publish to a live URL.</p>
+            <div class="dash-welcome-actions">
+              <Button variant="primary" href="/dashboard/templates">Pick a template</Button>
+              <Button variant="secondary" class="import-site" id="import-btn">Import existing site</Button>
+            </div>
+          </div>
+          <div class="dash-quick">
+            <a href="/dashboard/templates" class="dash-quick-card">
+              <span class="qicon">&#x2B50;</span>
+              <h3>Start from a template</h3>
+              <p>Choose from curated starter templates for portfolios, landing pages, and more.</p>
+            </a>
+            <a href="/dashboard/profile" class="dash-quick-card">
+              <span class="qicon">&#x1F464;</span>
+              <h3>Set up your profile</h3>
+              <p>Add your name and bio so collaborators know who you are.</p>
+            </a>
+            <a href="/dashboard/settings" class="dash-quick-card">
+              <span class="qicon">&#x2699;</span>
+              <h3>Explore settings</h3>
+              <p>Check your plan, usage, and notification preferences.</p>
+            </a>
+          </div>
+        </>
       )}
       <div id="card-backdrop" class="card-backdrop" data-open="false" />
       {toggleScript}
