@@ -1300,6 +1300,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // require nested symbols (forbidden by scope).
     const hasInstance = section.elements.some((e) => e && e.type === "symbol-instance");
     const onlyInstance = section.elements.length === 1 && hasInstance;
+    const isSpecial = section.role === "header" || section.role === "footer";
     const buttons = [
       { label: "+T", action: "add-text" },
       { label: "+Img", action: "add-image" },
@@ -1309,9 +1310,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       { label: "+\u25a1", action: "add-container" },
       // Wave 2 #11 \u2014 chart element. Additive entry; existing buttons unchanged.
       { label: "+\ud83d\udcca", action: "add-chart" },
-      { label: "Dup", action: "duplicate-section" },
-      { label: "\u2191", action: "move-up" },
-      { label: "\u2193", action: "move-down" },
+      ...(!isSpecial ? [{ label: "Dup", action: "duplicate-section" }] : []),
+      ...(!isSpecial ? [{ label: "\u2191", action: "move-up" }] : []),
+      ...(!isSpecial ? [{ label: "\u2193", action: "move-down" }] : []),
       { label: "Save", action: "save-to-library" },
       { label: "Del", action: "delete-section", danger: true },
     ];
@@ -1349,6 +1350,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     node.className = "rev01-section";
     node.setAttribute("data-rev01-section", section.id);
     node.setAttribute("data-recipe", section.recipeId);
+    if (section.role && section.role !== "body") node.setAttribute("data-section-role", section.role);
     if (section.backgroundEffect) node.setAttribute("data-bg-effect", section.backgroundEffect);
     if (section.entrance) node.setAttribute("data-entrance", section.entrance);
     node.style.position = "relative";
@@ -3083,9 +3085,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return btn;
   }
 
+  function clampInsertIndex(page, insertAt) {
+    var lo = page.sections.length > 0 && page.sections[0].role === "header" ? 1 : 0;
+    var hi = page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer" ? page.sections.length - 1 : page.sections.length;
+    if (insertAt < lo) return lo;
+    if (insertAt > hi) return hi;
+    return insertAt;
+  }
+
   function insertBlankSectionAt(insertAt) {
     const page = currentPage();
     if (!page) return;
+    insertAt = clampInsertIndex(page, insertAt);
     const section = {
       id: newSectionId(),
       recipeId: "feature-grid",
@@ -3105,11 +3116,47 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const page = currentPage();
     if (!page) return;
     if (fromIdx === toIdx || fromIdx + 1 === toIdx) return;
-    const section = page.sections.splice(fromIdx, 1)[0];
+    const section = page.sections[fromIdx];
+    if (section.role === "header" || section.role === "footer") return;
+    const headerAt = page.sections[0] && page.sections[0].role === "header" ? 0 : -1;
+    const footerAt = page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer" ? page.sections.length - 1 : -1;
     const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
-    page.sections.splice(adjustedTo, 0, section);
+    if (headerAt >= 0 && adjustedTo <= headerAt) return;
+    if (footerAt >= 0 && adjustedTo >= footerAt) return;
+    page.sections.splice(fromIdx, 1);
+    const finalTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
+    page.sections.splice(finalTo, 0, section);
     renderAll();
     scheduleSave();
+  }
+
+  function buildReelRoleSlot(role, page) {
+    const slot = document.createElement("button");
+    slot.type = "button";
+    slot.className = "reel-role-slot";
+    slot.setAttribute("data-reel-role-slot", role);
+    slot.textContent = role === "header" ? "+ Add Header" : "+ Add Footer";
+    slot.addEventListener("click", function() {
+      var section = {
+        id: newSectionId(),
+        recipeId: "custom",
+        name: role === "header" ? "Header" : "Footer",
+        height: role === "header" ? 80 : 120,
+        role: role,
+        elements: [],
+      };
+      if (role === "header") {
+        page.sections.unshift(section);
+      } else {
+        page.sections.push(section);
+      }
+      selectedSectionId = section.id;
+      selectedElementId = null;
+      renderAll();
+      scheduleSave();
+      setStatus((role === "header" ? "Header" : "Footer") + " added", "ok");
+    });
+    return slot;
   }
 
   function renderReel() {
@@ -3129,12 +3176,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const isTile = reelViewMode === "tile";
     const thumbW = isTile ? 288 : 64;
 
+    const hasHeader = page.sections.length > 0 && page.sections[0].role === "header";
+    const hasFooter = page.sections.length > 0 && page.sections[page.sections.length - 1].role === "footer";
+
+    if (!hasHeader) {
+      body.appendChild(buildReelRoleSlot("header", page));
+    }
+
     for (let i = 0; i < page.sections.length; i++) {
       const section = page.sections[i];
-      body.appendChild(buildReelInsertButton(i));
+      const isSpecial = section.role === "header" || section.role === "footer";
+
+      if (!isSpecial) {
+        body.appendChild(buildReelInsertButton(i));
+      }
 
       const tile = document.createElement("div");
       tile.className = isTile ? "reel-tile" : "reel-list-item";
+      if (isSpecial) tile.classList.add("reel-locked");
       tile.setAttribute("data-reel-section", section.id);
       tile.setAttribute("data-reel-index", String(i));
 
@@ -3147,14 +3206,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (isTile) {
         const label = document.createElement("div");
         label.className = "reel-tile-label";
-        label.textContent = section.name || section.recipeId;
+        label.textContent = (isSpecial ? (section.role === "header" ? "Header" : "Footer") + " — " : "") + (section.name || section.recipeId);
         tile.appendChild(label);
       } else {
         const info = document.createElement("div");
         info.className = "reel-list-info";
         const name = document.createElement("div");
         name.className = "reel-list-name";
-        name.textContent = section.name || "Untitled";
+        name.textContent = (isSpecial ? (section.role === "header" ? "Header" : "Footer") + " — " : "") + (section.name || "Untitled");
         const recipe = document.createElement("div");
         recipe.className = "reel-list-recipe";
         recipe.textContent = section.recipeId;
@@ -3163,17 +3222,29 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         tile.appendChild(info);
       }
 
-      tile.addEventListener("mousedown", (function(sectionId, idx) {
-        return function(ev) {
-          if (ev.button !== 0) return;
-          ev.preventDefault();
-          beginReelDrag(sectionId, idx, ev);
-        };
-      })(section.id, i));
+      if (!isSpecial) {
+        tile.addEventListener("mousedown", (function(sectionId, idx) {
+          return function(ev) {
+            if (ev.button !== 0) return;
+            ev.preventDefault();
+            beginReelDrag(sectionId, idx, ev);
+          };
+        })(section.id, i));
+      } else {
+        tile.addEventListener("click", (function(sectionId) {
+          return function() { selectSection(sectionId); };
+        })(section.id));
+      }
 
       body.appendChild(tile);
     }
-    body.appendChild(buildReelInsertButton(page.sections.length));
+
+    var trailingInsertIdx = hasFooter ? page.sections.length - 1 : page.sections.length;
+    body.appendChild(buildReelInsertButton(trailingInsertIdx));
+
+    if (!hasFooter) {
+      body.appendChild(buildReelRoleSlot("footer", page));
+    }
 
     const tileBtn = reelEl.querySelector('[data-reel-view="tile"]');
     const listBtn = reelEl.querySelector('[data-reel-view="list"]');
@@ -4583,7 +4654,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const selectedIndex = selectedSectionId
       ? page.sections.findIndex((candidate) => candidate.id === selectedSectionId)
       : -1;
-    const insertAt = selectedIndex >= 0 ? selectedIndex + 1 : page.sections.length;
+    const insertAt = clampInsertIndex(page, selectedIndex >= 0 ? selectedIndex + 1 : page.sections.length);
     page.sections.splice(insertAt, 0, section);
     selectedSectionId = section.id;
     selectedElementId = null;
@@ -4697,9 +4768,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         box: defaultBox(section, 480, 320),
       });
     } else if (action === "duplicate-section") {
+      if (section.role === "header" || section.role === "footer") return;
       const copy = JSON.parse(JSON.stringify(section));
       copy.id = newSectionId();
       copy.name = section.name + " copy";
+      copy.role = undefined;
       for (const el of copy.elements) { el.id = newElementId(); }
       page.sections.splice(idx + 1, 0, copy);
       renderAll();
@@ -4717,14 +4790,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       scheduleSave();
     } else if (action === "move-up") {
       if (idx === 0) return;
+      if (section.role === "header" || section.role === "footer") return;
       const prev = page.sections[idx - 1];
+      if (prev.role === "header") return;
       page.sections[idx - 1] = section;
       page.sections[idx] = prev;
       renderAll();
       scheduleSave();
     } else if (action === "move-down") {
       if (idx >= page.sections.length - 1) return;
+      if (section.role === "header" || section.role === "footer") return;
       const next = page.sections[idx + 1];
+      if (next.role === "footer") return;
       page.sections[idx + 1] = section;
       page.sections[idx] = next;
       renderAll();
@@ -5191,20 +5268,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
 
+    const hasHeader = sections[0] && sections[0].role === "header";
+    const hasFooter = sections.length > 0 && sections[sections.length - 1].role === "footer";
+
     // Section nodes carry data-rev01-section (see buildSectionNode); the
     // [data-section-id] attribute is used by toolbar buttons, not the section
     // DOM root.
     const sectionNodes = Array.from(canvasRoot.querySelectorAll('[data-rev01-section]'));
     for (let i = 0; i < sectionNodes.length; i += 1) {
+      if (hasHeader && i === 0) continue;
+      if (hasFooter && i === sections.length - 1) continue;
       const node = sectionNodes[i];
       if (node.parentNode) node.parentNode.insertBefore(makeSlot(i), node);
     }
     const lastNode = sectionNodes[sectionNodes.length - 1];
     if (lastNode && lastNode.parentNode) {
+      var endIdx = hasFooter ? sections.length - 1 : sections.length;
       if (lastNode.nextSibling) {
-        lastNode.parentNode.insertBefore(makeSlot(sections.length), lastNode.nextSibling);
+        lastNode.parentNode.insertBefore(makeSlot(endIdx), hasFooter ? lastNode : lastNode.nextSibling);
       } else {
-        lastNode.parentNode.appendChild(makeSlot(sections.length));
+        if (!hasFooter) lastNode.parentNode.appendChild(makeSlot(endIdx));
       }
     }
   }
