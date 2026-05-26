@@ -1,5 +1,20 @@
 {
   "name": "rev01",
+  "description": "A desktop canvas site builder — start from a template, edit positioned design primitives with AI, switch style kits, and publish instantly.",
+  "author": "Aayushman Singh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aayushman-singh/rev01.git"
+  },
+  "keywords": [
+    "site-builder",
+    "canvas",
+    "cloudflare-workers",
+    "hono",
+    "ai",
+    "design"
+  ],
   "private": true,
   "type": "module",
   "scripts": {

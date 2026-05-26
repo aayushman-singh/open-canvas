@@ -26,3 +26,4 @@ PARALLEL_AGENT.md
 .bun/
 .playwright-mcp/
 package-lock.json
+e2e-screenshots/
