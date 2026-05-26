@@ -1,5 +1,6 @@
 import baseSeed from '../canvas/fixtures/home.json';
 import enterpriseScaleSeed from '../canvas/fixtures/enterprise-scale.json';
+import webflowDesignerSeed from '../canvas/fixtures/webflow-designer.json';
 import type { CanvasElement, CanvasSiteState, InlineRun, StyleKit } from '../canvas/schema';
 
 export interface TemplateSeed {
@@ -169,12 +170,21 @@ export const localTemplate = buildTemplate({
   primaryAction: 'Book a visit',
 });
 
+export const webflowDesignerTemplate: TemplateSeed = {
+  id: 'webflow-designer',
+  name: 'Webflow Designer',
+  tagline:
+    'A multi-page designer site inspired by Webflow — dark, bold, and built around a blog. Custom style kit with signature blue accent.',
+  state: structuredClone(webflowDesignerSeed) as CanvasSiteState,
+};
+
 export const allTemplateSeeds = [
   starterTemplate,
   launchTemplate,
   enterpriseScaleTemplate,
   studioTemplate,
   localTemplate,
+  webflowDesignerTemplate,
 ] as const satisfies readonly TemplateSeed[];
 
 const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, template]));

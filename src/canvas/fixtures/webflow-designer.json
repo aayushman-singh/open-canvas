@@ -1,0 +1,2738 @@
+{
+  "styleKit": "custom",
+  "customStyleKit": {
+    "bg": "#000000",
+    "panel": "#0a0a0a",
+    "text": "#ffffff",
+    "muted": "#71717a",
+    "accent": "#4353FF",
+    "accentText": "#ffffff",
+    "fontFamilyDisplay": "'Inter', system-ui, -apple-system, sans-serif",
+    "fontFamilyBody": "'Inter', system-ui, -apple-system, sans-serif",
+    "fontFamilyMono": "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+    "headingScale": 1.0,
+    "bodyScale": 1.0,
+    "labelScale": 0.85,
+    "lineHeight": 1.5,
+    "radius": "6px",
+    "borderWidth": "1px",
+    "shadow": "0 8px 24px rgba(0, 0, 0, 0.4)",
+    "surfaceVariants": {
+      "flat": { "background": "#0a0a0a", "shadow": "none" },
+      "raised": { "background": "#111113", "shadow": "0 12px 32px rgba(0, 0, 0, 0.5)", "radius": "12px" },
+      "glass": {
+        "background": "rgba(255, 255, 255, 0.04)",
+        "border": "1px solid rgba(255, 255, 255, 0.08)",
+        "shadow": "0 8px 24px rgba(0, 0, 0, 0.3)"
+      },
+      "outlined": { "background": "transparent", "border": "1px solid rgba(255, 255, 255, 0.12)" },
+      "sticker": {
+        "background": "#111113",
+        "border": "1px solid rgba(255, 255, 255, 0.08)",
+        "shadow": "0 2px 0 #000, 0 8px 20px rgba(0, 0, 0, 0.4)",
+        "radius": "12px"
+      },
+      "editorial-frame": {
+        "background": "transparent",
+        "border": "2px solid #4353FF",
+        "radius": "0px"
+      },
+      "soft-panel": { "background": "#0d0d0f", "shadow": "0 1px 0 rgba(255,255,255,0.03) inset" }
+    },
+    "shapeFill": "#4353FF",
+    "shapeStroke": "#71717a",
+    "shapeStrokeWidth": "1px",
+    "actionRadius": "6px",
+    "actionPadding": "12px 24px",
+    "actionVariants": {
+      "solid": { "background": "#4353FF", "color": "#ffffff", "weight": 600 },
+      "outline": { "background": "transparent", "color": "#ffffff", "border": "1px solid rgba(255, 255, 255, 0.2)" },
+      "ghost": { "background": "transparent", "color": "#ffffff" },
+      "pill": { "background": "#4353FF", "color": "#ffffff", "weight": 600 },
+      "glass": {
+        "background": "rgba(255, 255, 255, 0.06)",
+        "color": "#ffffff",
+        "border": "1px solid rgba(255, 255, 255, 0.12)"
+      },
+      "brutalist": {
+        "background": "#000000",
+        "color": "#ffffff",
+        "border": "2px solid #ffffff",
+        "weight": 700
+      },
+      "underline": { "background": "transparent", "color": "#4353FF" }
+    },
+    "motionDurationMs": 400,
+    "motionEasing": "cubic-bezier(0.25, 0.1, 0.25, 1.0)",
+    "motionPresets": {
+      "none": {},
+      "fade-up": { "transform": "translateY(16px)", "opacity": 0 },
+      "fade-down": { "transform": "translateY(-16px)", "opacity": 0 },
+      "fade-in": { "opacity": 0 },
+      "fade-right": { "transform": "translateX(-16px)", "opacity": 0 },
+      "slide-left": { "transform": "translateX(24px)", "opacity": 0 },
+      "slide-up": { "transform": "translateY(24px)" },
+      "slide-right": { "transform": "translateX(-24px)" },
+      "scale-in": { "transform": "scale(0.96)", "opacity": 0 },
+      "zoom-out": { "transform": "scale(1.05)", "opacity": 0 },
+      "blur-in": { "opacity": 0 },
+      "rotate-in": { "transform": "rotate(-4deg) scale(0.97)", "opacity": 0 },
+      "flip-in": { "transform": "perspective(600px) rotateY(90deg)", "opacity": 0 },
+      "bounce-in": { "transform": "scale(0.7)", "opacity": 0 },
+      "stagger-children": { "transform": "translateY(12px)", "opacity": 0, "delayMs": 80 },
+      "slow-drift": { "transform": "translateY(0px)" },
+      "parallax-soft": { "transform": "translateY(8px)" }
+    }
+  },
+  "symbols": [],
+  "header": {
+    "id": "wf-site-header",
+    "recipeId": "custom",
+    "name": "Navigation",
+    "height": 72,
+    "role": "header",
+    "elements": [
+      {
+        "id": "wf-header-logo",
+        "type": "text",
+        "box": { "x": 80, "y": 18, "w": 160, "h": 36, "z": 3 },
+        "content": [{ "text": "Webflow", "marks": [{ "type": "bold" }] }],
+        "role": "heading",
+        "fontSize": 22,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-header-nav-solutions",
+        "type": "action",
+        "box": { "x": 820, "y": 20, "w": 100, "h": 32, "z": 3 },
+        "label": "Solutions",
+        "href": { "type": "external", "url": "#solutions" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-header-nav-blog",
+        "type": "action",
+        "box": { "x": 930, "y": 20, "w": 60, "h": 32, "z": 3 },
+        "label": "Blog",
+        "href": { "type": "page", "pageId": "page-wf-blog" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-header-nav-enterprise",
+        "type": "action",
+        "box": { "x": 1000, "y": 20, "w": 110, "h": 32, "z": 3 },
+        "label": "Enterprise",
+        "href": { "type": "page", "pageId": "page-wf-enterprise" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-header-nav-pricing",
+        "type": "action",
+        "box": { "x": 1120, "y": 20, "w": 80, "h": 32, "z": 3 },
+        "label": "Pricing",
+        "href": { "type": "page", "pageId": "page-wf-pricing" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-header-cta",
+        "type": "action",
+        "box": { "x": 1240, "y": 16, "w": 140, "h": 40, "z": 3 },
+        "label": "Get started",
+        "href": { "type": "external", "url": "/signup" },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-header-divider",
+        "type": "shape",
+        "box": { "x": 0, "y": 70, "w": 1440, "h": 2, "z": 1 },
+        "variant": "line",
+        "pinnedStyle": { "background": "rgba(255, 255, 255, 0.06)" }
+      }
+    ]
+  },
+  "footer": {
+    "id": "wf-site-footer",
+    "recipeId": "custom",
+    "name": "Footer",
+    "height": 320,
+    "role": "footer",
+    "elements": [
+      {
+        "id": "wf-footer-bg",
+        "type": "container",
+        "box": { "x": 0, "y": 0, "w": 1440, "h": 320, "z": 0 },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "wf-footer-divider",
+        "type": "shape",
+        "box": { "x": 80, "y": 0, "w": 1280, "h": 1, "z": 2 },
+        "variant": "line",
+        "pinnedStyle": { "background": "rgba(255, 255, 255, 0.08)" }
+      },
+      {
+        "id": "wf-footer-brand",
+        "type": "text",
+        "box": { "x": 80, "y": 48, "w": 200, "h": 36, "z": 2 },
+        "content": [{ "text": "Webflow", "marks": [{ "type": "bold" }] }],
+        "role": "heading",
+        "fontSize": 20,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-tagline",
+        "type": "text",
+        "box": { "x": 80, "y": 92, "w": 320, "h": 48, "z": 2 },
+        "content": [{ "text": "The site you want, without the dev you don't." }],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": { "color": "#71717a" }
+      },
+      {
+        "id": "wf-footer-col1-heading",
+        "type": "text",
+        "box": { "x": 540, "y": 48, "w": 160, "h": 28, "z": 2 },
+        "content": [{ "text": "Product" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-col1-link1",
+        "type": "action",
+        "box": { "x": 540, "y": 84, "w": 120, "h": 28, "z": 2 },
+        "label": "Designer",
+        "href": { "type": "external", "url": "#" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col1-link2",
+        "type": "action",
+        "box": { "x": 540, "y": 116, "w": 120, "h": 28, "z": 2 },
+        "label": "CMS",
+        "href": { "type": "external", "url": "#" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col1-link3",
+        "type": "action",
+        "box": { "x": 540, "y": 148, "w": 120, "h": 28, "z": 2 },
+        "label": "Hosting",
+        "href": { "type": "external", "url": "#" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col2-heading",
+        "type": "text",
+        "box": { "x": 760, "y": 48, "w": 160, "h": 28, "z": 2 },
+        "content": [{ "text": "Resources" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-col2-link1",
+        "type": "action",
+        "box": { "x": 760, "y": 84, "w": 120, "h": 28, "z": 2 },
+        "label": "Blog",
+        "href": { "type": "page", "pageId": "page-wf-blog" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col2-link2",
+        "type": "action",
+        "box": { "x": 760, "y": 116, "w": 120, "h": 28, "z": 2 },
+        "label": "University",
+        "href": { "type": "external", "url": "#" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col2-link3",
+        "type": "action",
+        "box": { "x": 760, "y": 148, "w": 120, "h": 28, "z": 2 },
+        "label": "Community",
+        "href": { "type": "external", "url": "#" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col3-heading",
+        "type": "text",
+        "box": { "x": 980, "y": 48, "w": 160, "h": 28, "z": 2 },
+        "content": [{ "text": "Company" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-col3-link1",
+        "type": "action",
+        "box": { "x": 980, "y": 84, "w": 120, "h": 28, "z": 2 },
+        "label": "Customers",
+        "href": { "type": "page", "pageId": "page-wf-customers" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col3-link2",
+        "type": "action",
+        "box": { "x": 980, "y": 116, "w": 120, "h": 28, "z": 2 },
+        "label": "Enterprise",
+        "href": { "type": "page", "pageId": "page-wf-enterprise" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col3-link3",
+        "type": "action",
+        "box": { "x": 980, "y": 148, "w": 120, "h": 28, "z": 2 },
+        "label": "Pricing",
+        "href": { "type": "page", "pageId": "page-wf-pricing" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-copyright",
+        "type": "text",
+        "box": { "x": 80, "y": 264, "w": 400, "h": 24, "z": 2 },
+        "content": [{ "text": "© 2026 Webflow, Inc. All rights reserved." }],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": { "color": "#52525b" }
+      },
+      {
+        "id": "wf-footer-legal-privacy",
+        "type": "action",
+        "box": { "x": 1100, "y": 264, "w": 80, "h": 24, "z": 2 },
+        "label": "Privacy",
+        "href": { "type": "external", "url": "/privacy" },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-legal-terms",
+        "type": "action",
+        "box": { "x": 1200, "y": 264, "w": 80, "h": 24, "z": 2 },
+        "label": "Terms",
+        "href": { "type": "external", "url": "/terms" },
+        "variant": "ghost"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "id": "page-wf-home",
+      "slug": "index",
+      "title": "Webflow - The web platform for modern businesses",
+      "width": 1440,
+      "description": "Design, build, optimize, and rank in AI search - all in Webflow. Enterprise-grade security, CMS, hosting, and AEO built in.",
+      "sections": [
+        {
+          "id": "wf-hero",
+          "recipeId": "hero-split",
+          "name": "Hero",
+          "height": 800,
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-hero-bg",
+              "type": "container",
+              "box": { "x": 0, "y": 0, "w": 1440, "h": 800, "z": 0 },
+              "variant": "flat"
+            },
+            {
+              "id": "wf-hero-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 600, "h": 32, "z": 3 },
+              "content": [{ "text": "New for Enterprise: Webflow AEO →" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 600,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" },
+              "motion": { "preset": "fade-in", "delayMs": 0 }
+            },
+            {
+              "id": "wf-hero-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 132, "w": 700, "h": 240, "z": 3 },
+              "content": [
+                { "text": "The agentic web platform for " },
+                { "text": "modern businesses", "marks": [{ "type": "bold" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 72,
+              "fontWeight": 700,
+              "align": "left",
+              "motion": { "preset": "fade-up", "delayMs": 60 }
+            },
+            {
+              "id": "wf-hero-body",
+              "type": "text",
+              "box": { "x": 80, "y": 400, "w": 580, "h": 80, "z": 3 },
+              "content": [
+                { "text": "Design, build, optimize, and rank in AI search - all in Webflow. Enterprise-grade security, CMS, hosting, and AEO built in." }
+              ],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-hero-cta-primary",
+              "type": "action",
+              "box": { "x": 80, "y": 520, "w": 180, "h": 52, "z": 3 },
+              "label": "Get started free",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "solid",
+              "motion": { "preset": "fade-up", "delayMs": 160 }
+            },
+            {
+              "id": "wf-hero-cta-secondary",
+              "type": "action",
+              "box": { "x": 280, "y": 520, "w": 160, "h": 52, "z": 3 },
+              "label": "Contact sales",
+              "href": { "type": "external", "url": "/contact" },
+              "variant": "outline",
+              "motion": { "preset": "fade-up", "delayMs": 200 }
+            },
+            {
+              "id": "wf-hero-proof-label",
+              "type": "text",
+              "box": { "x": 80, "y": 620, "w": 500, "h": 24, "z": 3 },
+              "content": [{ "text": "Trusted by 300,000+ teams worldwide" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 500,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-hero-logo-strip",
+              "type": "container",
+              "box": { "x": 80, "y": 656, "w": 600, "h": 48, "z": 2 },
+              "variant": "outlined",
+              "pinnedStyle": { "background": "rgba(255, 255, 255, 0.02)" }
+            },
+            {
+              "id": "wf-hero-logo-1",
+              "type": "text",
+              "box": { "x": 100, "y": 666, "w": 80, "h": 28, "z": 3 },
+              "content": [{ "text": "IDEO" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-hero-logo-2",
+              "type": "text",
+              "box": { "x": 200, "y": 666, "w": 100, "h": 28, "z": 3 },
+              "content": [{ "text": "monday" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-hero-logo-3",
+              "type": "text",
+              "box": { "x": 320, "y": 666, "w": 80, "h": 28, "z": 3 },
+              "content": [{ "text": "TED" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-hero-logo-4",
+              "type": "text",
+              "box": { "x": 420, "y": 666, "w": 120, "h": 28, "z": 3 },
+              "content": [{ "text": "DocuSign" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-hero-logo-5",
+              "type": "text",
+              "box": { "x": 560, "y": 666, "w": 100, "h": 28, "z": 3 },
+              "content": [{ "text": "NYT" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-hero-visual-panel",
+              "type": "container",
+              "box": { "x": 800, "y": 60, "w": 580, "h": 680, "z": 2 },
+              "variant": "raised",
+              "motion": { "preset": "slide-left", "delayMs": 100 }
+            },
+            {
+              "id": "wf-hero-visual-accent",
+              "type": "shape",
+              "box": { "x": 780, "y": 40, "w": 100, "h": 100, "z": 4, "rotation": 15 },
+              "variant": "circle",
+              "pinnedStyle": { "background": "#4353FF" }
+            }
+          ]
+        },
+        {
+          "id": "wf-platform",
+          "recipeId": "feature-grid",
+          "name": "Platform pillars",
+          "height": 900,
+          "backgroundEffect": "grid",
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "wf-platform-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 400, "h": 28, "z": 2 },
+              "content": [{ "text": "THE PLATFORM" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-platform-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 120, "w": 800, "h": 120, "z": 2 },
+              "content": [
+                { "text": "The agentic web marketing platform for " },
+                { "text": "high-performing brands", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 48,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-platform-card1-bg",
+              "type": "container",
+              "box": { "x": 80, "y": 300, "w": 400, "h": 520, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-platform-card1-icon",
+              "type": "shape",
+              "box": { "x": 120, "y": 340, "w": 48, "h": 48, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#4353FF" }
+            },
+            {
+              "id": "wf-platform-card1-title",
+              "type": "text",
+              "box": { "x": 120, "y": 410, "w": 320, "h": 36, "z": 3 },
+              "content": [{ "text": "Build together", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-platform-card1-body",
+              "type": "text",
+              "box": { "x": 120, "y": 460, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "Bring team members and AI agents into one shared workspace, with design systems to keep everything on brand." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-platform-card1-cta",
+              "type": "action",
+              "box": { "x": 120, "y": 580, "w": 160, "h": 40, "z": 3 },
+              "label": "Start building →",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-platform-card2-bg",
+              "type": "container",
+              "box": { "x": 520, "y": 300, "w": 400, "h": 520, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-platform-card2-icon",
+              "type": "shape",
+              "box": { "x": 560, "y": 340, "w": 48, "h": 48, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#22c55e" }
+            },
+            {
+              "id": "wf-platform-card2-title",
+              "type": "text",
+              "box": { "x": 560, "y": 410, "w": 320, "h": 36, "z": 3 },
+              "content": [{ "text": "Publish at scale", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-platform-card2-body",
+              "type": "text",
+              "box": { "x": 560, "y": 460, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "Create and manage content in a visual, composable CMS - with built-in SEO and AEO to reach humans and machines alike." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-platform-card2-cta",
+              "type": "action",
+              "box": { "x": 560, "y": 580, "w": 180, "h": 40, "z": 3 },
+              "label": "Start publishing →",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-platform-card3-bg",
+              "type": "container",
+              "box": { "x": 960, "y": 300, "w": 400, "h": 520, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-platform-card3-icon",
+              "type": "shape",
+              "box": { "x": 1000, "y": 340, "w": 48, "h": 48, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#f59e0b" }
+            },
+            {
+              "id": "wf-platform-card3-title",
+              "type": "text",
+              "box": { "x": 1000, "y": 410, "w": 320, "h": 36, "z": 3 },
+              "content": [{ "text": "Optimize for growth", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-platform-card3-body",
+              "type": "text",
+              "box": { "x": 1000, "y": 460, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "Turn every page into a revenue driver with native analytics and AI that show you what's working and help you scale it." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-platform-card3-cta",
+              "type": "action",
+              "box": { "x": 1000, "y": 580, "w": 180, "h": 40, "z": 3 },
+              "label": "Start optimizing →",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "underline"
+            }
+          ]
+        },
+        {
+          "id": "wf-social-proof",
+          "recipeId": "testimonial-row",
+          "name": "Social proof",
+          "height": 700,
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-proof-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 400, "h": 28, "z": 2 },
+              "content": [{ "text": "CUSTOMER STORIES" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-proof-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 120, "w": 900, "h": 80, "z": 2 },
+              "content": [
+                { "text": "300,000+ brands", "marks": [{ "type": "bold" }] },
+                { "text": " move the needle with Webflow." }
+              ],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-proof-card1-bg",
+              "type": "container",
+              "box": { "x": 80, "y": 260, "w": 620, "h": 380, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-proof-card1-stat",
+              "type": "text",
+              "box": { "x": 120, "y": 300, "w": 540, "h": 60, "z": 3 },
+              "content": [{ "text": "32 global sites launched in 10 days", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 32,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-proof-card1-quote",
+              "type": "text",
+              "box": { "x": 120, "y": 380, "w": 540, "h": 120, "z": 3 },
+              "content": [
+                { "text": "\"Before Webflow, we had a rigid, brittle CMS that wouldn't allow us to execute quickly or at scale. We were shackled by older technology.\"" }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-proof-card1-author",
+              "type": "text",
+              "box": { "x": 120, "y": 520, "w": 540, "h": 28, "z": 3 },
+              "content": [
+                { "text": "Rob Alfano" , "marks": [{ "type": "bold" }] },
+                { "text": ", VP of Digital Marketing - Verifone" }
+              ],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#71717a" }
+            },
+            {
+              "id": "wf-proof-card1-link",
+              "type": "action",
+              "box": { "x": 120, "y": 564, "w": 180, "h": 32, "z": 3 },
+              "label": "Read customer story →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-proof-card2-bg",
+              "type": "container",
+              "box": { "x": 740, "y": 260, "w": 620, "h": 380, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-proof-card2-stat",
+              "type": "text",
+              "box": { "x": 780, "y": 300, "w": 540, "h": 60, "z": 3 },
+              "content": [{ "text": "20% increase in site-wide conversion", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 32,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-proof-card2-quote",
+              "type": "text",
+              "box": { "x": 780, "y": 380, "w": 540, "h": 120, "z": 3 },
+              "content": [
+                { "text": "\"With Webflow, we've significantly improved organic traffic, SEO, and conversions. From my perspective as CMO, that's a huge win.\"" }
+              ],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-proof-card2-author",
+              "type": "text",
+              "box": { "x": 780, "y": 520, "w": 540, "h": 28, "z": 3 },
+              "content": [
+                { "text": "Elizabeth Walton Egan", "marks": [{ "type": "bold" }] },
+                { "text": ", CMO - Lattice" }
+              ],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#71717a" }
+            },
+            {
+              "id": "wf-proof-card2-link",
+              "type": "action",
+              "box": { "x": 780, "y": 564, "w": 180, "h": 32, "z": 3 },
+              "label": "Read customer story →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            }
+          ]
+        },
+        {
+          "id": "wf-features",
+          "recipeId": "feature-grid",
+          "name": "Feature showcase",
+          "height": 860,
+          "backgroundEffect": "paper",
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "wf-feat-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 400, "h": 28, "z": 2 },
+              "content": [{ "text": "FROM IDEA TO IMPACT" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-feat-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 120, "w": 700, "h": 80, "z": 2 },
+              "content": [
+                { "text": "From idea to impact, " },
+                { "text": "faster", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 48,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-feat-subhead",
+              "type": "text",
+              "box": { "x": 80, "y": 210, "w": 700, "h": 60, "z": 2 },
+              "content": [{ "text": "Webflow's agentic AI works alongside your team - drafting copy, generating pages, running experiments - with the guardrails enterprise teams need." }],
+              "role": "body",
+              "fontSize": 17,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-feat-build-panel",
+              "type": "container",
+              "box": { "x": 80, "y": 320, "w": 420, "h": 480, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-feat-build-badge",
+              "type": "text",
+              "box": { "x": 120, "y": 360, "w": 80, "h": 28, "z": 3 },
+              "content": [{ "text": "BUILD" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-feat-build-title",
+              "type": "text",
+              "box": { "x": 120, "y": 400, "w": 340, "h": 64, "z": 3 },
+              "content": [{ "text": "Design without limits", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-feat-build-body",
+              "type": "text",
+              "box": { "x": 120, "y": 480, "w": 340, "h": 120, "z": 3 },
+              "content": [{ "text": "Design directly in the browser - no redlines, no translation layer. What you design is what ships, pixel for pixel. Generate clean code components using your existing design system." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-feat-build-cta",
+              "type": "action",
+              "box": { "x": 120, "y": 620, "w": 200, "h": 40, "z": 3 },
+              "label": "Discover Webflow AI →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-feat-manage-panel",
+              "type": "container",
+              "box": { "x": 520, "y": 320, "w": 420, "h": 480, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-feat-manage-badge",
+              "type": "text",
+              "box": { "x": 560, "y": 360, "w": 100, "h": 28, "z": 3 },
+              "content": [{ "text": "MANAGE" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#22c55e" }
+            },
+            {
+              "id": "wf-feat-manage-title",
+              "type": "text",
+              "box": { "x": 560, "y": 400, "w": 340, "h": 64, "z": 3 },
+              "content": [{ "text": "Publish without the handoff tax", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-feat-manage-body",
+              "type": "text",
+              "box": { "x": 560, "y": 480, "w": 340, "h": 120, "z": 3 },
+              "content": [{ "text": "Generate copy and CMS collection items individually or in bulk to keep your site fresh, drive traffic, and strengthen your brand presence across channels." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-feat-manage-cta",
+              "type": "action",
+              "box": { "x": 560, "y": 620, "w": 160, "h": 40, "z": 3 },
+              "label": "Explore CMS →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-feat-optimize-panel",
+              "type": "container",
+              "box": { "x": 960, "y": 320, "w": 400, "h": 480, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-feat-optimize-badge",
+              "type": "text",
+              "box": { "x": 1000, "y": 360, "w": 100, "h": 28, "z": 3 },
+              "content": [{ "text": "OPTIMIZE" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#f59e0b" }
+            },
+            {
+              "id": "wf-feat-optimize-title",
+              "type": "text",
+              "box": { "x": 1000, "y": 400, "w": 320, "h": 64, "z": 3 },
+              "content": [{ "text": "Turn traffic into revenue", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-feat-optimize-body",
+              "type": "text",
+              "box": { "x": 1000, "y": 480, "w": 320, "h": 120, "z": 3 },
+              "content": [{ "text": "Native tools run experiments, personalize by audience, and optimize for traditional search and LLMs. AI-powered A/B testing helps prove ROI on every page." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-feat-optimize-cta",
+              "type": "action",
+              "box": { "x": 1000, "y": 620, "w": 180, "h": 40, "z": 3 },
+              "label": "See analytics →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            }
+          ]
+        },
+        {
+          "id": "wf-cta-band",
+          "recipeId": "cta-band",
+          "name": "Final CTA",
+          "height": 560,
+          "backgroundEffect": "soft-light",
+          "entrance": "scale-in",
+          "elements": [
+            {
+              "id": "wf-cta-bg",
+              "type": "container",
+              "box": { "x": 160, "y": 80, "w": 1120, "h": 400, "z": 0 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-cta-heading",
+              "type": "text",
+              "box": { "x": 240, "y": 140, "w": 960, "h": 120, "z": 3 },
+              "content": [
+                { "text": "Make your website your " },
+                { "text": "competitive edge", "marks": [{ "type": "bold" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 52,
+              "fontWeight": 600,
+              "align": "center"
+            },
+            {
+              "id": "wf-cta-body",
+              "type": "text",
+              "box": { "x": 340, "y": 280, "w": 760, "h": 40, "z": 3 },
+              "content": [{ "text": "Build a brand people trust and pipeline you can measure, all with one powerful platform." }],
+              "role": "body",
+              "fontSize": 17,
+              "fontWeight": 400,
+              "align": "center",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-cta-primary",
+              "type": "action",
+              "box": { "x": 500, "y": 360, "w": 220, "h": 56, "z": 3 },
+              "label": "Get started - it's free",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-cta-secondary",
+              "type": "action",
+              "box": { "x": 740, "y": 360, "w": 180, "h": 56, "z": 3 },
+              "label": "Talk to sales",
+              "href": { "type": "external", "url": "/contact" },
+              "variant": "outline"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-wf-blog",
+      "slug": "blog",
+      "title": "Blog - Insights, tutorials, and updates",
+      "width": 1440,
+      "description": "The latest on web design, development, and building for the modern web.",
+      "sections": [
+        {
+          "id": "wf-blog-hero",
+          "recipeId": "custom",
+          "name": "Blog hero",
+          "height": 340,
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-blog-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 200, "h": 28, "z": 2 },
+              "content": [{ "text": "THE BLOG" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-blog-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 120, "w": 800, "h": 100, "z": 2 },
+              "content": [
+                { "text": "Insights for builders, " },
+                { "text": "by builders", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 56,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-blog-subhead",
+              "type": "text",
+              "box": { "x": 80, "y": 240, "w": 600, "h": 48, "z": 2 },
+              "content": [{ "text": "Design thinking, engineering depth, and product strategy from the team building the modern web." }],
+              "role": "body",
+              "fontSize": 17,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-blog-featured",
+          "recipeId": "custom",
+          "name": "Featured post",
+          "height": 520,
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-blog-feat-card",
+              "type": "container",
+              "box": { "x": 80, "y": 0, "w": 1280, "h": 460, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-blog-feat-image",
+              "type": "container",
+              "box": { "x": 80, "y": 0, "w": 640, "h": 460, "z": 2 },
+              "variant": "flat",
+              "pinnedStyle": { "background": "#111113" }
+            },
+            {
+              "id": "wf-blog-feat-placeholder",
+              "type": "shape",
+              "box": { "x": 300, "y": 170, "w": 200, "h": 120, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#1f1f23" }
+            },
+            {
+              "id": "wf-blog-feat-tag",
+              "type": "text",
+              "box": { "x": 780, "y": 48, "w": 200, "h": 24, "z": 3 },
+              "content": [{ "text": "FEATURED" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-blog-feat-title",
+              "type": "text",
+              "box": { "x": 780, "y": 88, "w": 520, "h": 100, "z": 3 },
+              "content": [{ "text": "Introducing Webflow AEO: Own your visibility in AI search", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 32,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-blog-feat-excerpt",
+              "type": "text",
+              "box": { "x": 780, "y": 210, "w": 520, "h": 100, "z": 3 },
+              "content": [{ "text": "AI search is changing how people discover brands. Webflow AEO gives your marketing team the tools to control how AI models see, cite, and recommend your content - without writing a line of code." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-blog-feat-meta",
+              "type": "text",
+              "box": { "x": 780, "y": 340, "w": 300, "h": 24, "z": 3 },
+              "content": [{ "text": "May 20, 2026  ·  8 min read" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-blog-feat-cta",
+              "type": "action",
+              "box": { "x": 780, "y": 388, "w": 160, "h": 40, "z": 3 },
+              "label": "Read more →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            }
+          ]
+        },
+        {
+          "id": "wf-blog-grid",
+          "recipeId": "custom",
+          "name": "Blog grid",
+          "height": 720,
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "wf-blog-grid-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 40, "w": 300, "h": 36, "z": 2 },
+              "content": [{ "text": "Latest posts" }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-blog-post1-card",
+              "type": "container",
+              "box": { "x": 80, "y": 110, "w": 400, "h": 560, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-blog-post1-image",
+              "type": "container",
+              "box": { "x": 80, "y": 110, "w": 400, "h": 240, "z": 2 },
+              "variant": "flat",
+              "pinnedStyle": { "background": "#111113" }
+            },
+            {
+              "id": "wf-blog-post1-img-placeholder",
+              "type": "shape",
+              "box": { "x": 220, "y": 190, "w": 120, "h": 80, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#1f1f23" }
+            },
+            {
+              "id": "wf-blog-post1-tag",
+              "type": "text",
+              "box": { "x": 112, "y": 370, "w": 120, "h": 22, "z": 3 },
+              "content": [{ "text": "DESIGN" }],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-blog-post1-title",
+              "type": "text",
+              "box": { "x": 112, "y": 400, "w": 340, "h": 72, "z": 3 },
+              "content": [{ "text": "Design systems that actually scale: lessons from 100+ enterprise sites", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 20,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-blog-post1-excerpt",
+              "type": "text",
+              "box": { "x": 112, "y": 484, "w": 340, "h": 60, "z": 3 },
+              "content": [{ "text": "How enterprise teams are using composable design systems to ship faster without sacrificing brand consistency." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-blog-post1-meta",
+              "type": "text",
+              "box": { "x": 112, "y": 560, "w": 240, "h": 22, "z": 3 },
+              "content": [{ "text": "May 18, 2026  ·  6 min read" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-blog-post2-card",
+              "type": "container",
+              "box": { "x": 520, "y": 110, "w": 400, "h": 560, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-blog-post2-image",
+              "type": "container",
+              "box": { "x": 520, "y": 110, "w": 400, "h": 240, "z": 2 },
+              "variant": "flat",
+              "pinnedStyle": { "background": "#111113" }
+            },
+            {
+              "id": "wf-blog-post2-img-placeholder",
+              "type": "shape",
+              "box": { "x": 660, "y": 190, "w": 120, "h": 80, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#1f1f23" }
+            },
+            {
+              "id": "wf-blog-post2-tag",
+              "type": "text",
+              "box": { "x": 552, "y": 370, "w": 140, "h": 22, "z": 3 },
+              "content": [{ "text": "ENGINEERING" }],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#22c55e" }
+            },
+            {
+              "id": "wf-blog-post2-title",
+              "type": "text",
+              "box": { "x": 552, "y": 400, "w": 340, "h": 72, "z": 3 },
+              "content": [{ "text": "How we built the Webflow MCP server for Cursor and Claude", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 20,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-blog-post2-excerpt",
+              "type": "text",
+              "box": { "x": 552, "y": 484, "w": 340, "h": 60, "z": 3 },
+              "content": [{ "text": "A deep dive into building an MCP server that lets AI assistants generate and manage Webflow components natively." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-blog-post2-meta",
+              "type": "text",
+              "box": { "x": 552, "y": 560, "w": 240, "h": 22, "z": 3 },
+              "content": [{ "text": "May 14, 2026  ·  12 min read" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-blog-post3-card",
+              "type": "container",
+              "box": { "x": 960, "y": 110, "w": 400, "h": 560, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-blog-post3-image",
+              "type": "container",
+              "box": { "x": 960, "y": 110, "w": 400, "h": 240, "z": 2 },
+              "variant": "flat",
+              "pinnedStyle": { "background": "#111113" }
+            },
+            {
+              "id": "wf-blog-post3-img-placeholder",
+              "type": "shape",
+              "box": { "x": 1100, "y": 190, "w": 120, "h": 80, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#1f1f23" }
+            },
+            {
+              "id": "wf-blog-post3-tag",
+              "type": "text",
+              "box": { "x": 992, "y": 370, "w": 140, "h": 22, "z": 3 },
+              "content": [{ "text": "STRATEGY" }],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#f59e0b" }
+            },
+            {
+              "id": "wf-blog-post3-title",
+              "type": "text",
+              "box": { "x": 992, "y": 400, "w": 340, "h": 72, "z": 3 },
+              "content": [{ "text": "AEO vs SEO: why your site needs to speak to machines and humans", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 20,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-blog-post3-excerpt",
+              "type": "text",
+              "box": { "x": 992, "y": 484, "w": 340, "h": 60, "z": 3 },
+              "content": [{ "text": "AI engine optimization is the new frontier. Here's how forward-thinking marketing teams are preparing their web presence." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-blog-post3-meta",
+              "type": "text",
+              "box": { "x": 992, "y": 560, "w": 240, "h": 22, "z": 3 },
+              "content": [{ "text": "May 10, 2026  ·  5 min read" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            }
+          ]
+        },
+        {
+          "id": "wf-blog-newsletter",
+          "recipeId": "cta-band",
+          "name": "Newsletter CTA",
+          "height": 400,
+          "entrance": "scale-in",
+          "elements": [
+            {
+              "id": "wf-newsletter-bg",
+              "type": "container",
+              "box": { "x": 200, "y": 60, "w": 1040, "h": 280, "z": 0 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-newsletter-heading",
+              "type": "text",
+              "box": { "x": 320, "y": 108, "w": 800, "h": 60, "z": 3 },
+              "content": [
+                { "text": "Stay in the " },
+                { "text": "flow", "marks": [{ "type": "italic" }] }
+              ],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 600,
+              "align": "center"
+            },
+            {
+              "id": "wf-newsletter-body",
+              "type": "text",
+              "box": { "x": 380, "y": 180, "w": 680, "h": 40, "z": 3 },
+              "content": [{ "text": "Get the latest on web design, product updates, and building for the modern web. Delivered weekly." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "center",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-newsletter-cta",
+              "type": "action",
+              "box": { "x": 600, "y": 248, "w": 240, "h": 52, "z": 3 },
+              "label": "Subscribe to the blog",
+              "href": { "type": "external", "url": "#subscribe" },
+              "variant": "solid"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-wf-pricing",
+      "slug": "pricing",
+      "title": "Pricing - Plans for every team",
+      "width": 1440,
+      "description": "Start building for free and add a paid plan later to unlock premium hosting, design, and collaboration features.",
+      "sections": [
+        {
+          "id": "wf-pricing-hero",
+          "recipeId": "custom",
+          "name": "Pricing hero",
+          "height": 280,
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-pricing-heading",
+              "type": "text",
+              "box": { "x": 200, "y": 80, "w": 1040, "h": 80, "z": 2 },
+              "content": [
+                { "text": "Create powerful, custom websites " },
+                { "text": "with your team", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 52,
+              "fontWeight": 600,
+              "align": "center"
+            },
+            {
+              "id": "wf-pricing-subhead",
+              "type": "text",
+              "box": { "x": 300, "y": 184, "w": 840, "h": 48, "z": 2 },
+              "content": [{ "text": "Start building for free and add a paid plan later to unlock premium hosting, design, and collaboration features." }],
+              "role": "body",
+              "fontSize": 17,
+              "fontWeight": 400,
+              "align": "center",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-pricing-tiers",
+          "recipeId": "feature-grid",
+          "name": "Site plans",
+          "height": 800,
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "wf-pricing-label",
+              "type": "text",
+              "box": { "x": 80, "y": 20, "w": 200, "h": 28, "z": 2 },
+              "content": [{ "text": "SITE PLANS" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-pricing-free-card",
+              "type": "container",
+              "box": { "x": 80, "y": 68, "w": 310, "h": 680, "z": 1 },
+              "variant": "outlined"
+            },
+            {
+              "id": "wf-pricing-free-name",
+              "type": "text",
+              "box": { "x": 112, "y": 100, "w": 246, "h": 32, "z": 3 },
+              "content": [{ "text": "Starter" }],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-free-price",
+              "type": "text",
+              "box": { "x": 112, "y": 144, "w": 246, "h": 56, "z": 3 },
+              "content": [{ "text": "Free", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-free-desc",
+              "type": "text",
+              "box": { "x": 112, "y": 216, "w": 246, "h": 48, "z": 3 },
+              "content": [{ "text": "For exploring and experimenting with Webflow." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-free-cta",
+              "type": "action",
+              "box": { "x": 112, "y": 284, "w": 246, "h": 44, "z": 3 },
+              "label": "Start for free",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "outline"
+            },
+            {
+              "id": "wf-pricing-free-f1",
+              "type": "text",
+              "box": { "x": 112, "y": 360, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Webflow.io domain" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-free-f2",
+              "type": "text",
+              "box": { "x": 112, "y": 392, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  2 static pages" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-free-f3",
+              "type": "text",
+              "box": { "x": 112, "y": 424, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  1 GB bandwidth" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-free-f4",
+              "type": "text",
+              "box": { "x": 112, "y": 456, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Webflow AI + MCP server" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-basic-card",
+              "type": "container",
+              "box": { "x": 420, "y": 68, "w": 310, "h": 680, "z": 1 },
+              "variant": "outlined"
+            },
+            {
+              "id": "wf-pricing-basic-name",
+              "type": "text",
+              "box": { "x": 452, "y": 100, "w": 246, "h": 32, "z": 3 },
+              "content": [{ "text": "Basic" }],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-basic-price",
+              "type": "text",
+              "box": { "x": 452, "y": 144, "w": 246, "h": 56, "z": 3 },
+              "content": [
+                { "text": "$15", "marks": [{ "type": "bold" }] },
+                { "text": "/mo" }
+              ],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-basic-billing",
+              "type": "text",
+              "box": { "x": 452, "y": 200, "w": 246, "h": 20, "z": 3 },
+              "content": [{ "text": "billed yearly" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-pricing-basic-desc",
+              "type": "text",
+              "box": { "x": 452, "y": 228, "w": 246, "h": 40, "z": 3 },
+              "content": [{ "text": "For simple sites that don't need a CMS." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-basic-cta",
+              "type": "action",
+              "box": { "x": 452, "y": 284, "w": 246, "h": 44, "z": 3 },
+              "label": "Add plan",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-pricing-basic-f1",
+              "type": "text",
+              "box": { "x": 452, "y": 360, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Custom domain" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-basic-f2",
+              "type": "text",
+              "box": { "x": 452, "y": 392, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  300 static pages" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-basic-f3",
+              "type": "text",
+              "box": { "x": 452, "y": 424, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  10 GB bandwidth" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-basic-f4",
+              "type": "text",
+              "box": { "x": 452, "y": 456, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Unlimited form submissions" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-premium-card",
+              "type": "container",
+              "box": { "x": 760, "y": 68, "w": 310, "h": 680, "z": 1 },
+              "variant": "raised",
+              "pinnedStyle": { "border": "1px solid #4353FF" }
+            },
+            {
+              "id": "wf-pricing-premium-badge",
+              "type": "text",
+              "box": { "x": 792, "y": 80, "w": 100, "h": 20, "z": 4 },
+              "content": [{ "text": "POPULAR" }],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-pricing-premium-name",
+              "type": "text",
+              "box": { "x": 792, "y": 100, "w": 246, "h": 32, "z": 3 },
+              "content": [{ "text": "Premium" }],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-premium-price",
+              "type": "text",
+              "box": { "x": 792, "y": 144, "w": 246, "h": 56, "z": 3 },
+              "content": [
+                { "text": "$25", "marks": [{ "type": "bold" }] },
+                { "text": "/mo" }
+              ],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-premium-billing",
+              "type": "text",
+              "box": { "x": 792, "y": 200, "w": 246, "h": 20, "z": 3 },
+              "content": [{ "text": "billed yearly" }],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-pricing-premium-desc",
+              "type": "text",
+              "box": { "x": 792, "y": 228, "w": 246, "h": 40, "z": 3 },
+              "content": [{ "text": "For content-rich sites with robust CMS and traffic needs." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-premium-cta",
+              "type": "action",
+              "box": { "x": 792, "y": 284, "w": 246, "h": 44, "z": 3 },
+              "label": "Add plan",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-pricing-premium-f1",
+              "type": "text",
+              "box": { "x": 792, "y": 360, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Everything in Basic" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-premium-f2",
+              "type": "text",
+              "box": { "x": 792, "y": 392, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Webflow CMS" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-premium-f3",
+              "type": "text",
+              "box": { "x": 792, "y": 424, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Up to 2.5 TB bandwidth" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-premium-f4",
+              "type": "text",
+              "box": { "x": 792, "y": 456, "w": 246, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Code components + site search" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-enterprise-card",
+              "type": "container",
+              "box": { "x": 1100, "y": 68, "w": 260, "h": 680, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-pricing-enterprise-name",
+              "type": "text",
+              "box": { "x": 1128, "y": 100, "w": 204, "h": 32, "z": 3 },
+              "content": [{ "text": "Enterprise" }],
+              "role": "heading",
+              "fontSize": 22,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-enterprise-price",
+              "type": "text",
+              "box": { "x": 1128, "y": 144, "w": 204, "h": 56, "z": 3 },
+              "content": [{ "text": "Custom", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-pricing-enterprise-desc",
+              "type": "text",
+              "box": { "x": 1128, "y": 216, "w": 204, "h": 60, "z": 3 },
+              "content": [{ "text": "Flexible, fully customizable solution for organizations." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-enterprise-cta",
+              "type": "action",
+              "box": { "x": 1128, "y": 284, "w": 204, "h": 44, "z": 3 },
+              "label": "Talk to us",
+              "href": { "type": "page", "pageId": "page-wf-enterprise" },
+              "variant": "outline"
+            },
+            {
+              "id": "wf-pricing-enterprise-f1",
+              "type": "text",
+              "box": { "x": 1128, "y": 360, "w": 204, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Granular permissions" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-enterprise-f2",
+              "type": "text",
+              "box": { "x": 1128, "y": 392, "w": 204, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Custom SLAs" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-enterprise-f3",
+              "type": "text",
+              "box": { "x": 1128, "y": 424, "w": 204, "h": 24, "z": 3 },
+              "content": [{ "text": "✓  Dedicated account mgr" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-pricing-cta",
+          "recipeId": "cta-band",
+          "name": "Pricing CTA",
+          "height": 400,
+          "entrance": "scale-in",
+          "elements": [
+            {
+              "id": "wf-pricing-cta-bg",
+              "type": "container",
+              "box": { "x": 200, "y": 60, "w": 1040, "h": 280, "z": 0 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-pricing-cta-heading",
+              "type": "text",
+              "box": { "x": 320, "y": 108, "w": 800, "h": 60, "z": 3 },
+              "content": [{ "text": "Get started for free" }],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 600,
+              "align": "center"
+            },
+            {
+              "id": "wf-pricing-cta-body",
+              "type": "text",
+              "box": { "x": 380, "y": 180, "w": 680, "h": 40, "z": 3 },
+              "content": [{ "text": "Try Webflow for as long as you like with our free Starter plan. No credit card required." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "center",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-pricing-cta-primary",
+              "type": "action",
+              "box": { "x": 520, "y": 244, "w": 220, "h": 52, "z": 3 },
+              "label": "Get started - it's free",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-pricing-cta-secondary",
+              "type": "action",
+              "box": { "x": 760, "y": 244, "w": 160, "h": 52, "z": 3 },
+              "label": "Watch demo",
+              "href": { "type": "external", "url": "#demo" },
+              "variant": "outline"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-wf-enterprise",
+      "slug": "enterprise",
+      "title": "Enterprise - Scale with confidence",
+      "width": 1440,
+      "description": "See how enterprises achieve a 332% ROI with Webflow. Enterprise-grade scalability, security, and support.",
+      "sections": [
+        {
+          "id": "wf-ent-hero",
+          "recipeId": "hero-split",
+          "name": "Enterprise hero",
+          "height": 720,
+          "backgroundEffect": "grid",
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-ent-hero-bg",
+              "type": "container",
+              "box": { "x": 0, "y": 0, "w": 1440, "h": 720, "z": 0 },
+              "variant": "soft-panel"
+            },
+            {
+              "id": "wf-ent-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 300, "h": 28, "z": 3 },
+              "content": [{ "text": "WEBFLOW ENTERPRISE" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-ent-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 124, "w": 700, "h": 200, "z": 3 },
+              "content": [
+                { "text": "Build better enterprise websites - " },
+                { "text": "faster", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 64,
+              "fontWeight": 700,
+              "align": "left",
+              "motion": { "preset": "fade-up", "delayMs": 40 }
+            },
+            {
+              "id": "wf-ent-body",
+              "type": "text",
+              "box": { "x": 80, "y": 352, "w": 580, "h": 80, "z": 3 },
+              "content": [{ "text": "See how enterprises achieve a 332% ROI with Webflow. Enterprise-grade scalability, security, and support - with a unified dashboard for your entire team." }],
+              "role": "body",
+              "fontSize": 18,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-ent-cta-primary",
+              "type": "action",
+              "box": { "x": 80, "y": 472, "w": 180, "h": 52, "z": 3 },
+              "label": "Contact sales",
+              "href": { "type": "external", "url": "/contact" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-ent-cta-secondary",
+              "type": "action",
+              "box": { "x": 280, "y": 472, "w": 180, "h": 52, "z": 3 },
+              "label": "Watch demo",
+              "href": { "type": "external", "url": "#demo" },
+              "variant": "outline"
+            },
+            {
+              "id": "wf-ent-stat-panel",
+              "type": "container",
+              "box": { "x": 800, "y": 100, "w": 560, "h": 520, "z": 2 },
+              "variant": "raised",
+              "motion": { "preset": "slide-left", "delayMs": 100 }
+            },
+            {
+              "id": "wf-ent-stat1-card",
+              "type": "container",
+              "box": { "x": 832, "y": 140, "w": 240, "h": 140, "z": 4 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-ent-stat1-num",
+              "type": "text",
+              "box": { "x": 860, "y": 160, "w": 184, "h": 56, "z": 5 },
+              "content": [{ "text": "332%", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-stat1-label",
+              "type": "text",
+              "box": { "x": 860, "y": 220, "w": 184, "h": 40, "z": 5 },
+              "content": [{ "text": "ROI achieved by enterprises" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 500,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-ent-stat2-card",
+              "type": "container",
+              "box": { "x": 1092, "y": 140, "w": 240, "h": 140, "z": 4 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-ent-stat2-num",
+              "type": "text",
+              "box": { "x": 1120, "y": 160, "w": 184, "h": 56, "z": 5 },
+              "content": [{ "text": "99.99%", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-stat2-label",
+              "type": "text",
+              "box": { "x": 1120, "y": 220, "w": 184, "h": 40, "z": 5 },
+              "content": [{ "text": "uptime SLA guaranteed" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 500,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-ent-stat3-card",
+              "type": "container",
+              "box": { "x": 832, "y": 300, "w": 500, "h": 140, "z": 4 },
+              "variant": "outlined"
+            },
+            {
+              "id": "wf-ent-stat3-num",
+              "type": "text",
+              "box": { "x": 860, "y": 320, "w": 440, "h": 56, "z": 5 },
+              "content": [{ "text": "$6M", "marks": [{ "type": "bold" }] }, { "text": " annual savings" }],
+              "role": "heading",
+              "fontSize": 36,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-stat3-label",
+              "type": "text",
+              "box": { "x": 860, "y": 380, "w": 440, "h": 40, "z": 5 },
+              "content": [{ "text": "OrangeTheory Fitness saved by consolidating on Webflow" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 500,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-ent-pillars",
+          "recipeId": "feature-grid",
+          "name": "Enterprise pillars",
+          "height": 700,
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "wf-ent-pillars-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 800, "h": 80, "z": 2 },
+              "content": [
+                { "text": "Enterprise-grade, " },
+                { "text": "at every layer", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-p1-card",
+              "type": "container",
+              "box": { "x": 80, "y": 210, "w": 400, "h": 420, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-ent-p1-icon",
+              "type": "shape",
+              "box": { "x": 120, "y": 250, "w": 44, "h": 44, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#4353FF" }
+            },
+            {
+              "id": "wf-ent-p1-title",
+              "type": "text",
+              "box": { "x": 120, "y": 314, "w": 320, "h": 36, "z": 3 },
+              "content": [{ "text": "Scalability", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-p1-body",
+              "type": "text",
+              "box": { "x": 120, "y": 364, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "CMS at scale, global optimization, and high-volume automation. Enterprise traffic scaling with AWS-backed infrastructure and global CDN." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-ent-p2-card",
+              "type": "container",
+              "box": { "x": 520, "y": 210, "w": 400, "h": 420, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-ent-p2-icon",
+              "type": "shape",
+              "box": { "x": 560, "y": 250, "w": 44, "h": 44, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#22c55e" }
+            },
+            {
+              "id": "wf-ent-p2-title",
+              "type": "text",
+              "box": { "x": 560, "y": 314, "w": 320, "h": 36, "z": 3 },
+              "content": [{ "text": "Governance", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-p2-body",
+              "type": "text",
+              "box": { "x": 560, "y": 364, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "Granular permissions, enterprise workflows, compliance and audit logs. SOC 2 Type II certified with SSO, SCIM, and SIEM integration." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-ent-p3-card",
+              "type": "container",
+              "box": { "x": 960, "y": 210, "w": 400, "h": 420, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-ent-p3-icon",
+              "type": "shape",
+              "box": { "x": 1000, "y": 250, "w": 44, "h": 44, "z": 3 },
+              "variant": "rect",
+              "pinnedStyle": { "background": "#f59e0b" }
+            },
+            {
+              "id": "wf-ent-p3-title",
+              "type": "text",
+              "box": { "x": 1000, "y": 314, "w": 320, "h": 36, "z": 3 },
+              "content": [{ "text": "Security", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 24,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-ent-p3-body",
+              "type": "text",
+              "box": { "x": 1000, "y": 364, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "TLS/SSL encryption, DDoS mitigation via AWS and Cloudflare, audit log API, custom certificates. 24/7 monitoring with enterprise Whistic profile." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-ent-logos",
+          "recipeId": "logo-strip",
+          "name": "Enterprise logos",
+          "height": 240,
+          "entrance": "fade-in",
+          "elements": [
+            {
+              "id": "wf-ent-logos-heading",
+              "type": "text",
+              "box": { "x": 320, "y": 32, "w": 800, "h": 28, "z": 2 },
+              "content": [{ "text": "Trusted by the world's most innovative companies" }],
+              "role": "label",
+              "fontSize": 14,
+              "fontWeight": 500,
+              "align": "center",
+              "pinnedStyle": { "color": "#71717a" }
+            },
+            {
+              "id": "wf-ent-logos-strip",
+              "type": "container",
+              "box": { "x": 80, "y": 80, "w": 1280, "h": 64, "z": 1 },
+              "variant": "outlined",
+              "pinnedStyle": { "background": "rgba(255, 255, 255, 0.02)" }
+            },
+            {
+              "id": "wf-ent-logo-1",
+              "type": "text",
+              "box": { "x": 120, "y": 96, "w": 100, "h": 32, "z": 3 },
+              "content": [{ "text": "Spotify" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-ent-logo-2",
+              "type": "text",
+              "box": { "x": 280, "y": 96, "w": 100, "h": 32, "z": 3 },
+              "content": [{ "text": "Dropbox" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-ent-logo-3",
+              "type": "text",
+              "box": { "x": 440, "y": 96, "w": 100, "h": 32, "z": 3 },
+              "content": [{ "text": "Discord" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-ent-logo-4",
+              "type": "text",
+              "box": { "x": 600, "y": 96, "w": 100, "h": 32, "z": 3 },
+              "content": [{ "text": "Upwork" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-ent-logo-5",
+              "type": "text",
+              "box": { "x": 760, "y": 96, "w": 100, "h": 32, "z": 3 },
+              "content": [{ "text": "Reddit" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-ent-logo-6",
+              "type": "text",
+              "box": { "x": 920, "y": 96, "w": 120, "h": 32, "z": 3 },
+              "content": [{ "text": "Greenhouse" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            },
+            {
+              "id": "wf-ent-logo-7",
+              "type": "text",
+              "box": { "x": 1100, "y": 96, "w": 120, "h": 32, "z": 3 },
+              "content": [{ "text": "Lattice" }],
+              "role": "label",
+              "fontSize": 16,
+              "fontWeight": 700,
+              "align": "center",
+              "pinnedStyle": { "color": "#52525b" }
+            }
+          ]
+        },
+        {
+          "id": "wf-ent-cta",
+          "recipeId": "cta-band",
+          "name": "Enterprise CTA",
+          "height": 440,
+          "backgroundEffect": "soft-light",
+          "entrance": "scale-in",
+          "elements": [
+            {
+              "id": "wf-ent-cta-bg",
+              "type": "container",
+              "box": { "x": 160, "y": 60, "w": 1120, "h": 320, "z": 0 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-ent-cta-heading",
+              "type": "text",
+              "box": { "x": 280, "y": 108, "w": 880, "h": 80, "z": 3 },
+              "content": [
+                { "text": "Ready to see Webflow " },
+                { "text": "at enterprise scale", "marks": [{ "type": "bold" }] },
+                { "text": "?" }
+              ],
+              "role": "heading",
+              "fontSize": 44,
+              "fontWeight": 600,
+              "align": "center"
+            },
+            {
+              "id": "wf-ent-cta-body",
+              "type": "text",
+              "box": { "x": 360, "y": 200, "w": 720, "h": 40, "z": 3 },
+              "content": [{ "text": "Talk to our enterprise team about custom pricing, SLAs, and a personalized onboarding plan." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "center",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-ent-final-primary",
+              "type": "action",
+              "box": { "x": 540, "y": 268, "w": 180, "h": 52, "z": 3 },
+              "label": "Contact sales",
+              "href": { "type": "external", "url": "/contact" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-ent-final-secondary",
+              "type": "action",
+              "box": { "x": 740, "y": 268, "w": 180, "h": 52, "z": 3 },
+              "label": "Watch demo",
+              "href": { "type": "external", "url": "#demo" },
+              "variant": "outline"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page-wf-customers",
+      "slug": "customers",
+      "title": "Customers - Stories from 300,000+ teams",
+      "width": 1440,
+      "description": "See how enterprises, agencies, and businesses large and small build with Webflow.",
+      "sections": [
+        {
+          "id": "wf-cust-hero",
+          "recipeId": "custom",
+          "name": "Customers hero",
+          "height": 340,
+          "entrance": "fade-up",
+          "elements": [
+            {
+              "id": "wf-cust-kicker",
+              "type": "text",
+              "box": { "x": 80, "y": 80, "w": 300, "h": 28, "z": 2 },
+              "content": [{ "text": "CUSTOMER STORIES" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-cust-heading",
+              "type": "text",
+              "box": { "x": 80, "y": 120, "w": 900, "h": 100, "z": 2 },
+              "content": [
+                { "text": "Built by the best, " },
+                { "text": "proven by results", "marks": [{ "type": "italic" }] },
+                { "text": "." }
+              ],
+              "role": "heading",
+              "fontSize": 56,
+              "fontWeight": 600,
+              "align": "left"
+            },
+            {
+              "id": "wf-cust-subhead",
+              "type": "text",
+              "box": { "x": 80, "y": 240, "w": 700, "h": 48, "z": 2 },
+              "content": [{ "text": "See how enterprises, agencies, and fast-growing teams use Webflow to ship faster, convert more, and cut costs." }],
+              "role": "body",
+              "fontSize": 17,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-cust-grid",
+          "recipeId": "feature-grid",
+          "name": "Customer stories",
+          "height": 960,
+          "entrance": "stagger-children",
+          "elements": [
+            {
+              "id": "wf-cust-card1-bg",
+              "type": "container",
+              "box": { "x": 80, "y": 0, "w": 620, "h": 420, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-cust-card1-company",
+              "type": "text",
+              "box": { "x": 120, "y": 40, "w": 540, "h": 28, "z": 3 },
+              "content": [{ "text": "VERIFONE" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-cust-card1-stat",
+              "type": "text",
+              "box": { "x": 120, "y": 80, "w": 540, "h": 60, "z": 3 },
+              "content": [{ "text": "32 global sites launched in 10 days", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 32,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-cust-card1-quote",
+              "type": "text",
+              "box": { "x": 120, "y": 160, "w": 540, "h": 100, "z": 3 },
+              "content": [{ "text": "\"We were shackled by older technology and we needed to tell the story of the modern Verifone. Webflow let us execute quickly and at scale.\"" }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-cust-card1-author",
+              "type": "text",
+              "box": { "x": 120, "y": 280, "w": 540, "h": 24, "z": 3 },
+              "content": [
+                { "text": "Rob Alfano", "marks": [{ "type": "bold" }] },
+                { "text": " - VP of Digital Marketing" }
+              ],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#71717a" }
+            },
+            {
+              "id": "wf-cust-card1-cta",
+              "type": "action",
+              "box": { "x": 120, "y": 324, "w": 160, "h": 32, "z": 3 },
+              "label": "Read story →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-cust-card2-bg",
+              "type": "container",
+              "box": { "x": 740, "y": 0, "w": 620, "h": 420, "z": 1 },
+              "variant": "raised"
+            },
+            {
+              "id": "wf-cust-card2-company",
+              "type": "text",
+              "box": { "x": 780, "y": 40, "w": 540, "h": 28, "z": 3 },
+              "content": [{ "text": "LATTICE" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#22c55e" }
+            },
+            {
+              "id": "wf-cust-card2-stat",
+              "type": "text",
+              "box": { "x": 780, "y": 80, "w": 540, "h": 60, "z": 3 },
+              "content": [{ "text": "20% increase in site-wide conversion", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 32,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-cust-card2-quote",
+              "type": "text",
+              "box": { "x": 780, "y": 160, "w": 540, "h": 100, "z": 3 },
+              "content": [{ "text": "With Webflow, we have significantly improved organic traffic, SEO, and conversions. From my perspective as CMO, that is a huge win because our brand is reaching more people." }],
+              "role": "body",
+              "fontSize": 15,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-cust-card2-author",
+              "type": "text",
+              "box": { "x": 780, "y": 280, "w": 540, "h": 24, "z": 3 },
+              "content": [
+                { "text": "Elizabeth Walton Egan", "marks": [{ "type": "bold" }] },
+                { "text": " - CMO" }
+              ],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#71717a" }
+            },
+            {
+              "id": "wf-cust-card2-cta",
+              "type": "action",
+              "box": { "x": 780, "y": 324, "w": 160, "h": 32, "z": 3 },
+              "label": "Read story →",
+              "href": { "type": "external", "url": "#" },
+              "variant": "underline"
+            },
+            {
+              "id": "wf-cust-card3-bg",
+              "type": "container",
+              "box": { "x": 80, "y": 460, "w": 400, "h": 440, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-cust-card3-company",
+              "type": "text",
+              "box": { "x": 120, "y": 500, "w": 320, "h": 28, "z": 3 },
+              "content": [{ "text": "ORANGETHEORY" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#f59e0b" }
+            },
+            {
+              "id": "wf-cust-card3-stat",
+              "type": "text",
+              "box": { "x": 120, "y": 540, "w": 320, "h": 60, "z": 3 },
+              "content": [{ "text": "$6M in annual cost savings", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-cust-card3-quote",
+              "type": "text",
+              "box": { "x": 120, "y": 620, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "We've reinvested those savings in other areas like website optimization and localization - that's been really powerful." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-cust-card3-author",
+              "type": "text",
+              "box": { "x": 120, "y": 740, "w": 320, "h": 24, "z": 3 },
+              "content": [
+                { "text": "Malcolm Greene", "marks": [{ "type": "bold" }] },
+                { "text": " - CIO" }
+              ],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#71717a" }
+            },
+            {
+              "id": "wf-cust-card4-bg",
+              "type": "container",
+              "box": { "x": 520, "y": 460, "w": 400, "h": 440, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-cust-card4-company",
+              "type": "text",
+              "box": { "x": 560, "y": 500, "w": 320, "h": 28, "z": 3 },
+              "content": [{ "text": "SAMSARA" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#4353FF" }
+            },
+            {
+              "id": "wf-cust-card4-stat",
+              "type": "text",
+              "box": { "x": 560, "y": 540, "w": 320, "h": 60, "z": 3 },
+              "content": [{ "text": "50% lift in conversion rate", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-cust-card4-quote",
+              "type": "text",
+              "box": { "x": 560, "y": 620, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "On-page form experiments drove a 50% lift in conversion rate - results we could measure from day one." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-cust-card5-bg",
+              "type": "container",
+              "box": { "x": 960, "y": 460, "w": 400, "h": 440, "z": 1 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-cust-card5-company",
+              "type": "text",
+              "box": { "x": 1000, "y": 500, "w": 320, "h": 28, "z": 3 },
+              "content": [{ "text": "VEO" }],
+              "role": "label",
+              "fontSize": 13,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": { "color": "#22c55e" }
+            },
+            {
+              "id": "wf-cust-card5-stat",
+              "type": "text",
+              "box": { "x": 1000, "y": 540, "w": 320, "h": 60, "z": 3 },
+              "content": [{ "text": "170% increase in demo bookings", "marks": [{ "type": "bold" }] }],
+              "role": "heading",
+              "fontSize": 28,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "wf-cust-card5-quote",
+              "type": "text",
+              "box": { "x": 1000, "y": 620, "w": 320, "h": 100, "z": 3 },
+              "content": [{ "text": "Webflow's visual CMS and optimization tools helped us nearly triple our demo pipeline in under a quarter." }],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            }
+          ]
+        },
+        {
+          "id": "wf-cust-cta",
+          "recipeId": "cta-band",
+          "name": "Customers CTA",
+          "height": 400,
+          "entrance": "scale-in",
+          "elements": [
+            {
+              "id": "wf-cust-cta-bg",
+              "type": "container",
+              "box": { "x": 200, "y": 60, "w": 1040, "h": 280, "z": 0 },
+              "variant": "glass"
+            },
+            {
+              "id": "wf-cust-cta-heading",
+              "type": "text",
+              "box": { "x": 320, "y": 108, "w": 800, "h": 60, "z": 3 },
+              "content": [{ "text": "Join 300,000+ teams on Webflow" }],
+              "role": "heading",
+              "fontSize": 40,
+              "fontWeight": 600,
+              "align": "center"
+            },
+            {
+              "id": "wf-cust-cta-body",
+              "type": "text",
+              "box": { "x": 380, "y": 180, "w": 680, "h": 40, "z": 3 },
+              "content": [{ "text": "Try Webflow for free and see why the world's best teams choose us." }],
+              "role": "body",
+              "fontSize": 16,
+              "fontWeight": 400,
+              "align": "center",
+              "pinnedStyle": { "color": "#a1a1aa" }
+            },
+            {
+              "id": "wf-cust-cta-primary",
+              "type": "action",
+              "box": { "x": 520, "y": 244, "w": 220, "h": 52, "z": 3 },
+              "label": "Get started - it's free",
+              "href": { "type": "external", "url": "/signup" },
+              "variant": "solid"
+            },
+            {
+              "id": "wf-cust-cta-secondary",
+              "type": "action",
+              "box": { "x": 760, "y": 244, "w": 160, "h": 52, "z": 3 },
+              "label": "Contact sales",
+              "href": { "type": "external", "url": "/contact" },
+              "variant": "outline"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
