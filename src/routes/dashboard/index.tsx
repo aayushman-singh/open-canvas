@@ -26,6 +26,26 @@ export const dashboard = new Hono<{ Bindings: Bindings; Variables: ClerkAuthVari
 dashboard.use('*', clerkAuth());
 dashboard.use('*', requireAuth());
 
+dashboard.use('*', async (c, next) => {
+  await next();
+  const ct = c.res.headers.get('content-type') ?? '';
+  if (!ct.includes('text/html')) return;
+  const { publishableKey } = resolveClerkKeys(c.env);
+  const clerkScript =
+    `<script>(function(){` +
+    `var pk="${publishableKey}";` +
+    `var r=atob(pk.replace(/^pk_(test|live)_/,""));` +
+    `if(r.endsWith("$"))r=r.slice(0,-1);` +
+    `var s=document.createElement("script");` +
+    `s.src="https://"+r+"/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";` +
+    `s.crossOrigin="anonymous";s.async=true;` +
+    `s.onload=function(){if(window.Clerk)window.Clerk.load();};` +
+    `document.head.appendChild(s);` +
+    `})()</script>`;
+  const body = await c.res.text();
+  c.res = new Response(body.replace('</head>', clerkScript + '</head>'), c.res);
+});
+
 const THUMB_SCALE = 0.24;
 
 function formatDate(d: Date): string {

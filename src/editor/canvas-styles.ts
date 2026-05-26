@@ -716,11 +716,11 @@ body[data-placement-active="true"] .rev01-section-slot {
 .resize-handle-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
 .resize-handle-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
 
-/* -- Element context menu (3-dot trigger, top-left on hover) ------------- */
+/* -- Element context menu (3-dot trigger, above top-left, selected only) -- */
 .rev01-element .element-menu-trigger {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: -28px;
+  left: 0;
   width: 22px;
   height: 22px;
   display: none;
@@ -737,7 +737,7 @@ body[data-placement-active="true"] .rev01-section-slot {
   padding: 0;
   letter-spacing: 1px;
 }
-.rev01-element:hover .element-menu-trigger,
+.rev01-element[data-selected="true"] .element-menu-trigger,
 .rev01-element .element-menu-trigger[data-menu-open="true"] {
   display: flex;
 }
@@ -748,8 +748,8 @@ body[data-placement-active="true"] .rev01-section-slot {
 
 .element-menu {
   position: absolute;
-  top: 28px;
-  left: 4px;
+  top: 24px;
+  left: 0;
   min-width: 180px;
   background: var(--rev01-bg-panel-strong);
   border: 1px solid var(--rev01-hairline-strong);

@@ -1638,6 +1638,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (!existing.parentNode) continue;
       const replacement = buildElementNode(found.element);
       existing.parentNode.replaceChild(replacement, existing);
+      if (found.element.type === "text") {
+        var inner = replacement.querySelector(".rev01-text");
+        if (inner) {
+          var textH = inner.scrollHeight;
+          if (textH > found.element.box.h) {
+            found.element.box.h = textH;
+            setBoxStyle(replacement, found.element.box);
+          }
+        }
+      }
     }
   }
 
@@ -1810,6 +1820,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderInspector();
     renderSidebarSelection();
     renderReel();
+    autoGrowTextElements();
 
     if (pendingImport) {
       renderPlacementSlots();
@@ -1817,6 +1828,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     if (!activePageId && state.pages.length > 0) {
       activePageId = state.pages[0].id;
+    }
+  }
+
+  function autoGrowTextElements() {
+    var wrappers = root.querySelectorAll('[data-element-type="text"]');
+    for (var i = 0; i < wrappers.length; i++) {
+      var w = wrappers[i];
+      var inner = w.querySelector(".rev01-text");
+      if (!inner) continue;
+      var eid = w.getAttribute("data-rev01-element");
+      var found = findElement(eid);
+      if (!found) continue;
+      var textH = inner.scrollHeight;
+      if (textH > found.element.box.h) {
+        found.element.box.h = textH;
+        setBoxStyle(w, found.element.box);
+      }
     }
   }
 
