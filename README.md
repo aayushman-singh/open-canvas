@@ -41,14 +41,7 @@ bun.cmd run build           # wrangler deploy --dry-run
 
 ## Status
 
-Canvas-first POC. Implementation plan: [docs/superpowers/plans/2026-05-22-canvas-first-poc.md](docs/superpowers/plans/2026-05-22-canvas-first-poc.md). ADR for the architecture reset: [docs/adr/0003-canvas-first-reset.md](docs/adr/0003-canvas-first-reset.md). The earlier ProseMirror + Yjs implementation is preserved on disk as inert reference code — see [RECON.md](RECON.md) for what is retained where.
-
-## Documents
-
-- [ADR 0001 — Original architecture](docs/architecture/0001-architecture.md) (superseded by 0003).
-- [ADR 0002 — Published Address](docs/adr/0002-published-address.md) — wildcard host + custom-domain hand-off.
-- [ADR 0003 — Canvas-first reset](docs/adr/0003-canvas-first-reset.md) — current architecture.
-- [RECON.md](RECON.md) — backlog, locked decisions, what is retired and why.
+Canvas-first POC — actively developed.
 
 ## License
 
