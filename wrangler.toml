@@ -1,6 +1,6 @@
 name = "rev01"
 main = "src/index.ts"
-compatibility_date = "2026-05-01"
+compatibility_date = "2026-05-26"
 compatibility_flags = ["nodejs_compat"]
 
 [[routes]]
