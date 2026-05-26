@@ -220,6 +220,7 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
     pages: template.state.pages,
     ...(template.state.header ? { header: template.state.header } : {}),
     ...(template.state.footer ? { footer: template.state.footer } : {}),
+    ...(template.state.customStyleKit ? { customStyleKit: template.state.customStyleKit } : {}),
   };
   const html = renderCanvasSnapshot(snapshot, `/dashboard/templates/${template.id}/assets`);
 
@@ -281,7 +282,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                       src={`/dashboard/templates/${template.id}/preview`}
                       title={`${template.name} preview`}
                       loading="lazy"
-                      sandbox=""
+                      sandbox="allow-scripts"
                       referrerpolicy="no-referrer"
                     />
                   </span>
@@ -310,7 +311,7 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                       src={`/api/custom-templates/${dt.id}/preview`}
                       title={`${dt.name} preview`}
                       loading="lazy"
-                      sandbox=""
+                      sandbox="allow-scripts"
                       referrerpolicy="no-referrer"
                     />
                   </span>
