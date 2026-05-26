@@ -5899,29 +5899,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
 
-    const hasHeader = hasHeaderSection(page);
-    const hasFooter = hasFooterSection(page);
-
-    // Section nodes carry data-rev01-section (see buildSectionNode); the
-    // [data-section-id] attribute is used by toolbar buttons, not the section
-    // DOM root.
-    const sectionNodes = Array.from(canvasRoot.querySelectorAll('[data-rev01-section]'));
+    const sectionNodes = Array.from(
+      canvasRoot.querySelectorAll('[data-rev01-section]:not([data-section-role])'),
+    );
     for (let i = 0; i < sectionNodes.length; i += 1) {
-      if (hasHeader && i === 0) continue;
-      if (hasFooter && i === sections.length - 1) continue;
       const node = sectionNodes[i];
       if (node.parentNode) node.parentNode.insertBefore(makeSlot(i), node);
     }
     const lastNode = sectionNodes[sectionNodes.length - 1];
-    var endIdx = hasFooter ? sections.length - 1 : sections.length;
-    if (hasFooter && sectionNodes[endIdx]) {
-      const footerNode = sectionNodes[endIdx];
-      if (footerNode.parentNode) footerNode.parentNode.insertBefore(makeSlot(endIdx), footerNode);
-    } else if (lastNode && lastNode.parentNode) {
-      if (lastNode.nextSibling) {
-        lastNode.parentNode.insertBefore(makeSlot(endIdx), lastNode.nextSibling);
+    if (lastNode && lastNode.parentNode) {
+      const afterLast = lastNode.nextSibling;
+      if (afterLast) {
+        lastNode.parentNode.insertBefore(makeSlot(sections.length), afterLast);
       } else {
-        lastNode.parentNode.appendChild(makeSlot(endIdx));
+        lastNode.parentNode.appendChild(makeSlot(sections.length));
       }
     }
   }
