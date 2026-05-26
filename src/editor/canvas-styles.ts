@@ -137,12 +137,13 @@ body.rev01-modal-open {
   top: 56px;
   left: 0;
   bottom: 28px;
-  width: 248px;
+  width: 280px;
   z-index: 150;
   min-width: 0;
   border-right: 1px solid var(--rev01-hairline);
   background: linear-gradient(180deg, var(--rev01-bg-titlebar), var(--rev01-bg-panel-strong));
   overflow-y: auto;
+  overflow-x: hidden;
   transition: width 0.15s ease, transform 0.15s ease;
 }
 .rev01-editor-sidebar.collapsed {
@@ -290,8 +291,8 @@ body.rev01-modal-open {
 .rev01-section-picker {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px 8px;
 }
 
 .rev01-section-picker-empty {
@@ -333,11 +334,12 @@ body.rev01-modal-open {
 .rev01-section-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px;
+  gap: 4px;
+  padding: 8px;
   border: 1px solid var(--rev01-hairline);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--rev01-bg-panel);
+  cursor: grab;
 }
 .rev01-section-card-head {
   display: flex;
@@ -487,7 +489,7 @@ body[data-placement-active="true"] .rev01-section-slot {
   background:
     radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
     linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
-  margin-left: 268px;
+  margin-left: 300px;
   margin-right: 320px;
   height: calc(100vh - 56px);
   display: block;
