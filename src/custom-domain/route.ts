@@ -13,7 +13,7 @@
 // register / poll / delete primitives, which are pure functions over deps
 // and inputs so they can be smoke-tested without the route layer.
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { createCfHostnamesClient } from './cf-api.js';
 import { deleteCustomDomain } from './delete.js';
@@ -111,23 +111,12 @@ router.get('/', async (c) => {
     return c.json({ error: 'site not found' }, 404);
   }
   const database = db(c.env);
-  // Scope by site + ownership in a single query so a typo'd siteId doesn't
-  // leak rows owned by a different Owner.
-  const siteRows = await database
-    .select({ id: site.id })
-    .from(site)
-    .where(eq(site.id, siteId))
-    .limit(1);
-  if (!siteRows[0]) {
-    return c.json({ error: 'site not found' }, 404);
-  }
-  // REVIEW: this queries all owned sites (limit 50), then checks if siteId is in the list. Two problems: (1) O(N) scan instead of a single `WHERE id = siteId AND customerId = customerId` query, and (2) customers with >50 sites silently bypass the ownership check for sites beyond the 50th. Combine into a single query with both conditions.
   const ownedRows = await database
     .select({ id: site.id })
     .from(site)
-    .where(eq(site.customerId, customerId))
-    .limit(50);
-  if (!ownedRows.some((r) => r.id === siteId)) {
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .limit(1);
+  if (!ownedRows[0]) {
     return c.json({ error: 'site not found' }, 404);
   }
   const domains = await database

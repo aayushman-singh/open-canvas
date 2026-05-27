@@ -119,7 +119,6 @@ export async function pollOne(
         failureReason: 'Cloudflare no longer recognises this hostname',
       };
     }
-    // REVIEW: transient CF errors are logged but the return value is "no change" — the caller sees success. Per all-or-nothing posture, this should return a failure sentinel or throw so the cron handler can report degraded poll health. As-is, intermittent CF outages are invisible to monitoring.
     console.error('[custom-domain] CF poll failed for row', {
       rowId: row.id,
       hostname: row.hostname,
