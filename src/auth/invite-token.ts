@@ -24,6 +24,7 @@ export async function signInviteToken(
   // Reuse the same HMAC-SHA256 signing from edit-token but with invite-specific
   // payload fields and a longer TTL. The token format is identical (header.payload.sig)
   // so verifyEditToken can decode it — we just cast the payload type.
+  // REVIEW: casting InviteTokenPayload to EditTokenPayload is a type lie — the shapes have incompatible fields (collaboratorId vs customerId). Works because signEditToken just JSON-encodes the payload, but this creates tight coupling to an implementation detail. Extract a generic `signHMACJwt(payload: Record<string, unknown>, secret, ttl)` function both can call.
   return signEditToken(payload as unknown as Omit<import('./edit-token').EditTokenPayload, 'iat' | 'exp'>, secret, INVITE_TTL_SECONDS);
 }
 

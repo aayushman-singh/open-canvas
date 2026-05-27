@@ -44,6 +44,7 @@ refreshRoute.post('/refresh', async (c) => {
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
+  // REVIEW: manually constructing Set-Cookie is error-prone — Hono provides `setCookie()` from `hono/cookie` that handles escaping and edge cases. Replace manual string join with the framework helper.
   const cookieValue = [
     `${EDIT_TOKEN_COOKIE}=${fresh}`,
     'Path=/',
