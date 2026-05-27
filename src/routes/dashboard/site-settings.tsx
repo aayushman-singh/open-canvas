@@ -24,7 +24,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customer, site, siteCollaborator } from '../../db/schema';
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Badge, Card } from '../../ui';
 
 interface Bindings {
@@ -250,7 +250,7 @@ function clientScript(siteId: string): string {
   }
   if (disableBtn) {
     disableBtn.addEventListener('click', async () => {
-      if (!confirm('Disable password protection? Visitors will be able to view this site without a password.')) return;
+      if (!await __rev01Modal.confirm('Disable password protection? Visitors will be able to view this site without a password.', { title: 'Disable protection' })) return;
       disableBtn.disabled = true;
       try {
         const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/password', {
@@ -328,7 +328,7 @@ function clientScript(siteId: string): string {
       if (!btn) return;
       const collabId = btn.getAttribute('data-remove-collab');
       if (!collabId) return;
-      if (!confirm('Remove this collaborator?')) return;
+      if (!await __rev01Modal.confirm('Remove this collaborator?', { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true })) return;
       btn.disabled = true;
       clearCollabStatus();
       try {
@@ -393,6 +393,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         { label: 'Settings' },
       ]}
       pageStyles={pageStyles}
+      siteNav={buildSiteNav(owned.id, owned.name, `/dashboard/sites/${owned.id}/settings`)}
     >
       <h1>Settings</h1>
       <p class="lede">

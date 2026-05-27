@@ -28,7 +28,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customDomain, customer, site, type CustomDomain } from '../../db/schema';
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Badge } from '../../ui';
 
 interface Bindings {
@@ -332,7 +332,7 @@ function clientScript(siteId: string): string {
     removeBtn.addEventListener('click', async () => {
       const hostname = card.getAttribute('data-hostname');
       if (!hostname) return;
-      if (!confirm('Remove ' + hostname + '? This cannot be undone.')) return;
+      if (!await __rev01Modal.confirm('Remove ' + hostname + '? This cannot be undone.', { title: 'Remove domain', confirmLabel: 'Remove', danger: true })) return;
       removeBtn.disabled = true;
       try {
         const response = await fetch(
@@ -390,6 +390,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
         { label: 'Custom domains' },
       ]}
       pageStyles={pageStyles}
+      siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/domains`)}
     >
       <h1>Custom domains</h1>
       <p class="lede">

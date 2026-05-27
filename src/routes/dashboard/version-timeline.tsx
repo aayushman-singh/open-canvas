@@ -23,7 +23,7 @@ import { db } from '../../db/client.js';
 import { customer, site } from '../../db/schema.js';
 
 import { listSnapshots, type SnapshotListItem } from '../../version/list.js';
-import { DashboardShell } from './shell.js';
+import { DashboardShell, buildSiteNav } from './shell.js';
 import { Button, Badge } from '../../ui';
 
 interface Bindings {
@@ -227,7 +227,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
       }
 
       async function doRestore(id, label) {
-        if (!confirm('Restore "' + label + '"? This overwrites your current edits. A safety snapshot of your current state will be saved automatically.')) {
+        if (!await __rev01Modal.confirm('Restore "' + label + '"? This overwrites your current edits. A safety snapshot of your current state will be saved automatically.', { title: 'Restore version' })) {
           return;
         }
         const res = await fetch(apiBase + '/' + encodeURIComponent(id) + '/restore', {
@@ -236,7 +236,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         });
         if (!res.ok) {
           const body = await res.text();
-          alert('Restore failed: ' + body);
+          __rev01Modal.alert('Restore failed: ' + body, 'Error');
           return;
         }
         window.location.reload();
@@ -245,7 +245,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
       async function doManualCapture(form) {
         const label = String(new FormData(form).get('label') || '').trim();
         if (label.length === 0) {
-          alert('Label is required.');
+          __rev01Modal.alert('Label is required.', 'Missing label');
           return;
         }
         const res = await fetch(apiBase, {
@@ -255,7 +255,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         });
         if (!res.ok) {
           const body = await res.text();
-          alert('Capture failed: ' + body);
+          __rev01Modal.alert('Capture failed: ' + body, 'Error');
           return;
         }
         window.location.reload();
@@ -294,6 +294,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         { href: `/dashboard/sites/${row.id}/edit`, label: row.name },
         { label: 'Version history' },
       ]}
+      siteNav={buildSiteNav(row.id, row.name, `/dashboard/sites/${row.id}/snapshots`)}
       pageStyles={panelStyles}
     >
       <h1>Version history</h1>

@@ -521,7 +521,7 @@ settingsRoute.get('/settings', async (c) => {
         <div class="settings-section danger-zone">
           <h3>Danger zone</h3>
           <p class="desc">Permanently delete your account and all associated data. This cannot be undone.</p>
-          <button class="btn-danger" onclick="alert('Account deletion is not available in the demo.')">Delete account</button>
+          <button class="btn-danger" onclick="__rev01Modal.alert('Account deletion is not available in the demo.', 'Not available')">Delete account</button>
         </div>
       </div>
 

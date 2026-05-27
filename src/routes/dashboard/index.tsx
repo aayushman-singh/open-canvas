@@ -30,6 +30,7 @@ dashboard.use('*', async (c, next) => {
   await next();
   const ct = c.res.headers.get('content-type') ?? '';
   if (!ct.includes('text/html')) return;
+  if (c.req.path.endsWith('/preview')) return;
   const { publishableKey } = resolveClerkKeys(c.env);
   const clerkScript =
     `<script>(function(){` +
@@ -863,7 +864,7 @@ document.addEventListener('click', function(e) {
     .catch(function(err) {
       unpubBtn.textContent = 'Failed';
       unpubBtn.style.pointerEvents = '';
-      alert(err.message || 'Unpublish failed');
+      __rev01Modal.alert(err.message || 'Unpublish failed', 'Unpublish error');
     });
 });
 
@@ -889,7 +890,7 @@ document.addEventListener('click', function(e) {
       pubBtn.textContent = 'Failed';
       pubBtn.title = err.message || 'Unknown error';
       pubBtn.style.pointerEvents = '';
-      alert(err.message || 'Publish failed');
+      __rev01Modal.alert(err.message || 'Publish failed', 'Publish error');
     });
 });
 </script>`);
@@ -1066,6 +1067,9 @@ dashboard.get('/', async (c) => {
   const { publishableKey } = resolveClerkKeys(c.env);
   const signOutUrl = buildSignOutUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url, '/'));
 
+  const FREE_SITE_LIMIT = 3;
+  const atSiteLimit = cards.length >= FREE_SITE_LIMIT;
+
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
 
@@ -1081,6 +1085,7 @@ dashboard.get('/', async (c) => {
         <div class="dash-stat-card">
           <div class="stat-label">Total sites</div>
           <div class="stat-value">{String(cards.length)}</div>
+          <div class="stat-sub">of {String(FREE_SITE_LIMIT)} on Free</div>
         </div>
         <div class="dash-stat-card">
           <div class="stat-label">Published</div>
@@ -1103,7 +1108,10 @@ dashboard.get('/', async (c) => {
         <h1>Your sites</h1>
         <div class="dash-header-actions">
           <Button variant="secondary" class="import-site" id="import-btn">Import</Button>
-          <Button variant="primary" class="new-site" href="/dashboard/templates">+ New site</Button>
+          {atSiteLimit
+            ? <Button variant="primary" class="new-site" href="/dashboard/settings">Upgrade to add sites</Button>
+            : <Button variant="primary" class="new-site" href="/dashboard/templates">+ New site</Button>
+          }
         </div>
       </div>
 

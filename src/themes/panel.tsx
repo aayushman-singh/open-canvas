@@ -662,7 +662,7 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
     reset.addEventListener('click', async () => {
       const target = root.querySelector('[data-rev01-theme-reset-target]');
       const builtIn = target ? target.value : 'charcoal';
-      if (!confirm('Reset to built-in kit "' + builtIn + '"? Your custom theme will be discarded.')) return;
+      if (!await window.__rev01Modal.confirm('Reset to built-in kit "' + builtIn + '"? Your custom theme will be discarded.', { title: 'Reset theme' })) return;
       setStatus('Resetting to ' + builtIn + '…');
       try {
         const response = await fetch(
@@ -851,8 +851,8 @@ function darkVariantClientScript(siteId: string, preset: StyleKitPreset): string
   }
   const clearBtn = root.querySelector('[data-rev01-dark-clear]');
   if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      if (!confirm('Clear the dark variant? Visitors in dark mode will see the light kit.')) return;
+    clearBtn.addEventListener('click', async () => {
+      if (!await window.__rev01Modal.confirm('Clear the dark variant? Visitors in dark mode will see the light kit.', { title: 'Clear dark variant' })) return;
       const nextKit = JSON.parse(JSON.stringify(STATE.preset));
       delete nextKit.dark;
       putKit(nextKit);
@@ -1107,7 +1107,7 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
 
       const deleteId = target.getAttribute('data-rev01-font-delete');
       if (deleteId) {
-        if (!confirm('Delete this font? Any token that references it will stop rendering.')) return;
+        if (!await window.__rev01Modal.confirm('Delete this font? Any token that references it will stop rendering.', { title: 'Delete font', confirmLabel: 'Delete', danger: true })) return;
         setStatus('Deleting font…');
         try {
           const response = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/fonts/' + encodeURIComponent(deleteId), {

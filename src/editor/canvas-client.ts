@@ -19,12 +19,13 @@
 export interface CanvasClientScriptParams {
   siteId: string;
   apiBase?: string;
+  wsToken?: string;
 }
 
 const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
 
 export function canvasClientScript(params: CanvasClientScriptParams): string {
-  const { siteId, apiBase = '/api' } = params;
+  const { siteId, apiBase = '/api', wsToken = '' } = params;
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
     throw new Error(
       `canvasClientScript: siteId must match /^[A-Za-z0-9-]+$/ (got ${JSON.stringify(siteId)})`,
@@ -41,6 +42,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
   const API_BASE = ${JSON.stringify(apiBase)};
+  const WS_TOKEN = ${JSON.stringify(wsToken)};
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
 
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic"];
@@ -154,6 +156,25 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const saveButton = document.getElementById("canvas-save");
   const publishButton = document.getElementById("canvas-publish");
   const saveTemplateButton = document.getElementById("canvas-save-template");
+
+  // -- Chat panel toggle (wired early — no site data dependency) ----------
+  var chatToggleBtn = document.getElementById("canvas-chat-toggle");
+  var chatPanelEl = document.getElementById("canvas-chat-panel");
+  var chatCloseBtn = document.getElementById("canvas-chat-close");
+
+  function toggleChatPanel() {
+    if (!chatPanelEl) return;
+    var isOpen = !chatPanelEl.hidden;
+    chatPanelEl.hidden = isOpen;
+    if (chatToggleBtn) chatToggleBtn.classList.toggle("active", !isOpen);
+    if (!isOpen) {
+      var inp = document.getElementById("canvas-chat-input");
+      if (inp) inp.focus();
+    }
+  }
+
+  if (chatToggleBtn) chatToggleBtn.addEventListener("click", toggleChatPanel);
+  if (chatCloseBtn) chatCloseBtn.addEventListener("click", toggleChatPanel);
 
   // -- Viewport + camera --------------------------------------------------
   // The route ships #canvas-root directly inside the editor shell. We wrap
@@ -730,6 +751,123 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
+  function openConfirmModal(opts) {
+    if (modalOpen) {
+      throw new Error("openConfirmModal: another modal is already open");
+    }
+    var title = typeof opts.title === "string" ? opts.title : "";
+    var message = typeof opts.message === "string" ? opts.message : "";
+    var confirmLabel = typeof opts.confirmLabel === "string" ? opts.confirmLabel : "OK";
+    var danger = opts.danger === true;
+    modalOpen = true;
+    return new Promise(function(resolve) {
+      var backdrop = document.createElement("div");
+      backdrop.className = "rev01-modal-backdrop";
+      var panel = document.createElement("div");
+      panel.className = "rev01-modal";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      if (title) panel.setAttribute("aria-label", title);
+      if (title) {
+        var h = document.createElement("h3");
+        h.textContent = title;
+        panel.appendChild(h);
+      }
+      var p = document.createElement("p");
+      p.style.cssText = "margin:0 0 14px;font-size:13px;color:var(--rev01-fg-mute);line-height:1.5;white-space:pre-line";
+      p.textContent = message;
+      panel.appendChild(p);
+      var actions = document.createElement("div");
+      actions.className = "rev01-modal-actions";
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = confirmLabel;
+      if (danger) { ok.style.background = "#ef4444"; ok.style.borderColor = "#ef4444"; ok.style.color = "#fff"; }
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      panel.appendChild(actions);
+      backdrop.appendChild(panel);
+      function close(value) {
+        document.removeEventListener("keydown", onKey, true);
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove("rev01-modal-open");
+        modalOpen = false;
+        resolve(value);
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(false); return; }
+        if (ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); close(true); }
+      }
+      backdrop.addEventListener("click", function(ev) { if (ev.target === backdrop) close(false); });
+      cancel.addEventListener("click", function() { close(false); });
+      ok.addEventListener("click", function() { close(true); });
+      document.addEventListener("keydown", onKey, true);
+      document.body.classList.add("rev01-modal-open");
+      document.body.appendChild(backdrop);
+      ok.focus();
+    });
+  }
+
+  function openAlertModal(opts) {
+    if (modalOpen) {
+      throw new Error("openAlertModal: another modal is already open");
+    }
+    var title = typeof opts.title === "string" ? opts.title : "";
+    var message = typeof opts.message === "string" ? opts.message : "";
+    modalOpen = true;
+    return new Promise(function(resolve) {
+      var backdrop = document.createElement("div");
+      backdrop.className = "rev01-modal-backdrop";
+      var panel = document.createElement("div");
+      panel.className = "rev01-modal";
+      panel.setAttribute("role", "alertdialog");
+      panel.setAttribute("aria-modal", "true");
+      if (title) panel.setAttribute("aria-label", title);
+      if (title) {
+        var h = document.createElement("h3");
+        h.textContent = title;
+        panel.appendChild(h);
+      }
+      var p = document.createElement("p");
+      p.style.cssText = "margin:0 0 14px;font-size:13px;color:var(--rev01-fg-mute);line-height:1.5";
+      p.textContent = message;
+      panel.appendChild(p);
+      var actions = document.createElement("div");
+      actions.className = "rev01-modal-actions";
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "OK";
+      actions.appendChild(ok);
+      panel.appendChild(actions);
+      backdrop.appendChild(panel);
+      function close() {
+        document.removeEventListener("keydown", onKey, true);
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove("rev01-modal-open");
+        modalOpen = false;
+        resolve(undefined);
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape" || ev.key === "Enter") { ev.preventDefault(); ev.stopPropagation(); close(); }
+      }
+      backdrop.addEventListener("click", function(ev) { if (ev.target === backdrop) close(); });
+      ok.addEventListener("click", close);
+      document.addEventListener("keydown", onKey, true);
+      document.body.classList.add("rev01-modal-open");
+      document.body.appendChild(backdrop);
+      ok.focus();
+    });
+  }
+
+  window.__rev01Modal = {
+    confirm: function(msg, opts) { var o = opts || {}; return openConfirmModal({ title: o.title || "", message: msg, confirmLabel: o.confirmLabel, danger: o.danger }); },
+    alert: function(msg, title) { return openAlertModal({ title: title || "", message: msg }); },
+    prompt: function(title, label, def) { return openTextModal({ title: title || "", label: label || "", defaultValue: def || "" }); }
+  };
+
   function uuid() {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
@@ -799,6 +937,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renameBtn.setAttribute("data-page-id", page.id);
       actions.appendChild(renameBtn);
 
+      var seoLink = document.createElement("a");
+      seoLink.textContent = "SEO";
+      seoLink.href = "/dashboard/sites/" + SITE_ID + "/pages/" + page.id + "/seo";
+      seoLink.target = "_blank";
+      seoLink.className = "rev01-page-seo-link";
+      actions.appendChild(seoLink);
+
       if (state.pages.length > 1) {
         var deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
@@ -841,14 +986,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     setStatus("Page created: " + newPage.title, "ok");
   }
 
-  function renamePage(pageId) {
+  async function renamePage(pageId) {
     if (!state) return;
     var page = null;
     for (var i = 0; i < state.pages.length; i++) {
       if (state.pages[i].id === pageId) { page = state.pages[i]; break; }
     }
     if (!page) return;
-    var newTitle = window.prompt("Page title:", page.title);
+    var newTitle = await openTextModal({ title: "Rename page", label: "Page title", defaultValue: page.title });
     if (!newTitle || newTitle.trim().length === 0) return;
     newTitle = newTitle.trim();
     page.title = newTitle;
@@ -905,7 +1050,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return refs;
   }
 
-  function deletePage(pageId) {
+  async function deletePage(pageId) {
     if (!state || state.pages.length <= 1) return;
     var idx = -1;
     for (var i = 0; i < state.pages.length; i++) {
@@ -917,7 +1062,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus("Delete blocked: page is linked from " + inboundPageLinks[0], "error");
       return;
     }
-    if (!window.confirm('Delete page "' + state.pages[idx].title + '"? This cannot be undone.')) return;
+    if (!await openConfirmModal({ title: "Delete page", message: 'Delete page "' + state.pages[idx].title + '"? This cannot be undone.', confirmLabel: "Delete", danger: true })) return;
     state.pages.splice(idx, 1);
     captureForUndo();
     if (activePageId === pageId) {
@@ -1015,6 +1160,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function scheduleSave() {
     captureForUndo();
     coEditSync();
+    if (coEditConnection) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
@@ -3113,7 +3259,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       lines.push("", "No canvas references were found.");
     }
     lines.push("", "Continue?");
-    if (!confirm(lines.join("\\n"))) return;
+    if (!await openConfirmModal({ title: "Delete asset", message: lines.join("\\n"), confirmLabel: "Delete", danger: true })) return;
 
     try {
       const resp = await authFetch(
@@ -5240,6 +5386,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (component === "container") return "add-container";
     // Wave 2 #11 — sidebar entry for chart elements.
     if (component === "chart") return "add-chart";
+    if (component === "form") return "add-form";
+    if (component === "embed") return "add-embed";
+    if (component === "code") return "add-code";
+    if (component === "accordion") return "add-accordion";
+    if (component === "carousel") return "add-carousel";
+    if (component === "table") return "add-table";
+    if (component === "nav") return "add-nav";
     return null;
   }
 
@@ -5365,6 +5518,94 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         showLegend: true,
         box: defaultBox(section, 480, 320),
       });
+    } else if (action === "add-form") {
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "form",
+        fields: [
+          { id: newElementId(), label: "Name", kind: "text", required: true, placeholder: "Your name" },
+          { id: newElementId(), label: "Email", kind: "email", required: true, placeholder: "you@example.com" },
+          { id: newElementId(), label: "Message", kind: "textarea", required: false, placeholder: "Your message" },
+        ],
+        submitLabel: "Send",
+        successMessage: "Thanks! We received your submission.",
+        box: defaultBox(section, 480, 360),
+      });
+    } else if (action === "add-embed") {
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "embed",
+        url: "",
+        title: "Embed",
+        box: defaultBox(section, 480, 320),
+      });
+    } else if (action === "add-code") {
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "code",
+        language: "typescript",
+        source: "function hello() {" + String.fromCharCode(10) + "  return 'world';" + String.fromCharCode(10) + "}",
+        showLineNumbers: true,
+        box: defaultBox(section, 480, 240),
+      });
+    } else if (action === "add-accordion") {
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "accordion",
+        items: [
+          { id: newElementId(), title: "First question", body: [{ text: "Answer to the first question." }] },
+          { id: newElementId(), title: "Second question", body: [{ text: "Answer to the second question." }] },
+          { id: newElementId(), title: "Third question", body: [{ text: "Answer to the third question." }] },
+        ],
+        allowMultipleOpen: false,
+        box: defaultBox(section, 480, 320),
+      });
+    } else if (action === "add-carousel") {
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "carousel",
+        slides: [
+          { id: newElementId(), assetId: "__placeholder__", caption: "Slide 1" },
+          { id: newElementId(), assetId: "__placeholder__", caption: "Slide 2" },
+          { id: newElementId(), assetId: "__placeholder__", caption: "Slide 3" },
+        ],
+        showArrows: true,
+        showDots: true,
+        box: defaultBox(section, 480, 320),
+      });
+    } else if (action === "add-table") {
+      var colA = newElementId();
+      var colB = newElementId();
+      var colC = newElementId();
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "table",
+        columns: [
+          { id: colA, header: "Name" },
+          { id: colB, header: "Role" },
+          { id: colC, header: "Status" },
+        ],
+        rows: [
+          { id: newElementId(), cells: Object.fromEntries([[colA, "Alice"], [colB, "Engineer"], [colC, "Active"]]) },
+          { id: newElementId(), cells: Object.fromEntries([[colA, "Bob"], [colB, "Designer"], [colC, "Active"]]) },
+        ],
+        zebra: true,
+        collapseOnPhone: true,
+        box: defaultBox(section, 480, 240),
+      });
+    } else if (action === "add-nav") {
+      addElementToSection(section, {
+        id: newElementId(),
+        type: "nav",
+        links: [
+          { label: "Home", href: "/home", kind: "internal" },
+          { label: "About", href: "/about", kind: "internal" },
+          { label: "Contact", href: "/contact", kind: "internal" },
+        ],
+        layout: "left-right",
+        sticky: false,
+        box: defaultBox(section, 960, 56),
+      });
     } else if (action === "duplicate-section") {
       if (isPinnedSection(section)) return;
       const copy = JSON.parse(JSON.stringify(section));
@@ -5421,7 +5662,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // -- Save section to library -------------------------------------------
 
   async function saveToLibrary(section) {
-    var name = prompt("Section name for the library:", section.name || "");
+    var name = await openTextModal({ title: "Save to library", label: "Section name", defaultValue: section.name || "" });
     if (name === null) return;
     if (name.trim().length === 0) name = section.name || "Untitled";
     try {
@@ -5452,13 +5693,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // -- Save site as template ----------------------------------------------
 
   async function saveSiteAsTemplate() {
-    var name = prompt("Template name:", state && state.pages && state.pages[0] ? state.pages[0].title : "");
+    var name = await openTextModal({ title: "Save as template", label: "Template name", defaultValue: state && state.pages && state.pages[0] ? state.pages[0].title : "" });
     if (name === null) return;
     if (name.trim().length === 0) {
       setStatus("Template name is required", "error");
       return;
     }
-    var tagline = prompt("One-line description:", "");
+    var tagline = await openTextModal({ title: "Save as template", label: "One-line description", defaultValue: "" });
     if (tagline === null) tagline = "";
     try {
       var saved = await flushPendingSave();
@@ -6022,7 +6263,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
 
     var scheme = location.protocol === "https:" ? "wss:" : "ws:";
-    var wsUrl = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID);
+    var wsUrl = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID) + (WS_TOKEN ? "&wsToken=" + encodeURIComponent(WS_TOKEN) : "");
 
     var conn = window.__rev01CoEdit.connectCoEdit(SITE_ID, state, {
       websocketUrl: wsUrl,
@@ -6031,10 +6272,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     conn.onRemoteState(function(newState) {
       if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
       state = newState;
-      selectedSectionId = null;
-      selectedElementId = null;
-      editingElementId = null;
-      editingSnapshot = null;
+      if (selectedElementId && !findElement(selectedElementId)) {
+        selectedElementId = null;
+        editingElementId = null;
+        editingSnapshot = null;
+      }
+      if (selectedSectionId && !findSection(selectedSectionId)) {
+        selectedSectionId = null;
+      }
       if (mainEl && state && state.styleKit) {
         mainEl.setAttribute("data-style-kit", state.styleKit);
       }
@@ -6055,6 +6300,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
 
     coEditConnection = conn;
+
+    window.addEventListener("beforeunload", function() {
+      conn.destroy();
+    });
   }
 
   // -- Publish ------------------------------------------------------------
@@ -6169,6 +6418,32 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         clearTemporaryPanState();
         setInteractionMode("select");
         return;
+      }
+      if (
+        (ev.key === "Delete" || ev.key === "Backspace") &&
+        !editingElementId &&
+        !isEditableShortcutTarget(ev.target)
+      ) {
+        if (selectedElementId) {
+          ev.preventDefault();
+          var found = findElement(selectedElementId);
+          if (found) {
+            var idx = found.section.elements.indexOf(found.element);
+            if (idx >= 0) found.section.elements.splice(idx, 1);
+            closeElementMenu();
+            selectedElementId = null;
+            captureForUndo();
+            renderAll();
+            renderInspector();
+            scheduleSave();
+          }
+          return;
+        }
+        if (selectedSectionId) {
+          ev.preventDefault();
+          handleSectionAction("delete-section", selectedSectionId);
+          return;
+        }
       }
       if (ev.key === "1" && !isEditableShortcutTarget(ev.target)) {
         ev.preventDefault();
@@ -6731,8 +7006,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     saveBtn.className = "rev01-sidebar-command";
     saveBtn.textContent = "Save snapshot";
     saveBtn.style.marginBottom = "12px";
-    saveBtn.addEventListener("click", function() {
-      var label = prompt("Snapshot label:");
+    saveBtn.addEventListener("click", async function() {
+      var label = await openTextModal({ title: "Save snapshot", label: "Snapshot label", defaultValue: "" });
       if (!label || !label.trim()) return;
       saveBtn.disabled = true;
       saveBtn.textContent = "Saving...";
@@ -6852,8 +7127,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         restoreBtn.style.color = "#f6f7fb";
         restoreBtn.style.cursor = "pointer";
         restoreBtn.style.fontFamily = "inherit";
-        restoreBtn.addEventListener("click", function() {
-          if (!confirm("Restore to this version? Current state will be saved as a snapshot first.")) return;
+        restoreBtn.addEventListener("click", async function() {
+          if (!await openConfirmModal({ title: "Restore version", message: "Restore to this version? Current state will be saved as a snapshot first." })) return;
           restoreBtn.disabled = true;
           restoreBtn.textContent = "Restoring...";
           authFetch(API_BASE + "/sites/" + SITE_ID + "/snapshots/" + snap.id + "/restore", {
@@ -7003,6 +7278,135 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           })
           .catch(function() {});
       }
+
+      // -- AI prompt button (topbar) ----------------------------------------
+      var aiPromptBtn = document.getElementById("canvas-ai-prompt");
+      if (aiPromptBtn) {
+        aiPromptBtn.addEventListener("click", function() {
+          if (aiBusy) return;
+          openTextModal({
+            title: "Edit with AI",
+            label: "Describe the change you want the agent to make:",
+            placeholder: "Add a testimonials section after the hero",
+            multiline: true,
+          }).then(function(brief) {
+            if (brief === null || brief.trim().length === 0) return;
+            runAiPreview(brief);
+          });
+        });
+      }
+
+      // -- Chat panel form submission -----------------------------------------
+      var chatForm = document.getElementById("canvas-chat-form");
+      var chatInput = document.getElementById("canvas-chat-input");
+      var chatMessages = document.getElementById("canvas-chat-messages");
+      var chatSessionId = null;
+      var chatBusy = false;
+
+      function appendChatMessage(role, text) {
+        if (!chatMessages) return;
+        var div = document.createElement("div");
+        div.className = "rev01-chat-msg " + role;
+        div.textContent = text;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      if (chatForm) {
+        chatForm.addEventListener("submit", function(ev) {
+          ev.preventDefault();
+          if (chatBusy || !chatInput) return;
+          var msg = chatInput.value.trim();
+          if (msg.length === 0) return;
+          chatInput.value = "";
+          appendChatMessage("user", msg);
+          chatBusy = true;
+          var submitBtn = chatForm.querySelector("button[type=submit]");
+          if (submitBtn) submitBtn.disabled = true;
+
+          var payload = { message: msg };
+          if (chatSessionId) payload.sessionId = chatSessionId;
+
+          authFetch(API_BASE + "/sites/" + SITE_ID + "/chat", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(payload),
+          }).then(function(response) {
+            if (!response.ok) {
+              appendChatMessage("error", "Chat request failed: " + response.status);
+              chatBusy = false;
+              if (submitBtn) submitBtn.disabled = false;
+              return;
+            }
+            var reader = response.body.getReader();
+            var decoder = new TextDecoder();
+            var buffer = "";
+            var assistantText = "";
+            var msgDiv = document.createElement("div");
+            msgDiv.className = "rev01-chat-msg assistant";
+            chatMessages.appendChild(msgDiv);
+
+            function readChunk() {
+              reader.read().then(function(result) {
+                if (result.done) {
+                  chatBusy = false;
+                  if (submitBtn) submitBtn.disabled = false;
+                  return;
+                }
+                buffer += decoder.decode(result.value, { stream: true });
+                var lines = buffer.split(String.fromCharCode(10));
+                buffer = lines.pop() || "";
+                for (var i = 0; i < lines.length; i++) {
+                  var line = lines[i];
+                  if (line.indexOf("data: ") === 0) {
+                    var dataStr = line.slice(6);
+                    try {
+                      var data = JSON.parse(dataStr);
+                      if (data.event === "session") {
+                        chatSessionId = data.sessionId || chatSessionId;
+                      } else if (data.event === "token") {
+                        assistantText += data.token || "";
+                        msgDiv.textContent = assistantText;
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                      } else if (data.event === "message") {
+                        assistantText = data.content || assistantText;
+                        msgDiv.textContent = assistantText;
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                      } else if (data.event === "tool-preview") {
+                        var previewLine = "[Agent proposes: " + (data.toolName || "edit") + "]";
+                        appendChatMessage("assistant", previewLine);
+                      } else if (data.event === "state-update") {
+                        if (data.editableState) {
+                          state = data.editableState;
+                          renderAll();
+                          scheduleSave();
+                          setStatus("Agent applied changes", "ok");
+                        }
+                      } else if (data.event === "error") {
+                        appendChatMessage("error", data.message || "Agent error");
+                      } else if (data.event === "done") {
+                        chatBusy = false;
+                        if (submitBtn) submitBtn.disabled = false;
+                      }
+                    } catch (_) { /* ignore malformed SSE lines */ }
+                  }
+                }
+                readChunk();
+              }).catch(function(err) {
+                appendChatMessage("error", "Stream error: " + (err.message || String(err)));
+                chatBusy = false;
+                if (submitBtn) submitBtn.disabled = false;
+              });
+            }
+            readChunk();
+          }).catch(function(err) {
+            appendChatMessage("error", "Network error: " + (err.message || String(err)));
+            chatBusy = false;
+            if (submitBtn) submitBtn.disabled = false;
+          });
+        });
+      }
+
     } catch (err) {
       setStatus("Failed to load site: " + (err && err.message ? err.message : String(err)), "error");
     }
