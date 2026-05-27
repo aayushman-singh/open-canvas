@@ -249,9 +249,7 @@ export function resolveActionHref(
 ): string {
   if (href.type === 'external') return href.url;
   const page = pages.find((p) => p.id === href.pageId);
-  if (!page) {
-    throw new Error(`ActionHref pageId "${href.pageId}" does not reference an existing page`);
-  }
+  if (!page) return '#';
   const base = '/' + page.slug;
   return href.anchor ? base + '#' + href.anchor : base;
 }
