@@ -40,6 +40,7 @@ a11yRoute.use('*', clerkAuth());
 a11yRoute.use('*', requireAuth());
 
 a11yRoute.get('/:siteId/a11y', async (c) => {
+  // REVIEW: `requireAuth()` middleware already runs above. If it guarantees `userId` is set, this throw is dead code. If it doesn't, the middleware is broken and this band-aid hides that. Clarify the middleware contract.
   const auth = c.get('auth');
   if (!auth.userId) {
     throw new Error('a11y route reached without an authenticated user');
@@ -82,6 +83,7 @@ a11yRoute.get('/:siteId/a11y', async (c) => {
     );
   }
 
+  // REVIEW: no Cache-Control header set. Audit reports hit the DB + walk every element — repeated rapid requests from the dashboard will recompute every time. Consider short-term caching (e.g. `max-age=10`) or ETag.
   const report = runAudit(row.editableState);
   return c.json(report);
 });
