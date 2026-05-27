@@ -14,6 +14,8 @@
 // renderer never has to know how Owner Assets are addressed.
 
 import { RENDER_DISPATCH, type ElementRenderCtx } from './elements/index.js';
+import { configureCodeRender } from './elements/code.js';
+import { configureChartPalette } from '../charts/colors.js';
 import {
   escapeAttr,
   escapeCssValue,
@@ -212,6 +214,7 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   // (T5.7) are the Owner's lever for changing it independent of visual z/x/y.
   const elementsHtml = section.elements.map((element) => renderElement(element, ctx)).join('');
   const roleAttr = section.role && section.role !== 'body' ? ` data-section-role="${escapeAttr(section.role)}"` : '';
+  // REVIEW: `section.trigger.value ?? ''` coalesces undefined to empty string. If a delay/scroll trigger reaches render with value=undefined (validation gap at validate.ts:865), the output becomes `data-rev01-trigger-value=""` which client-side handlers will parse as NaN. Should fail loud or omit the attribute when value is undefined.
   const triggerAttrs = section.trigger
     ? ` data-rev01-popup="true" data-rev01-trigger-type="${escapeAttr(section.trigger.type)}" data-rev01-trigger-value="${escapeAttr(String(section.trigger.value ?? ''))}"`
     : '';
@@ -325,9 +328,13 @@ export function renderCanvasSnapshot(
   // here even though the public route also emits CSS from them, so every
   // render entry point has the same fail-loud boundary.
   if (snapshot.styleKit === 'custom') {
-    resolveStyleKitWithCustom(snapshot);
+    const resolved = resolveStyleKitWithCustom(snapshot);
+    configureCodeRender({ customPreset: resolved });
+    configureChartPalette({ customAccent: resolved.accent });
   } else {
     getStyleKitPreset(snapshot.styleKit);
+    configureCodeRender({ customPreset: null });
+    configureChartPalette({ customAccent: null });
   }
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
     assetBasePath,

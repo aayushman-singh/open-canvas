@@ -537,7 +537,7 @@ function validateElement(
     errors.push(
       `${basePath}.type must be one of [${ELEMENT_TYPES.join(', ')}] (got ${describe(element.type)})`,
     );
-    // Without a known type we cannot validate the body — skip the rest.
+    // REVIEW: comment says "skip the rest" but then runs 4 sub-validators. If type is unknown, these validators produce errors with no context that the element type itself is invalid — mixed signals for the owner. Either skip all body validation (as the comment says) or validate but note that type is unknown.
     validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
     validateMotion(element.motion, basePath, errors);
     validatePinnedStyle(element.pinnedStyle, basePath, errors);
@@ -1094,6 +1094,7 @@ function validatePublishedMediaReferencesInSection(
     if (element.assetId === '') {
       errors.push(`${elementPath}.assetId must be non-empty in published snapshots`);
     }
+    // REVIEW: `posterAssetId === ''` is unreachable when posterAssetId is `undefined` (schema allows `posterAssetId?: string`). An undefined posterAssetId silently passes this check. Should be `element.posterAssetId !== undefined && element.posterAssetId === ''` or require posterAssetId in published snapshots.
     if (element.posterAssetId === '') {
       errors.push(`${elementPath}.posterAssetId must be non-empty in published snapshots`);
     }
