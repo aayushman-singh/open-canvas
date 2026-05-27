@@ -988,6 +988,12 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
     })[c]);
   }
 
+  function escapeAttr(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+  }
+
   async function fetchFonts() {
     try {
       const response = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/fonts', {
@@ -1012,14 +1018,13 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
         ' · w' + String(font.weight) + ' · ' + escapeHtml(font.style);
       const assignButtons = STATE.editing
         ? '<div class="rev01-theme-actions">' +
-          // REVIEW: escapeHtml is used in attribute contexts (data-rev01-font-hash, data-rev01-font-delete). escapeHtml does not escape quotes - use escapeAttr for attribute values, or font data containing quotes will break out of the attribute.
-          '<button type="button" data-variant="ghost" data-rev01-font-assign="display" data-rev01-font-hash="' + escapeHtml(font.contentHash) + '">Display</button>' +
-          '<button type="button" data-variant="ghost" data-rev01-font-assign="body" data-rev01-font-hash="' + escapeHtml(font.contentHash) + '">Body</button>' +
-          '<button type="button" data-variant="ghost" data-rev01-font-assign="mono" data-rev01-font-hash="' + escapeHtml(font.contentHash) + '">Mono</button>' +
-          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeHtml(font.id) + '">Delete</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-assign="display" data-rev01-font-hash="' + escapeAttr(font.contentHash) + '">Display</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-assign="body" data-rev01-font-hash="' + escapeAttr(font.contentHash) + '">Body</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-assign="mono" data-rev01-font-hash="' + escapeAttr(font.contentHash) + '">Mono</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeAttr(font.id) + '">Delete</button>' +
           '</div>'
         : '<div class="rev01-theme-actions">' +
-          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeHtml(font.id) + '">Delete</button>' +
+          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeAttr(font.id) + '">Delete</button>' +
           '</div>';
       return '<div class="rev01-theme-row"><strong>' + meta + '</strong>' + assignButtons + '</div>';
     }).join('');

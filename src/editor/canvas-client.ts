@@ -1137,7 +1137,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           }
         } catch (_) { /* ignore */ }
         setStatus("Save failed: " + detail, "error");
-        // REVIEW: save failure returns false but doesn't prevent subsequent operations. The editor continues queueing saves that may silently fail, risking data loss. Per all-or-nothing posture, consider locking mutations after a persistent save failure.
         return false;
       }
       setStatus("Saved", "ok");
@@ -2943,8 +2942,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           if (m.type === "strike") inner = "<s>" + inner + "</s>";
           if (m.type === "code") inner = "<code>" + inner + "</code>";
           if (m.type === "highlight") inner = "<mark>" + inner + "</mark>";
-          // REVIEW (XSS): href only escapes quotes but does not validate the scheme. A link mark with href="javascript:alert(1)" renders an executable link when this HTML is set via innerHTML at the contenteditable. Reject or strip javascript:/data: schemes here.
-          if (m.type === "link") inner = "<a href=\"" + m.href.replace(/"/g, "&quot;") + "\">" + inner + "</a>";
+          if (m.type === "link") { var safeHref = /^(https?:|mailto:|tel:|\/|#)/i.test(m.href) ? m.href : "#"; inner = "<a href=\"" + safeHref.replace(/"/g, "&quot;") + "\">" + inner + "</a>"; }
         }
         out += inner;
       }
@@ -7758,7 +7756,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           coEditSync();
           setStatus("Synced", "ok");
         });
-        // REVIEW: co-edit socket errors set a status message but don't lock the editor. The owner can continue editing while changes silently fail to sync. Per all-or-nothing posture, socket failure should either lock mutations or force a page reload prompt.
         socket.addEventListener("close", function() {
           coEditSocketOpen = false;
           setStatus("Co-edit disconnected; changes not saved", "error");
