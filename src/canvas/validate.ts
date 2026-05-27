@@ -7,6 +7,7 @@
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import { PAGE_METADATA_FIELDS } from './elements/collection.js';
+import { escapeCssValue } from './elements/render-utils.js';
 import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
@@ -16,6 +17,7 @@ import {
   MEDIA_KINDS,
   MOTION_PRESETS,
   OVERFLOW_VALUES,
+  SCROLL_TRIGGER_MODES,
   SECTION_RECIPE_IDS,
   SECTION_ROLES,
   SHAPE_VARIANTS,
@@ -34,6 +36,7 @@ import {
   type MotionPreset,
   type OverflowValue,
   type PublishedSnapshot,
+  type ScrollTriggerMode,
   type SectionRecipeId,
   type SectionRole,
   type ShapeVariant,
@@ -318,6 +321,56 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   if (value.overflow !== undefined) {
     if (!isOneOf<OverflowValue>(value.overflow, OVERFLOW_VALUES)) {
       errors.push(`${p}.overflow must be visible|hidden (got ${describe(value.overflow)})`);
+    }
+  }
+}
+
+function validatePageMotionLayout(page: Record<string, unknown>, basePath: string, errors: string[]): void {
+  if (page.entranceAnimation !== undefined) {
+    if (!isOneOf<MotionPreset>(page.entranceAnimation, MOTION_PRESETS)) {
+      errors.push(
+        `${basePath}.entranceAnimation must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(page.entranceAnimation)})`,
+      );
+    }
+  }
+  if (page.scrollTriggerMode !== undefined) {
+    if (!isOneOf<ScrollTriggerMode>(page.scrollTriggerMode, SCROLL_TRIGGER_MODES)) {
+      errors.push(
+        `${basePath}.scrollTriggerMode must be on-scroll|on-load (got ${describe(page.scrollTriggerMode)})`,
+      );
+    }
+  }
+  if (page.pageBackground !== undefined) {
+    if (typeof page.pageBackground !== 'string' || page.pageBackground.length === 0) {
+      errors.push(`${basePath}.pageBackground must be a non-empty string when present`);
+    } else {
+      const issue = pinnedStyleValueIssue(page.pageBackground);
+      if (issue !== null) {
+        errors.push(
+          `${basePath}.pageBackground value ${JSON.stringify(page.pageBackground)} contains ${issue}`,
+        );
+      } else if (escapeCssValue(page.pageBackground) === '') {
+        errors.push(
+          `${basePath}.pageBackground value ${JSON.stringify(page.pageBackground)} contains forbidden CSS syntax`,
+        );
+      }
+    }
+  }
+  if (page.defaultMotionPreset !== undefined) {
+    if (!isOneOf<MotionPreset>(page.defaultMotionPreset, MOTION_PRESETS)) {
+      errors.push(
+        `${basePath}.defaultMotionPreset must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(page.defaultMotionPreset)})`,
+      );
+    }
+  }
+  if (page.sectionGap !== undefined) {
+    if (!isFiniteNumber(page.sectionGap) || page.sectionGap < 0 || page.sectionGap > 120) {
+      errors.push(`${basePath}.sectionGap must be a finite number in [0, 120]`);
+    }
+  }
+  if (page.maxWidth !== undefined) {
+    if (!isFiniteNumber(page.maxWidth) || page.maxWidth < 600 || page.maxWidth > 2400) {
+      errors.push(`${basePath}.maxWidth must be a finite number in [600, 2400]`);
     }
   }
 }
@@ -914,6 +967,7 @@ function validatePage(
       `${basePath}.width must be a finite number in [${String(PAGE_WIDTH_MIN)}, ${String(PAGE_WIDTH_MAX)}] (got ${describe(page.width)})`,
     );
   }
+  validatePageMotionLayout(page, basePath, errors);
   if (!Array.isArray(page.sections) || page.sections.length === 0) {
     errors.push(`${basePath}.sections must be a non-empty array`);
     return;

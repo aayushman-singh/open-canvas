@@ -49,7 +49,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
   const SURFACE_VARIANTS = ["flat", "raised", "glass", "outlined", "sticker", "editorial-frame", "soft-panel"];
   const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
-  const MOTION_PRESETS = ["none", "fade-up", "slide-left", "scale-in", "blur-in", "stagger-children", "slow-drift", "parallax-soft"];
+  const MOTION_PRESETS = ["none", "fade-up", "fade-down", "fade-in", "fade-right", "slide-left", "slide-up", "slide-right", "scale-in", "zoom-out", "blur-in", "rotate-in", "flip-in", "bounce-in", "stagger-children", "slow-drift", "parallax-soft"];
   const INLINE_MARK_TYPES = ["bold", "italic", "underline", "strike", "code", "highlight", "link"];
   // -- href allowlist (mirrors src/canvas/validate.ts isAllowedHref) -------
   // Centralised so the inline-link mark toolbar uses the SAME rules as the
@@ -66,6 +66,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     } catch (_) {
       return false;
     }
+  }
+  function isSafeCssValue(value) {
+    if (typeof value !== "string" || value.length === 0) return false;
+    for (var i = 0; i < value.length; i++) {
+      var code = value.charCodeAt(i);
+      var ch = value.charAt(i);
+      if (code < 32 || ch === ";" || ch === "{" || ch === "}" || ch === "\\\\" || ch === "/") return false;
+    }
+    return value.toLowerCase().indexOf("</") < 0;
   }
   function isValidActionHref(href) {
     if (!href || typeof href !== "object") return false;
@@ -1923,6 +1932,34 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  function pageRenderWidth(page) {
+    if (!page) return 1440;
+    return page.maxWidth != null && page.maxWidth < page.width ? page.maxWidth : page.width;
+  }
+
+  function applyPageMotionAttributes(article, page) {
+    article.removeAttribute("data-motion-preset");
+    article.removeAttribute("data-entrance-animation");
+    article.removeAttribute("data-scroll-trigger");
+    if (!page.entranceAnimation || page.entranceAnimation === "none") return;
+    var triggerMode = page.scrollTriggerMode || "on-load";
+    if (triggerMode === "on-load") {
+      article.setAttribute("data-motion-preset", page.entranceAnimation);
+    } else {
+      article.setAttribute("data-entrance-animation", page.entranceAnimation);
+    }
+    article.setAttribute("data-scroll-trigger", triggerMode);
+  }
+
+  function applyPageStyleProperties(article, page) {
+    article.style.width = pageRenderWidth(page) + "px";
+    article.style.background = page.pageBackground || "";
+    article.style.display = page.sectionGap != null ? "flex" : "";
+    article.style.flexDirection = page.sectionGap != null ? "column" : "";
+    article.style.gap = page.sectionGap != null ? page.sectionGap + "px" : "";
+    article.style.maxWidth = page.maxWidth != null ? page.maxWidth + "px" : "";
+  }
+
   function renderAll() {
     if (!state) return;
     computePagePositions();
@@ -1949,19 +1986,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var article = document.createElement("article");
       article.className = "rev01-page";
       article.setAttribute("data-rev01-page", page.id);
-      article.style.width = page.width + "px";
       article.style.position = "relative";
+      applyPageMotionAttributes(article, page);
+      applyPageStyleProperties(article, page);
+      var renderWidth = pageRenderWidth(page);
 
       if (state.header) {
-        article.appendChild(buildSectionNode(state.header, page.width));
+        article.appendChild(buildSectionNode(state.header, renderWidth));
       }
 
       for (var si = 0; si < page.sections.length; si++) {
-        article.appendChild(buildSectionNode(page.sections[si], page.width));
+        article.appendChild(buildSectionNode(page.sections[si], renderWidth));
       }
 
       if (state.footer) {
-        article.appendChild(buildSectionNode(state.footer, page.width));
+        article.appendChild(buildSectionNode(state.footer, renderWidth));
       }
 
       artboard.appendChild(article);
@@ -2476,11 +2515,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!page) return;
     var targets;
     if (scope === "page") {
-      var artboard = root.querySelector('[data-artboard-page="' + (activePageId || page.id) + '"]');
+      var artboard = root.querySelector('[data-page-id="' + cssEscape(activePageId || page.id) + '"]');
       if (!artboard) return;
       targets = artboard.querySelectorAll("[data-motion-preset]");
     } else {
-      var el = root.querySelector('[data-element-id="' + scope + '"]');
+      var el = root.querySelector('[data-rev01-element="' + cssEscape(scope) + '"]');
       if (!el) { targets = []; } else { targets = [el]; }
     }
     for (var i = 0; i < targets.length; i++) {
@@ -2537,7 +2576,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         delete page.entranceAnimation;
       } else {
         page.entranceAnimation = entranceSel.value;
+        if (!page.scrollTriggerMode) page.scrollTriggerMode = "on-load";
       }
+      applyPageStyles(page);
       renderInspector();
       scheduleSave();
     });
@@ -2551,9 +2592,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     h4b.textContent = "Animation trigger";
     group2.appendChild(h4b);
 
-    var triggerSel = selectInput(["on-scroll", "on-load"], page.scrollTriggerMode || "on-scroll");
+    var triggerSel = selectInput(["on-load", "on-scroll"], page.scrollTriggerMode || "on-load");
     triggerSel.addEventListener("change", function() {
       page.scrollTriggerMode = triggerSel.value;
+      applyPageStyles(page);
       scheduleSave();
     });
     group2.appendChild(triggerSel);
@@ -2626,6 +2668,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var val = bgInput.value.trim();
       if (val.length === 0) {
         delete page.pageBackground;
+      } else if (!isSafeCssValue(val)) {
+        setStatus("Invalid page background", "error");
+        return;
       } else {
         page.pageBackground = val;
       }
@@ -2649,9 +2694,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     gapInput.placeholder = "0";
     gapInput.value = page.sectionGap != null ? String(page.sectionGap) : "";
     gapInput.addEventListener("change", function() {
-      var n = Number(gapInput.value);
-      if (!Number.isFinite(n) || n < 0) { delete page.sectionGap; }
-      else { page.sectionGap = n; }
+      if (gapInput.value.trim().length === 0) {
+        delete page.sectionGap;
+      } else {
+        var n = Number(gapInput.value);
+        if (!Number.isFinite(n) || n < 0 || n > 120) {
+          setStatus("Section gap must be 0-120px", "error");
+          return;
+        }
+        page.sectionGap = n;
+      }
       applyPageStyles(page);
       scheduleSave();
     });
@@ -2672,9 +2724,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     maxWInput.placeholder = "1440";
     maxWInput.value = page.maxWidth != null ? String(page.maxWidth) : "";
     maxWInput.addEventListener("change", function() {
-      var n = Number(maxWInput.value);
-      if (!Number.isFinite(n) || n < 600) { delete page.maxWidth; }
-      else { page.maxWidth = n; }
+      if (maxWInput.value.trim().length === 0) {
+        delete page.maxWidth;
+      } else {
+        var n = Number(maxWInput.value);
+        if (!Number.isFinite(n) || n < 600 || n > 2400) {
+          setStatus("Content max-width must be 600-2400px", "error");
+          return;
+        }
+        page.maxWidth = n;
+      }
       applyPageStyles(page);
       scheduleSave();
     });
@@ -2684,13 +2743,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // Live-apply page-level visual properties on the artboard.
   function applyPageStyles(page) {
-    var artboard = root.querySelector('[data-artboard-page="' + page.id + '"]');
+    var artboard = root.querySelector('[data-page-id="' + cssEscape(page.id) + '"]');
     if (!artboard) return;
     var article = artboard.querySelector(".rev01-page");
     if (article) {
-      article.style.background = page.pageBackground || "";
-      article.style.gap = page.sectionGap != null ? page.sectionGap + "px" : "";
-      article.style.maxWidth = page.maxWidth != null ? page.maxWidth + "px" : "";
+      applyPageMotionAttributes(article, page);
+      applyPageStyleProperties(article, page);
+      var renderWidth = pageRenderWidth(page);
+      var sections = article.querySelectorAll("[data-rev01-section]");
+      for (var i = 0; i < sections.length; i++) {
+        sections[i].style.width = renderWidth + "px";
+      }
     }
   }
 

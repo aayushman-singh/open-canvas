@@ -67,4 +67,43 @@ assert(
   'style inspector must reattach elementStyle after the last property was removed and a new property is set',
 );
 
+const replayAnimationsStart = source.indexOf('function replayAnimations(scope) {');
+const replayAnimationsEnd = source.indexOf('function pageHasMotion()', replayAnimationsStart);
+assert(replayAnimationsStart >= 0, 'canvas client must define replayAnimations');
+assert(replayAnimationsEnd > replayAnimationsStart, 'replayAnimations body must be found');
+const replayAnimationsSource = source.slice(replayAnimationsStart, replayAnimationsEnd);
+assert(
+  replayAnimationsSource.includes('root.querySelector(\'[data-page-id="\'') &&
+    replayAnimationsSource.includes('root.querySelector(\'[data-rev01-element="\''),
+  'animation replay must query the data attributes emitted by renderAll/buildElementNode',
+);
+
+const applyPageStylesStart = source.indexOf('function applyPageStyles(page) {');
+const applyPageStylesEnd = source.indexOf('function renderInspector()', applyPageStylesStart);
+assert(applyPageStylesStart >= 0, 'canvas client must define applyPageStyles');
+assert(applyPageStylesEnd > applyPageStylesStart, 'applyPageStyles body must be found');
+const applyPageStylesSource = source.slice(applyPageStylesStart, applyPageStylesEnd);
+const applyPageStylePropertiesStart = source.indexOf('function applyPageStyleProperties(article, page) {');
+const applyPageStylePropertiesEnd = source.indexOf('function renderAll()', applyPageStylePropertiesStart);
+assert(applyPageStylePropertiesStart >= 0, 'canvas client must define applyPageStyleProperties');
+assert(
+  applyPageStylePropertiesEnd > applyPageStylePropertiesStart,
+  'applyPageStyleProperties body must be found',
+);
+const applyPageStylePropertiesSource = source.slice(
+  applyPageStylePropertiesStart,
+  applyPageStylePropertiesEnd,
+);
+assert(
+  applyPageStylesSource.includes('root.querySelector(\'[data-page-id="\'') &&
+    applyPageStylesSource.includes('applyPageStyleProperties(article, page);') &&
+    applyPageStylePropertiesSource.includes(
+      'article.style.display = page.sectionGap != null ? "flex" : ""',
+    ) &&
+    applyPageStylePropertiesSource.includes(
+      'article.style.flexDirection = page.sectionGap != null ? "column" : ""',
+    ),
+  'live page styles must query the rendered artboard and apply the flex container required for section gaps',
+);
+
 console.log('[film-reel:smoke] OK');

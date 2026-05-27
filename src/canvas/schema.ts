@@ -102,6 +102,9 @@ export const MOTION_PRESETS = [
 ] as const;
 export type MotionPreset = (typeof MOTION_PRESETS)[number];
 
+export const SCROLL_TRIGGER_MODES = ['on-scroll', 'on-load'] as const;
+export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
+
 export const AGENT_RECIPE_IDS = [
   'hero-split',
   'feature-grid',
@@ -387,7 +390,7 @@ export interface CanvasPage {
   locale?: string;
   // -- Page-level motion & layout ---------------------------------------------
   entranceAnimation?: MotionPreset;
-  scrollTriggerMode?: 'on-scroll' | 'on-load';
+  scrollTriggerMode?: ScrollTriggerMode;
   pageBackground?: string;
   defaultMotionPreset?: MotionPreset;
   sectionGap?: number;

@@ -46,6 +46,107 @@ assert(html.includes('data-rev01-section="section-hero"'), 'expected rendered he
 assert(html.includes('data-rev01-element="hero-heading"'), 'expected rendered heading marker');
 assert(html.includes('data-rev01-media-kind="image"'), 'expected rendered image media marker');
 
+const pageMotionLayoutState: CanvasSiteState = {
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-motion-layout',
+      slug: 'motion-layout',
+      title: 'Motion Layout',
+      width: 1440,
+      entranceAnimation: 'fade-up',
+      scrollTriggerMode: 'on-load',
+      pageBackground: '#123456',
+      defaultMotionPreset: 'scale-in',
+      sectionGap: 24,
+      maxWidth: 960,
+      sections: [
+        {
+          id: 'section-motion-layout',
+          recipeId: 'feature-grid',
+          name: 'Motion Layout',
+          height: 240,
+          elements: [],
+        },
+      ],
+    },
+  ],
+};
+const pageMotionLayoutValidation = validateCanvasSiteState(pageMotionLayoutState);
+assert(
+  pageMotionLayoutValidation.valid,
+  pageMotionLayoutValidation.valid
+    ? ''
+    : `expected valid page-level motion/layout fields: ${pageMotionLayoutValidation.errors.join('; ')}`,
+);
+const pageMotionLayoutHtml = renderCanvasSnapshot(
+  {
+    version: 1,
+    publishedAt: '2026-05-27T00:00:00.000Z',
+    styleKit: pageMotionLayoutState.styleKit,
+    pages: pageMotionLayoutState.pages,
+  },
+  '/assets',
+);
+assert(
+  pageMotionLayoutHtml.includes(
+    'data-rev01-page="page-motion-layout" data-motion-preset="fade-up" data-scroll-trigger="on-load"',
+  ),
+  'expected on-load page entrance animation to reuse data-motion-preset so style-kit motion CSS runs',
+);
+assert(
+  pageMotionLayoutHtml.includes(
+    'style="width:960px;margin:0 auto;background:#123456;display:flex;flex-direction:column;gap:24px;max-width:960px"',
+  ),
+  'expected page background, section gap, and max-width to render as sanitized inline styles',
+);
+assert(
+  pageMotionLayoutHtml.includes(
+    'data-rev01-section="section-motion-layout" data-recipe="feature-grid" data-bg-effect="none" data-entrance="none" style="position:relative;width:960px;height:240px"',
+  ),
+  'expected maxWidth to constrain rendered section width inside the page',
+);
+
+const badPageMotionLayoutResult = validateCanvasSiteState({
+  styleKit: 'charcoal',
+  symbols: [],
+  pages: [
+    {
+      id: 'page-bad-motion-layout',
+      slug: 'bad-motion-layout',
+      title: 'Bad Motion Layout',
+      width: 1440,
+      entranceAnimation: 'not-real',
+      scrollTriggerMode: 'sometimes',
+      pageBackground: '#fff;background:red',
+      defaultMotionPreset: 'also-not-real',
+      sectionGap: 121,
+      maxWidth: 599,
+      sections: [
+        {
+          id: 'section-bad-motion-layout',
+          recipeId: 'feature-grid',
+          name: 'Bad Motion Layout',
+          height: 240,
+          elements: [],
+        },
+      ],
+    },
+  ],
+} as unknown as CanvasSiteState);
+assert(!badPageMotionLayoutResult.valid, 'expected invalid page motion/layout fields to be rejected');
+assert(
+  !badPageMotionLayoutResult.valid &&
+    badPageMotionLayoutResult.errors.some((m) => m.includes('pageBackground')) &&
+    badPageMotionLayoutResult.errors.some((m) => m.includes('sectionGap')) &&
+    badPageMotionLayoutResult.errors.some((m) => m.includes('maxWidth')) &&
+    badPageMotionLayoutResult.errors.some((m) => m.includes('scrollTriggerMode')) &&
+    badPageMotionLayoutResult.errors.some((m) => m.includes('entranceAnimation')) &&
+    badPageMotionLayoutResult.errors.some((m) => m.includes('defaultMotionPreset')),
+  'expected page motion/layout validation errors to name every invalid field',
+);
+
 // Rich text: the hero heading must contain a <strong> tag (the "lived-in" run
 // in the fixture carries a `bold` mark). Anchor the search to the heading's
 // element wrapper so we don't accept a stray <strong> elsewhere.

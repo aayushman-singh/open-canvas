@@ -123,12 +123,14 @@ const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 const ENTRANCE_OBSERVER_SCRIPT = String.raw`
 (function(){
   if(!("IntersectionObserver" in window))return;
-  var els=document.querySelectorAll("[data-entrance]");
+  var els=document.querySelectorAll("[data-entrance],[data-entrance-animation][data-scroll-trigger=\"on-scroll\"]");
   if(!els.length)return;
   var io=new IntersectionObserver(function(entries){
     for(var i=0;i<entries.length;i++){
       if(entries[i].isIntersecting){
         entries[i].target.setAttribute("data-visible","");
+        var pagePreset=entries[i].target.getAttribute("data-entrance-animation");
+        if(pagePreset)entries[i].target.setAttribute("data-motion-preset",pagePreset);
         io.unobserve(entries[i].target);
       }
     }

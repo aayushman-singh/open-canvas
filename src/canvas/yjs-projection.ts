@@ -665,6 +665,12 @@ function encodePage(page: CanvasPage): Y.Map<unknown> {
   setIfDefined(out, 'canonical', page.canonical);
   setIfDefined(out, 'noIndex', page.noIndex);
   setIfDefined(out, 'locale', page.locale);
+  setIfDefined(out, 'entranceAnimation', page.entranceAnimation);
+  setIfDefined(out, 'scrollTriggerMode', page.scrollTriggerMode);
+  setIfDefined(out, 'pageBackground', page.pageBackground);
+  setIfDefined(out, 'defaultMotionPreset', page.defaultMotionPreset);
+  setIfDefined(out, 'sectionGap', page.sectionGap);
+  setIfDefined(out, 'maxWidth', page.maxWidth);
   setIfDefined(out, 'publishedDate', page.publishedDate);
   setIfDefined(out, 'author', page.author);
   if (page.tags !== undefined) {
@@ -1226,6 +1232,18 @@ function decodePage(map: Y.Map<unknown>): CanvasPage {
   if (map.has('canonical')) page.canonical = map.get('canonical') as string;
   if (map.has('noIndex')) page.noIndex = map.get('noIndex') as boolean;
   if (map.has('locale')) page.locale = map.get('locale') as string;
+  if (map.has('entranceAnimation')) {
+    page.entranceAnimation = map.get('entranceAnimation') as NonNullable<CanvasPage['entranceAnimation']>;
+  }
+  if (map.has('scrollTriggerMode')) {
+    page.scrollTriggerMode = map.get('scrollTriggerMode') as NonNullable<CanvasPage['scrollTriggerMode']>;
+  }
+  if (map.has('pageBackground')) page.pageBackground = map.get('pageBackground') as string;
+  if (map.has('defaultMotionPreset')) {
+    page.defaultMotionPreset = map.get('defaultMotionPreset') as NonNullable<CanvasPage['defaultMotionPreset']>;
+  }
+  if (map.has('sectionGap')) page.sectionGap = map.get('sectionGap') as number;
+  if (map.has('maxWidth')) page.maxWidth = map.get('maxWidth') as number;
   if (map.has('publishedDate')) page.publishedDate = map.get('publishedDate') as string;
   if (map.has('author')) page.author = map.get('author') as string;
   if (map.has('tags')) page.tags = (map.get('tags') as Y.Array<string>).toArray();

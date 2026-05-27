@@ -255,6 +255,12 @@ const syntheticPage: CanvasPage = {
   canonical: 'https://example.com/synthetic',
   noIndex: false,
   locale: 'en',
+  entranceAnimation: 'fade-up',
+  scrollTriggerMode: 'on-load',
+  pageBackground: '#123456',
+  defaultMotionPreset: 'scale-in',
+  sectionGap: 24,
+  maxWidth: 960,
   sections: [syntheticSection],
 };
 

@@ -227,25 +227,42 @@ function renderPage(
   header?: CanvasSection,
   footer?: CanvasSection,
 ): string {
+  const renderWidth = page.maxWidth != null && page.maxWidth < page.width ? page.maxWidth : page.width;
   const entries: Array<[string, string]> = [
-    ['width', `${String(page.width)}px`],
+    ['width', `${String(renderWidth)}px`],
     ['margin', '0 auto'],
   ];
-  if (page.pageBackground) entries.push(['background', page.pageBackground]);
-  if (page.sectionGap != null) entries.push(['display', 'flex'], ['flex-direction', 'column'], ['gap', `${String(page.sectionGap)}px`]);
+  if (page.pageBackground) {
+    const safeBackground = escapeCssValue(page.pageBackground);
+    if (safeBackground) entries.push(['background', safeBackground]);
+  }
+  if (page.sectionGap != null) {
+    entries.push(
+      ['display', 'flex'],
+      ['flex-direction', 'column'],
+      ['gap', `${String(page.sectionGap)}px`],
+    );
+  }
   if (page.maxWidth != null) entries.push(['max-width', `${String(page.maxWidth)}px`]);
   const style = styleFromEntries(entries);
   const pageCtx: ElementRenderCtx = { ...ctx, pageSlug: page.slug };
-  const headerHtml = header ? renderSection(header, page.width, pageCtx) : '';
+  const headerHtml = header ? renderSection(header, renderWidth, pageCtx) : '';
   const sectionsHtml = page.sections
-    .map((section) => renderSection(section, page.width, pageCtx))
+    .map((section) => renderSection(section, renderWidth, pageCtx))
     .join('');
-  const footerHtml = footer ? renderSection(footer, page.width, pageCtx) : '';
-  const entranceAttr = page.entranceAnimation && page.entranceAnimation !== 'none'
-    ? ` data-entrance-animation="${escapeAttr(page.entranceAnimation)}"`
-    : '';
-  const triggerAttr = page.scrollTriggerMode ? ` data-scroll-trigger="${escapeAttr(page.scrollTriggerMode)}"` : '';
-  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}"${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
+  const footerHtml = footer ? renderSection(footer, renderWidth, pageCtx) : '';
+  const hasEntrance = page.entranceAnimation !== undefined && page.entranceAnimation !== 'none';
+  const triggerMode = page.scrollTriggerMode ?? 'on-load';
+  const motionAttr =
+    hasEntrance && triggerMode === 'on-load'
+      ? ` data-motion-preset="${escapeAttr(page.entranceAnimation as string)}"`
+      : '';
+  const entranceAttr =
+    hasEntrance && triggerMode === 'on-scroll'
+      ? ` data-entrance-animation="${escapeAttr(page.entranceAnimation as string)}"`
+      : '';
+  const triggerAttr = hasEntrance ? ` data-scroll-trigger="${escapeAttr(triggerMode)}"` : '';
+  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
 /**
