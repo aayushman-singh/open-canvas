@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { collectReferencedAssets } from '../../assets/site-assets';
@@ -306,6 +306,19 @@ sites.post('/', async (c) => {
       { error: 'no customer row for current user - visit /dashboard first to materialise it' },
       409,
     );
+  }
+
+  const FREE_SITE_LIMIT = 3;
+  const siteCountRows = await database
+    .select({ value: count() })
+    .from(site)
+    .where(eq(site.customerId, customerId));
+  const siteCount = siteCountRows[0]?.value ?? 0;
+  if (siteCount >= FREE_SITE_LIMIT) {
+    if (wantsJson(c)) {
+      return c.json({ error: 'Free plan allows up to 3 sites. Upgrade to create more.' }, 403);
+    }
+    return c.redirect('/dashboard/templates', 303);
   }
 
   let editableState: CanvasSiteState;
