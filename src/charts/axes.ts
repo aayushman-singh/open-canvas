@@ -218,6 +218,7 @@ export function renderLegend(items: LegendItem[], width: number, y: number): str
   const out: string[] = [];
   for (const item of items) {
     out.push(
+      // REVIEW: `fill="${escapeHtml(item.color)}"` — `escapeHtml` does not escape quotes. In an attribute context, a color value containing `"` breaks out of the fill attribute. Use `escapeAttr` (which escapes quotes) for attribute values.
       `<rect x="${cursor.toFixed(2)}" y="${(y - swatchSize + 2).toFixed(2)}" width="${String(swatchSize)}" height="${String(swatchSize)}" fill="${escapeHtml(item.color)}" rx="2"/>`,
     );
     out.push(
