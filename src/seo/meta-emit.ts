@@ -274,7 +274,7 @@ export interface RenderHeadContext {
 export function renderCanvasHead(snapshot: PublishedSnapshot, ctx: RenderHeadContext): string {
   const page = snapshot.pages.find((p) => p.slug === ctx.pageSlug);
   if (!page) {
-    // REVIEW: silent fallback to first page's meta when requested page not found. This violates all-or-nothing — serving wrong page's meta silently is arguably worse than no meta because it's actively misleading to social crawlers. Consider returning explicit 404 meta or an empty string with a logged warning.
+    console.warn('[seo/meta-emit] page not found in snapshot, falling back to first page', { pageSlug: ctx.pageSlug });
     const first = snapshot.pages[0];
     if (!first) return '';
     return emitPageMeta(first, {

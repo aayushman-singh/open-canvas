@@ -170,7 +170,7 @@ export async function resolveOgRequest(
     if (assetRow) {
       return { status: 'override', contentHash: assetRow.contentHash };
     }
-    // REVIEW: silent fallback to default card when the owner's OG image asset is missing. Per all-or-nothing posture, a dangling assetId is data corruption — the publish guard should have caught it. Falling through masks the underlying issue. At minimum log a warning so operators can detect it.
+    console.warn('[og-image] page.ogImageAssetId references missing asset', { siteId, pageSlug, assetId: page.ogImageAssetId });
     // Asset missing — fall through to the rendered card.
   }
 

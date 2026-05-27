@@ -214,8 +214,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         });
         if (!res.ok) {
           const body = await res.text();
-          // REVIEW (XSS): `body` is an unsanitized server response concatenated into innerHTML. If the server returns HTML in an error body, it executes in the owner's browser. Use textContent or escapeHtml() before inserting.
-          preview.innerHTML = '<h2>Preview</h2><p class="empty">Preview failed: ' + body + '</p>';
+          var errP = document.createElement('p'); errP.className = 'empty'; errP.textContent = 'Preview failed: ' + body; preview.innerHTML = '<h2>Preview</h2>'; preview.appendChild(errP);
           return;
         }
         const data = await res.json();
