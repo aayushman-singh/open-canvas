@@ -137,7 +137,6 @@ async function loadOwnedSiteWithFonts(
   };
 }
 
-// REVIEW: `isRecord` is duplicated in at least 3 files (here, orchestrator.ts, design-section-parser.ts). Extract to a shared utility module to avoid drift.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -147,7 +146,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // ---------------------------------------------------------------------------
 
 chatApi.post('/:siteId/chat', async (c) => {
-  // REVIEW: API key check at line 149 happens AFTER the DB round-trip for site ownership. Move it before `loadOwnedSiteWithFonts` to fail fast on a misconfigured env without wasting a DB query.
   const siteId = c.req.param('siteId');
   const row = await loadOwnedSiteWithFonts(c, siteId);
   if (!row) return c.json({ error: 'site not found' }, 404);

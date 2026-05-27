@@ -262,7 +262,6 @@ const layoutChildSchema: JsonSchema = {
         'Container elements with "fill" become background panels spanning the parent layout node.',
     },
   },
-  // REVIEW: `required: ['element']` means a layout-node child (which has `type` + `children`, not `element`) would fail JSON Schema validation. The description says children can be layout nodes OR element leaves, but the required field only matches element leaves. The model may be confused into always wrapping things in an element key.
   required: ['element'],
 };
 
@@ -368,9 +367,8 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
   },
   {
     name: 'replaceMedia',
-    // REVIEW: backtick (`) in "element`s" — should be apostrophe ('). This is a model-facing description; typos degrade instruction following.
     description:
-      'Replace a media element`s asset with an EXISTING uploaded asset id. ' +
+      "Replace a media element's asset with an EXISTING uploaded asset id. " +
       'The model picks an asset that has already been uploaded to the site; this tool does NOT generate media bytes.',
     parameters: replaceMediaSchema,
   },

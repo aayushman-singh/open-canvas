@@ -218,7 +218,6 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       doneReason = 'cap';
       break;
     }
-    // REVIEW: `sawMutating` is assigned (line 183) but never read — `void sawMutating` just suppresses the unused-variable lint. Either use the flag (e.g. to decide whether to continue the loop differently) or remove it entirely.
     void sawMutating;
   }
 

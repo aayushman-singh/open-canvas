@@ -22,7 +22,6 @@ import {
   type LayoutNode,
 } from '../canvas/layout/tree.js';
 
-// REVIEW: `DESIGN_ELEMENT_TYPES` and `ELEMENT_PROP_KEYS` are identical arrays. If they're intentionally the same concept, use one constant. If they could diverge in the future, add a comment explaining why they're separate.
 const DESIGN_ELEMENT_TYPES = ['text', 'media', 'action', 'shape', 'container'] as const;
 const ELEMENT_PROP_KEYS = ['text', 'media', 'action', 'shape', 'container'] as const;
 const DESIGN_ELEMENT_MAX = 30;

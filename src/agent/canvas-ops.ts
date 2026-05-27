@@ -226,11 +226,9 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     return next;
   }
 
-  // REVIEW: no exhaustiveness check. If a fifth op kind is added, it silently falls through to this block. Refactor to a `switch` with a `default: { const _: never = op; throw ... }` to catch new kinds at compile time.
   if (op.kind === 'designSection') {
     // designSection — layout engine resolves a semantic tree into positioned
     // elements. The LLM describes structure; the engine computes geometry.
-    // REVIEW: `getStyleKitPreset(next.styleKit)` when styleKit is 'custom' — does `getStyleKitPreset` handle that or throw "unknown kit"? The a11y audit uses `resolveStyleKitWithCustom` for this reason. Inconsistent resolution path.
     const preset = getStyleKitPreset(next.styleKit);
     const pageWidth = page.width;
     const result = resolveDesignSection(op.input, pageWidth, preset);
