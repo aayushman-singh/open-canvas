@@ -105,6 +105,7 @@ router.post('/:siteId/:formElementId', async (c) => {
         subject: `New form submission on your site`,
         html: [
           `<p>A new form submission was received.</p>`,
+          // REVIEW (XSS): `formElementId` is interpolated raw into HTML email body. Owner-controlled form IDs containing HTML tags will render in the email client. Use escapeHtml().
           `<p><strong>Form ID:</strong> ${formElementId}</p>`,
           `<p><strong>Submitted at:</strong> ${submittedAt}</p>`,
           `<p><a href="${inboxUrl}">View in Forms Inbox</a></p>`,

@@ -50,6 +50,7 @@ export function inviteEmailHtml(params: InviteEmailParams): string {
 </html>`;
 }
 
+// REVIEW (email header injection): `siteName` is interpolated raw into the subject line. A site name containing `\r\n` or `\n` can inject SMTP headers (e.g. `\nBcc: attacker@evil.com`). Strip or reject control characters before use in email subjects.
 export function inviteEmailSubject(siteName: string): string {
   return `You've been invited to edit "${siteName}" on rev01`;
 }

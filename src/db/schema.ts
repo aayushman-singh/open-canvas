@@ -34,6 +34,7 @@ export const customer = pgTable('customer', {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
+  // REVIEW: email column is NOT unique. Multiple customer rows can share the same email. Collaborator invite queries by email with `.limit(1)`, silently picking the first match. If duplicates exist, invites go to an unpredictable recipient. Add `.unique()`.
   email: text('email').notNull(),
   displayName: text('display_name'),
   bio: text('bio'),

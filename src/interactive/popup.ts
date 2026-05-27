@@ -64,6 +64,7 @@ setTimeout(show,val||3000);
 }else if(type==='scroll'){
 var thr=val||50;
 window.addEventListener('scroll',function(){
+// REVIEW: divide-by-zero when scrollHeight === innerHeight (page exactly fits viewport). Result is Infinity, so `pct >= thr` is always false and the scroll trigger never fires. Guard: `if (scrollHeight <= innerHeight) return;`.
 var pct=window.scrollY/(document.documentElement.scrollHeight-window.innerHeight)*100;
 if(pct>=thr)show();
 });
