@@ -18,6 +18,10 @@
 
 import { escapeHtml } from '../canvas/elements/render-utils.js';
 
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 /** Pixel-space rectangle reserved for the plot itself (inside axis labels). */
 export interface PlotArea {
   x: number;
@@ -218,8 +222,7 @@ export function renderLegend(items: LegendItem[], width: number, y: number): str
   const out: string[] = [];
   for (const item of items) {
     out.push(
-      // REVIEW: `fill="${escapeHtml(item.color)}"` — `escapeHtml` does not escape quotes. In an attribute context, a color value containing `"` breaks out of the fill attribute. Use `escapeAttr` (which escapes quotes) for attribute values.
-      `<rect x="${cursor.toFixed(2)}" y="${(y - swatchSize + 2).toFixed(2)}" width="${String(swatchSize)}" height="${String(swatchSize)}" fill="${escapeHtml(item.color)}" rx="2"/>`,
+      `<rect x="${cursor.toFixed(2)}" y="${(y - swatchSize + 2).toFixed(2)}" width="${String(swatchSize)}" height="${String(swatchSize)}" fill="${escapeAttr(item.color)}" rx="2"/>`,
     );
     out.push(
       `<text x="${(cursor + swatchSize + gap).toFixed(2)}" y="${y.toFixed(2)}" font-size="11" fill="currentColor" fill-opacity="0.9">${escapeHtml(item.label)}</text>`,
