@@ -125,6 +125,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
   s.src = "https://" + raw + "/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
   s.crossOrigin = "anonymous";
   s.async = true;
+  s.setAttribute("data-clerk-publishable-key", pk);
   s.onload = function() { if (window.Clerk) window.Clerk.load(); };
   document.head.appendChild(s);
 })();

@@ -39,6 +39,7 @@ dashboard.use('*', async (c, next) => {
     `var s=document.createElement("script");` +
     `s.src="https://"+r+"/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";` +
     `s.crossOrigin="anonymous";s.async=true;` +
+    `s.setAttribute("data-clerk-publishable-key",pk);` +
     `s.onload=function(){if(window.Clerk)window.Clerk.load();};` +
     `document.head.appendChild(s);` +
     `})()</script>`;
