@@ -293,7 +293,10 @@ function requireActionVariantTokens(value: unknown, pathPrefix: string): void {
     );
   }
   const v = value as Record<string, unknown>;
-  const stringFields = ['background', 'color', 'border'];
+  const stringFields = [
+    'background', 'color', 'border', 'borderRadius', 'textDecoration',
+    'backdropFilter', 'boxShadow', 'padding', 'letterSpacing',
+  ];
   for (const field of stringFields) {
     const slot = v[field];
     if (slot !== undefined && typeof slot !== 'string') {

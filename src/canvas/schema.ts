@@ -453,6 +453,12 @@ export interface ActionVariantTokens {
   color?: string;
   border?: string;
   weight?: number;
+  borderRadius?: string;
+  textDecoration?: string;
+  backdropFilter?: string;
+  boxShadow?: string;
+  padding?: string;
+  letterSpacing?: string;
 }
 
 export interface MotionPresetTokens {

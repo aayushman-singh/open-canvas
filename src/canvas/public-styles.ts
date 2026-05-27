@@ -63,7 +63,7 @@ html, body {
   width: 100%;
   height: 100%;
   padding: var(--rev01-kit-action-padding, 0 16px);
-  border-radius: var(--rev01-kit-action-radius, 999px);
+  border-radius: var(--rev01-kit-action-radius, 8px);
   background: var(--rev01-kit-accent, var(--kit-accent, currentColor));
   color: var(--rev01-kit-accent-text, var(--kit-bg, #fff));
   text-decoration: none;

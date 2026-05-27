@@ -80,19 +80,29 @@ const CHARCOAL: StyleKitPreset = {
     solid: { background: '#d9dde4', color: '#0c0c0d', weight: 600 },
     outline: { background: 'transparent', color: '#f6f6f6', border: '1px solid #d9dde4' },
     ghost: { background: 'transparent', color: '#f6f6f6' },
-    pill: { background: '#d9dde4', color: '#0c0c0d', weight: 600 },
+    pill: { background: '#d9dde4', color: '#0c0c0d', weight: 600, borderRadius: '999px' },
     glass: {
       background: 'rgba(255, 255, 255, 0.08)',
       color: '#f6f6f6',
       border: '1px solid rgba(255, 255, 255, 0.16)',
+      borderRadius: '12px',
+      backdropFilter: 'blur(12px)',
     },
     brutalist: {
       background: '#0c0c0d',
       color: '#f6f6f6',
       border: '2px solid #f6f6f6',
       weight: 700,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #f6f6f6',
     },
-    underline: { background: 'transparent', color: '#f6f6f6' },
+    underline: {
+      background: 'transparent',
+      color: '#f6f6f6',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
   },
   // Snappy motion — charcoal leans modern + technical.
   motionDurationMs: 320,
@@ -173,20 +183,29 @@ const ORANGE_EDITORIAL: StyleKitPreset = {
     solid: { background: '#d6541b', color: '#fff7ef', weight: 700 },
     outline: { background: 'transparent', color: '#221610', border: '2px solid #221610' },
     ghost: { background: 'transparent', color: '#d6541b' },
-    // Pill keeps its rounded shape even in this brutalist kit — owner choice.
-    pill: { background: '#221610', color: '#fff7ef', weight: 700 },
+    pill: { background: '#221610', color: '#fff7ef', weight: 700, borderRadius: '999px' },
     glass: {
       background: 'rgba(255, 247, 239, 0.55)',
       color: '#221610',
       border: '2px solid #221610',
+      borderRadius: '8px',
+      backdropFilter: 'blur(12px)',
     },
     brutalist: {
       background: '#fff7ef',
       color: '#221610',
       border: '3px solid #221610',
       weight: 800,
+      borderRadius: '0px',
+      boxShadow: '6px 6px 0 #221610',
     },
-    underline: { background: 'transparent', color: '#221610' },
+    underline: {
+      background: 'transparent',
+      color: '#221610',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
   },
   // Editorial = snappy, with character.
   motionDurationMs: 280,
@@ -265,19 +284,29 @@ const BLUE_SAAS: StyleKitPreset = {
     solid: { background: '#5b8def', color: '#0b1530', weight: 600 },
     outline: { background: 'transparent', color: '#e8efff', border: '1px solid #5b8def' },
     ghost: { background: 'transparent', color: '#8da3c8' },
-    pill: { background: '#5b8def', color: '#0b1530', weight: 600 },
+    pill: { background: '#5b8def', color: '#0b1530', weight: 600, borderRadius: '999px' },
     glass: {
       background: 'rgba(91, 141, 239, 0.14)',
       color: '#e8efff',
       border: '1px solid rgba(91, 141, 239, 0.3)',
+      borderRadius: '14px',
+      backdropFilter: 'blur(12px)',
     },
     brutalist: {
       background: '#0b1530',
       color: '#e8efff',
       border: '2px solid #5b8def',
       weight: 700,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #5b8def',
     },
-    underline: { background: 'transparent', color: '#5b8def' },
+    underline: {
+      background: 'transparent',
+      color: '#5b8def',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
   },
   // Soft motion — modern SaaS, medium pace.
   motionDurationMs: 420,
@@ -356,19 +385,29 @@ const GREEN_ORGANIC: StyleKitPreset = {
     solid: { background: '#7ec18e', color: '#0f1a14', weight: 600 },
     outline: { background: 'transparent', color: '#e7f3ea', border: '1px solid #7ec18e' },
     ghost: { background: 'transparent', color: '#9bb4a4' },
-    pill: { background: '#7ec18e', color: '#0f1a14', weight: 600 },
+    pill: { background: '#7ec18e', color: '#0f1a14', weight: 600, borderRadius: '999px' },
     glass: {
       background: 'rgba(126, 193, 142, 0.14)',
       color: '#e7f3ea',
       border: '1px solid rgba(126, 193, 142, 0.3)',
+      borderRadius: '16px',
+      backdropFilter: 'blur(12px)',
     },
     brutalist: {
       background: '#0f1a14',
       color: '#e7f3ea',
       border: '2px solid #7ec18e',
       weight: 700,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #7ec18e',
     },
-    underline: { background: 'transparent', color: '#7ec18e' },
+    underline: {
+      background: 'transparent',
+      color: '#7ec18e',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
   },
   // Slow drifty — organic kit takes its time.
   motionDurationMs: 620,
@@ -533,6 +572,12 @@ function buildActionVariantBlock(
   if (tokens.color !== undefined) decls.push(declaration('color', tokens.color));
   if (tokens.border !== undefined) decls.push(declaration('border', tokens.border));
   if (tokens.weight !== undefined) decls.push(declaration('font-weight', tokens.weight));
+  if (tokens.borderRadius !== undefined) decls.push(declaration('border-radius', tokens.borderRadius));
+  if (tokens.textDecoration !== undefined) decls.push(declaration('text-decoration', tokens.textDecoration));
+  if (tokens.backdropFilter !== undefined) decls.push(declaration('backdrop-filter', tokens.backdropFilter));
+  if (tokens.boxShadow !== undefined) decls.push(declaration('box-shadow', tokens.boxShadow));
+  if (tokens.padding !== undefined) decls.push(declaration('padding', tokens.padding));
+  if (tokens.letterSpacing !== undefined) decls.push(declaration('letter-spacing', tokens.letterSpacing));
   if (decls.length === 0) return '';
   return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="action"][data-variant=${quoteCssString(variant)}] .rev01-action {\n  ${decls.join('\n  ')}\n}`;
 }
