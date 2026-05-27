@@ -91,6 +91,7 @@ export class GeminiAdapter implements LlmAdapter {
   }
 }
 
+// REVIEW: `Math.random()` is not cryptographically secure and theoretically collides. Since these ids only pair request/response within one session it's low-risk, but `crypto.randomUUID()` (available in all modern runtimes including Workers) would be both simpler and collision-free.
 function synthCallId(name: string, counter: number): string {
   return `${name}-${counter}-${Math.floor(Math.random() * 1e9).toString(36)}`;
 }
@@ -131,9 +132,7 @@ function translateMessagesToContents(messages: LlmMessage[]): Content[] {
   for (const msg of messages) {
     switch (msg.role) {
       case 'system':
-        // Caller should pass systemInstruction via opts; if a system message
-        // leaks in here, prepend to a synthetic user turn so the model still
-        // sees it.
+        // REVIEW: silently coercing a system message into a `[system]`-prefixed user turn is a fallback that hides a caller bug. Per all-or-nothing posture, this should throw — the caller must use `systemInstruction` in opts, not sneak system messages into the content array.
         out.push({ role: 'user', parts: [{ text: `[system] ${msg.content}` }] });
         break;
       case 'user':
@@ -155,6 +154,7 @@ function translateMessagesToContents(messages: LlmMessage[]): Content[] {
             });
           }
         }
+        // REVIEW: empty-string placeholder for assistants with no text and no tool calls is a Gemini API quirk (Content requires at least one part). Worth a comment explaining *why* — right now it looks like a mistake.
         if (parts.length === 0) parts.push({ text: '' });
         out.push({ role: 'model', parts });
         break;
@@ -206,5 +206,6 @@ function translateToolToDeclaration(tool: LlmTool): FunctionDeclaration {
   };
 }
 
+// REVIEW: re-exporting Gemini's `Type` enum from an adapter file leaks a provider-specific type. Any consumer importing `{ Type }` from `llm-gemini.ts` is now coupled to Gemini. If other adapters are planned (per the comment in llm.ts), this should live in the shared interface or not be exported at all.
 export { Type };
 export type { JsonSchema };

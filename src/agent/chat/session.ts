@@ -191,6 +191,7 @@ export async function createSession(
   const insert: NewChatSession = {
     siteId,
     customerId,
+    // REVIEW: double cast `as unknown as Array<Record<string, unknown>>` signals a type mismatch between the app model (`ChatMessage[]`) and the DB schema (`jsonb`). Consider a shared Zod schema or a serialize/deserialize pair that both the DB layer and the session module agree on, so the cast isn't needed.
     messages: seed as unknown as Array<Record<string, unknown>>,
   };
   const inserted = await database.insert(chatSession).values(insert).returning();

@@ -210,9 +210,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       doneReason = 'cap';
       break;
     }
-    // If the model proposed mutating ops only and no read query, the model
-    // typically returns `stop` on the next pass once we feed back the
-    // synthetic tool acknowledgements; let the loop continue.
+    // REVIEW: `sawMutating` is assigned (line 183) but never read — `void sawMutating` just suppresses the unused-variable lint. Either use the flag (e.g. to decide whether to continue the loop differently) or remove it entirely.
     void sawMutating;
   }
 
@@ -368,6 +366,8 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
 // We re-implement here (not import) because the canvas-agent route module is
 // off-limits per the brief and importing internals would couple us to its
 // HTTP shell. Both implementations enforce the same contract.
+//
+// REVIEW: "copied / adapted" means two parse implementations that must stay in sync manually. If the canvas-agent route's parser changes (e.g. new validation rule), this copy silently diverges. Extract the shared parsing logic into a standalone module both can import — the "coupling" concern is about the HTTP shell, not the parsing contract.
 // ---------------------------------------------------------------------------
 
 type ParseResult = { ok: true; op: CanvasAgentOp } | { ok: false; error: string };
@@ -495,6 +495,7 @@ function parseInlineMark(value: unknown, runIdx: number, markIdx: number): Inlin
   return { type: value.type };
 }
 
+// REVIEW: `isRecord` and `isOneOf` are duplicated across at least 4 files: here, route.ts, design-section-parser.ts, and canvas-agent route. Define once in a shared `src/util/type-guards.ts` or similar.
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

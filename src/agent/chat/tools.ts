@@ -174,9 +174,8 @@ function summariseSection(
   detail: QuerySiteDetail,
 ): QuerySiteSectionSummary {
   const counts: Partial<Record<ElementType, number>> = {};
+  // REVIEW: this loop is dead code — it iterates ELEMENT_TYPES and `void`s every value, doing nothing. The comment says "initialise lazily" but no initialization happens. Either delete the loop or actually initialize the counts (e.g. `counts[t] = 0`). The second loop below already handles counting via the `?? 0` fallback.
   for (const t of ELEMENT_TYPES) {
-    // initialise lazily — only emit present types in the output to avoid
-    // wasting tokens on a forest of zeros.
     void t;
   }
   for (const el of section.elements) {

@@ -1,11 +1,18 @@
 // src/agent/canvas-ops.ts
 //
-// Pure agent-op layer for the Canvas AI flow (T7). Defines the small union of
-// operations the canvas agent can request and a single `applyCanvasAgentOp`
-// function that produces a new `CanvasSiteState` for each op. The function is
-// pure: it deep-clones the input state via `structuredClone`, mutates the
-// clone, and returns it. The caller is responsible for revalidating the
-// result with `validateCanvasSiteState`.
+// Pure agent-op layer for the Canvas AI flow (T7). Defines the discriminated
+// union of operations the canvas agent can request and a single
+// `applyCanvasAgentOp` function that produces a new `CanvasSiteState` for
+// each op. The function is pure: it deep-clones the input state via
+// `structuredClone`, mutates the clone, and returns it. The caller is
+// responsible for revalidating the result with `validateCanvasSiteState`.
+//
+// Operations cover:
+//   - Text & media edits: rewriteText, replaceMedia, updateElement, deleteElement, addElement
+//   - Section CRUD: insertSection, designSection, updateSection, deleteSection,
+//     moveSection, duplicateSection
+//   - Page CRUD: addPage, updatePage, deletePage
+//   - Site-level: setStyleKit, setSiteConfig
 //
 // The agent NEVER hand-writes canvas section JSON. `insertSection` carries
 // only a `recipeId` plus a `RecipeFactoryInput`; the apply function calls
@@ -19,7 +26,7 @@
 import { resolveDesignSection } from '../canvas/layout/engine.js';
 import type { DesignSectionInput, DesignSectionResult } from '../canvas/layout/tree.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../canvas/recipes.js';
-import type { CanvasSiteState, InlineRun, MediaKind, SectionRecipeId } from '../canvas/schema.js';
+import type { BuiltInStyleKit, CanvasElement, CanvasSection, CanvasSiteState, InlineRun, MediaKind, SectionRecipeId } from '../canvas/schema.js';
 import { getStyleKitPreset } from '../canvas/style-kits.js';
 
 export type CanvasAgentOp =
@@ -41,7 +48,94 @@ export type CanvasAgentOp =
       kind: 'designSection';
       afterSectionId: string | null;
       input: DesignSectionInput;
-    };
+    }
+  | { kind: 'deleteElement'; elementId: string }
+  | {
+      kind: 'updateElement';
+      elementId: string;
+      elementType: string;
+      patch: Record<string, unknown>;
+    }
+  | {
+      kind: 'addElement';
+      sectionId: string;
+      elementType: string;
+      box?: { x: number; y: number; w: number; h: number };
+      props: Record<string, unknown>;
+    }
+  | { kind: 'updateSection'; sectionId: string; patch: Record<string, unknown> }
+  | { kind: 'deleteSection'; sectionId: string }
+  | { kind: 'moveSection'; sectionId: string; afterSectionId: string | null }
+  | { kind: 'duplicateSection'; sectionId: string }
+  | { kind: 'addPage'; title: string; slug: string }
+  | { kind: 'updatePage'; pageId: string; patch: Record<string, unknown> }
+  | { kind: 'deletePage'; pageId: string }
+  | { kind: 'setStyleKit'; styleKit: BuiltInStyleKit }
+  | { kind: 'setSiteConfig'; patch: Record<string, unknown> };
+
+// ---------------------------------------------------------------------------
+// Helpers — search across all pages, header, and footer
+// ---------------------------------------------------------------------------
+
+function findElementAcrossSite(
+  state: CanvasSiteState,
+  elementId: string,
+): { element: CanvasElement; section: CanvasSection } {
+  // Check header
+  if (state.header) {
+    for (const el of state.header.elements) {
+      if (el.id === elementId) return { element: el, section: state.header };
+    }
+  }
+  // Check footer
+  if (state.footer) {
+    for (const el of state.footer.elements) {
+      if (el.id === elementId) return { element: el, section: state.footer };
+    }
+  }
+  // Check all pages
+  for (const page of state.pages) {
+    for (const section of page.sections) {
+      for (const el of section.elements) {
+        if (el.id === elementId) return { element: el, section };
+      }
+    }
+  }
+  throw new Error(`element not found: ${elementId}`);
+}
+
+type SectionLocation =
+  | { kind: 'header' }
+  | { kind: 'footer' }
+  | { kind: 'page'; pageIndex: number; sectionIndex: number };
+
+function findSectionAcrossSite(
+  state: CanvasSiteState,
+  sectionId: string,
+): { section: CanvasSection; location: SectionLocation } {
+  if (state.header && state.header.id === sectionId) {
+    return { section: state.header, location: { kind: 'header' } };
+  }
+  if (state.footer && state.footer.id === sectionId) {
+    return { section: state.footer, location: { kind: 'footer' } };
+  }
+  for (let pi = 0; pi < state.pages.length; pi++) {
+    const page = state.pages[pi];
+    for (let si = 0; si < page.sections.length; si++) {
+      if (page.sections[si].id === sectionId) {
+        return {
+          section: page.sections[si],
+          location: { kind: 'page', pageIndex: pi, sectionIndex: si },
+        };
+      }
+    }
+  }
+  throw new Error(`section not found: ${sectionId}`);
+}
+
+// ---------------------------------------------------------------------------
+// applyCanvasAgentOp
+// ---------------------------------------------------------------------------
 
 /**
  * Apply a single agent op to a `CanvasSiteState`. The input is left untouched
@@ -65,43 +159,35 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     throw new Error('applyCanvasAgentOp: state must have at least one page');
   }
 
+  // -- rewriteText (uses findElementAcrossSite for header/footer support) ---
   if (op.kind === 'rewriteText') {
     if (!Array.isArray(op.content)) {
       throw new Error(
         `applyCanvasAgentOp(rewriteText): content must be an InlineRun[] (got ${typeof op.content})`,
       );
     }
-    for (const section of page.sections) {
-      for (const element of section.elements) {
-        if (element.id !== op.elementId) continue;
-        if (element.type !== 'text') {
-          throw new Error(
-            `applyCanvasAgentOp(rewriteText): element ${op.elementId} is type ${element.type}, expected text`,
-          );
-        }
-        element.content = op.content;
-        return next;
-      }
+    const { element } = findElementAcrossSite(next, op.elementId);
+    if (element.type !== 'text') {
+      throw new Error(
+        `applyCanvasAgentOp(rewriteText): element ${op.elementId} is type ${element.type}, expected text`,
+      );
     }
-    throw new Error(`applyCanvasAgentOp(rewriteText): text element not found: ${op.elementId}`);
+    (element as any).content = op.content;
+    return next;
   }
 
+  // -- replaceMedia (uses findElementAcrossSite for header/footer support) --
   if (op.kind === 'replaceMedia') {
-    for (const section of page.sections) {
-      for (const element of section.elements) {
-        if (element.id !== op.elementId) continue;
-        if (element.type !== 'media') {
-          throw new Error(
-            `applyCanvasAgentOp(replaceMedia): element ${op.elementId} is type ${element.type}, expected media`,
-          );
-        }
-        element.mediaKind = op.mediaKind;
-        element.assetId = op.assetId;
-        element.alt = op.alt;
-        return next;
-      }
+    const { element } = findElementAcrossSite(next, op.elementId);
+    if (element.type !== 'media') {
+      throw new Error(
+        `applyCanvasAgentOp(replaceMedia): element ${op.elementId} is type ${element.type}, expected media`,
+      );
     }
-    throw new Error(`applyCanvasAgentOp(replaceMedia): media element not found: ${op.elementId}`);
+    (element as any).mediaKind = op.mediaKind;
+    (element as any).assetId = op.assetId;
+    (element as any).alt = op.alt;
+    return next;
   }
 
   if (op.kind === 'insertSection') {
@@ -120,28 +206,264 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     return next;
   }
 
-  // designSection — layout engine resolves a semantic tree into positioned
-  // elements. The LLM describes structure; the engine computes geometry.
-  const preset = getStyleKitPreset(next.styleKit);
-  const pageWidth = page.width;
-  const result = resolveDesignSection(op.input, pageWidth, preset);
-  if (result.imagePrompts.size > 0) {
-    throw new Error(
-      `applyCanvasAgentOp(designSection): image generation is not wired for media prompts (${[...result.imagePrompts.values()].join('; ')})`,
-    );
-  }
-  if (op.afterSectionId === null) {
-    page.sections.push(result.section);
+  // REVIEW: no exhaustiveness check. If a fifth op kind is added, it silently falls through to this block. Refactor to a `switch` with a `default: { const _: never = op; throw ... }` to catch new kinds at compile time.
+  if (op.kind === 'designSection') {
+    // designSection — layout engine resolves a semantic tree into positioned
+    // elements. The LLM describes structure; the engine computes geometry.
+    // REVIEW: `getStyleKitPreset(next.styleKit)` when styleKit is 'custom' — does `getStyleKitPreset` handle that or throw "unknown kit"? The a11y audit uses `resolveStyleKitWithCustom` for this reason. Inconsistent resolution path.
+    const preset = getStyleKitPreset(next.styleKit);
+    const pageWidth = page.width;
+    const result = resolveDesignSection(op.input, pageWidth, preset);
+    if (result.imagePrompts.size > 0) {
+      throw new Error(
+        `applyCanvasAgentOp(designSection): image generation is not wired for media prompts (${[...result.imagePrompts.values()].join('; ')})`,
+      );
+    }
+    if (op.afterSectionId === null) {
+      page.sections.push(result.section);
+      return next;
+    }
+    const insertIdx = page.sections.findIndex((s) => s.id === op.afterSectionId);
+    if (insertIdx < 0) {
+      throw new Error(
+        `applyCanvasAgentOp(designSection): afterSectionId not found: ${op.afterSectionId}`,
+      );
+    }
+    page.sections.splice(insertIdx + 1, 0, result.section);
     return next;
   }
-  const insertIdx = page.sections.findIndex((s) => s.id === op.afterSectionId);
-  if (insertIdx < 0) {
-    throw new Error(
-      `applyCanvasAgentOp(designSection): afterSectionId not found: ${op.afterSectionId}`,
-    );
+
+  // -- deleteElement --------------------------------------------------------
+  if (op.kind === 'deleteElement') {
+    const { section } = findElementAcrossSite(next, op.elementId);
+    const idx = section.elements.findIndex((e) => e.id === op.elementId);
+    if (idx < 0) {
+      throw new Error(`deleteElement: element not found in section: ${op.elementId}`);
+    }
+    section.elements.splice(idx, 1);
+    return next;
   }
-  page.sections.splice(insertIdx + 1, 0, result.section);
-  return next;
+
+  // -- updateElement --------------------------------------------------------
+  if (op.kind === 'updateElement') {
+    const { element } = findElementAcrossSite(next, op.elementId);
+    if (element.type !== op.elementType) {
+      throw new Error(
+        `updateElement: element ${op.elementId} is type ${element.type}, expected ${op.elementType}`,
+      );
+    }
+    const patch = op.patch;
+    // Apply shared BaseElement patches
+    if (patch.box && typeof patch.box === 'object') {
+      const b = patch.box as Record<string, unknown>;
+      if (typeof b.x === 'number') element.box.x = b.x;
+      if (typeof b.y === 'number') element.box.y = b.y;
+      if (typeof b.w === 'number') element.box.w = b.w;
+      if (typeof b.h === 'number') element.box.h = b.h;
+      if (typeof b.z === 'number') element.box.z = b.z;
+      if (typeof b.rotation === 'number') element.box.rotation = b.rotation;
+    }
+    if (patch.motion && typeof patch.motion === 'object') {
+      (element as any).motion = patch.motion;
+    }
+    if (patch.elementStyle && typeof patch.elementStyle === 'object') {
+      (element as any).elementStyle = {
+        ...(element as any).elementStyle,
+        ...patch.elementStyle,
+      };
+    }
+    if (patch.responsive && typeof patch.responsive === 'object') {
+      (element as any).responsive = {
+        ...(element as any).responsive,
+        ...patch.responsive,
+      };
+    }
+    // Apply type-specific patches — spread remaining fields onto the element.
+    // validateCanvasSiteState will catch invalid fields.
+    const sharedKeys = new Set(['box', 'motion', 'elementStyle', 'responsive']);
+    for (const [key, value] of Object.entries(patch)) {
+      if (!sharedKeys.has(key) && value !== undefined) {
+        (element as any)[key] = value;
+      }
+    }
+    return next;
+  }
+
+  // -- addElement -----------------------------------------------------------
+  if (op.kind === 'addElement') {
+    const { section } = findSectionAcrossSite(next, op.sectionId);
+    // Compute box: use provided or auto-place below lowest existing element
+    let box: { x: number; y: number; w: number; h: number; z: number };
+    if (op.box) {
+      const maxZ = section.elements.reduce((m, e) => Math.max(m, e.box.z || 0), 0);
+      box = { ...op.box, z: maxZ + 1 };
+    } else {
+      let bottomY = 40;
+      let maxZ = 0;
+      for (const el of section.elements) {
+        const elBottom = el.box.y + el.box.h;
+        if (elBottom > bottomY) bottomY = elBottom;
+        if ((el.box.z || 0) > maxZ) maxZ = el.box.z || 0;
+      }
+      box = { x: 40, y: bottomY + 20, w: 320, h: 80, z: maxZ + 1 };
+    }
+    const id = `el-${op.elementType}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const element: any = { id, type: op.elementType, box, ...op.props };
+    section.elements.push(element);
+    return next;
+  }
+
+  // -- updateSection --------------------------------------------------------
+  if (op.kind === 'updateSection') {
+    const { section } = findSectionAcrossSite(next, op.sectionId);
+    const patch = op.patch;
+    if (typeof patch.name === 'string') section.name = patch.name;
+    if (typeof patch.height === 'number') {
+      section.height = Math.max(240, Math.min(1200, patch.height));
+    }
+    if (typeof patch.backgroundEffect === 'string') {
+      (section as any).backgroundEffect = patch.backgroundEffect;
+    }
+    if (typeof patch.entrance === 'string') {
+      (section as any).entrance = patch.entrance;
+    }
+    return next;
+  }
+
+  // -- deleteSection --------------------------------------------------------
+  if (op.kind === 'deleteSection') {
+    const { location } = findSectionAcrossSite(next, op.sectionId);
+    if (location.kind === 'header') {
+      next.header = undefined;
+      return next;
+    }
+    if (location.kind === 'footer') {
+      next.footer = undefined;
+      return next;
+    }
+    const sectionPage = next.pages[location.pageIndex];
+    if (sectionPage.sections.length <= 1) {
+      throw new Error('deleteSection: cannot delete the last section on a page');
+    }
+    sectionPage.sections.splice(location.sectionIndex, 1);
+    return next;
+  }
+
+  // -- moveSection ----------------------------------------------------------
+  if (op.kind === 'moveSection') {
+    const { location } = findSectionAcrossSite(next, op.sectionId);
+    if (location.kind !== 'page') {
+      throw new Error('moveSection: cannot move header or footer sections');
+    }
+    const movePage = next.pages[location.pageIndex];
+    const [section] = movePage.sections.splice(location.sectionIndex, 1);
+    if (op.afterSectionId === null) {
+      movePage.sections.unshift(section);
+    } else {
+      const targetIdx = movePage.sections.findIndex((s) => s.id === op.afterSectionId);
+      if (targetIdx < 0) {
+        throw new Error(`moveSection: afterSectionId not found: ${op.afterSectionId}`);
+      }
+      movePage.sections.splice(targetIdx + 1, 0, section);
+    }
+    return next;
+  }
+
+  // -- duplicateSection -----------------------------------------------------
+  if (op.kind === 'duplicateSection') {
+    const { location } = findSectionAcrossSite(next, op.sectionId);
+    if (location.kind !== 'page') {
+      throw new Error('duplicateSection: cannot duplicate header or footer');
+    }
+    const dupPage = next.pages[location.pageIndex];
+    const original = dupPage.sections[location.sectionIndex];
+    const clone = structuredClone(original);
+    clone.id = `sec-${clone.recipeId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    clone.name = original.name + ' copy';
+    for (const el of clone.elements) {
+      const prefix = el.id.includes('-')
+        ? el.id.split('-').slice(0, -1).join('-')
+        : 'el';
+      el.id = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    }
+    if (clone.role) clone.role = undefined;
+    dupPage.sections.splice(location.sectionIndex + 1, 0, clone);
+    return next;
+  }
+
+  // -- addPage --------------------------------------------------------------
+  if (op.kind === 'addPage') {
+    const pageId = `page-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const sectionId = `sec-feature-grid-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    const newPage = {
+      id: pageId,
+      slug: op.slug,
+      title: op.title,
+      width: next.pages[0]?.width ?? 1440,
+      sections: [
+        {
+          id: sectionId,
+          recipeId: 'feature-grid' as SectionRecipeId,
+          name: 'Blank section',
+          height: 640,
+          elements: [],
+        },
+      ],
+    };
+    next.pages.push(newPage);
+    return next;
+  }
+
+  // -- updatePage -----------------------------------------------------------
+  if (op.kind === 'updatePage') {
+    const targetPage = next.pages.find((p) => p.id === op.pageId);
+    if (!targetPage) throw new Error(`updatePage: page not found: ${op.pageId}`);
+    const patch = op.patch;
+    if (typeof patch.title === 'string') targetPage.title = patch.title;
+    if (typeof patch.slug === 'string') targetPage.slug = patch.slug;
+    if (typeof patch.description === 'string') (targetPage as any).description = patch.description;
+    if (typeof patch.ogImageAssetId === 'string') {
+      (targetPage as any).ogImageAssetId = patch.ogImageAssetId;
+    }
+    if (typeof patch.canonical === 'string') (targetPage as any).canonical = patch.canonical;
+    if (typeof patch.noIndex === 'boolean') (targetPage as any).noIndex = patch.noIndex;
+    if (typeof patch.locale === 'string') (targetPage as any).locale = patch.locale;
+    if (typeof patch.publishedDate === 'string') {
+      (targetPage as any).publishedDate = patch.publishedDate;
+    }
+    if (typeof patch.author === 'string') (targetPage as any).author = patch.author;
+    if (Array.isArray(patch.tags)) (targetPage as any).tags = patch.tags;
+    if (typeof patch.category === 'string') (targetPage as any).category = patch.category;
+    return next;
+  }
+
+  // -- deletePage -----------------------------------------------------------
+  if (op.kind === 'deletePage') {
+    if (next.pages.length <= 1) {
+      throw new Error('deletePage: cannot delete the last page');
+    }
+    const idx = next.pages.findIndex((p) => p.id === op.pageId);
+    if (idx < 0) throw new Error(`deletePage: page not found: ${op.pageId}`);
+    next.pages.splice(idx, 1);
+    return next;
+  }
+
+  // -- setStyleKit ----------------------------------------------------------
+  if (op.kind === 'setStyleKit') {
+    next.styleKit = op.styleKit;
+    return next;
+  }
+
+  // -- setSiteConfig --------------------------------------------------------
+  if (op.kind === 'setSiteConfig') {
+    const patch = op.patch;
+    if (typeof patch.darkModeEnabled === 'boolean') next.darkModeEnabled = patch.darkModeEnabled;
+    if (typeof patch.defaultLocale === 'string') next.defaultLocale = patch.defaultLocale;
+    if (typeof patch.siteNoIndex === 'boolean') next.siteNoIndex = patch.siteNoIndex;
+    return next;
+  }
+
+  throw new Error(`applyCanvasAgentOp: unknown op kind: ${(op as any).kind}`);
 }
 
 /**
