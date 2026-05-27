@@ -33,6 +33,7 @@ import { GeminiAdapter } from '../llm-gemini.js';
 import { db } from '../../db/client.js';
 import {
   customer,
+  ownerAsset,
   site,
   siteFont,
   type SiteFont,
@@ -42,6 +43,7 @@ import {
   buildSystemPrompt,
   runChatTurn,
   type OrchestratorContext,
+  type OwnerAssetRef,
 } from './orchestrator.js';
 import {
   createSession,
@@ -75,6 +77,7 @@ interface OwnedSiteRow {
   styleKit: StyleKit;
   editableState: CanvasSiteState;
   fonts: SiteFont[];
+  assets: OwnerAssetRef[];
 }
 
 async function loadOwnedSiteWithFonts(
@@ -111,12 +114,26 @@ async function loadOwnedSiteWithFonts(
     .from(siteFont)
     .where(eq(siteFont.siteId, siteId));
 
+  const assetRows = await database
+    .select({
+      id: ownerAsset.id,
+      kind: ownerAsset.kind,
+      alt: ownerAsset.alt,
+      contentHash: ownerAsset.contentHash,
+      width: ownerAsset.width,
+      height: ownerAsset.height,
+    })
+    .from(ownerAsset)
+    .where(eq(ownerAsset.customerId, customerId))
+    .limit(200);
+
   return {
     id: row.id,
     customerId,
     styleKit: row.styleKit,
     editableState: row.editableState,
     fonts,
+    assets: assetRows,
   };
 }
 
@@ -176,6 +193,7 @@ chatApi.post('/:siteId/chat', async (c) => {
       adapter,
       state: row.editableState,
       fonts: row.fonts,
+      assets: row.assets,
       systemInstruction: buildSystemPrompt(row.editableState),
     };
 

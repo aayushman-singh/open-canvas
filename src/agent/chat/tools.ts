@@ -58,20 +58,74 @@ export const QUERY_SITE_TOOL: LlmTool = {
 };
 
 // ---------------------------------------------------------------------------
+// query_assets — read-only tool (list owner's uploaded assets)
+// ---------------------------------------------------------------------------
+
+const queryAssetsSchema: JsonSchema = {
+  type: 'object',
+  description:
+    "List the owner's uploaded media assets. Returns id, kind, alt, and dimensions so you can reference asset IDs in replaceMedia or addElement calls.",
+  properties: {
+    limit: {
+      type: 'number',
+      description: 'Maximum number of assets to return (default 50).',
+    },
+  },
+};
+
+export const QUERY_ASSETS_TOOL: LlmTool = {
+  name: 'query_assets',
+  description:
+    "List the owner's uploaded media assets. Use this to find asset IDs before calling replaceMedia or adding media elements. Read-only — never mutates state.",
+  parameters: queryAssetsSchema,
+};
+
+export interface QueryAssetSummary {
+  id: string;
+  kind: string;
+  alt: string;
+  contentHash: string;
+  width?: number;
+  height?: number;
+}
+
+export interface QueryAssetsResult {
+  assets: QueryAssetSummary[];
+  total: number;
+  truncated: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // CHAT_AGENT_TOOLS — full tool catalogue exposed to the chat model
 // ---------------------------------------------------------------------------
 
-export const CHAT_AGENT_TOOLS: LlmTool[] = [QUERY_SITE_TOOL, ...CANVAS_AGENT_TOOLS];
+export const CHAT_AGENT_TOOLS: LlmTool[] = [
+  QUERY_SITE_TOOL,
+  QUERY_ASSETS_TOOL,
+  ...CANVAS_AGENT_TOOLS,
+];
 
 /** Tool names that mutate (produce ops); used by the orchestrator to route to op-preview events. */
 export const MUTATING_TOOL_NAMES = new Set<string>([
   'rewriteText',
   'replaceMedia',
   'designSection',
+  'deleteElement',
+  'updateElement',
+  'addElement',
+  'updateSection',
+  'deleteSection',
+  'moveSection',
+  'duplicateSection',
+  'addPage',
+  'updatePage',
+  'deletePage',
+  'setStyleKit',
+  'setSiteConfig',
 ]);
 
 /** Tool names that are read-only; the orchestrator dispatches and feeds the result back into the model. */
-export const READ_ONLY_TOOL_NAMES = new Set<string>(['query_site']);
+export const READ_ONLY_TOOL_NAMES = new Set<string>(['query_site', 'query_assets']);
 
 // ---------------------------------------------------------------------------
 // query_site implementation — token-budgeted site summary
@@ -83,6 +137,8 @@ export interface QuerySiteSummary {
   customStyleKitPresent: boolean;
   symbolsCount: number;
   pageCount: number;
+  header?: QuerySiteSectionSummary | undefined;
+  footer?: QuerySiteSectionSummary | undefined;
   pages: QuerySitePageSummary[];
   customFonts: QuerySiteFontRef[];
   truncated: boolean;
@@ -143,12 +199,17 @@ export function buildQuerySiteSummary(input: QuerySiteInput): QuerySiteSummary {
     style: f.style,
   }));
 
+  const header = state.header ? summariseSection(state.header, detail) : undefined;
+  const footer = state.footer ? summariseSection(state.footer, detail) : undefined;
+
   const summary: QuerySiteSummary = {
     styleKit: state.styleKit,
     defaultLocale: state.defaultLocale ?? 'en',
     customStyleKitPresent: state.customStyleKit !== undefined,
     symbolsCount: state.symbols.length,
     pageCount: state.pages.length,
+    header,
+    footer,
     pages,
     customFonts,
     truncated: false,
@@ -203,24 +264,24 @@ function summariseSection(
 function trimToCap(summary: QuerySiteSummary): QuerySiteSummary {
   const cap = QUERY_SITE_TOKEN_CAP;
   const sizeOf = (s: QuerySiteSummary): number => estimateTokens(JSON.stringify(s));
+  const stripElements = (s: QuerySiteSectionSummary): QuerySiteSectionSummary => ({
+    id: s.id,
+    recipeId: s.recipeId,
+    name: s.name,
+    elementCount: s.elementCount,
+    elementTypeCounts: s.elementTypeCounts,
+  });
 
   if (sizeOf(summary) <= cap) return summary;
 
   // 1) Drop per-element listings.
   let working: QuerySiteSummary = {
     ...summary,
+    header: summary.header ? stripElements(summary.header) : undefined,
+    footer: summary.footer ? stripElements(summary.footer) : undefined,
     pages: summary.pages.map((p) => ({
       ...p,
-      sections: p.sections.map((s) => {
-        const stripped: QuerySiteSectionSummary = {
-          id: s.id,
-          recipeId: s.recipeId,
-          name: s.name,
-          elementCount: s.elementCount,
-          elementTypeCounts: s.elementTypeCounts,
-        };
-        return stripped;
-      }),
+      sections: p.sections.map(stripElements),
     })),
     truncated: true,
   };

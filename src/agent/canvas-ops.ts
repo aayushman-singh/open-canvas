@@ -26,8 +26,27 @@
 import { resolveDesignSection } from '../canvas/layout/engine.js';
 import type { DesignSectionInput, DesignSectionResult } from '../canvas/layout/tree.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../canvas/recipes.js';
-import type { BuiltInStyleKit, CanvasElement, CanvasSection, CanvasSiteState, InlineRun, MediaKind, SectionRecipeId } from '../canvas/schema.js';
+import type {
+  BuiltInStyleKit,
+  CanvasElement,
+  CanvasSection,
+  CanvasSiteState,
+  InlineRun,
+  MediaKind,
+  SectionRecipeId,
+} from '../canvas/schema.js';
 import { getStyleKitPreset } from '../canvas/style-kits.js';
+
+const SECTION_HEIGHT_MAX = 1400;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function setElementField(element: CanvasElement, key: string, value: unknown): void {
+  const target = element as CanvasElement & Record<string, unknown>;
+  target[key] = value;
+}
 
 export type CanvasAgentOp =
   | { kind: 'rewriteText'; elementId: string; content: InlineRun[] }
@@ -60,7 +79,7 @@ export type CanvasAgentOp =
       kind: 'addElement';
       sectionId: string;
       elementType: string;
-      box?: { x: number; y: number; w: number; h: number };
+      box?: { x: number; y: number; w: number; h: number } | undefined;
       props: Record<string, unknown>;
     }
   | { kind: 'updateSection'; sectionId: string; patch: Record<string, unknown> }
@@ -120,11 +139,12 @@ function findSectionAcrossSite(
     return { section: state.footer, location: { kind: 'footer' } };
   }
   for (let pi = 0; pi < state.pages.length; pi++) {
-    const page = state.pages[pi];
-    for (let si = 0; si < page.sections.length; si++) {
-      if (page.sections[si].id === sectionId) {
+    const pg = state.pages[pi]!;
+    for (let si = 0; si < pg.sections.length; si++) {
+      const sec = pg.sections[si]!;
+      if (sec.id === sectionId) {
         return {
-          section: page.sections[si],
+          section: sec,
           location: { kind: 'page', pageIndex: pi, sectionIndex: si },
         };
       }
@@ -172,7 +192,7 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
         `applyCanvasAgentOp(rewriteText): element ${op.elementId} is type ${element.type}, expected text`,
       );
     }
-    (element as any).content = op.content;
+    element.content = op.content;
     return next;
   }
 
@@ -184,9 +204,9 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
         `applyCanvasAgentOp(replaceMedia): element ${op.elementId} is type ${element.type}, expected media`,
       );
     }
-    (element as any).mediaKind = op.mediaKind;
-    (element as any).assetId = op.assetId;
-    (element as any).alt = op.alt;
+    element.mediaKind = op.mediaKind;
+    element.assetId = op.assetId;
+    element.alt = op.alt;
     return next;
   }
 
@@ -254,8 +274,8 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     }
     const patch = op.patch;
     // Apply shared BaseElement patches
-    if (patch.box && typeof patch.box === 'object') {
-      const b = patch.box as Record<string, unknown>;
+    if (isRecord(patch.box)) {
+      const b = patch.box;
       if (typeof b.x === 'number') element.box.x = b.x;
       if (typeof b.y === 'number') element.box.y = b.y;
       if (typeof b.w === 'number') element.box.w = b.w;
@@ -263,18 +283,18 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
       if (typeof b.z === 'number') element.box.z = b.z;
       if (typeof b.rotation === 'number') element.box.rotation = b.rotation;
     }
-    if (patch.motion && typeof patch.motion === 'object') {
-      (element as any).motion = patch.motion;
+    if (isRecord(patch.motion)) {
+      element.motion = patch.motion as NonNullable<CanvasElement['motion']>;
     }
-    if (patch.elementStyle && typeof patch.elementStyle === 'object') {
-      (element as any).elementStyle = {
-        ...(element as any).elementStyle,
+    if (isRecord(patch.elementStyle)) {
+      element.elementStyle = {
+        ...element.elementStyle,
         ...patch.elementStyle,
       };
     }
-    if (patch.responsive && typeof patch.responsive === 'object') {
-      (element as any).responsive = {
-        ...(element as any).responsive,
+    if (isRecord(patch.responsive)) {
+      element.responsive = {
+        ...element.responsive,
         ...patch.responsive,
       };
     }
@@ -283,7 +303,7 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     const sharedKeys = new Set(['box', 'motion', 'elementStyle', 'responsive']);
     for (const [key, value] of Object.entries(patch)) {
       if (!sharedKeys.has(key) && value !== undefined) {
-        (element as any)[key] = value;
+        setElementField(element, key, value);
       }
     }
     return next;
@@ -306,9 +326,18 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
         if ((el.box.z || 0) > maxZ) maxZ = el.box.z || 0;
       }
       box = { x: 40, y: bottomY + 20, w: 320, h: 80, z: maxZ + 1 };
+      const requiredHeight = box.y + box.h + 40;
+      if (requiredHeight > SECTION_HEIGHT_MAX) {
+        throw new Error(
+          `addElement: auto-placement would require section height ${String(requiredHeight)}, max is ${String(SECTION_HEIGHT_MAX)}`,
+        );
+      }
+      if (requiredHeight > section.height) {
+        section.height = requiredHeight;
+      }
     }
     const id = `el-${op.elementType}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
-    const element: any = { id, type: op.elementType, box, ...op.props };
+    const element = { id, type: op.elementType, box, ...op.props } as CanvasElement;
     section.elements.push(element);
     return next;
   }
@@ -322,10 +351,12 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
       section.height = Math.max(240, Math.min(1200, patch.height));
     }
     if (typeof patch.backgroundEffect === 'string') {
-      (section as any).backgroundEffect = patch.backgroundEffect;
+      section.backgroundEffect = patch.backgroundEffect as NonNullable<
+        CanvasSection['backgroundEffect']
+      >;
     }
     if (typeof patch.entrance === 'string') {
-      (section as any).entrance = patch.entrance;
+      section.entrance = patch.entrance as NonNullable<CanvasSection['entrance']>;
     }
     return next;
   }
@@ -334,14 +365,14 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
   if (op.kind === 'deleteSection') {
     const { location } = findSectionAcrossSite(next, op.sectionId);
     if (location.kind === 'header') {
-      next.header = undefined;
+      delete next.header;
       return next;
     }
     if (location.kind === 'footer') {
-      next.footer = undefined;
+      delete next.footer;
       return next;
     }
-    const sectionPage = next.pages[location.pageIndex];
+    const sectionPage = next.pages[location.pageIndex]!;
     if (sectionPage.sections.length <= 1) {
       throw new Error('deleteSection: cannot delete the last section on a page');
     }
@@ -355,16 +386,17 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     if (location.kind !== 'page') {
       throw new Error('moveSection: cannot move header or footer sections');
     }
-    const movePage = next.pages[location.pageIndex];
-    const [section] = movePage.sections.splice(location.sectionIndex, 1);
+    const movePage = next.pages[location.pageIndex]!;
+    const [moved] = movePage.sections.splice(location.sectionIndex, 1);
+    if (!moved) throw new Error('moveSection: splice returned empty');
     if (op.afterSectionId === null) {
-      movePage.sections.unshift(section);
+      movePage.sections.unshift(moved);
     } else {
       const targetIdx = movePage.sections.findIndex((s) => s.id === op.afterSectionId);
       if (targetIdx < 0) {
         throw new Error(`moveSection: afterSectionId not found: ${op.afterSectionId}`);
       }
-      movePage.sections.splice(targetIdx + 1, 0, section);
+      movePage.sections.splice(targetIdx + 1, 0, moved);
     }
     return next;
   }
@@ -375,18 +407,16 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     if (location.kind !== 'page') {
       throw new Error('duplicateSection: cannot duplicate header or footer');
     }
-    const dupPage = next.pages[location.pageIndex];
-    const original = dupPage.sections[location.sectionIndex];
-    const clone = structuredClone(original);
+    const dupPage = next.pages[location.pageIndex]!;
+    const original = dupPage.sections[location.sectionIndex]!;
+    const clone: CanvasSection = structuredClone(original);
     clone.id = `sec-${clone.recipeId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
     clone.name = original.name + ' copy';
     for (const el of clone.elements) {
-      const prefix = el.id.includes('-')
-        ? el.id.split('-').slice(0, -1).join('-')
-        : 'el';
+      const prefix = el.id.includes('-') ? el.id.split('-').slice(0, -1).join('-') : 'el';
       el.id = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
     }
-    if (clone.role) clone.role = undefined;
+    if (clone.role) delete clone.role;
     dupPage.sections.splice(location.sectionIndex + 1, 0, clone);
     return next;
   }
@@ -421,19 +451,19 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     const patch = op.patch;
     if (typeof patch.title === 'string') targetPage.title = patch.title;
     if (typeof patch.slug === 'string') targetPage.slug = patch.slug;
-    if (typeof patch.description === 'string') (targetPage as any).description = patch.description;
+    if (typeof patch.description === 'string') targetPage.description = patch.description;
     if (typeof patch.ogImageAssetId === 'string') {
-      (targetPage as any).ogImageAssetId = patch.ogImageAssetId;
+      targetPage.ogImageAssetId = patch.ogImageAssetId;
     }
-    if (typeof patch.canonical === 'string') (targetPage as any).canonical = patch.canonical;
-    if (typeof patch.noIndex === 'boolean') (targetPage as any).noIndex = patch.noIndex;
-    if (typeof patch.locale === 'string') (targetPage as any).locale = patch.locale;
+    if (typeof patch.canonical === 'string') targetPage.canonical = patch.canonical;
+    if (typeof patch.noIndex === 'boolean') targetPage.noIndex = patch.noIndex;
+    if (typeof patch.locale === 'string') targetPage.locale = patch.locale;
     if (typeof patch.publishedDate === 'string') {
-      (targetPage as any).publishedDate = patch.publishedDate;
+      targetPage.publishedDate = patch.publishedDate;
     }
-    if (typeof patch.author === 'string') (targetPage as any).author = patch.author;
-    if (Array.isArray(patch.tags)) (targetPage as any).tags = patch.tags;
-    if (typeof patch.category === 'string') (targetPage as any).category = patch.category;
+    if (typeof patch.author === 'string') targetPage.author = patch.author;
+    if (Array.isArray(patch.tags)) targetPage.tags = patch.tags as string[];
+    if (typeof patch.category === 'string') targetPage.category = patch.category;
     return next;
   }
 
@@ -463,7 +493,8 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
     return next;
   }
 
-  throw new Error(`applyCanvasAgentOp: unknown op kind: ${(op as any).kind}`);
+  const exhaustive: never = op;
+  throw new Error(`applyCanvasAgentOp: unknown op kind: ${JSON.stringify(exhaustive)}`);
 }
 
 /**

@@ -29,6 +29,7 @@ import {
 import { validateCanvasSiteState } from '../canvas/validate.js';
 import type { DesignSectionInput } from '../canvas/layout/tree.js';
 import { parseDesignSectionToolArgs } from './design-section-parser.js';
+import { parseApplyOp, translateToolCall } from './tool-parsers.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -282,10 +283,27 @@ assert(insertUnknownAfterThrew, 'expected insertSection with unknown afterSectio
 // CANVAS_AGENT_TOOLS — schema sanity (well-formed JSON-Schema bodies).
 // ---------------------------------------------------------------------------
 
+const expectedCanvasToolNames = [
+  'addElement',
+  'addPage',
+  'deleteElement',
+  'deletePage',
+  'deleteSection',
+  'designSection',
+  'duplicateSection',
+  'moveSection',
+  'replaceMedia',
+  'rewriteText',
+  'setSiteConfig',
+  'setStyleKit',
+  'updateElement',
+  'updatePage',
+  'updateSection',
+].sort();
 const toolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
 assert(
-  JSON.stringify(toolNames) === JSON.stringify(['designSection', 'replaceMedia', 'rewriteText']),
-  `expected CANVAS_AGENT_TOOLS to expose [designSection, replaceMedia, rewriteText] (got [${toolNames.join(', ')}])`,
+  JSON.stringify(toolNames) === JSON.stringify(expectedCanvasToolNames),
+  `expected CANVAS_AGENT_TOOLS to expose every mutating tool (got [${toolNames.join(', ')}])`,
 );
 
 const createSectionTool = CANVAS_AGENT_TOOLS.find((t) => t.name === 'createSection');
@@ -361,6 +379,162 @@ assert(
   parsedValidDesign.ok && parsedValidDesign.input.sectionName === 'Strict parser',
   'expected parseDesignSectionToolArgs to accept a complete designSection payload',
 );
+
+const toolArgsByName: Record<string, Record<string, unknown>> = {
+  rewriteText: {
+    elementId: 'el-text',
+    content: [{ text: 'Updated copy' }],
+  },
+  replaceMedia: {
+    elementId: 'el-media',
+    mediaKind: 'image',
+    assetId: 'asset-1',
+    alt: 'Updated alt',
+  },
+  designSection: {
+    sectionName: 'Strict parser',
+    afterSectionId: '',
+    layout: {
+      type: 'stack',
+      direction: 'column',
+      children: [
+        validDesignArgs.layout.children[0],
+        {
+          element: {
+            type: 'action',
+            action: { label: 'Start', variant: 'solid', href: '/start' },
+          },
+        },
+      ],
+    },
+  },
+  deleteElement: {
+    elementId: 'el-delete',
+  },
+  updateElement: {
+    elementId: 'el-update',
+    elementType: 'text',
+    box: { x: 10, y: 20, w: 300, h: 80 },
+    content: [{ text: 'Nested patch must survive apply parsing' }],
+    role: 'heading',
+    fontSize: 32,
+  },
+  addElement: {
+    sectionId: 'sec-target',
+    elementType: 'action',
+    box: { x: 40, y: 80, w: 180, h: 48 },
+    label: 'Start',
+    href: '/start',
+    variant: 'solid',
+  },
+  updateSection: {
+    sectionId: 'sec-target',
+    name: 'Renamed section',
+    height: 640,
+    backgroundEffect: 'grain',
+    entrance: 'fade-up',
+  },
+  deleteSection: {
+    sectionId: 'sec-delete',
+  },
+  moveSection: {
+    sectionId: 'sec-move',
+    afterSectionId: '',
+  },
+  duplicateSection: {
+    sectionId: 'sec-copy',
+  },
+  addPage: {
+    title: 'About',
+    slug: 'about',
+  },
+  updatePage: {
+    pageId: 'page-home',
+    title: 'Home updated',
+    slug: 'home',
+    description: 'Updated description',
+    noIndex: true,
+    tags: ['launch', 'news'],
+  },
+  deletePage: {
+    pageId: 'page-old',
+  },
+  setStyleKit: {
+    styleKit: 'blue-saas',
+  },
+  setSiteConfig: {
+    darkModeEnabled: true,
+    defaultLocale: 'en',
+    siteNoIndex: true,
+  },
+};
+
+for (const name of expectedCanvasToolNames) {
+  const args = toolArgsByName[name];
+  assert(args !== undefined, `test fixture missing args for tool ${name}`);
+
+  const parsed = translateToolCall({
+    id: `${name}-smoke`,
+    name,
+    arguments: args,
+  });
+  if (!parsed.ok) {
+    throw new Error(`expected translateToolCall(${name}) to parse: ${parsed.error}`);
+  }
+
+  const reparsed = parseApplyOp(parsed.op, 'charcoal');
+  if (!reparsed.ok) {
+    throw new Error(`expected parseApplyOp(${name}) to parse normalized op: ${reparsed.error}`);
+  }
+  assert(
+    JSON.stringify(reparsed.op) === JSON.stringify(parsed.op),
+    `expected parseApplyOp(${name}) to preserve the normalized preview op`,
+  );
+}
+
+const addActionToolCall = translateToolCall({
+  id: 'add-action-end-to-end',
+  name: 'addElement',
+  arguments: {
+    sectionId: baseSection.id,
+    elementType: 'action',
+    label: 'Start',
+    href: '/start',
+    variant: 'solid',
+  },
+});
+assert(
+  addActionToolCall.ok,
+  addActionToolCall.ok ? '' : `expected addElement action to parse: ${addActionToolCall.error}`,
+);
+const acceptedAddAction = addActionToolCall.ok
+  ? parseApplyOp(addActionToolCall.op, 'charcoal')
+  : null;
+assert(
+  acceptedAddAction?.ok === true,
+  acceptedAddAction && !acceptedAddAction.ok
+    ? `expected addElement action preview op to parse on apply: ${acceptedAddAction.error}`
+    : 'expected addElement action preview op to parse on apply',
+);
+if (acceptedAddAction?.ok) {
+  const withAction = applyCanvasAgentOp(baseState, acceptedAddAction.op);
+  const addedValidation = validateCanvasSiteState(withAction);
+  assert(
+    addedValidation.valid,
+    addedValidation.valid
+      ? ''
+      : `addElement action preview op produced invalid state: ${addedValidation.errors.join('; ')}`,
+  );
+  const addedAction = withAction.pages[0]?.sections[0]?.elements.at(-1);
+  assert(
+    addedAction !== undefined &&
+      addedAction.type === 'action' &&
+      typeof addedAction.href === 'object' &&
+      addedAction.href.type === 'external' &&
+      addedAction.href.url === '/start',
+    'expected addElement action to normalize string href into an ActionHref object',
+  );
+}
 
 const missingTextProps = parseDesignSectionToolArgs({
   sectionName: 'Bad text',

@@ -44,11 +44,9 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type { CanvasSiteState, InlineMark, InlineRun, MediaKind } from '../../canvas/schema.js';
+import type { CanvasSiteState } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
-import { INLINE_MARK_TYPES, MEDIA_KINDS } from '../../canvas/schema.js';
-import { isAllowedHref } from '../../canvas/validate.js';
-import { parseDesignSectionToolArgs } from '../design-section-parser.js';
+import { translateToolCall, isRecord } from '../tool-parsers.js';
 import {
   CHAT_AGENT_TOOLS,
   MUTATING_TOOL_NAMES,
@@ -78,11 +76,21 @@ export const MAX_TOOL_CALL_ITERATIONS = 5;
 // Public entrypoint
 // ---------------------------------------------------------------------------
 
+export interface OwnerAssetRef {
+  id: string;
+  kind: string;
+  alt: string;
+  contentHash: string;
+  width?: number | null;
+  height?: number | null;
+}
+
 export interface OrchestratorContext {
   adapter: LlmAdapter;
   model?: string;
   state: CanvasSiteState;
   fonts?: SiteFont[];
+  assets?: OwnerAssetRef[];
   /**
    * Optional. The smoke uses this to pin the system prompt to a stable
    * fixture. Production passes the live builder from `systemPrompt()`.
@@ -293,7 +301,38 @@ interface ReadOnlyDispatchInput {
 
 async function dispatchReadOnlyTool(input: ReadOnlyDispatchInput): Promise<void> {
   const { call, writer, ctx, history } = input;
-  if (call.name !== 'query_site') {
+  const args = isRecord(call.arguments) ? call.arguments : {};
+
+  let output: unknown;
+
+  if (call.name === 'query_site') {
+    const requested = args.detail;
+    const detail: QuerySiteDetail = requested === 'full' ? 'full' : 'summary';
+    output = buildQuerySiteSummary({
+      state: ctx.state,
+      detail,
+      fonts: ctx.fonts ?? [],
+    });
+  } else if (call.name === 'query_assets') {
+    const assets = ctx.assets ?? [];
+    const limit =
+      typeof args.limit === 'number' && Number.isFinite(args.limit)
+        ? Math.min(Math.max(1, args.limit), 200)
+        : 50;
+    const sliced = assets.slice(0, limit);
+    output = {
+      assets: sliced.map((a) => ({
+        id: a.id,
+        kind: a.kind,
+        alt: a.alt,
+        contentHash: a.contentHash,
+        ...(a.width != null ? { width: a.width } : {}),
+        ...(a.height != null ? { height: a.height } : {}),
+      })),
+      total: assets.length,
+      truncated: assets.length > limit,
+    };
+  } else {
     const err = `unsupported read-only tool: ${call.name}`;
     await writer.write({ kind: 'error', error: err });
     history.push({
@@ -304,20 +343,13 @@ async function dispatchReadOnlyTool(input: ReadOnlyDispatchInput): Promise<void>
     });
     return;
   }
-  const args = isRecord(call.arguments) ? call.arguments : {};
-  const requested = args.detail;
-  const detail: QuerySiteDetail = requested === 'full' ? 'full' : 'summary';
-  const summary = buildQuerySiteSummary({
-    state: ctx.state,
-    detail,
-    fonts: ctx.fonts ?? [],
-  });
-  const outputJson = JSON.stringify(summary);
+
+  const outputJson = JSON.stringify(output);
   await writer.write({
     kind: 'tool-result',
     id: call.id,
     name: call.name,
-    output: summary,
+    output,
   });
   history.push({
     role: 'tool',
@@ -359,149 +391,6 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
     content: JSON.stringify({ ok: true, preview: true, op: parsed.op }),
   });
   return { preview: { op: parsed.op } };
-}
-
-// ---------------------------------------------------------------------------
-// Tool-call translation — copied / adapted from `routes/api/canvas-agent.ts`.
-// We re-implement here (not import) because the canvas-agent route module is
-// off-limits per the brief and importing internals would couple us to its
-// HTTP shell. Both implementations enforce the same contract.
-//
-// REVIEW: "copied / adapted" means two parse implementations that must stay in sync manually. If the canvas-agent route's parser changes (e.g. new validation rule), this copy silently diverges. Extract the shared parsing logic into a standalone module both can import — the "coupling" concern is about the HTTP shell, not the parsing contract.
-// ---------------------------------------------------------------------------
-
-type ParseResult = { ok: true; op: CanvasAgentOp } | { ok: false; error: string };
-
-function translateToolCall(call: LlmAssistantToolCall): ParseResult {
-  switch (call.name) {
-    case 'rewriteText':
-      return parseRewriteText(call.arguments);
-    case 'replaceMedia':
-      return parseReplaceMedia(call.arguments);
-    case 'designSection':
-      return parseDesignSection(call.arguments);
-    default:
-      return { ok: false, error: `unknown tool name: ${call.name}` };
-  }
-}
-
-function parseRewriteText(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'rewriteText arguments must be an object' };
-  if (typeof args.elementId !== 'string' || args.elementId.length === 0) {
-    return { ok: false, error: 'rewriteText.elementId must be a non-empty string' };
-  }
-  const parsed = parseInlineRuns(args.content);
-  if (!parsed.ok) return { ok: false, error: `rewriteText.${parsed.error}` };
-  return {
-    ok: true,
-    op: { kind: 'rewriteText', elementId: args.elementId, content: parsed.runs },
-  };
-}
-
-function parseReplaceMedia(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'replaceMedia arguments must be an object' };
-  if (typeof args.elementId !== 'string' || args.elementId.length === 0) {
-    return { ok: false, error: 'replaceMedia.elementId must be a non-empty string' };
-  }
-  if (!isOneOf<MediaKind>(args.mediaKind, MEDIA_KINDS)) {
-    return {
-      ok: false,
-      error: `replaceMedia.mediaKind must be one of [${MEDIA_KINDS.join(', ')}]`,
-    };
-  }
-  if (typeof args.assetId !== 'string' || args.assetId.length === 0) {
-    return { ok: false, error: 'replaceMedia.assetId must be a non-empty string' };
-  }
-  if (typeof args.alt !== 'string') {
-    return { ok: false, error: 'replaceMedia.alt must be a string' };
-  }
-  return {
-    ok: true,
-    op: {
-      kind: 'replaceMedia',
-      elementId: args.elementId,
-      mediaKind: args.mediaKind,
-      assetId: args.assetId,
-      alt: args.alt,
-    },
-  };
-}
-
-function parseDesignSection(args: unknown): ParseResult {
-  const parsed = parseDesignSectionToolArgs(args);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
-  return {
-    ok: true,
-    op: { kind: 'designSection', afterSectionId: parsed.afterSectionId, input: parsed.input },
-  };
-}
-
-function parseInlineRuns(
-  value: unknown,
-): { ok: true; runs: InlineRun[] } | { ok: false; error: string } {
-  if (!Array.isArray(value)) {
-    return { ok: false, error: 'content must be an array of InlineRun objects (not a string)' };
-  }
-  if (value.length === 0) {
-    return { ok: false, error: 'content must be a non-empty array' };
-  }
-  const runs: InlineRun[] = [];
-  const items: unknown[] = value;
-  for (let i = 0; i < items.length; i++) {
-    const raw: unknown = items[i];
-    if (!isRecord(raw)) {
-      return { ok: false, error: `content[${String(i)}] must be an object` };
-    }
-    const text = raw.text;
-    if (typeof text !== 'string') {
-      return { ok: false, error: `content[${String(i)}].text must be a string` };
-    }
-    const run: InlineRun = { text };
-    const rawMarks = raw.marks;
-    if (rawMarks !== undefined) {
-      if (!Array.isArray(rawMarks)) {
-        return { ok: false, error: `content[${String(i)}].marks must be an array` };
-      }
-      const marks: InlineMark[] = [];
-      const markItems: unknown[] = rawMarks;
-      for (let m = 0; m < markItems.length; m++) {
-        const parsed = parseInlineMark(markItems[m], i, m);
-        if (typeof parsed === 'string') return { ok: false, error: parsed };
-        marks.push(parsed);
-      }
-      run.marks = marks;
-    }
-    runs.push(run);
-  }
-  return { ok: true, runs };
-}
-
-function parseInlineMark(value: unknown, runIdx: number, markIdx: number): InlineMark | string {
-  if (!isRecord(value)) {
-    return `mark[${String(runIdx)}][${String(markIdx)}] must be an object`;
-  }
-  if (!isOneOf(value.type, INLINE_MARK_TYPES)) {
-    return `mark[${String(runIdx)}][${String(markIdx)}].type must be one of [${INLINE_MARK_TYPES.join(', ')}]`;
-  }
-  if (value.type === 'link') {
-    if (typeof value.href !== 'string' || value.href.length === 0) {
-      return `mark[${String(runIdx)}][${String(markIdx)}] is a link mark but href is missing`;
-    }
-    if (!isAllowedHref(value.href)) {
-      return `mark[${String(runIdx)}][${String(markIdx)}] link href ${JSON.stringify(value.href)} is not allowed`;
-    }
-    return { type: 'link', href: value.href };
-  }
-  return { type: value.type };
-}
-
-// REVIEW: `isRecord` and `isOneOf` are duplicated across at least 4 files: here, route.ts, design-section-parser.ts, and canvas-agent route. Define once in a shared `src/util/type-guards.ts` or similar.
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
-  return typeof value === 'string' && (allowed as readonly string[]).includes(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -568,24 +457,52 @@ export function buildSystemPrompt(state: CanvasSiteState): string {
     'Every change you propose is shown to the Owner as a preview; the Owner accepts or rejects before it applies to the site.',
   );
   lines.push(
-    'You speak in terms of: Owner, Visitor, Editable Site, Canvas Page, Canvas Section, Content Element, Section Recipe, Style Kit, Agent Edit.',
+    'You speak in terms of: Owner, Visitor, Editable Site, Canvas Page, Canvas Section, Content Element, Style Kit, Agent Edit.',
   );
-  lines.push('Tools available:');
+  lines.push('');
+  lines.push('Read-only tools:');
   lines.push(
-    '  - query_site: read-only inspection. Use this BEFORE proposing changes when you need page / section / element ids.',
-  );
-  lines.push(
-    '  - rewriteText: rewrite a Text Element. content MUST be an InlineRun[] — never a plain string.',
+    '  query_site — inspect site structure (pages, sections, elements with IDs). Call this BEFORE proposing changes when you need IDs.',
   );
   lines.push(
-    '  - replaceMedia: swap a Media Element to an EXISTING uploaded Owner Asset. The tool does NOT generate media bytes.',
+    "  query_assets — list the owner's uploaded media assets. Call this when you need asset IDs for replaceMedia or addElement.",
+  );
+  lines.push('');
+  lines.push('Mutating tools (all previewed before applying):');
+  lines.push(
+    '  rewriteText — rewrite text element content. content MUST be InlineRun[] — never a plain string.',
+  );
+  lines.push('  replaceMedia — swap a media element to an EXISTING uploaded Owner Asset.');
+  lines.push(
+    '  designSection — design a new section from a semantic layout tree (stack/grid/split).',
   );
   lines.push(
-    '  - designSection: design a custom section from scratch using a semantic layout tree (stack/grid/split). ' +
-      'Use this for new Canvas Sections such as pricing tiers, FAQ, team grids, stats, and CTAs.',
+    '  updateElement — change properties of an existing element. Pass elementType matching the actual type.',
   );
+  lines.push('  deleteElement — remove an element from its section.');
+  lines.push(
+    '  addElement — add a new element to a section. Auto-placed below existing content unless box is specified.',
+  );
+  lines.push(
+    '  updateSection — change section name, height, background effect, or entrance animation.',
+  );
+  lines.push(
+    '  deleteSection — remove a section (including header/footer). Cannot delete the last section on a page.',
+  );
+  lines.push(
+    '  moveSection — reorder a body section. Pass afterSectionId (empty string = move to top).',
+  );
+  lines.push('  duplicateSection — clone a body section with new IDs.');
+  lines.push('  addPage — create a new page with title and URL slug.');
+  lines.push('  updatePage — update page title, slug, SEO metadata, locale, and other properties.');
+  lines.push('  deletePage — remove a page. Cannot delete the last page.');
+  lines.push(
+    '  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).',
+  );
+  lines.push('  setSiteConfig — toggle darkModeEnabled, defaultLocale, or siteNoIndex.');
+  lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
-  lines.push('Do not invent ids — call query_site first when you are unsure.');
+  lines.push('Do not invent IDs — call query_site or query_assets first when unsure.');
   return lines.join('\n');
 }
 

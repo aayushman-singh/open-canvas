@@ -28,23 +28,15 @@ import { GeminiAdapter } from '../../agent/llm-gemini';
 import type { LlmAssistantToolCall, LlmMessage, LlmTool } from '../../agent/llm';
 import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
-import { parseDesignSectionToolArgs } from '../../agent/design-section-parser';
+import { translateToolCall, parseApplyOp, isRecord } from '../../agent/tool-parsers';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
-import type { RecipeFactoryInput } from '../../canvas/recipes';
 import {
-  AGENT_RECIPE_IDS,
-  INLINE_MARK_TYPES,
-  MEDIA_KINDS,
-  type AgentRecipeId,
   type CanvasSiteState,
-  type InlineMark,
-  type InlineRun,
-  type MediaKind,
   type StyleKit,
 } from '../../canvas/schema';
-import { validateCanvasSiteState, isAllowedHref } from '../../canvas/validate';
+import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
 
@@ -63,14 +55,6 @@ const canvasAgentApi = new Hono<Env>();
 
 canvasAgentApi.use('*', clerkAuth());
 canvasAgentApi.use('*', requireAuth());
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
-  return typeof value === 'string' && (allowed as readonly string[]).includes(value);
-}
 
 interface OwnedSiteRow {
   id: string;
@@ -110,221 +94,6 @@ async function loadOwnedSite(c: Context<Env>, siteId: string): Promise<OwnedSite
     styleKit: row.styleKit,
     editableState: row.editableState,
   };
-}
-
-// ---------------------------------------------------------------------------
-// Tool-call to CanvasAgentOp translation. The schemas in canvas-tools.ts are
-// strict but JSON-Schema enforcement at the model side is best-effort — we
-// still validate every field here before letting it near the apply step.
-// ---------------------------------------------------------------------------
-
-type ParseResult = { ok: true; op: CanvasAgentOp } | { ok: false; error: string };
-
-function parseInlineMark(value: unknown, runIdx: number, markIdx: number): InlineMark | string {
-  if (!isRecord(value)) {
-    return `mark[${runIdx}][${markIdx}] must be an object`;
-  }
-  if (!isOneOf(value.type, INLINE_MARK_TYPES)) {
-    return `mark[${runIdx}][${markIdx}].type must be one of [${INLINE_MARK_TYPES.join(', ')}] (got ${JSON.stringify(value.type)})`;
-  }
-  if (value.type === 'link') {
-    if (typeof value.href !== 'string' || value.href.length === 0) {
-      return `mark[${runIdx}][${markIdx}] is a link mark but href is missing or empty`;
-    }
-    if (!isAllowedHref(value.href)) {
-      return `mark[${runIdx}][${markIdx}] link href ${JSON.stringify(value.href)} is not allowed`;
-    }
-    return { type: 'link', href: value.href };
-  }
-  // Other mark types have no extra fields.
-  return { type: value.type };
-}
-
-function parseInlineRuns(
-  value: unknown,
-): { ok: true; runs: InlineRun[] } | { ok: false; error: string } {
-  if (!Array.isArray(value)) {
-    return { ok: false, error: 'content must be an array of InlineRun objects (not a string)' };
-  }
-  if (value.length === 0) {
-    return { ok: false, error: 'content must be a non-empty array' };
-  }
-  const runs: InlineRun[] = [];
-  const items: unknown[] = value;
-  for (let i = 0; i < items.length; i++) {
-    const raw: unknown = items[i];
-    if (!isRecord(raw)) {
-      return { ok: false, error: `content[${String(i)}] must be an object` };
-    }
-    const text = raw.text;
-    if (typeof text !== 'string') {
-      return { ok: false, error: `content[${String(i)}].text must be a string` };
-    }
-    const run: InlineRun = { text };
-    const rawMarks = raw.marks;
-    if (rawMarks !== undefined) {
-      if (!Array.isArray(rawMarks)) {
-        return { ok: false, error: `content[${String(i)}].marks must be an array when present` };
-      }
-      const marks: InlineMark[] = [];
-      const markItems: unknown[] = rawMarks;
-      for (let m = 0; m < markItems.length; m++) {
-        const parsed = parseInlineMark(markItems[m], i, m);
-        if (typeof parsed === 'string') return { ok: false, error: parsed };
-        marks.push(parsed);
-      }
-      run.marks = marks;
-    }
-    runs.push(run);
-  }
-  return { ok: true, runs };
-}
-
-function parseRewriteText(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'rewriteText arguments must be an object' };
-  if (typeof args.elementId !== 'string' || args.elementId.length === 0) {
-    return { ok: false, error: 'rewriteText.elementId must be a non-empty string' };
-  }
-  const parsed = parseInlineRuns(args.content);
-  if (!parsed.ok) return { ok: false, error: `rewriteText.${parsed.error}` };
-  return {
-    ok: true,
-    op: { kind: 'rewriteText', elementId: args.elementId, content: parsed.runs },
-  };
-}
-
-function parseReplaceMedia(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'replaceMedia arguments must be an object' };
-  if (typeof args.elementId !== 'string' || args.elementId.length === 0) {
-    return { ok: false, error: 'replaceMedia.elementId must be a non-empty string' };
-  }
-  if (!isOneOf<MediaKind>(args.mediaKind, MEDIA_KINDS)) {
-    return {
-      ok: false,
-      error: `replaceMedia.mediaKind must be one of [${MEDIA_KINDS.join(', ')}] (got ${JSON.stringify(args.mediaKind)})`,
-    };
-  }
-  if (typeof args.assetId !== 'string' || args.assetId.length === 0) {
-    return { ok: false, error: 'replaceMedia.assetId must be a non-empty string' };
-  }
-  if (typeof args.alt !== 'string') {
-    return { ok: false, error: 'replaceMedia.alt must be a string' };
-  }
-  return {
-    ok: true,
-    op: {
-      kind: 'replaceMedia',
-      elementId: args.elementId,
-      mediaKind: args.mediaKind,
-      assetId: args.assetId,
-      alt: args.alt,
-    },
-  };
-}
-
-function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'createSection arguments must be an object' };
-  if (!isOneOf<AgentRecipeId>(args.recipeId, AGENT_RECIPE_IDS)) {
-    return {
-      ok: false,
-      error: `createSection.recipeId must be one of [${AGENT_RECIPE_IDS.join(', ')}] (got ${JSON.stringify(args.recipeId)})`,
-    };
-  }
-  if (typeof args.brief !== 'string' || args.brief.length === 0) {
-    return { ok: false, error: 'createSection.brief must be a non-empty string' };
-  }
-  // afterSectionId: null OR string. We accept '' as "append at end" to keep
-  // the JSON-Schema simple (no null variant in our subset).
-  let afterSectionId: string | null = null;
-  if (typeof args.afterSectionId === 'string' && args.afterSectionId.length > 0) {
-    afterSectionId = args.afterSectionId;
-  }
-  const assetIds: RecipeFactoryInput['assetIds'] = {};
-  if (isRecord(args.assetIds)) {
-    if (typeof args.assetIds.hero === 'string' && args.assetIds.hero.length > 0) {
-      assetIds.hero = args.assetIds.hero;
-    }
-    if (Array.isArray(args.assetIds.cards)) {
-      const cards: string[] = [];
-      for (const id of args.assetIds.cards) {
-        if (typeof id === 'string' && id.length > 0) cards.push(id);
-      }
-      if (cards.length > 0) assetIds.cards = cards;
-    }
-    if (Array.isArray(args.assetIds.gallery)) {
-      const gallery: string[] = [];
-      for (const id of args.assetIds.gallery) {
-        if (typeof id === 'string' && id.length > 0) gallery.push(id);
-      }
-      if (gallery.length > 0) assetIds.gallery = gallery;
-    }
-  }
-  return {
-    ok: true,
-    op: {
-      kind: 'insertSection',
-      afterSectionId,
-      recipeId: args.recipeId,
-      input: { brief: args.brief, styleKit, assetIds },
-    },
-  };
-}
-
-function parseDesignSection(args: unknown): ParseResult {
-  const parsed = parseDesignSectionToolArgs(args);
-  if (!parsed.ok) return { ok: false, error: parsed.error };
-  return {
-    ok: true,
-    op: { kind: 'designSection', afterSectionId: parsed.afterSectionId, input: parsed.input },
-  };
-}
-
-function translateToolCall(call: LlmAssistantToolCall): ParseResult {
-  switch (call.name) {
-    case 'rewriteText':
-      return parseRewriteText(call.arguments);
-    case 'replaceMedia':
-      return parseReplaceMedia(call.arguments);
-    case 'designSection':
-      return parseDesignSection(call.arguments);
-    default:
-      return { ok: false, error: `unknown tool name: ${call.name}` };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Body parsing for the apply endpoint — accepts an already-shaped op[].
-// ---------------------------------------------------------------------------
-
-function parseApplyOp(value: unknown, styleKit: StyleKit): ParseResult {
-  if (!isRecord(value)) return { ok: false, error: 'op must be an object' };
-  if (value.kind === 'rewriteText') return parseRewriteText(value);
-  if (value.kind === 'replaceMedia') return parseReplaceMedia(value);
-  if (value.kind === 'insertSection') {
-    // The apply payload mirrors the LLM tool shape exactly: recipeId, brief,
-    // afterSectionId, assetIds. We re-derive a RecipeFactoryInput so we never
-    // trust the styleKit field from the wire — the styleKit comes from the
-    // freshly-loaded site row, not from the request body.
-    const flattened = {
-      recipeId: value.recipeId,
-      brief: isRecord(value.input) ? value.input.brief : undefined,
-      afterSectionId: value.afterSectionId,
-      assetIds: isRecord(value.input) ? value.input.assetIds : undefined,
-    };
-    return parseCreateSection(flattened, styleKit);
-  }
-  if (value.kind === 'designSection') {
-    const flattened = {
-      sectionName: isRecord(value.input) ? value.input.sectionName : undefined,
-      layout: isRecord(value.input) ? value.input.layout : undefined,
-      height: isRecord(value.input) ? value.input.height : undefined,
-      backgroundEffect: isRecord(value.input) ? value.input.backgroundEffect : undefined,
-      entrance: isRecord(value.input) ? value.input.entrance : undefined,
-      afterSectionId: value.afterSectionId,
-    };
-    return parseDesignSection(flattened);
-  }
-  return { ok: false, error: `unknown op kind: ${JSON.stringify(value.kind)}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -419,11 +188,20 @@ function buildSystemPrompt(state: CanvasSiteState): string {
   const lines: string[] = [];
   lines.push('You are an editing assistant for the rev01 canvas site builder.');
   lines.push(
-    'Use only the supplied tools. Do NOT invent asset ids or element ids; pick from the existing ones below.',
+    'Use only the supplied tools. Do NOT invent asset ids, element ids, section ids, or page ids; pick from the existing ones below.',
   );
   lines.push(`Current style kit: ${state.styleKit}.`);
-  const page = state.pages[0];
-  if (page) {
+
+  // Enumerate header
+  if (state.header) {
+    lines.push(`Header section ${state.header.id} (name=${JSON.stringify(state.header.name)}, height=${String(state.header.height)}):`);
+    for (const element of state.header.elements) {
+      lines.push(`  - element ${element.id} type=${element.type}`);
+    }
+  }
+
+  // Enumerate pages and sections
+  for (const page of state.pages) {
     lines.push(
       `Page id: ${page.id} (slug=${page.slug}, title=${JSON.stringify(page.title)}, width=${String(page.width)}).`,
     );
@@ -436,31 +214,33 @@ function buildSystemPrompt(state: CanvasSiteState): string {
       }
     }
   }
-  lines.push(
-    'For rewriteText: produce an array of inline runs. Each run is { "text": "...", "marks"?: [{ "type": "bold" }, ...] }. Never send a plain string.',
-  );
-  lines.push(
-    'For replaceMedia: assetId must already exist as an uploaded asset on this site. The tool does not generate media.',
-  );
-  lines.push(
-    'For designSection: describe the section structure as a semantic layout tree. Use stack (column or row), grid (2-4 columns), or split (ratio 1:1, 1:2, 2:1) nodes. ' +
-      'Each leaf is an element node with type + matching props (text, media, action, shape, container). ' +
-      'Colors use semantic tokens (accent, text, muted, bg, panel). Fonts use kit slots (display, body, mono). ' +
-      'Containers with size="fill" become background panels spanning their parent layout node. ' +
-      'Avoid media elements until image generation is wired into this preview flow.',
-  );
-  lines.push(
-    'Example designSection layout for a pricing section: ' +
-      '{ "type": "stack", "direction": "column", "align": "center", "gap": "loose", "children": [' +
-      '{ "element": { "type": "text", "text": { "content": "Pricing", "role": "heading", "color": "text", "font": "display", "size": 48 } } }, ' +
-      '{ "type": "grid", "columns": 3, "gap": "normal", "children": [' +
-      '{ "type": "stack", "direction": "column", "gap": "tight", "children": [' +
-      '{ "element": { "type": "container", "container": { "variant": "outlined", "padding": 24 } }, "size": "fill" }, ' +
-      '{ "element": { "type": "text", "text": { "content": "Starter", "role": "heading", "color": "text", "font": "display", "size": 24 } } }, ' +
-      '{ "element": { "type": "text", "text": { "content": "$9/mo", "role": "heading", "color": "accent", "font": "display", "size": 36 } } }, ' +
-      '{ "element": { "type": "action", "action": { "label": "Get Started", "variant": "outline", "href": "#" } } }' +
-      '] } ] } ] }',
-  );
+
+  // Enumerate footer
+  if (state.footer) {
+    lines.push(`Footer section ${state.footer.id} (name=${JSON.stringify(state.footer.name)}, height=${String(state.footer.height)}):`);
+    for (const element of state.footer.elements) {
+      lines.push(`  - element ${element.id} type=${element.type}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Tools:');
+  lines.push('  rewriteText — rewrite text element content. content must be InlineRun[] (never a plain string).');
+  lines.push('  replaceMedia — swap a media element to an existing uploaded asset.');
+  lines.push('  designSection — create a new section from a semantic layout tree (stack/grid/split nodes with element leaves).');
+  lines.push('  updateElement — change properties of an existing element. Pass elementType matching the actual type.');
+  lines.push('  deleteElement — remove an element from its section.');
+  lines.push('  addElement — add a new element to a section. Auto-placed below existing content unless box is specified.');
+  lines.push('  updateSection — change section name, height, background effect, or entrance animation.');
+  lines.push('  deleteSection — remove a section. Can delete header/footer (removes site-wide). Cannot delete the last section on a page.');
+  lines.push('  moveSection — move a body section. Pass afterSectionId (empty string = move to top). Cannot move header/footer.');
+  lines.push('  duplicateSection — clone a body section with new IDs.');
+  lines.push('  addPage — create a new page with title and slug.');
+  lines.push('  updatePage — update page title, slug, SEO description, noIndex, locale, and other metadata.');
+  lines.push('  deletePage — remove a page. Cannot delete the last page.');
+  lines.push('  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).');
+  lines.push('  setSiteConfig — toggle darkModeEnabled, defaultLocale, or siteNoIndex.');
+
   return lines.join('\n');
 }
 

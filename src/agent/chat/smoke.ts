@@ -68,6 +68,13 @@ function buildLargeState(): CanvasSiteState {
     styleKit: 'charcoal',
     assetIds: {},
   };
+  const header = createSectionFromRecipe('feature-grid', recipeInput);
+  const headerSeed = header.elements[0];
+  if (!headerSeed) throw new Error('large-state header fixture must have an element');
+  header.elements = Array.from({ length: 400 }, (_, i) => ({
+    ...structuredClone(headerSeed),
+    id: `el-header-large-${String(i)}`,
+  }));
   // 50 pages × every recipe to push the JSON well past 2k tokens.
   const pages = Array.from({ length: 50 }, (_, i) => {
     const sections = SECTION_RECIPE_IDS.map((id: SectionRecipeId) =>
@@ -81,7 +88,7 @@ function buildLargeState(): CanvasSiteState {
       sections,
     };
   });
-  return { styleKit: 'charcoal', symbols: [], pages };
+  return { styleKit: 'charcoal', symbols: [], header, pages };
 }
 
 // ---------------------------------------------------------------------------
@@ -210,15 +217,16 @@ const querySiteCallIdx = events1.findIndex(
 const querySiteResultIdx = events1.findIndex(
   (e) => e.kind === 'tool-result' && e.name === 'query_site',
 );
-const rewriteCallIdx = events1.findIndex(
-  (e) => e.kind === 'tool-call' && e.name === 'rewriteText',
-);
+const rewriteCallIdx = events1.findIndex((e) => e.kind === 'tool-call' && e.name === 'rewriteText');
 const opPreviewIdx = events1.findIndex(
   (e) => e.kind === 'op-preview' && e.toolName === 'rewriteText',
 );
 const doneIdx = events1.findIndex((e) => e.kind === 'done');
 
-assert(querySiteCallIdx >= 0, `expected a query_site tool-call event (got kinds: ${kinds1.join(', ')})`);
+assert(
+  querySiteCallIdx >= 0,
+  `expected a query_site tool-call event (got kinds: ${kinds1.join(', ')})`,
+);
 assert(
   querySiteResultIdx > querySiteCallIdx,
   'expected query_site tool-result to come AFTER tool-call',
@@ -240,7 +248,10 @@ assert(
   opPreviews1.length === 1,
   `expected exactly 1 op-preview (got ${String(opPreviews1.length)})`,
 );
-assert(result1.previewOps.length === 1, 'expected result.previewOps to mirror the op-preview events');
+assert(
+  result1.previewOps.length === 1,
+  'expected result.previewOps to mirror the op-preview events',
+);
 
 // ---- Assert preview op is well-formed and references the right element ----
 const previewOp = result1.previewOps[0];
@@ -272,11 +283,7 @@ assert(
 // Drive a second send-message turn. The adapter script left an entry for the
 // "no more tools" wrap-up; we extend the script for a fresh user message.
 const followupScript: Script = [
-  () =>
-    yieldChunks(
-      { type: 'text', text: 'Anything else?' },
-      { type: 'done', reason: 'stop' },
-    ),
+  () => yieldChunks({ type: 'text', text: 'Anything else?' }, { type: 'done', reason: 'stop' }),
 ];
 const adapter2 = new MockLlmAdapter(followupScript);
 const writer2 = new BufferedStreamWriter();
