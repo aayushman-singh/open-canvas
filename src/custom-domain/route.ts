@@ -121,7 +121,7 @@ router.get('/', async (c) => {
   if (!siteRows[0]) {
     return c.json({ error: 'site not found' }, 404);
   }
-  // Ownership check
+  // REVIEW: this queries all owned sites (limit 50), then checks if siteId is in the list. Two problems: (1) O(N) scan instead of a single `WHERE id = siteId AND customerId = customerId` query, and (2) customers with >50 sites silently bypass the ownership check for sites beyond the 50th. Combine into a single query with both conditions.
   const ownedRows = await database
     .select({ id: site.id })
     .from(site)
