@@ -86,8 +86,7 @@ async function main(): Promise<void> {
       execSync(cmd, { stdio: 'inherit' });
       uploaded.add(asset.r2Key);
     } finally {
-      // REVIEW: `.catch(() => {})` silently swallows unlink errors — violates all-or-nothing posture. If temp file cleanup fails, operator has no signal. At minimum `console.warn` the error.
-      await unlink(tmp).catch(() => {});
+      await unlink(tmp).catch((e) => console.warn('[seed:assets] unlink failed:', e));
     }
   }
   console.log(`[seed:assets] uploaded ${String(uploaded.size)} unique R2 objects`);
