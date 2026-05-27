@@ -1,4 +1,4 @@
-import { eq, or } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth } from '../../auth/middleware';
@@ -9,7 +9,7 @@ import { renderCanvasSnapshot } from '../../canvas/render';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { db } from '../../db/client';
-import { customer, customTemplate } from '../../db/schema';
+import { customer, customTemplate, site } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
@@ -98,17 +98,25 @@ const pageStyles = `
     transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
   }
   .template-preview {
+    position: relative;
     height: 232px;
     border-bottom: 1px solid var(--line);
     background: #05070c;
+    overflow: hidden;
+    container-type: inline-size;
   }
   .template-preview iframe {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1440px;
+    height: 900px;
+    transform-origin: top left;
+    border: none;
     pointer-events: none;
-    background: #05070c;
+  }
+  @container (min-width: 1px) {
+    .template-preview iframe { transform: scale(calc(100cqi / 1440)); }
   }
   .template-copy {
     display: grid;
@@ -188,28 +196,7 @@ const pageStyles = `
 `;
 
 const previewStyles = `
-  html,
-  body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #05070c;
-  }
-  .rev01-preview-stage {
-    width: 316.8px;
-    min-height: 400px;
-    margin: 0 auto;
-    overflow: visible;
-  }
-  .rev01-preview-stage > .rev01-site {
-    width: 1440px;
-    transform: scale(0.22);
-    transform-origin: top left;
-  }
-  .rev01-preview-stage .rev01-page {
-    margin: 0;
-  }
+  html, body { margin: 0; overflow: hidden; background: #05070c; }
 `;
 
 function PreviewPage({ template }: { template: TemplateSeed }) {
@@ -234,7 +221,7 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
         <style>{raw(previewStyles)}</style>
       </head>
       <body>
-        <div class="rev01-preview-stage">{raw(html)}</div>
+        {raw(html)}
       </body>
     </html>
   );
@@ -248,7 +235,7 @@ interface CustomTemplateCard {
   visibility: string;
 }
 
-function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
+function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplateCard[]; atSiteLimit: boolean }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
     <DashboardShell
@@ -280,10 +267,11 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                   <span class="template-preview">
                     <iframe
                       src={`/dashboard/templates/${template.id}/preview`}
+                      scrolling="no"
+                      tabindex={-1}
                       title={`${template.name} preview`}
                       loading="lazy"
-                      sandbox="allow-scripts"
-                      referrerpolicy="no-referrer"
+                      sandbox="allow-same-origin"
                     />
                   </span>
                   <span class="template-copy">
@@ -309,10 +297,11 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
                   <span class="template-preview">
                     <iframe
                       src={`/api/custom-templates/${dt.id}/preview`}
+                      scrolling="no"
+                      tabindex={-1}
                       title={`${dt.name} preview`}
                       loading="lazy"
-                      sandbox="allow-scripts"
-                      referrerpolicy="no-referrer"
+                      sandbox="allow-same-origin"
                     />
                   </span>
                   <span class="template-copy">
@@ -352,7 +341,13 @@ function Page({ customTemplates }: { customTemplates: CustomTemplateCard[] }) {
           </label>
         </div>
 
-        <Button variant="primary" type="submit">Create site</Button>
+        {atSiteLimit ? (
+          <p class="limit-notice">
+            You've reached your Free plan limit (3 sites). <a href="/dashboard/settings">Upgrade</a> to create more.
+          </p>
+        ) : (
+          <Button variant="primary" type="submit">Create site</Button>
+        )}
       </form>
     </DashboardShell>
   );
@@ -422,5 +417,17 @@ templatesRoute.get('/', async (c) => {
 
     customTemplates = rows;
   }
-  return c.html(<Page customTemplates={customTemplates} />);
+
+  const FREE_SITE_LIMIT = 3;
+  let atSiteLimit = false;
+  if (auth.userId) {
+    const database = db(c.env);
+    const countRows = await database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(site)
+      .where(eq(site.customerId, customerRow[0]?.id ?? ''));
+    atSiteLimit = (countRows[0]?.count ?? 0) >= FREE_SITE_LIMIT;
+  }
+
+  return c.html(<Page customTemplates={customTemplates} atSiteLimit={atSiteLimit} />);
 });
