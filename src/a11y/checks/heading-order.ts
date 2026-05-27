@@ -59,11 +59,11 @@ const BASE_HEADING_RUNGS_PX: ReadonlyArray<{ level: 1 | 2 | 3 | 4 | 5 | 6; minPx
 ];
 
 /** Map a TextElement.fontSize to an H-level (1..6) given the kit's scale. */
-// REVIEW: no guard against `headingScale <= 0`. If a custom kit ships `headingScale: 0`, all thresholds collapse to 0, every heading becomes H1, and no skips are detected. An assertion or clamp at entry would be safer.
 export function deriveHeadingLevel(
   fontSize: number,
   headingScale: number,
 ): 1 | 2 | 3 | 4 | 5 | 6 {
+  if (headingScale <= 0) return 6;
   for (const rung of BASE_HEADING_RUNGS_PX) {
     if (fontSize >= rung.minPx * headingScale) return rung.level;
   }

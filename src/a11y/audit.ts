@@ -21,7 +21,7 @@
 // Severity counters are derived once at the end — every issue's severity is
 // already typed (the constructors hard-fail on a typo).
 
-import { compareSeverity, type Severity } from './severity.js';
+import { compareSeverity, type IssueKind, type Severity } from './severity.js';
 import { checkAltText } from './checks/alt-text.js';
 import { checkContrastOnPage } from './checks/contrast.js';
 import { checkHeadingOrder } from './checks/heading-order.js';
@@ -32,8 +32,7 @@ import { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 import type { CanvasPage, CanvasSiteState, StyleKitPreset } from '../canvas/schema.js';
 
 export interface AuditIssue {
-  // REVIEW: `kind` is typed as bare `string` but `IssueKind` already enumerates the domain set in severity.ts. Use `IssueKind` here to close the type hole — right now nothing stops a check from emitting `kind: 'typo'`.
-  kind: string;
+  kind: IssueKind;
   severity: Severity;
   /** Set when the issue can be traced to a specific element. */
   elementId?: string;
@@ -61,7 +60,6 @@ interface CheckEntry {
 // Order matters only for stable test output — the report sorts by severity
 // then by page+kind at the end. The list is closed (no plugins) by design.
 const PAGE_CHECKS: ReadonlyArray<CheckEntry> = [
-  // REVIEW: wrapping lambdas `(page) => checkAltText(page)` are unnecessary — the function signatures already match `PageCheck`. Use `{ name: 'alt-text', run: checkAltText }` directly.
   { name: 'alt-text', run: (page) => checkAltText(page) },
   { name: 'contrast', run: (page, kit) => checkContrastOnPage(page, kit) },
   { name: 'heading-order', run: (page, kit) => checkHeadingOrder(page, kit) },
@@ -135,7 +133,6 @@ export function runAudit(state: CanvasSiteState): AuditReport {
   }
 
   for (const page of state.pages) {
-    // REVIEW: `issues.push(...runChecksOnPage(page, styleKit))` avoids the inner loop. Same applies to `runChecksOnPage` line 79.
     for (const issue of runChecksOnPage(page, styleKit)) issues.push(issue);
   }
 

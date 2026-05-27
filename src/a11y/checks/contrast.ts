@@ -121,8 +121,8 @@ export function resolveComputedBackground(
     if (element.type !== 'container') continue;
     if (element.id === text.id) continue;
     if (!boxContains(element.box, text.box)) continue;
-    // REVIEW: no guard for `element.variant` not existing in `surfaceVariants`. If a ContainerElement has a variant the kit doesn't define, `variantTokens` is `undefined` and `.background` on the next line throws with a confusing "Cannot read properties of undefined" instead of a domain-specific error.
     const variantTokens = styleKit.surfaceVariants[element.variant];
+    if (!variantTokens) continue;
     const color = tryParseHexColor(variantTokens.background);
     if (color === null) continue;
     candidates.push({ container: element, color, area: area(element.box) });

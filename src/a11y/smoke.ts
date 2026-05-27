@@ -239,7 +239,6 @@ async function loadHomeFixture(): Promise<CanvasSiteState> {
   if (!validation.valid) {
     throw new Error(`home.json fixture failed validation: ${JSON.stringify(validation.errors)}`);
   }
-  // REVIEW: `as CanvasSiteState` is a trust cast — the validator doesn't return the narrowed value. If `validateCanvasSiteState` returned `{ valid: true; data: CanvasSiteState }`, the cast would be unnecessary and every call site would get type safety for free.
   return parsed as CanvasSiteState;
 }
 
