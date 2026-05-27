@@ -134,7 +134,7 @@ const badPageMotionLayoutResult = validateCanvasSiteState({
       ],
     },
   ],
-} as unknown as CanvasSiteState);
+});
 assert(!badPageMotionLayoutResult.valid, 'expected invalid page motion/layout fields to be rejected');
 assert(
   !badPageMotionLayoutResult.valid &&

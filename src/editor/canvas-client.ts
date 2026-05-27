@@ -2430,6 +2430,1041 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderGrid();
   }
 
+  // -- Extracted inspector builders -----------------------------------------
+
+  function buildTextInspector(element) {
+    const aiBtn = document.createElement("button");
+    aiBtn.type = "button";
+    aiBtn.textContent = "AI rewrite";
+    aiBtn.setAttribute("data-ai-button", "rewrite-text");
+    if (aiBusy) aiBtn.disabled = true;
+    aiBtn.addEventListener("click", () => { aiRewriteText(element.id); });
+    inspector.appendChild(aiBtn);
+
+    const role = selectInput(["heading", "body", "label"], element.role);
+    role.addEventListener("change", () => {
+      element.role = role.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Role", role));
+
+    const fontSize = document.createElement("input");
+    fontSize.type = "number";
+    fontSize.min = "12"; fontSize.max = "96";
+    fontSize.value = String(element.fontSize);
+    fontSize.addEventListener("change", () => {
+      const n = Number(fontSize.value);
+      if (Number.isFinite(n) && n >= 12 && n <= 96) {
+        element.fontSize = n;
+        rebuildElement(element.id);
+        scheduleSave();
+      }
+    });
+    inspector.appendChild(field("Font size", fontSize));
+
+    const weight = selectInput(["400", "500", "600", "700"], String(element.fontWeight));
+    weight.addEventListener("change", () => {
+      element.fontWeight = Number(weight.value);
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Font weight", weight));
+
+    const align = selectInput(["left", "center", "right"], element.align);
+    align.addEventListener("change", () => {
+      element.align = align.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Align", align));
+  }
+
+  function buildActionInspector(element) {
+    const variant = selectInput(ACTION_VARIANTS, element.variant);
+    variant.addEventListener("change", () => {
+      element.variant = variant.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Variant", variant));
+
+    const label = document.createElement("input");
+    label.type = "text";
+    label.value = element.label;
+    label.addEventListener("change", () => {
+      if (label.value.length === 0) {
+        setStatus("Label can't be empty", "error");
+        label.value = element.label;
+        return;
+      }
+      element.label = label.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Label", label));
+
+    var hrefTypeSelect = document.createElement("select");
+    var optExternal = document.createElement("option");
+    optExternal.value = "external";
+    optExternal.textContent = "External URL";
+    hrefTypeSelect.appendChild(optExternal);
+    var optPage = document.createElement("option");
+    optPage.value = "page";
+    optPage.textContent = "Page link";
+    hrefTypeSelect.appendChild(optPage);
+    hrefTypeSelect.value = element.href && element.href.type ? element.href.type : "external";
+
+    var hrefValueContainer = document.createElement("div");
+
+    function renderHrefValue() {
+      hrefValueContainer.replaceChildren();
+      if (hrefTypeSelect.value === "external") {
+        var urlInput = document.createElement("input");
+        urlInput.type = "text";
+        urlInput.value = element.href && element.href.type === "external" ? element.href.url : "";
+        urlInput.placeholder = "https://...";
+        urlInput.addEventListener("change", function() {
+          if (urlInput.value.length === 0) {
+            setStatus("URL can not be empty", "error");
+            return;
+          }
+          if (!isAllowedHref(urlInput.value)) {
+            setStatus("URL not allowed", "error");
+            return;
+          }
+          element.href = { type: "external", url: urlInput.value };
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        hrefValueContainer.appendChild(urlInput);
+      } else {
+        var pageSelect = document.createElement("select");
+        for (var pi = 0; pi < state.pages.length; pi++) {
+          var p = state.pages[pi];
+          var opt = document.createElement("option");
+          opt.value = p.id;
+          opt.textContent = p.title + " (/" + p.slug + ")";
+          pageSelect.appendChild(opt);
+        }
+        if (element.href && element.href.type === "page") {
+          pageSelect.value = element.href.pageId;
+        }
+        pageSelect.addEventListener("change", function() {
+          element.href = { type: "page", pageId: pageSelect.value };
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        hrefValueContainer.appendChild(pageSelect);
+      }
+    }
+
+    hrefTypeSelect.addEventListener("change", function() {
+      if (hrefTypeSelect.value === "external") {
+        element.href = { type: "external", url: "" };
+      } else {
+        element.href = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
+      }
+      renderHrefValue();
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+
+    inspector.appendChild(field("Link Type", hrefTypeSelect));
+    renderHrefValue();
+    inspector.appendChild(field("Destination", hrefValueContainer));
+  }
+
+  function buildShapeInspector(element) {
+    const variant = selectInput(SHAPE_VARIANTS, element.variant);
+    variant.addEventListener("change", () => {
+      element.variant = variant.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Variant", variant));
+  }
+
+  function buildContainerInspector(element) {
+    const variant = selectInput(SURFACE_VARIANTS, element.variant);
+    variant.addEventListener("change", () => {
+      element.variant = variant.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Variant", variant));
+  }
+
+  function buildMediaInspector(element) {
+    const aiBtn = document.createElement("button");
+    aiBtn.type = "button";
+    aiBtn.textContent = "AI media";
+    aiBtn.setAttribute("data-ai-button", "replace-media");
+    if (aiBusy) aiBtn.disabled = true;
+    aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
+    inspector.appendChild(aiBtn);
+
+    mountMediaPicker(element, inspector);
+
+    const fit = selectInput(["cover", "contain"], element.fit);
+    fit.addEventListener("change", () => {
+      element.fit = fit.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Fit", fit));
+
+    if (element.mediaKind === "video") {
+      const playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
+      const autoplay = document.createElement("input");
+      autoplay.type = "checkbox"; autoplay.checked = !!playback.autoplay;
+      const muted = document.createElement("input");
+      muted.type = "checkbox"; muted.checked = !!playback.muted;
+      const loop = document.createElement("input");
+      loop.type = "checkbox"; loop.checked = !!playback.loop;
+      const controls = document.createElement("input");
+      controls.type = "checkbox"; controls.checked = !!playback.controls;
+
+      function enforceMuted() {
+        if (autoplay.checked) {
+          muted.checked = true;
+          muted.disabled = true;
+        } else {
+          muted.disabled = false;
+        }
+      }
+      enforceMuted();
+
+      autoplay.addEventListener("change", () => {
+        playback.autoplay = autoplay.checked;
+        enforceMuted();
+        playback.muted = muted.checked;
+        scheduleSave();
+      });
+      muted.addEventListener("change", () => {
+        if (autoplay.checked) { muted.checked = true; return; }
+        playback.muted = muted.checked;
+        scheduleSave();
+      });
+      loop.addEventListener("change", () => { playback.loop = loop.checked; scheduleSave(); });
+      controls.addEventListener("change", () => { playback.controls = controls.checked; scheduleSave(); });
+
+      const row = document.createElement("div"); row.className = "row";
+      row.appendChild(autoplay);
+      const al = document.createElement("label"); al.textContent = "autoplay"; row.appendChild(al);
+      inspector.appendChild(row);
+
+      const row2 = document.createElement("div"); row2.className = "row";
+      row2.appendChild(muted);
+      const ml = document.createElement("label"); ml.textContent = "muted"; row2.appendChild(ml);
+      inspector.appendChild(row2);
+
+      const row3 = document.createElement("div"); row3.className = "row";
+      row3.appendChild(loop);
+      const ll = document.createElement("label"); ll.textContent = "loop"; row3.appendChild(ll);
+      inspector.appendChild(row3);
+
+      const row4 = document.createElement("div"); row4.className = "row";
+      row4.appendChild(controls);
+      const cl = document.createElement("label"); cl.textContent = "controls"; row4.appendChild(cl);
+      inspector.appendChild(row4);
+    }
+  }
+
+  function buildFormInspector(element) {
+    if (!Array.isArray(element.fields)) element.fields = [];
+    var fieldListHost = document.createElement("div");
+
+    function formOption(label) {
+      return { value: label, label: label };
+    }
+
+    function assertFormOptionShape(option, fieldId, optionIndex) {
+      if (!option || typeof option !== "object" || typeof option.value !== "string" || typeof option.label !== "string") {
+        throw new Error("buildFormInspector: field " + JSON.stringify(fieldId) + " option " + String(optionIndex) + " must be { value: string, label: string }");
+      }
+    }
+
+    function renderFieldList() {
+      fieldListHost.replaceChildren();
+      for (var fi = 0; fi < element.fields.length; fi++) {
+        (function(idx) {
+          var f = element.fields[idx];
+          var card = document.createElement("div");
+          card.className = "inspector-list-card";
+
+          var labelInput = document.createElement("input");
+          labelInput.type = "text";
+          labelInput.value = f.label;
+          labelInput.placeholder = "Field label";
+          labelInput.addEventListener("change", function() {
+            f.label = labelInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Label", labelInput));
+
+          var kindSel = selectInput(["text", "email", "textarea", "checkbox", "select"], f.kind);
+          kindSel.addEventListener("change", function() {
+            f.kind = kindSel.value;
+            if (f.kind === "select" && !Array.isArray(f.options)) {
+              f.options = [formOption("Option 1"), formOption("Option 2")];
+            }
+            rebuildElement(element.id);
+            scheduleSave();
+            renderFieldList();
+          });
+          card.appendChild(field("Kind", kindSel));
+
+          var reqCheck = document.createElement("input");
+          reqCheck.type = "checkbox";
+          reqCheck.checked = !!f.required;
+          reqCheck.addEventListener("change", function() {
+            f.required = reqCheck.checked;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Required", reqCheck));
+
+          if (f.kind !== "checkbox") {
+            var phInput = document.createElement("input");
+            phInput.type = "text";
+            phInput.value = f.placeholder || "";
+            phInput.placeholder = "Placeholder text";
+            phInput.addEventListener("change", function() {
+              f.placeholder = phInput.value;
+              rebuildElement(element.id);
+              scheduleSave();
+            });
+            card.appendChild(field("Placeholder", phInput));
+          }
+
+          if (f.kind === "select") {
+            if (!Array.isArray(f.options)) f.options = [];
+            var optHost = document.createElement("div");
+
+            function renderOpts() {
+              optHost.replaceChildren();
+              for (var oi = 0; oi < f.options.length; oi++) {
+                (function(optIdx) {
+                  var option = f.options[optIdx];
+                  assertFormOptionShape(option, f.id, optIdx);
+                  var optRow = document.createElement("div");
+                  optRow.style.cssText = "display:flex;gap:4px;margin-bottom:2px;";
+                  var optInput = document.createElement("input");
+                  optInput.type = "text";
+                  optInput.value = option.label;
+                  optInput.style.cssText = "flex:1;min-width:0;";
+                  optInput.addEventListener("change", function() {
+                    f.options[optIdx] = { value: optInput.value, label: optInput.value };
+                    rebuildElement(element.id);
+                    scheduleSave();
+                  });
+                  optRow.appendChild(optInput);
+                  var rmOpt = document.createElement("button");
+                  rmOpt.type = "button";
+                  rmOpt.textContent = "x";
+                  rmOpt.addEventListener("click", function() {
+                    f.options.splice(optIdx, 1);
+                    renderOpts();
+                    rebuildElement(element.id);
+                    scheduleSave();
+                  });
+                  optRow.appendChild(rmOpt);
+                  optHost.appendChild(optRow);
+                })(oi);
+              }
+              var addOpt = document.createElement("button");
+              addOpt.type = "button";
+              addOpt.textContent = "+ option";
+              addOpt.addEventListener("click", function() {
+                f.options.push(formOption("Option " + (f.options.length + 1)));
+                renderOpts();
+                rebuildElement(element.id);
+                scheduleSave();
+              });
+              optHost.appendChild(addOpt);
+            }
+            renderOpts();
+            card.appendChild(field("Options", optHost));
+          }
+
+          var removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.textContent = "Remove field";
+          removeBtn.addEventListener("click", function() {
+            element.fields.splice(idx, 1);
+            renderFieldList();
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(removeBtn);
+
+          fieldListHost.appendChild(card);
+        })(fi);
+      }
+
+      var addFieldBtn = document.createElement("button");
+      addFieldBtn.type = "button";
+      addFieldBtn.textContent = "+ field";
+      addFieldBtn.addEventListener("click", function() {
+        element.fields.push({ id: newElementId(), label: "New field", kind: "text", required: false, placeholder: "" });
+        renderFieldList();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      fieldListHost.appendChild(addFieldBtn);
+    }
+    renderFieldList();
+    inspector.appendChild(field("Fields", fieldListHost));
+
+    var submitLabel = document.createElement("input");
+    submitLabel.type = "text";
+    submitLabel.value = element.submitLabel || "Submit";
+    submitLabel.addEventListener("change", function() {
+      element.submitLabel = submitLabel.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Submit label", submitLabel));
+
+    var successMsg = document.createElement("input");
+    successMsg.type = "text";
+    successMsg.value = element.successMessage || "";
+    successMsg.addEventListener("change", function() {
+      element.successMessage = successMsg.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Success message", successMsg));
+
+    var webhookInput = document.createElement("input");
+    webhookInput.type = "text";
+    webhookInput.value = element.webhookUrl || "";
+    webhookInput.placeholder = "https://...";
+    webhookInput.addEventListener("change", function() {
+      element.webhookUrl = webhookInput.value;
+      scheduleSave();
+    });
+    inspector.appendChild(field("Webhook URL", webhookInput));
+  }
+
+  function buildEmbedInspector(element) {
+    var urlInput = document.createElement("input");
+    urlInput.type = "text";
+    urlInput.value = element.url || "";
+    urlInput.placeholder = "https://youtube.com/...";
+    urlInput.addEventListener("change", function() {
+      element.url = urlInput.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("URL", urlInput));
+
+    var titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.value = element.title || "";
+    titleInput.placeholder = "Title (optional)";
+    titleInput.addEventListener("change", function() {
+      element.title = titleInput.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Title", titleInput));
+
+    var ratioMap = { "16:9": 16 / 9, "4:3": 4 / 3, "1:1": 1, "21:9": 21 / 9 };
+    var ratioLabels = ["16:9", "4:3", "1:1", "21:9"];
+    var currentLabel = "16:9";
+    var currentRatio = element.aspectRatio || (16 / 9);
+    for (var ri = 0; ri < ratioLabels.length; ri++) {
+      if (Math.abs(ratioMap[ratioLabels[ri]] - currentRatio) < 0.01) {
+        currentLabel = ratioLabels[ri];
+        break;
+      }
+    }
+    var ratioSel = selectInput(ratioLabels, currentLabel);
+    ratioSel.addEventListener("change", function() {
+      element.aspectRatio = ratioMap[ratioSel.value] || (16 / 9);
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Aspect ratio", ratioSel));
+  }
+
+  function buildCodeInspector(element) {
+    var langOptions = ["typescript", "javascript", "python", "rust", "go", "json", "bash", "sql", "html", "css", "markdown"];
+    var langSel = selectInput(langOptions, element.language || "typescript");
+    langSel.addEventListener("change", function() {
+      element.language = langSel.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Language", langSel));
+
+    var sourceArea = document.createElement("textarea");
+    sourceArea.rows = 8;
+    sourceArea.style.cssText = "width:100%;font-family:monospace;font-size:12px;resize:vertical;box-sizing:border-box;";
+    sourceArea.value = element.source || "";
+    sourceArea.addEventListener("change", function() {
+      element.source = sourceArea.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Source", sourceArea));
+
+    var lineNumCheck = document.createElement("input");
+    lineNumCheck.type = "checkbox";
+    lineNumCheck.checked = !!element.showLineNumbers;
+    lineNumCheck.addEventListener("change", function() {
+      element.showLineNumbers = lineNumCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Line numbers", lineNumCheck));
+  }
+
+  function buildAccordionInspector(element) {
+    if (!Array.isArray(element.items)) element.items = [];
+    var itemListHost = document.createElement("div");
+
+    function runsToHtml(runs) {
+      var out = "";
+      for (var ri = 0; ri < runs.length; ri++) {
+        var run = runs[ri];
+        var text = run.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        var inner = text;
+        var marks = Array.isArray(run.marks) ? run.marks : [];
+        for (var mi = 0; mi < marks.length; mi++) {
+          var m = marks[mi];
+          if (m.type === "bold") inner = "<strong>" + inner + "</strong>";
+          if (m.type === "italic") inner = "<em>" + inner + "</em>";
+          if (m.type === "underline") inner = "<u>" + inner + "</u>";
+          if (m.type === "strike") inner = "<s>" + inner + "</s>";
+          if (m.type === "code") inner = "<code>" + inner + "</code>";
+          if (m.type === "highlight") inner = "<mark>" + inner + "</mark>";
+          if (m.type === "link") inner = "<a href=\"" + m.href.replace(/"/g, "&quot;") + "\">" + inner + "</a>";
+        }
+        out += inner;
+      }
+      return out;
+    }
+
+    function renderItemList() {
+      itemListHost.replaceChildren();
+      for (var ii = 0; ii < element.items.length; ii++) {
+        (function(idx) {
+          var item = element.items[idx];
+          var card = document.createElement("div");
+          card.className = "inspector-list-card";
+
+          var titleInput = document.createElement("input");
+          titleInput.type = "text";
+          titleInput.value = item.title;
+          titleInput.placeholder = "Title";
+          titleInput.addEventListener("change", function() {
+            item.title = titleInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Title", titleInput));
+
+          var bodyWrap = document.createElement("div");
+          var toolbar = document.createElement("div");
+          toolbar.style.cssText = "display:flex;gap:2px;margin-bottom:4px;";
+          var boldBtn = document.createElement("button"); boldBtn.type = "button"; boldBtn.textContent = "B"; boldBtn.style.fontWeight = "700";
+          var italicBtn = document.createElement("button"); italicBtn.type = "button"; italicBtn.textContent = "I"; italicBtn.style.fontStyle = "italic";
+          var underlineBtn = document.createElement("button"); underlineBtn.type = "button"; underlineBtn.textContent = "U"; underlineBtn.style.textDecoration = "underline";
+          var strikeBtn = document.createElement("button"); strikeBtn.type = "button"; strikeBtn.textContent = "S"; strikeBtn.style.textDecoration = "line-through";
+          toolbar.appendChild(boldBtn);
+          toolbar.appendChild(italicBtn);
+          toolbar.appendChild(underlineBtn);
+          toolbar.appendChild(strikeBtn);
+          bodyWrap.appendChild(toolbar);
+
+          var editable = document.createElement("div");
+          editable.setAttribute("contenteditable", "true");
+          editable.style.cssText = "min-height:40px;padding:4px 6px;border:1px solid var(--rev01-hairline);border-radius:4px;font-size:12px;background:var(--rev01-bg-panel);color:var(--rev01-fg);overflow-y:auto;max-height:120px;";
+          editable.innerHTML = runsToHtml(Array.isArray(item.body) ? item.body : []);
+          bodyWrap.appendChild(editable);
+
+          function wireAccordionToolbarButton(button, command) {
+            button.addEventListener("mousedown", function(ev) {
+              ev.preventDefault();
+            });
+            button.addEventListener("click", function() {
+              editable.focus();
+              document.execCommand(command);
+            });
+          }
+          wireAccordionToolbarButton(boldBtn, "bold");
+          wireAccordionToolbarButton(italicBtn, "italic");
+          wireAccordionToolbarButton(underlineBtn, "underline");
+          wireAccordionToolbarButton(strikeBtn, "strikeThrough");
+
+          editable.addEventListener("blur", function() {
+            item.body = serializeContentToRuns(editable);
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+
+          card.appendChild(field("Body", bodyWrap));
+
+          var removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.textContent = "Remove item";
+          removeBtn.addEventListener("click", function() {
+            element.items.splice(idx, 1);
+            renderItemList();
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(removeBtn);
+
+          itemListHost.appendChild(card);
+        })(ii);
+      }
+
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.textContent = "+ item";
+      addBtn.addEventListener("click", function() {
+        element.items.push({ id: newElementId(), title: "New item", body: [{ text: "Content" }] });
+        renderItemList();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      itemListHost.appendChild(addBtn);
+    }
+    renderItemList();
+    inspector.appendChild(field("Items", itemListHost));
+
+    var multiCheck = document.createElement("input");
+    multiCheck.type = "checkbox";
+    multiCheck.checked = !!element.allowMultipleOpen;
+    multiCheck.addEventListener("change", function() {
+      element.allowMultipleOpen = multiCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Allow multiple open", multiCheck));
+  }
+
+  function buildCarouselInspector(element) {
+    if (!Array.isArray(element.slides)) element.slides = [];
+    var slideListHost = document.createElement("div");
+
+    function renderSlideList() {
+      slideListHost.replaceChildren();
+      for (var si = 0; si < element.slides.length; si++) {
+        (function(idx) {
+          var slide = element.slides[idx];
+          var card = document.createElement("div");
+          card.className = "inspector-list-card";
+
+          var thumbWrap = document.createElement("div");
+          thumbWrap.style.cssText = "margin-bottom:4px;";
+          var thumb = buildPickerThumb(slide.assetId, slide.assetId, function() {});
+          thumbWrap.appendChild(thumb);
+
+          var fileInput = document.createElement("input");
+          fileInput.type = "file";
+          fileInput.accept = "image/*";
+          fileInput.style.display = "none";
+          var uploadBtn = document.createElement("button");
+          uploadBtn.type = "button";
+          uploadBtn.textContent = "Upload image";
+          uploadBtn.addEventListener("click", function() {
+            fileInput.value = "";
+            fileInput.click();
+          });
+          fileInput.addEventListener("change", function() {
+            var file = fileInput.files && fileInput.files[0];
+            if (!file) return;
+            setStatus("Uploading...");
+            postAssetUpload(file, "", element.id).then(function(result) {
+              slide.assetId = result.assetId;
+              rebuildElement(element.id);
+              scheduleSave();
+              renderSlideList();
+              setStatus("Uploaded", "ok");
+            }).catch(function(err) {
+              setStatus("Upload failed: " + (err && err.message ? err.message : String(err)), "error");
+            });
+          });
+          thumbWrap.appendChild(uploadBtn);
+          thumbWrap.appendChild(fileInput);
+          card.appendChild(thumbWrap);
+
+          var captionInput = document.createElement("input");
+          captionInput.type = "text";
+          captionInput.value = slide.caption || "";
+          captionInput.placeholder = "Caption";
+          captionInput.addEventListener("change", function() {
+            slide.caption = captionInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Caption", captionInput));
+
+          var hrefInput = document.createElement("input");
+          hrefInput.type = "text";
+          hrefInput.value = slide.href || "";
+          hrefInput.placeholder = "Link (optional)";
+          hrefInput.addEventListener("change", function() {
+            slide.href = hrefInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Link", hrefInput));
+
+          var removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.textContent = "Remove slide";
+          removeBtn.addEventListener("click", function() {
+            element.slides.splice(idx, 1);
+            renderSlideList();
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(removeBtn);
+
+          slideListHost.appendChild(card);
+        })(si);
+      }
+
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.textContent = "+ slide";
+      addBtn.addEventListener("click", function() {
+        element.slides.push({ id: newElementId(), assetId: "__placeholder__", caption: "" });
+        renderSlideList();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      slideListHost.appendChild(addBtn);
+    }
+    renderSlideList();
+    inspector.appendChild(field("Slides", slideListHost));
+
+    var arrowsCheck = document.createElement("input");
+    arrowsCheck.type = "checkbox";
+    arrowsCheck.checked = !!element.showArrows;
+    arrowsCheck.addEventListener("change", function() {
+      element.showArrows = arrowsCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Show arrows", arrowsCheck));
+
+    var dotsCheck = document.createElement("input");
+    dotsCheck.type = "checkbox";
+    dotsCheck.checked = !!element.showDots;
+    dotsCheck.addEventListener("change", function() {
+      element.showDots = dotsCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Show dots", dotsCheck));
+  }
+
+  function buildTableInspector(element) {
+    if (!Array.isArray(element.columns)) element.columns = [];
+    if (!Array.isArray(element.rows)) element.rows = [];
+    var gridHost = document.createElement("div");
+
+    function renderTableGrid() {
+      gridHost.replaceChildren();
+      var table = document.createElement("table");
+      table.style.cssText = "width:100%;border-collapse:collapse;font-size:11px;";
+
+      var thead = document.createElement("thead");
+      var headerRow = document.createElement("tr");
+      var cornerCell = document.createElement("th");
+      cornerCell.textContent = "#";
+      cornerCell.style.cssText = "padding:2px 4px;border:1px solid var(--rev01-hairline);";
+      headerRow.appendChild(cornerCell);
+
+      for (var ci = 0; ci < element.columns.length; ci++) {
+        (function(colIdx) {
+          var col = element.columns[colIdx];
+          var th = document.createElement("th");
+          th.style.cssText = "padding:2px;border:1px solid var(--rev01-hairline);";
+          var headerInput = document.createElement("input");
+          headerInput.type = "text";
+          headerInput.value = col.header;
+          headerInput.style.cssText = "width:100%;box-sizing:border-box;font-size:11px;";
+          headerInput.addEventListener("change", function() {
+            col.header = headerInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          th.appendChild(headerInput);
+
+          var rmColBtn = document.createElement("button");
+          rmColBtn.type = "button";
+          rmColBtn.textContent = "x";
+          rmColBtn.title = "Remove column";
+          rmColBtn.style.cssText = "font-size:9px;padding:0 3px;margin-left:2px;";
+          rmColBtn.addEventListener("click", function() {
+            var removedId = element.columns[colIdx].id;
+            element.columns.splice(colIdx, 1);
+            for (var ri = 0; ri < element.rows.length; ri++) {
+              if (element.rows[ri].cells && element.rows[ri].cells[removedId] !== undefined) {
+                delete element.rows[ri].cells[removedId];
+              }
+            }
+            renderTableGrid();
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          th.appendChild(rmColBtn);
+          headerRow.appendChild(th);
+        })(ci);
+      }
+
+      var addColTh = document.createElement("th");
+      addColTh.style.cssText = "padding:2px;border:1px solid var(--rev01-hairline);";
+      var addColBtn = document.createElement("button");
+      addColBtn.type = "button";
+      addColBtn.textContent = "+ col";
+      addColBtn.addEventListener("click", function() {
+        var newColId = newElementId();
+        element.columns.push({ id: newColId, header: "Column " + (element.columns.length + 1) });
+        for (var ri = 0; ri < element.rows.length; ri++) {
+          if (!element.rows[ri].cells) element.rows[ri].cells = {};
+          element.rows[ri].cells[newColId] = "";
+        }
+        renderTableGrid();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      addColTh.appendChild(addColBtn);
+      headerRow.appendChild(addColTh);
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      var tbody = document.createElement("tbody");
+      for (var rowIdx = 0; rowIdx < element.rows.length; rowIdx++) {
+        (function(ri) {
+          var rowData = element.rows[ri];
+          if (!rowData.cells) rowData.cells = {};
+          var tr = document.createElement("tr");
+
+          var numCell = document.createElement("td");
+          numCell.textContent = String(ri + 1);
+          numCell.style.cssText = "padding:2px 4px;border:1px solid var(--rev01-hairline);text-align:center;color:var(--rev01-fg-faint);";
+          tr.appendChild(numCell);
+
+          for (var ci2 = 0; ci2 < element.columns.length; ci2++) {
+            (function(colIdx2) {
+              var colId = element.columns[colIdx2].id;
+              var td = document.createElement("td");
+              td.style.cssText = "padding:1px;border:1px solid var(--rev01-hairline);";
+              var cellInput = document.createElement("input");
+              cellInput.type = "text";
+              cellInput.value = rowData.cells[colId] || "";
+              cellInput.style.cssText = "width:100%;box-sizing:border-box;font-size:11px;";
+              cellInput.addEventListener("change", function() {
+                rowData.cells[colId] = cellInput.value;
+                rebuildElement(element.id);
+                scheduleSave();
+              });
+              td.appendChild(cellInput);
+              tr.appendChild(td);
+            })(ci2);
+          }
+
+          var rmCell = document.createElement("td");
+          rmCell.style.cssText = "padding:2px;border:1px solid var(--rev01-hairline);";
+          var rmRowBtn = document.createElement("button");
+          rmRowBtn.type = "button";
+          rmRowBtn.textContent = "x";
+          rmRowBtn.title = "Remove row";
+          rmRowBtn.addEventListener("click", function() {
+            element.rows.splice(ri, 1);
+            renderTableGrid();
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          rmCell.appendChild(rmRowBtn);
+          tr.appendChild(rmCell);
+          tbody.appendChild(tr);
+        })(rowIdx);
+      }
+
+      var addRowTr = document.createElement("tr");
+      var addRowTd = document.createElement("td");
+      addRowTd.colSpan = element.columns.length + 2;
+      var addRowBtn = document.createElement("button");
+      addRowBtn.type = "button";
+      addRowBtn.textContent = "+ row";
+      addRowBtn.addEventListener("click", function() {
+        var cells = {};
+        for (var ci3 = 0; ci3 < element.columns.length; ci3++) {
+          cells[element.columns[ci3].id] = "";
+        }
+        element.rows.push({ id: newElementId(), cells: cells });
+        renderTableGrid();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      addRowTd.appendChild(addRowBtn);
+      addRowTr.appendChild(addRowTd);
+      tbody.appendChild(addRowTr);
+      table.appendChild(tbody);
+      gridHost.appendChild(table);
+
+      if (element.columns.length === 0 && element.rows.length === 0) {
+        var hint = document.createElement("div");
+        hint.style.fontSize = "11px";
+        hint.style.opacity = "0.7";
+        hint.style.marginTop = "4px";
+        hint.textContent = "Add a column and a row to start.";
+        gridHost.appendChild(hint);
+      }
+    }
+    renderTableGrid();
+    inspector.appendChild(field("Data", gridHost));
+
+    var zebraCheck = document.createElement("input");
+    zebraCheck.type = "checkbox";
+    zebraCheck.checked = !!element.zebra;
+    zebraCheck.addEventListener("change", function() {
+      element.zebra = zebraCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Zebra striping", zebraCheck));
+
+    var collapseCheck = document.createElement("input");
+    collapseCheck.type = "checkbox";
+    collapseCheck.checked = !!element.collapseOnPhone;
+    collapseCheck.addEventListener("change", function() {
+      element.collapseOnPhone = collapseCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Collapse on phone", collapseCheck));
+  }
+
+  function buildNavInspector(element) {
+    if (!Array.isArray(element.links)) element.links = [];
+    var linkListHost = document.createElement("div");
+
+    function validateNavLinkEdit(kind, href) {
+      if (kind === "anchor" && (typeof href !== "string" || href.charAt(0) !== "#")) {
+        setStatus("Anchor targets must start with #.", "error");
+        return false;
+      }
+      return true;
+    }
+
+    function renderLinkList() {
+      linkListHost.replaceChildren();
+      for (var li = 0; li < element.links.length; li++) {
+        (function(idx) {
+          var lnk = element.links[idx];
+          var card = document.createElement("div");
+          card.className = "inspector-list-card";
+
+          var labelInput = document.createElement("input");
+          labelInput.type = "text";
+          labelInput.value = lnk.label;
+          labelInput.placeholder = "Label";
+          labelInput.addEventListener("change", function() {
+            lnk.label = labelInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Label", labelInput));
+
+          var hrefInput = document.createElement("input");
+          hrefInput.type = "text";
+          hrefInput.value = lnk.href;
+          hrefInput.placeholder = lnk.kind === "anchor" ? "#section" : (lnk.kind === "external" ? "https://..." : "/page");
+          hrefInput.addEventListener("change", function() {
+            if (!validateNavLinkEdit(lnk.kind, hrefInput.value)) {
+              hrefInput.value = lnk.href;
+              return;
+            }
+            lnk.href = hrefInput.value;
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Href", hrefInput));
+
+          var kindSel = selectInput(["internal", "external", "anchor"], lnk.kind);
+          kindSel.addEventListener("change", function() {
+            if (!validateNavLinkEdit(kindSel.value, lnk.href)) {
+              kindSel.value = lnk.kind;
+              return;
+            }
+            lnk.kind = kindSel.value;
+            hrefInput.placeholder = lnk.kind === "anchor" ? "#section" : (lnk.kind === "external" ? "https://..." : "/page");
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(field("Kind", kindSel));
+
+          var removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.textContent = "Remove link";
+          removeBtn.addEventListener("click", function() {
+            element.links.splice(idx, 1);
+            renderLinkList();
+            rebuildElement(element.id);
+            scheduleSave();
+          });
+          card.appendChild(removeBtn);
+
+          linkListHost.appendChild(card);
+        })(li);
+      }
+
+      var addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.textContent = "+ link";
+      addBtn.addEventListener("click", function() {
+        element.links.push({ label: "New link", href: "/", kind: "internal" });
+        renderLinkList();
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      linkListHost.appendChild(addBtn);
+    }
+    renderLinkList();
+    inspector.appendChild(field("Links", linkListHost));
+
+    var layoutSel = selectInput(["left-right", "left-center-right"], element.layout || "left-right");
+    layoutSel.addEventListener("change", function() {
+      element.layout = layoutSel.value;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Layout", layoutSel));
+
+    var stickyCheck = document.createElement("input");
+    stickyCheck.type = "checkbox";
+    stickyCheck.checked = !!element.sticky;
+    stickyCheck.addEventListener("change", function() {
+      element.sticky = stickyCheck.checked;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Sticky", stickyCheck));
+
+    var logoInput = document.createElement("input");
+    logoInput.type = "text";
+    logoInput.value = element.logoAssetId || "";
+    logoInput.placeholder = "Logo asset ID (optional)";
+    logoInput.addEventListener("change", function() {
+      element.logoAssetId = logoInput.value || undefined;
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+    inspector.appendChild(field("Logo asset", logoInput));
+  }
+
   // Revoke any blob URLs held by AI-preview wraps before wiping the
   // inspector. Without this, navigating selection while a preview is open
   // leaks the bytes for the rest of the tab session.
@@ -2806,259 +3841,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildReorderGroup(section, element));
     inspector.appendChild(buildZOrderGroup(section, element));
 
-    if (element.type === "text") {
-      const aiBtn = document.createElement("button");
-      aiBtn.type = "button";
-      aiBtn.textContent = "AI rewrite";
-      aiBtn.setAttribute("data-ai-button", "rewrite-text");
-      if (aiBusy) aiBtn.disabled = true;
-      aiBtn.addEventListener("click", () => { aiRewriteText(element.id); });
-      inspector.appendChild(aiBtn);
-
-      const role = selectInput(["heading", "body", "label"], element.role);
-      role.addEventListener("change", () => {
-        element.role = role.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Role", role));
-
-      const fontSize = document.createElement("input");
-      fontSize.type = "number";
-      fontSize.min = "12"; fontSize.max = "96";
-      fontSize.value = String(element.fontSize);
-      fontSize.addEventListener("change", () => {
-        const n = Number(fontSize.value);
-        if (Number.isFinite(n) && n >= 12 && n <= 96) {
-          element.fontSize = n;
-          rebuildElement(element.id);
-          scheduleSave();
-        }
-      });
-      inspector.appendChild(field("Font size", fontSize));
-
-      const weight = selectInput(["400", "500", "600", "700"], String(element.fontWeight));
-      weight.addEventListener("change", () => {
-        element.fontWeight = Number(weight.value);
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Font weight", weight));
-
-      const align = selectInput(["left", "center", "right"], element.align);
-      align.addEventListener("change", () => {
-        element.align = align.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Align", align));
-    }
-
-    if (element.type === "action") {
-      const variant = selectInput(ACTION_VARIANTS, element.variant);
-      variant.addEventListener("change", () => {
-        element.variant = variant.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Variant", variant));
-
-      const label = document.createElement("input");
-      label.type = "text";
-      label.value = element.label;
-      label.addEventListener("change", () => {
-        if (label.value.length === 0) {
-          setStatus("Label can't be empty", "error");
-          label.value = element.label;
-          return;
-        }
-        element.label = label.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Label", label));
-
-      var hrefTypeSelect = document.createElement("select");
-      var optExternal = document.createElement("option");
-      optExternal.value = "external";
-      optExternal.textContent = "External URL";
-      hrefTypeSelect.appendChild(optExternal);
-      var optPage = document.createElement("option");
-      optPage.value = "page";
-      optPage.textContent = "Page link";
-      hrefTypeSelect.appendChild(optPage);
-      hrefTypeSelect.value = element.href && element.href.type ? element.href.type : "external";
-
-      var hrefValueContainer = document.createElement("div");
-
-      function renderHrefValue() {
-        hrefValueContainer.replaceChildren();
-        if (hrefTypeSelect.value === "external") {
-          var urlInput = document.createElement("input");
-          urlInput.type = "text";
-          urlInput.value = element.href && element.href.type === "external" ? element.href.url : "";
-          urlInput.placeholder = "https://...";
-          urlInput.addEventListener("change", function() {
-            if (urlInput.value.length === 0) {
-              setStatus("URL can not be empty", "error");
-              return;
-            }
-            if (!isAllowedHref(urlInput.value)) {
-              setStatus("URL not allowed", "error");
-              return;
-            }
-            element.href = { type: "external", url: urlInput.value };
-            rebuildElement(element.id);
-            scheduleSave();
-          });
-          hrefValueContainer.appendChild(urlInput);
-        } else {
-          var pageSelect = document.createElement("select");
-          for (var pi = 0; pi < state.pages.length; pi++) {
-            var p = state.pages[pi];
-            var opt = document.createElement("option");
-            opt.value = p.id;
-            opt.textContent = p.title + " (/" + p.slug + ")";
-            pageSelect.appendChild(opt);
-          }
-          if (element.href && element.href.type === "page") {
-            pageSelect.value = element.href.pageId;
-          }
-          pageSelect.addEventListener("change", function() {
-            element.href = { type: "page", pageId: pageSelect.value };
-            rebuildElement(element.id);
-            scheduleSave();
-          });
-          hrefValueContainer.appendChild(pageSelect);
-        }
-      }
-
-      hrefTypeSelect.addEventListener("change", function() {
-        if (hrefTypeSelect.value === "external") {
-          element.href = { type: "external", url: "" };
-        } else {
-          element.href = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
-        }
-        renderHrefValue();
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-
-      inspector.appendChild(field("Link Type", hrefTypeSelect));
-      renderHrefValue();
-      inspector.appendChild(field("Destination", hrefValueContainer));
-    }
-
-    if (element.type === "shape") {
-      const variant = selectInput(SHAPE_VARIANTS, element.variant);
-      variant.addEventListener("change", () => {
-        element.variant = variant.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Variant", variant));
-    }
-
-    if (element.type === "container") {
-      const variant = selectInput(SURFACE_VARIANTS, element.variant);
-      variant.addEventListener("change", () => {
-        element.variant = variant.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Variant", variant));
-    }
-
-    if (element.type === "media") {
-      const aiBtn = document.createElement("button");
-      aiBtn.type = "button";
-      aiBtn.textContent = "AI media";
-      aiBtn.setAttribute("data-ai-button", "replace-media");
-      if (aiBusy) aiBtn.disabled = true;
-      aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
-      inspector.appendChild(aiBtn);
-
-      // Three-row media picker: current thumb + upload + AI generate + alt,
-      // history row (slot MRU), gallery grid (all owner assets by kind).
-      mountMediaPicker(element, inspector);
-
-      const fit = selectInput(["cover", "contain"], element.fit);
-      fit.addEventListener("change", () => {
-        element.fit = fit.value;
-        rebuildElement(element.id);
-        scheduleSave();
-      });
-      inspector.appendChild(field("Fit", fit));
-
-      // chart inspector block follows below (additive Wave 2 #11 slot).
-      if (element.mediaKind === "video") {
-        const playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
-        const autoplay = document.createElement("input");
-        autoplay.type = "checkbox"; autoplay.checked = !!playback.autoplay;
-        const muted = document.createElement("input");
-        muted.type = "checkbox"; muted.checked = !!playback.muted;
-        const loop = document.createElement("input");
-        loop.type = "checkbox"; loop.checked = !!playback.loop;
-        const controls = document.createElement("input");
-        controls.type = "checkbox"; controls.checked = !!playback.controls;
-
-        function enforceMuted() {
-          if (autoplay.checked) {
-            muted.checked = true;
-            muted.disabled = true;
-          } else {
-            muted.disabled = false;
-          }
-        }
-        enforceMuted();
-
-        autoplay.addEventListener("change", () => {
-          playback.autoplay = autoplay.checked;
-          enforceMuted();
-          playback.muted = muted.checked;
-          scheduleSave();
-        });
-        muted.addEventListener("change", () => {
-          if (autoplay.checked) { muted.checked = true; return; }
-          playback.muted = muted.checked;
-          scheduleSave();
-        });
-        loop.addEventListener("change", () => { playback.loop = loop.checked; scheduleSave(); });
-        controls.addEventListener("change", () => { playback.controls = controls.checked; scheduleSave(); });
-
-        const row = document.createElement("div"); row.className = "row";
-        row.appendChild(autoplay);
-        const al = document.createElement("label"); al.textContent = "autoplay"; row.appendChild(al);
-        inspector.appendChild(row);
-
-        const row2 = document.createElement("div"); row2.className = "row";
-        row2.appendChild(muted);
-        const ml = document.createElement("label"); ml.textContent = "muted"; row2.appendChild(ml);
-        inspector.appendChild(row2);
-
-        const row3 = document.createElement("div"); row3.className = "row";
-        row3.appendChild(loop);
-        const ll = document.createElement("label"); ll.textContent = "loop"; row3.appendChild(ll);
-        inspector.appendChild(row3);
-
-        const row4 = document.createElement("div"); row4.className = "row";
-        row4.appendChild(controls);
-        const cl = document.createElement("label"); cl.textContent = "controls"; row4.appendChild(cl);
-        inspector.appendChild(row4);
-      }
-    }
-
-    // -- Wave 2 #11 chart inspector ----------------------------------------
-    //
-    // Kind picker, axis title fields, legend toggle, and a spreadsheet-like
-    // data grid (series rows x category columns) with add/remove controls
-    // for both. Every keystroke calls scheduleSave() and rebuildElement()
-    // so the preview thumbnail updates inline. The grid is rendered fresh
-    // on every change via a local renderChartGrid() helper so we don't
-    // have to manage incremental DOM diffs for a 6x6 grid.
-    if (element.type === "chart") {
-      buildChartInspector(element);
-    }
+    const inspectorBuilders = {
+      text: buildTextInspector,
+      action: buildActionInspector,
+      shape: buildShapeInspector,
+      container: buildContainerInspector,
+      media: buildMediaInspector,
+      chart: buildChartInspector,
+      form: buildFormInspector,
+      embed: buildEmbedInspector,
+      code: buildCodeInspector,
+      accordion: buildAccordionInspector,
+      carousel: buildCarouselInspector,
+      table: buildTableInspector,
+      nav: buildNavInspector,
+    };
+    const inspectorBuilder = inspectorBuilders[element.type];
+    if (inspectorBuilder) inspectorBuilder(element);
 
     // -- Element style controls -----------------------------------------------
     (function buildStyleSection() {

@@ -46,6 +46,8 @@
 //   kind: 'external' → renderer emits the raw href and adds
 //                      target="_blank" rel="noopener" defensively. The Owner
 //                      pastes the full URL (e.g. https://example.com/x).
+//   kind: 'anchor'   -> renderer emits the raw fragment href (e.g. #pricing),
+//                      never prefixes "/" and never opens a new tab.
 //
 // We do not attempt to validate that an internal slug resolves to an existing
 // page at render time — the editor's link picker is the validator. The
@@ -76,7 +78,7 @@
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml, styleFromEntries } from './render-utils.js';
 
-export type NavLinkKind = 'internal' | 'external';
+export type NavLinkKind = 'internal' | 'external' | 'anchor';
 
 export interface NavLink {
   label: string;
@@ -113,6 +115,7 @@ export interface NavRenderCtx {
  */
 export function navLinkHref(link: NavLink): string {
   if (link.kind === 'external') return link.href;
+  if (link.kind === 'anchor') return link.href;
   // internal
   if (link.href.startsWith('/')) return link.href;
   return `/${link.href}`;
@@ -121,8 +124,7 @@ export function navLinkHref(link: NavLink): string {
 /** Build a single `<a>` for one NavLink, fully escaped. */
 function renderNavLink(link: NavLink): string {
   const href = navLinkHref(link);
-  const target =
-    link.kind === 'external' ? ' target="_blank" rel="noopener"' : '';
+  const target = link.kind === 'external' ? ' target="_blank" rel="noopener"' : '';
   return (
     `<a class="rev01-nav-link" data-rev01-nav-link-kind="${escapeAttr(link.kind)}" ` +
     `href="${escapeAttr(href)}"${target}>` +
@@ -171,9 +173,7 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
   const slot1 = `<div class="rev01-nav-slot" data-slot="left">${logoHtml}</div>`;
   const slot2 = `<div class="rev01-nav-slot" data-slot="${el.layout === 'left-right' ? 'right' : 'center'}">${linksHtml}</div>`;
   const slot3 =
-    el.layout === 'left-center-right'
-      ? `<div class="rev01-nav-slot" data-slot="right"></div>`
-      : '';
+    el.layout === 'left-center-right' ? `<div class="rev01-nav-slot" data-slot="right"></div>` : '';
 
   return (
     `<nav class="rev01-nav" data-rev01-nav-layout="${escapeAttr(el.layout)}" ` +

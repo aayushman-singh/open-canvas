@@ -50,6 +50,7 @@
     "charts:smoke": "bun run src/charts/smoke.ts",
     "fonts:smoke": "bun run src/fonts/smoke.ts",
     "film-reel:smoke": "bun run src/editor/film-reel-smoke.ts",
+    "inspector:smoke": "bun run src/editor/inspector-smoke.ts",
     "search:smoke": "bun run src/search/smoke.ts",
     "symbols:smoke": "bun run src/symbols/smoke.ts",
     "a11y:smoke": "bun run src/a11y/smoke.ts",

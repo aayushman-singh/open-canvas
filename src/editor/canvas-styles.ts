@@ -1075,6 +1075,13 @@ body[data-placement-active="true"] .rev01-section-slot {
   margin-bottom: 12px;
   word-break: break-all;
 }
+#canvas-inspector .inspector-list-card {
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--rev01-bg-panel) 60%, transparent);
+}
 #canvas-inspector .inspector-section-heading {
   margin-top: 16px;
   padding-top: 12px;

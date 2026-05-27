@@ -59,10 +59,7 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import type {
-  CanvasPage,
-  CanvasSiteState,
-} from '../../canvas/schema';
+import type { CanvasPage, CanvasSiteState } from '../../canvas/schema';
 import type { NavElement, NavLayout, NavLink } from '../../canvas/elements/nav';
 import { SITE_NAV_SYMBOL_ID } from '../../canvas/elements/nav';
 import { SITE_NAV_INNER_ELEMENT_ID } from '../../symbols/nav-bootstrap';
@@ -300,15 +297,23 @@ function clientScript(siteId: string, pageSlugs: string[]): string {
     return PAGE_SLUGS.map((slug) => '<option value="/' + escAttr(slug) + '"' + sel(slug) + '>/' + escAttr(slug) + '</option>').join('');
   }
 
+  function hrefControlHtml(kind, href) {
+    if (kind === 'internal') {
+      const internalHref = href.length > 0 ? href : (PAGE_SLUGS[0] ? '/' + PAGE_SLUGS[0] : '');
+      return '<select name="href">' + internalOptionsHtml(internalHref) + '</select>';
+    }
+    if (kind === 'anchor') {
+      return '<input type="text" name="href" value="' + escAttr(href) + '" placeholder="#section" />';
+    }
+    return '<input type="url" name="href" value="' + escAttr(href) + '" placeholder="https://example.com" />';
+  }
+
   function buildLinkRow(link) {
     const row = document.createElement('div');
     row.className = 'link-row';
-    const kind = link && link.kind === 'external' ? 'external' : 'internal';
+    const kind = link && (link.kind === 'external' || link.kind === 'anchor') ? link.kind : 'internal';
     const label = link && typeof link.label === 'string' ? link.label : '';
     const href = link && typeof link.href === 'string' ? link.href : '';
-
-    const internalHref = kind === 'internal' && href.length > 0 ? href : (PAGE_SLUGS[0] ? '/' + PAGE_SLUGS[0] : '');
-    const externalHref = kind === 'external' ? href : '';
 
     row.innerHTML = ''
       + '<label><span>Label</span><input type="text" name="label" value="' + escAttr(label) + '" placeholder="Home" /></label>'
@@ -316,13 +321,11 @@ function clientScript(siteId: string, pageSlugs: string[]): string {
       + '  <select name="kind">'
       + '    <option value="internal"' + (kind === 'internal' ? ' selected' : '') + '>Internal</option>'
       + '    <option value="external"' + (kind === 'external' ? ' selected' : '') + '>External</option>'
+      + '    <option value="anchor"' + (kind === 'anchor' ? ' selected' : '') + '>Anchor</option>'
       + '  </select>'
       + '</label>'
       + '<label class="href-cell"><span>Target</span>'
-      + (kind === 'internal'
-          ? '<select name="href">' + internalOptionsHtml(internalHref) + '</select>'
-          : '<input type="url" name="href" value="' + escAttr(externalHref) + '" placeholder="https://example.com" />'
-        )
+      + hrefControlHtml(kind, href)
       + '</label>'
       + '<button type="button" class="remove" aria-label="Remove link">Remove</button>';
 
@@ -341,10 +344,12 @@ function clientScript(siteId: string, pageSlugs: string[]): string {
         hrefCell.appendChild(sel);
       } else {
         const inp = document.createElement('input');
-        inp.type = 'url';
+        inp.type = newKind === 'anchor' ? 'text' : 'url';
         inp.name = 'href';
-        inp.placeholder = 'https://example.com';
-        inp.value = oldVal && !oldVal.startsWith('/') ? oldVal : '';
+        inp.placeholder = newKind === 'anchor' ? '#section' : 'https://example.com';
+        inp.value = newKind === 'anchor'
+          ? (oldVal && oldVal.startsWith('#') ? oldVal : '')
+          : (oldVal && !oldVal.startsWith('/') && !oldVal.startsWith('#') ? oldVal : '');
         hrefCell.appendChild(inp);
       }
       void span;
@@ -386,6 +391,11 @@ function clientScript(siteId: string, pageSlugs: string[]): string {
       const href = row.querySelector('[name="href"]').value.trim();
       if (label.length === 0 || href.length === 0) {
         showError('Every link needs a label and a target.');
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+      if (kind === 'anchor' && !href.startsWith('#')) {
+        showError('Anchor targets must start with #.');
         if (saveBtn) saveBtn.disabled = false;
         return;
       }
@@ -463,17 +473,16 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
     >
       <h1>Site nav</h1>
       <p class="lede">
-        The site nav is one bar that appears on every page. Edit it once here
-        and the change rolls out across the whole site. To hide the bar on a
-        specific page, delete its nav instance from the canvas editor for that
-        page.
+        The site nav is one bar that appears on every page. Edit it once here and the change rolls
+        out across the whole site. To hide the bar on a specific page, delete its nav instance from
+        the canvas editor for that page.
       </p>
 
       <Card>
         <h2>Bar configuration</h2>
         <p class="sub">
-          Layout slots, sticky behaviour, and the optional logo. Layout
-          `left-center-right` reserves a third slot for a future CTA.
+          Layout slots, sticky behaviour, and the optional logo. Layout `left-center-right` reserves
+          a third slot for a future CTA.
         </p>
         <form class="nav-config" autocomplete="off">
           <label class="field">
@@ -497,12 +506,7 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
             />
           </label>
           <div class="row">
-            <input
-              type="checkbox"
-              name="sticky"
-              id="sticky"
-              checked={sticky}
-            />
+            <input type="checkbox" name="sticky" id="sticky" checked={sticky} />
             <label for="sticky" style="color: var(--text); font-size: 14px;">
               Stick the bar to the top of the viewport on scroll
             </label>
@@ -510,26 +514,27 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
 
           <h2 style="margin-top: 18px;">Links</h2>
           <p class="sub">
-            Internal links route to one of this site&rsquo;s pages by slug.
-            External links open in a new tab with <code>rel="noopener"</code>.
+            Internal links route to one of this site&rsquo;s pages by slug. External links open in a
+            new tab with <code>rel="noopener"</code>.
           </p>
 
-          <div
-            class="links-list"
-            data-seed={raw(esc(JSON.stringify(links)))}
-          ></div>
+          <div class="links-list" data-seed={raw(esc(JSON.stringify(links)))}></div>
 
           {pageSlugs.length === 0 ? (
             <p class="empty-state">
-              This site has no pages yet — internal links will have nothing to
-              point at. Add a page first.
+              This site has no pages yet — internal links will have nothing to point at. Add a page
+              first.
             </p>
           ) : null}
 
-          <Button variant="ghost" class="add-link">+ Add link</Button>
+          <Button variant="ghost" class="add-link">
+            + Add link
+          </Button>
 
           <div class="save-row">
-            <Button variant="primary" type="submit" class="save">Save</Button>
+            <Button variant="primary" type="submit" class="save">
+              Save
+            </Button>
           </div>
           <p class="err" role="alert" aria-live="polite"></p>
           <p class="ok" role="status" aria-live="polite"></p>
@@ -539,13 +544,12 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
       <Card>
         <h2>Per-page suppression</h2>
         <p class="sub">
-          The schema is intentionally narrow — pages do not carry a
-          <code>hideSiteNav</code> flag. To omit the bar on a specific page,
-          open that page in the canvas editor and delete the nav instance
-          from it. Saving link or layout changes here updates the shared bar
-          without touching individual page placements, so a deletion stays
-          deleted. Adding the bar back to a page that had it removed is an
-          explicit &ldquo;Show site nav here&rdquo; action on that page.
+          The schema is intentionally narrow — pages do not carry a <code>hideSiteNav</code> flag.
+          To omit the bar on a specific page, open that page in the canvas editor and delete the nav
+          instance from it. Saving link or layout changes here updates the shared bar without
+          touching individual page placements, so a deletion stays deleted. Adding the bar back to a
+          page that had it removed is an explicit &ldquo;Show site nav here&rdquo; action on that
+          page.
         </p>
       </Card>
 

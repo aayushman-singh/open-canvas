@@ -15,12 +15,9 @@
 //   4. `sticky: true` emits `position: sticky` inline on the <nav> wrapper.
 //   5. Logo with `logoAssetId` emits `<img src="<assetBasePath>/<id>">`.
 
-import type {
-  CanvasPage,
-  CanvasSection,
-  CanvasSiteState,
-} from '../schema.js';
+import type { CanvasPage, CanvasSection, CanvasSiteState } from '../schema.js';
 import {
+  navLinkHref,
   renderNav,
   SITE_NAV_SYMBOL_ID,
   SITE_NAV_SYMBOL_NAME,
@@ -106,10 +103,7 @@ const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
 
   const innerEl = master.section.elements[0];
   assert(innerEl !== undefined, '(1) master section has one inner element');
-  assert(
-    innerEl.type === 'nav',
-    `(1) master inner element is a NavElement (got ${innerEl.type})`,
-  );
+  assert(innerEl.type === 'nav', `(1) master inner element is a NavElement (got ${innerEl.type})`);
   assert(
     innerEl.id === SITE_NAV_INNER_ELEMENT_ID,
     `(1) master inner element id is "${SITE_NAV_INNER_ELEMENT_ID}"`,
@@ -234,6 +228,8 @@ const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
       { label: 'Pricing', href: 'pricing', kind: 'internal' },
       // External link with full URL.
       { label: 'Docs', href: 'https://docs.example.com/start', kind: 'external' },
+      // Anchor link with fragment href.
+      { label: 'Pricing', href: '#pricing', kind: 'anchor' },
     ],
     layout: 'left-right',
     sticky: false,
@@ -271,9 +267,22 @@ const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
     docsSegment.includes('target="_blank"'),
     `(3) external link emits target="_blank" (segment: ${JSON.stringify(docsSegment)})`,
   );
+  assert(docsSegment.includes('rel="noopener"'), '(3) external link emits rel="noopener"');
+
+  // Anchor: href="#pricing", no target attr, no internal "/" prefix.
   assert(
-    docsSegment.includes('rel="noopener"'),
-    '(3) external link emits rel="noopener"',
+    navLinkHref({ label: 'Pricing', href: '#pricing', kind: 'anchor' }) === '#pricing',
+    '(3) anchor href passes through',
+  );
+  assert(html.includes('href="#pricing"'), '(3) anchor link emits href="#pricing"');
+  const pricingIndex = html.indexOf('href="#pricing"');
+  const pricingSegment = html.slice(pricingIndex, pricingIndex + 200);
+  const pricingCloseIdx = pricingSegment.indexOf('</a>');
+  assert(pricingCloseIdx > 0, '(3) anchor link emits a closing </a>');
+  const pricingAnchor = pricingSegment.slice(0, pricingCloseIdx);
+  assert(
+    !pricingAnchor.includes('target='),
+    `(3) anchor link must not carry target="_blank" (got: ${JSON.stringify(pricingAnchor)})`,
   );
 
   // data-rev01-nav-link-kind reflects the kind for both.
@@ -284,6 +293,10 @@ const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
   assert(
     html.includes('data-rev01-nav-link-kind="external"'),
     '(3) external link carries data-rev01-nav-link-kind="external"',
+  );
+  assert(
+    html.includes('data-rev01-nav-link-kind="anchor"'),
+    '(3) anchor link carries data-rev01-nav-link-kind="anchor"',
   );
 }
 
@@ -315,10 +328,7 @@ const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
   // Non-sticky: no position:sticky, no top:0, no z-index:100.
   const flatEl: NavElement = { ...stickyEl, id: 'el-nav-flat', sticky: false };
   const flatHtml = renderNav(flatEl, RENDER_CTX);
-  assert(
-    !flatHtml.includes('position:sticky'),
-    '(4) sticky=false does NOT emit position:sticky',
-  );
+  assert(!flatHtml.includes('position:sticky'), '(4) sticky=false does NOT emit position:sticky');
   assert(
     flatHtml.includes('data-rev01-nav-sticky="false"'),
     '(4) sticky=false emits data-rev01-nav-sticky="false"',
@@ -351,10 +361,7 @@ const RENDER_CTX = { styleKit: 'charcoal', assetBasePath: '/assets' };
   const noLogoEl: NavElement = { ...logoEl, id: 'el-nav-no-logo' };
   delete (noLogoEl as { logoAssetId?: string }).logoAssetId;
   const noLogoHtml = renderNav(noLogoEl, RENDER_CTX);
-  assert(
-    !noLogoHtml.includes('<img'),
-    `(5) no logoAssetId means no <img> in the rendered HTML`,
-  );
+  assert(!noLogoHtml.includes('<img'), `(5) no logoAssetId means no <img> in the rendered HTML`);
 }
 
 console.log('[nav:smoke] OK');
