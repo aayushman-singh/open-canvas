@@ -19,6 +19,7 @@ export interface AddonDefinition {
   emitBodyScripts?: (config: Record<string, string>) => string;
 }
 
+// REVIEW (XSS): `mid` is interpolated raw into a <script> src attribute and a JS string literal. The `pattern` on the config field is a UI hint only — nothing server-side enforces it. A stored config value like `G-X"></script><script>alert(1)</script>` breaks out of the tag. Validate `mid` against the pattern here at emit time, not just at the form layer.
 function emitGoogleAnalytics(config: Record<string, string>): string {
   const mid = config['measurementId'] ?? '';
   if (!mid) return '';
