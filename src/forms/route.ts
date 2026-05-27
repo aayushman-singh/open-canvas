@@ -19,6 +19,7 @@ import type { FormElement } from '../canvas/elements/form.js';
 import type { CanvasPage } from '../canvas/schema.js';
 import { db } from '../db/client.js';
 import { customer, site as siteTable } from '../db/schema.js';
+import { sendEmail } from '../email/send.js';
 import type { FormRateLimiterMarker } from '../live/form-rate-limiter-client.js';
 
 import { exportFormSubmissionsCsv, listFormSubmissions } from './inbox.js';
@@ -33,6 +34,7 @@ interface Bindings {
   TURNSTILE_SITE_KEY: string;
   WEBHOOK_SIGNING_SECRET: string;
   FORM_RATE_LIMITER: DurableObjectNamespace<FormRateLimiterMarker>;
+  RESEND_API_KEY: string;
 }
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -79,6 +81,47 @@ router.post('/:siteId/:formElementId', async (c) => {
       userAgent,
     },
   );
+
+  // Notify site owner by email on successful submission.
+  if (outcome.status === 'ok') {
+    const database = db(c.env);
+    const ownerRow = await database
+      .select({ email: customer.email })
+      .from(siteTable)
+      .innerJoin(customer, eq(siteTable.customerId, customer.id))
+      .where(eq(siteTable.id, siteId))
+      .limit(1);
+    const ownerEmail = ownerRow[0]?.email;
+    if (!ownerEmail) {
+      throw new Error(
+        `[forms/route] cannot notify owner for form submission: missing owner email for site ${siteId}`,
+      );
+    }
+    const submittedAt = new Date().toISOString();
+    const inboxUrl = `https://rev01.aayushman.dev/dashboard/sites/${encodeURIComponent(siteId)}/forms/${encodeURIComponent(formElementId)}`;
+    try {
+      await sendEmail(c.env.RESEND_API_KEY, {
+        to: ownerEmail,
+        subject: `New form submission on your site`,
+        html: [
+          `<p>A new form submission was received.</p>`,
+          `<p><strong>Form ID:</strong> ${formElementId}</p>`,
+          `<p><strong>Submitted at:</strong> ${submittedAt}</p>`,
+          `<p><a href="${inboxUrl}">View in Forms Inbox</a></p>`,
+        ].join('\n'),
+      });
+    } catch (err) {
+      console.error('[forms/route] form-notify email failed', {
+        siteId,
+        formElementId,
+        ownerEmail,
+        submittedAt,
+        inboxUrl,
+        err,
+      });
+      throw err;
+    }
+  }
 
   return outcomeToResponse(c, outcome, siteId, formElementId, rawFields);
 });

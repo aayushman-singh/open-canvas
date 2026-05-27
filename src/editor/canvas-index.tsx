@@ -143,6 +143,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
             {breadcrumbs}
             <span class="address">{publicAddress}</span>
             <span class="spacer" />
+            <button id="canvas-chat-toggle" type="button" title="Chat with AI to edit your site">
+              AI Chat
+            </button>
             <button id="canvas-save" type="button">
               Save
             </button>
@@ -162,9 +165,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
               hidden
               role="status"
               aria-live="polite"
-              aria-label="People viewing"
+              aria-label="People editing"
             >
-              <span data-rev01-presence-count>0</span> viewing
+              <span data-rev01-presence-count>0</span> editing
             </span>
           </header>
           <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
@@ -176,13 +179,14 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 role="tab"
                 aria-selected="true"
                 data-sidebar-tab="add"
+                title="Add components and sections to the page"
               >
                 Add
               </button>
-              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections">
+              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections" title="Browse and reuse saved sections">
                 Sections
               </button>
-              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="pages">
+              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="pages" title="Manage your site pages">
                 Pages
               </button>
             </div>
@@ -198,6 +202,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   type="button"
                   class="rev01-sidebar-command"
                   data-sidebar-add-section="blank"
+                  title="Add a new empty section to the page"
                 >
                   Blank section
                 </button>
@@ -209,6 +214,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="text"
+                    title="Add a text block"
                   >
                     Text
                   </button>
@@ -216,6 +222,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="image"
+                    title="Add an image"
                   >
                     Image
                   </button>
@@ -223,6 +230,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="video"
+                    title="Add a video player"
                   >
                     Video
                   </button>
@@ -230,6 +238,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="action"
+                    title="Add a clickable button"
                   >
                     Button
                   </button>
@@ -237,6 +246,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="shape"
+                    title="Add a decorative shape"
                   >
                     Shape
                   </button>
@@ -244,6 +254,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="container"
+                    title="Add a layout container to group elements"
                   >
                     Container
                   </button>
@@ -251,8 +262,65 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="chart"
+                    title="Add a data chart"
                   >
                     Chart
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="form"
+                    title="Add a contact or signup form"
+                  >
+                    Form
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="embed"
+                    title="Embed external content (YouTube, maps, etc.)"
+                  >
+                    Embed
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="code"
+                    title="Add a code snippet block"
+                  >
+                    Code
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="accordion"
+                    title="Add a collapsible accordion (FAQ-style)"
+                  >
+                    Accordion
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="carousel"
+                    title="Add an image carousel / slideshow"
+                  >
+                    Carousel
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="table"
+                    title="Add a data table"
+                  >
+                    Table
+                  </button>
+                  <button
+                    type="button"
+                    class="rev01-sidebar-command"
+                    data-sidebar-add-component="nav"
+                    title="Add a navigation bar"
+                  >
+                    Nav
                   </button>
                 </div>
               </section>
@@ -299,6 +367,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 class="rev01-sidebar-action"
                 id="canvas-add-page"
                 type="button"
+                title="Create a new page for your site"
               >
                 + New Page
               </button>
@@ -306,6 +375,22 @@ export function editorPageJsx(opts: EditorPageOptions) {
           </aside>
           <div id="canvas-root" data-site-id={siteId} />
           <aside id="canvas-inspector" hidden />
+          <aside id="canvas-chat-panel" class="rev01-chat-panel" hidden>
+            <div class="rev01-chat-header">
+              <span>Chat</span>
+              <button type="button" id="canvas-chat-close" title="Close chat">&times;</button>
+            </div>
+            <div id="canvas-chat-messages" class="rev01-chat-messages" />
+            <form id="canvas-chat-form" class="rev01-chat-input">
+              <input
+                type="text"
+                id="canvas-chat-input"
+                placeholder="Ask the agent to edit your site..."
+                autocomplete="off"
+              />
+              <button type="submit">Send</button>
+            </form>
+          </aside>
           <footer class="rev01-editor-status">
             <span id="canvas-status">Ready</span>
           </footer>

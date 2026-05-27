@@ -157,12 +157,12 @@ const meta3 = emitPageMeta(page3, {
   assetLookup: stubAssetLookup,
 });
 assert(
-  meta3.includes(`<meta property="og:image" content="/assets/${KNOWN_ASSET_HASH}">`),
-  '3: og:image must point to /assets/<contentHash> when ogImageAssetId resolves',
+  meta3.includes(`<meta property="og:image" content="https://${HOST}/assets/${KNOWN_ASSET_HASH}">`),
+  '3: og:image must be an absolute URL pointing to /assets/<contentHash> when ogImageAssetId resolves',
 );
 assert(
-  meta3.includes(`<meta name="twitter:image" content="/assets/${KNOWN_ASSET_HASH}">`),
-  '3: twitter:image must point to /assets/<contentHash> when ogImageAssetId resolves',
+  meta3.includes(`<meta name="twitter:image" content="https://${HOST}/assets/${KNOWN_ASSET_HASH}">`),
+  '3: twitter:image must be an absolute URL pointing to /assets/<contentHash> when ogImageAssetId resolves',
 );
 // resolveOgUrl direct check.
 assert(
@@ -176,8 +176,8 @@ const meta3Direct = emitPageMeta(page3, {
   snapshot: snapshot3,
 });
 assert(
-  meta3Direct.includes(`<meta property="og:image" content="/assets/${KNOWN_ASSET_ID}">`),
-  '3: og:image must point to /assets/<assetId> when the public renderer has no asset lookup',
+  meta3Direct.includes(`<meta property="og:image" content="https://${HOST}/assets/${KNOWN_ASSET_ID}">`),
+  '3: og:image must be an absolute URL pointing to /assets/<assetId> when the public renderer has no asset lookup',
 );
 
 // ---------------------------------------------------------------------------
@@ -193,18 +193,19 @@ const page4: CanvasPage = {
 };
 const snapshot4 = makeSnapshot([page4]);
 const meta4 = emitPageMeta(page4, { siteId: SITE_ID, host: HOST, snapshot: snapshot4 });
-const expectedFallback = `/og/${encodeURIComponent(SITE_ID)}/${encodeURIComponent('contact')}.png`;
+const expectedRelativeFallback = `/og/${encodeURIComponent(SITE_ID)}/${encodeURIComponent('contact')}.png`;
+const expectedFallback = `https://${HOST}${expectedRelativeFallback}`;
 assert(
   meta4.includes(`<meta property="og:image" content="${expectedFallback}">`),
-  `4: og:image must fall back to ${expectedFallback}`,
+  `4: og:image must be an absolute URL falling back to the OG generator`,
 );
 assert(
   meta4.includes(`<meta name="twitter:image" content="${expectedFallback}">`),
-  `4: twitter:image must fall back to ${expectedFallback}`,
+  `4: twitter:image must be an absolute URL falling back to the OG generator`,
 );
 assert(
-  resolveOgUrl(page4, { siteId: SITE_ID }) === expectedFallback,
-  '4: resolveOgUrl must produce the generator URL when no asset id is set',
+  resolveOgUrl(page4, { siteId: SITE_ID }) === expectedRelativeFallback,
+  '4: resolveOgUrl must produce the relative generator URL when no asset id is set',
 );
 
 // Also: an asset id present but unresolved is a publish/metadata integrity

@@ -11,6 +11,7 @@ export interface MediaRenderCtx {
 }
 
 export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string {
+  if (element.assetId === '__placeholder__') return '';
   const src = `${ctx.assetBasePath}/${element.assetId}`;
   const baseStyle = styleFromEntries([
     ['object-fit', element.fit],
@@ -30,7 +31,7 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
   if (playback.controls) attrs.push('controls');
   attrs.push('playsinline');
   const posterAttr =
-    element.posterAssetId !== undefined
+    element.posterAssetId !== undefined && element.posterAssetId !== '__placeholder__'
       ? ` poster="${escapeAttr(`${ctx.assetBasePath}/${element.posterAssetId}`)}"`
       : '';
   return `<video class="rev01-media" data-rev01-media-kind="video" src="${escapeAttr(src)}" aria-label="${escapeAttr(element.alt)}"${posterAttr} style="${baseStyle}" ${attrs.join(' ')}></video>`;

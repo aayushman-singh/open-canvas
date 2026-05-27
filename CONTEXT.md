@@ -65,7 +65,7 @@ An AI collaborator that changes the editable site only from an owner request.
 _Avoid_: Chatbot, assistant, generator
 
 **Agent Edit**:
-An owner-requested change made by the agent to a text element, media element, or canvas section.
+An owner-requested change made by the agent to the Editable Site. The owner previews every Agent Edit before it takes effect.
 _Avoid_: Prompt response, AI output, background automation
 
 **Section Recipe**:
@@ -150,8 +150,7 @@ _Avoid_: Undo stack, version history, asset trail
 - A **Media Element** may display an image or a video
 - An **Owner** requests an **Agent Edit**
 - An **Agent Edit** changes the **Editable Site**, not the **Published Site**
-- An **Agent Edit** may rewrite a text element, replace a media element, or create a **Canvas Section** from a **Section Recipe**
-- An **Agent Edit** is previewed by the **Owner** before it changes the **Editable Site**
+- An **Agent Edit** is previewed by the **Owner** before it takes effect
 - A media-producing **Agent Edit** creates an **Owner Asset** only when the owner applies the previewed media to a media element
 - Discarded media-edit previews and discarded direct-generation previews never become **Owner Assets**
 - An **Owner Asset** can only be deleted by its **Owner** after the owner confirms the named consequences for every editable site, every **Media Element**, and every **Published Site** that references it

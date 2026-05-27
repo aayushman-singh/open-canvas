@@ -22,9 +22,63 @@ import {
 } from './elements/render-utils.js';
 import { renderResponsiveCss } from './responsive/index.js';
 import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
-import type { CanvasElement, CanvasPage, CanvasSection, PublishedSnapshot } from './schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, ElementStyle, PublishedSnapshot } from './schema.js';
 
-function buildElementWrapperStyle(element: CanvasElement): string {
+function applyElementStyle(
+  entries: Array<[string, string]>,
+  es: ElementStyle,
+  assetBasePath: string,
+): void {
+  if (es.backgroundColor) {
+    const v = escapeCssValue(es.backgroundColor);
+    if (v) entries.push(['background-color', v]);
+  }
+  if (es.backgroundImageAssetId) {
+    const url = escapeAttr(`${assetBasePath}/${es.backgroundImageAssetId}`);
+    entries.push(['background-image', `url(${url})`]);
+    entries.push(['background-size', es.backgroundSize === 'contain' ? 'contain' : 'cover']);
+    entries.push(['background-position', 'center']);
+  }
+  if (typeof es.borderRadius === 'number') {
+    entries.push(['border-radius', `${String(es.borderRadius)}px`]);
+  }
+  if (es.borderColor || typeof es.borderWidth === 'number') {
+    const col = es.borderColor ? escapeCssValue(es.borderColor) : '';
+    const w = typeof es.borderWidth === 'number' ? es.borderWidth : 1;
+    if (col) {
+      entries.push(['border', `${String(w)}px solid ${col}`]);
+    } else {
+      entries.push(['border-width', `${String(w)}px`]);
+      entries.push(['border-style', 'solid']);
+    }
+  }
+  if (es.boxShadow) {
+    const v = escapeCssValue(es.boxShadow);
+    if (v) entries.push(['box-shadow', v]);
+  }
+  if (typeof es.opacity === 'number') {
+    entries.push(['opacity', String(es.opacity)]);
+  }
+  if (es.color) {
+    const v = escapeCssValue(es.color);
+    if (v) entries.push(['color', v]);
+  }
+  if (es.overflow) {
+    entries.push(['overflow', es.overflow]);
+  }
+}
+
+function buildElementStyleDataAttrs(es: ElementStyle | undefined): string {
+  if (!es) return '';
+  let attrs = '';
+  if (es.backgroundColor || es.backgroundImageAssetId) attrs += ' data-es-bg';
+  if (typeof es.borderRadius === 'number') attrs += ' data-es-radius';
+  if (es.borderColor || typeof es.borderWidth === 'number') attrs += ' data-es-border';
+  if (es.boxShadow) attrs += ' data-es-shadow';
+  return attrs;
+}
+
+function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string): string {
   const { box } = element;
   const entries: Array<[string, string]> = [
     ['position', 'absolute'],
@@ -37,8 +91,11 @@ function buildElementWrapperStyle(element: CanvasElement): string {
   if (typeof box.rotation === 'number' && box.rotation !== 0) {
     entries.push(['transform', `rotate(${String(box.rotation)}deg)`]);
   }
+  if (element.elementStyle) {
+    applyElementStyle(entries, element.elementStyle, assetBasePath);
+  }
   if (element.pinnedStyle) {
-    // Pinned style wins — append after defaults so its keys override duplicates.
+    // Pinned style wins — append after elementStyle and defaults.
     for (const [k, v] of Object.entries(element.pinnedStyle)) {
       const safeKey = sanitiseCssKey(k);
       if (safeKey === '') continue;
@@ -126,14 +183,15 @@ function variantAttr(element: CanvasElement): string {
 
 function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   const inner = renderElementBody(element, ctx);
-  const wrapperStyle = buildElementWrapperStyle(element);
+  const wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
   const motionAttrs =
     element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
       : '';
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
-  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs} style="${wrapperStyle}">${inner}</div>`;
+  const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
+  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
 function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
@@ -169,17 +227,25 @@ function renderPage(
   header?: CanvasSection,
   footer?: CanvasSection,
 ): string {
-  const style = styleFromEntries([
+  const entries: Array<[string, string]> = [
     ['width', `${String(page.width)}px`],
     ['margin', '0 auto'],
-  ]);
+  ];
+  if (page.pageBackground) entries.push(['background', page.pageBackground]);
+  if (page.sectionGap != null) entries.push(['display', 'flex'], ['flex-direction', 'column'], ['gap', `${String(page.sectionGap)}px`]);
+  if (page.maxWidth != null) entries.push(['max-width', `${String(page.maxWidth)}px`]);
+  const style = styleFromEntries(entries);
   const pageCtx: ElementRenderCtx = { ...ctx, pageSlug: page.slug };
   const headerHtml = header ? renderSection(header, page.width, pageCtx) : '';
   const sectionsHtml = page.sections
     .map((section) => renderSection(section, page.width, pageCtx))
     .join('');
   const footerHtml = footer ? renderSection(footer, page.width, pageCtx) : '';
-  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}" style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
+  const entranceAttr = page.entranceAnimation && page.entranceAnimation !== 'none'
+    ? ` data-entrance-animation="${escapeAttr(page.entranceAnimation)}"`
+    : '';
+  const triggerAttr = page.scrollTriggerMode ? ` data-scroll-trigger="${escapeAttr(page.scrollTriggerMode)}"` : '';
+  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}"${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
 /**

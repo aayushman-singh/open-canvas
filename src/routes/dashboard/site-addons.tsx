@@ -7,7 +7,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { addonEntitlement, customer, site, siteAddon } from '../../db/schema';
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 import { Badge, Pill } from '../../ui';
 import { allAddons } from '../../addons/registry';
 
@@ -227,6 +227,7 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
         { href: `/dashboard/sites/${siteId}/edit`, label: owned.name },
         { label: 'Addons' },
       ]}
+      siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/addons`)}
       pageStyles={pageStyles}
     >
       <h1>Addons</h1>

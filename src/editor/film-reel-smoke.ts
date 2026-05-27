@@ -35,13 +35,36 @@ assert(
 );
 
 assert(
-  source.includes('if (hasFooter && sectionNodes[endIdx]) {'),
-  'placement mode must render an insert slot immediately before the footer',
+  source.includes("querySelectorAll('[data-rev01-section]:not([data-section-role])')") &&
+    source.includes('lastNode.parentNode.insertBefore(makeSlot(sections.length), afterLast);'),
+  'placement mode must render body insert slots without treating header/footer as body sections',
 );
 
 assert(
   styles.includes('.rev01-section[data-section-role="header"] .section-grip-handle'),
   'header/footer sections must not show the canvas drag grip affordance',
+);
+
+const buildElementNodeStart = source.indexOf('function buildElementNode(element) {');
+const buildElementNodeEnd = source.indexOf('function rebuildElement(elementId)', buildElementNodeStart);
+assert(buildElementNodeStart >= 0, 'canvas client must define buildElementNode');
+assert(buildElementNodeEnd > buildElementNodeStart, 'buildElementNode body must be found');
+const buildElementNodeSource = source.slice(buildElementNodeStart, buildElementNodeEnd);
+assert(
+  buildElementNodeSource.includes('applyElementStyle(wrapper, element);'),
+  'editor preview element builder must apply elementStyle to the wrapper',
+);
+assert(
+  buildElementNodeSource.indexOf('applyElementStyle(wrapper, element);') >
+    buildElementNodeSource.indexOf('setBoxStyle(wrapper, element.box);') &&
+    buildElementNodeSource.indexOf('applyElementStyle(wrapper, element);') <
+      buildElementNodeSource.indexOf('applyPinnedStyle(wrapper, element);'),
+  'editor preview must apply elementStyle after box styles and before pinnedStyle',
+);
+
+assert(
+  source.includes('element.elementStyle = es;'),
+  'style inspector must reattach elementStyle after the last property was removed and a new property is set',
 );
 
 console.log('[film-reel:smoke] OK');

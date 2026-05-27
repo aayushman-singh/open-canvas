@@ -68,7 +68,7 @@ import { SITE_NAV_SYMBOL_ID } from '../../canvas/elements/nav';
 import { SITE_NAV_INNER_ELEMENT_ID } from '../../symbols/nav-bootstrap';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Card } from '../../ui';
 
 interface Bindings {
@@ -459,6 +459,7 @@ navEditorRoute.get('/sites/:siteId/nav', async (c) => {
         { label: 'Site nav' },
       ]}
       pageStyles={pageStyles}
+      siteNav={buildSiteNav(siteId, siteName, `/dashboard/sites/${siteId}/nav`)}
     >
       <h1>Site nav</h1>
       <p class="lede">

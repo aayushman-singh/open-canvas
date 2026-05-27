@@ -23,7 +23,7 @@ import { customer, site } from '../../db/schema';
 import { runAudit, type AuditIssue } from '../../a11y/audit';
 import type { Severity } from '../../a11y/severity';
 
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -97,17 +97,6 @@ const pageStyles = `
   }
 `;
 
-const HTML_ESCAPES: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-  '"': '&quot;',
-  "'": '&#39;',
-};
-function esc(value: string): string {
-  return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
-}
-
 interface OwnedSiteRow {
   id: string;
   name: string;
@@ -153,18 +142,18 @@ function groupBySeverity(issues: AuditIssue[]): Record<Severity, AuditIssue[]> {
 function IssueCard({ issue }: { issue: AuditIssue }) {
   const where =
     issue.elementId !== undefined && issue.pageSlug !== undefined
-      ? `Page /${esc(issue.pageSlug)} — element ${esc(issue.elementId)}`
+      ? `Page /${issue.pageSlug} — element ${issue.elementId}`
       : issue.pageSlug !== undefined
-        ? `Page /${esc(issue.pageSlug)}`
+        ? `Page /${issue.pageSlug}`
         : 'Site';
   return (
     <div class={`issue ${issue.severity}`}>
       <div>
-        <span class="kind">{esc(issue.kind)}</span>
+        <span class="kind">{issue.kind}</span>
         <span class="where">{where}</span>
       </div>
-      <p class="message">{esc(issue.message)}</p>
-      {issue.fixHint && <p class="fix">{esc(issue.fixHint)}</p>}
+      <p class="message">{issue.message}</p>
+      {issue.fixHint && <p class="fix">{issue.fixHint}</p>}
     </div>
   );
 }
@@ -190,9 +179,10 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
       title={`${owned.name} — a11y report`}
       crumbs={[
         { href: '/dashboard', label: 'Dashboard' },
-        { href: `/dashboard/sites/${esc(siteId)}/edit`, label: owned.name },
+        { href: `/dashboard/sites/${siteId}/edit`, label: owned.name },
         { label: 'Accessibility' },
       ]}
+      siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/a11y`)}
       pageStyles={pageStyles}
     >
       <h1>Accessibility report</h1>

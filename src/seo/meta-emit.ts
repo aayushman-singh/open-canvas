@@ -189,7 +189,9 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
     siteId: ctx.siteId,
     ...(ctx.assetLookup ? { assetLookup: ctx.assetLookup } : {}),
   };
-  const ogImageUrl = resolveOgUrl(page, ogCtx);
+  const ogImageRelative = resolveOgUrl(page, ogCtx);
+  const ogOrigin = ctx.host.length > 0 ? `${ctx.protocol ?? 'https'}://${ctx.host}` : '';
+  const ogImageUrl = ogImageRelative !== null ? `${ogOrigin}${ogImageRelative}` : null;
   const ogImageAttr = ogImageUrl !== null ? escapeAttr(ogImageUrl) : null;
 
   // -- Open Graph ----------------------------------------------------------

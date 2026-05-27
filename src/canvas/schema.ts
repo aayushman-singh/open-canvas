@@ -198,12 +198,32 @@ export interface ResponsiveOverrides {
   phone?: ResponsiveBoxOverride;
 }
 
+export const BACKGROUND_SIZES = ['cover', 'contain'] as const;
+export type BackgroundSize = (typeof BACKGROUND_SIZES)[number];
+
+export const OVERFLOW_VALUES = ['visible', 'hidden'] as const;
+export type OverflowValue = (typeof OVERFLOW_VALUES)[number];
+
+export interface ElementStyle {
+  backgroundColor?: string;
+  backgroundImageAssetId?: string;
+  backgroundSize?: BackgroundSize;
+  borderRadius?: number;
+  borderColor?: string;
+  borderWidth?: number;
+  opacity?: number;
+  boxShadow?: string;
+  color?: string;
+  overflow?: OverflowValue;
+}
+
 export interface BaseElement {
   id: string;
   type: ElementType;
   box: PositionedBox;
   motion?: { preset: MotionPreset; delayMs?: number };
   pinnedStyle?: Record<string, string>;
+  elementStyle?: ElementStyle;
   /**
    * Phase 0 scaffold — Wave 1 (#1) consumes. Omitted on every existing fixture
    * element; the translator treats absence as "scale proportionally from
@@ -249,7 +269,9 @@ export function resolveActionHref(
 ): string {
   if (href.type === 'external') return href.url;
   const page = pages.find((p) => p.id === href.pageId);
-  if (!page) return '#';
+  if (!page) {
+    throw new Error(`action href references missing page id ${JSON.stringify(href.pageId)}`);
+  }
   const base = '/' + page.slug;
   return href.anchor ? base + '#' + href.anchor : base;
 }
@@ -363,6 +385,13 @@ export interface CanvasPage {
   noIndex?: boolean;
   /** BCP-47 locale (e.g. 'en', 'ar') — drives `<html lang>` and i18n (Wave 5 #25). */
   locale?: string;
+  // -- Page-level motion & layout ---------------------------------------------
+  entranceAnimation?: MotionPreset;
+  scrollTriggerMode?: 'on-scroll' | 'on-load';
+  pageBackground?: string;
+  defaultMotionPreset?: MotionPreset;
+  sectionGap?: number;
+  maxWidth?: number;
   // -- Page metadata (CMS collections) ----------------------------------------
   publishedDate?: string;
   author?: string;

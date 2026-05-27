@@ -22,7 +22,7 @@ import type {
 import { db } from '../../db/client';
 import { customer, formSubmission, site, type FormSubmission } from '../../db/schema';
 
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -203,6 +203,7 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
         { href: `/dashboard/sites/${esc(siteId)}/edit`, label: owned.name },
         { label: 'Forms' },
       ]}
+      siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/forms`)}
       pageStyles={pageStyles}
     >
       <h1>Forms</h1>
@@ -269,6 +270,7 @@ formsInboxRoute.get('/sites/:siteId/forms/:formElementId', async (c) => {
         { href: `/dashboard/sites/${esc(siteId)}/forms`, label: 'Forms' },
         { label: formElementId },
       ]}
+      siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/forms`)}
       pageStyles={pageStyles}
     >
       <h1>{formElementId}</h1>

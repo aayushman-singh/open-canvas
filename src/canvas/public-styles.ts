@@ -125,6 +125,28 @@ html, body {
 [data-rev01-presence][hidden] {
   display: none;
 }
+
+/* ---- Element style overrides ------------------------------------------------
+   When a per-element style property is set on the wrapper (.rev01-element),
+   the inner element's kit-driven value for that property must step aside so
+   the wrapper's value shows through. Each data-es-* attribute resets only
+   the property it controls — unrelated kit values stay intact.              */
+
+.rev01-element[data-es-bg] > .rev01-surface,
+.rev01-element[data-es-bg] > .rev01-action,
+.rev01-element[data-es-bg] > .rev01-shape { background: transparent; }
+
+.rev01-element[data-es-radius] > .rev01-surface,
+.rev01-element[data-es-radius] > .rev01-action,
+.rev01-element[data-es-radius] > .rev01-shape { border-radius: inherit; }
+
+.rev01-element[data-es-border] > .rev01-surface,
+.rev01-element[data-es-border] > .rev01-action,
+.rev01-element[data-es-border] > .rev01-shape { border-color: transparent; border-width: 0; }
+
+.rev01-element[data-es-shadow] > .rev01-surface,
+.rev01-element[data-es-shadow] > .rev01-action,
+.rev01-element[data-es-shadow] > .rev01-shape { box-shadow: none; }
 `;
 
 export const canvasPublishedStyles = `${baseCss}\n${kitCss}`;

@@ -895,6 +895,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderInspector();
     renderReel();
     renderSidebarSelection();
+
     updatePageSidebar();
     if (root) {
       var artboards = root.querySelectorAll(".rev01-artboard");
@@ -1250,6 +1251,42 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (value.indexOf("{") >= 0 || value.indexOf("}") >= 0) continue;
       wrapper.style.setProperty(key, value);
     }
+  }
+
+  function applyElementStyle(wrapper, element) {
+    const es = element.elementStyle;
+    if (!es) return;
+    if (es.backgroundColor) {
+      wrapper.style.backgroundColor = es.backgroundColor;
+      wrapper.setAttribute("data-es-bg", "");
+    }
+    if (es.backgroundImageAssetId) {
+      wrapper.style.backgroundImage = 'url("' + SITE_BASE + "/assets/" + encodeURIComponent(es.backgroundImageAssetId) + '")';
+      wrapper.style.backgroundSize = es.backgroundSize === "contain" ? "contain" : "cover";
+      wrapper.style.backgroundPosition = "center";
+      wrapper.setAttribute("data-es-bg", "");
+    }
+    if (typeof es.borderRadius === "number") {
+      wrapper.style.borderRadius = es.borderRadius + "px";
+      wrapper.setAttribute("data-es-radius", "");
+    }
+    if (es.borderColor || typeof es.borderWidth === "number") {
+      const w = typeof es.borderWidth === "number" ? es.borderWidth : 1;
+      if (es.borderColor) {
+        wrapper.style.border = w + "px solid " + es.borderColor;
+      } else {
+        wrapper.style.borderWidth = w + "px";
+        wrapper.style.borderStyle = "solid";
+      }
+      wrapper.setAttribute("data-es-border", "");
+    }
+    if (es.boxShadow) {
+      wrapper.style.boxShadow = es.boxShadow;
+      wrapper.setAttribute("data-es-shadow", "");
+    }
+    if (typeof es.opacity === "number") wrapper.style.opacity = String(es.opacity);
+    if (es.color) wrapper.style.color = es.color;
+    if (es.overflow) wrapper.style.overflow = es.overflow;
   }
 
   // Build the nested-mark DOM for one InlineRun. Mark nesting order must
@@ -1754,6 +1791,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       wrapper.setAttribute("data-motion-delay-ms", String(element.motion.delayMs || 0));
     }
     setBoxStyle(wrapper, element.box);
+    applyElementStyle(wrapper, element);
     applyPinnedStyle(wrapper, element);
     wrapper.appendChild(buildElementBody(element));
     var dirs = ["n","s","e","w","ne","nw","se","sw"];
@@ -1838,52 +1876,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function buildSectionToolbar(section) {
     const bar = document.createElement("div");
     bar.className = "section-toolbar";
-    // Wave 3 #14 \u2014 Symbol controls. A section that already hosts an instance
-    // cannot become a symbol master because that would require nested symbols
-    // (forbidden by scope).
-    const hasInstance = section.elements.some((e) => e && e.type === "symbol-instance");
-    const isPinned = isPinnedSection(section);
     const buttons = [
-      { label: "+T", action: "add-text" },
-      { label: "+Img", action: "add-image" },
-      { label: "+Vid", action: "add-video" },
-      { label: "+Btn", action: "add-action" },
-      { label: "+\u25c7", action: "add-shape" },
-      { label: "+\u25a1", action: "add-container" },
-      // Wave 2 #11 \u2014 chart element. Additive entry; existing buttons unchanged.
-      { label: "+\ud83d\udcca", action: "add-chart" },
-      ...(!isPinned ? [{ label: "Dup", action: "duplicate-section" }] : []),
-      ...(!isPinned ? [{ label: "\u2191", action: "move-up" }] : []),
-      ...(!isPinned ? [{ label: "\u2193", action: "move-down" }] : []),
-      { label: "Save", action: "save-to-library" },
-      { label: "Del", action: "delete-section", danger: true },
+      { label: "+T", action: "add-text", tip: "Add text" },
+      { label: "+Img", action: "add-image", tip: "Add image" },
+      { label: "+Vid", action: "add-video", tip: "Add video" },
+      { label: "+Btn", action: "add-action", tip: "Add button" },
+      { label: "+◇", action: "add-shape", tip: "Add shape" },
+      { label: "+□", action: "add-container", tip: "Add container" },
+      { label: "+📊", action: "add-chart", tip: "Add chart" },
     ];
-    if (!hasInstance) {
-      buttons.splice(buttons.length - 1, 0, { label: "Sym", action: "convert-to-symbol" });
-    }
     for (const def of buttons) {
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = def.label;
+      button.title = def.tip;
       button.setAttribute("data-section-action", def.action);
       button.setAttribute("data-section-id", section.id);
-      if (def.danger) button.classList.add("danger");
       bar.appendChild(button);
     }
-    // AI section button \u2014 drives /api/canvas-agent/sites/.../preview with a
-    // designSection prompt. The button shares the disabled-while-busy
-    // contract with the other AI controls via data-ai-button.
-    const aiBtn = document.createElement("button");
-    aiBtn.type = "button";
-    aiBtn.textContent = "AI section";
-    aiBtn.setAttribute("data-ai-button", "create-section");
-    aiBtn.setAttribute("data-section-id", section.id);
-    if (aiBusy) aiBtn.disabled = true;
-    aiBtn.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      aiCreateSection(section.id);
-    });
-    bar.appendChild(aiBtn);
     return bar;
   }
 
@@ -1972,6 +1982,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     applyCameraTransform();
     renderInspector();
     renderSidebarSelection();
+
     renderReel();
     autoGrowTextElements();
 
@@ -2392,6 +2403,297 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  function renderSectionInspector() {
+    if (!inspector) return;
+    var section = findSection(selectedSectionId);
+    if (!section) {
+      inspector.hidden = true;
+      inspector.replaceChildren();
+      return;
+    }
+    revokePendingPreviews();
+    inspector.replaceChildren();
+    inspector.hidden = false;
+
+    var heading = document.createElement("h3");
+    heading.textContent = "Section";
+    inspector.appendChild(heading);
+
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = section.name || section.recipeId;
+    inspector.appendChild(meta);
+
+    var grid = document.createElement("div");
+    grid.className = "rev01-section-inspector-grid";
+
+    var hasInstance = section.elements.some(function(e) { return e && e.type === "symbol-instance"; });
+    var pinned = isPinnedSection(section);
+    var defs = [];
+    if (!pinned) {
+      defs.push({ label: "Duplicate", action: "duplicate-section", tip: "Create a copy of this section" });
+      defs.push({ label: "Move up", action: "move-up", tip: "Move this section up on the page" });
+      defs.push({ label: "Move down", action: "move-down", tip: "Move this section down on the page" });
+    }
+    defs.push({ label: "Save to library", action: "save-to-library", tip: "Save this section for reuse on other pages" });
+    if (!hasInstance) {
+      defs.push({ label: "Convert to symbol", action: "convert-to-symbol", tip: "Turn this section into a reusable symbol" });
+    }
+    defs.push({ label: "Delete section", action: "delete-section", danger: true, tip: "Remove this section from the page" });
+
+    for (var i = 0; i < defs.length; i++) {
+      var def = defs[i];
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = def.label;
+      btn.title = def.tip;
+      btn.setAttribute("data-section-action", def.action);
+      btn.setAttribute("data-section-id", section.id);
+      if (def.danger) btn.classList.add("danger");
+      grid.appendChild(btn);
+    }
+
+    var aiBtn = document.createElement("button");
+    aiBtn.type = "button";
+    aiBtn.textContent = "Generate with AI";
+    aiBtn.title = "Use AI to design this section from a description";
+    aiBtn.setAttribute("data-ai-button", "create-section");
+    aiBtn.setAttribute("data-section-id", section.id);
+    if (aiBusy) aiBtn.disabled = true;
+    aiBtn.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      aiCreateSection(section.id);
+    });
+    grid.appendChild(aiBtn);
+
+    inspector.appendChild(grid);
+  }
+
+  // -- Animation replay ---------------------------------------------------
+  function replayAnimations(scope) {
+    // scope: "page" replays all, or an element id replays just that one.
+    var page = currentPage();
+    if (!page) return;
+    var targets;
+    if (scope === "page") {
+      var artboard = root.querySelector('[data-artboard-page="' + (activePageId || page.id) + '"]');
+      if (!artboard) return;
+      targets = artboard.querySelectorAll("[data-motion-preset]");
+    } else {
+      var el = root.querySelector('[data-element-id="' + scope + '"]');
+      if (!el) { targets = []; } else { targets = [el]; }
+    }
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      var preset = t.getAttribute("data-motion-preset");
+      if (!preset || preset === "none") continue;
+      t.removeAttribute("data-motion-preset");
+      // Force reflow so the browser restarts the animation.
+      void t.offsetWidth;
+      t.setAttribute("data-motion-preset", preset);
+    }
+  }
+
+  function pageHasMotion() {
+    var page = currentPage();
+    if (!page) return false;
+    if (page.entranceAnimation && page.entranceAnimation !== "none") return true;
+    for (var i = 0; i < page.sections.length; i++) {
+      var sec = page.sections[i];
+      for (var j = 0; j < sec.elements.length; j++) {
+        if (sec.elements[j].motion) return true;
+      }
+    }
+    return false;
+  }
+
+  // -- Page inspector (right panel when nothing selected) -----------------
+  function renderPageInspector() {
+    if (!inspector) return;
+    var page = currentPage();
+    if (!page) { inspector.hidden = true; inspector.replaceChildren(); return; }
+    revokePendingPreviews();
+    inspector.replaceChildren();
+    inspector.hidden = false;
+
+    var heading = document.createElement("h3");
+    heading.textContent = "Page";
+    inspector.appendChild(heading);
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = page.title || page.slug;
+    inspector.appendChild(meta);
+
+    // -- Entrance animation -----------------------------------------------
+    var group1 = document.createElement("div");
+    group1.className = "rev01-page-inspector-group";
+    var h4a = document.createElement("h4");
+    h4a.textContent = "Entrance animation";
+    group1.appendChild(h4a);
+
+    var entranceSel = selectInput(MOTION_PRESETS, page.entranceAnimation || "none");
+    entranceSel.addEventListener("change", function() {
+      if (entranceSel.value === "none") {
+        delete page.entranceAnimation;
+      } else {
+        page.entranceAnimation = entranceSel.value;
+      }
+      renderInspector();
+      scheduleSave();
+    });
+    group1.appendChild(entranceSel);
+    inspector.appendChild(group1);
+
+    // -- Scroll trigger mode ----------------------------------------------
+    var group2 = document.createElement("div");
+    group2.className = "rev01-page-inspector-group";
+    var h4b = document.createElement("h4");
+    h4b.textContent = "Animation trigger";
+    group2.appendChild(h4b);
+
+    var triggerSel = selectInput(["on-scroll", "on-load"], page.scrollTriggerMode || "on-scroll");
+    triggerSel.addEventListener("change", function() {
+      page.scrollTriggerMode = triggerSel.value;
+      scheduleSave();
+    });
+    group2.appendChild(triggerSel);
+    inspector.appendChild(group2);
+
+    // -- Default motion preset --------------------------------------------
+    var group3 = document.createElement("div");
+    group3.className = "rev01-page-inspector-group";
+    var h4c = document.createElement("h4");
+    h4c.textContent = "Default motion for new elements";
+    group3.appendChild(h4c);
+
+    var defaultSel = selectInput(MOTION_PRESETS, page.defaultMotionPreset || "none");
+    defaultSel.addEventListener("change", function() {
+      if (defaultSel.value === "none") {
+        delete page.defaultMotionPreset;
+      } else {
+        page.defaultMotionPreset = defaultSel.value;
+      }
+      scheduleSave();
+    });
+    group3.appendChild(defaultSel);
+    inspector.appendChild(group3);
+
+    // -- Divider ----------------------------------------------------------
+    var divider1 = document.createElement("div");
+    divider1.className = "rev01-page-inspector-divider";
+    inspector.appendChild(divider1);
+
+    // -- Play / replay animations -----------------------------------------
+    var group4 = document.createElement("div");
+    group4.className = "rev01-page-inspector-group";
+    var h4d = document.createElement("h4");
+    h4d.textContent = "Preview";
+    group4.appendChild(h4d);
+
+    var playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "rev01-replay-btn";
+    var playIcon = document.createElement("span");
+    playIcon.className = "play-icon";
+    playBtn.appendChild(playIcon);
+    var playLabel = document.createElement("span");
+    playLabel.textContent = "Replay all animations";
+    playBtn.appendChild(playLabel);
+    if (!pageHasMotion()) playBtn.disabled = true;
+    playBtn.addEventListener("click", function() {
+      replayAnimations("page");
+    });
+    group4.appendChild(playBtn);
+    inspector.appendChild(group4);
+
+    // -- Divider ----------------------------------------------------------
+    var divider2 = document.createElement("div");
+    divider2.className = "rev01-page-inspector-divider";
+    inspector.appendChild(divider2);
+
+    // -- Page background --------------------------------------------------
+    var group5 = document.createElement("div");
+    group5.className = "rev01-page-inspector-group";
+    var h4e = document.createElement("h4");
+    h4e.textContent = "Page background";
+    group5.appendChild(h4e);
+
+    var bgInput = document.createElement("input");
+    bgInput.type = "text";
+    bgInput.placeholder = "e.g. #1a1a2e or transparent";
+    bgInput.value = page.pageBackground || "";
+    bgInput.addEventListener("change", function() {
+      var val = bgInput.value.trim();
+      if (val.length === 0) {
+        delete page.pageBackground;
+      } else {
+        page.pageBackground = val;
+      }
+      applyPageStyles(page);
+      scheduleSave();
+    });
+    group5.appendChild(bgInput);
+    inspector.appendChild(group5);
+
+    // -- Section gap ------------------------------------------------------
+    var group6 = document.createElement("div");
+    group6.className = "rev01-page-inspector-group";
+    var h4f = document.createElement("h4");
+    h4f.textContent = "Section gap";
+    group6.appendChild(h4f);
+
+    var gapInput = document.createElement("input");
+    gapInput.type = "number";
+    gapInput.min = "0";
+    gapInput.max = "120";
+    gapInput.placeholder = "0";
+    gapInput.value = page.sectionGap != null ? String(page.sectionGap) : "";
+    gapInput.addEventListener("change", function() {
+      var n = Number(gapInput.value);
+      if (!Number.isFinite(n) || n < 0) { delete page.sectionGap; }
+      else { page.sectionGap = n; }
+      applyPageStyles(page);
+      scheduleSave();
+    });
+    group6.appendChild(gapInput);
+    inspector.appendChild(group6);
+
+    // -- Page max-width ---------------------------------------------------
+    var group7 = document.createElement("div");
+    group7.className = "rev01-page-inspector-group";
+    var h4g = document.createElement("h4");
+    h4g.textContent = "Content max-width";
+    group7.appendChild(h4g);
+
+    var maxWInput = document.createElement("input");
+    maxWInput.type = "number";
+    maxWInput.min = "600";
+    maxWInput.max = "2400";
+    maxWInput.placeholder = "1440";
+    maxWInput.value = page.maxWidth != null ? String(page.maxWidth) : "";
+    maxWInput.addEventListener("change", function() {
+      var n = Number(maxWInput.value);
+      if (!Number.isFinite(n) || n < 600) { delete page.maxWidth; }
+      else { page.maxWidth = n; }
+      applyPageStyles(page);
+      scheduleSave();
+    });
+    group7.appendChild(maxWInput);
+    inspector.appendChild(group7);
+  }
+
+  // Live-apply page-level visual properties on the artboard.
+  function applyPageStyles(page) {
+    var artboard = root.querySelector('[data-artboard-page="' + page.id + '"]');
+    if (!artboard) return;
+    var article = artboard.querySelector(".rev01-page");
+    if (article) {
+      article.style.background = page.pageBackground || "";
+      article.style.gap = page.sectionGap != null ? page.sectionGap + "px" : "";
+      article.style.maxWidth = page.maxWidth != null ? page.maxWidth + "px" : "";
+    }
+  }
+
   function renderInspector() {
     if (!inspector) return;
     if (isReelOpen) {
@@ -2401,9 +2703,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
     if (!selectedElementId) {
-      inspector.hidden = true;
-      revokePendingPreviews();
-      inspector.replaceChildren();
+      if (selectedSectionId) {
+        renderSectionInspector();
+      } else {
+        renderPageInspector();
+      }
       return;
     }
     const found = findElement(selectedElementId);
@@ -2693,6 +2997,277 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       buildChartInspector(element);
     }
 
+    // -- Element style controls -----------------------------------------------
+    (function buildStyleSection() {
+      var styleHeading = document.createElement("h3");
+      styleHeading.textContent = "Style";
+      styleHeading.className = "inspector-section-heading";
+      inspector.appendChild(styleHeading);
+
+      var es = element.elementStyle || {};
+
+      function onStyleChange() {
+        var empty = true;
+        for (var k in es) {
+          if (es[k] !== undefined) { empty = false; break; }
+        }
+        if (empty) {
+          delete element.elementStyle;
+        } else {
+          element.elementStyle = es;
+        }
+        rebuildElement(element.id);
+        scheduleSave();
+      }
+
+      // -- Background color
+      var bgRow = document.createElement("div");
+      bgRow.className = "style-row";
+      var bgColor = document.createElement("input");
+      bgColor.type = "color";
+      bgColor.value = es.backgroundColor || "#000000";
+      bgColor.className = "color-swatch";
+      var bgEnabled = document.createElement("input");
+      bgEnabled.type = "checkbox";
+      bgEnabled.checked = !!es.backgroundColor;
+      bgEnabled.title = "Enable background color";
+      bgEnabled.addEventListener("change", function() {
+        if (bgEnabled.checked) {
+          es.backgroundColor = bgColor.value;
+        } else {
+          delete es.backgroundColor;
+        }
+        onStyleChange();
+      });
+      bgColor.addEventListener("input", function() {
+        if (!bgEnabled.checked) { bgEnabled.checked = true; }
+        es.backgroundColor = bgColor.value;
+        onStyleChange();
+      });
+      bgRow.appendChild(bgEnabled);
+      bgRow.appendChild(bgColor);
+      inspector.appendChild(field("Background", bgRow));
+
+      // -- Background image upload
+      var bgImgRow = document.createElement("div");
+      bgImgRow.className = "style-row";
+      var bgImgThumb = document.createElement("div");
+      bgImgThumb.className = "bg-img-thumb";
+      if (es.backgroundImageAssetId) {
+        var thumbImg = document.createElement("img");
+        thumbImg.src = SITE_BASE + "/assets/" + encodeURIComponent(es.backgroundImageAssetId);
+        thumbImg.alt = "";
+        bgImgThumb.appendChild(thumbImg);
+      } else {
+        bgImgThumb.textContent = "none";
+      }
+      var bgImgUpload = document.createElement("button");
+      bgImgUpload.type = "button";
+      bgImgUpload.textContent = "Upload";
+      bgImgUpload.className = "style-btn";
+      var bgImgClear = document.createElement("button");
+      bgImgClear.type = "button";
+      bgImgClear.textContent = "x";
+      bgImgClear.className = "style-btn-clear";
+      bgImgClear.disabled = !es.backgroundImageAssetId;
+      bgImgUpload.addEventListener("click", function() {
+        var inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = "image/*";
+        inp.addEventListener("change", function() {
+          if (!inp.files || inp.files.length === 0) return;
+          var file = inp.files[0];
+          setStatus("Uploading background...", "info");
+          postAssetUpload(file, "", element.id).then(function(result) {
+            es.backgroundImageAssetId = result.assetId;
+            if (!es.backgroundSize) es.backgroundSize = "cover";
+            onStyleChange();
+            renderInspector();
+            setStatus("Background image set", "ok");
+          }).catch(function(err) {
+            setStatus("Upload failed: " + err.message, "error");
+          });
+        });
+        inp.click();
+      });
+      bgImgClear.addEventListener("click", function() {
+        delete es.backgroundImageAssetId;
+        delete es.backgroundSize;
+        onStyleChange();
+        renderInspector();
+      });
+      bgImgRow.appendChild(bgImgThumb);
+      bgImgRow.appendChild(bgImgUpload);
+      bgImgRow.appendChild(bgImgClear);
+      inspector.appendChild(field("Bg image", bgImgRow));
+
+      if (es.backgroundImageAssetId) {
+        var bgSizeSelect = selectInput(["cover", "contain"], es.backgroundSize || "cover");
+        bgSizeSelect.addEventListener("change", function() {
+          es.backgroundSize = bgSizeSelect.value;
+          onStyleChange();
+        });
+        inspector.appendChild(field("Bg size", bgSizeSelect));
+      }
+
+      // -- Border radius
+      var radiusRow = document.createElement("div");
+      radiusRow.className = "style-row";
+      var radiusInput = document.createElement("input");
+      radiusInput.type = "number";
+      radiusInput.min = "0";
+      radiusInput.max = "200";
+      radiusInput.placeholder = "inherit";
+      radiusInput.value = typeof es.borderRadius === "number" ? String(es.borderRadius) : "";
+      radiusInput.addEventListener("change", function() {
+        if (radiusInput.value === "") {
+          delete es.borderRadius;
+        } else {
+          var n = Number(radiusInput.value);
+          if (Number.isFinite(n) && n >= 0) es.borderRadius = n;
+        }
+        onStyleChange();
+      });
+      var radiusUnit = document.createElement("span");
+      radiusUnit.className = "unit-label";
+      radiusUnit.textContent = "px";
+      radiusRow.appendChild(radiusInput);
+      radiusRow.appendChild(radiusUnit);
+      inspector.appendChild(field("Corner radius", radiusRow));
+
+      // -- Border color + width
+      var borderRow = document.createElement("div");
+      borderRow.className = "style-row";
+      var borderColor = document.createElement("input");
+      borderColor.type = "color";
+      borderColor.value = es.borderColor || "#ffffff";
+      borderColor.className = "color-swatch";
+      var borderEnabled = document.createElement("input");
+      borderEnabled.type = "checkbox";
+      borderEnabled.checked = !!(es.borderColor || typeof es.borderWidth === "number");
+      borderEnabled.title = "Enable border";
+      var borderWidth = document.createElement("input");
+      borderWidth.type = "number";
+      borderWidth.min = "0";
+      borderWidth.max = "20";
+      borderWidth.value = typeof es.borderWidth === "number" ? String(es.borderWidth) : "1";
+      borderWidth.style.width = "48px";
+      var bwUnit = document.createElement("span");
+      bwUnit.className = "unit-label";
+      bwUnit.textContent = "px";
+      borderEnabled.addEventListener("change", function() {
+        if (borderEnabled.checked) {
+          es.borderColor = borderColor.value;
+          es.borderWidth = Number(borderWidth.value) || 1;
+        } else {
+          delete es.borderColor;
+          delete es.borderWidth;
+        }
+        onStyleChange();
+      });
+      borderColor.addEventListener("input", function() {
+        if (!borderEnabled.checked) borderEnabled.checked = true;
+        es.borderColor = borderColor.value;
+        if (typeof es.borderWidth !== "number") es.borderWidth = Number(borderWidth.value) || 1;
+        onStyleChange();
+      });
+      borderWidth.addEventListener("change", function() {
+        var n = Number(borderWidth.value);
+        if (Number.isFinite(n) && n >= 0) {
+          es.borderWidth = n;
+          if (!borderEnabled.checked) borderEnabled.checked = true;
+          if (!es.borderColor) es.borderColor = borderColor.value;
+          onStyleChange();
+        }
+      });
+      borderRow.appendChild(borderEnabled);
+      borderRow.appendChild(borderColor);
+      borderRow.appendChild(borderWidth);
+      borderRow.appendChild(bwUnit);
+      inspector.appendChild(field("Border", borderRow));
+
+      // -- Opacity
+      var opacityRow = document.createElement("div");
+      opacityRow.className = "style-row";
+      var opacityRange = document.createElement("input");
+      opacityRange.type = "range";
+      opacityRange.min = "0";
+      opacityRange.max = "1";
+      opacityRange.step = "0.05";
+      opacityRange.value = typeof es.opacity === "number" ? String(es.opacity) : "1";
+      var opacityReadout = document.createElement("span");
+      opacityReadout.className = "unit-label";
+      opacityReadout.textContent = typeof es.opacity === "number" ? String(es.opacity) : "1";
+      opacityRange.addEventListener("input", function() {
+        var n = Number(opacityRange.value);
+        opacityReadout.textContent = String(n);
+        if (n >= 1) {
+          delete es.opacity;
+        } else {
+          es.opacity = n;
+        }
+        onStyleChange();
+      });
+      opacityRow.appendChild(opacityRange);
+      opacityRow.appendChild(opacityReadout);
+      inspector.appendChild(field("Opacity", opacityRow));
+
+      // -- Box shadow
+      var shadowInput = document.createElement("input");
+      shadowInput.type = "text";
+      shadowInput.placeholder = "none";
+      shadowInput.value = es.boxShadow || "";
+      shadowInput.addEventListener("change", function() {
+        if (shadowInput.value.trim() === "" || shadowInput.value.trim() === "none") {
+          delete es.boxShadow;
+        } else {
+          es.boxShadow = shadowInput.value.trim();
+        }
+        onStyleChange();
+      });
+      inspector.appendChild(field("Shadow", shadowInput));
+
+      // -- Text color
+      var textColorRow = document.createElement("div");
+      textColorRow.className = "style-row";
+      var textColor = document.createElement("input");
+      textColor.type = "color";
+      textColor.value = es.color || "#ffffff";
+      textColor.className = "color-swatch";
+      var textColorEnabled = document.createElement("input");
+      textColorEnabled.type = "checkbox";
+      textColorEnabled.checked = !!es.color;
+      textColorEnabled.title = "Enable text color override";
+      textColorEnabled.addEventListener("change", function() {
+        if (textColorEnabled.checked) {
+          es.color = textColor.value;
+        } else {
+          delete es.color;
+        }
+        onStyleChange();
+      });
+      textColor.addEventListener("input", function() {
+        if (!textColorEnabled.checked) textColorEnabled.checked = true;
+        es.color = textColor.value;
+        onStyleChange();
+      });
+      textColorRow.appendChild(textColorEnabled);
+      textColorRow.appendChild(textColor);
+      inspector.appendChild(field("Text color", textColorRow));
+
+      // -- Overflow
+      var overflowSelect = selectInput(["auto", "visible", "hidden"], es.overflow || "auto");
+      overflowSelect.addEventListener("change", function() {
+        if (overflowSelect.value === "auto") {
+          delete es.overflow;
+        } else {
+          es.overflow = overflowSelect.value;
+        }
+        onStyleChange();
+      });
+      inspector.appendChild(field("Overflow", overflowSelect));
+    })();
+
     // Motion controls.
     const motionPreset = selectInput(MOTION_PRESETS, element.motion ? element.motion.preset : "none");
     motionPreset.addEventListener("change", () => {
@@ -2725,6 +3300,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       inspector.appendChild(field("Motion delay (ms)", delay));
     }
+
+    // Play/replay button for this element's animation.
+    var elPlayBtn = document.createElement("button");
+    elPlayBtn.type = "button";
+    elPlayBtn.className = "rev01-replay-btn";
+    var elPlayIcon = document.createElement("span");
+    elPlayIcon.className = "play-icon";
+    elPlayBtn.appendChild(elPlayIcon);
+    var elPlayLabel = document.createElement("span");
+    elPlayLabel.textContent = "Replay animation";
+    elPlayBtn.appendChild(elPlayLabel);
+    if (!element.motion) elPlayBtn.disabled = true;
+    elPlayBtn.addEventListener("click", function() {
+      replayAnimations(element.id);
+    });
+    inspector.appendChild(elPlayBtn);
   }
 
   // -- Media upload helper -----------------------------------------------
@@ -3658,6 +4249,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const next = root.querySelector('[data-rev01-section="' + cssEscape(sectionId) + '"]');
       if (next) next.setAttribute("data-selected", "true");
     }
+    if (!selectedElementId) renderInspector();
     if (isReelOpen) renderReel();
   }
 
@@ -5346,6 +5938,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function addElementToSection(section, element) {
+    // Apply page default motion if the element has no motion set.
+    if (!element.motion) {
+      var pg = currentPage();
+      if (pg && pg.defaultMotionPreset && pg.defaultMotionPreset !== "none") {
+        element.motion = { preset: pg.defaultMotionPreset, delayMs: 0 };
+      }
+    }
     section.elements.push(element);
     renderAll();
     selectElement(element.id);
@@ -6240,6 +6839,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         void applySidebarStyleKit(kit, styleButtons);
       });
     });
+
+    if (inspector) {
+      inspector.addEventListener("click", function(ev) {
+        var btn = ev.target.closest("[data-section-action]");
+        if (!btn) return;
+        var action = btn.getAttribute("data-section-action");
+        var sid = btn.getAttribute("data-section-id");
+        if (action && sid) handleSectionAction(action, sid);
+      });
+    }
   }
 
   // -- Real-time co-edit via Yjs ------------------------------------------
@@ -7308,23 +7917,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           .catch(function() {});
       }
 
-      // -- AI prompt button (topbar) ----------------------------------------
-      var aiPromptBtn = document.getElementById("canvas-ai-prompt");
-      if (aiPromptBtn) {
-        aiPromptBtn.addEventListener("click", function() {
-          if (aiBusy) return;
-          openTextModal({
-            title: "Edit with AI",
-            label: "Describe the change you want the agent to make:",
-            placeholder: "Add a testimonials section after the hero",
-            multiline: true,
-          }).then(function(brief) {
-            if (brief === null || brief.trim().length === 0) return;
-            runAiPreview(brief);
-          });
-        });
-      }
-
       // -- Chat panel form submission -----------------------------------------
       var chatForm = document.getElementById("canvas-chat-form");
       var chatInput = document.getElementById("canvas-chat-input");
@@ -7391,29 +7983,47 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                     var dataStr = line.slice(6);
                     try {
                       var data = JSON.parse(dataStr);
-                      if (data.event === "session") {
+                      var kind = data.kind || data.event || "";
+                      if (kind === "session") {
                         chatSessionId = data.sessionId || chatSessionId;
-                      } else if (data.event === "token") {
-                        assistantText += data.token || "";
+                      } else if (kind === "token") {
+                        assistantText += data.text || data.token || "";
                         msgDiv.textContent = assistantText;
                         chatMessages.scrollTop = chatMessages.scrollHeight;
-                      } else if (data.event === "message") {
-                        assistantText = data.content || assistantText;
-                        msgDiv.textContent = assistantText;
+                      } else if (kind === "tool-call") {
+                        appendChatMessage("assistant", "[Calling " + (data.name || "tool") + "]");
+                      } else if (kind === "op-preview") {
+                        var opDiv = document.createElement("div");
+                        opDiv.className = "rev01-chat-msg assistant";
+                        opDiv.textContent = "Proposed: " + (data.toolName || "edit") + " ";
+                        var acceptBtn = document.createElement("button");
+                        acceptBtn.textContent = "Accept";
+                        acceptBtn.style.cssText = "margin-left:8px;padding:4px 10px;border:1px solid var(--rev01-accent);background:var(--rev01-accent);color:var(--rev01-bg);border-radius:4px;cursor:pointer;font-size:12px;";
+                        acceptBtn.addEventListener("click", function() {
+                          acceptBtn.disabled = true;
+                          acceptBtn.textContent = "Applying...";
+                          authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ ops: [data.op] }),
+                          }).then(function(r) { return r.json(); }).then(function(body) {
+                            if (body && body.editableState) {
+                              state = body.editableState;
+                              renderAll();
+                              scheduleSave();
+                              setStatus("Agent changes applied", "ok");
+                              acceptBtn.textContent = "Applied";
+                            } else {
+                              acceptBtn.textContent = "Failed";
+                            }
+                          }).catch(function() { acceptBtn.textContent = "Failed"; });
+                        });
+                        opDiv.appendChild(acceptBtn);
+                        chatMessages.appendChild(opDiv);
                         chatMessages.scrollTop = chatMessages.scrollHeight;
-                      } else if (data.event === "tool-preview") {
-                        var previewLine = "[Agent proposes: " + (data.toolName || "edit") + "]";
-                        appendChatMessage("assistant", previewLine);
-                      } else if (data.event === "state-update") {
-                        if (data.editableState) {
-                          state = data.editableState;
-                          renderAll();
-                          scheduleSave();
-                          setStatus("Agent applied changes", "ok");
-                        }
-                      } else if (data.event === "error") {
-                        appendChatMessage("error", data.message || "Agent error");
-                      } else if (data.event === "done") {
+                      } else if (kind === "error") {
+                        appendChatMessage("error", data.error || data.message || "Agent error");
+                      } else if (kind === "done") {
                         chatBusy = false;
                         if (submitBtn) submitBtn.disabled = false;
                       }

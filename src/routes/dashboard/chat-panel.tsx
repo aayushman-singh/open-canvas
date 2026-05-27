@@ -24,7 +24,7 @@ import { requireAuth } from '../../auth/require-auth.js';
 import { db } from '../../db/client.js';
 import { customer, site } from '../../db/schema.js';
 
-import { DashboardShell } from './shell.js';
+import { DashboardShell, buildSiteNav } from './shell.js';
 import { Button } from '../../ui';
 
 interface Bindings {
@@ -342,6 +342,7 @@ chatPanelRoute.get('/sites/:siteId/chat', async (c) => {
         { href: `/dashboard/sites/${row.id}`, label: row.name },
         { label: 'Chat' },
       ]}
+      siteNav={buildSiteNav(row.id, row.name, `/dashboard/sites/${row.id}/chat`)}
       pageStyles={pageStyles}
     >
       <div data-site-id={row.id}>

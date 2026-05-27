@@ -160,8 +160,9 @@ function encodeJsonValue(value: unknown): unknown {
     return arr;
   }
   const map = new Y.Map<unknown>();
-  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-    const v = (value as Record<string, unknown>)[key];
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(value).sort()) {
+    const v = record[key];
     if (v === undefined) continue;
     map.set(key, encodeJsonValue(v));
   }

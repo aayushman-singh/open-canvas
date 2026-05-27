@@ -44,6 +44,7 @@ import addonsApi from './routes/api/addons';
 import profileRoute from './routes/dashboard/profile';
 import accountSettingsRoute from './routes/dashboard/settings';
 import { domainsRoute } from './routes/dashboard/domains';
+import versionTimelineRoute from './routes/dashboard/version-timeline';
 import profileApi from './routes/api/profile';
 // Section library + custom template routes
 import {
@@ -54,9 +55,8 @@ import {
   customTemplatesOwner,
   customTemplatesAdmin,
 } from './routes/api/custom-templates';
-import { clerkAuth, editTokenAuth } from './auth/middleware';
+import { editTokenAuth } from './auth/middleware';
 import editTokenRefreshRoute from './auth/refresh-route';
-import { requireAuth } from './auth/require-auth';
 import { verifyEditToken } from './auth/edit-token';
 import { db } from './db/client';
 import onSiteEditRoute from './routes/api/on-site-edit';
@@ -216,6 +216,7 @@ app.route('/api/addons', addonsApi);
 app.route('/dashboard', profileRoute);
 app.route('/dashboard', accountSettingsRoute);
 app.route('/dashboard', domainsRoute);
+app.route('/dashboard', versionTimelineRoute);
 app.route('/api/profile', profileApi);
 // On-site editor auth popup — main domain endpoint that sets the edit token
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.

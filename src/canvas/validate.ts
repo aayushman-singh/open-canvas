@@ -10,10 +10,12 @@ import { PAGE_METADATA_FIELDS } from './elements/collection.js';
 import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
+  BACKGROUND_SIZES,
   ELEMENT_TYPES,
   INLINE_MARK_TYPES,
   MEDIA_KINDS,
   MOTION_PRESETS,
+  OVERFLOW_VALUES,
   SECTION_RECIPE_IDS,
   SECTION_ROLES,
   SHAPE_VARIANTS,
@@ -21,6 +23,7 @@ import {
   SURFACE_VARIANTS,
   type ActionVariant,
   type BackgroundEffect,
+  type BackgroundSize,
   type CanvasElement,
   type CanvasPage,
   type CanvasSection,
@@ -29,6 +32,7 @@ import {
   type InlineMarkType,
   type MediaKind,
   type MotionPreset,
+  type OverflowValue,
   type PublishedSnapshot,
   type SectionRecipeId,
   type SectionRole,
@@ -235,6 +239,89 @@ function validatePinnedStyle(value: unknown, basePath: string, errors: string[])
   }
 }
 
+const ASSET_ID_RE = /^[A-Za-z0-9._-]+$/;
+
+function validateElementStyle(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath}.elementStyle must be an object when present`);
+    return;
+  }
+  const p = `${basePath}.elementStyle`;
+  if (value.backgroundColor !== undefined) {
+    if (typeof value.backgroundColor !== 'string') {
+      errors.push(`${p}.backgroundColor must be a string`);
+    } else {
+      const issue = pinnedStyleValueIssue(value.backgroundColor);
+      if (issue !== null) {
+        errors.push(`${p}.backgroundColor value ${JSON.stringify(value.backgroundColor)} contains ${issue}`);
+      }
+    }
+  }
+  if (value.backgroundImageAssetId !== undefined) {
+    if (typeof value.backgroundImageAssetId !== 'string') {
+      errors.push(`${p}.backgroundImageAssetId must be a string`);
+    } else if (!ASSET_ID_RE.test(value.backgroundImageAssetId)) {
+      errors.push(`${p}.backgroundImageAssetId must be an asset id, not a path or URL`);
+    }
+  }
+  if (value.backgroundSize !== undefined) {
+    if (!isOneOf<BackgroundSize>(value.backgroundSize, BACKGROUND_SIZES)) {
+      errors.push(`${p}.backgroundSize must be cover|contain (got ${describe(value.backgroundSize)})`);
+    }
+  }
+  if (value.borderRadius !== undefined) {
+    if (!isFiniteNumber(value.borderRadius) || value.borderRadius < 0) {
+      errors.push(`${p}.borderRadius must be a non-negative number`);
+    }
+  }
+  if (value.borderColor !== undefined) {
+    if (typeof value.borderColor !== 'string') {
+      errors.push(`${p}.borderColor must be a string`);
+    } else {
+      const issue = pinnedStyleValueIssue(value.borderColor);
+      if (issue !== null) {
+        errors.push(`${p}.borderColor value ${JSON.stringify(value.borderColor)} contains ${issue}`);
+      }
+    }
+  }
+  if (value.borderWidth !== undefined) {
+    if (!isFiniteNumber(value.borderWidth) || value.borderWidth < 0) {
+      errors.push(`${p}.borderWidth must be a non-negative number`);
+    }
+  }
+  if (value.opacity !== undefined) {
+    if (!isFiniteNumber(value.opacity) || value.opacity < 0 || value.opacity > 1) {
+      errors.push(`${p}.opacity must be a number in [0, 1]`);
+    }
+  }
+  if (value.boxShadow !== undefined) {
+    if (typeof value.boxShadow !== 'string') {
+      errors.push(`${p}.boxShadow must be a string`);
+    } else {
+      const issue = pinnedStyleValueIssue(value.boxShadow);
+      if (issue !== null) {
+        errors.push(`${p}.boxShadow value ${JSON.stringify(value.boxShadow)} contains ${issue}`);
+      }
+    }
+  }
+  if (value.color !== undefined) {
+    if (typeof value.color !== 'string') {
+      errors.push(`${p}.color must be a string`);
+    } else {
+      const issue = pinnedStyleValueIssue(value.color);
+      if (issue !== null) {
+        errors.push(`${p}.color value ${JSON.stringify(value.color)} contains ${issue}`);
+      }
+    }
+  }
+  if (value.overflow !== undefined) {
+    if (!isOneOf<OverflowValue>(value.overflow, OVERFLOW_VALUES)) {
+      errors.push(`${p}.overflow must be visible|hidden (got ${describe(value.overflow)})`);
+    }
+  }
+}
+
 function registerElementId(
   element: unknown,
   elementPath: string,
@@ -401,12 +488,14 @@ function validateElement(
     validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
     validateMotion(element.motion, basePath, errors);
     validatePinnedStyle(element.pinnedStyle, basePath, errors);
+    validateElementStyle(element.elementStyle, basePath, errors);
     return;
   }
 
   validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
   validateMotion(element.motion, basePath, errors);
   validatePinnedStyle(element.pinnedStyle, basePath, errors);
+  validateElementStyle(element.elementStyle, basePath, errors);
 
   switch (element.type) {
     case 'text': {

@@ -33,7 +33,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { CanvasPage, CanvasSiteState } from '../../canvas/schema';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
-import { DashboardShell } from './shell';
+import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Card } from '../../ui';
 
 interface Bindings {
@@ -339,6 +339,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
         { label: `${page.title} — SEO` },
       ]}
       pageStyles={pageStyles}
+      siteNav={buildSiteNav(siteId, siteName, `/dashboard/sites/${siteId}/settings`)}
     >
       <h1>SEO &amp; metadata</h1>
       <p class="lede">
