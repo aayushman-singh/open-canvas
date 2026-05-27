@@ -84,9 +84,9 @@ export interface TableRenderCtx {
  * `<div class="rev01-element" data-rev01-element="<id>" ...>`, so this
  * selector matches that wrapper and only that wrapper.
  */
-// REVIEW: `elementId` is interpolated directly into a CSS attribute selector without escaping. If an element ID contains `"]` or other selector-special characters, it can break the selector or inject CSS rules. Use CSS.escape() or the project's escapeCssValue() from render-utils.ts to sanitize.
 function scopeSelector(elementId: string): string {
-  return `[data-rev01-element="${elementId}"]`;
+  const escaped = elementId.replace(/[\\"]/g, '\\$&');
+  return `[data-rev01-element="${escaped}"]`;
 }
 
 /**

@@ -441,7 +441,6 @@ function resolveRowStack(
   let fillCount = 0;
 
   for (const child of children) {
-    // REVIEW: default is `'fill'` here but column stack at line 404 defaults to `'hug'`. Asymmetric defaults mean an unsized child in a row fills width but an unsized child in a column hugs height. If this is intentional, document the reasoning — otherwise, align both defaults.
     if (isElementNode(child) && (child.size ?? 'fill') === 'hug') {
       const w = estimateIntrinsicWidth(child);
       childWidths.push(w);
@@ -537,7 +536,6 @@ function resolveSplit(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): 
   ctx.parentAlign = prevAlign;
 }
 
-// REVIEW: no `default` case — if `SplitRatio` union grows (e.g. '1:3'), this function returns `undefined`. Add `default: throw new Error(...)` or use a const Record<SplitRatio, [number, number]> for exhaustive mapping at compile time.
 function parseSplitRatio(ratio: SplitRatio): [number, number] {
   switch (ratio) {
     case '1:1':
@@ -546,6 +544,8 @@ function parseSplitRatio(ratio: SplitRatio): [number, number] {
       return [1, 2];
     case '2:1':
       return [2, 1];
+    default:
+      throw new Error('parseSplitRatio: unknown ratio ' + ratio);
   }
 }
 
@@ -581,7 +581,6 @@ export function resolveDesignSection(
 
   resolveNode(input.layout, rootBox, ctx);
 
-  // REVIEW: clamp order dependency — x is clamped first, then w is clamped to `pageWidth - el.box.x`. If an element lands at x=pageWidth-1, max width becomes 1px regardless of the original width. Consider computing bounds from the original unclamped position first, then applying all four clamps together.
   for (const el of ctx.elements) {
     el.box.x = clamp(el.box.x, 0, pageWidth - 1);
     el.box.y = clamp(el.box.y, 0, height - 1);

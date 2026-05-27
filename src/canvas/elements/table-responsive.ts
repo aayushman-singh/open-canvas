@@ -47,9 +47,9 @@ const PHONE_MAX_PX = 767;
  * Scoped by `[data-rev01-element="<elementId>"]` so two tables on the same
  * page collapse independently and the rules can never leak to anything else.
  */
-// REVIEW: same CSS injection risk as table.ts scopeSelector — `elementId` unescaped in CSS selector. Escape for attribute selector context.
 export function buildTablePhoneCollapseCss(elementId: string): string {
-  const scope = `[data-rev01-element="${elementId}"]`;
+  const escaped = elementId.replace(/[\\"]/g, '\\$&');
+  const scope = `[data-rev01-element="${escaped}"]`;
   const inner = [
     // Strip native table layout.
     `${scope} table.rev01-table,`,

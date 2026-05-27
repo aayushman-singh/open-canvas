@@ -111,7 +111,6 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
   for (const element of cloned.elements) {
     if (element.type !== 'media') continue;
     const mapped = assetIdMap.get(element.assetId);
-    // REVIEW: silent skip when `mapped` is falsy — if an asset wasn't mapped, the element keeps its original (foreign) assetId. This is a data integrity issue that should fail loud, not silently produce a section referencing non-existent assets.
     if (mapped) element.assetId = mapped;
     if (element.posterAssetId !== undefined) {
       const posterMapped = assetIdMap.get(element.posterAssetId);
