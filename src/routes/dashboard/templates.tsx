@@ -51,6 +51,16 @@ templatesRoute.use('*', requireAuth());
 const PUBLISHED_SUFFIX = '.rev01.aayushman.dev';
 
 const pageStyles = `
+  .limit-notice {
+    padding: 14px 20px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 12px;
+  }
+  .limit-notice a { color: var(--accent); font-weight: 600; }
   .lede {
     margin: 10px 0 24px;
     max-width: 640px;
@@ -112,6 +122,7 @@ const pageStyles = `
     width: 1440px;
     height: 900px;
     transform-origin: top left;
+    transform: scale(0.22);
     border: none;
     pointer-events: none;
   }
@@ -388,6 +399,7 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
 templatesRoute.get('/', async (c) => {
   const auth = c.get('auth');
   let customTemplates: CustomTemplateCard[] = [];
+  let atSiteLimit = false;
   if (auth.userId) {
     const database = db(c.env);
     const customerRow = await database
@@ -416,17 +428,15 @@ templatesRoute.get('/', async (c) => {
       .where(whereClause);
 
     customTemplates = rows;
-  }
 
-  const FREE_SITE_LIMIT = 3;
-  let atSiteLimit = false;
-  if (auth.userId) {
-    const database = db(c.env);
-    const countRows = await database
-      .select({ count: sql<number>`count(*)::int` })
-      .from(site)
-      .where(eq(site.customerId, customerRow[0]?.id ?? ''));
-    atSiteLimit = (countRows[0]?.count ?? 0) >= FREE_SITE_LIMIT;
+    if (customerId) {
+      const FREE_SITE_LIMIT = 3;
+      const countRows = await database
+        .select({ count: sql<number>`count(*)::int` })
+        .from(site)
+        .where(eq(site.customerId, customerId));
+      atSiteLimit = (countRows[0]?.count ?? 0) >= FREE_SITE_LIMIT;
+    }
   }
 
   return c.html(<Page customTemplates={customTemplates} atSiteLimit={atSiteLimit} />);
