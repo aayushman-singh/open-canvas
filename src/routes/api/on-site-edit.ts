@@ -88,6 +88,7 @@ onSiteEditRoute.get('/', async (c) => {
   ].join('; ');
 
   const siteIdJson = JSON.stringify(siteId);
+  const tokenJson = JSON.stringify(token);
 
   return c.html(
     `<!DOCTYPE html>
@@ -114,7 +115,7 @@ onSiteEditRoute.get('/', async (c) => {
   <script>
     if (window.opener) {
       window.opener.postMessage(
-        { type: "rev01:edit-ready", siteId: ${siteIdJson} },
+        { type: "rev01:edit-ready", siteId: ${siteIdJson}, token: ${tokenJson} },
         "*"
       );
     }

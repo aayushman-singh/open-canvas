@@ -135,10 +135,13 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   return String.raw`
 (() => {
   const ROOT_SELECTOR = '[data-rev01-public-root]';
-  const RECONNECT_DELAY_MS = 1000;
+  const RECONNECT_BASE_MS = 1000;
+  const RECONNECT_MAX_MS = 30000;
+  const MAX_RETRIES = 5;
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = scheme + '//' + location.host + '/__live';
   let currentVersion = ${versionLiteral};
+  let retryCount = 0;
 
   function currentSlug(defaultSlug) {
     const raw = location.pathname.replace(/^\/+|\/+$/g, '');
@@ -174,6 +177,7 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   function connect() {
     const ws = new WebSocket(url);
     ws.addEventListener('message', (event) => {
+      retryCount = 0;
       let payload;
       try {
         payload = JSON.parse(event.data);
@@ -226,7 +230,10 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
       }
     });
     ws.addEventListener('close', () => {
-      setTimeout(connect, RECONNECT_DELAY_MS);
+      if (retryCount >= MAX_RETRIES) return;
+      var delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, retryCount), RECONNECT_MAX_MS);
+      retryCount++;
+      setTimeout(connect, delay);
     });
     ws.addEventListener('error', () => {
       // Let the close handler schedule the reconnect; don't double-fire.
@@ -322,6 +329,30 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   c: Context<PublicEnv, P, I>,
   siteRow: PublicSiteRow,
 ): Promise<Response> {
+  // Token transfer: the auth popup passes the signed token via postMessage,
+  // and the bootstrap page redirects here with ?__transfer=<token>. We verify
+  // it and set a cookie scoped to the current host (critical for custom
+  // domains where the .rev01.aayushman.dev cookie isn't readable).
+  const requestUrl = new URL(c.req.url);
+  const transfer = requestUrl.searchParams.get('__transfer');
+  if (transfer) {
+    const tp = await verifyEditToken(transfer, c.env.UNLOCK_SIGNING_SECRET);
+    if (tp && tp.siteId === siteRow.id) {
+      const cookie = [
+        `${EDIT_TOKEN_COOKIE}=${transfer}`,
+        'Path=/',
+        'HttpOnly',
+        'Secure',
+        'SameSite=Lax',
+        `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
+      ].join('; ');
+      return new Response(null, {
+        status: 302,
+        headers: { Location: '/__edit', 'Set-Cookie': cookie },
+      });
+    }
+  }
+
   const token = getCookie(c, EDIT_TOKEN_COOKIE);
   const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
 
@@ -355,7 +386,11 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     );
     window.addEventListener("message", function(e) {
       if (e.data && e.data.type === "rev01:edit-ready") {
-        location.reload();
+        if (e.data.token) {
+          location.href = "/__edit?__transfer=" + encodeURIComponent(e.data.token);
+        } else {
+          location.reload();
+        }
       }
     });
     if (!popup || popup.closed) {
@@ -440,7 +475,6 @@ async function handleAcceptInvite<P extends string, I extends Input>(
 
   const cookieValue = [
     `${EDIT_TOKEN_COOKIE}=${editToken}`,
-    'Domain=rev01.aayushman.dev',
     'Path=/',
     'HttpOnly',
     'Secure',
@@ -586,6 +620,10 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // surfaces, not snapshot HTML. Fall through to the app router which
   // mounts `/sitemap.xml` and `/robots.txt` via the sitemap router.
   if (path === '/sitemap.xml' || path === '/robots.txt' || path === '/favicon.ico') {
+    return null;
+  }
+
+  if (path.startsWith('/og/')) {
     return null;
   }
 

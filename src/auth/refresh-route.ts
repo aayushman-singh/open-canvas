@@ -46,7 +46,6 @@ refreshRoute.post('/refresh', async (c) => {
 
   const cookieValue = [
     `${EDIT_TOKEN_COOKIE}=${fresh}`,
-    'Domain=rev01.aayushman.dev',
     'Path=/',
     'HttpOnly',
     'Secure',
