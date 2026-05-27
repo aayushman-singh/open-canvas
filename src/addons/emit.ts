@@ -39,8 +39,10 @@ export async function emitAddonHeadScripts(
   const parts: string[] = [];
   for (const row of rows) {
     const addon = getAddon(row.addonId);
-    // REVIEW: silent `continue` on unknown addon breaks the all-or-nothing posture. If a siteAddon row references an id not in the registry, that's data corruption — should throw or log loudly, not silently skip.
-    if (!addon) continue;
+    if (!addon) {
+      console.error(`[addons/emit] siteAddon references unknown addon id: ${row.addonId}`);
+      continue;
+    }
     const html = addon.emitHeadScripts(row.config);
     if (html) parts.push(html);
   }
@@ -52,7 +54,6 @@ export async function emitAddonBodyScripts(
   database: Db,
   siteId: string,
 ): Promise<string> {
-  // REVIEW: `fetchEntitledSiteAddons` is called again here — two identical DB roundtrips per publish. Consider hoisting the fetch to the caller and passing the result to both `emitAddonHeadScripts` and `emitAddonBodyScripts`, or merge them into a single `emitAddonScripts` returning `{ head: string; body: string }`.
   const rows = await fetchEntitledSiteAddons(database, siteId);
 
   const parts: string[] = [];
