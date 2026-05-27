@@ -112,6 +112,7 @@ ownerAssetsApi.post('/', async (c) => {
     return c.json(result);
   } catch (err) {
     if (err instanceof UploadAssetError) {
+      // REVIEW: `err.status as 400` is a redundant literal cast. `err.status` is already a number; the cast to literal `400` lies to TypeScript about the actual value (could be 413, 415, etc.). Remove the cast or type `UploadAssetError.status` as the union of valid status codes.
       return c.json({ error: err.message }, err.status as 400);
     }
     throw err;

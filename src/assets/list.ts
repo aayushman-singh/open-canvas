@@ -71,6 +71,7 @@ export async function listOwnerAssets(
     height: row.height,
     byteSize: row.byteSize,
     createdAt: row.createdAt.toISOString(),
+    // REVIEW: `createdAt` on line 73 calls `.toISOString()` but `lastUsedAt` returns the raw value. If `lastUsedAt` is a Date from the DB, this returns a Date object where the consumer expects a string. Should be `row.lastUsedAt?.toISOString() ?? null` for consistency.
     lastUsedAt: row.lastUsedAt ?? null,
   }));
 }

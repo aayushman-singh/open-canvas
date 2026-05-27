@@ -17,6 +17,7 @@ export async function sha256Hex(input: ArrayBuffer | Uint8Array): Promise<string
   // unchanged — a Uint8Array IS a BufferSource — but a copy is needed when
   // the source is a partial view on a larger buffer to avoid hashing data
   // outside the intended range.
+  // REVIEW: dead code — both ternary branches return `input`. The comment says "a copy is needed when the source is a partial view" but no copy is made. If the intent is to handle Uint8Array views over shared buffers, do `input instanceof Uint8Array ? input.slice() : input`.
   const source: BufferSource = input instanceof Uint8Array ? input : input;
   const digest = await crypto.subtle.digest('SHA-256', source);
   const bytes = new Uint8Array(digest);
