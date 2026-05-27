@@ -183,11 +183,20 @@ export function buildPaletteFromAccent(accentHex: string): string[] {
  * and may pass an accent through different plumbing — chart palette resolves
  * only against built-in kits today.
  */
+let _customAccent: string | null = null;
+
+export function configureChartPalette(opts: { customAccent: string | null }): void {
+  _customAccent = opts.customAccent;
+}
+
 export function buildChartPalette(styleKitName: string): string[] {
   if (styleKitName === 'custom') {
-    throw new Error(
-      "buildChartPalette: 'custom' kit not yet wired through chart palette — Wave 2 #10 follow-up",
-    );
+    if (!_customAccent) {
+      throw new Error(
+        'buildChartPalette: styleKit is "custom" but configureChartPalette was not called with the resolved accent.',
+      );
+    }
+    return buildPaletteFromAccent(_customAccent);
   }
   const preset = getStyleKitPreset(styleKitName);
   return buildPaletteFromAccent(preset.accent);

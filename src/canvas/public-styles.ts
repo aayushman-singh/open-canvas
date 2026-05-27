@@ -105,6 +105,29 @@ html, body {
   color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
 }
 
+.rev01-nav-link {
+  color: inherit;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 12px;
+}
+.rev01-nav-link:hover {
+  color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+}
+.rev01-nav {
+  gap: 4px;
+}
+.rev01-nav-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.rev01-nav-logo {
+  height: 28px;
+  width: auto;
+}
+
 /* Presence indicator — a tiny pill that lives in the top-right of the
    published page. Hidden by default; the visitor script removes the
    [hidden] attribute when more than one socket is connected. */

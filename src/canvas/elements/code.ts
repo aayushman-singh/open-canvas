@@ -15,7 +15,14 @@
 //      and the kit's `fontFamilyMono` typeface.
 
 import type { BaseElement } from '../schema.js';
+import type { StyleKitPreset } from '../schema.js';
 import { getStyleKitPreset } from '../style-kits.js';
+
+let _customPreset: StyleKitPreset | null = null;
+
+export function configureCodeRender(opts: { customPreset: StyleKitPreset | null }): void {
+  _customPreset = opts.customPreset;
+}
 import {
   highlightCode,
   isSupportedLanguage,
@@ -77,16 +84,14 @@ export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
   let fontMono: string;
   let radius: string;
   if (ctx.styleKit === 'custom') {
-    // Custom kits flow through `resolveStyleKitWithCustom`, but we do not
-    // have a `CanvasSiteState` reference at the element render boundary.
-    // The renderer (`src/canvas/render.ts`) already throws on `'custom'`
-    // unless the snapshot carries an explicit customStyleKit override
-    // — see the comment in `renderCanvasSnapshot`. For Wave 4 we treat
-    // reaching `'custom'` here as a programming error and fail loudly,
-    // matching every other element renderer's posture.
-    throw new Error(
-      "renderCode: ctx.styleKit === 'custom' is not resolvable at the element boundary — caller must materialise the preset first.",
-    );
+    if (!_customPreset) {
+      throw new Error(
+        'renderCode: styleKit is "custom" but configureCodeRender was not called with the resolved preset.',
+      );
+    }
+    panel = _customPreset.panel;
+    fontMono = _customPreset.fontFamilyMono;
+    radius = _customPreset.radius;
   } else {
     const preset = getStyleKitPreset(ctx.styleKit);
     panel = preset.panel;

@@ -74,8 +74,13 @@ function renderPublishedPageHtml(
   siteId: string,
 ): string {
   const pageSnapshot = snapshotForPageSlug(snapshot, pageSlug);
+  const targetPage = pageSnapshot.pages[0];
+  if (!targetPage) {
+    throw new Error(`renderPublishedPageHtml: no page for slug ${JSON.stringify(pageSlug)}`);
+  }
+  const fullPagesSnapshot = { ...snapshot, pages: snapshot.pages };
   return injectInteractiveRuntime(
-    renderCanvasSnapshot(pageSnapshot, '/assets', siteId),
+    renderCanvasSnapshot(fullPagesSnapshot, '/assets', siteId, { renderPages: [targetPage] }),
     pageSnapshot,
   );
 }

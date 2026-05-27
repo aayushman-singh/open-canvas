@@ -6,6 +6,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { renderCanvasSnapshot } from '../../canvas/render';
+import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { db } from '../../db/client';
@@ -219,7 +220,9 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
     ...(template.state.header ? { header: template.state.header } : {}),
     ...(template.state.footer ? { footer: template.state.footer } : {}),
     ...(template.state.customStyleKit ? { customStyleKit: template.state.customStyleKit } : {}),
+    ...(template.state.symbols?.length ? { symbols: template.state.symbols } : {}),
   };
+  configureSymbolInstanceRender({ symbols: template.state.symbols ?? [] });
   const html = renderCanvasSnapshot(snapshot, `/dashboard/templates/${template.id}/assets`);
 
   return (

@@ -1,6 +1,6 @@
 import baseSeed from '../canvas/fixtures/home.json';
 import enterpriseScaleSeed from '../canvas/fixtures/enterprise-scale.json';
-import webflowDesignerSeed from '../canvas/fixtures/webflow-designer.json';
+import apogeeShowcaseSeed from '../canvas/fixtures/apogee-showcase.json';
 import type { CanvasElement, CanvasSiteState, InlineRun, StyleKit } from '../canvas/schema';
 
 export interface TemplateSeed {
@@ -170,12 +170,12 @@ export const localTemplate = buildTemplate({
   primaryAction: 'Book a visit',
 });
 
-export const webflowDesignerTemplate: TemplateSeed = {
-  id: 'webflow-designer',
-  name: 'Webflow Designer',
+export const apogeeShowcaseTemplate: TemplateSeed = {
+  id: 'apogee-showcase',
+  name: 'Apogee Showcase',
   tagline:
-    'A multi-page designer site inspired by Webflow — dark, bold, and built around a blog. Custom style kit with signature blue accent.',
-  state: structuredClone(webflowDesignerSeed) as CanvasSiteState,
+    'A multi-page showcase site — dark, bold, and loaded with every element type. Carousels, charts, forms, code blocks, accordions, embeds, and more.',
+  state: structuredClone(apogeeShowcaseSeed) as CanvasSiteState,
 };
 
 export const allTemplateSeeds = [
@@ -184,7 +184,7 @@ export const allTemplateSeeds = [
   enterpriseScaleTemplate,
   studioTemplate,
   localTemplate,
-  webflowDesignerTemplate,
+  apogeeShowcaseTemplate,
 ] as const satisfies readonly TemplateSeed[];
 
 const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, template]));
