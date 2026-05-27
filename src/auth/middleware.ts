@@ -1,6 +1,10 @@
 import { createClerkClient, type User } from '@clerk/backend';
+import { eq } from 'drizzle-orm';
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
+import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
+import { db } from '../db/client';
+import { site } from '../db/schema';
 import { EDIT_TOKEN_COOKIE, verifyEditToken } from './edit-token';
 
 export type AuthState = {
@@ -45,6 +49,7 @@ const AUTHORIZED_PARTIES = [
   'http://127.0.0.1:8788',
   'https://rev01.aayushman.dev',
 ];
+const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
 
 // Picks the publishable/secret key pair to use. Live keys
 // (CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY) are the default; the test pair
@@ -278,15 +283,61 @@ export function clerkAuth() {
 // downstream handlers (canvasApi, publishApi, etc.) work unchanged.
 type EditTokenBindings = ClerkBindings & { UNLOCK_SIGNING_SECRET: string };
 
+function extractPublishedSubdomain(host: string): string | null {
+  if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
+  const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
+  if (prefix.length === 0 || prefix.includes('.')) return null;
+  return prefix;
+}
+
+export function extractEditApiRouteSiteId(path: string): string | null {
+  const parts = path.split('/').filter(Boolean);
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    if (parts[i] === 'sites') {
+      return parts[i + 1] ?? null;
+    }
+  }
+  return null;
+}
+
+export async function resolveEditHostSiteId(
+  env: EditTokenBindings & { DATABASE_URL: string },
+  hostHeader: string,
+): Promise<string | null> {
+  const host = hostHeader.toLowerCase();
+  const subdomain = extractPublishedSubdomain(host);
+  if (subdomain !== null) {
+    const rows = await db(env)
+      .select({ id: site.id })
+      .from(site)
+      .where(eq(site.subdomain, subdomain))
+      .limit(1);
+    return rows[0]?.id ?? null;
+  }
+
+  const custom = await resolveCustomDomainWithRuntimeCache(host, env);
+  return custom?.siteId ?? null;
+}
+
 export function editTokenAuth() {
   return createMiddleware<{
-    Bindings: EditTokenBindings;
+    Bindings: EditTokenBindings & { DATABASE_URL: string };
     Variables: ClerkAuthVariables;
   }>(async (c, next) => {
     const token = getCookie(c, EDIT_TOKEN_COOKIE);
     const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
     if (!payload) {
       return c.json({ error: 'unauthorized' }, 401);
+    }
+
+    const expectedSiteId = await resolveEditHostSiteId(c.env, new URL(c.req.url).host);
+    if (!expectedSiteId || payload.siteId !== expectedSiteId) {
+      return c.json({ error: 'edit token does not match published host' }, 403);
+    }
+
+    const requestedSiteId = extractEditApiRouteSiteId(c.req.path);
+    if (requestedSiteId !== null && requestedSiteId !== payload.siteId) {
+      return c.json({ error: 'edit token does not match requested site' }, 403);
     }
 
     const keys = resolveClerkKeys(c.env);

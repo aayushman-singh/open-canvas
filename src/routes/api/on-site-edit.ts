@@ -20,8 +20,8 @@ import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { signEditToken, EDIT_TOKEN_COOKIE, EDIT_TOKEN_MAX_AGE } from '../../auth/edit-token';
-import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { db, type Db } from '../../db/client';
+import { customer, customDomain, site } from '../../db/schema';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -35,11 +35,52 @@ interface Bindings {
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
 const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
+const STATE_RE = /^[A-Za-z0-9._~-]{16,256}$/;
 
 const onSiteEditRoute = new Hono<Env>();
 
 onSiteEditRoute.use('*', clerkAuth());
 onSiteEditRoute.use('*', requireAuth());
+
+function parseReturnOrigin(returnOrigin: string | undefined): URL | null {
+  if (!returnOrigin) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(returnOrigin);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== returnOrigin) return null;
+  if (parsed.protocol !== 'https:') return null;
+  return parsed;
+}
+
+export async function isAuthorizedOnSiteEditReturnOrigin(
+  database: Db,
+  siteId: string,
+  subdomain: string,
+  returnOrigin: string | undefined,
+): Promise<boolean> {
+  const parsed = parseReturnOrigin(returnOrigin);
+  if (!parsed) return false;
+
+  if (parsed.hostname === `${subdomain}.rev01.aayushman.dev`) {
+    return true;
+  }
+
+  const rows = await database
+    .select({ id: customDomain.id })
+    .from(customDomain)
+    .where(
+      and(
+        eq(customDomain.siteId, siteId),
+        eq(customDomain.hostname, parsed.hostname.toLowerCase()),
+        eq(customDomain.status, 'active'),
+      ),
+    )
+    .limit(1);
+  return rows.length > 0;
+}
 
 onSiteEditRoute.get('/', async (c) => {
   const auth = c.get('auth');
@@ -50,6 +91,11 @@ onSiteEditRoute.get('/', async (c) => {
   const siteId = c.req.query('siteId');
   if (!siteId || !SITE_ID_RE.test(siteId)) {
     return c.text('missing or invalid siteId', 400);
+  }
+  const returnOrigin = c.req.query('returnOrigin');
+  const state = c.req.query('state');
+  if (!state || !STATE_RE.test(state)) {
+    return c.text('missing or invalid state', 400);
   }
 
   const database = db(c.env);
@@ -71,6 +117,16 @@ onSiteEditRoute.get('/', async (c) => {
   if (!siteRow[0]) {
     return c.text('site not found', 404);
   }
+  if (
+    !(await isAuthorizedOnSiteEditReturnOrigin(
+      database,
+      siteId,
+      siteRow[0].subdomain,
+      returnOrigin,
+    ))
+  ) {
+    return c.text('invalid returnOrigin', 400);
+  }
 
   const token = await signEditToken(
     { siteId, customerId, clerkUserId: auth.userId },
@@ -89,6 +145,8 @@ onSiteEditRoute.get('/', async (c) => {
 
   const siteIdJson = JSON.stringify(siteId);
   const tokenJson = JSON.stringify(token);
+  const stateJson = JSON.stringify(state);
+  const returnOriginJson = JSON.stringify(returnOrigin);
 
   return c.html(
     `<!DOCTYPE html>
@@ -115,8 +173,8 @@ onSiteEditRoute.get('/', async (c) => {
   <script>
     if (window.opener) {
       window.opener.postMessage(
-        { type: "rev01:edit-ready", siteId: ${siteIdJson}, token: ${tokenJson} },
-        "*"
+        { type: "rev01:edit-ready", siteId: ${siteIdJson}, token: ${tokenJson}, state: ${stateJson} },
+        ${returnOriginJson}
       );
     }
     setTimeout(function() { window.close(); }, 600);

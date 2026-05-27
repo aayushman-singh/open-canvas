@@ -115,6 +115,32 @@ const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 // duplicate broadcasts (payload.version <= currentVersion) are ignored, so a
 // late-arriving republish from before a full page reload cannot overwrite a
 // freshly-loaded snapshot.
+// Scroll-entrance animation: IntersectionObserver watches [data-entrance]
+// elements and stamps data-visible when they cross the viewport threshold.
+// The CSS transition (below, injected into the <style> block) handles the
+// visual reveal. Observer unobserves after firing — animate once.
+const ENTRANCE_OBSERVER_SCRIPT = String.raw`
+(function(){
+  if(!("IntersectionObserver" in window))return;
+  var els=document.querySelectorAll("[data-entrance]");
+  if(!els.length)return;
+  var io=new IntersectionObserver(function(entries){
+    for(var i=0;i<entries.length;i++){
+      if(entries[i].isIntersecting){
+        entries[i].target.setAttribute("data-visible","");
+        io.unobserve(entries[i].target);
+      }
+    }
+  },{threshold:0.15});
+  for(var j=0;j<els.length;j++)io.observe(els[j]);
+})();
+`;
+
+const ENTRANCE_ANIMATION_CSS = [
+  '[data-entrance]{opacity:0;transition:opacity var(--motion-duration,0.6s) var(--motion-easing,ease),transform var(--motion-duration,0.6s) var(--motion-easing,ease);}',
+  '[data-entrance][data-visible]{opacity:1;transform:none;}',
+].join('\n');
+
 function buildVisitorLiveScript(snapshotVersion: number): string {
   // Refuse non-integer/non-finite versions loudly — the caller is supposed to
   // have already validated the snapshot, but the visitor script's stale
@@ -137,7 +163,6 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   const ROOT_SELECTOR = '[data-rev01-public-root]';
   const RECONNECT_BASE_MS = 1000;
   const RECONNECT_MAX_MS = 30000;
-  const MAX_RETRIES = 5;
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = scheme + '//' + location.host + '/__live';
   let currentVersion = ${versionLiteral};
@@ -176,8 +201,10 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
 
   function connect() {
     const ws = new WebSocket(url);
-    ws.addEventListener('message', (event) => {
+    ws.addEventListener('open', () => {
       retryCount = 0;
+    });
+    ws.addEventListener('message', (event) => {
       let payload;
       try {
         payload = JSON.parse(event.data);
@@ -230,7 +257,6 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
       }
     });
     ws.addEventListener('close', () => {
-      if (retryCount >= MAX_RETRIES) return;
       var delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, retryCount), RECONNECT_MAX_MS);
       retryCount++;
       setTimeout(connect, delay);
@@ -379,13 +405,27 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     <p>Opening sign-in…</p>
   </div>
   <script>
+    if (!window.crypto || typeof window.crypto.randomUUID !== "function") {
+      document.querySelector(".wrap p").textContent =
+        "This browser cannot start secure sign-in.";
+      throw new Error("rev01 on-site edit requires crypto.randomUUID");
+    }
+    var authState = window.crypto.randomUUID();
+    var authUrl = "https://rev01.aayushman.dev/api/on-site-edit?siteId=" +
+      encodeURIComponent(${siteIdJson}) +
+      "&returnOrigin=" + encodeURIComponent(location.origin) +
+      "&state=" + encodeURIComponent(authState);
     var popup = window.open(
-      "https://rev01.aayushman.dev/api/on-site-edit?siteId=" + encodeURIComponent(${siteIdJson}),
+      authUrl,
       "rev01_auth",
       "width=420,height=320,menubar=no,toolbar=no"
     );
     window.addEventListener("message", function(e) {
+      if (e.origin !== "https://rev01.aayushman.dev") return;
+      if (e.source !== popup) return;
       if (e.data && e.data.type === "rev01:edit-ready") {
+        if (e.data.siteId !== ${siteIdJson}) return;
+        if (e.data.state !== authState) return;
         if (e.data.token) {
           location.href = "/__edit?__transfer=" + encodeURIComponent(e.data.token);
         } else {
@@ -814,6 +854,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',
             )}${darkModeEnabled ? `\n${dualModeCss}` : ''}
+            ${raw(ENTRANCE_ANIMATION_CSS)}
           </style>
           ${addonScripts ? raw(addonScripts) : ''}
         </head>
@@ -832,6 +873,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <script type="module">
             ${raw(visitorScript)};
           </script>
+          <script>${raw(ENTRANCE_OBSERVER_SCRIPT)}</script>
           ${addonBodyScripts ? raw(addonBodyScripts) : ''}
         </body>
       </html>`,
