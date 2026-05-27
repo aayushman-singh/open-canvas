@@ -13,6 +13,10 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import type { FormElement } from '../canvas/elements/form.js';
@@ -105,8 +109,7 @@ router.post('/:siteId/:formElementId', async (c) => {
         subject: `New form submission on your site`,
         html: [
           `<p>A new form submission was received.</p>`,
-          // REVIEW (XSS): `formElementId` is interpolated raw into HTML email body. Owner-controlled form IDs containing HTML tags will render in the email client. Use escapeHtml().
-          `<p><strong>Form ID:</strong> ${formElementId}</p>`,
+          `<p><strong>Form ID:</strong> ${escapeHtml(formElementId)}</p>`,
           `<p><strong>Submitted at:</strong> ${submittedAt}</p>`,
           `<p><a href="${inboxUrl}">View in Forms Inbox</a></p>`,
         ].join('\n'),

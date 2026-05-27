@@ -125,11 +125,10 @@ async function deriveBits(
   return new Uint8Array(bits);
 }
 
-// REVIEW (timing attack): early return on length mismatch leaks whether the password has the correct derived-key length. Pad the shorter array to the longer's length and always run the full comparison loop, so response time is constant regardless of input length.
 function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i += 1) {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i += 1) {
     diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
   }
   return diff === 0;
