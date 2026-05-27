@@ -21,6 +21,7 @@ type Bindings = {
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
 export const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const FREE_SITE_LIMIT = 3;
 
 // Reserved subdomains under *.rev01.aayushman.dev:
 // - www/api/app/admin: standard reservations.
@@ -111,7 +112,8 @@ async function parseInput(c: Context<Env>): Promise<CreateInput> {
 
 function wantsJson(c: Context<Env>): boolean {
   const accept = c.req.header('accept') ?? '';
-  return accept.includes('application/json');
+  const contentType = c.req.header('content-type') ?? '';
+  return accept.includes('application/json') || contentType.includes('application/json');
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -121,6 +123,28 @@ function isUniqueViolation(err: unknown): boolean {
   if (typeof e.message === 'string' && e.message.includes('duplicate key value')) return true;
   if (e.cause) return isUniqueViolation(e.cause);
   return false;
+}
+
+function isSiteLimitViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: unknown; message?: unknown; cause?: unknown };
+  if (
+    e.code === '23514' &&
+    typeof e.message === 'string' &&
+    e.message.includes('free site limit exceeded')
+  ) {
+    return true;
+  }
+  if (e.cause) return isSiteLimitViolation(e.cause);
+  return false;
+}
+
+function siteLimitResponse(c: Context<Env>) {
+  const error = `Free plan allows up to ${String(FREE_SITE_LIMIT)} sites. Upgrade to create more.`;
+  if (wantsJson(c)) {
+    return c.json({ error }, 403);
+  }
+  return c.redirect('/dashboard/templates', 303);
 }
 
 function customerSeedAssetId(customerId: string, seedAssetId: string): string {
@@ -273,8 +297,13 @@ sites.post('/', async (c) => {
 
   const input = await parseInput(c);
   const trimmedName = input.siteName.trim();
-  const derivedSubdomain = input.subdomain.trim().toLowerCase() ||
-    trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
+  const derivedSubdomain =
+    input.subdomain.trim().toLowerCase() ||
+    trimmedName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 63);
   const trimmedSubdomain = derivedSubdomain;
   const templateId = input.templateId.trim();
 
@@ -308,17 +337,13 @@ sites.post('/', async (c) => {
     );
   }
 
-  const FREE_SITE_LIMIT = 3;
   const siteCountRows = await database
     .select({ value: count() })
     .from(site)
     .where(eq(site.customerId, customerId));
   const siteCount = siteCountRows[0]?.value ?? 0;
   if (siteCount >= FREE_SITE_LIMIT) {
-    if (wantsJson(c)) {
-      return c.json({ error: 'Free plan allows up to 3 sites. Upgrade to create more.' }, 403);
-    }
-    return c.redirect('/dashboard/templates', 303);
+    return siteLimitResponse(c);
   }
 
   let editableState: CanvasSiteState;
@@ -435,13 +460,13 @@ sites.post('/', async (c) => {
     if (assetRows.length === 0) {
       await siteInsert;
     } else {
-      const assetInsert = database
-        .insert(ownerAsset)
-        .values(assetRows)
-        .onConflictDoNothing();
+      const assetInsert = database.insert(ownerAsset).values(assetRows).onConflictDoNothing();
       await database.batch([siteInsert, assetInsert]);
     }
   } catch (err) {
+    if (isSiteLimitViolation(err)) {
+      return siteLimitResponse(c);
+    }
     if (isUniqueViolation(err)) {
       return c.json({ error: 'subdomain is already taken' }, 409);
     }

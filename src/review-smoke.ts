@@ -433,6 +433,10 @@ assert(
   'expected template preview iframes to be sandboxed without extra permissions',
 );
 assert(
+  !templatesPageSource.includes('sandbox="allow-same-origin"'),
+  'expected template picker previews not to grant same-origin sandbox capability',
+);
+assert(
   templatesPageSource.includes("templatesRoute.get('/:templateId/preview'"),
   'expected templates route to expose a per-template preview page',
 );
@@ -450,6 +454,27 @@ const sitesApiSource = await readSource('./routes/api/sites.ts');
 assert(
   !sitesApiSource.includes("input.templateId.trim() === '' ? 'starter-canvas'"),
   'expected site creation API not to silently default a missing templateId',
+);
+const wantsJsonSource = sitesApiSource.match(/function wantsJson[\s\S]*?\n}/)?.[0] ?? '';
+assert(
+  wantsJsonSource.includes('content-type') && wantsJsonSource.includes('application/json'),
+  'expected site creation API to return JSON for JSON request bodies even without an Accept header',
+);
+const customTemplatesSource = await readSource('./routes/api/custom-templates.ts');
+assert(
+  !customTemplatesSource.includes('rev01-preview-stage'),
+  'expected custom template previews to rely on the outer thumbnail iframe scaling',
+);
+assert(
+  !customTemplatesSource.includes('transform: scale(0.22)'),
+  'expected custom template previews not to apply their own inner scale transform',
+);
+const siteLimitMigration = await readSource('../drizzle/0005_site_limit_guard.sql');
+assert(
+  siteLimitMigration.includes('rev01_enforce_free_site_limit') &&
+    siteLimitMigration.includes('pg_advisory_xact_lock') &&
+    siteLimitMigration.includes('CREATE TRIGGER'),
+  'expected a database trigger migration to enforce the free site limit under concurrent inserts',
 );
 const sectionsApiSource = await readSource('./routes/api/sections.ts');
 assert(

@@ -36,6 +36,13 @@
       "when": 1779926400000,
       "tag": "0004_customer_profile_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779928200000,
+      "tag": "0005_site_limit_guard",
+      "breakpoints": true
     }
   ]
 }

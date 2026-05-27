@@ -265,10 +265,7 @@ customTemplatesOwner.delete('/:id', async (c) => {
 // ---------------------------------------------------------------------------
 
 const previewStyles = `
-  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #05070c; }
-  .rev01-preview-stage { width: 316.8px; min-height: 400px; margin: 0 auto; overflow: visible; }
-  .rev01-preview-stage > .rev01-site { width: 1440px; transform: scale(0.22); transform-origin: top left; }
-  .rev01-preview-stage .rev01-page { margin: 0; }
+  html, body { margin: 0; overflow: hidden; background: #05070c; }
 `;
 
 customTemplatesOwner.get('/:id/preview', async (c) => {
@@ -299,14 +296,12 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
     pages: tmpl.siteState.pages,
     ...(tmpl.siteState.header ? { header: tmpl.siteState.header } : {}),
     ...(tmpl.siteState.footer ? { footer: tmpl.siteState.footer } : {}),
+    ...(tmpl.siteState.customStyleKit ? { customStyleKit: tmpl.siteState.customStyleKit } : {}),
   };
-  const html = renderCanvasSnapshot(
-    snapshot,
-    `/api/custom-templates/${c.req.param('id')}/assets`,
-  );
+  const html = renderCanvasSnapshot(snapshot, `/api/custom-templates/${c.req.param('id')}/assets`);
 
   return c.html(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}</style><style>${previewStyles}</style></head><body><div class="rev01-preview-stage">${html}</div></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}</style><style>${previewStyles}</style></head><body>${html}</body></html>`,
   );
 });
 

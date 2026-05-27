@@ -231,9 +231,7 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
         <style>{raw(canvasPublishedStyles)}</style>
         <style>{raw(previewStyles)}</style>
       </head>
-      <body>
-        {raw(html)}
-      </body>
+      <body>{raw(html)}</body>
     </html>
   );
 }
@@ -246,7 +244,13 @@ interface CustomTemplateCard {
   visibility: string;
 }
 
-function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplateCard[]; atSiteLimit: boolean }) {
+function Page({
+  customTemplates,
+  atSiteLimit,
+}: {
+  customTemplates: CustomTemplateCard[];
+  atSiteLimit: boolean;
+}) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
     <DashboardShell
@@ -282,7 +286,7 @@ function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplat
                       tabindex={-1}
                       title={`${template.name} preview`}
                       loading="lazy"
-                      sandbox="allow-same-origin"
+                      sandbox=""
                     />
                   </span>
                   <span class="template-copy">
@@ -297,13 +301,7 @@ function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplat
             ))}
             {customTemplates.map((dt) => (
               <label class="template">
-                <input
-                  type="radio"
-                  name="templateId"
-                  value={dt.id}
-                  required
-                  checked={false}
-                />
+                <input type="radio" name="templateId" value={dt.id} required checked={false} />
                 <span class="template-body">
                   <span class="template-preview">
                     <iframe
@@ -312,7 +310,7 @@ function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplat
                       tabindex={-1}
                       title={`${dt.name} preview`}
                       loading="lazy"
-                      sandbox="allow-same-origin"
+                      sandbox=""
                     />
                   </span>
                   <span class="template-copy">
@@ -338,7 +336,9 @@ function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplat
           </label>
 
           <label class="field">
-            <span>Subdomain <small>(optional — auto-generated from name if blank)</small></span>
+            <span>
+              Subdomain <small>(optional — auto-generated from name if blank)</small>
+            </span>
             <span class="subdomain">
               <input
                 type="text"
@@ -354,10 +354,13 @@ function Page({ customTemplates, atSiteLimit }: { customTemplates: CustomTemplat
 
         {atSiteLimit ? (
           <p class="limit-notice">
-            You've reached your Free plan limit (3 sites). <a href="/dashboard/settings">Upgrade</a> to create more.
+            You've reached your Free plan limit (3 sites). <a href="/dashboard/settings">Upgrade</a>{' '}
+            to create more.
           </p>
         ) : (
-          <Button variant="primary" type="submit">Create site</Button>
+          <Button variant="primary" type="submit">
+            Create site
+          </Button>
         )}
       </form>
     </DashboardShell>
@@ -410,10 +413,7 @@ templatesRoute.get('/', async (c) => {
     const customerId = customerRow[0]?.id;
 
     const whereClause = customerId
-      ? or(
-          eq(customTemplate.visibility, 'global'),
-          eq(customTemplate.customerId, customerId),
-        )
+      ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
       : eq(customTemplate.visibility, 'global');
 
     const rows = await database
