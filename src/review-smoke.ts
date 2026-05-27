@@ -26,6 +26,7 @@ import {
 import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
+import { signEditToken } from './auth/edit-token';
 import { buildSignInUrl, buildSignOutUrl } from './auth/require-auth';
 import {
   prepareSeedAssetsForCustomer,
@@ -46,10 +47,14 @@ function assert(condition: boolean, message: string): asserts condition {
 // DATABASE_URL even for the 404 path (we want a real "no row" answer, not a
 // crash from a missing env var). Pull from process.env so the smoke remains
 // deterministic against the empty dev DB.
+const SMOKE_UNLOCK_SIGNING_SECRET =
+  process.env.UNLOCK_SIGNING_SECRET ?? 'smoke-test-secret';
+
 const smokeEnv: Record<string, string> = {
   DATABASE_URL: process.env.DATABASE_URL ?? '',
   CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY ?? '',
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
+  UNLOCK_SIGNING_SECRET: SMOKE_UNLOCK_SIGNING_SECRET,
 };
 
 async function responseText(path: string): Promise<{ status: number; body: string }> {
@@ -553,7 +558,7 @@ assert(
 assert(
   publicRouteSource.includes('role=visitor') &&
     indexSource.includes("app.get('/__live'") &&
-    indexSource.includes('requireAuth()') &&
+    indexSource.includes('verifyEditToken') &&
     indexSource.includes('role=editor'),
   'expected /__live to separate unauthenticated visitor sockets from authenticated editor sockets',
 );
@@ -1021,6 +1026,43 @@ try {
   assert(
     appLive.status !== 426,
     `expected app host /__live not to be a 426 (public router should ignore the app host), got ${appLive.status}`,
+  );
+
+  // 6. /__live with upgrade header but missing wsToken → 401.
+  const liveNoToken = await app.request(
+    `http://rev01.test/__live?siteId=fake-site-id`,
+    { headers: new Headers({ upgrade: 'websocket' }) },
+    smokeEnv,
+  );
+  assert(
+    liveNoToken.status === 401,
+    `expected /__live without wsToken to 401, got ${liveNoToken.status}`,
+  );
+
+  // 7. /__live with invalid wsToken → 401.
+  const liveInvalidToken = await app.request(
+    `http://rev01.test/__live?siteId=fake-site-id&wsToken=not-a-real-token`,
+    { headers: new Headers({ upgrade: 'websocket' }) },
+    smokeEnv,
+  );
+  assert(
+    liveInvalidToken.status === 401,
+    `expected /__live with invalid wsToken to 401, got ${liveInvalidToken.status}`,
+  );
+
+  // 8. /__live with validly-signed token whose siteId doesn't match URL → 401.
+  const wrongSiteToken = await signEditToken(
+    { siteId: 'wrong-site-id', customerId: seededCustomerId, clerkUserId: SMOKE_CLERK_USER },
+    SMOKE_UNLOCK_SIGNING_SECRET,
+  );
+  const liveWrongSite = await app.request(
+    `http://rev01.test/__live?siteId=fake-site-id&wsToken=${encodeURIComponent(wrongSiteToken)}`,
+    { headers: new Headers({ upgrade: 'websocket' }) },
+    smokeEnv,
+  );
+  assert(
+    liveWrongSite.status === 401,
+    `expected /__live with wrong-siteId token to 401, got ${liveWrongSite.status}`,
   );
 } finally {
   // Clean up regardless of assertion outcome. site is FK-cascade-deleted

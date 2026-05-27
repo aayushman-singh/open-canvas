@@ -18,6 +18,7 @@ import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
 import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
+import { signEditToken } from '../auth/edit-token';
 import { db } from '../db/client';
 import { customer, site } from '../db/schema';
 
@@ -27,6 +28,7 @@ interface Bindings {
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
+  UNLOCK_SIGNING_SECRET: string;
 }
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -40,6 +42,7 @@ canvasEditor.use('*', requireAuth());
 
 interface OwnedSite {
   id: string;
+  customerId: string;
   name: string;
   subdomain: string;
   styleKit: StyleKit;
@@ -52,6 +55,7 @@ export interface EditorPageOptions {
   styleKit: StyleKit;
   context?: 'dashboard' | 'public';
   clerkPublishableKey?: string;
+  wsToken?: string;
 }
 
 async function lookupOwnedSite(
@@ -78,13 +82,15 @@ async function lookupOwnedSite(
     .from(site)
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
-  return siteRow[0] ?? null;
+  const row = siteRow[0];
+  if (!row) return null;
+  return { ...row, customerId };
 }
 
 export function editorPageJsx(opts: EditorPageOptions) {
-  const { siteId, siteName, subdomain, styleKit, context = 'dashboard', clerkPublishableKey } = opts;
+  const { siteId, siteName, subdomain, styleKit, context = 'dashboard', clerkPublishableKey, wsToken } = opts;
   const apiBase = context === 'public' ? '/__api' : '/api';
-  const inlineScript = canvasClientScript({ siteId, apiBase });
+  const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
   const publicAddress = `${subdomain}.rev01.aayushman.dev`;
 
   const breadcrumbs =
@@ -327,6 +333,11 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
     return c.text('site not found', 404);
   }
 
+  const wsToken = await signEditToken(
+    { siteId: owned.id, customerId: owned.customerId, clerkUserId: auth.userId },
+    c.env.UNLOCK_SIGNING_SECRET,
+  );
+
   const { publishableKey } = resolveClerkKeys(c.env);
   return c.html(
     editorPageJsx({
@@ -336,6 +347,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       styleKit: owned.styleKit,
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
+      wsToken,
     }),
   );
 });

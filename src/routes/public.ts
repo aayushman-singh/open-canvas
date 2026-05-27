@@ -22,6 +22,7 @@ import { collectReferencedAssetIds } from '../assets/site-assets';
 import { snapshotForPageSlug } from '../canvas/page-routing';
 import { resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
 import {
+  type EditTokenPayload,
   verifyEditToken,
   EDIT_TOKEN_COOKIE,
   signEditToken,
@@ -296,6 +297,40 @@ interface PublicSiteRow {
   passwordSetAt: Date | null;
 }
 
+type OnSiteEditorSite = Pick<PublicSiteRow, 'id' | 'name' | 'subdomain' | 'styleKit'>;
+type OnSiteEditorTokenPayload = Pick<EditTokenPayload, 'siteId' | 'customerId' | 'clerkUserId'>;
+type OnSiteEditorEnv = Pick<
+  Bindings,
+  'CLERK_PUBLISHABLE_KEY' | 'CLERK_SECRET_KEY' | 'UNLOCK_SIGNING_SECRET'
+>;
+
+export async function buildOnSiteEditorOptions(
+  siteRow: OnSiteEditorSite,
+  payload: OnSiteEditorTokenPayload,
+  env: OnSiteEditorEnv,
+): Promise<EditorPageOptions> {
+  if (payload.siteId !== siteRow.id) {
+    throw new Error(
+      `buildOnSiteEditorOptions: token siteId ${payload.siteId} does not match ${siteRow.id}`,
+    );
+  }
+
+  const wsToken = await signEditToken(
+    { siteId: siteRow.id, customerId: payload.customerId, clerkUserId: payload.clerkUserId },
+    env.UNLOCK_SIGNING_SECRET,
+  );
+
+  return {
+    siteId: siteRow.id,
+    siteName: siteRow.name,
+    subdomain: siteRow.subdomain,
+    styleKit: siteRow.styleKit as EditorPageOptions['styleKit'],
+    context: 'public',
+    clerkPublishableKey: resolveClerkKeys(env).publishableKey,
+    wsToken,
+  };
+}
+
 async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicSiteRow | null> {
   const database = db(env);
   const rows = await database
@@ -443,14 +478,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     );
   }
 
-  const opts: EditorPageOptions = {
-    siteId: siteRow.id,
-    siteName: siteRow.name,
-    subdomain: siteRow.subdomain,
-    styleKit: siteRow.styleKit as EditorPageOptions['styleKit'],
-    context: 'public',
-    clerkPublishableKey: resolveClerkKeys(c.env).publishableKey,
-  };
+  const opts = await buildOnSiteEditorOptions(siteRow, payload, c.env);
   return c.html(editorPageJsx(opts));
 }
 

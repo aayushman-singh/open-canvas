@@ -142,6 +142,46 @@ function setIfDefined<T>(map: Y.Map<unknown>, key: string, value: T | undefined)
   if (value !== undefined) map.set(key, value);
 }
 
+/**
+ * Generic JSON → Y type encoder for the catch-all branches of the sorted-key
+ * walkers (`encodeCustomStyleKit`, `encodeNestedTokenRecord`,
+ * `encodeSymbolInstanceOverrides`). Those walkers deliberately iterate
+ * Object.keys instead of destructuring named fields so future schema additions
+ * don't require per-field encode/decode pairs. This function is the terminal
+ * case: if a value is a plain object or array rather than a primitive, wrap it
+ * in the matching Y type recursively. `decodeJsonValue` reverses.
+ */
+function encodeJsonValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    const arr = new Y.Array<unknown>();
+    for (const item of value) arr.push([encodeJsonValue(item)]);
+    return arr;
+  }
+  const map = new Y.Map<unknown>();
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    const v = (value as Record<string, unknown>)[key];
+    if (v === undefined) continue;
+    map.set(key, encodeJsonValue(v));
+  }
+  return map;
+}
+
+function decodeJsonValue(value: unknown): unknown {
+  if (value instanceof Y.Map) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of (value as Y.Map<unknown>).entries()) {
+      out[k] = decodeJsonValue(v);
+    }
+    return out;
+  }
+  if (value instanceof Y.Array) {
+    return (value as Y.Array<unknown>).toArray().map(decodeJsonValue);
+  }
+  return value;
+}
+
 function encodePositionedBox(box: PositionedBox): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   out.set('x', box.x);
@@ -322,8 +362,7 @@ function encodeSymbolInstanceOverrides(overrides: SymbolInstanceOverrides): Y.Ma
         patchMap.set('content', encodeInlineRuns(value as InlineRun[]));
         continue;
       }
-      // Primitive or already-typed field — set as-is.
-      patchMap.set(field, value);
+      patchMap.set(field, encodeJsonValue(value));
     }
     out.set(elementId, patchMap);
   }
@@ -667,7 +706,7 @@ function encodeCustomStyleKit(preset: StyleKitPreset): Y.Map<unknown> {
       out.set(key, encodeCustomStyleKit(value as StyleKitPreset));
       continue;
     }
-    out.set(key, value);
+    out.set(key, encodeJsonValue(value));
   }
   return out;
 }
@@ -683,7 +722,7 @@ function encodeNestedTokenRecord(
     for (const innerKey of Object.keys(inner).sort()) {
       const innerValue = inner[innerKey];
       if (innerValue === undefined) continue;
-      innerMap.set(innerKey, innerValue);
+      innerMap.set(innerKey, encodeJsonValue(innerValue));
     }
     out.set(outerKey, innerMap);
   }
@@ -1065,7 +1104,7 @@ function decodeSymbolInstanceOverrides(map: Y.Map<Y.Map<unknown>>): SymbolInstan
         patch.content = decodeInlineRuns(value as Y.Array<Y.Map<unknown>>);
         continue;
       }
-      patch[field] = value;
+      patch[field] = decodeJsonValue(value);
     }
     out[elementId] = patch;
   }
@@ -1212,7 +1251,7 @@ function decodeCustomStyleKit(map: Y.Map<unknown>): StyleKitPreset {
       out[key] = decodeCustomStyleKit(value as Y.Map<unknown>);
       continue;
     }
-    out[key] = value;
+    out[key] = decodeJsonValue(value);
   }
   return out as unknown as StyleKitPreset;
 }
@@ -1223,7 +1262,7 @@ function decodeNestedTokenRecord(
   const out: Record<string, Record<string, unknown>> = {};
   for (const [outerKey, innerMap] of map.entries()) {
     const inner: Record<string, unknown> = {};
-    for (const [innerKey, innerValue] of innerMap.entries()) inner[innerKey] = innerValue;
+    for (const [innerKey, innerValue] of innerMap.entries()) inner[innerKey] = decodeJsonValue(innerValue);
     out[outerKey] = inner;
   }
   return out;

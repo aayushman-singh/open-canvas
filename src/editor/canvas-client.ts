@@ -1159,8 +1159,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function scheduleSave() {
     captureForUndo();
-    coEditSync();
-    if (coEditConnection) return;
+    var coEditSent = coEditSync();
+    if (coEditConnection) {
+      if (coEditSent) {
+        setStatus("Synced", "ok");
+      } else {
+        setStatus("Co-edit disconnected; changes not saved", "error");
+      }
+      return;
+    }
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveTimer = null;
@@ -6250,11 +6257,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // --------------------------------------------------------------------
 
   var coEditConnection = null;
+  var coEditSocketOpen = false;
 
   function coEditSync() {
     if (coEditConnection && state) {
       coEditConnection.applyLocalState(state);
+      return coEditSocketOpen;
     }
+    return false;
   }
 
   function attachCoEdit() {
@@ -6265,8 +6275,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var scheme = location.protocol === "https:" ? "wss:" : "ws:";
     var wsUrl = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID) + (WS_TOKEN ? "&wsToken=" + encodeURIComponent(WS_TOKEN) : "");
 
+    coEditSocketOpen = false;
     var conn = window.__rev01CoEdit.connectCoEdit(SITE_ID, state, {
       websocketUrl: wsUrl,
+      websocketFactory: function(url) {
+        var socket = new WebSocket(url);
+        socket.addEventListener("open", function() {
+          coEditSocketOpen = true;
+          coEditSync();
+          setStatus("Synced", "ok");
+        });
+        socket.addEventListener("close", function() {
+          coEditSocketOpen = false;
+          setStatus("Co-edit disconnected; changes not saved", "error");
+        });
+        socket.addEventListener("error", function() {
+          coEditSocketOpen = false;
+          setStatus("Co-edit failed; changes not saved", "error");
+        });
+        return socket;
+      },
     });
 
     conn.onRemoteState(function(newState) {
@@ -6302,6 +6330,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     coEditConnection = conn;
 
     window.addEventListener("beforeunload", function() {
+      coEditSocketOpen = false;
       conn.destroy();
     });
   }

@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { and, eq } from 'drizzle-orm';
 import ownerAssetsApi from './assets/route';
 import landing from './landing';
 import { dashboard } from './routes/dashboard';
@@ -58,10 +57,11 @@ import {
 import { clerkAuth, editTokenAuth } from './auth/middleware';
 import editTokenRefreshRoute from './auth/refresh-route';
 import { requireAuth } from './auth/require-auth';
+import { verifyEditToken } from './auth/edit-token';
 import { db } from './db/client';
-import { customer, site } from './db/schema';
 import onSiteEditRoute from './routes/api/on-site-edit';
 import collaboratorsApi from './routes/api/collaborators';
+import { hasLiveEditorSocketAccess } from './live/editor-auth';
 
 const app = new Hono<PublicEnv>();
 
@@ -94,12 +94,7 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-app.get('/__live', clerkAuth(), requireAuth(), async (c) => {
-  const auth = c.get('auth');
-  if (!auth.userId) {
-    throw new Error('__live editor route reached without authenticated user');
-  }
-
+app.get('/__live', async (c) => {
   const siteId = c.req.query('siteId');
   if (!siteId || !/^[A-Za-z0-9-]+$/.test(siteId)) {
     return c.text('site not found', 404);
@@ -110,24 +105,16 @@ app.get('/__live', clerkAuth(), requireAuth(), async (c) => {
     return c.text('expected websocket upgrade', 426);
   }
 
-  const database = db(c.env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) {
-    return c.text('site not found', 404);
+  const wsToken = c.req.query('wsToken');
+  const payload = await verifyEditToken(wsToken, c.env.UNLOCK_SIGNING_SECRET);
+  if (!payload || payload.siteId !== siteId) {
+    return c.text('unauthorized', 401);
   }
 
-  const ownedRows = await database
-    .select({ id: site.id })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  if (!ownedRows[0]) {
-    return c.text('site not found', 404);
+  const database = db(c.env);
+  const hasAccess = await hasLiveEditorSocketAccess(database, siteId, payload.customerId);
+  if (!hasAccess) {
+    return c.text('unauthorized', 401);
   }
 
   const id = c.env.SITE_ROOM.idFromName(siteId);
