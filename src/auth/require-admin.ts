@@ -27,9 +27,8 @@ export function requireAdmin() {
     Bindings: AdminBindings;
     Variables: ClerkAuthVariables;
   }>(async (c, next) => {
-    // REVIEW: `c.get('auth')` may return `undefined` if Clerk middleware hasn't run or failed silently. Accessing `.userId` on undefined would throw "Cannot read properties of undefined". Add a null check: `if (!auth?.userId)`.
     const auth = c.get('auth');
-    if (!auth.userId) {
+    if (!auth?.userId) {
       return c.json({ error: 'unauthorized' }, 401);
     }
     const adminIds = resolveAdminIds(c.env.ADMIN_CLERK_USER_IDS);
