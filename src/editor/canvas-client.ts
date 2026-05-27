@@ -2943,7 +2943,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           if (m.type === "strike") inner = "<s>" + inner + "</s>";
           if (m.type === "code") inner = "<code>" + inner + "</code>";
           if (m.type === "highlight") inner = "<mark>" + inner + "</mark>";
-          // REVIEW (XSS): href only escapes quotes but does not validate the scheme. A link mark with `href: "javascript:alert(1)"` renders an executable link when this HTML is set via innerHTML at the contenteditable. Reject or strip javascript:/data: schemes here.
+          // REVIEW (XSS): href only escapes quotes but does not validate the scheme. A link mark with href="javascript:alert(1)" renders an executable link when this HTML is set via innerHTML at the contenteditable. Reject or strip javascript:/data: schemes here.
           if (m.type === "link") inner = "<a href=\"" + m.href.replace(/"/g, "&quot;") + "\">" + inner + "</a>";
         }
         out += inner;
