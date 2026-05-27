@@ -99,6 +99,7 @@ export async function searchSite(opts: SearchSiteOptions): Promise<SearchHit[]> 
   // parameters. There is no path from `q` or `siteId` into the SQL text.
   // `TS_HEADLINE_OPTIONS` is a module constant; `sql.raw` is used only on
   // that constant, never on user input.
+  // REVIEW: `sql.raw()` on any string is a code smell even when the value is a module constant today. If `TS_HEADLINE_OPTIONS` is ever refactored to accept dynamic input, this becomes SQL injection. Consider binding it as a parameter or adding a `// SQL-SAFE: static constant` annotation with a grep-enforced lint rule.
   const headlineOpts = sql.raw(`'${TS_HEADLINE_OPTIONS}'`);
   const query = sql`
     SELECT

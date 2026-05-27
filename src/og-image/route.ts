@@ -170,10 +170,8 @@ export async function resolveOgRequest(
     if (assetRow) {
       return { status: 'override', contentHash: assetRow.contentHash };
     }
-    // Asset missing — fall through to the rendered card. We do not throw
-    // because the published snapshot already passed the publish guard;
-    // surfacing as "render the default" is the least surprising visitor
-    // experience.
+    // REVIEW: silent fallback to default card when the owner's OG image asset is missing. Per all-or-nothing posture, a dangling assetId is data corruption — the publish guard should have caught it. Falling through masks the underlying issue. At minimum log a warning so operators can detect it.
+    // Asset missing — fall through to the rendered card.
   }
 
   const preset = resolveStyleKitPreset(snapshot);
