@@ -744,6 +744,281 @@ Exhaustive inventory of testable features for end-to-end coverage.
 
 ---
 
+## 45. Site-Level Sidebar Navigation
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 45.1 | Sidebar renders on site pages | Any `/dashboard/sites/:id/*` page shows left sidebar with 9 links | — |
+| 45.2 | Active page highlighted | Current page link has `aria-current="page"` and visual highlight | — |
+| 45.3 | All 9 links present | Editor, Settings, Navigation, Forms, Versions, Domains, Addons, Accessibility, Chat | — |
+| 45.4 | "All sites" back link | Clicking "← All sites" navigates to `/dashboard` | — |
+| 45.5 | No sidebar on global pages | Dashboard, Templates, Shop, Settings, Profile have NO sidebar | — |
+| 45.6 | Site name in sidebar header | Sidebar shows site name in uppercase label | — |
+
+---
+
+## 46. Rich Text Editing
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 46.1 | contenteditable activation | Clicking a text element makes it editable | — |
+| 46.2 | Bold shortcut | Ctrl+B toggles bold on selected text | — |
+| 46.3 | Italic shortcut | Ctrl+I toggles italic on selected text | — |
+| 46.4 | Underline shortcut | Ctrl+U toggles underline on selected text | — |
+| 46.5 | Link shortcut | Ctrl+K opens link insertion modal | — |
+| 46.6 | Floating mark toolbar | Selecting text shows toolbar with 7 mark buttons | — |
+| 46.7 | Mark persistence | Bold/italic marks survive save + reload | — |
+| 46.8 | Paste handling | Pasting formatted text preserves bold/italic/link marks | — |
+| 46.9 | Adjacent run merging | Typing "abc" then bolding "b" produces 3 runs, not more | — |
+| 46.10 | Semantic role select | Inspector shows heading/body/label role dropdown | — |
+| 46.11 | DOM parser round-trip | Edit text → blur → re-select → content matches what was typed | — |
+
+---
+
+## 47. AI Chat Panel (Editor)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 47.1 | Chat button in topbar | Editor topbar shows "Chat" button | — |
+| 47.2 | Panel toggle | Clicking Chat opens 360px slide-out panel on right | — |
+| 47.3 | Panel close | Clicking × or Chat again closes the panel | — |
+| 47.4 | Input field | Panel has text input with "Ask the agent..." placeholder | — |
+| 47.5 | Send button | Panel has Send button that submits the message | — |
+| 47.6 | User message display | Sent message appears as user bubble (right-aligned) | — |
+| 47.7 | SSE streaming tokens | Assistant response streams in token by token | — |
+| 47.8 | Session persistence | Session ID returned on first message, reused on subsequent | — |
+| 47.9 | op-preview Accept | Tool preview shows "Accept" button; clicking calls /apply | — |
+| 47.10 | Canvas update on accept | Accepting an op-preview updates the canvas in real-time | — |
+| 47.11 | Error display | API errors shown as error-styled message bubble | — |
+| 47.12 | Busy state | Send button disabled while waiting for response | — |
+
+---
+
+## 48. AI Agent Prompt (Editor)
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 48.1 | AI button in topbar | Editor topbar shows cyan "AI" button | — |
+| 48.2 | Prompt modal | Clicking AI opens text modal with "Describe the change..." | — |
+| 48.3 | Preview flow | Submitting prompt calls /canvas-agent/preview and shows result panel | — |
+| 48.4 | Accept/dismiss | Preview panel has Accept and Dismiss buttons | — |
+| 48.5 | Canvas update on accept | Accepting applies ops and updates canvas state | — |
+| 48.6 | AI section button | Each section toolbar has "AI section" button | — |
+| 48.7 | AI rewrite on text | Text inspector shows "AI rewrite" button | — |
+| 48.8 | Busy state | All AI buttons disabled while one AI operation is in progress | — |
+
+---
+
+## 49. AI Image Generation
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 49.1 | Generate from media inspector | Media inspector has AI generation button | — |
+| 49.2 | Aspect ratio presets | 8 options: 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, 2:3, 21:9 | — |
+| 49.3 | Replicate integration | POST to Replicate Flux Schnell model | — |
+| 49.4 | Generated image replaces element | Result uploaded as ownerAsset and set on element | — |
+| 49.5 | Missing API key error | Clear error when REPLICATE_API_TOKEN not configured | — |
+
+---
+
+## 50. Scroll Entrance Animations
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 50.1 | Observer injected | Published site HTML contains IntersectionObserver script | — |
+| 50.2 | Elements start hidden | `[data-entrance]` elements have `opacity: 0` initially | — |
+| 50.3 | Scroll triggers animation | Scrolling element into viewport adds `data-visible` attribute | — |
+| 50.4 | Animate once | Observer unobserves after triggering (no re-animation on scroll back) | — |
+| 50.5 | Kit-derived timing | Transition uses `--motion-duration` and `--motion-easing` CSS vars | — |
+| 50.6 | No script when no animations | If no elements have `data-entrance`, observer script still present but no-ops | — |
+| 50.7 | Not in editor | Editor does NOT have the entrance observer (animations are publish-only) | — |
+
+---
+
+## 51. Form Email Notifications
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 51.1 | Email sent on submission | Successful form submission triggers Resend email to site owner | — |
+| 51.2 | Non-blocking | Form response returns before email sends (fire-and-forget) | — |
+| 51.3 | Email content | Contains form ID, timestamp, link to forms inbox | — |
+| 51.4 | Email failure non-fatal | Failed email send does not break form submission success | — |
+| 51.5 | Owner email resolution | Resolves email via site → customer → email join | — |
+
+---
+
+## 52. Section Background Video
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 52.1 | Video element emitted | Section with `backgroundVideo` renders `<video>` as first child | — |
+| 52.2 | Autoplay + muted | Video has `autoplay loop muted playsinline` attributes | — |
+| 52.3 | Full cover | Video styled `position:absolute; inset:0; object-fit:cover` | — |
+| 52.4 | aria-hidden | Background video has `aria-hidden="true"` | — |
+| 52.5 | No video when absent | Sections without `backgroundVideo` emit no `<video>` tag | — |
+
+---
+
+## 53. Popup/Modal Sections
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 53.1 | Section marked as popup | `data-rev01-popup="true"` + trigger type/value attributes emitted | — |
+| 53.2 | Initially hidden | Popup sections have `display: none` initially | — |
+| 53.3 | Exit-intent trigger | Popup shows when mouse leaves viewport top (`clientY <= 0`) | — |
+| 53.4 | Delay trigger | Popup shows after N milliseconds | — |
+| 53.5 | Scroll trigger | Popup shows when scroll percentage >= value | — |
+| 53.6 | Dismissal persistence | Dismissed popup stays dismissed (localStorage per section ID) | — |
+| 53.7 | Close button | Popup has close/dismiss mechanism | — |
+
+---
+
+## 54. Background Effects
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 54.1 | data-bg-effect attribute | Sections emit `data-bg-effect="grain"` (or grid/soft-light/paper/glass) | — |
+| 54.2 | Validator accepts effects | `backgroundEffect` values validated against allowed set | — |
+| 54.3 | Agent can set effects | `designSection` tool accepts `backgroundEffect` parameter | — |
+| 54.4 | Effects preserved in Yjs | Round-trip through Y.Doc projection maintains backgroundEffect | — |
+
+---
+
+## 55. i18n & RTL Support
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 55.1 | RTL detection | Arabic/Farsi/Hebrew/Urdu locales trigger RTL | — |
+| 55.2 | HTML dir attribute | `<html lang="ar" dir="rtl">` emitted for RTL locales | — |
+| 55.3 | Coordinate mirroring | RTL layouts mirror element x-coordinates | — |
+| 55.4 | BCP-47 resolution | Full locale code resolved with fallback chain | — |
+| 55.5 | Per-page locale routing | `/<locale>/<slug>` URL structure served correctly | — |
+
+---
+
+## 56. Visitor Light/Dark Mode
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 56.1 | Dual palette CSS | Published site has both light and dark `:root` rules | — |
+| 56.2 | Early script | Inline script sets mode before first paint (no flash) | — |
+| 56.3 | prefers-color-scheme | Respects system preference when no localStorage value | — |
+| 56.4 | localStorage persistence | Toggle choice persisted across visits | — |
+| 56.5 | Toggle element | Visitor-facing toggle button switches modes | — |
+| 56.6 | Pre-computed dark palettes | Built-in kits have calculated dark variants (not just inverted) | — |
+
+---
+
+## 57. Plan Limits & Gating
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 57.1 | Dashboard shows limit | "3 of 3 on Free" in stat card | PASS |
+| 57.2 | Dashboard button gated | "+ New site" becomes "Upgrade to add sites" at limit | PASS |
+| 57.3 | Templates page gated | "Create site" replaced with "Upgrade" message at limit | — |
+| 57.4 | API enforces limit | `POST /api/sites` returns 403 at limit | — |
+| 57.5 | Usage meters | Settings page shows sites/storage/AI generations with progress bars | PASS |
+
+---
+
+## 58. Element Inspector Panels
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 58.1 | Text inspector | Semantic role, font size, font weight, alignment, AI rewrite button | — |
+| 58.2 | Action inspector | 7 variants, label input, link type (external/page), destination picker | — |
+| 58.3 | Shape inspector | 6 shape variants via dropdown | — |
+| 58.4 | Container inspector | 7 surface variants via dropdown | — |
+| 58.5 | Media inspector | Upload/history/gallery, alt text, fit mode, AI generate, video controls | — |
+| 58.6 | Chart inspector | Kind picker (5 types), data grid, axis titles, legend toggle | — |
+| 58.7 | Motion controls (all) | Motion preset dropdown (16 presets), delay input (0-2000ms) | — |
+| 58.8 | Z-order controls (all) | Bring forward / send backward buttons | — |
+| 58.9 | Reading-order controls (all) | Reorder in DOM for assistive tech | — |
+
+---
+
+## 59. Section Toolbar
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 59.1 | Section actions | Duplicate, delete, move up, move down | — |
+| 59.2 | Save to library | Section toolbar has "Save to library" button | — |
+| 59.3 | Convert to symbol | Section toolbar has "Sym" button to create SymbolMaster | — |
+| 59.4 | AI section | Section toolbar has "AI section" button for agent-driven design | — |
+| 59.5 | Element add buttons | Per-section quick-add buttons: +T(text), +▷(media), +◇(shape), +□(container), +📊(chart) | — |
+
+---
+
+## 60. Page SEO Settings
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 60.1 | SEO link in Pages tab | Each page in editor Pages tab has "SEO" link | — |
+| 60.2 | Title field | Title input with 60-character counter | — |
+| 60.3 | Description field | Description textarea with 160-character counter | — |
+| 60.4 | noIndex toggle | Checkbox to exclude page from search engines | — |
+| 60.5 | Canonical URL | Optional canonical URL input | — |
+| 60.6 | Locale field | BCP-47 locale input | — |
+| 60.7 | Character count warnings | Counter turns warning color near limit | — |
+
+---
+
+## 61. JSON-LD Structured Data
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 61.1 | Script tag emitted | Published pages have `<script type="application/ld+json">` | — |
+| 61.2 | Valid JSON | JSON-LD parses correctly | — |
+| 61.3 | Required fields | Contains @context, @type, name | — |
+| 61.4 | Description included | Pages with description include it in JSON-LD | — |
+| 61.5 | URL included | Canonical URL present as `url` field | — |
+| 61.6 | Image included | OG image present as `image` field when available | — |
+| 61.7 | Safe encoding | Special characters don't produce raw `</script>` in output | — |
+
+---
+
+## 62. Canvas Validation
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 62.1 | Page width bounds | Width outside 960-1920px rejected | — |
+| 62.2 | Section height bounds | Height outside 240-1400px rejected | — |
+| 62.3 | Element type validation | Unknown element types rejected | — |
+| 62.4 | Href scheme validation | Only http, https, mailto, tel, internal paths, anchors allowed | — |
+| 62.5 | Inline mark validation | Only 7 recognized mark types accepted | — |
+| 62.6 | All errors collected | Validator collects ALL errors, never fails fast | — |
+| 62.7 | Background effect validation | Only grain/grid/soft-light/paper/glass/none accepted | — |
+
+---
+
+## 63. Asset Deduplication & Integrity
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 63.1 | Content-hash dedup | Uploading same bytes twice → same R2 key, two ownerAsset rows | — |
+| 63.2 | Image dimension probing | PNG/JPEG/GIF/WebP dimensions detected from magic bytes | — |
+| 63.3 | Cross-owner dedup | Two owners uploading same file share R2 object, separate rows | — |
+| 63.4 | Cascade delete | Deleting ownerAsset cleans up R2 only when no siblings remain | — |
+| 63.5 | Reference report | Delete flow reports which elements reference the asset before confirming | — |
+
+---
+
+## 64. Embed CSP & Provider Resolution
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 64.1 | YouTube resolution | youtube.com and youtu.be URLs → YouTube embed | — |
+| 64.2 | Vimeo resolution | vimeo.com URLs → Vimeo embed | — |
+| 64.3 | Figma resolution | figma.com URLs → Figma embed | — |
+| 64.4 | Google Maps resolution | maps.google.com, goo.gl/maps → Maps embed | — |
+| 64.5 | Generic iframe fallback | Unknown URLs → sandboxed iframe | — |
+| 64.6 | CSP frame-src | Content-Security-Policy includes only used providers | — |
+| 64.7 | Sandbox attributes | All embeds have `allow-scripts allow-same-origin allow-popups allow-forms` | — |
+| 64.8 | Lazy loading | Embeds have `loading="lazy"` | — |
+| 64.9 | Invalid URL placeholder | Invalid embed URL shows placeholder instead of broken iframe | — |
+
+---
+
 ## Test Environment Notes
 
 - **Auth**: Tests will need Clerk test mode or mock auth tokens
