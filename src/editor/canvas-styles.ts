@@ -273,7 +273,7 @@ body.rev01-modal-open {
   top: 56px;
   left: 0;
   bottom: 28px;
-  width: 280px;
+  width: 320px;
   z-index: 150;
   min-width: 0;
   border-right: 1px solid var(--rev01-hairline);
@@ -634,10 +634,15 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-viewport {
   position: relative;
   overflow: hidden;
-  background:
+  background-color: #07101f;
+  background-image:
+    linear-gradient(oklch(0.95 0.02 240 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.95 0.02 240 / 0.05) 1px, transparent 1px),
     radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
     linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
-  margin-left: 300px;
+  background-size: 32px 32px, 32px 32px, auto, auto;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+  margin-left: 340px;
   margin-right: 320px;
   height: calc(100vh - 56px);
   display: block;
@@ -657,7 +662,7 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-zoom-toolbar {
   position: fixed;
   top: 64px;
-  left: 268px;
+  left: 308px;
   z-index: 160;
   width: max-content;
   display: inline-flex;
