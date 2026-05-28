@@ -396,7 +396,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
       ].join('; ');
       return new Response(null, {
         status: 302,
-        headers: { Location: '/__edit', 'Set-Cookie': cookie },
+        headers: { Location: '/?edit', 'Set-Cookie': cookie },
       });
     }
   }
@@ -449,7 +449,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
         if (e.data.siteId !== ${siteIdJson}) return;
         if (e.data.state !== authState) return;
         if (e.data.token) {
-          location.href = "/__edit?__transfer=" + encodeURIComponent(e.data.token);
+          location.href = "/?edit&__transfer=" + encodeURIComponent(e.data.token);
         } else {
           location.reload();
         }
@@ -566,7 +566,7 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   return new Response(null, {
     status: 302,
     headers: {
-      Location: '/__edit',
+      Location: '/?edit',
       'Set-Cookie': cookieValue,
     },
   });
@@ -627,7 +627,7 @@ function buildPublishedFooterHtml(): string {
   onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
   >made with rev01</a
   ><span style="opacity:0.3">&middot;</span
-  ><a href="/__edit"
+  ><a href="/?edit"
   style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
   onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
   >edit this site</a
@@ -672,12 +672,12 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return c.text('site not found', 404);
   }
 
-  // On-site editor: /__edit serves the canvas editor on the published
-  // subdomain. /__api/* falls through to the app router where duplicated
-  // API mounts with edit-token auth handle the request. Both bypass the
-  // publishedSnapshot and password-gate checks — the editor operates on
-  // editableState and the edit token proves ownership.
-  if (path === '/__edit') {
+  // On-site editor: `/?edit` on the published subdomain serves the canvas
+  // editor instead of the published snapshot. /__api/* falls through to the
+  // app router where duplicated API mounts with edit-token auth handle the
+  // request. Both bypass the publishedSnapshot and password-gate checks —
+  // the editor operates on editableState and the edit token proves ownership.
+  if (path === '/' && requestUrl.searchParams.has('edit')) {
     return handleOnSiteEdit(c, siteRow);
   }
   if (path === '/__accept-invite') {
