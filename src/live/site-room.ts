@@ -9,27 +9,11 @@
 // Keyed by site.id via SITE_ROOM.idFromName(siteId). One DO per Published
 // Site; Visitors are not auth-gated (Visitor !== Owner).
 //
-// ----------------------------------------------------------------------------
-// Phase 0 — Yjs message envelope scaffold.
-//
-// The five message kinds reserved below (`y-sync-step1`, `y-sync-step2`,
-// `y-update`, `awareness-update`, `editable-state-replaced`) are the contract
-// that Wave 1 #3 (version history) and #4 (co-edit) consume. Their handlers
-// throw with a clear TODO so a misrouted client during Phase 0 fails loudly
-// rather than silently no-oping.
-//
-// The four Yjs sync kinds (every kind ending in `-update` or starting with
-// `y-`) carry `Uint8Array` payloads that we base64-encode inside the JSON
-// envelope so the WebSocket text frames stay opaque-string clean. The two
-// helpers `encodeBytesField` / `decodeBytesField` keep that contract in one
-// place so Wave 1 #4 doesn't re-invent the encoding.
-//
-// The `editable-state-replaced` kind is the server→client broadcast that
-// Wave 1 #3 fires from its restore handler — the version-history restore
-// path calls `SiteRoom.broadcast` with this kind to flip every connected
-// editor to the restored state. The Phase 0 scaffold defines the shape and
-// leaves the handler body to Wave 1.
-// ----------------------------------------------------------------------------
+// Yjs message envelopes (`y-sync-step1`, `y-sync-step2`, `y-update`,
+// `awareness-update`, `editable-state-replaced`) carry binary payloads
+// base64-encoded into JSON so WebSocket text frames stay opaque-string clean.
+// Envelope shapes + the byte helpers live in `./site-room-protocol.ts` so
+// browser-bundled consumers don't need to import `cloudflare:workers`.
 
 import { DurableObject } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
@@ -70,7 +54,7 @@ interface SiteRoomEnv {
 }
 
 // ----------------------------------------------------------------------------
-// Existing message kinds (Phase 0 unchanged)
+// Message kinds
 // ----------------------------------------------------------------------------
 
 interface BroadcastPayload {
@@ -121,9 +105,9 @@ function isBroadcastPayload(value: unknown): value is BroadcastPayload {
 //
 // Defined in `./site-room-protocol.ts` so consumers that need only the wire
 // shape (browser-bundled editor, Bun-runnable smokes) don't pull
-// `cloudflare:workers` through this module. We re-export here so the
-// existing import surface (`from '../site-room'`) keeps working byte-for-
-// byte — Phase 0 marked this surface frozen and we don't break the contract.
+// `cloudflare:workers` through this module. Re-exported here so the
+// previously-frozen import surface (`from '../site-room'`) keeps working
+// byte-for-byte for any consumer already wired against it.
 // ----------------------------------------------------------------------------
 
 export {
@@ -243,6 +227,13 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
   private currentOriginSocket: WebSocket | null = null;
   /** Optional test hooks; production stays at defaults. */
   private testHooks: SiteRoomTestHooks | null = null;
+  /**
+   * Throttle map keyed by log tag — a misbehaving client that sends garbage
+   * every WS frame would otherwise drown the DO logs. We keep one timestamp
+   * per category and skip emitting the same tag more than once per window.
+   */
+  private lastLogAtMs: Map<string, number> = new Map();
+  private static readonly LOG_THROTTLE_WINDOW_MS = 5_000;
 
   override async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -263,11 +254,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       }
       const message = JSON.stringify(payload);
       for (const ws of this.ctx.getWebSockets()) {
-        try {
-          ws.send(message);
-        } catch (error) {
-          console.error('[SiteRoom] broadcast send failed', error);
-        }
+        this.safeSend(ws, message, '[SiteRoom] broadcast send failed');
       }
       // Update presence after a broadcast too — keeps a fresh count visible.
       this.broadcastPresence();
@@ -374,11 +361,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       for (const ws of this.ctx.getWebSockets()) {
         if (ws === origin) continue;
         if (!this.isEditorSocket(ws)) continue;
-        try {
-          ws.send(message);
-        } catch (error) {
-          console.error('[SiteRoom] y-update fan-out failed', error);
-        }
+        this.safeSend(ws, message, '[SiteRoom] y-update fan-out failed');
       }
     };
     this.yDoc.on('update', this.docUpdateObserver);
@@ -404,11 +387,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       for (const ws of this.ctx.getWebSockets()) {
         if (ws === origin) continue;
         if (!this.isEditorSocket(ws)) continue;
-        try {
-          ws.send(message);
-        } catch (error) {
-          console.error('[SiteRoom] awareness fan-out failed', error);
-        }
+        this.safeSend(ws, message, '[SiteRoom] awareness fan-out failed');
       }
     };
     this.awareness.on('update', this.awarenessUpdateObserver);
@@ -489,23 +468,31 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       parsed =
         typeof raw === 'string' ? JSON.parse(raw) : JSON.parse(new TextDecoder().decode(raw));
     } catch (error) {
-      console.error('[SiteRoom] rejected non-JSON websocket message', error);
+      // A misbehaving client can hammer non-JSON frames; throttle the log so
+      // it doesn't drown out everything else the DO has to say.
+      this.logThrottled('[SiteRoom] rejected non-JSON websocket message', error);
       return;
     }
 
     if (!isSiteRoomMessage(parsed)) {
-      console.error('[SiteRoom] rejected unknown websocket message kind', parsed);
+      this.logThrottled('[SiteRoom] rejected unknown websocket message kind', parsed);
       return;
     }
 
     if (!this.isEditorSocket(ws)) {
-      console.error('[SiteRoom] rejected visitor websocket message', parsed);
+      this.logThrottled('[SiteRoom] rejected visitor websocket message', parsed);
       return;
     }
 
-    // Lazy-hydrate the Y.Doc on first message rather than on first connect —
-    // this lets the smoke harness prime the doc explicitly before either
-    // client sends step1.
+    // Lazy-hydrate the Y.Doc on first message rather than on first connect.
+    //
+    // Tradeoff: this defers the Postgres read until a real Yjs frame arrives,
+    // which keeps idle WebSocket connects (visitors, dead tabs, port-scans)
+    // off the DB. It also lets the smoke harness call `__primeForTest()`
+    // between accept and the first inbound frame, so the smoke can seed an
+    // in-memory doc without a DB round-trip. Both reasons are deliberate —
+    // production behaviour is "don't hit Postgres until we have to" and the
+    // smoke contract is "prime before first frame".
     if (this.yDoc === null) {
       try {
         await this.ensureHydrated();
@@ -531,22 +518,14 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
             type: 'y-sync-step2',
             update: encodeBytesField(handleSyncStep1(doc, stateVector)),
           };
-          try {
-            ws.send(JSON.stringify(reply));
-          } catch (error) {
-            console.error('[SiteRoom] y-sync-step2 reply send failed', error);
-          }
+          this.safeSend(ws, JSON.stringify(reply), '[SiteRoom] y-sync-step2 reply send failed');
           // Also send our own state vector so the client can ship US the
           // updates we don't yet have (symmetric client-server sync).
           const ourStep1: YSyncStep1Envelope = {
             type: 'y-sync-step1',
             stateVector: encodeBytesField(encodeStateVector(doc)),
           };
-          try {
-            ws.send(JSON.stringify(ourStep1));
-          } catch (error) {
-            console.error('[SiteRoom] y-sync-step1 reply send failed', error);
-          }
+          this.safeSend(ws, JSON.stringify(ourStep1), '[SiteRoom] y-sync-step1 reply send failed');
           // Bootstrap awareness for the new peer — ship our current view of
           // every connected client's presence so they render without
           // waiting for the next setLocalState bump.
@@ -557,11 +536,11 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
               type: 'awareness-update',
               update: encodeBytesField(update),
             };
-            try {
-              ws.send(JSON.stringify(envelope));
-            } catch (error) {
-              console.error('[SiteRoom] initial awareness send failed', error);
-            }
+            this.safeSend(
+              ws,
+              JSON.stringify(envelope),
+              '[SiteRoom] initial awareness send failed',
+            );
           }
           return;
         }
@@ -580,8 +559,12 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
         case 'editable-state-replaced': {
           // Wave 1 #3 broadcasts this kind FROM the server. Clients never
           // send it upstream — a client→server occurrence is a protocol
-          // violation. Reject and log loudly per the project's posture.
-          console.error('[SiteRoom] rejected client-originated editable-state-replaced');
+          // violation. Reject and log loudly per the project's posture
+          // (throttled so a stuck client doesn't drown the DO logs).
+          this.logThrottled(
+            '[SiteRoom] rejected client-originated editable-state-replaced',
+            parsed,
+          );
           return;
         }
         default: {
@@ -620,11 +603,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
     const count = this.ctx.getWebSockets().length;
     const message = JSON.stringify({ type: 'presence', count });
     for (const ws of this.ctx.getWebSockets()) {
-      try {
-        ws.send(message);
-      } catch (error) {
-        console.error('[SiteRoom] presence send failed', error);
-      }
+      this.safeSend(ws, message, '[SiteRoom] presence send failed');
     }
   }
 
@@ -636,12 +615,41 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
     for (const ws of this.ctx.getWebSockets()) {
       if (skip !== null && ws === skip) continue;
       if (!this.isEditorSocket(ws)) continue;
+      this.safeSend(ws, message, errorMessage);
+    }
+  }
+
+  /**
+   * Send a message to a socket; on send failure, log loudly and evict the
+   * socket so we don't keep fanning out to a dead handle. Cloudflare's
+   * hibernation API surfaces sends to dead sockets as throws — once that
+   * happens the socket is unusable and `close()` is the documented cleanup.
+   */
+  private safeSend(ws: WebSocket, message: string, errorTag: string): void {
+    try {
+      ws.send(message);
+    } catch (error) {
+      this.logThrottled(errorTag, error);
       try {
-        ws.send(message);
-      } catch (error) {
-        console.error(errorMessage, error);
+        ws.close(1011, 'send failed');
+      } catch {
+        // Already torn down — drop silently.
       }
     }
+  }
+
+  /**
+   * Rate-limited `console.error`. The first emission per tag inside the
+   * throttle window logs at full fidelity; subsequent emissions are
+   * silently dropped until the window rolls over. A persistent fault
+   * therefore reports once every 5s rather than once per frame.
+   */
+  private logThrottled(tag: string, payload: unknown): void {
+    const now = Date.now();
+    const last = this.lastLogAtMs.get(tag) ?? 0;
+    if (now - last < SiteRoom.LOG_THROTTLE_WINDOW_MS) return;
+    this.lastLogAtMs.set(tag, now);
+    console.error(tag, payload);
   }
 
   // ----------------------------------------------------------------------

@@ -9,7 +9,7 @@
 //   * An `Awareness` instance for presence broadcast.
 //   * A WebSocket to `/__live?siteId=<id>` (same endpoint the visitor
 //     presence-pill uses; see `src/routes/public.ts`).
-//   * Auto-reconnect with backoff.
+//   * Auto-reconnect with exponential backoff (capped + jittered).
 //
 // The editor host (`src/editor/canvas-client.ts`) consumes this module to
 // route mutations through the shared Y.Doc. Specifically:
@@ -103,8 +103,16 @@ export interface ConnectCoEditOptions {
   websocketUrl?: string;
   /** Inject a custom WebSocket factory — smokes pass a stub here. */
   websocketFactory?: (url: string) => WebSocketLike;
-  /** Reconnect delay in ms; defaults to 2000. */
+  /**
+   * Base delay (ms) for the first reconnect attempt. Subsequent attempts grow
+   * exponentially up to `reconnectMaxDelayMs`. Defaults to 1000ms.
+   *
+   * Name kept for source-compatibility with existing smoke harnesses that pin
+   * a large value here to suppress reconnects during in-process tests.
+   */
   reconnectDelayMs?: number;
+  /** Upper cap for the exponential backoff. Defaults to 30_000ms. */
+  reconnectMaxDelayMs?: number;
   /** Initial presence payload posted as soon as the socket opens. */
   initialPresence?: PresenceState;
 }
@@ -140,7 +148,9 @@ export interface WebSocketLike {
  *      remote-origin updates so we don't echo).
  *   4. Wires `awareness.on('update', …)` similarly for the awareness
  *      channel.
- *   5. Reconnects after `reconnectDelayMs` on close.
+ *   5. Reconnects on close with exponential backoff + full jitter — base
+ *      delay `reconnectDelayMs`, doubling per attempt, capped at
+ *      `reconnectMaxDelayMs`. A successful re-handshake resets the counter.
  */
 export function connectCoEdit(
   siteId: string,
@@ -152,11 +162,16 @@ export function connectCoEdit(
 
   const url = options?.websocketUrl ?? defaultWebsocketUrl(siteId);
   const factory = options?.websocketFactory ?? defaultWebsocketFactory;
-  const reconnectDelayMs = options?.reconnectDelayMs ?? 2000;
+  const reconnectBaseDelayMs = options?.reconnectDelayMs ?? 1000;
+  const reconnectMaxDelayMs = options?.reconnectMaxDelayMs ?? 30_000;
 
   let socket: WebSocketLike | null = null;
   let destroyed = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  // Consecutive failed reconnect attempts since the last successful open.
+  // Cleared to zero in the open handler so a long-stable connection that
+  // later drops starts retrying at the base delay rather than the last cap.
+  let reconnectAttempt = 0;
   const remoteStateHandlers = new Set<(state: EditableSite) => void>();
   const remotePresenceHandlers = new Set<(peers: Map<number, PresenceState>) => void>();
 
@@ -308,6 +323,9 @@ export function connectCoEdit(
     }
     socket = s;
     s.addEventListener('open', () => {
+      // Successful handshake — reset the backoff counter so the next outage
+      // starts retries fresh rather than continuing the previous escalation.
+      reconnectAttempt = 0;
       // Initial handshake — ship our state vector so the server can compute
       // the minimal diff to bring us up to date.
       const step1: YSyncStep1Envelope = {
@@ -341,10 +359,17 @@ export function connectCoEdit(
   function scheduleReconnect(): void {
     if (destroyed) return;
     if (reconnectTimer !== null) return;
+    // Exponential backoff with full jitter — base * 2^attempt, capped at the
+    // ceiling, then multiplied by [0.5, 1.0) so a SiteRoom restart doesn't
+    // see every editor reconnect on the same tick.
+    const exponential = reconnectBaseDelayMs * 2 ** reconnectAttempt;
+    const capped = Math.min(exponential, reconnectMaxDelayMs);
+    const jittered = Math.round(capped * (0.5 + Math.random() * 0.5));
+    reconnectAttempt += 1;
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect();
-    }, reconnectDelayMs);
+    }, jittered);
   }
 
   function applyLocalState(state: EditableSite): void {
