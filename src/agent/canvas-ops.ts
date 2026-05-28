@@ -2,10 +2,10 @@
 //
 // Pure agent-op layer for the Canvas AI flow (T7). Defines the discriminated
 // union of operations the canvas agent can request and a single
-// `applyCanvasAgentOp` function that produces a new `CanvasSiteState` for
+// `applyCanvasAgentOp` function that produces a new `EditableSite` for
 // each op. The function is pure: it deep-clones the input state via
 // `structuredClone`, mutates the clone, and returns it. The caller is
-// responsible for revalidating the result with `validateCanvasSiteState`.
+// responsible for revalidating the result with `validateEditableSite`.
 //
 // Operations cover:
 //   - Text & media edits: rewriteText, replaceMedia, updateElement, deleteElement, addElement
@@ -30,7 +30,7 @@ import type {
   BuiltInStyleKit,
   CanvasElement,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   InlineRun,
   MediaKind,
   SectionRecipeId,
@@ -97,7 +97,7 @@ export type CanvasAgentOp =
 // ---------------------------------------------------------------------------
 
 function findElementAcrossSite(
-  state: CanvasSiteState,
+  state: EditableSite,
   elementId: string,
 ): { element: CanvasElement; section: CanvasSection } {
   // Check header
@@ -129,7 +129,7 @@ type SectionLocation =
   | { kind: 'page'; pageIndex: number; sectionIndex: number };
 
 function findSectionAcrossSite(
-  state: CanvasSiteState,
+  state: EditableSite,
   sectionId: string,
 ): { section: CanvasSection; location: SectionLocation } {
   if (state.header && state.header.id === sectionId) {
@@ -158,7 +158,7 @@ function findSectionAcrossSite(
 // ---------------------------------------------------------------------------
 
 /**
- * Apply a single agent op to a `CanvasSiteState`. The input is left untouched
+ * Apply a single agent op to a `EditableSite`. The input is left untouched
  * — the returned state is always a fresh `structuredClone`. The caller MUST
  * revalidate the returned state because the apply step does not.
  *
@@ -172,7 +172,7 @@ function findSectionAcrossSite(
  *     any section in the page.
  *   - `createSectionFromRecipe` itself rejects the recipe id (unknown id).
  */
-export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): CanvasSiteState {
+export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): EditableSite {
   const next = structuredClone(state);
   const page = next.pages[0];
   if (!page) {
@@ -297,7 +297,7 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
       };
     }
     // Apply type-specific patches — spread remaining fields onto the element.
-    // validateCanvasSiteState will catch invalid fields.
+    // validateEditableSite will catch invalid fields.
     const sharedKeys = new Set(['box', 'motion', 'elementStyle', 'responsive']);
     for (const [key, value] of Object.entries(patch)) {
       if (!sharedKeys.has(key) && value !== undefined) {
@@ -502,7 +502,7 @@ export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): C
  * On accept the orchestrator inserts the already-resolved section.
  */
 export function resolveDesignOp(
-  state: CanvasSiteState,
+  state: EditableSite,
   input: DesignSectionInput,
 ): DesignSectionResult {
   const page = state.pages[0];

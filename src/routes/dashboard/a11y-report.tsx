@@ -17,7 +17,7 @@ import { Hono } from 'hono';
 
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import type { CanvasSiteState } from '../../canvas/schema';
+import type { EditableSite } from '../../canvas/schema';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { runAudit, type AuditIssue } from '../../a11y/audit';
@@ -100,7 +100,7 @@ const pageStyles = `
 interface OwnedSiteRow {
   id: string;
   name: string;
-  editableState: CanvasSiteState;
+  editableState: EditableSite;
 }
 
 async function lookupOwnedSite(

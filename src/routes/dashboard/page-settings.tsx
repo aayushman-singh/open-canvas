@@ -30,7 +30,7 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import type { CanvasPage, CanvasSiteState, StyleKitPreset } from '../../canvas/schema';
+import type { CanvasPage, EditableSite, StyleKitPreset } from '../../canvas/schema';
 import { getStyleKitPreset } from '../../canvas/style-kits';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
@@ -572,7 +572,7 @@ async function lookupOwnedPage(
   const row = rows[0];
   if (!row) return null;
 
-  const state = row.editableState as CanvasSiteState | null;
+  const state = row.editableState as EditableSite | null;
   if (!state) return null;
   const page = state.pages.find((p) => p.id === pageId);
   if (!page) return null;

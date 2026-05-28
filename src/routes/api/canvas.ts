@@ -10,10 +10,10 @@ import { requireAuth } from '../../auth/require-auth';
 import {
   STYLE_KITS,
   type CanvasPage,
-  type CanvasSiteState,
+  type EditableSite,
   type StyleKit,
 } from '../../canvas/schema';
-import { validateCanvasSiteState } from '../../canvas/validate';
+import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { ownerAsset, site } from '../../db/schema';
 
@@ -67,10 +67,10 @@ function setOptionalPageField<K extends keyof CanvasPage>(
 }
 
 function patchEditablePage(
-  state: CanvasSiteState,
+  state: EditableSite,
   pageId: string,
   patch: (page: CanvasPage) => CanvasPage,
-): CanvasSiteState | null {
+): EditableSite | null {
   let found = false;
   const pages = state.pages.map((page) => {
     if (page.id !== pageId) return page;
@@ -85,10 +85,10 @@ async function persistEditableState(
   c: Context<Env>,
   siteId: string,
   ownerCustomerId: string,
-  nextState: CanvasSiteState,
+  nextState: EditableSite,
   extraSiteFields: { styleKit?: StyleKit } = {},
 ): Promise<Response | null> {
-  const validation = validateCanvasSiteState(nextState);
+  const validation = validateEditableSite(nextState);
   if (!validation.valid) {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
   }
@@ -125,7 +125,7 @@ async function loadCanvasSiteAccess(
         name: string;
         subdomain: string;
         styleKit: StyleKit;
-        editableState: CanvasSiteState;
+        editableState: EditableSite;
         publishedVersion: number;
       };
     }
@@ -195,12 +195,12 @@ canvasApi.put('/sites/:siteId', async (c) => {
       400,
     );
   }
-  const validation = validateCanvasSiteState(editableState);
+  const validation = validateEditableSite(editableState);
   if (!validation.valid) {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
   }
 
-  const nextState = editableState as unknown as CanvasSiteState;
+  const nextState = editableState as unknown as EditableSite;
   const database = db(c.env);
   const referenced = collectReferencedAssetIds(nextState);
   if (referenced.size > 0) {
@@ -269,7 +269,7 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
     return c.json({ error: 'body must be a JSON object' }, 400);
   }
 
-  const next: CanvasSiteState = {
+  const next: EditableSite = {
     ...result.site.editableState,
     pages: result.site.editableState.pages,
   };
@@ -818,7 +818,7 @@ canvasApi.post('/sites/:siteId/style-kit', async (c) => {
     return c.json({ error: 'unknown style kit' }, 400);
   }
 
-  const nextState: CanvasSiteState = {
+  const nextState: EditableSite = {
     ...result.site.editableState,
     styleKit: incoming,
   };

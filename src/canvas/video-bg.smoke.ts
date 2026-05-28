@@ -6,8 +6,8 @@
 // Run with `bun.cmd run video-bg:smoke`.
 
 import { renderCanvasSnapshot } from './render.js';
-import type { CanvasSection, CanvasSiteState, PublishedSnapshot, TextElement } from './schema.js';
-import { validateCanvasSiteState } from './validate.js';
+import type { CanvasSection, EditableSite, PublishedSnapshot, TextElement } from './schema.js';
+import { validateEditableSite } from './validate.js';
 import { decodeYDoc, encodeYDoc } from './yjs-projection.js';
 
 function assert(condition: boolean, message: string): asserts condition {
@@ -32,7 +32,7 @@ const sectionWithVideo: CanvasSection = {
   recipeId: 'hero-split',
   name: 'Video Hero',
   height: 600,
-  backgroundVideo: 'asset-123',
+  backgroundVideoAssetId: 'asset-123',
   elements: [textElement],
 };
 
@@ -63,7 +63,7 @@ const html = renderCanvasSnapshot(snapshot, '/assets', '', {
   turnstileSiteKey: 'turnstile-test-key',
 });
 
-const validation = validateCanvasSiteState(snapshot);
+const validation = validateEditableSite(snapshot);
 assert(validation.valid, 'expected video background snapshot to pass validation');
 
 // 1. Section with backgroundVideo renders a <video> tag
@@ -128,25 +128,25 @@ const invalidVideoSnapshot: PublishedSnapshot = {
   pages: [
     {
       ...snapshot.pages[0]!,
-      sections: [{ ...sectionWithVideo, backgroundVideo: '../asset-123' }],
+      sections: [{ ...sectionWithVideo, backgroundVideoAssetId: '../asset-123' }],
     },
   ],
 };
-const invalidVideo = validateCanvasSiteState(invalidVideoSnapshot);
+const invalidVideo = validateEditableSite(invalidVideoSnapshot);
 assert(
   !invalidVideo.valid && invalidVideo.errors.some((error) => error.includes('backgroundVideo')),
   'expected path-shaped backgroundVideo to fail validation',
 );
 
 // 9. Yjs projection preserves section backgroundVideo
-const state: CanvasSiteState = {
+const state: EditableSite = {
   styleKit: snapshot.styleKit,
   pages: snapshot.pages,
 };
 const roundTrip = decodeYDoc(encodeYDoc(state));
 assert(
-  roundTrip.pages[0]?.sections[0]?.backgroundVideo === 'asset-123',
-  'expected Yjs round-trip to preserve backgroundVideo',
+  roundTrip.pages[0]?.sections[0]?.backgroundVideoAssetId === 'asset-123',
+  'expected Yjs round-trip to preserve backgroundVideoAssetId',
 );
 
 console.log('video-bg.smoke.ts: all assertions passed');

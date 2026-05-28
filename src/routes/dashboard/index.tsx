@@ -13,7 +13,7 @@ import { Button, Badge, Pill } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
-import type { PublishedSnapshot, CanvasSiteState } from '../../canvas/schema';
+import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -80,7 +80,7 @@ function formatBytes(bytes: number): string {
 }
 
 function buildThumbHtml(
-  state: CanvasSiteState,
+  state: EditableSite,
   siteId: string,
   origin: string,
   turnstileSiteKey: string,
@@ -997,7 +997,7 @@ function buildCards(
     styleKit: string;
     publishedVersion: number;
     updatedAt: Date;
-    editableState: CanvasSiteState;
+    editableState: EditableSite;
     passwordEnabled: boolean;
   }>,
   origin: string,

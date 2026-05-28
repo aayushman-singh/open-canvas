@@ -6,9 +6,9 @@
 // Per the plan's "Open questions" resolution: the preview path hydrates
 // the public renderer directly from the decoded JSON (no Y.Doc bridge in
 // the preview hot path). The Y.Doc bridge is only used on the restore
-// path where the resulting `CanvasSiteState` is what gets persisted.
+// path where the resulting `EditableSite` is what gets persisted.
 //
-// The decoded `CanvasSiteState` is wrapped as a synthetic
+// The decoded `EditableSite` is wrapped as a synthetic
 // `PublishedSnapshot` so the existing `renderCanvasSnapshot` can serve as
 // the renderer. We assign `version: 0` and the snapshot's `capturedAt` as
 // `publishedAt` — the preview view is informational, not a real publish.

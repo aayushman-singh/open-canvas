@@ -19,7 +19,7 @@
 //   - Slots real asset ids from `input.assetIds` when present. When the
 //     recipe needs media and no asset id was supplied, it falls back to the
 //     seed registry ids (`seed-hero-poster-1` / `seed-feature-canvas-1`).
-//   - Produces output that passes `validateCanvasSiteState` when wrapped in
+//   - Produces output that passes `validateEditableSite` when wrapped in
 //     a single-page state. The canvas-agent smoke enforces this.
 //
 // `createSectionFromRecipe(recipeId, input)` is the entry point used by

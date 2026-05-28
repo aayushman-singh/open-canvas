@@ -12,7 +12,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { importLibrarySectionIntoSite } from '../../canvas/library-section-import';
 import { importSectionIntoSite } from '../../canvas/section-import';
 import type { CanvasPage } from '../../canvas/schema';
-import { validateCanvasSiteState } from '../../canvas/validate';
+import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, librarySection, ownerAsset, site } from '../../db/schema';
 import { allTemplateSeeds } from '../../templates/registry';
@@ -203,7 +203,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
 
   page.sections.splice(insertAt, 0, importedSection);
 
-  const validation = validateCanvasSiteState(state);
+  const validation = validateEditableSite(state);
   if (!validation.valid) {
     return c.json(
       { error: 'imported section produced invalid state', details: validation.errors },

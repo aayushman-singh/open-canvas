@@ -6,8 +6,8 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
-import type { CanvasSection, CanvasSiteState, MediaKind } from '../../canvas/schema';
-import { validateCanvasSiteState } from '../../canvas/validate';
+import type { CanvasSection, EditableSite, MediaKind } from '../../canvas/schema';
+import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, customTemplate, ownerAsset, site, type BillingPlan } from '../../db/schema';
 import { canReadScopedLibraryRow } from './library-access';
@@ -49,7 +49,7 @@ export interface SeedOwnerAssetRow {
 }
 
 type PreparedSeedAssets =
-  | { ok: true; editableState: CanvasSiteState; seedRows: SeedOwnerAssetRow[] }
+  | { ok: true; editableState: EditableSite; seedRows: SeedOwnerAssetRow[] }
   | {
       ok: false;
       unknownSeedIds: string[];
@@ -165,7 +165,7 @@ function customerSeedAssetId(customerId: string, seedAssetId: string): string {
  */
 export function prepareSeedAssetsForCustomer(
   customerId: string,
-  state: CanvasSiteState,
+  state: EditableSite,
   /**
    * Existing (contentHash → ownerAsset.id) for this customer. When a seed's
    * contentHash already maps to an existing asset row, the canvas state is
@@ -245,10 +245,10 @@ export function prepareSeedAssetsForCustomer(
     sectionPath: string,
   ): string | null {
     if (!section) return null;
-    if (typeof section.backgroundVideo === 'string' && section.backgroundVideo.length > 0) {
-      const mapped = materializeAssetId(section.backgroundVideo, `${sectionPath}.backgroundVideo`);
+    if (typeof section.backgroundVideoAssetId === 'string' && section.backgroundVideoAssetId.length > 0) {
+      const mapped = materializeAssetId(section.backgroundVideoAssetId, `${sectionPath}.backgroundVideoAssetId`);
       if (typeof mapped !== 'string') return mapped.missing;
-      section.backgroundVideo = mapped;
+      section.backgroundVideoAssetId = mapped;
     }
     for (let elementIdx = 0; elementIdx < section.elements.length; elementIdx++) {
       const element = section.elements[elementIdx];
@@ -267,7 +267,7 @@ export function prepareSeedAssetsForCustomer(
         const mapped = materializeAssetId(element.assetId, `${elementPath}.assetId`);
         if (typeof mapped !== 'string') return mapped.missing;
         element.assetId = mapped;
-        if (element.posterAssetId !== undefined) {
+        if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
           const posterMapped = materializeAssetId(
             element.posterAssetId,
             `${elementPath}.posterAssetId`,
@@ -397,7 +397,7 @@ sites.post('/', async (c) => {
     }
   }
 
-  let editableState: CanvasSiteState;
+  let editableState: EditableSite;
   let assetRows: Array<typeof ownerAsset.$inferInsert> = [];
 
   const seed = getTemplateSeed(templateId);
@@ -484,7 +484,7 @@ sites.post('/', async (c) => {
           if (element.type !== 'media') continue;
           const mapped = assetIdMap.get(element.assetId);
           if (mapped) element.assetId = mapped;
-          if (element.posterAssetId !== undefined) {
+          if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
             const posterMapped = assetIdMap.get(element.posterAssetId);
             if (posterMapped) element.posterAssetId = posterMapped;
           }
@@ -494,7 +494,7 @@ sites.post('/', async (c) => {
     assetRows = newRows;
   }
 
-  const validation = validateCanvasSiteState(editableState);
+  const validation = validateEditableSite(editableState);
   if (!validation.valid) {
     return c.json(
       {

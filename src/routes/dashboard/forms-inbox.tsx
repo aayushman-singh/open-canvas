@@ -16,7 +16,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { FormElement } from '../../canvas/elements/form';
 import type {
   CanvasPage,
-  CanvasSiteState,
+  EditableSite,
   PublishedSnapshot,
 } from '../../canvas/schema';
 import { db } from '../../db/client';
@@ -101,7 +101,7 @@ const pageStyles = `
 interface OwnedSite {
   id: string;
   name: string;
-  editableState: CanvasSiteState;
+  editableState: EditableSite;
   publishedSnapshot: PublishedSnapshot | null;
 }
 

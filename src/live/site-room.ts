@@ -35,7 +35,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { eq } from 'drizzle-orm';
 import * as Y from 'yjs';
 
-import type { CanvasSiteState } from '../canvas/schema.js';
+import type { EditableSite } from '../canvas/schema.js';
 import { encodeYDoc } from '../canvas/yjs-projection.js';
 import { db } from '../db/client.js';
 import { site as siteTable } from '../db/schema.js';
@@ -181,7 +181,7 @@ function isSiteRoomMessage(value: unknown): value is SiteRoomMessage {
 interface EditableStateReplacedBroadcast {
   kind: 'editable-state-replaced';
   siteId: string;
-  newState: CanvasSiteState;
+  newState: EditableSite;
 }
 
 function isEditableStateReplacedBroadcast(value: unknown): value is EditableStateReplacedBroadcast {
@@ -202,7 +202,7 @@ export interface SiteRoomTestHooks {
   /** Skip the autosave attach entirely. Used by the smoke. */
   disableAutosave?: boolean;
   /** Custom persist sink — receives the projected state on every flush. */
-  onPersist?: (state: CanvasSiteState) => void | Promise<void>;
+  onPersist?: (state: EditableSite) => void | Promise<void>;
 }
 
 // ----------------------------------------------------------------------------
@@ -342,7 +342,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
    * autosave + broadcast observers. Called by the lazy-hydration path and
    * by `handleEditableStateReplaced` (for destructive wholesale replacement).
    */
-  private installDoc(state: CanvasSiteState): void {
+  private installDoc(state: EditableSite): void {
     // Tear down any previous doc.
     if (this.detachAutosave) {
       this.detachAutosave();
@@ -656,7 +656,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
   // ----------------------------------------------------------------------
 
   /** @internal Test-only entrypoint. Wires the DO without a DB hop. */
-  __primeForTest(siteId: string, state: CanvasSiteState, hooks: SiteRoomTestHooks): void {
+  __primeForTest(siteId: string, state: EditableSite, hooks: SiteRoomTestHooks): void {
     this.siteId = siteId;
     this.testHooks = hooks;
     this.installDoc(state);

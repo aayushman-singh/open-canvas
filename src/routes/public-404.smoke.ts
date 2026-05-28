@@ -13,7 +13,7 @@
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
 import { resolvePrimaryPage, snapshotForPageSlug } from '../canvas/page-routing.js';
-import { validateCanvasSiteState } from '../canvas/validate.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import { prepareRender } from '../i18n/render-hook.js';
 import { resolveNoIndex } from '../seo/meta-emit.js';
 
@@ -63,13 +63,13 @@ const homePage = makePage('home');
 const notFoundPage = makePage('_404');
 const snapshotWith404 = makeSnapshot([homePage, notFoundPage]);
 
-const validSnapshotWith404 = validateCanvasSiteState(snapshotWith404);
+const validSnapshotWith404 = validateEditableSite(snapshotWith404);
 assert(
   validSnapshotWith404.valid,
   'setup: snapshot with one primary page plus _404 must pass validation',
 );
 
-const invalidOnly404 = validateCanvasSiteState(makeSnapshot([notFoundPage]));
+const invalidOnly404 = validateEditableSite(makeSnapshot([notFoundPage]));
 assert(
   !invalidOnly404.valid,
   'setup: a lone _404 page must fail validation because the site needs a primary page',

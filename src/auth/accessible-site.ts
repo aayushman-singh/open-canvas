@@ -10,7 +10,7 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { CollaboratorRole } from '../db/schema';
 import { customer, site, siteCollaborator } from '../db/schema';
-import type { CanvasSiteState, StyleKit } from '../canvas/schema';
+import type { EditableSite, StyleKit } from '../canvas/schema';
 
 export interface AccessibleSite {
   id: string;
@@ -18,7 +18,7 @@ export interface AccessibleSite {
   name: string;
   subdomain: string;
   styleKit: StyleKit;
-  editableState: CanvasSiteState;
+  editableState: EditableSite;
   publishedVersion: number;
   accessRole: 'owner' | CollaboratorRole;
 }

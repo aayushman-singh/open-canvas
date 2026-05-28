@@ -25,10 +25,10 @@ import { requireAuth } from '../auth/require-auth.js';
 import {
   BUILT_IN_STYLE_KITS,
   type BuiltInStyleKit,
-  type CanvasSiteState,
+  type EditableSite,
   type StyleKitPreset,
 } from '../canvas/schema.js';
-import { validateCanvasSiteState } from '../canvas/validate.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import { db } from '../db/client.js';
 import { customer, site } from '../db/schema.js';
 
@@ -71,7 +71,7 @@ async function loadOwnedSite(
   c: Context<Env>,
   siteId: string,
   customerId: string,
-): Promise<{ id: string; editableState: CanvasSiteState } | null> {
+): Promise<{ id: string; editableState: EditableSite } | null> {
   const database = db(c.env);
   const rows = await database
     .select({ id: site.id, editableState: site.editableState })
@@ -125,12 +125,12 @@ themeRoute.put('/:siteId/custom-theme', async (c) => {
   // StyleKitPreset; the cast simply tightens the type. Spread order matters
   // here: the source might carry a stale customStyleKit slot, so the explicit
   // assignment after the spread wins.
-  const nextState: CanvasSiteState = {
+  const nextState: EditableSite = {
     ...owned.editableState,
     styleKit: 'custom',
     customStyleKit: candidate as StyleKitPreset,
   };
-  const validation = validateCanvasSiteState(nextState);
+  const validation = validateEditableSite(nextState);
   if (!validation.valid) {
     return c.json(
       { error: 'site state would be invalid after applying customStyleKit', errors: validation.errors },
@@ -184,8 +184,8 @@ themeRoute.delete('/:siteId/custom-theme', async (c) => {
   // the publish path into thinking a custom kit is still in play.
   const { customStyleKit: _drop, ...rest } = owned.editableState;
   void _drop;
-  const nextState: CanvasSiteState = { ...rest, styleKit: styleKitRaw };
-  const validation = validateCanvasSiteState(nextState);
+  const nextState: EditableSite = { ...rest, styleKit: styleKitRaw };
+  const validation = validateEditableSite(nextState);
   if (!validation.valid) {
     return c.json(
       { error: 'site state would be invalid after reset', errors: validation.errors },

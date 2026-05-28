@@ -13,7 +13,7 @@
 //   4. Mutate the JS state — append a new element to a section — and call
 //      applyLocalState. Capture the y-update bytes the doc emits.
 //   5. Apply those bytes to the server doc. Confirm both docs project to
-//      the same CanvasSiteState.
+//      the same EditableSite.
 //   6. Repeat (4-5) N times with DIFFERENT element types so each iteration
 //      exercises a different encoder branch.
 //
@@ -31,7 +31,7 @@ import * as Y from 'yjs';
 import type {
   ActionElement,
   CanvasElement,
-  CanvasSiteState,
+  EditableSite,
   TextElement,
   MediaElement,
   ShapeElement,
@@ -70,7 +70,7 @@ function cloneYValue(value: unknown): unknown {
   return value;
 }
 
-function applyLocalState(doc: Y.Doc, state: CanvasSiteState): void {
+function applyLocalState(doc: Y.Doc, state: EditableSite): void {
   const transient = encodeYDoc(state);
   doc.transact(() => {
     const root = doc.getMap<unknown>('state');
@@ -120,7 +120,7 @@ function ok(label: string): void {
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.join(thisDir, 'fixtures', 'home.json');
-const initial = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as CanvasSiteState;
+const initial = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as EditableSite;
 
 // ----------------------------------------------------------------------------
 // Set up two docs and bring the server into sync with the client (step1/step2).
@@ -318,7 +318,7 @@ const factories: Array<{ name: string; build: (id: string) => CanvasElement }> =
 // Replay loop: 12 element types × 2 passes = 24 "Add component" cycles.
 // ----------------------------------------------------------------------------
 
-const liveState: CanvasSiteState = JSON.parse(JSON.stringify(initial)) as CanvasSiteState;
+const liveState: EditableSite = JSON.parse(JSON.stringify(initial)) as EditableSite;
 const firstPage = liveState.pages[0];
 const firstSection = firstPage?.sections[0];
 if (!firstPage || !firstSection) {

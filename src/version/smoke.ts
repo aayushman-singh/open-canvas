@@ -32,7 +32,7 @@
 import * as Y from 'yjs';
 
 import { encodeYDoc } from '../canvas/yjs-projection.js';
-import type { CanvasSiteState, PublishedSnapshot } from '../canvas/schema.js';
+import type { EditableSite, PublishedSnapshot } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
 import {
   decodeByteaDriverValue,
@@ -63,7 +63,7 @@ function assert(condition: unknown, message: string): asserts condition {
 // capture → restore cycle).
 // ---------------------------------------------------------------------------
 
-function makeState(headingText: string): CanvasSiteState {
+function makeState(headingText: string): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [
@@ -119,8 +119,8 @@ function makeState(headingText: string): CanvasSiteState {
 
 interface SiteRow {
   id: string;
-  editableState: CanvasSiteState;
-  styleKit: CanvasSiteState['styleKit'];
+  editableState: EditableSite;
+  styleKit: EditableSite['styleKit'];
 }
 
 class InMemoryDb {

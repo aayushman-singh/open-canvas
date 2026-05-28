@@ -1,10 +1,43 @@
 // src/canvas/elements/media.ts
 //
-// Render fn for the existing `MediaElement` element type. Interface still
-// lives in `src/canvas/schema.ts`; this module owns rendering only.
+// `MediaElement` discriminated union (image/video) + renderer.
 
 import { escapeAttr, styleFromEntries } from './render-utils.js';
-import type { MediaElement } from '../schema.js';
+import type { BackgroundSize, BaseElement } from '../schema.js';
+
+/** Fields shared by both media variants. */
+interface MediaElementShared extends BaseElement {
+  type: 'media';
+  assetId: string;
+  alt: string;
+  // `'cover' | 'contain'` — reuses BackgroundSize since the value set is the
+  // same CSS `object-fit` / `background-size` pair.
+  fit: BackgroundSize;
+}
+
+/** Static image. No poster, no playback. */
+export interface ImageMediaElement extends MediaElementShared {
+  mediaKind: 'image';
+}
+
+/** Video clip. `posterAssetId` and `playback` are video-only and unrepresentable on images. */
+export interface VideoMediaElement extends MediaElementShared {
+  mediaKind: 'video';
+  posterAssetId?: string;
+  /**
+   * Each flag is truthy-only: undefined or `false` means the corresponding
+   * `<video>` attribute is NOT emitted and the browser's default applies
+   * (no autoplay, audible, plays once, no chrome).
+   */
+  playback?: {
+    autoplay?: boolean;
+    muted?: boolean;
+    loop?: boolean;
+    controls?: boolean;
+  };
+}
+
+export type MediaElement = ImageMediaElement | VideoMediaElement;
 
 export interface MediaRenderCtx {
   assetBasePath: string;

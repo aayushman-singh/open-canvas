@@ -5,7 +5,7 @@
 //   POST /api/canvas-agent/sites/:siteId/preview
 //     Owner-gated. Loads the site, calls Gemini with the constrained tool
 //     definitions, translates tool calls into CanvasAgentOps, dry-runs them
-//     through `applyCanvasAgentOp`, revalidates with `validateCanvasSiteState`,
+//     through `applyCanvasAgentOp`, revalidates with `validateEditableSite`,
 //     verifies any referenced asset ids belong to the site, and returns
 //     `{ previewId, ops, previewState }`. The endpoint NEVER mutates the
 //     stored editableState.
@@ -33,10 +33,10 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import {
-  type CanvasSiteState,
+  type EditableSite,
   type StyleKit,
 } from '../../canvas/schema';
-import { validateCanvasSiteState } from '../../canvas/validate';
+import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
 
@@ -60,7 +60,7 @@ interface OwnedSiteRow {
   id: string;
   customerId: string;
   styleKit: StyleKit;
-  editableState: CanvasSiteState;
+  editableState: EditableSite;
 }
 
 async function loadOwnedSite(c: Context<Env>, siteId: string): Promise<OwnedSiteRow | null> {
@@ -102,7 +102,7 @@ async function loadOwnedSite(c: Context<Env>, siteId: string): Promise<OwnedSite
 // ---------------------------------------------------------------------------
 
 type PipelineResult =
-  | { ok: true; next: CanvasSiteState }
+  | { ok: true; next: EditableSite }
   | { ok: false; status: 400; error: string; errors?: string[] };
 
 async function runOpsPipeline(
@@ -112,7 +112,7 @@ async function runOpsPipeline(
 ): Promise<PipelineResult> {
   // Apply each op in order. Catch loudly — applyCanvasAgentOp throws on
   // unknown elements / unknown recipes / bad shapes.
-  let next: CanvasSiteState = row.editableState;
+  let next: EditableSite = row.editableState;
   for (let i = 0; i < ops.length; i++) {
     const op = ops[i];
     if (!op) continue;
@@ -125,7 +125,7 @@ async function runOpsPipeline(
   }
 
   // Revalidate the whole result. Apply does not validate; the caller MUST.
-  const validation = validateCanvasSiteState(next);
+  const validation = validateEditableSite(next);
   if (!validation.valid) {
     return {
       ok: false,
@@ -184,7 +184,7 @@ async function runOpsPipeline(
 // the creative work, the prompt nails down the canvas shape.
 // ---------------------------------------------------------------------------
 
-function buildSystemPrompt(state: CanvasSiteState): string {
+function buildSystemPrompt(state: EditableSite): string {
   const lines: string[] = [];
   lines.push('You are an editing assistant for the rev01 canvas site builder.');
   lines.push(

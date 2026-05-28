@@ -27,7 +27,7 @@ import {
   type BackgroundEffect,
   type BackgroundSize,
   type CanvasSection,
-  type CanvasSiteState,
+  type EditableSite,
   type ElementType,
   type InlineMarkType,
   type MediaKind,
@@ -65,9 +65,9 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 // One predicate for "is this a date string that Date can parse?". Both
-// `Date.parse + Number.isFinite` and `new Date + Number.isNaN(getTime())`
-// do the same thing; the file previously carried both idioms. Date.parse
-// returns NaN for unparseable input, and NaN is not finite — single check.
+// `Date.parse + Number.isFinite` and `new Date + Number.isNaN(getTime())` do
+// the same thing; the file previously carried both. Date.parse returns NaN
+// for unparseable input, and NaN is not finite — single check.
 function isParseableDate(value: string): boolean {
   return Number.isFinite(Date.parse(value));
 }
@@ -436,9 +436,9 @@ function validatePageMotionLayout(page: Record<string, unknown>, basePath: strin
 
 // Assert that `element.id` has not been seen before in this page/scope and
 // register it as seen. The seen-set (`pageIds`) is mutated as a side effect
-// so callers can keep walking the tree without re-passing the set; the
+// so the caller can keep walking the tree without re-passing the set; the
 // "assert" framing names the failure mode (duplicate) since that is the only
-// observable outcome at the call site.
+// observable outcome to a reader of the call site.
 function assertUniqueElementId(
   element: unknown,
   elementPath: string,
@@ -1172,7 +1172,7 @@ function validatePublishedMediaReferences(snapshot: unknown, errors: string[]): 
   }
 }
 
-export function validateCanvasSiteState(state: unknown): ValidationResult {
+export function validateEditableSite(state: unknown): ValidationResult {
   const errors: string[] = [];
   validateSiteShape(state, errors);
   if (errors.length === 0) return { valid: true };
@@ -1208,7 +1208,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
  * Validate that every media element in a fixture references an `assetId` (and
  * `posterAssetId` when present) that exists in {@link SEED_ASSET_REGISTRY}.
  *
- * This validator is INTENTIONALLY separate from `validateCanvasSiteState` /
+ * This validator is INTENTIONALLY separate from `validateEditableSite` /
  * `validatePublishedSnapshot`. Customer-uploaded assets have ids the registry
  * does not know about (they are generated on upload via crypto.randomUUID);
  * only the bundled seed fixture is gated against the registry so a new site
@@ -1218,7 +1218,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
  * Walks every page → section → element. Returns ALL errors at once so the
  * fixture author sees every missing id in one pass.
  */
-export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
+export function validateSeedFixture(state: EditableSite): ValidationResult {
   const errors: string[] = [];
 
   function validateSeedSection(section: CanvasSection | undefined, sectionPath: string): void {
@@ -1238,7 +1238,7 @@ export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
           `${elementPath}.assetId "${assetId}" is registered as ${seedAsset.kind}, but mediaKind is ${element.mediaKind}`,
         );
       }
-      if (element.posterAssetId !== undefined) {
+      if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
         const posterSeedAsset = SEED_ASSET_REGISTRY[element.posterAssetId];
         if (!posterSeedAsset) {
           errors.push(

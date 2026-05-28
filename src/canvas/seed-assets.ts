@@ -22,7 +22,7 @@
 // underneath. If we need to roll a new seed, we add a NEW id (and a new bytes
 // file) and update the fixture; we do NOT mutate the existing entries.
 //
-// Production validators (`validateCanvasSiteState`, `validatePublishedSnapshot`)
+// Production validators (`validateEditableSite`, `validatePublishedSnapshot`)
 // do NOT consult this registry — customer-uploaded asset ids are unknown to
 // it by design. Only `validateSeedFixture` (canvas/validate.ts) reads it, and
 // only against the bundled fixture.

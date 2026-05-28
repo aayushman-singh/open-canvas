@@ -5,7 +5,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import type {
-  CanvasSiteState,
+  EditableSite,
   CanvasPage,
   CanvasSection,
   CanvasElement,
@@ -22,7 +22,7 @@ import type {
   MediaKind,
 } from '../../canvas/schema';
 import { MOTION_PRESETS } from '../../canvas/schema';
-import { validateCanvasSiteState } from '../../canvas/validate';
+import { validateEditableSite } from '../../canvas/validate';
 import { isSiteLimitViolation, validateSubdomain } from './sites';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site, siteFont } from '../../db/schema';
@@ -217,9 +217,9 @@ importRouter.post('/', async (c) => {
     existingOwnerAssets,
   });
 
-  let editableState: CanvasSiteState;
+  let editableState: EditableSite;
   try {
-    editableState = buildCanvasSiteState(
+    editableState = buildEditableSite(
       scraperData,
       preparedAssets.mediaAssetIdMap,
       preparedAssets.fontFamilyTokenMap,
@@ -228,7 +228,7 @@ importRouter.post('/', async (c) => {
     const message = err instanceof Error ? err.message : String(err);
     return c.json({ error: `Import failed: ${message}` }, 502);
   }
-  const validation = validateCanvasSiteState(editableState);
+  const validation = validateEditableSite(editableState);
   if (!validation.valid) {
     return c.json(
       { error: 'Import produced invalid editable state', errors: validation.errors },
@@ -442,11 +442,11 @@ export async function prepareImportedAssets(input: {
   };
 }
 
-export function buildCanvasSiteState(
+export function buildEditableSite(
   data: ScraperResponse,
   assetIdMap: Map<string, string>,
   fontFamilyTokenMap: Map<string, string> = new Map(),
-): CanvasSiteState {
+): EditableSite {
   const sections: CanvasSection[] = data.sections.map((s, i) => {
     const name = s.name || `section-${i}`;
     const nameLower = name.toLowerCase();

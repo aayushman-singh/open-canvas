@@ -16,10 +16,10 @@
 
 import { applyCanvasAgentOp } from '../canvas-ops.js';
 import type { LlmAdapter, LlmChunk, LlmMessage, ChatWithToolsOptions } from '../llm.js';
-import type { CanvasSiteState, SectionRecipeId } from '../../canvas/schema.js';
+import type { EditableSite, SectionRecipeId } from '../../canvas/schema.js';
 import { SECTION_RECIPE_IDS } from '../../canvas/schema.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../../canvas/recipes.js';
-import { validateCanvasSiteState } from '../../canvas/validate.js';
+import { validateEditableSite } from '../../canvas/validate.js';
 
 import { runChatTurn, type OrchestratorContext } from './orchestrator.js';
 import {
@@ -39,7 +39,7 @@ function assert(condition: boolean, message: string): void {
 // Fixture site state — single page, hero-split + feature-grid.
 // ---------------------------------------------------------------------------
 
-function buildFixtureState(): CanvasSiteState {
+function buildFixtureState(): EditableSite {
   const recipeInput: RecipeFactoryInput = {
     brief: 'A bright product launch.',
     styleKit: 'charcoal',
@@ -61,7 +61,7 @@ function buildFixtureState(): CanvasSiteState {
   };
 }
 
-function buildLargeState(): CanvasSiteState {
+function buildLargeState(): EditableSite {
   const recipeInput: RecipeFactoryInput = {
     brief: 'A bright product launch with a very long brief that pushes element count up.',
     styleKit: 'charcoal',
@@ -390,12 +390,12 @@ assert(
 const previewOp3 = result3.previewOps[0];
 if (!previewOp3) throw new Error('expected preview op');
 const applied = applyCanvasAgentOp(fixtureState, previewOp3.op);
-const validation = validateCanvasSiteState(applied);
+const validation = validateEditableSite(applied);
 assert(
   validation.valid,
   validation.valid
     ? ''
-    : `preview op would fail validateCanvasSiteState: ${validation.errors.join('; ')}`,
+    : `preview op would fail validateEditableSite: ${validation.errors.join('; ')}`,
 );
 // The source must STILL be unchanged after the clone-apply.
 assert(JSON.stringify(fixtureState) === beforeJson, 'apply-clone must not mutate source');

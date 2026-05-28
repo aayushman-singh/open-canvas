@@ -21,12 +21,10 @@ export type BuiltInStyleKit = (typeof BUILT_IN_STYLE_KITS)[number];
 
 /**
  * Full set of selector values an Owner may store on a site. Built-ins plus
- * `'custom'` (Wave 2 #10 — the resolver pulls tokens from
- * `CanvasSiteState.customStyleKit` instead of `STYLE_KIT_PRESETS`). The
+ * `'custom'`: when the selector is `'custom'` the resolver pulls tokens from
+ * `EditableSite.customStyleKit` instead of `STYLE_KIT_PRESETS`. The
  * built-in presets do not include a `custom` row; resolvers must check the
  * selector before looking up the preset.
- *
- * See docs/superpowers/plans/2026-05-23-10-custom-theme-editor.md.
  */
 export const STYLE_KITS = [...BUILT_IN_STYLE_KITS, 'custom'] as const;
 export type StyleKit = (typeof STYLE_KITS)[number];
@@ -156,25 +154,23 @@ export const BACKGROUND_EFFECTS = [
 ] as const;
 export type BackgroundEffect = (typeof BACKGROUND_EFFECTS)[number];
 
-export interface CanvasPoint {
+export interface PositionedBox {
   x: number;
   y: number;
-}
-export interface CanvasSize {
   w: number;
   h: number;
-}
-export interface PositionedBox extends CanvasPoint, CanvasSize {
+  // rotation is optional because absence means "no transform" — the renderer
+  // emits no rotation CSS at all. `z` is required because stacking order is
+  // intrinsic to every element (even at z=0, layout has to commit to a layer).
   rotation?: number;
   z: number;
 }
 
-// -- Responsive overrides (Wave 1 #1 — see plan 01-responsive-canvas) -------
+// -- Responsive overrides ---------------------------------------------------
 //
 // Owner-authored optional overrides per Positioned Element at named
-// breakpoints. The Phase 0 scaffold declares the types; the responsive
-// translator + CSS emitter live under `src/canvas/responsive/` and are filled
-// in by the Wave 1 agent. Both publishing and editor preview consume these.
+// breakpoints. The responsive translator + CSS emitter live under
+// `src/canvas/responsive/`. Both publishing and editor preview consume these.
 
 export const BREAKPOINTS = ['desktop', 'tablet', 'phone'] as const;
 export type Breakpoint = (typeof BREAKPOINTS)[number];
@@ -183,15 +179,19 @@ export type Breakpoint = (typeof BREAKPOINTS)[number];
  * Per-element override at a named breakpoint. Every field is optional — the
  * translator falls back to the canonical desktop `box` for any unspecified
  * dimension. `hidden: true` removes the element entirely at that breakpoint.
+ *
+ * Box fields are derived from `PositionedBox` so adding a new dimension to
+ * the canonical box automatically widens the override shape.
  */
-export interface ResponsiveBoxOverride {
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
+export type ResponsiveBoxOverride = Partial<Pick<PositionedBox, 'x' | 'y' | 'w' | 'h'>> & {
   hidden?: boolean;
-}
+};
 
+/**
+ * Owner-authored overrides at smaller breakpoints. The canonical desktop box
+ * lives on `BaseElement.box` itself, which is why there is no `desktop?`
+ * field here — the breakpoint set is "smaller-than-canonical" only.
+ */
 export interface ResponsiveOverrides {
   tablet?: ResponsiveBoxOverride;
   phone?: ResponsiveBoxOverride;
@@ -216,92 +216,49 @@ export interface ElementStyle {
   overflow?: OverflowValue;
 }
 
+/**
+ * @internal Shared shape extended by every concrete `*Element` interface.
+ * Not a domain object on its own — exported only so element modules in
+ * `./elements/*.ts` can `extends BaseElement`.
+ */
 export interface BaseElement {
   id: string;
   type: ElementType;
   box: PositionedBox;
   motion?: { preset: MotionPreset; delayMs?: number };
+  /**
+   * Escape hatch: arbitrary CSS custom-property overrides applied to the
+   * element's root, untouched by the renderer's element-style serializer.
+   * Reserved for one-off visual tweaks the structured `elementStyle` graph
+   * cannot express; persists across style-kit changes ("pinned").
+   */
   pinnedStyle?: Record<string, string>;
   elementStyle?: ElementStyle;
   /**
-   * Phase 0 scaffold — Wave 1 (#1) consumes. Omitted on every existing fixture
-   * element; the translator treats absence as "scale proportionally from
-   * desktop box at the smaller breakpoints."
+   * Omitted on most fixture elements; the translator treats absence as
+   * "scale proportionally from desktop box at the smaller breakpoints."
    */
   responsive?: ResponsiveOverrides;
 }
 
-export interface TextElement extends BaseElement {
-  type: 'text';
-  // 1..N inline runs; the concatenation of run.text is the plain-text
-  // projection. Replaces the prior `text: string` field — there is no
-  // backwards-compat shim, the dev DB is empty.
-  content: InlineRun[];
-  role: 'heading' | 'body' | 'label';
-  fontSize: number;
-  fontWeight: 400 | 500 | 600 | 700;
-  align: 'left' | 'center' | 'right';
-}
-
-export interface MediaElement extends BaseElement {
-  type: 'media';
-  mediaKind: MediaKind;
-  assetId: string;
-  posterAssetId?: string;
-  alt: string;
-  fit: 'cover' | 'contain';
-  playback?: {
-    autoplay?: boolean;
-    muted?: boolean;
-    loop?: boolean;
-    controls?: boolean;
-  };
-}
-
-export type ActionHref =
-  | { type: 'external'; url: string }
-  | { type: 'page'; pageId: string; anchor?: string };
-
-export function resolveActionHref(
-  href: ActionHref,
-  pages: CanvasPage[],
-): string {
-  if (href.type === 'external') return href.url;
-  const page = pages.find((p) => p.id === href.pageId);
-  if (!page) {
-    throw new Error(`action href references missing page id ${JSON.stringify(href.pageId)}`);
-  }
-  const base = '/' + page.slug;
-  return href.anchor ? base + '#' + href.anchor : base;
-}
-
-export interface ActionElement extends BaseElement {
-  type: 'action';
-  label: string;
-  href: ActionHref;
-  variant: ActionVariant;
-}
-
-export interface ShapeElement extends BaseElement {
-  type: 'shape';
-  variant: ShapeVariant;
-}
-
-export interface ContainerElement extends BaseElement {
-  type: 'container';
-  variant: SurfaceVariant;
-}
+export const TEXT_ROLES = ['heading', 'body', 'label'] as const;
+export type TextRole = (typeof TEXT_ROLES)[number];
 
 // -- CanvasElement discriminated union -------------------------------------
 //
-// The five originals (text, media, action, shape, container) are defined
-// inline above for historical reasons; the nine Phase 0 element interfaces
-// live in `src/canvas/elements/*.ts` and are re-exported through
-// `src/canvas/elements/index.ts`. Each element file imports `BaseElement` and
-// related primitives from this module — schema is the root of the dependency
-// tree. The `CanvasElement` union pulls each new interface in via a type-only
-// import; TypeScript handles the cycle between schema.ts and elements/*.ts
-// because the references are types, not runtime values.
+// All 14 element interfaces live in `src/canvas/elements/*.ts`. Each file
+// owns its interface and renderer together; schema.ts is the root of the
+// dependency tree (provides BaseElement and the variant enums) but does not
+// define any element interface itself. The `CanvasElement` union pulls each
+// interface in via a type-only import; TypeScript handles the cycle between
+// schema.ts and elements/*.ts because the references are types, not runtime
+// values. Re-exported below so existing `import type { TextElement } from
+// '../canvas/schema'` consumers continue to resolve without change.
+import type { TextElement } from './elements/text.js';
+import type { MediaElement, ImageMediaElement, VideoMediaElement } from './elements/media.js';
+import type { ActionElement, ActionHref } from './elements/action.js';
+import type { ShapeElement } from './elements/shape.js';
+import type { ContainerElement } from './elements/container.js';
 import type { AccordionElement } from './elements/accordion.js';
 import type { CarouselElement } from './elements/carousel.js';
 import type { ChartElement } from './elements/chart.js';
@@ -311,6 +268,20 @@ import type { FormElement } from './elements/form.js';
 import type { NavElement } from './elements/nav.js';
 import type { TableElement } from './elements/table.js';
 import type { CollectionElement } from './elements/collection.js';
+
+// Re-export so callers can keep importing element types from schema. Adding
+// a new element type only requires updating the import block above + the
+// CanvasElement union; consumers do not need to change their import paths.
+export type {
+  TextElement,
+  MediaElement,
+  ImageMediaElement,
+  VideoMediaElement,
+  ActionElement,
+  ActionHref,
+  ShapeElement,
+  ContainerElement,
+};
 
 export type CanvasElement =
   | TextElement
@@ -328,6 +299,31 @@ export type CanvasElement =
   | NavElement
   | CollectionElement;
 
+// Compile-time invariants: ELEMENT_TYPES and CanvasElement['type'] must
+// stay bidirectionally exhaustive — adding a new element interface without
+// listing its `type` literal in ELEMENT_TYPES (or vice-versa) fails
+// type-check on one of these two consts. Split into two checks instead of
+// an intersection so `@typescript-eslint/no-duplicate-type-constituents`
+// doesn't flatten the bidirectional pair.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _ELEMENT_TYPES_COVERS_UNION: Exclude<ElementType, CanvasElement['type']> extends never
+  ? true
+  : never = true;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _UNION_COVERS_ELEMENT_TYPES: Exclude<CanvasElement['type'], ElementType> extends never
+  ? true
+  : never = true;
+
+// Same invariants for inline mark types ↔ InlineMark variants.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _MARK_TYPES_COVERS_UNION: Exclude<InlineMarkType, InlineMark['type']> extends never
+  ? true
+  : never = true;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _UNION_COVERS_MARK_TYPES: Exclude<InlineMark['type'], InlineMarkType> extends never
+  ? true
+  : never = true;
+
 export const SECTION_ROLES = ['header', 'footer', 'body'] as const;
 export type SectionRole = (typeof SECTION_ROLES)[number];
 
@@ -339,8 +335,18 @@ export interface CanvasSection {
   role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
   entrance?: MotionPreset;
-  trigger?: { type: 'exit-intent' | 'delay' | 'scroll'; value?: number };
-  backgroundVideo?: string;
+  /**
+   * Popup-section trigger. Discriminated by `type` so `exit-intent` cannot
+   * carry a `value` and the other two arms require one. Unit of `value`
+   * depends on the arm; documented inline because the persistence layer
+   * (yjs + data-rev01-trigger-value attribute) shares a single key.
+   */
+  trigger?:
+    | { type: 'exit-intent' }
+    | { type: 'delay'; /** Milliseconds after page load. */ value: number }
+    | { type: 'scroll'; /** Vertical scroll percentage in [0, 100]. */ value: number };
+  /** Owner asset id of an MP4/webm clip played behind the section. Same `*AssetId` shape as image/poster references. */
+  backgroundVideoAssetId?: string;
   elements: CanvasElement[];
 }
 
@@ -349,28 +355,33 @@ export interface CanvasPage {
   slug: string;
   /**
    * Page display name AND SEO `<title>` source. Required and non-empty — the
-   * SEO plan (#21) treats this as the `<title>` value, falling back to the
-   * site name only when the field is missing at runtime (cannot happen given
-   * the type, but the renderer is defensive).
+   * renderer treats this as the `<title>` value, falling back to the site
+   * name only when the field is missing at runtime (cannot happen given the
+   * type, but the renderer is defensive).
    */
   title: string;
+  /** Canvas width in pixels — the design surface against which element boxes are positioned. */
   width: number;
   sections: CanvasSection[];
-  // -- SEO metadata (Wave 3 #21 — see plan 21-seo-meta) ---------------------
+  // -- SEO metadata -----------------------------------------------------------
   // Optional everywhere. Renderer falls back to site-level defaults when
-  // absent; sitemap (#22) reads `noIndex` to exclude entries.
+  // absent; the sitemap emitter reads `noIndex` to exclude entries.
   description?: string;
   ogImageAssetId?: string;
+  /** Absolute URL used verbatim as `<link rel="canonical">`. When unset the SEO emitter composes one from the configured host. */
   canonical?: string;
   noIndex?: boolean;
-  /** BCP-47 locale (e.g. 'en', 'ar') — drives `<html lang>` and i18n (Wave 5 #25). */
+  /** BCP-47 locale (e.g. 'en', 'ar') — drives `<html lang>` and i18n. */
   locale?: string;
   // -- Page-level motion & layout ---------------------------------------------
   entranceAnimation?: MotionPreset;
   scrollTriggerMode?: ScrollTriggerMode;
+  /** Any valid CSS `background` shorthand (color, gradient, `url(...)`); emitted verbatim onto the page wrapper after value-escaping. */
   pageBackground?: string;
   defaultMotionPreset?: MotionPreset;
+  /** Vertical gap between sections, in pixels. When unset, sections stack with no flex gap. */
   sectionGap?: number;
+  /** Hard cap on rendered page width, in pixels. Clamps `width` downward at render time. */
   maxWidth?: number;
   // -- Page metadata (CMS collections) ----------------------------------------
   publishedDate?: string;
@@ -379,7 +390,7 @@ export interface CanvasPage {
   category?: string;
 }
 
-export interface CanvasSiteState {
+export interface EditableSite {
   styleKit: StyleKit;
   pages: CanvasPage[];
   /** Site-wide header section shared across all pages. */
@@ -387,26 +398,24 @@ export interface CanvasSiteState {
   /** Site-wide footer section shared across all pages. */
   footer?: CanvasSection;
   /**
-   * Wave 2 #10 — `styleKit === 'custom'` selects this preset. Required to be
-   * present when the selector is `'custom'`; ignored otherwise. The Phase 0
-   * scaffold leaves enforcement to the Wave 2 owner; until then the renderer
-   * still picks built-in presets.
+   * Selected when `styleKit === 'custom'`. Required to be present in that
+   * case; ignored otherwise.
    */
   customStyleKit?: StyleKitPreset;
   /**
-   * Wave 5 #25 — default locale for pages with no explicit `locale`. Optional
-   * everywhere; `'en'` when absent.
+   * Default locale for pages with no explicit `locale`. Optional everywhere;
+   * `'en'` when absent.
    */
   defaultLocale?: string;
   /**
-   * Wave 3 #21 — when true, renderer emits `<meta name="robots" content="noindex">`
-   * across every page regardless of per-page settings. Owner switch for
-   * "publish but don't expose yet."
+   * When true, renderer emits `<meta name="robots" content="noindex">` across
+   * every page regardless of per-page settings. Owner switch for "publish but
+   * don't expose yet."
    */
   siteNoIndex?: boolean;
   /**
-   * Wave 3 #20 — when true, public renderer emits both light and dark token
-   * blocks plus the inline mode-setter script. Owner-controlled per site.
+   * When true, public renderer emits both light and dark token blocks plus
+   * the inline mode-setter script. Owner-controlled per site.
    */
   darkModeEnabled?: boolean;
   /**
@@ -417,28 +426,20 @@ export interface CanvasSiteState {
   faviconAssetId?: string;
 }
 
-export interface PublishedSnapshot {
+/**
+ * A frozen `EditableSite` at publish time, plus the publish counter and
+ * timestamp. Structurally identical to the editable site — the rename
+ * indicates the value is now immutable, not that the fields differ. Adding
+ * a field to `EditableSite` automatically extends the snapshot.
+ */
+export type PublishedSnapshot = EditableSite & {
+  /** Monotonic publish counter, starting at 1. Bumped by +1 per successful publish; not a semver. */
   version: number;
+  /** ISO-8601 timestamp in UTC (`new Date().toISOString()`), e.g. `"2026-05-28T14:23:00.000Z"`. */
   publishedAt: string;
-  styleKit: StyleKit;
-  pages: CanvasPage[];
-  /** Mirror of `CanvasSiteState.header`; site-wide header rendered on every page. */
-  header?: CanvasSection;
-  /** Mirror of `CanvasSiteState.footer`; site-wide footer rendered on every page. */
-  footer?: CanvasSection;
-  /** Mirror of `CanvasSiteState.customStyleKit` carried through publish. */
-  customStyleKit?: StyleKitPreset;
-  /** Mirror of `CanvasSiteState.defaultLocale`; used by public `<html lang>`. */
-  defaultLocale?: string;
-  /** Mirror of `CanvasSiteState.siteNoIndex`; used by SEO meta emission. */
-  siteNoIndex?: boolean;
-  /** Mirror of `CanvasSiteState.darkModeEnabled`; used by visitor-mode CSS emission. */
-  darkModeEnabled?: boolean;
-  /** Mirror of `CanvasSiteState.faviconAssetId`; emitted as `<link rel="icon">`. */
-  faviconAssetId?: string;
-}
+};
 
-// -- Style Kit token contract (Task 8) -------------------------------------
+// -- Style Kit token contract ---------------------------------------------
 //
 // A Style Kit is a curated visual system — colour, typography, surfaces,
 // shapes, actions, and motion — that the editor preview and the published
@@ -511,10 +512,10 @@ export interface StyleKitPreset {
   motionEasing: string;
   motionPresets: Record<MotionPreset, MotionPresetTokens>;
   /**
-   * Wave 3 #20 — partial override applied in dark mode. Any field of the
-   * preset may be re-specified; the resolver merges over the light base.
-   * Optional everywhere; the existing four built-in kits leave it unset for
-   * now.
+   * Partial override applied in dark mode. Any field of the preset may be
+   * re-specified; the resolver merges over the light base. Optional
+   * everywhere; the four built-in kits leave it unset. `dark` itself is
+   * excluded from the partial so nesting (`dark.dark.dark…`) is unrepresentable.
    */
-  dark?: Partial<StyleKitPreset>;
+  dark?: Partial<Omit<StyleKitPreset, 'dark'>>;
 }

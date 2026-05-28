@@ -3,7 +3,7 @@
 // Wave 3 #15 — Top-level a11y audit runner.
 //
 // Contract:
-//   - Pure function: `runAudit(state: CanvasSiteState): AuditReport`.
+//   - Pure function: `runAudit(state: EditableSite): AuditReport`.
 //   - Walks every page; runs each registered check; aggregates the issue list.
 //   - NO publishing side-effect — that's the caller's job. The pre-publish
 //     gate lives in `src/routes/api/publish.ts` and refuses publish when
@@ -29,7 +29,7 @@ import { checkActionLabels } from './checks/action-labels.js';
 import { checkFormFields } from './checks/form-fields.js';
 import { checkPageMeta } from './checks/page-meta.js';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
-import type { CanvasPage, CanvasSiteState, StyleKitPreset } from '../canvas/schema.js';
+import type { CanvasPage, EditableSite, StyleKitPreset } from '../canvas/schema.js';
 
 export interface AuditIssue {
   kind: IssueKind;
@@ -103,7 +103,7 @@ function runChecksOnPage(
  * caller (publish endpoint, dashboard route, smoke harness) reads the
  * structured `AuditReport` shape.
  */
-export function runAudit(state: CanvasSiteState): AuditReport {
+export function runAudit(state: EditableSite): AuditReport {
   const issues: AuditIssue[] = [];
 
   // Resolving the Style Kit can itself throw (custom-kit validator hard-fails

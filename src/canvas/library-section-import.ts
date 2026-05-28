@@ -63,7 +63,9 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
     if (element.type !== 'media') continue;
 
     const refs = [element.assetId];
-    if (element.posterAssetId !== undefined) refs.push(element.posterAssetId);
+    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+      refs.push(element.posterAssetId);
+    }
 
     for (const ref of refs) {
       if (assetIdMap.has(ref)) continue;
@@ -103,7 +105,7 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
     if (element.type !== 'media') continue;
     const mapped = assetIdMap.get(element.assetId);
     if (mapped) element.assetId = mapped;
-    if (element.posterAssetId !== undefined) {
+    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
       const posterMapped = assetIdMap.get(element.posterAssetId);
       if (posterMapped) element.posterAssetId = posterMapped;
     }

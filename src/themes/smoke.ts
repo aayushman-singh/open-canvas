@@ -23,7 +23,7 @@
 //      it without depending on `src/themes/`.
 
 import { renderCanvasSnapshot } from '../canvas/render.js';
-import type { CanvasSiteState, PublishedSnapshot, StyleKitPreset } from '../canvas/schema.js';
+import type { EditableSite, PublishedSnapshot, StyleKitPreset } from '../canvas/schema.js';
 import { buildStyleKitCss, getStyleKitPreset, STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
 
 import { checkKitContrast, BG_TEXT_AA_THRESHOLD } from './contrast-guard.js';
@@ -129,7 +129,7 @@ function buildCustomKit(): StyleKitPreset {
   };
 }
 
-function makeSnapshot(state: CanvasSiteState): PublishedSnapshot {
+function makeSnapshot(state: EditableSite): PublishedSnapshot {
   // Mirror the same fields the publish path mirrors over. The custom kit (if
   // any) is carried separately so the renderer can resolve it.
   return {
@@ -141,7 +141,7 @@ function makeSnapshot(state: CanvasSiteState): PublishedSnapshot {
   };
 }
 
-function makeMinimalState(styleKit: CanvasSiteState['styleKit']): CanvasSiteState {
+function makeMinimalState(styleKit: EditableSite['styleKit']): EditableSite {
   return {
     styleKit,
     pages: [
@@ -180,7 +180,7 @@ function makeMinimalState(styleKit: CanvasSiteState['styleKit']): CanvasSiteStat
 // --------------------------------------------------------------------------
 
 const customKit = buildCustomKit();
-const customState: CanvasSiteState = {
+const customState: EditableSite = {
   ...makeMinimalState('custom'),
   customStyleKit: customKit,
 };
@@ -216,7 +216,7 @@ const recovered = resolveStyleKitWithCustom({
   styleKit: customSnapshot.styleKit,
   // The published snapshot mirrors the editable state's customStyleKit, but
   // its TS type is `StyleKitPreset | undefined`. Branch around the undefined
-  // case so the resolver call accepts `Pick<CanvasSiteState, ...>` under
+  // case so the resolver call accepts `Pick<EditableSite, ...>` under
   // exactOptionalPropertyTypes.
   ...(customSnapshot.customStyleKit !== undefined
     ? { customStyleKit: customSnapshot.customStyleKit }
@@ -432,7 +432,7 @@ assert(
 // Test 6 — reset-to-built-in.
 // --------------------------------------------------------------------------
 
-const resetState: CanvasSiteState = {
+const resetState: EditableSite = {
   ...customState,
   styleKit: 'charcoal',
   // customStyleKit lingers on the in-memory state — the resolver MUST ignore

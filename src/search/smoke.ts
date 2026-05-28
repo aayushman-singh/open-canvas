@@ -22,7 +22,7 @@
 import type {
   ActionElement,
   CanvasPage,
-  CanvasSiteState,
+  EditableSite,
   PublishedSnapshot,
   TextElement,
 } from '../canvas/schema.js';
@@ -154,7 +154,7 @@ function makeFixtureSnapshot(version: number, page: CanvasPage): PublishedSnapsh
   };
 }
 
-function makeFixtureSiteState(page: CanvasPage): CanvasSiteState {
+function makeFixtureSiteState(page: CanvasPage): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [page],
@@ -650,8 +650,8 @@ assert(
 );
 
 // Sanity: the recipe section is structurally compatible with a real page —
-// we can drop it into a CanvasSiteState without TS complaining.
-const recipeState: CanvasSiteState = makeFixtureSiteState({
+// we can drop it into a EditableSite without TS complaining.
+const recipeState: EditableSite = makeFixtureSiteState({
   ...page1,
   sections: [recipeSection, ...page1.sections],
 });

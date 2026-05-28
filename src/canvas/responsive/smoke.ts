@@ -9,7 +9,7 @@
 
 import fixture from '../fixtures/home.json' with { type: 'json' };
 import { renderCanvasSnapshot } from '../render.js';
-import type { CanvasSiteState, PublishedSnapshot } from '../schema.js';
+import type { EditableSite, PublishedSnapshot } from '../schema.js';
 
 import { renderResponsiveCss } from './index.js';
 import { PHONE_DESIGN_WIDTH, scaleFactor } from './translate.js';
@@ -18,7 +18,7 @@ function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
 }
 
-const editable = structuredClone(fixture) as CanvasSiteState;
+const editable = structuredClone(fixture) as EditableSite;
 
 // The bundled home fixture has no `responsive` overrides. To exercise the
 // hidden + override paths the smoke synthesises one: hide the decorative

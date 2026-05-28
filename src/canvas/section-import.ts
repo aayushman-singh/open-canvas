@@ -113,7 +113,7 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
     if (resolveTargetId(media.assetId) === null) {
       errors.push(`unknown seed asset id: ${media.assetId}`);
     }
-    if (media.posterAssetId !== undefined && resolveTargetId(media.posterAssetId) === null) {
+    if (media.mediaKind === 'video' && media.posterAssetId !== undefined && resolveTargetId(media.posterAssetId) === null) {
       errors.push(`unknown seed poster asset id: ${media.posterAssetId}`);
     }
   }
@@ -124,7 +124,7 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
     if (element.type !== 'media') continue;
     const media = element;
     media.assetId = assetIdMap.get(media.assetId)!;
-    if (media.posterAssetId !== undefined) {
+    if (media.mediaKind === 'video' && media.posterAssetId !== undefined) {
       media.posterAssetId = assetIdMap.get(media.posterAssetId)!;
     }
   }

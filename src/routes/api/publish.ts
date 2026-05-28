@@ -31,7 +31,7 @@ import { resolvePrimaryPage, snapshotForPageSlug } from '../../canvas/page-routi
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import type { PublishedSnapshot } from '../../canvas/schema';
-import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
+import { validateEditableSite, validatePublishedSnapshot } from '../../canvas/validate';
 import { db, type Db } from '../../db/client';
 import { customer, ownerAsset, site, siteSearchEntry, siteSnapshot } from '../../db/schema';
 // Post-publish side effects that are part of the published-site contract:
@@ -283,7 +283,7 @@ publishApi.post('/sites/:siteId', async (c) => {
     return c.json({ error: 'site not found' }, 404);
   }
 
-  const validation = validateCanvasSiteState(row.editableState);
+  const validation = validateEditableSite(row.editableState);
   if (!validation.valid) {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
   }

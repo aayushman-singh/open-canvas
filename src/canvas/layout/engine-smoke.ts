@@ -9,15 +9,15 @@
 //   - Color/font pinning (non-default tokens → pinnedStyle)
 //   - Image prompt collection
 //   - Element cap enforcement (MAX_ELEMENTS = 30)
-//   - Output passes validateCanvasSiteState
+//   - Output passes validateEditableSite
 //
 // Pure, no network. Run: bun run src/canvas/layout/engine-smoke.ts
 
 import { resolveDesignSection } from './engine.js';
 import type { DesignSectionInput, LayoutNode, ElementNode } from './tree.js';
-import { validateCanvasSiteState } from '../validate.js';
+import { validateEditableSite } from '../validate.js';
 import { getStyleKitPreset } from '../style-kits.js';
-import type { CanvasSiteState } from '../schema.js';
+import type { EditableSite } from '../schema.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -26,7 +26,7 @@ function assert(condition: boolean, message: string): void {
 const CHARCOAL = getStyleKitPreset('charcoal');
 const PAGE_WIDTH = 1440;
 
-function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteState {
+function wrapInState(section: import('../schema.js').CanvasSection): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [{ id: 'page-1', slug: 'home', title: 'Smoke', width: PAGE_WIDTH, sections: [section] }],
@@ -127,7 +127,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
   );
 
   // Validate
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `validation failed: ${result.errors.join('; ')}`);
 }
 
@@ -192,7 +192,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
   assert(xs[0]! < xs[1]!, 'col 0 left of col 1');
   assert(xs[1]! < xs[2]!, 'col 1 left of col 2');
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `grid validation failed: ${result.errors.join('; ')}`);
 }
 
@@ -268,7 +268,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     'image prompt content',
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `split validation failed: ${result.errors.join('; ')}`);
 }
 
@@ -317,7 +317,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     `2:1 ratio: left (${String(leftW)}) should be wider than right (${String(rightW)})`,
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(
     result.valid,
     result.valid ? '' : `2:1 split validation failed: ${result.errors.join('; ')}`,
@@ -393,7 +393,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     );
   }
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(
     result.valid,
     result.valid ? '' : `bg container validation failed: ${result.errors.join('; ')}`,
@@ -489,7 +489,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     'pricing heading should be center-aligned',
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(
     result.valid,
     result.valid ? '' : `pricing validation failed: ${result.errors.join('; ')}`,
@@ -534,7 +534,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     'left element should be left of right',
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `row validation failed: ${result.errors.join('; ')}`);
 }
 
@@ -566,7 +566,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     `height should be clamped to >= 240, got ${String(section.height)}`,
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `clamped validation: ${result.errors.join('; ')}`);
 }
 
@@ -594,7 +594,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     `height should be clamped to <= 1200, got ${String(section.height)}`,
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `clamped high validation: ${result.errors.join('; ')}`);
 }
 
@@ -658,7 +658,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteS
     'mono font on heading should produce font-family pinnedStyle',
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `font pin validation: ${result.errors.join('; ')}`);
 }
 
@@ -694,11 +694,11 @@ for (const kit of BUILT_IN_STYLE_KITS) {
   const { section, imagePrompts } = resolveDesignSection(input, PAGE_WIDTH, preset);
   assert(imagePrompts.size === 1, `kit ${kit}: one image prompt`);
 
-  const state: CanvasSiteState = {
+  const state: EditableSite = {
     styleKit: kit,
     pages: [{ id: 'page-1', slug: 'home', title: 'Smoke', width: PAGE_WIDTH, sections: [section] }],
   };
-  const result = validateCanvasSiteState(state);
+  const result = validateEditableSite(state);
   assert(
     result.valid,
     result.valid ? '' : `kit ${kit} validation failed: ${result.errors.join('; ')}`,
@@ -761,7 +761,7 @@ for (const kit of BUILT_IN_STYLE_KITS) {
     `deep nested: expected 4 elements, got ${String(section.elements.length)}`,
   );
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `deep nested validation: ${result.errors.join('; ')}`);
 }
 
@@ -799,7 +799,7 @@ for (const kit of BUILT_IN_STYLE_KITS) {
   assert(tiny.type === 'text' && tiny.fontSize >= 12, 'font size clamped to >= 12');
   assert(huge.type === 'text' && huge.fontSize <= 96, 'font size clamped to <= 96');
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `font clamp validation: ${result.errors.join('; ')}`);
 }
 
@@ -877,7 +877,7 @@ for (const kit of BUILT_IN_STYLE_KITS) {
     assert(el.box.y + el.box.h <= section.height, `${el.id}: y+h <= sectionHeight`);
   }
 
-  const result = validateCanvasSiteState(wrapInState(section));
+  const result = validateEditableSite(wrapInState(section));
   assert(result.valid, result.valid ? '' : `boundary validation: ${result.errors.join('; ')}`);
 }
 

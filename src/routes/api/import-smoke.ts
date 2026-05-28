@@ -1,6 +1,6 @@
 import { sha256Hex } from '../../assets/hash.js';
-import { validateCanvasSiteState } from '../../canvas/validate.js';
-import { buildCanvasSiteState, prepareImportedAssets, type ScraperResponse } from './import.js';
+import { validateEditableSite } from '../../canvas/validate.js';
+import { buildEditableSite, prepareImportedAssets, type ScraperResponse } from './import.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[import:smoke] ${message}`);
@@ -90,8 +90,8 @@ assert(
   'imported font family must become a font:<hash> token',
 );
 
-const state = buildCanvasSiteState(data, prepared.mediaAssetIdMap, prepared.fontFamilyTokenMap);
-const validation = validateCanvasSiteState(state);
+const state = buildEditableSite(data, prepared.mediaAssetIdMap, prepared.fontFamilyTokenMap);
+const validation = validateEditableSite(state);
 assert(validation.valid, validation.valid ? '' : validation.errors.join('; '));
 const elements = state.pages[0]?.sections[0]?.elements ?? [];
 assert(elements.length === 2, `expected two media elements, got ${String(elements.length)}`);
@@ -111,7 +111,7 @@ assert(
 
 let missingAssetThrew = false;
 try {
-  buildCanvasSiteState(data, new Map(), prepared.fontFamilyTokenMap);
+  buildEditableSite(data, new Map(), prepared.fontFamilyTokenMap);
 } catch (err) {
   missingAssetThrew =
     err instanceof Error && err.message.includes('missing imported media asset');
@@ -120,7 +120,7 @@ assert(missingAssetThrew, 'missing imported media asset must fail loudly');
 
 let unknownElementThrew = false;
 try {
-  buildCanvasSiteState(
+  buildEditableSite(
     {
       ...data,
       sections: [

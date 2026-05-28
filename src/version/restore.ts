@@ -16,7 +16,7 @@
 //
 //   3. Decode the target snapshot bytes via the frozen Yjs projection
 //      (`Y.applyUpdate` into a fresh `Y.Doc`, then `decodeYDoc`). The
-//      decoded `CanvasSiteState` is the new editable state.
+//      decoded `EditableSite` is the new editable state.
 //
 //   4. Swap `site.editableState` atomically. Drizzle UPDATE is a single SQL
 //      statement, so the swap is point-in-time atomic from the row's
@@ -36,7 +36,7 @@ import { eq } from 'drizzle-orm';
 import * as Y from 'yjs';
 
 import { decodeYDoc } from '../canvas/yjs-projection.js';
-import type { CanvasSiteState } from '../canvas/schema.js';
+import type { EditableSite } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
 import { site, siteSnapshot } from '../db/schema.js';
 
@@ -69,14 +69,14 @@ export interface RestoreEnv {
 export interface EditableStateReplacedBroadcast {
   kind: 'editable-state-replaced';
   siteId: string;
-  newState: CanvasSiteState;
+  newState: EditableSite;
 }
 
 export interface RestoreResult {
   /** Snapshot id that was restored from. */
   snapshotId: string;
   /** The new editable state (decoded from the snapshot). */
-  newState: CanvasSiteState;
+  newState: EditableSite;
   /** True when the SiteRoom accepted the editor replacement broadcast. */
   broadcasted: true;
 }
@@ -144,7 +144,7 @@ export async function restoreSnapshot(
   const safetyLabel = buildSafetyLabel();
   await captureManual(siteId, safetyLabel, db, env);
 
-  // Step 3 — decode the target snapshot bytes back into CanvasSiteState
+  // Step 3 — decode the target snapshot bytes back into EditableSite
   // via the frozen Yjs projection. Applying the update onto a fresh Doc
   // gives us a Doc whose state vector matches the captured moment exactly;
   // `decodeYDoc` then walks that Doc back into JSON.
@@ -179,7 +179,7 @@ export async function restoreSnapshot(
 async function broadcastReplacement(
   env: RestoreEnv,
   siteId: string,
-  newState: CanvasSiteState,
+  newState: EditableSite,
 ): Promise<void> {
   try {
     const id = env.SITE_ROOM.idFromName(siteId);

@@ -50,7 +50,10 @@ assert(
   'cookie header preserved verbatim',
 );
 
-const parsedOriginal = (await original.json());
+// `original.json()` returns `unknown` under this tsconfig; cast to the shape
+// we constructed the request with so the assertion below can read fields.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+const parsedOriginal = (await original.json()) as typeof bodyPayload;
 assert(
   parsedOriginal.siteId === bodyPayload.siteId && parsedOriginal.name === bodyPayload.name,
   "original request's body must remain readable after the rebuild",

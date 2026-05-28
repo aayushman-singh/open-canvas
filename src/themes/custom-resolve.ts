@@ -1,7 +1,7 @@
 // src/themes/custom-resolve.ts
 //
 // Wave 2 #10 — Custom theme editor. The renderer treats `styleKit === 'custom'`
-// as a signal to resolve the preset from `CanvasSiteState.customStyleKit`
+// as a signal to resolve the preset from `EditableSite.customStyleKit`
 // instead of the built-in lookup table. Everything else flows unchanged.
 //
 // This module owns ONE public function — `resolveStyleKitWithCustom` — which
@@ -28,7 +28,7 @@ import {
   MOTION_PRESETS,
   SURFACE_VARIANTS,
   type ActionVariant,
-  type CanvasSiteState,
+  type EditableSite,
   type MotionPreset,
   type StyleKitPreset,
   type SurfaceVariant,
@@ -52,7 +52,7 @@ import { getStyleKitPreset } from '../canvas/style-kits.js';
  * must have a `customStyleKit`.
  */
 export function resolveStyleKitWithCustom(
-  state: Pick<CanvasSiteState, 'styleKit' | 'customStyleKit'>,
+  state: Pick<EditableSite, 'styleKit' | 'customStyleKit'>,
 ): StyleKitPreset {
   if (state.styleKit !== 'custom') {
     return getStyleKitPreset(state.styleKit);

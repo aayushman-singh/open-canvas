@@ -23,7 +23,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { db } from '../db/client.js';
 import { customer, site } from '../db/schema.js';
-import { validateCanvasSiteState } from '../canvas/validate.js';
+import { validateEditableSite } from '../canvas/validate.js';
 
 import { runAudit } from './audit.js';
 
@@ -71,7 +71,7 @@ a11yRoute.get('/:siteId/a11y', async (c) => {
   // Defence in depth: a corrupted editableState shouldn't 500 — re-validate
   // and report up front so the audit doesn't run over a malformed shape and
   // get blamed for the failure.
-  const validation = validateCanvasSiteState(row.editableState);
+  const validation = validateEditableSite(row.editableState);
   if (!validation.valid) {
     return c.json(
       {

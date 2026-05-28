@@ -24,8 +24,8 @@ import { requireAdmin } from '../../auth/require-admin.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
-import type { CanvasSiteState, PublishedSnapshot } from '../../canvas/schema.js';
-import { validateCanvasSiteState } from '../../canvas/validate.js';
+import type { EditableSite, PublishedSnapshot } from '../../canvas/schema.js';
+import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
 import {
   customer,
@@ -63,14 +63,16 @@ async function resolveCustomerId(
   return row[0]?.id ?? null;
 }
 
-function collectAssetIds(state: CanvasSiteState): Set<string> {
+function collectAssetIds(state: EditableSite): Set<string> {
   const ids = new Set<string>();
   for (const page of state.pages) {
     for (const section of page.sections) {
       for (const element of section.elements) {
         if (element.type !== 'media') continue;
         ids.add(element.assetId);
-        if (element.posterAssetId !== undefined) ids.add(element.posterAssetId);
+        if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+          ids.add(element.posterAssetId);
+        }
       }
     }
   }
@@ -80,7 +82,7 @@ function collectAssetIds(state: CanvasSiteState): Set<string> {
 async function buildAssetManifest(
   database: ReturnType<typeof db>,
   customerId: string,
-  state: CanvasSiteState,
+  state: EditableSite,
 ): Promise<AssetManifestEntry[]> {
   const assetIds = collectAssetIds(state);
   if (assetIds.size === 0) return [];
@@ -216,7 +218,7 @@ customTemplatesOwner.post('/', async (c) => {
   const siteState = siteRow[0]?.editableState;
   if (!siteState) return c.json({ error: 'site not found' }, 404);
 
-  const validation = validateCanvasSiteState(siteState);
+  const validation = validateEditableSite(siteState);
   if (!validation.valid) {
     return c.json({ error: 'site state invalid', details: validation.errors }, 400);
   }
@@ -377,7 +379,7 @@ customTemplatesAdmin.post('/', async (c) => {
   const siteState = siteRow[0]?.editableState;
   if (!siteState) return c.json({ error: 'site not found' }, 404);
 
-  const validation = validateCanvasSiteState(siteState);
+  const validation = validateEditableSite(siteState);
   if (!validation.valid) {
     return c.json({ error: 'site state invalid', details: validation.errors }, 400);
   }

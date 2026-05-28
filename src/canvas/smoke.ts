@@ -13,7 +13,7 @@ import type {
   CanvasElement,
   CanvasPage,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   PublishedSnapshot,
   StyleKit,
   TextElement,
@@ -21,7 +21,7 @@ import type {
 import { BUILT_IN_STYLE_KITS } from './schema.js';
 import { STYLE_KIT_PRESETS, buildAllStyleKitsCss, getStyleKitPreset } from './style-kits.js';
 import {
-  validateCanvasSiteState,
+  validateEditableSite,
   validatePublishedSnapshot,
   validateSeedFixture,
 } from './validate.js';
@@ -30,8 +30,8 @@ function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
 }
 
-const editable = fixture as CanvasSiteState;
-const editableResult = validateCanvasSiteState(editable);
+const editable = fixture as EditableSite;
+const editableResult = validateEditableSite(editable);
 assert(editableResult.valid, editableResult.valid ? '' : editableResult.errors.join('; '));
 
 const snapshot: PublishedSnapshot = {
@@ -49,7 +49,7 @@ assert(html.includes('data-rev01-section="section-hero"'), 'expected rendered he
 assert(html.includes('data-rev01-element="hero-heading"'), 'expected rendered heading marker');
 assert(html.includes('data-rev01-media-kind="image"'), 'expected rendered image media marker');
 
-const pageMotionLayoutState: CanvasSiteState = {
+const pageMotionLayoutState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -75,7 +75,7 @@ const pageMotionLayoutState: CanvasSiteState = {
     },
   ],
 };
-const pageMotionLayoutValidation = validateCanvasSiteState(pageMotionLayoutState);
+const pageMotionLayoutValidation = validateEditableSite(pageMotionLayoutState);
 assert(
   pageMotionLayoutValidation.valid,
   pageMotionLayoutValidation.valid
@@ -112,7 +112,7 @@ assert(
   'expected maxWidth to constrain rendered section width inside the page',
 );
 
-const badPageMotionLayoutResult = validateCanvasSiteState({
+const badPageMotionLayoutResult = validateEditableSite({
   styleKit: 'charcoal',
   pages: [
     {
@@ -173,7 +173,7 @@ assert(
 );
 
 // Validator: a hand-built text element whose link mark uses a javascript:
-// scheme must be rejected. The smoke wraps it in a minimum CanvasSiteState.
+// scheme must be rejected. The smoke wraps it in a minimum EditableSite.
 const javascriptLinkText: TextElement = {
   id: 'hero-heading-evil',
   type: 'text',
@@ -184,7 +184,7 @@ const javascriptLinkText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const javascriptLinkState: CanvasSiteState = {
+const javascriptLinkState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -204,7 +204,7 @@ const javascriptLinkState: CanvasSiteState = {
     },
   ],
 };
-const javascriptLinkResult = validateCanvasSiteState(javascriptLinkState);
+const javascriptLinkResult = validateEditableSite(javascriptLinkState);
 assert(
   !javascriptLinkResult.valid,
   'expected validator to reject a link mark with href "javascript:alert(1)"',
@@ -231,7 +231,7 @@ const blankTargetText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const blankTargetState: CanvasSiteState = {
+const blankTargetState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -251,7 +251,7 @@ const blankTargetState: CanvasSiteState = {
     },
   ],
 };
-const blankTargetResult = validateCanvasSiteState(blankTargetState);
+const blankTargetResult = validateEditableSite(blankTargetState);
 assert(
   blankTargetResult.valid,
   blankTargetResult.valid
@@ -282,7 +282,7 @@ const badTargetText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const badTargetState: CanvasSiteState = {
+const badTargetState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -302,7 +302,7 @@ const badTargetState: CanvasSiteState = {
     },
   ],
 };
-const badTargetResult = validateCanvasSiteState(badTargetState);
+const badTargetResult = validateEditableSite(badTargetState);
 assert(!badTargetResult.valid, 'expected validator to reject link mark with target="_self"');
 assert(
   !badTargetResult.valid && badTargetResult.errors.some((m) => m.includes('target')),
@@ -320,7 +320,7 @@ const noTargetText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const noTargetState: CanvasSiteState = {
+const noTargetState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -340,7 +340,7 @@ const noTargetState: CanvasSiteState = {
     },
   ],
 };
-const noTargetResult = validateCanvasSiteState(noTargetState);
+const noTargetResult = validateEditableSite(noTargetState);
 assert(
   noTargetResult.valid,
   noTargetResult.valid
@@ -430,11 +430,11 @@ const secondPage: CanvasPage = structuredClone(fixtureClone.pages[0] as CanvasPa
 secondPage.id = 'page-second';
 secondPage.slug = 'second';
 secondPage.title = 'Second';
-const twoPageState: CanvasSiteState = {
+const twoPageState: EditableSite = {
   ...fixtureClone,
   pages: [fixtureClone.pages[0] as CanvasPage, secondPage],
 };
-const twoPageResult = validateCanvasSiteState(twoPageState);
+const twoPageResult = validateEditableSite(twoPageState);
 assert(
   twoPageResult.valid,
   twoPageResult.valid
@@ -442,10 +442,10 @@ assert(
     : 'expected validator to accept a two-page state: ' + twoPageResult.errors.join('; '),
 );
 
-const duplicatePageState: CanvasSiteState = structuredClone(twoPageState);
+const duplicatePageState: EditableSite = structuredClone(twoPageState);
 duplicatePageState.pages[1]!.id = duplicatePageState.pages[0]!.id;
 duplicatePageState.pages[1]!.slug = duplicatePageState.pages[0]!.slug;
-const duplicatePageResult = validateCanvasSiteState(duplicatePageState);
+const duplicatePageResult = validateEditableSite(duplicatePageState);
 assert(
   !duplicatePageResult.valid,
   'expected validator to reject duplicate page ids/slugs',
@@ -458,20 +458,20 @@ assert(
 
 // Validator: the existing empty-pages case must still reject (the new length
 // rule does not displace the non-empty-array check).
-const noPagesResult = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
+const noPagesResult = validateEditableSite({ styleKit: 'charcoal', pages: [] });
 assert(
   !noPagesResult.valid,
   'expected validator to still reject pages: [] (non-empty array required)',
 );
 
-const pageLinkState: CanvasSiteState = structuredClone(twoPageState);
+const pageLinkState: EditableSite = structuredClone(twoPageState);
 const linkSection = pageLinkState.pages[0]!.sections[0]!;
 const linkElement = linkSection.elements.find((el) => el.id === 'header-cta');
 if (!linkElement || linkElement.type !== 'action') {
   throw new Error('fixture header must contain action element header-cta');
 }
 linkElement.href = { type: 'page', pageId: 'page-second', anchor: 'pricing' };
-const pageLinkResult = validateCanvasSiteState(pageLinkState);
+const pageLinkResult = validateEditableSite(pageLinkState);
 assert(
   pageLinkResult.valid,
   pageLinkResult.valid
@@ -495,7 +495,7 @@ assert(
 );
 
 linkElement.href = { type: 'page', pageId: 'missing-page' };
-const brokenPageLinkResult = validateCanvasSiteState(pageLinkState);
+const brokenPageLinkResult = validateEditableSite(pageLinkState);
 assert(
   !brokenPageLinkResult.valid &&
     brokenPageLinkResult.errors.some((m) => m.includes('must reference an existing page')),
@@ -635,7 +635,7 @@ function roleTestSection(
   };
 }
 
-function roleTestState(sections: CanvasSection[]): CanvasSiteState {
+function roleTestState(sections: CanvasSection[]): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [
@@ -655,7 +655,7 @@ const shortFrameRoleState = roleTestState([
   roleTestSection('section-body-ok'),
   roleTestSection('section-footer-short', 'footer', 120),
 ]);
-const shortFrameRoleResult = validateCanvasSiteState(shortFrameRoleState);
+const shortFrameRoleResult = validateEditableSite(shortFrameRoleState);
 assert(
   shortFrameRoleResult.valid,
   shortFrameRoleResult.valid
@@ -664,7 +664,7 @@ assert(
         shortFrameRoleResult.errors.join('; '),
 );
 
-const duplicateHeaderResult = validateCanvasSiteState(
+const duplicateHeaderResult = validateEditableSite(
   roleTestState([
     roleTestSection('section-header-a', 'header', 72),
     roleTestSection('section-header-b', 'header', 72),
@@ -678,7 +678,7 @@ assert(
   'expected duplicate-header rejection to mention at most one Header Section',
 );
 
-const misplacedHeaderResult = validateCanvasSiteState(
+const misplacedHeaderResult = validateEditableSite(
   roleTestState([
     roleTestSection('section-body-before-header'),
     roleTestSection('section-header-misplaced', 'header', 72),
@@ -691,7 +691,7 @@ assert(
   'expected misplaced-header rejection to mention sections[0]',
 );
 
-const misplacedFooterResult = validateCanvasSiteState(
+const misplacedFooterResult = validateEditableSite(
   roleTestState([
     roleTestSection('section-footer-misplaced', 'footer', 120),
     roleTestSection('section-body-after-footer'),
@@ -706,7 +706,7 @@ assert(
 
 const badSectionRoleState = roleTestState([roleTestSection('section-bad-role')]);
 (badSectionRoleState.pages[0]!.sections[0]! as unknown as { role: string }).role = 'sidebar';
-const badSectionRoleResult = validateCanvasSiteState(badSectionRoleState);
+const badSectionRoleResult = validateEditableSite(badSectionRoleState);
 assert(!badSectionRoleResult.valid, 'expected validator to reject an unknown section role');
 assert(
   !badSectionRoleResult.valid &&
@@ -729,7 +729,7 @@ assert(
 // And a hand-built fixture whose media references an unregistered assetId
 // must be rejected, with the rejection message mentioning the offending id.
 const bogusAssetId = 'not-a-real-seed-id-xyz';
-const fixtureWithBogusAsset: CanvasSiteState = structuredClone(editable);
+const fixtureWithBogusAsset: EditableSite = structuredClone(editable);
 const firstPage = fixtureWithBogusAsset.pages[0];
 if (!firstPage) throw new Error('fixture must have at least one page');
 const heroSection = firstPage.sections.find((s) => s.id === 'section-hero');

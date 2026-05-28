@@ -31,7 +31,7 @@ function assert(condition: boolean, message: string): void {
 function makeSnapshot(pages: CanvasPage[], extra: Record<string, unknown> = {}): PublishedSnapshot {
   // The base obeys the PublishedSnapshot shape; the optional `extra` overlay
   // is how the smoke threads experimental fields (`siteNoIndex`,
-  // `defaultLocale`) that live on `CanvasSiteState` but may surface on the
+  // `defaultLocale`) that live on `EditableSite` but may surface on the
   // snapshot via the structural probe in `meta-emit.ts`. We assemble the
   // base first, then attach extras via Object.assign so the resulting value
   // keeps the static `PublishedSnapshot` type.

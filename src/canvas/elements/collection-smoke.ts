@@ -11,10 +11,10 @@ import type {
   CanvasElement,
   CanvasPage,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   TextElement,
 } from '../schema.js';
-import { validateCanvasSiteState } from '../validate.js';
+import { validateEditableSite } from '../validate.js';
 import { renderCollection, type CollectionElement } from './collection.js';
 import { encodeYDoc, decodeYDoc } from '../yjs-projection.js';
 import { renderText } from './text.js';
@@ -94,7 +94,7 @@ function makeSection(elements: CollectionElement[]): CanvasSection {
 function makeSiteState(
   collection: CollectionElement,
   pageMetadata?: Partial<CanvasPage>,
-): CanvasSiteState {
+): EditableSite {
   const page: CanvasPage = {
     id: 'page-home',
     slug: 'home',
@@ -160,14 +160,14 @@ function makeSiteState(
 
 {
   const goodState = makeSiteState(makeManualCollection());
-  const goodResult = validateCanvasSiteState(goodState);
+  const goodResult = validateEditableSite(goodState);
   assert(
     goodResult.valid,
     `(3) valid manual collection passes validation: ${goodResult.valid ? '' : goodResult.errors.join('; ')}`,
   );
 
   const pageBoundState = makeSiteState(makePageBoundCollection());
-  const pbResult = validateCanvasSiteState(pageBoundState);
+  const pbResult = validateEditableSite(pageBoundState);
   assert(
     pbResult.valid,
     `(3) valid page-bound collection passes validation: ${pbResult.valid ? '' : pbResult.errors.join('; ')}`,
@@ -178,7 +178,7 @@ function makeSiteState(
     ...makeManualCollection(),
     mode: 'invalid' as CollectionElement['mode'],
   });
-  const badModeResult = validateCanvasSiteState(badMode);
+  const badModeResult = validateEditableSite(badMode);
   assert(!badModeResult.valid, '(3) invalid mode rejected');
 
   // Bad: layout.columns < 1
@@ -186,7 +186,7 @@ function makeSiteState(
     ...makeManualCollection(),
     layout: { columns: 0, gap: 10 },
   });
-  const badColsResult = validateCanvasSiteState(badCols);
+  const badColsResult = validateEditableSite(badCols);
   assert(!badColsResult.valid, '(3) layout.columns=0 rejected');
 
   // Bad: layout.gap < 0
@@ -194,22 +194,22 @@ function makeSiteState(
     ...makeManualCollection(),
     layout: { columns: 2, gap: -1 },
   });
-  const badGapResult = validateCanvasSiteState(badGap);
+  const badGapResult = validateEditableSite(badGap);
   assert(!badGapResult.valid, '(3) layout.gap=-1 rejected');
 
   const badNestedText = makeManualCollection();
   badNestedText.entries = [[{ ...makeText('entry-bad-title', ''), content: [] }]];
-  const badNestedResult = validateCanvasSiteState(makeSiteState(badNestedText));
+  const badNestedResult = validateEditableSite(makeSiteState(badNestedText));
   assert(!badNestedResult.valid, '(3) invalid nested entry element rejected');
 
   const badBinding = makePageBoundCollection();
   badBinding.fieldBindings = {
     'card-title': 'slug' as NonNullable<CollectionElement['fieldBindings']>[string],
   };
-  const badBindingResult = validateCanvasSiteState(makeSiteState(badBinding));
+  const badBindingResult = validateEditableSite(makeSiteState(badBinding));
   assert(!badBindingResult.valid, '(3) invalid field binding rejected');
 
-  const badMetadataResult = validateCanvasSiteState(
+  const badMetadataResult = validateEditableSite(
     makeSiteState(makeManualCollection(), { publishedDate: 'not-a-date' }),
   );
   assert(!badMetadataResult.valid, '(3) invalid page metadata date rejected');
@@ -226,7 +226,7 @@ function makeSiteState(
     tags: ['launch', 'design'],
     category: 'blog',
   });
-  const result = validateCanvasSiteState(state);
+  const result = validateEditableSite(state);
   assert(
     result.valid,
     `(4) page metadata passes validation: ${result.valid ? '' : result.errors.join('; ')}`,

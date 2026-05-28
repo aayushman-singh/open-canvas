@@ -5,7 +5,7 @@
 // Inputs:
 //   - A `ChatSessionState` with the persisted message history.
 //   - The Owner's next user message.
-//   - The current `CanvasSiteState` (for `query_site` + op preview validation).
+//   - The current `EditableSite` (for `query_site` + op preview validation).
 //   - An LlmAdapter (Gemini in production; a mock in the smoke).
 //   - A `ChatStreamWriter` the loop emits SSE events into.
 //
@@ -44,7 +44,7 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type { CanvasSiteState } from '../../canvas/schema.js';
+import type { EditableSite } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
 import { translateToolCall, isRecord } from '../tool-parsers.js';
 import {
@@ -88,7 +88,7 @@ export interface OwnerAssetRef {
 export interface OrchestratorContext {
   adapter: LlmAdapter;
   model?: string;
-  state: CanvasSiteState;
+  state: EditableSite;
   fonts?: SiteFont[];
   assets?: OwnerAssetRef[];
   /**
@@ -447,7 +447,7 @@ export function toLlmMessages(history: readonly ChatMessage[]): LlmMessage[] {
  * Uses domain language from CONTEXT.md verbatim — Owner, Editable Site,
  * Canvas Page, Canvas Section, Content Element, Section Recipe, Style Kit.
  */
-export function buildSystemPrompt(state: CanvasSiteState): string {
+export function buildSystemPrompt(state: EditableSite): string {
   const lines: string[] = [];
   lines.push(
     'You are the Agent for the rev01 site builder — an AI collaborator that changes an Editable Site only from an Owner request.',

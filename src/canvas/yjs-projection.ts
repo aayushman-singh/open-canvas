@@ -6,10 +6,10 @@
 //
 // The canonical operation model per ADR 0007 is a `Y.Doc`. Every other
 // subsystem (agent ops, validators, renderer, publish) still consumes the
-// JSON `CanvasSiteState`. This module owns the bridge in BOTH directions:
+// JSON `EditableSite`. This module owns the bridge in BOTH directions:
 //
-//   encodeYDoc(state)  : CanvasSiteState  -> Y.Doc
-//   decodeYDoc(doc)    : Y.Doc             -> CanvasSiteState
+//   encodeYDoc(state)  : EditableSite  -> Y.Doc
+//   decodeYDoc(doc)    : Y.Doc             -> EditableSite
 //   attachAutosave(doc): observe edits, debounce, hand projected JSON to caller
 //
 // The round-trip invariant `decodeYDoc(encodeYDoc(state)) deepEqual state`
@@ -87,7 +87,7 @@ import type {
   CanvasElement,
   CanvasPage,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   ContainerElement,
   ElementStyle,
   InlineMark,
@@ -99,6 +99,7 @@ import type {
   StyleKit,
   StyleKitPreset,
   TextElement,
+  VideoMediaElement,
 } from './schema.js';
 import type {
   AccordionElement,
@@ -302,16 +303,18 @@ function encodeMediaElement(el: MediaElement): Y.Map<unknown> {
   encodeBaseElementFields(out, el);
   out.set('mediaKind', el.mediaKind);
   out.set('assetId', el.assetId);
-  setIfDefined(out, 'posterAssetId', el.posterAssetId);
   out.set('alt', el.alt);
   out.set('fit', el.fit);
-  if (el.playback !== undefined) {
-    const playback = new Y.Map<unknown>();
-    setIfDefined(playback, 'autoplay', el.playback.autoplay);
-    setIfDefined(playback, 'muted', el.playback.muted);
-    setIfDefined(playback, 'loop', el.playback.loop);
-    setIfDefined(playback, 'controls', el.playback.controls);
-    out.set('playback', playback);
+  if (el.mediaKind === 'video') {
+    setIfDefined(out, 'posterAssetId', el.posterAssetId);
+    if (el.playback !== undefined) {
+      const playback = new Y.Map<unknown>();
+      setIfDefined(playback, 'autoplay', el.playback.autoplay);
+      setIfDefined(playback, 'muted', el.playback.muted);
+      setIfDefined(playback, 'loop', el.playback.loop);
+      setIfDefined(playback, 'controls', el.playback.controls);
+      out.set('playback', playback);
+    }
   }
   return out;
 }
@@ -615,10 +618,12 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   if (section.trigger !== undefined) {
     const trigger = new Y.Map<unknown>();
     trigger.set('type', section.trigger.type);
-    setIfDefined(trigger, 'value', section.trigger.value);
+    if (section.trigger.type !== 'exit-intent') {
+      trigger.set('value', section.trigger.value);
+    }
     out.set('trigger', trigger);
   }
-  setIfDefined(out, 'backgroundVideo', section.backgroundVideo);
+  setIfDefined(out, 'backgroundVideoAssetId', section.backgroundVideoAssetId);
   const elements = new Y.Array<Y.Map<unknown>>();
   for (const el of section.elements) elements.push([encodeElement(el)]);
   out.set('elements', elements);
@@ -700,12 +705,12 @@ function encodeNestedTokenRecord(
 }
 
 /**
- * Encode a CanvasSiteState into a fresh Y.Doc.
+ * Encode a EditableSite into a fresh Y.Doc.
  *
  * One transaction wraps the entire encode so a downstream `attachAutosave`
  * sees a single update event per encode call rather than one per nested set.
  */
-export function encodeYDoc(state: CanvasSiteState): Y.Doc {
+export function encodeYDoc(state: EditableSite): Y.Doc {
   const doc = new Y.Doc();
   doc.transact(() => {
     const root = doc.getMap<unknown>('state');
@@ -831,18 +836,22 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       return el;
     }
     case 'media': {
-      const el: MediaElement = {
+      const mediaKind = map.get('mediaKind') as MediaElement['mediaKind'];
+      const shared = {
         ...base,
         type,
-        mediaKind: map.get('mediaKind') as MediaElement['mediaKind'],
         assetId: map.get('assetId') as string,
         alt: map.get('alt') as string,
         fit: map.get('fit') as MediaElement['fit'],
       };
+      if (mediaKind === 'image') {
+        return { ...shared, mediaKind: 'image' };
+      }
+      const el: VideoMediaElement = { ...shared, mediaKind: 'video' };
       if (map.has('posterAssetId')) el.posterAssetId = map.get('posterAssetId') as string;
       if (map.has('playback')) {
         const playback = map.get('playback') as Y.Map<unknown>;
-        const playbackOut: NonNullable<MediaElement['playback']> = {};
+        const playbackOut: NonNullable<VideoMediaElement['playback']> = {};
         if (playback.has('autoplay')) playbackOut.autoplay = playback.get('autoplay') as boolean;
         if (playback.has('muted')) playbackOut.muted = playback.get('muted') as boolean;
         if (playback.has('loop')) playbackOut.loop = playback.get('loop') as boolean;
@@ -1128,15 +1137,15 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   }
   if (map.has('trigger')) {
     const triggerMap = map.get('trigger') as Y.Map<unknown>;
-    section.trigger = {
-      type: triggerMap.get('type') as NonNullable<CanvasSection['trigger']>['type'],
-    };
-    if (triggerMap.has('value')) {
-      section.trigger.value = triggerMap.get('value') as number;
+    const triggerType = triggerMap.get('type') as NonNullable<CanvasSection['trigger']>['type'];
+    if (triggerType === 'exit-intent') {
+      section.trigger = { type: 'exit-intent' };
+    } else {
+      section.trigger = { type: triggerType, value: triggerMap.get('value') as number };
     }
   }
-  if (map.has('backgroundVideo')) {
-    section.backgroundVideo = map.get('backgroundVideo') as string;
+  if (map.has('backgroundVideoAssetId')) {
+    section.backgroundVideoAssetId = map.get('backgroundVideoAssetId') as string;
   }
   return section;
 }
@@ -1202,16 +1211,16 @@ function decodeNestedTokenRecord(
 }
 
 /**
- * Decode a Y.Doc encoded by `encodeYDoc` back into a plain CanvasSiteState.
+ * Decode a Y.Doc encoded by `encodeYDoc` back into a plain EditableSite.
  *
  * Round-trip invariant: `decodeYDoc(encodeYDoc(state))` is deep-equal to
  * the input. The smoke test enforces this for both fixtures and a synthetic
  * state covering every ElementType.
  */
-export function decodeYDoc(doc: Y.Doc): CanvasSiteState {
+export function decodeYDoc(doc: Y.Doc): EditableSite {
   const root = doc.getMap<unknown>('state');
 
-  const state: CanvasSiteState = {
+  const state: EditableSite = {
     styleKit: root.get('styleKit') as StyleKit,
     pages: (root.get('pages') as Y.Array<Y.Map<unknown>>).map(decodePage),
   };
@@ -1261,7 +1270,7 @@ export interface AttachAutosaveOptions {
  */
 export function attachAutosave(
   doc: Y.Doc,
-  onPersist: (state: CanvasSiteState) => void | Promise<void>,
+  onPersist: (state: EditableSite) => void | Promise<void>,
   options?: AttachAutosaveOptions,
 ): () => void {
   const debounceMs = options?.debounceMs ?? 750;

@@ -18,7 +18,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import type { R2Client } from './r2-client.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site } from '../db/schema.js';
-import type { CanvasSiteState, PublishedSnapshot } from '../canvas/schema.js';
+import type { EditableSite, PublishedSnapshot } from '../canvas/schema.js';
 
 export interface DeleteAssetDeps {
   db: Db;
@@ -47,7 +47,7 @@ interface OwnerSiteAssetScanRow {
   name: string;
   subdomain: string;
   publishedVersion: number;
-  editableState: CanvasSiteState;
+  editableState: EditableSite;
   publishedSnapshot: PublishedSnapshot | null;
 }
 
@@ -165,9 +165,9 @@ function collectFromPages(
   source: 'editable' | 'published',
   publishedAddress: string | null,
   state:
-    | CanvasSiteState
+    | EditableSite
     | PublishedSnapshot
-    | { pages: CanvasSiteState['pages']; faviconAssetId?: string },
+    | { pages: EditableSite['pages']; faviconAssetId?: string },
   assetId: string,
 ): void {
   const seen = new Set<string>();
@@ -218,7 +218,7 @@ function collectFromPages(
             });
           }
         }
-        if (element.posterAssetId === assetId) {
+        if (element.mediaKind === 'video' && element.posterAssetId === assetId) {
           const key = `${page.slug}|${element.id}|poster`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -239,9 +239,9 @@ function collectFromPages(
 }
 
 function clearAssetReferences(
-  state: CanvasSiteState,
+  state: EditableSite,
   assetId: string,
-): { changed: false; state: CanvasSiteState } | { changed: true; state: CanvasSiteState } {
+): { changed: false; state: EditableSite } | { changed: true; state: EditableSite } {
   let rootChanged = false;
   let rootState = state;
   if (state.faviconAssetId === assetId) {
@@ -261,7 +261,7 @@ function clearAssetReferences(
         if (element.assetId === assetId) {
           next = { ...next, assetId: '' };
         }
-        if (element.posterAssetId === assetId) {
+        if (next.mediaKind === 'video' && next.posterAssetId === assetId) {
           next = { ...next, posterAssetId: '' };
         }
         if (next === element) return element;

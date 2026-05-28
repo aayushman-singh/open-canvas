@@ -40,7 +40,7 @@ for (const seed of allTemplateSeeds) {
       media.assetId.startsWith(expectedPrefix),
       `${seed.id}: media.assetId "${media.assetId}" not remapped`,
     );
-    if (media.posterAssetId !== undefined) {
+    if (media.mediaKind === 'video' && media.posterAssetId !== undefined) {
       assert(
         media.posterAssetId.startsWith(expectedPrefix),
         `${seed.id}: media.posterAssetId "${media.posterAssetId}" not remapped`,

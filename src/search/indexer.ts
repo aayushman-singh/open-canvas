@@ -20,7 +20,7 @@
 //   set of (site_id, page_slug, element_id, text, published_version) rows.
 //   The synthetic `__page` element id never collides with a real element id
 //   because the canvas validator rejects double-underscore element ids
-//   (Phase 0 contract — see `validateCanvasSiteState`).
+//   (Phase 0 contract — see `validateEditableSite`).
 //
 // Failure mode:
 //   Any DB error propagates to the caller. There is no fallback path that

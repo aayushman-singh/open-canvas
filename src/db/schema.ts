@@ -10,7 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
-import type { CanvasSection, CanvasSiteState, PublishedSnapshot, StyleKit } from '../canvas/schema';
+import type { CanvasSection, EditableSite, PublishedSnapshot, StyleKit } from '../canvas/schema';
 
 // -- Postgres `bytea` custom column (Phase 0 — Wave 1 #3 version history) ----
 //
@@ -124,7 +124,7 @@ export const site = pgTable(
     name: text('name').notNull(),
     subdomain: text('subdomain').notNull().unique(),
     styleKit: text('style_kit').notNull().$type<StyleKit>(),
-    editableState: jsonb('editable_state').notNull().$type<CanvasSiteState>(),
+    editableState: jsonb('editable_state').notNull().$type<EditableSite>(),
     publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
     publishedVersion: integer('published_version').notNull().default(0),
     // Wave 2 #9 — password-protected publish. `passwordEnabled` is the visitor-
@@ -542,7 +542,7 @@ export const customTemplate = pgTable('custom_template', {
   name: text('name').notNull(),
   tagline: text('tagline').notNull().default(''),
   styleKit: text('style_kit').notNull(),
-  siteState: jsonb('site_state').notNull().$type<CanvasSiteState>(),
+  siteState: jsonb('site_state').notNull().$type<EditableSite>(),
   assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

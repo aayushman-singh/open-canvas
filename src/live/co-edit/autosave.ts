@@ -8,7 +8,7 @@
 //      `site.editableState` for the given site id.
 //   2. On every Yjs update — whether local-from-decode or remote-from-wire —
 //      the projection is debounced 750ms (default), then the projected
-//      `CanvasSiteState` is written via Drizzle.
+//      `EditableSite` is written via Drizzle.
 //   3. The detach function returned can be called from `webSocketClose` /
 //      `alarm()` to cancel pending timers when the DO winds down.
 //
@@ -26,7 +26,7 @@
 import { eq } from 'drizzle-orm';
 import * as Y from 'yjs';
 
-import type { CanvasSiteState } from '../../canvas/schema.js';
+import type { EditableSite } from '../../canvas/schema.js';
 import { attachAutosave } from '../../canvas/yjs-projection.js';
 import { db, type Db } from '../../db/client.js';
 import { site } from '../../db/schema.js';
@@ -42,7 +42,7 @@ export interface AttachAutosaveToDOOptions {
    * Override the persistence sink. Default writes to Postgres `site.editableState`.
    * Tests / smokes inject a stub here to capture the persisted payload.
    */
-  onPersist?: (state: CanvasSiteState) => void | Promise<void>;
+  onPersist?: (state: EditableSite) => void | Promise<void>;
   /**
    * Override the db builder. Defaults to the project's Drizzle/Neon client.
    * Smokes pass a stub `Db` so no network round-trip is required.
@@ -73,8 +73,8 @@ function defaultPostgresPersist(
   env: AutosaveEnv,
   siteId: string,
   dbFactory?: (env: AutosaveEnv) => Db,
-): (state: CanvasSiteState) => Promise<void> {
-  return async (state: CanvasSiteState) => {
+): (state: EditableSite) => Promise<void> {
+  return async (state: EditableSite) => {
     const client = (dbFactory ?? db)(env);
     try {
       await client

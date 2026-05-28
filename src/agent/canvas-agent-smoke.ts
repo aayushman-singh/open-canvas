@@ -2,7 +2,7 @@
 //
 // Pure smoke for the canvas-agent T7 pieces. Exercises:
 //   - Every recipe factory in RECIPE_REGISTRY produces a CanvasSection that
-//     passes validateCanvasSiteState when wrapped in a single-page state.
+//     passes validateEditableSite when wrapped in a single-page state.
 //   - createSectionFromRecipe throws on an unknown recipe id.
 //   - applyCanvasAgentOp handles each of the three op kinds (rewriteText,
 //     replaceMedia, insertSection) and rejects ill-formed inputs loudly.
@@ -23,10 +23,10 @@ import {
 import {
   INLINE_MARK_TYPES,
   SECTION_RECIPE_IDS,
-  type CanvasSiteState,
+  type EditableSite,
   type SectionRecipeId,
 } from '../canvas/schema.js';
-import { validateCanvasSiteState } from '../canvas/validate.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import type { DesignSectionInput } from '../canvas/layout/tree.js';
 import { parseDesignSectionToolArgs } from './design-section-parser.js';
 import { parseApplyOp, translateToolCall } from './tool-parsers.js';
@@ -48,11 +48,11 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-// Each factory produces output that passes validateCanvasSiteState when
+// Each factory produces output that passes validateEditableSite when
 // slotted into a single-page state.
 // ---------------------------------------------------------------------------
 
-function singlePageStateAround(...recipeIds: SectionRecipeId[]): CanvasSiteState {
+function singlePageStateAround(...recipeIds: SectionRecipeId[]): EditableSite {
   const input: RecipeFactoryInput = {
     brief: 'Smoke brief — keep it short.',
     styleKit: 'charcoal',
@@ -75,7 +75,7 @@ function singlePageStateAround(...recipeIds: SectionRecipeId[]): CanvasSiteState
 
 for (const recipeId of SECTION_RECIPE_IDS) {
   const state = singlePageStateAround(recipeId);
-  const result = validateCanvasSiteState(state);
+  const result = validateEditableSite(state);
   assert(
     result.valid,
     result.valid
@@ -100,7 +100,7 @@ assert(threwOnUnknown, 'expected createSectionFromRecipe to throw loud on an unk
 // applyCanvasAgentOp — each of the three op kinds against a known fixture.
 // ---------------------------------------------------------------------------
 
-const baseState: CanvasSiteState = singlePageStateAround('hero-split');
+const baseState: EditableSite = singlePageStateAround('hero-split');
 const basePage = baseState.pages[0];
 if (!basePage) throw new Error('smoke base state lost its page');
 const baseSection = basePage.sections[0];
@@ -121,7 +121,7 @@ const rewriteOp: CanvasAgentOp = {
   ],
 };
 const afterRewrite = applyCanvasAgentOp(baseState, rewriteOp);
-const rewriteValidation = validateCanvasSiteState(afterRewrite);
+const rewriteValidation = validateEditableSite(afterRewrite);
 assert(
   rewriteValidation.valid,
   rewriteValidation.valid
@@ -190,7 +190,7 @@ const replaceOp: CanvasAgentOp = {
   alt: 'replaced alt',
 };
 const afterReplace = applyCanvasAgentOp(baseState, replaceOp);
-const replaceValidation = validateCanvasSiteState(afterReplace);
+const replaceValidation = validateEditableSite(afterReplace);
 assert(
   replaceValidation.valid,
   replaceValidation.valid
@@ -233,7 +233,7 @@ const insertOp: CanvasAgentOp = {
   input: { brief: 'Three reasons.', styleKit: 'charcoal' },
 };
 const afterInsert = applyCanvasAgentOp(baseState, insertOp);
-const insertValidation = validateCanvasSiteState(afterInsert);
+const insertValidation = validateEditableSite(afterInsert);
 assert(
   insertValidation.valid,
   insertValidation.valid
@@ -517,7 +517,7 @@ assert(
 );
 if (acceptedAddAction?.ok) {
   const withAction = applyCanvasAgentOp(baseState, acceptedAddAction.op);
-  const addedValidation = validateCanvasSiteState(withAction);
+  const addedValidation = validateEditableSite(withAction);
   assert(
     addedValidation.valid,
     addedValidation.valid
@@ -760,7 +760,7 @@ const designOp: CanvasAgentOp = {
   input: designInput,
 };
 const afterDesign = applyCanvasAgentOp(baseState, designOp);
-const designValidation = validateCanvasSiteState(afterDesign);
+const designValidation = validateEditableSite(afterDesign);
 assert(
   designValidation.valid,
   designValidation.valid

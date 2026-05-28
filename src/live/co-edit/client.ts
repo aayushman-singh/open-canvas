@@ -18,7 +18,7 @@
 //     CRDT then computes a minimal update and broadcasts it via the
 //     WebSocket.
 //   * `connection.onRemoteState(handler)` fires when a remote update lands;
-//     the handler is given the projected `CanvasSiteState` and is
+//     the handler is given the projected `EditableSite` and is
 //     responsible for re-rendering the editor DOM.
 //
 // IMPORTANT — environment surface:
@@ -29,7 +29,7 @@
 
 import * as Y from 'yjs';
 
-import type { CanvasSiteState } from '../../canvas/schema.js';
+import type { EditableSite } from '../../canvas/schema.js';
 import { decodeYDoc, encodeYDoc } from '../../canvas/yjs-projection.js';
 import {
   type Awareness,
@@ -73,15 +73,15 @@ export interface CoEditConnection {
    * `state` JSON; the doc absorbs the change; the rest of the network
    * receives an update.
    */
-  applyLocalState: (state: CanvasSiteState) => void;
+  applyLocalState: (state: EditableSite) => void;
   /**
    * Subscribe to remote-update events. The handler is fired with the
-   * decoded `CanvasSiteState` after every wire update arrives. Editor
+   * decoded `EditableSite` after every wire update arrives. Editor
    * host uses this to refresh its local `state` and re-render.
    *
    * Returns an unsubscribe function.
    */
-  onRemoteState: (handler: (state: CanvasSiteState) => void) => () => void;
+  onRemoteState: (handler: (state: EditableSite) => void) => () => void;
   /**
    * Publish a presence update (cursor / selection / name+colour). The
    * Awareness instance handles the broadcast clock + outdated timeout.
@@ -144,7 +144,7 @@ export interface WebSocketLike {
  */
 export function connectCoEdit(
   siteId: string,
-  initialState: CanvasSiteState,
+  initialState: EditableSite,
   options?: ConnectCoEditOptions,
 ): CoEditConnection {
   const doc = encodeYDoc(initialState);
@@ -157,7 +157,7 @@ export function connectCoEdit(
   let socket: WebSocketLike | null = null;
   let destroyed = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  const remoteStateHandlers = new Set<(state: CanvasSiteState) => void>();
+  const remoteStateHandlers = new Set<(state: EditableSite) => void>();
   const remotePresenceHandlers = new Set<(peers: Map<number, PresenceState>) => void>();
 
   function send(envelope: SiteRoomMessage): void {
@@ -347,7 +347,7 @@ export function connectCoEdit(
     }, reconnectDelayMs);
   }
 
-  function applyLocalState(state: CanvasSiteState): void {
+  function applyLocalState(state: EditableSite): void {
     // Reconciliation strategy — clear the local doc's `state` root map and
     // rebuild it under a single LOCAL_ORIGIN transaction.
     //
@@ -381,7 +381,7 @@ export function connectCoEdit(
     }, LOCAL_ORIGIN);
   }
 
-  function onRemoteState(handler: (state: CanvasSiteState) => void): () => void {
+  function onRemoteState(handler: (state: EditableSite) => void): () => void {
     remoteStateHandlers.add(handler);
     return () => {
       remoteStateHandlers.delete(handler);
@@ -442,7 +442,7 @@ export function connectCoEdit(
  * transaction tagged as a remote-origin update so observers know not to
  * rebroadcast.
  */
-export function replaceDocContents(doc: Y.Doc, newState: CanvasSiteState): void {
+export function replaceDocContents(doc: Y.Doc, newState: EditableSite): void {
   // Same cloning strategy as `applyLocalState` — see the comment there for
   // the LWW reasoning. The origin is Y_SYNC_REMOTE_ORIGIN so the local
   // docObserver doesn't broadcast the replacement back out (it came from

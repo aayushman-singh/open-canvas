@@ -6,7 +6,7 @@
 //     Owner-gated. Accepts `{ sessionId?: string, message: string }`. Creates
 //     a new chat_session row when `sessionId` is omitted, otherwise loads the
 //     row and appends. Drives one orchestrator turn against the live
-//     CanvasSiteState. Streams SSE events to the response.
+//     EditableSite. Streams SSE events to the response.
 //
 //   GET /:siteId/chat/stream?sessionId=<id>
 //     Owner-gated. Streams SSE events for the already-running session. The
@@ -38,7 +38,7 @@ import {
   siteFont,
   type SiteFont,
 } from '../../db/schema.js';
-import type { CanvasSiteState, StyleKit } from '../../canvas/schema.js';
+import type { EditableSite, StyleKit } from '../../canvas/schema.js';
 import {
   buildSystemPrompt,
   runChatTurn,
@@ -75,7 +75,7 @@ interface OwnedSiteRow {
   id: string;
   customerId: string;
   styleKit: StyleKit;
-  editableState: CanvasSiteState;
+  editableState: EditableSite;
   fonts: SiteFont[];
   assets: OwnerAssetRef[];
 }

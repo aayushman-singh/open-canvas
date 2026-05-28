@@ -14,12 +14,12 @@ import {
 import { resolveAuthRedirectUrl, resolveClerkKeys } from './auth/middleware';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
-import type { CanvasSiteState, SectionRecipeId } from './canvas/schema';
+import type { EditableSite, SectionRecipeId } from './canvas/schema';
 import { SECTION_RECIPE_IDS } from './canvas/schema';
 import { SEED_ASSET_REGISTRY } from './canvas/seed-assets';
 import { STYLE_KIT_PRESETS } from './canvas/style-kits';
 import {
-  validateCanvasSiteState,
+  validateEditableSite,
   validatePublishedSnapshot,
   validateSeedFixture,
 } from './canvas/validate';
@@ -157,10 +157,10 @@ assert(
   'expected custom template preview titles to be HTML-escaped',
 );
 
-const emptyPagesState = validateCanvasSiteState({ styleKit: 'charcoal', pages: [] });
+const emptyPagesState = validateEditableSite({ styleKit: 'charcoal', pages: [] });
 assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be invalid');
 
-const editableEmptyMediaState: CanvasSiteState = {
+const editableEmptyMediaState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -190,7 +190,7 @@ const editableEmptyMediaState: CanvasSiteState = {
     },
   ],
 };
-const editableEmptyMedia = validateCanvasSiteState(editableEmptyMediaState);
+const editableEmptyMedia = validateEditableSite(editableEmptyMediaState);
 assert(
   editableEmptyMedia.valid,
   editableEmptyMedia.valid
@@ -222,7 +222,7 @@ const twoPageStarter = {
   ...starterTemplate.state,
   pages: [structuredClone(starterTemplate.state.pages[0]), secondStarterPage],
 };
-const twoPageResult = validateCanvasSiteState(twoPageStarter);
+const twoPageResult = validateEditableSite(twoPageStarter);
 assert(
   twoPageResult.valid,
   twoPageResult.valid
@@ -232,14 +232,14 @@ assert(
 const duplicatePageStarter = structuredClone(twoPageStarter);
 duplicatePageStarter.pages[1]!.id = duplicatePageStarter.pages[0]!.id;
 duplicatePageStarter.pages[1]!.slug = duplicatePageStarter.pages[0]!.slug;
-const duplicatePageResult = validateCanvasSiteState(duplicatePageStarter);
+const duplicatePageResult = validateEditableSite(duplicatePageStarter);
 assert(
   !duplicatePageResult.valid &&
     duplicatePageResult.errors.some((message) => message.includes('duplicated across pages')),
   'expected duplicate-page rejection to mention cross-page duplication',
 );
 
-const overWidePage = validateCanvasSiteState({
+const overWidePage = validateEditableSite({
   styleKit: 'charcoal',
   pages: [
     {
@@ -276,7 +276,7 @@ assert(
   'expected over-wide element error to mention "extends beyond page width"',
 );
 
-const unmutedAutoplayVideo = validateCanvasSiteState({
+const unmutedAutoplayVideo = validateEditableSite({
   styleKit: 'charcoal',
   pages: [
     {
@@ -318,7 +318,7 @@ assert(
 );
 
 // -- Rich text content (Task 4.5) ----------------------------------------
-// Build a minimum CanvasSiteState around each broken text element so the
+// Build a minimum EditableSite around each broken text element so the
 // rejection comes from the rich-text path specifically — not from missing
 // pages, sections, or other surrounding shape.
 
@@ -356,7 +356,7 @@ function richTextStateWith(content: unknown): unknown {
   };
 }
 
-const emptyContent = validateCanvasSiteState(richTextStateWith([]));
+const emptyContent = validateEditableSite(richTextStateWith([]));
 assert(
   !emptyContent.valid,
   'expected text element with content: [] to be rejected (non-empty array required)',
@@ -366,7 +366,7 @@ assert(
   'expected empty-content rejection to mention "non-empty array"',
 );
 
-const unknownMarkType = validateCanvasSiteState(
+const unknownMarkType = validateEditableSite(
   richTextStateWith([{ text: 'shiny', marks: [{ type: 'rainbow' }] }]),
 );
 assert(
@@ -378,7 +378,7 @@ assert(
   'expected unknown-mark rejection to mention the offending type "rainbow"',
 );
 
-const javascriptLink = validateCanvasSiteState(
+const javascriptLink = validateEditableSite(
   richTextStateWith([{ text: 'go', marks: [{ type: 'link', href: 'javascript:alert(1)' }] }]),
 );
 assert(
@@ -403,7 +403,7 @@ for (const seed of allTemplateSeeds) {
   assert(!templateIds.has(seed.id), `expected template id ${seed.id} to be unique`);
   templateIds.add(seed.id);
   assert(getTemplateSeed(seed.id) === seed, `expected getTemplateSeed to resolve ${seed.id}`);
-  const seedStateResult = validateCanvasSiteState(seed.state);
+  const seedStateResult = validateEditableSite(seed.state);
   assert(
     seedStateResult.valid,
     seedStateResult.valid
@@ -795,7 +795,7 @@ assert(
   'expected published page rendering to keep the original snapshot identity for responsive CSS memoization',
 );
 const importValidationIndex = importApiSource.indexOf(
-  'const validation = validateCanvasSiteState(editableState)',
+  'const validation = validateEditableSite(editableState)',
 );
 const importR2UploadIndex = importApiSource.indexOf('preparedAssets.r2Uploads.map');
 assert(
@@ -1304,7 +1304,7 @@ assert(
 // Negative case: a fixture whose media references an unregistered assetId is
 // rejected, with the rejection message mentioning the offending id.
 const T6_BOGUS_ID = 't6-bogus-asset-id';
-const bogusFixture: CanvasSiteState = structuredClone(starterTemplate.state);
+const bogusFixture: EditableSite = structuredClone(starterTemplate.state);
 const bogusPage = bogusFixture.pages[0];
 if (!bogusPage) throw new Error('starterTemplate must have at least one page');
 const bogusSection = bogusPage.sections.find((s) => s.id === 'section-hero');
@@ -1324,7 +1324,7 @@ assert(
   `expected validateSeedFixture rejection to mention the offending id ${T6_BOGUS_ID}`,
 );
 
-const kindMismatchFixture: CanvasSiteState = structuredClone(starterTemplate.state);
+const kindMismatchFixture: EditableSite = structuredClone(starterTemplate.state);
 const kindMismatchPage = kindMismatchFixture.pages[0];
 if (!kindMismatchPage) throw new Error('starterTemplate must have at least one page');
 const kindMismatchSection = kindMismatchPage.sections.find((s) => s.id === 'section-hero');
@@ -1346,7 +1346,7 @@ assert(
   'expected seed kind mismatch rejection to mention the image asset id',
 );
 
-const posterReferenceState: CanvasSiteState = structuredClone(starterTemplate.state);
+const posterReferenceState: EditableSite = structuredClone(starterTemplate.state);
 const posterReferencePage = posterReferenceState.pages[0];
 if (!posterReferencePage) throw new Error('starterTemplate must have at least one page');
 const posterReferenceSection = posterReferencePage.sections.find((s) => s.id === 'section-hero');
@@ -1355,9 +1355,14 @@ const posterReferenceMedia = posterReferenceSection.elements.find((el) => el.id 
 if (!posterReferenceMedia || posterReferenceMedia.type !== 'media') {
   throw new Error('starterTemplate hero must contain media element hero-media');
 }
-posterReferenceMedia.mediaKind = 'video';
-posterReferenceMedia.assetId = 'video-asset-id';
-posterReferenceMedia.posterAssetId = 'poster-asset-id';
+// Reshape the element from image to video. The discriminated MediaElement DU
+// rejects mutating mediaKind in place because `posterAssetId` doesn't exist
+// on the image arm — rebuild the object as a video variant.
+Object.assign(posterReferenceMedia, {
+  mediaKind: 'video',
+  assetId: 'video-asset-id',
+  posterAssetId: 'poster-asset-id',
+});
 const referencedAssets = collectReferencedAssets(posterReferenceState);
 assert(
   referencedAssets.some(
@@ -1508,7 +1513,7 @@ try {
 // preview/apply LLM call is exercised only when GEMINI_API_KEY is set; the
 // route shell mount is what we verify below.
 
-const baseT7State: CanvasSiteState = structuredClone(starterTemplate.state);
+const baseT7State: EditableSite = structuredClone(starterTemplate.state);
 const baseT7Page = baseT7State.pages[0];
 if (!baseT7Page) throw new Error('starterTemplate must have at least one page');
 const baseT7Section = baseT7Page.sections.find(
@@ -1530,7 +1535,7 @@ const t7Rewrite = applyCanvasAgentOp(baseT7State, {
   elementId: t7TextElement.id,
   content: [{ text: 'review-smoke ' }, { text: 'rewrite', marks: [{ type: 'bold' }] }],
 });
-const t7RewriteValidation = validateCanvasSiteState(t7Rewrite);
+const t7RewriteValidation = validateEditableSite(t7Rewrite);
 assert(
   t7RewriteValidation.valid,
   t7RewriteValidation.valid
@@ -1546,7 +1551,7 @@ const t7Replace = applyCanvasAgentOp(baseT7State, {
   assetId: 'up-review-smoke-asset',
   alt: 'review-smoke alt',
 });
-const t7ReplaceValidation = validateCanvasSiteState(t7Replace);
+const t7ReplaceValidation = validateEditableSite(t7Replace);
 assert(
   t7ReplaceValidation.valid,
   t7ReplaceValidation.valid
@@ -1561,7 +1566,7 @@ const t7Insert = applyCanvasAgentOp(baseT7State, {
   recipeId: 'feature-grid',
   input: { brief: 'Three reasons it works.', styleKit: baseT7State.styleKit },
 });
-const t7InsertValidation = validateCanvasSiteState(t7Insert);
+const t7InsertValidation = validateEditableSite(t7Insert);
 assert(
   t7InsertValidation.valid,
   t7InsertValidation.valid

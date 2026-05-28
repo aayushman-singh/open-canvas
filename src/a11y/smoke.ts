@@ -1,7 +1,7 @@
 // src/a11y/smoke.ts
 //
 // `bun run a11y:smoke` — Wave 3 #15. Exercises the audit runner against
-// hand-built CanvasSiteState fixtures plus the canonical `home.json` fixture
+// hand-built EditableSite fixtures plus the canonical `home.json` fixture
 // that the canvas smoke also consumes. Pure functions only — no Worker, no DB.
 //
 // Assertion coverage maps 1:1 to the plan brief §"Smoke":
@@ -24,10 +24,10 @@ import { compareSeverity } from './severity.js';
 import { deriveHeadingLevel } from './checks/heading-order.js';
 import { resolveComputedBackground } from './checks/contrast.js';
 import { getStyleKitPreset } from '../canvas/style-kits.js';
-import { validateCanvasSiteState } from '../canvas/validate.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import type {
   CanvasElement,
-  CanvasSiteState,
+  EditableSite,
   ContainerElement,
   MediaElement,
   StyleKit,
@@ -103,8 +103,8 @@ function mkContainer(
 
 function mkSiteState(
   styleKit: StyleKit,
-  pages: CanvasSiteState['pages'],
-): CanvasSiteState {
+  pages: EditableSite['pages'],
+): EditableSite {
   return { styleKit, pages };
 }
 
@@ -158,7 +158,7 @@ function test1MissingAlt(): void {
 // #f6f6f6) and overlay a TextElement on a wrapping ContainerElement whose
 // surface variant resolves to a light background — `glass` on `charcoal`
 // resolves to `rgba(255,255,255,0.06)` which is rejected as translucent, so
-// instead we craft a one-off CanvasSiteState that uses a kit where a
+// instead we craft a one-off EditableSite that uses a kit where a
 // container's resolved background is parseable AND yields a low ratio. The
 // charcoal `flat` variant gives #16171a — still very dark; light text on dark
 // is high contrast.
@@ -181,7 +181,7 @@ function test2LowContrast(): void {
     text: '#cccccc',
   };
 
-  const state: CanvasSiteState = {
+  const state: EditableSite = {
     styleKit: 'custom',
     customStyleKit: lowContrastKit,
     pages: [
@@ -229,16 +229,16 @@ function test2LowContrast(): void {
 // Test 3 — Clean fixture (home.json) → empty issues, blockerCount=0.
 // ---------------------------------------------------------------------------
 
-async function loadHomeFixture(): Promise<CanvasSiteState> {
+async function loadHomeFixture(): Promise<EditableSite> {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const fixturePath = path.resolve(here, '..', 'canvas', 'fixtures', 'home.json');
   const raw = await fs.readFile(fixturePath, 'utf8');
   const parsed = JSON.parse(raw) as unknown;
-  const validation = validateCanvasSiteState(parsed);
+  const validation = validateEditableSite(parsed);
   if (!validation.valid) {
     throw new Error(`home.json fixture failed validation: ${JSON.stringify(validation.errors)}`);
   }
-  return parsed as CanvasSiteState;
+  return parsed as EditableSite;
 }
 
 async function test3CleanFixture(): Promise<void> {

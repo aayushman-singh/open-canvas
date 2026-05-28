@@ -13,7 +13,7 @@ import type {
   CanvasElement,
   CanvasPage,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   MediaKind,
   PublishedSnapshot,
 } from '../canvas/schema.js';
@@ -60,7 +60,7 @@ export interface AssetReferenceRoot {
 export type AssetReferenceSource =
   | CanvasPage[]
   | AssetReferenceRoot
-  | CanvasSiteState
+  | EditableSite
   | PublishedSnapshot;
 
 // Sentinel for media slots an Owner has dropped onto the canvas but not yet
@@ -126,14 +126,16 @@ function collectElementReferences(
       `${elementPath}.assetId`,
       element.id,
     );
-    pushReference(
-      out,
-      element.posterAssetId,
-      'image',
-      'poster',
-      `${elementPath}.posterAssetId`,
-      element.id,
-    );
+    if (element.mediaKind === 'video') {
+      pushReference(
+        out,
+        element.posterAssetId,
+        'image',
+        'poster',
+        `${elementPath}.posterAssetId`,
+        element.id,
+      );
+    }
     return;
   }
   if (element.type === 'nav') {
@@ -161,10 +163,10 @@ function collectSectionReferences(
 ): void {
   pushReference(
     out,
-    section.backgroundVideo,
+    section.backgroundVideoAssetId,
     'video',
     'background-video',
-    `${sectionPath}.backgroundVideo`,
+    `${sectionPath}.backgroundVideoAssetId`,
   );
   for (const [elementIdx, element] of section.elements.entries()) {
     collectElementReferences(element, `${sectionPath}.elements[${String(elementIdx)}]`, out);
@@ -230,7 +232,7 @@ function collectUnfilledSectionReferences(
         mediaElementId: element.id,
       });
     }
-    if (isUnfilledAssetId(element.posterAssetId)) {
+    if (element.mediaKind === 'video' && isUnfilledAssetId(element.posterAssetId)) {
       out.push({
         role: 'poster',
         path: `${sectionPath}.elements[${String(elementIdx)}].posterAssetId`,

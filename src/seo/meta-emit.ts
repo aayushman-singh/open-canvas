@@ -100,9 +100,9 @@ export function resolveLang(page: CanvasPage, snapshot: PublishedSnapshot): stri
     return page.locale;
   }
   // PublishedSnapshot does not currently declare `defaultLocale`; it belongs
-  // to CanvasSiteState. Probe structurally so older snapshots fall back to
+  // to EditableSite. Probe structurally so older snapshots fall back to
   // 'en' and newer snapshots can carry the locale without changing this API.
-  const snapAny = snapshot as PublishedSnapshot & { defaultLocale?: unknown };
+  const snapAny = snapshot;
   if (typeof snapAny.defaultLocale === 'string' && snapAny.defaultLocale.length > 0) {
     return snapAny.defaultLocale;
   }
@@ -117,8 +117,8 @@ export function resolveLang(page: CanvasPage, snapshot: PublishedSnapshot): stri
 export function resolveNoIndex(page: CanvasPage, snapshot: PublishedSnapshot): boolean {
   if (page.slug === CUSTOM_404_PAGE_SLUG) return true;
   // Same structural probe as `resolveLang`: `siteNoIndex` belongs to
-  // CanvasSiteState today, but published snapshots may carry it.
-  const snapAny = snapshot as PublishedSnapshot & { siteNoIndex?: unknown };
+  // EditableSite today, but published snapshots may carry it.
+  const snapAny = snapshot;
   if (snapAny.siteNoIndex === true) return true;
   return page.noIndex === true;
 }

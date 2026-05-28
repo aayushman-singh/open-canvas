@@ -272,7 +272,7 @@ export const THEME_PANEL_STYLES: string = `
 export interface ThemePanelProps {
   /** Site id — interpolated into the form's submit URL. */
   siteId: string;
-  /** Current `styleKit` selector value from `CanvasSiteState`. */
+  /** Current `styleKit` selector value from `EditableSite`. */
   activeStyleKit: StyleKit;
   /**
    * The kit currently in effect on the canvas. Either a built-in preset (when

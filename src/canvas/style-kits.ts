@@ -436,7 +436,7 @@ const GREEN_ORGANIC: StyleKitPreset = {
 // `satisfies` enforces that the literal is a valid `Record<BuiltInStyleKit, ...>`
 // AND lets the four field shapes stay precise. `'custom'` (Phase 0 scaffold
 // for Wave 2 #10) is NOT a key here — it resolves at render time from
-// `CanvasSiteState.customStyleKit` instead.
+// `EditableSite.customStyleKit` instead.
 export const STYLE_KIT_PRESETS: Record<BuiltInStyleKit, StyleKitPreset> = {
   charcoal: CHARCOAL,
   'orange-editorial': ORANGE_EDITORIAL,
@@ -695,7 +695,7 @@ export function buildStyleKitCss(kitName: string, preset: StyleKitPreset): strin
 export function buildAllStyleKitsCss(): string {
   const keyframes = buildMotionKeyframes();
   // Iterate built-in kits only. `'custom'` resolves at render time from
-  // `CanvasSiteState.customStyleKit`; emitting a kit-wide CSS block for a
+  // `EditableSite.customStyleKit`; emitting a kit-wide CSS block for a
   // value that lives in per-site state would mix layers.
   const kitBlocks = BUILT_IN_STYLE_KITS.map((kit) => buildKitBlock(kit, STYLE_KIT_PRESETS[kit]));
   // Per-element typography uses the kit's font tokens. The display family

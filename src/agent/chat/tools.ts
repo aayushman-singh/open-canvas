@@ -19,7 +19,7 @@ import type { JsonSchema, LlmTool } from '../llm.js';
 import type {
   CanvasPage,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   ElementType,
 } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
@@ -164,7 +164,7 @@ export interface QuerySiteFontRef {
 export type QuerySiteDetail = 'summary' | 'full';
 
 export interface QuerySiteInput {
-  state: CanvasSiteState;
+  state: EditableSite;
   detail: QuerySiteDetail;
   fonts?: SiteFont[];
 }

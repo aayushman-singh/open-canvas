@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import * as Y from 'yjs';
 
 import { attachAutosave, decodeYDoc, encodeYDoc } from './yjs-projection.js';
-import type { CanvasElement, CanvasPage, CanvasSection, CanvasSiteState } from './schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from './schema.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -54,7 +54,7 @@ const fixturesDir = path.join(thisDir, 'fixtures');
 for (const fixtureFile of ['home.json', 'enterprise-scale.json']) {
   const filePath = path.join(fixturesDir, fixtureFile);
   const raw = fs.readFileSync(filePath, 'utf8');
-  const state = JSON.parse(raw) as CanvasSiteState;
+  const state = JSON.parse(raw) as EditableSite;
   const doc = encodeYDoc(state);
   const decoded = decodeYDoc(doc);
   assertDeepEqual(decoded, state, `round-trip ${fixtureFile}`);
@@ -251,7 +251,7 @@ const syntheticPage: CanvasPage = {
   sections: [syntheticSection],
 };
 
-const syntheticState: CanvasSiteState = {
+const syntheticState: EditableSite = {
   styleKit: 'orange-editorial',
   pages: [syntheticPage],
   header: {
@@ -311,7 +311,7 @@ const syntheticState: CanvasSiteState = {
 await (async () => {
   const doc = encodeYDoc(syntheticState);
   let calls = 0;
-  let lastState: CanvasSiteState | null = null;
+  let lastState: EditableSite | null = null;
   const detach = attachAutosave(
     doc,
     (state) => {
@@ -339,7 +339,7 @@ await (async () => {
   if (lastState === null) {
     throw new Error('autosave callback never received a projected state');
   }
-  const persisted: CanvasSiteState = lastState;
+  const persisted: EditableSite = lastState;
   // The last mutation set darkModeEnabled = (i=4) % 2 === 0 → true. The
   // projection should reflect that.
   assert(

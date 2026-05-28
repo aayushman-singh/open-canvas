@@ -29,7 +29,7 @@ import {
   type FormElement,
   type FormFieldDef,
 } from '../canvas/elements/form.js';
-import type { CanvasSiteState, PublishedSnapshot, TextElement } from '../canvas/schema.js';
+import type { EditableSite, PublishedSnapshot, TextElement } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
 import {
   formSubmission as formSubmissionTable,
@@ -113,7 +113,7 @@ const heroHeading: TextElement = {
   align: 'left',
 };
 
-const editableState: CanvasSiteState = {
+const editableState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -707,7 +707,7 @@ async function runWebhookDelivery(): Promise<void> {
     ...formElement,
     webhookUrl: 'https://webhook-stub.invalid/inbox',
   };
-  const editableStateWithWebhook: CanvasSiteState = {
+  const editableStateWithWebhook: EditableSite = {
     ...editableState,
     pages: editableState.pages.map((p) => ({
       ...p,

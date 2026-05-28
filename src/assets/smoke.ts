@@ -216,7 +216,7 @@ function runReferenceWalkTests(): void {
       name: 'Footer',
       role: 'footer',
       height: 120,
-      backgroundVideo: 'footer-bg-video-id',
+      backgroundVideoAssetId: 'footer-bg-video-id',
       elements: [
         {
           id: 'footer-carousel',

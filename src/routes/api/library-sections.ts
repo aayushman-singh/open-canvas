@@ -17,8 +17,8 @@ import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { requireAdmin } from '../../auth/require-admin.js';
-import type { CanvasSection, CanvasSiteState } from '../../canvas/schema.js';
-import { validateCanvasSiteState } from '../../canvas/validate.js';
+import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
+import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
 import {
   customer,
@@ -61,11 +61,11 @@ function validateSectionForLibrary(section: CanvasSection): { valid: true } | { 
   if (jsonSize > 102_400) {
     return { valid: false, errors: ['section JSON exceeds 100KB'] };
   }
-  const syntheticState: CanvasSiteState = {
+  const syntheticState: EditableSite = {
     styleKit: 'charcoal',
     pages: [{ id: 'validate-page', slug: 'home', title: 'Validate', width: 1440, sections: [section] }],
   };
-  return validateCanvasSiteState(syntheticState);
+  return validateEditableSite(syntheticState);
 }
 
 async function buildAssetManifest(
@@ -77,7 +77,9 @@ async function buildAssetManifest(
   for (const element of section.elements) {
     if (element.type !== 'media') continue;
     assetIds.add(element.assetId);
-    if (element.posterAssetId !== undefined) assetIds.add(element.posterAssetId);
+    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+      assetIds.add(element.posterAssetId);
+    }
   }
   if (assetIds.size === 0) return [];
 
@@ -131,7 +133,7 @@ async function loadOwnedSection(
   customerId: string,
   siteId: string,
   sectionId: string,
-): Promise<{ section: CanvasSection; state: CanvasSiteState } | null> {
+): Promise<{ section: CanvasSection; state: EditableSite } | null> {
   const siteRow = await database
     .select({ editableState: site.editableState })
     .from(site)

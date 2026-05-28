@@ -1,17 +1,17 @@
 import baseSeed from '../canvas/fixtures/home.json';
 import enterpriseScaleSeed from '../canvas/fixtures/enterprise-scale.json';
 import apogeeShowcaseSeed from '../canvas/fixtures/apogee-showcase.json';
-import type { CanvasElement, CanvasSiteState, InlineRun, StyleKit } from '../canvas/schema';
+import type { CanvasElement, EditableSite, InlineRun, StyleKit } from '../canvas/schema';
 
 export interface TemplateSeed {
   id: string;
   name: string;
   tagline: string;
-  state: CanvasSiteState;
+  state: EditableSite;
 }
 
-function cloneBaseState(styleKit: StyleKit, title: string): CanvasSiteState {
-  const state = structuredClone(baseSeed) as CanvasSiteState;
+function cloneBaseState(styleKit: StyleKit, title: string): EditableSite {
+  const state = structuredClone(baseSeed) as EditableSite;
   state.styleKit = styleKit;
   const page = state.pages[0];
   if (!page) {
@@ -21,7 +21,7 @@ function cloneBaseState(styleKit: StyleKit, title: string): CanvasSiteState {
   return state;
 }
 
-function findElement(state: CanvasSiteState, id: string): CanvasElement {
+function findElement(state: EditableSite, id: string): CanvasElement {
   for (const page of state.pages) {
     for (const section of page.sections) {
       for (const element of section.elements) {
@@ -32,7 +32,7 @@ function findElement(state: CanvasSiteState, id: string): CanvasElement {
   throw new Error(`template registry base seed is missing element ${id}`);
 }
 
-function setText(state: CanvasSiteState, id: string, content: InlineRun[]): void {
+function setText(state: EditableSite, id: string, content: InlineRun[]): void {
   const element = findElement(state, id);
   if (element.type !== 'text') {
     throw new Error(`template registry element ${id} must be text`);
@@ -40,7 +40,7 @@ function setText(state: CanvasSiteState, id: string, content: InlineRun[]): void
   element.content = content;
 }
 
-function setActionLabel(state: CanvasSiteState, id: string, label: string): void {
+function setActionLabel(state: EditableSite, id: string, label: string): void {
   const element = findElement(state, id);
   if (element.type !== 'action') {
     throw new Error(`template registry element ${id} must be action`);
@@ -129,7 +129,7 @@ export const enterpriseScaleTemplate: TemplateSeed = {
   name: 'Enterprise Scale',
   tagline:
     'A proof-heavy enterprise landing page seed with governed launch messaging, outcome cards, team sections, scalability, and sales CTAs.',
-  state: structuredClone(enterpriseScaleSeed) as CanvasSiteState,
+  state: structuredClone(enterpriseScaleSeed) as EditableSite,
 };
 
 export const studioTemplate = buildTemplate({
@@ -175,7 +175,7 @@ export const apogeeShowcaseTemplate: TemplateSeed = {
   name: 'Apogee Showcase',
   tagline:
     'A multi-page showcase site — dark, bold, and loaded with every element type. Carousels, charts, forms, code snippets, accordions, embeds, and more.',
-  state: structuredClone(apogeeShowcaseSeed) as CanvasSiteState,
+  state: structuredClone(apogeeShowcaseSeed) as EditableSite,
 };
 
 export const allTemplateSeeds = [

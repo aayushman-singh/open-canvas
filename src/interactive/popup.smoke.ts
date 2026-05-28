@@ -14,9 +14,9 @@
 //
 // All assertions are pure-CPU; no network, no jsdom, no Workers globals.
 
-import type { CanvasSiteState, PublishedSnapshot } from '../canvas/schema.js';
+import type { CanvasSection, EditableSite, PublishedSnapshot } from '../canvas/schema.js';
 import { renderCanvasSnapshot } from '../canvas/render.js';
-import { validateCanvasSiteState } from '../canvas/validate.js';
+import { validateEditableSite } from '../canvas/validate.js';
 import { decodeYDoc, encodeYDoc } from '../canvas/yjs-projection.js';
 import { INTERACTIVE_RUNTIME_SRC } from './build.js';
 import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
@@ -228,7 +228,7 @@ assert(injected.includes('initPopups'), 'injected runtime must contain initPopup
 // (7) Validator rejects malformed trigger configs.
 // ---------------------------------------------------------------------------
 
-const validPopup = validateCanvasSiteState(popupSnapshot);
+const validPopup = validateEditableSite(popupSnapshot);
 assert(validPopup.valid, 'valid popup trigger snapshot must pass validation');
 
 const invalidDelaySnapshot: PublishedSnapshot = {
@@ -239,13 +239,16 @@ const invalidDelaySnapshot: PublishedSnapshot = {
       sections: [
         {
           ...popupSnapshot.pages[0]!.sections[0]!,
-          trigger: { type: 'delay' },
+          // Intentionally invalid: delay arm requires `value`. The cast bypasses
+          // the discriminated union so we can test that the runtime validator
+          // catches what the type system normally prevents.
+          trigger: { type: 'delay' } as unknown as NonNullable<CanvasSection['trigger']>,
         },
       ],
     },
   ],
 };
-const invalidDelay = validateCanvasSiteState(invalidDelaySnapshot);
+const invalidDelay = validateEditableSite(invalidDelaySnapshot);
 assert(
   !invalidDelay.valid && invalidDelay.errors.some((error) => error.includes('trigger.value')),
   'delay trigger without numeric value must fail validation',
@@ -265,7 +268,7 @@ const invalidScrollSnapshot: PublishedSnapshot = {
     },
   ],
 };
-const invalidScroll = validateCanvasSiteState(invalidScrollSnapshot);
+const invalidScroll = validateEditableSite(invalidScrollSnapshot);
 assert(
   !invalidScroll.valid && invalidScroll.errors.some((error) => error.includes('[0, 100]')),
   'scroll trigger beyond 100 must fail validation',
@@ -275,7 +278,7 @@ assert(
 // (8) Yjs projection preserves section triggers.
 // ---------------------------------------------------------------------------
 
-const popupState: CanvasSiteState = {
+const popupState: EditableSite = {
   styleKit: popupSnapshot.styleKit,
   pages: popupSnapshot.pages,
 };

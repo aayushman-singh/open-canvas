@@ -1,10 +1,23 @@
 // src/canvas/elements/action.ts
 //
-// Render fn for the existing `ActionElement` element type. Interface still
-// lives in `src/canvas/schema.ts`; this module owns rendering only.
+// `ActionElement` interface (including `ActionHref` sub-type) + renderer.
+// Resolver lives in `../action-href.ts` so this module's interface-only
+// section stays declaration-only.
 
 import { escapeAttr, escapeHtml } from './render-utils.js';
-import { resolveActionHref, type ActionElement, type ActionHref, type CanvasPage } from '../schema.js';
+import { resolveActionHref } from '../action-href.js';
+import type { ActionVariant, BaseElement, CanvasPage } from '../schema.js';
+
+export type ActionHref =
+  | { type: 'external'; url: string }
+  | { type: 'page'; pageId: string; anchor?: string };
+
+export interface ActionElement extends BaseElement {
+  type: 'action';
+  label: string;
+  href: ActionHref;
+  variant: ActionVariant;
+}
 
 export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] }): string {
   // Legacy data may store href as a plain string; normalise to ActionHref.

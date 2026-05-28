@@ -15,7 +15,7 @@
 // frozen surface. Wave 1 #4 fills in handler bodies and the broadcast hook;
 // the shapes here do not change between Phase 0 and Wave 1.
 
-import type { CanvasSiteState } from '../canvas/schema.js';
+import type { EditableSite } from '../canvas/schema.js';
 
 // ----------------------------------------------------------------------------
 // Yjs sync message envelopes (Wave 1 #3 + #4 consumers)
@@ -79,7 +79,7 @@ export interface AwarenessUpdateEnvelope {
 export interface EditableStateReplacedEnvelope {
   type: 'editable-state-replaced';
   siteId: string;
-  newState: CanvasSiteState;
+  newState: EditableSite;
 }
 
 /**

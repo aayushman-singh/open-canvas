@@ -27,7 +27,7 @@
 
 import * as Y from 'yjs';
 
-import type { CanvasSiteState, TextElement } from '../../canvas/schema.js';
+import type { EditableSite, TextElement } from '../../canvas/schema.js';
 import { decodeYDoc, encodeYDoc } from '../../canvas/yjs-projection.js';
 import {
   type AwarenessUpdateEnvelope,
@@ -163,14 +163,14 @@ class StubSiteRoom {
   awareness: Awareness;
   sockets: Set<MockSocket> = new Set();
   /** Captured persisted state from the autosave hook. */
-  lastPersisted: CanvasSiteState | null = null;
+  lastPersisted: EditableSite | null = null;
   /** Allow tests to await the next autosave flush. */
-  pendingPersistResolvers: Array<(state: CanvasSiteState) => void> = [];
+  pendingPersistResolvers: Array<(state: EditableSite) => void> = [];
   private currentOriginSocket: MockSocket | null = null;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly debounceMs: number;
 
-  constructor(initialState: CanvasSiteState, debounceMs: number) {
+  constructor(initialState: EditableSite, debounceMs: number) {
     this.doc = encodeYDoc(initialState);
     this.awareness = createAwareness(this.doc);
     this.debounceMs = debounceMs;
@@ -231,7 +231,7 @@ class StubSiteRoom {
   }
 
   /** Promise that resolves on the next debounced persist. */
-  nextPersist(): Promise<CanvasSiteState> {
+  nextPersist(): Promise<EditableSite> {
     return new Promise((resolve) => {
       this.pendingPersistResolvers.push(resolve);
     });
@@ -326,7 +326,7 @@ async function waitFor(predicate: () => boolean, timeoutMs: number, label: strin
 // Fixtures + scenario.
 // ----------------------------------------------------------------------------
 
-const initialState: CanvasSiteState = {
+const initialState: EditableSite = {
   styleKit: 'charcoal',
   pages: [
     {
@@ -364,7 +364,7 @@ const connA = connectCoEdit('site-smoke', initialState, {
 // constructor see the open event.
 pairA.clientSide.fireOpen();
 
-const remoteOnA: Array<CanvasSiteState> = [];
+const remoteOnA: Array<EditableSite> = [];
 const presenceOnA: Array<Map<number, unknown>> = [];
 connA.onRemoteState((s) => {
   remoteOnA.push(s);
@@ -386,7 +386,7 @@ const connB = connectCoEdit('site-smoke', initialState, {
 });
 pairB.clientSide.fireOpen();
 
-const remoteOnB: Array<CanvasSiteState> = [];
+const remoteOnB: Array<EditableSite> = [];
 const presenceOnB: Array<Map<number, unknown>> = [];
 connB.onRemoteState((s) => {
   remoteOnB.push(s);
@@ -418,7 +418,7 @@ const newElement: TextElement = {
   align: 'left',
 };
 
-const nextStateAfterA: CanvasSiteState = {
+const nextStateAfterA: EditableSite = {
   ...initialState,
   pages: [
     {
@@ -458,7 +458,7 @@ const elementUpdated: TextElement = {
   ...newElement,
   content: [{ text: 'Hello from A — edited' }],
 };
-const stateAfterAEdit: CanvasSiteState = {
+const stateAfterAEdit: EditableSite = {
   ...nextStateAfterA,
   pages: [
     {
