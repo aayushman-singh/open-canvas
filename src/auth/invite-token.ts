@@ -10,6 +10,9 @@ import { signJWT, verifyJWT } from './jwt';
 export interface InviteTokenPayload {
   siteId: string;
   collaboratorId: string;
+  // Signed audit metadata, not an enforcement gate at accept time. The accept
+  // handler does not require a Clerk session, so there is no live identity to
+  // compare this against. See ADR-0010.
   invitedEmail: string;
   iat: number;
   exp: number;

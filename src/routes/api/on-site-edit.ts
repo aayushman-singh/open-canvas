@@ -19,7 +19,7 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import { signEditToken, EDIT_TOKEN_COOKIE, EDIT_TOKEN_MAX_AGE } from '../../auth/edit-token';
+import { signEditToken, buildEditTokenCookieHeader } from '../../auth/edit-token';
 import { db, type Db } from '../../db/client';
 import { customer, customDomain, site } from '../../db/schema';
 
@@ -133,15 +133,7 @@ onSiteEditRoute.get('/', async (c) => {
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
-  const cookieValue = [
-    `${EDIT_TOKEN_COOKIE}=${token}`,
-    'Domain=rev01.aayushman.dev',
-    'Path=/',
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax',
-    `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
-  ].join('; ');
+  const cookieValue = buildEditTokenCookieHeader(token, new URL(c.req.url).host);
 
   const siteIdJson = JSON.stringify(siteId);
   const tokenJson = JSON.stringify(token);

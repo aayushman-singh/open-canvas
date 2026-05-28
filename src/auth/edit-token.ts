@@ -51,3 +51,28 @@ export async function verifyEditToken(
 
 export const EDIT_TOKEN_COOKIE = '__rev01_edit';
 export const EDIT_TOKEN_MAX_AGE = TTL_SECONDS;
+
+// The cookie scope depends on which host issues it. On any *.rev01.aayushman.dev
+// host (the popup runs on the apex, the editor runs on a subdomain) the cookie
+// must be domain-scoped so every sibling subdomain can read it. On a custom
+// domain there is no shared parent — the cookie must be host-scoped or the
+// browser rejects it. A previous refresh path issued host-scoped on every host
+// and silently broke cross-subdomain editing; this helper is the single source
+// of truth so that bug cannot regress per-site.
+const REV01_COOKIE_DOMAIN = 'rev01.aayushman.dev';
+const REV01_HOST_SUFFIX = `.${REV01_COOKIE_DOMAIN}`;
+
+export function buildEditTokenCookieHeader(token: string, requestHost: string): string {
+  const host = requestHost.toLowerCase();
+  const onRev01Domain = host === REV01_COOKIE_DOMAIN || host.endsWith(REV01_HOST_SUFFIX);
+  const parts = [
+    `${EDIT_TOKEN_COOKIE}=${token}`,
+    ...(onRev01Domain ? [`Domain=${REV01_COOKIE_DOMAIN}`] : []),
+    'Path=/',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
+  ];
+  return parts.join('; ');
+}

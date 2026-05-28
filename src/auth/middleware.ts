@@ -5,6 +5,7 @@ import { createMiddleware } from 'hono/factory';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { site } from '../db/schema';
+import { upsertCustomerFromClerk } from './customer-upsert';
 import { EDIT_TOKEN_COOKIE, verifyEditToken } from './edit-token';
 
 export type AuthState = {
@@ -150,9 +151,61 @@ export function resolveAuthRedirectUrl(
   return source.toString();
 }
 
+// Wrangler dev rewrites both `c.req.url` AND the Host header to match the
+// worker's [[routes]] pattern (e.g. https://rev01.aayushman.dev/) even when
+// the browser hit localhost. That breaks Clerk's handshake: Clerk validates
+// the handshake JWT against the request's origin, sees the prod host instead
+// of localhost, and rejects the session forever.
+//
+// Workaround: when running with the test Clerk app (whose handshake JWT was
+// issued for the local host), rebuild a Request with the local origin AND
+// Origin/Referer headers so Clerk's session-refresh path (which validates
+// azp against the request origin header, not just the request URL) accepts
+// the cookie tokens issued for localhost. Without this override the refresh
+// fails with `refresh_request_origin_azp_mismatch` once the short-lived dev
+// JWT expires (~60s).
+//
+// The original request's body is intentionally NOT forwarded into the
+// rebuilt Request. clerk.authenticateRequest() validates cookies, headers,
+// and URL — never the body — so omitting it costs nothing on the Clerk
+// side. Forwarding `c.req.raw.body` here transfers ownership of the
+// underlying ReadableStream per the Fetch spec, which locks the original
+// stream; downstream handlers that call c.req.json() then read an empty
+// body. The auth path must leave the request's body intact for the
+// handler.
+export function rebuildRequestForLocalDevClerk(rawReq: Request, localOrigin: string): Request {
+  const localOriginUrl = new URL(localOrigin);
+  const original = new URL(rawReq.url);
+  const rebuilt = new URL(original.pathname + original.search, localOrigin);
+  const headers = new Headers(rawReq.headers);
+  headers.set('host', localOriginUrl.host);
+  headers.set('origin', localOrigin);
+  const existingReferer = headers.get('referer');
+  if (existingReferer) {
+    try {
+      const refererUrl = new URL(existingReferer);
+      headers.set(
+        'referer',
+        new URL(`${refererUrl.pathname}${refererUrl.search}`, localOrigin).toString(),
+      );
+    } catch (error) {
+      throw new Error(`failed to rewrite Clerk referer header: ${existingReferer}`, {
+        cause: error,
+      });
+    }
+  }
+  return new Request(rebuilt.toString(), {
+    method: rawReq.method,
+    headers,
+    redirect: rawReq.redirect,
+  });
+}
+
 export function clerkAuth() {
   return createMiddleware<{
-    Bindings: ClerkBindings;
+    // DATABASE_URL is required because upsertCustomerFromClerk runs on every
+    // authenticated request to keep the local customer row in sync.
+    Bindings: ClerkBindings & { DATABASE_URL: string };
     Variables: ClerkAuthVariables;
   }>(async (c, next) => {
     // If a prior middleware (e.g. editTokenAuth) already resolved the Owner's
@@ -175,56 +228,10 @@ export function clerkAuth() {
     });
     c.set('clerk', clerk);
 
-    // Wrangler dev rewrites both `c.req.url` AND the Host header to match the
-    // worker's [[routes]] pattern (e.g. https://rev01.aayushman.dev/) even
-    // when the browser hit localhost. That breaks Clerk's handshake: Clerk
-    // validates the handshake JWT against the request's origin, sees the
-    // prod host instead of localhost, and rejects the session forever.
-    //
-    // Workaround: when running with the test Clerk app (whose handshake JWT
-    // was issued for the local host), rewrite the request URL to the
-    // localhost origin so Clerk validates against what the browser actually
-    // saw. The `DEV_PUBLIC_HOST` env var lets the operator override the
-    // origin if the local dev port/host differs from the default.
     const usingTestKeys = usesTestClerkKeys(c.env, keys);
-    let requestForClerk: Request = c.req.raw;
-    if (usingTestKeys) {
-      const localOrigin = resolveDevPublicOrigin(c.env);
-      const localOriginUrl = new URL(localOrigin);
-      const original = new URL(c.req.url);
-      const rebuilt = new URL(original.pathname + original.search, localOrigin);
-      // Rebuild with the local origin AND override Origin/Referer headers so
-      // Clerk's session-refresh path (which validates azp against the request
-      // origin header, not just the request URL) accepts the cookie tokens
-      // issued for localhost. Without this override the refresh fails with
-      // `refresh_request_origin_azp_mismatch` once the short-lived dev JWT
-      // expires (~60s).
-      const headers = new Headers(c.req.raw.headers);
-      headers.set('host', localOriginUrl.host);
-      headers.set('origin', localOrigin);
-      const existingReferer = headers.get('referer');
-      if (existingReferer) {
-        try {
-          const refererUrl = new URL(existingReferer);
-          headers.set(
-            'referer',
-            new URL(`${refererUrl.pathname}${refererUrl.search}`, localOrigin).toString(),
-          );
-        } catch (error) {
-          throw new Error(`failed to rewrite Clerk referer header: ${existingReferer}`, {
-            cause: error,
-          });
-        }
-      }
-      requestForClerk = new Request(rebuilt.toString(), {
-        method: c.req.raw.method,
-        headers,
-        body: c.req.raw.body,
-        redirect: c.req.raw.redirect,
-        // @ts-expect-error duplex required by Cloudflare Workers when body present
-        duplex: c.req.raw.body ? 'half' : undefined,
-      });
-    }
+    const requestForClerk: Request = usingTestKeys
+      ? rebuildRequestForLocalDevClerk(c.req.raw, resolveDevPublicOrigin(c.env))
+      : c.req.raw;
 
     const requestState = await clerk.authenticateRequest(requestForClerk, {
       authorizedParties: AUTHORIZED_PARTIES,
@@ -272,6 +279,15 @@ export function clerkAuth() {
 
     const user = await clerk.users.getUser(auth.userId);
     c.set('user', user);
+
+    // Sync the local customer row on every authenticated request. Previously
+    // this lived only in three dashboard handlers (index, profile, settings),
+    // so a fresh Clerk sign-up that hit any other route first wedged at
+    // requireOwnerContext (no customer row -> 403 forever). Centralising it
+    // here removes that latent lockout. The dashboard callers still upsert
+    // themselves for their email-return value; those calls are now redundant
+    // and can be replaced with a context read in a follow-up.
+    await upsertCustomerFromClerk(db(c.env), user);
 
     await next();
   });

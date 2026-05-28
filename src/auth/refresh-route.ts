@@ -14,6 +14,7 @@ import type { ClerkAuthVariables } from './middleware';
 import {
   verifyEditToken,
   signEditToken,
+  buildEditTokenCookieHeader,
   EDIT_TOKEN_COOKIE,
   EDIT_TOKEN_MAX_AGE,
 } from './edit-token';
@@ -44,14 +45,7 @@ refreshRoute.post('/refresh', async (c) => {
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
-  const cookieValue = [
-    `${EDIT_TOKEN_COOKIE}=${fresh}`,
-    'Path=/',
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax',
-    `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
-  ].join('; ');
+  const cookieValue = buildEditTokenCookieHeader(fresh, new URL(c.req.url).host);
 
   return c.json({ ok: true, ttl: EDIT_TOKEN_MAX_AGE }, 200, {
     'Set-Cookie': cookieValue,
