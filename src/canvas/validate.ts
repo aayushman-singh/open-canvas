@@ -244,6 +244,97 @@ function validatePinnedStyle(value: unknown, basePath: string, errors: string[])
 
 const ASSET_ID_RE = /^[A-Za-z0-9._-]+$/;
 
+function isAssetIdLike(value: unknown): value is string {
+  return typeof value === 'string' && ASSET_ID_RE.test(value);
+}
+
+// Deep-validate the StyleKitPreset shape supplied as `customStyleKit` when
+// `styleKit === 'custom'`. Required fields go into CSS or are read by
+// per-element renderers (code.ts reads panel/fontFamilyMono/radius;
+// chart.ts reads accent); the renderer trusts the shape, so the validator
+// is the only gate. Nested variant maps (surfaceVariants, actionVariants,
+// motionPresets) are required-to-be-records only — the inner shape is left
+// to the resolver, since incomplete maps merge over built-in defaults.
+function validateCustomStyleKit(value: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object`);
+    return;
+  }
+  const colourFields = [
+    'bg',
+    'panel',
+    'text',
+    'muted',
+    'accent',
+    'accentText',
+    'shapeFill',
+    'shapeStroke',
+  ] as const;
+  for (const field of colourFields) {
+    validateInjectionSafeString(value[field], field, basePath, errors);
+  }
+  const cssStringFields = [
+    'radius',
+    'borderWidth',
+    'shadow',
+    'shapeStrokeWidth',
+    'actionRadius',
+    'actionPadding',
+    'motionEasing',
+  ] as const;
+  for (const field of cssStringFields) {
+    validateInjectionSafeString(value[field], field, basePath, errors);
+  }
+  const fontFields = ['fontFamilyDisplay', 'fontFamilyBody', 'fontFamilyMono'] as const;
+  for (const field of fontFields) {
+    validateInjectionSafeString(value[field], field, basePath, errors);
+  }
+  const numberFields = [
+    'headingScale',
+    'bodyScale',
+    'labelScale',
+    'lineHeight',
+    'motionDurationMs',
+  ] as const;
+  for (const field of numberFields) {
+    if (!isFiniteNumber(value[field])) {
+      errors.push(`${basePath}.${field} must be a finite number (got ${describe(value[field])})`);
+    }
+  }
+  const variantMaps = ['surfaceVariants', 'actionVariants', 'motionPresets'] as const;
+  for (const field of variantMaps) {
+    if (!isRecord(value[field])) {
+      errors.push(`${basePath}.${field} must be an object (got ${describe(value[field])})`);
+    }
+  }
+  if (value.dark !== undefined && !isRecord(value.dark)) {
+    errors.push(`${basePath}.dark must be an object when present (got ${describe(value.dark)})`);
+  }
+}
+
+// Validate one user-controlled string field by the pinned-style safety rules
+// (no `;`, `{`, `}`, control chars, no `</`). Used by elementStyle colour
+// fields, page background, and customStyleKit colour/CSS-string fields — any
+// payload that lands in a `style="..."` attribute or a CSS declaration.
+//
+// Required fields call this directly; optional fields guard with
+// `!== undefined` at the call site so a missing optional doesn't error.
+function validateInjectionSafeString(
+  value: unknown,
+  field: string,
+  basePath: string,
+  errors: string[],
+): void {
+  if (typeof value !== 'string') {
+    errors.push(`${basePath}.${field} must be a string (got ${describe(value)})`);
+    return;
+  }
+  const issue = pinnedStyleValueIssue(value);
+  if (issue !== null) {
+    errors.push(`${basePath}.${field} value ${JSON.stringify(value)} contains ${issue}`);
+  }
+}
+
 function validateElementStyle(value: unknown, basePath: string, errors: string[]): void {
   if (value === undefined) return;
   if (!isRecord(value)) {
@@ -955,6 +1046,32 @@ function validatePage(
   if (page.category !== undefined && !isNonEmptyString(page.category)) {
     errors.push(`${basePath}.category must be a non-empty string when present`);
   }
+  if (page.description !== undefined && !isNonEmptyString(page.description)) {
+    errors.push(`${basePath}.description must be a non-empty string when present`);
+  }
+  if (page.ogImageAssetId !== undefined && !isAssetIdLike(page.ogImageAssetId)) {
+    errors.push(
+      `${basePath}.ogImageAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(page.ogImageAssetId)})`,
+    );
+  }
+  if (page.canonical !== undefined) {
+    if (!isNonEmptyString(page.canonical)) {
+      errors.push(`${basePath}.canonical must be a non-empty string when present`);
+    } else {
+      const issue = pinnedStyleValueIssue(page.canonical);
+      if (issue !== null) {
+        errors.push(
+          `${basePath}.canonical value ${JSON.stringify(page.canonical)} contains ${issue}`,
+        );
+      }
+    }
+  }
+  if (page.noIndex !== undefined && typeof page.noIndex !== 'boolean') {
+    errors.push(`${basePath}.noIndex must be a boolean when present (got ${describe(page.noIndex)})`);
+  }
+  if (page.locale !== undefined && !isNonEmptyString(page.locale)) {
+    errors.push(`${basePath}.locale must be a non-empty BCP-47 string when present (got ${describe(page.locale)})`);
+  }
   const widthValid =
     isFiniteNumber(page.width) && page.width >= PAGE_WIDTH_MIN && page.width <= PAGE_WIDTH_MAX;
   if (!widthValid) {
@@ -998,6 +1115,35 @@ function validateEditableShape(state: unknown, errors: string[]): void {
   if (!isOneOf<StyleKit>(state.styleKit, STYLE_KITS)) {
     errors.push(
       `styleKit must be one of [${STYLE_KITS.join(', ')}] (got ${describe(state.styleKit)})`,
+    );
+  }
+  // Site-level optional fields. customStyleKit is required when styleKit ===
+  // 'custom'; the other four (defaultLocale, siteNoIndex, darkModeEnabled,
+  // faviconAssetId) are always optional. Each is typed-narrowed here so junk
+  // shapes cannot ride through the publish pipeline at publish.ts:373-386.
+  if (state.styleKit === 'custom') {
+    if (state.customStyleKit === undefined) {
+      errors.push('customStyleKit is required when styleKit === "custom"');
+    } else {
+      validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
+    }
+  } else if (state.customStyleKit !== undefined) {
+    // Documented as ignored, but a malformed object here would propagate to
+    // PublishedSnapshot via spread-copy. Validate shape when present.
+    validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
+  }
+  if (state.defaultLocale !== undefined && !isNonEmptyString(state.defaultLocale)) {
+    errors.push(`defaultLocale must be a non-empty BCP-47 string when present (got ${describe(state.defaultLocale)})`);
+  }
+  if (state.siteNoIndex !== undefined && typeof state.siteNoIndex !== 'boolean') {
+    errors.push(`siteNoIndex must be a boolean when present (got ${describe(state.siteNoIndex)})`);
+  }
+  if (state.darkModeEnabled !== undefined && typeof state.darkModeEnabled !== 'boolean') {
+    errors.push(`darkModeEnabled must be a boolean when present (got ${describe(state.darkModeEnabled)})`);
+  }
+  if (state.faviconAssetId !== undefined && !isAssetIdLike(state.faviconAssetId)) {
+    errors.push(
+      `faviconAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(state.faviconAssetId)})`,
     );
   }
   if (!Array.isArray(state.pages) || state.pages.length === 0) {
@@ -1104,17 +1250,13 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
       errors.push(`publishedAt "${snapshot.publishedAt}" is not a parseable Date`);
     }
   }
-  // Re-use the editable validator on the snapshot's pages + style kit +
-  // optional header/footer sections.
-  validateEditableShape(
-    {
-      styleKit: snapshot.styleKit,
-      pages: snapshot.pages,
-      header: snapshot.header,
-      footer: snapshot.footer,
-    },
-    errors,
-  );
+  // Re-use the editable validator on the full snapshot. Passing the snapshot
+  // directly (rather than a stripped {styleKit, pages, header, footer} literal)
+  // lets the site-level field validators inside validateEditableShape see
+  // customStyleKit / defaultLocale / siteNoIndex / darkModeEnabled /
+  // faviconAssetId — otherwise those fields silently round-trip onto the
+  // snapshot via the spread at publish.ts:373-386.
+  validateEditableShape(snapshot, errors);
   validatePublishedMediaReferences(snapshot, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
