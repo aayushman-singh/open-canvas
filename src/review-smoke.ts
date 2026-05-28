@@ -433,8 +433,8 @@ assert(
   'expected templates page to render iframe previews for selectable templates',
 );
 assert(
-  templatesPageSource.includes('sandbox=""'),
-  'expected template preview iframes to be sandboxed without extra permissions',
+  templatesPageSource.includes('sandbox="allow-scripts"'),
+  'expected template preview iframes to allow scripts while staying cross-origin sandboxed',
 );
 assert(
   !templatesPageSource.includes('sandbox="allow-same-origin"'),
