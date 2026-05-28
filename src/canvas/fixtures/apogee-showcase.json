@@ -385,7 +385,7 @@
               "type": "action",
               "box": { "x": 280, "y": 520, "w": 160, "h": 52, "z": 3 },
               "label": "Contact sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "outline",
               "motion": { "preset": "fade-up", "delayMs": 200 }
             },
@@ -1114,7 +1114,7 @@
               "type": "action",
               "box": { "x": 740, "y": 360, "w": 180, "h": 56, "z": 3 },
               "label": "Talk to sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "pill"
             }
           ]
@@ -2534,7 +2534,7 @@
               "type": "action",
               "box": { "x": 80, "y": 472, "w": 180, "h": 52, "z": 3 },
               "label": "Contact sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "solid"
             },
             {
@@ -3118,7 +3118,7 @@
               "type": "action",
               "box": { "x": 540, "y": 268, "w": 180, "h": 52, "z": 3 },
               "label": "Contact sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "solid"
             },
             {
@@ -3565,7 +3565,7 @@
               "type": "action",
               "box": { "x": 740, "y": 244, "w": 200, "h": 52, "z": 3 },
               "label": "Contact sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "glass"
             }
           ]

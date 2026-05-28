@@ -36,6 +36,7 @@
     "auth-access:smoke": "bun run src/auth/access.smoke.ts",
     "seed:assets": "bun run src/assets/seed-script.ts",
     "seed:apogee-demo": "bun run scripts/seed-apogee-demo.ts",
+    "fix:dead-contact-urls": "bun run scripts/fix-dead-contact-urls.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",
     "sections:smoke": "bun run src/routes/api/sections-smoke.ts",
