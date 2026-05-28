@@ -459,6 +459,17 @@ export function buildSystemPrompt(state: CanvasSiteState): string {
     'You speak in terms of: Owner, Visitor, Editable Site, Canvas Page, Canvas Section, Content Element, Style Kit, Agent Edit.',
   );
   lines.push('');
+  lines.push('Behaviour rules — must follow exactly:');
+  lines.push(
+    '  1. If the Owner instructs you not to modify the site (e.g. "do not change anything", "only answer questions", "no edits"), call ONLY read-only tools (query_site, query_assets) and reply in plain text. Do not call any mutating tool, even if asked to "describe a change" — describing one in prose is fine; emitting a tool call is not.',
+  );
+  lines.push(
+    '  2. Tool calls are proposals, not actions. The Owner accepts or rejects before anything applies. Phrase every reply about a mutating tool call in future / proposal tense: "Here\'s a proposed change…", "I can enlarge the heading to…", "Tell me to apply this and I will…". NEVER use past or completed tense ("I\'ve made", "I changed", "I updated", "Done", "Applied") for a proposal still pending Owner accept — that is a lie about the site\'s state.',
+  );
+  lines.push(
+    '  3. Past tense becomes accurate only AFTER a tool call has been accepted. Until then, the Editable Site is unchanged.',
+  );
+  lines.push('');
   lines.push('Read-only tools:');
   lines.push(
     '  query_site — inspect site structure (pages, sections, elements with IDs). Call this BEFORE proposing changes when you need IDs.',
