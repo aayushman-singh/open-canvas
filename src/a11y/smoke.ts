@@ -105,7 +105,7 @@ function mkSiteState(
   styleKit: StyleKit,
   pages: CanvasSiteState['pages'],
 ): CanvasSiteState {
-  return { styleKit, symbols: [], pages };
+  return { styleKit, pages };
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,6 @@ function test2LowContrast(): void {
   const state: CanvasSiteState = {
     styleKit: 'custom',
     customStyleKit: lowContrastKit,
-    symbols: [],
     pages: [
       {
         id: 'page-home',
