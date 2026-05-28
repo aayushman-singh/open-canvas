@@ -55,17 +55,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const SURFACE_VARIANTS = ["flat", "raised", "glass", "outlined", "sticker", "editorial-frame", "soft-panel"];
   const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
   const MOTION_PRESETS = ["none", "fade-up", "fade-down", "fade-in", "fade-right", "slide-left", "slide-up", "slide-right", "scale-in", "zoom-out", "blur-in", "rotate-in", "flip-in", "bounce-in", "stagger-children", "slow-drift", "parallax-soft"];
-  const INLINE_MARK_TYPES = ["bold", "italic", "underline", "strike", "code", "highlight", "link"];
   // Canonical nesting order for inline marks. Outermost first: link wraps every
   // other mark so anchor styling stays intact when marks combine; the typographic
   // tags (strong, em, u, s, mark, code) nest inside in this exact sequence so the
   // editor preview matches the server renderer (src/canvas/render.ts) and the
   // serializer's adjacent-run dedupe by JSON string stays reliable.
-  // Three locations within this file MUST stay in lockstep with this list:
+  // Three locations within this file MUST derive from this list (no parallel
+  // hardcoded mark-name arrays anywhere):
   //   1. activeMarksFor's order map (DOM->runs serializer sort).
   //   2. buildRunNode's wrap() sequence (runs->DOM nest order is the REVERSE
   //      of CANONICAL_MARK_ORDER because wrap() pushes innermost first).
-  //   3. Any future inline-mark consumer added to this script.
+  //   3. The mark-toolbar button loop (toolbar iterates this list directly so
+  //      adding a mark here surfaces a button automatically).
   const CANONICAL_MARK_ORDER = ["link", "bold", "italic", "underline", "strike", "highlight", "code"];
   // Scroll-trigger modes for page entrance animations. Mirrors schema's
   // SCROLL_TRIGGER_MODES; if you add a mode there, add it here too.
@@ -1383,14 +1384,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (es.overflow) wrapper.style.overflow = es.overflow;
   }
 
-  // Build the nested-mark DOM for one InlineRun. Mark nesting order must
-  // match CANONICAL_MARK_ORDER (and the server renderer in src/canvas/render.ts)
-  // so the editor preview and the published HTML agree visually:
+  // Build the nested-mark DOM for one InlineRun. Mark nesting order is
+  // derived directly from CANONICAL_MARK_ORDER (and the server renderer in
+  // src/canvas/render.ts) so the editor preview and the published HTML agree
+  // visually:
   //   <a> outermost (only when link mark present)
   //   <strong>, <em>, <u>, <s>, <mark>, <code> innermost
-  // wrap() pushes a new outer wrapper around the current inner, so the calls
-  // below execute in the REVERSE of CANONICAL_MARK_ORDER: innermost (code)
-  // first, link last. Keep these two lists in sync.
+  // wrap() pushes a new outer wrapper around the current inner, so the loop
+  // below walks CANONICAL_MARK_ORDER in reverse: innermost (code) first, then
+  // link is appended last via its dedicated branch. No parallel mark-order
+  // list lives in this function — the single source is CANONICAL_MARK_ORDER.
   function hasMark(run, type) {
     if (!run.marks || !Array.isArray(run.marks)) return false;
     for (let i = 0; i < run.marks.length; i++) {
@@ -1405,6 +1408,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     return null;
   }
+  // Maps CANONICAL_MARK_ORDER mark types to their DOM tags. "link" is omitted
+  // because the <a> wrap needs href/target attributes and is built inline below.
+  const MARK_TYPE_TO_TAG = { bold: "strong", italic: "em", underline: "u", strike: "s", highlight: "mark", code: "code" };
   function buildRunNode(run) {
     // Innermost text node carries the raw run.text. wrapInTag wraps the
     // current node in a new element of the given tag, returning the outer.
@@ -1415,12 +1421,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       inner = el;
       return el;
     }
-    if (hasMark(run, "code")) wrap("code");
-    if (hasMark(run, "highlight")) wrap("mark");
-    if (hasMark(run, "strike")) wrap("s");
-    if (hasMark(run, "underline")) wrap("u");
-    if (hasMark(run, "italic")) wrap("em");
-    if (hasMark(run, "bold")) wrap("strong");
+    // Walk CANONICAL_MARK_ORDER innermost-first (reverse) so wrap()'s
+    // outward-growth produces the exact nesting CANONICAL_MARK_ORDER prescribes.
+    // The "link" entry is handled separately below because <a> needs attributes.
+    for (let mi = CANONICAL_MARK_ORDER.length - 1; mi >= 0; mi--) {
+      const markType = CANONICAL_MARK_ORDER[mi];
+      const tag = MARK_TYPE_TO_TAG[markType];
+      if (tag && hasMark(run, markType)) wrap(tag);
+    }
     const link = findLinkMark(run);
     if (link) {
       const a = document.createElement("a");
@@ -7031,8 +7039,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       highlight: "HL",
       link: "Link",
     };
-    for (let i = 0; i < INLINE_MARK_TYPES.length; i++) {
-      const type = INLINE_MARK_TYPES[i];
+    for (let i = 0; i < CANONICAL_MARK_ORDER.length; i++) {
+      const type = CANONICAL_MARK_ORDER[i];
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = labels[type];
@@ -7561,7 +7569,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function defaultBox(section, w, h) {
     const page = currentPage();
-    const pageWidth = page ? page.width : 1440;
+    // defaultBox is only reachable via addElement* paths that resolve a
+    // section first (targetSectionForSidebar / addBlankSectionFromSidebar /
+    // direct selection), and every section lives inside a page. A null page
+    // here means the caller fed us a section that no longer belongs to any
+    // page in state — fail loudly instead of silently inventing a width.
+    if (!page) throw new Error("defaultBox: no current page; section/page state out of sync");
+    const pageWidth = page.width;
     let width = w;
     let height = h;
     if (width > pageWidth) width = pageWidth - 40;
