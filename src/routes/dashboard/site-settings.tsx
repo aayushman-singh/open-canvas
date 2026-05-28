@@ -267,6 +267,44 @@ const pageStyles = `
     background: rgba(134,239,172,0.15);
     color: #86efac;
   }
+  .collab-item .role-select {
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    text-transform: capitalize;
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  .collab-item .role-select:focus,
+  .collab-item .role-select:hover {
+    border-color: var(--accent);
+  }
+  .collab-item .role-select:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+  .collab-item .resend-btn {
+    background: transparent;
+    border: 1px solid rgba(125,211,252,0.35);
+    color: #7dd3fc;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .collab-item .resend-btn:hover {
+    background: rgba(125, 211, 252, 0.08);
+    border-color: rgba(125, 211, 252, 0.65);
+  }
+  .collab-item .resend-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
   .collab-item .remove-btn {
     background: transparent;
     border: 1px solid rgba(252,165,165,0.30);
@@ -611,7 +649,14 @@ const rev01SiteSettingsConfig = (() => {
   }
   async function responseDetail(response) {
     const bodyText = (await response.text()).trim();
-    return bodyText || response.statusText;
+    if (!bodyText) return response.statusText;
+    try {
+      const json = JSON.parse(bodyText);
+      if (json && typeof json.error === 'string') return json.error;
+    } catch {
+      // not JSON — fall through and return raw body
+    }
+    return bodyText;
   }
 
   if (collabForm) {
@@ -651,35 +696,94 @@ const rev01SiteSettingsConfig = (() => {
     collabList.addEventListener('click', async (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      // Anchor on the visible button class so the handler still fires when the
-      // click target is a child node of the button (e.g. an inner span added
-      // later) — closest on a [data-remove-collab] attribute alone would miss
-      // any wrapper that doesn't carry the attribute.
-      const btn = target.closest('button.remove-btn');
-      if (!(btn instanceof HTMLButtonElement)) return;
-      const item = btn.closest('.collab-item');
-      const collabId =
-        btn.getAttribute('data-remove-collab') ||
-        (item ? item.getAttribute('data-collab-id') : null);
+      const removeBtn = target.closest('button.remove-btn');
+      const resendBtn = target.closest('button.resend-btn');
+      if (removeBtn instanceof HTMLButtonElement) {
+        const item = removeBtn.closest('.collab-item');
+        const collabId =
+          removeBtn.getAttribute('data-remove-collab') ||
+          (item ? item.getAttribute('data-collab-id') : null);
+        if (!collabId) return;
+        if (!await __rev01Modal.confirm('Remove this collaborator?', { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true })) return;
+        removeBtn.disabled = true;
+        clearCollabStatus();
+        try {
+          const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/collaborators/' + encodeURIComponent(collabId), {
+            method: 'DELETE',
+            headers: { 'accept': 'application/json' },
+          });
+          if (!response.ok) {
+            const detail = await responseDetail(response);
+            if (collabErr) collabErr.textContent = detail;
+            removeBtn.disabled = false;
+            return;
+          }
+          if (item) item.remove();
+        } catch (e) {
+          if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
+          removeBtn.disabled = false;
+        }
+        return;
+      }
+      if (resendBtn instanceof HTMLButtonElement) {
+        const collabId = resendBtn.getAttribute('data-resend-collab');
+        if (!collabId) return;
+        resendBtn.disabled = true;
+        clearCollabStatus();
+        try {
+          const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/collaborators/' + encodeURIComponent(collabId) + '/resend', {
+            method: 'POST',
+            headers: { 'accept': 'application/json' },
+          });
+          if (!response.ok) {
+            const detail = await responseDetail(response);
+            if (collabErr) collabErr.textContent = detail;
+            resendBtn.disabled = false;
+            return;
+          }
+          if (collabOk) collabOk.textContent = 'Invitation resent.';
+        } catch (e) {
+          if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
+        } finally {
+          resendBtn.disabled = false;
+        }
+        return;
+      }
+    });
+
+    // Role change — fires PATCH on each change. On failure, revert to the
+    // previously persisted value (stashed in data-prev-role) so the dropdown
+    // doesn't visually claim a state the server didn't accept.
+    collabList.addEventListener('change', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLSelectElement)) return;
+      if (!target.classList.contains('role-select')) return;
+      const collabId = target.getAttribute('data-role-collab');
       if (!collabId) return;
-      if (!await __rev01Modal.confirm('Remove this collaborator?', { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true })) return;
-      btn.disabled = true;
+      const newRole = target.value;
+      const prevRole = target.getAttribute('data-prev-role') || 'editor';
+      if (newRole === prevRole) return;
+      target.disabled = true;
       clearCollabStatus();
       try {
         const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/collaborators/' + encodeURIComponent(collabId), {
-          method: 'DELETE',
-          headers: { 'accept': 'application/json' },
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+          body: JSON.stringify({ role: newRole }),
         });
         if (!response.ok) {
           const detail = await responseDetail(response);
           if (collabErr) collabErr.textContent = detail;
-          btn.disabled = false;
+          target.value = prevRole;
           return;
         }
-        if (item) item.remove();
+        target.setAttribute('data-prev-role', newRole);
+        if (collabOk) collabOk.textContent = 'Role updated.';
       } catch (e) {
         if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
-        btn.disabled = false;
+        target.value = prevRole;
+      } finally {
+        target.disabled = false;
       }
     });
   }
@@ -1098,10 +1202,27 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           {collaborators.map((collab) => (
             <li class="collab-item" data-collab-id={collab.id}>
               <span class="email">{collab.email}</span>
-              <span class="role-badge">{collab.role}</span>
+              <select
+                class="role-select"
+                data-role-collab={collab.id}
+                data-prev-role={collab.role}
+                aria-label="Role"
+              >
+                <option value="editor" selected={collab.role === 'editor'}>
+                  Editor
+                </option>
+                <option value="viewer" selected={collab.role === 'viewer'}>
+                  Viewer
+                </option>
+              </select>
               <span class={`status-badge ${collab.acceptedAt ? 'active' : 'pending'}`}>
                 {collab.acceptedAt ? 'active' : 'pending'}
               </span>
+              {collab.acceptedAt ? null : (
+                <button type="button" class="resend-btn" data-resend-collab={collab.id}>
+                  Resend
+                </button>
+              )}
               <button type="button" class="remove-btn" data-remove-collab={collab.id}>
                 Remove
               </button>
