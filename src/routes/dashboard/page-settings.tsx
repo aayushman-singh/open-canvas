@@ -365,6 +365,26 @@ const pageStyles = `
   .og-card[data-has-custom="true"] > * { display: none; }
   .og-card { container-type: inline-size; }
 
+  /* Embedded OG card replica inside Twitter/LinkedIn image slot — same colours
+     and layout as the standalone preview, scaled to the slot's inline size. */
+  .preview-twitter .pv-img,
+  .preview-linkedin .pv-img {
+    position: relative;
+    overflow: hidden;
+  }
+  .preview-twitter .pv-img > .og-card,
+  .preview-linkedin .pv-img > .og-card {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .preview-twitter .pv-img[data-has-custom="true"] > .og-card,
+  .preview-linkedin .pv-img[data-has-custom="true"] > .og-card { display: none; }
+
   /* Twitter card (light theme — matches the actual platform). */
   .preview-twitter {
     border: 1px solid #cfd9de;
@@ -592,6 +612,52 @@ function esc(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
 }
 
+/**
+ * The auto-generated OG card design as JSX — a CSS replica of the Satori
+ * template in `src/og-image/render.tsx`. Reused in three slots: the
+ * standalone preview, and embedded inside the Twitter and LinkedIn card
+ * image areas (where it shows what a crawler would actually fetch).
+ */
+function ogCardJsx(args: {
+  siteName: string;
+  titleVal: string;
+  descriptionVal: string;
+  ogStyle: string;
+  customImageUrl: string | null;
+}) {
+  const { siteName, titleVal, descriptionVal, ogStyle, customImageUrl } = args;
+  const style =
+    customImageUrl !== null
+      ? `${ogStyle};background-image:url(${customImageUrl})`
+      : ogStyle;
+  return (
+    <div
+      class="og-card"
+      data-preview="og"
+      data-has-custom={customImageUrl !== null ? 'true' : null}
+      style={style}
+    >
+      <div class="og-site" data-preview-site>{esc(siteName)}</div>
+      <div class="og-mid">
+        <div class="og-tick"></div>
+        <h3
+          class="og-title"
+          data-preview-title
+          data-empty-text="Untitled page"
+        >
+          {titleVal}
+        </h3>
+        {descriptionVal.length > 0 ? (
+          <p class="og-desc" data-preview-desc data-empty-hide>{raw(descriptionVal)}</p>
+        ) : (
+          <p class="og-desc" data-preview-desc data-empty-hide hidden></p>
+        )}
+      </div>
+      <div class="og-stripe"></div>
+    </div>
+  );
+}
+
 function clientScript(siteId: string, pageId: string): string {
   const sid = JSON.stringify(siteId);
   const pid = JSON.stringify(pageId);
@@ -629,6 +695,10 @@ function clientScript(siteId: string, pageId: string): string {
   // ---- Live previews -----------------------------------------------------
   // Bind title/description inputs to every [data-preview-title|desc] node so
   // OG card, Twitter, LinkedIn and SERP cards stay in sync as the user types.
+  // Empty-state rules per element:
+  //   data-empty-hide    → set hidden=true when input is empty (OG card desc)
+  //   data-empty-text=X  → fall back to X when input is empty (Twitter / SERP)
+  //   neither            → clear textContent (rare; effectively invisible)
   function bindPreview(inputName, attr) {
     const input = form.querySelector('[name="' + inputName + '"]');
     if (!input) return;
@@ -637,11 +707,18 @@ function clientScript(siteId: string, pageId: string): string {
       const v = input.value;
       for (const t of targets) {
         if (v.length === 0) {
-          t.textContent = '';
-          if (attr === 'data-preview-desc') t.hidden = true;
+          if (t.hasAttribute('data-empty-hide')) {
+            t.textContent = '';
+            t.hidden = true;
+          } else if (t.hasAttribute('data-empty-text')) {
+            t.textContent = t.getAttribute('data-empty-text') || '';
+            t.hidden = false;
+          } else {
+            t.textContent = '';
+          }
         } else {
           t.textContent = v;
-          if (attr === 'data-preview-desc') t.hidden = false;
+          t.hidden = false;
         }
       }
     }
@@ -758,20 +835,20 @@ function clientScript(siteId: string, pageId: string): string {
     if (meta) meta.textContent = 'Custom image overrides the generated card.';
     if (clearBtn) clearBtn.hidden = false;
     if (chooseBtn) chooseBtn.textContent = 'Change image';
-    // Update the OG card preview to show the chosen image.
-    const og = document.querySelector('[data-preview="og"]');
-    if (og) {
-      og.setAttribute('data-has-custom', 'true');
-      og.style.backgroundImage = 'url(/assets/' + encodeURIComponent(assetId) + ')';
-    }
-    // Twitter / LinkedIn preview images.
+    // Update every OG card preview (standalone + the embedded copies inside
+    // the Twitter and LinkedIn image slots) and the platform image slots.
     const url = 'url(/assets/' + encodeURIComponent(assetId) + ')';
+    document.querySelectorAll('[data-preview="og"]').forEach((og) => {
+      og.setAttribute('data-has-custom', 'true');
+      og.style.backgroundImage = url;
+    });
     for (const sel of ['[data-preview-img="twitter"]', '[data-preview-img="linkedin"]']) {
       const img = document.querySelector(sel);
       if (!img) continue;
       img.style.backgroundImage = url;
       img.style.backgroundSize = 'cover';
       img.style.backgroundPosition = 'center';
+      img.setAttribute('data-has-custom', 'true');
     }
     closePicker();
   }
@@ -792,15 +869,16 @@ function clientScript(siteId: string, pageId: string): string {
     if (meta) meta.textContent = 'Leave blank to use the auto-generated card.';
     if (clearBtn) clearBtn.hidden = true;
     if (chooseBtn) chooseBtn.textContent = 'Choose image';
-    const og = document.querySelector('[data-preview="og"]');
-    if (og) {
+    document.querySelectorAll('[data-preview="og"]').forEach((og) => {
       og.removeAttribute('data-has-custom');
       og.style.backgroundImage = '';
+    });
+    for (const sel of ['[data-preview-img="twitter"]', '[data-preview-img="linkedin"]']) {
+      const img = document.querySelector(sel);
+      if (!img) continue;
+      img.style.backgroundImage = '';
+      img.removeAttribute('data-has-custom');
     }
-    const twImg = document.querySelector('[data-preview-img="twitter"]');
-    const liImg = document.querySelector('[data-preview-img="linkedin"]');
-    if (twImg) twImg.style.backgroundImage = '';
-    if (liImg) liImg.style.backgroundImage = '';
   }
 
   document.querySelectorAll('[data-asset-picker]').forEach((picker) => {
@@ -1119,29 +1197,17 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
             </p>
             <div class="preview-stack">
               <div>
-                <p class="preview-label">Open Graph card (auto-generated)</p>
-                <div
-                  class="og-card"
-                  data-preview="og"
-                  data-has-custom={ogImageVal.length > 0 ? 'true' : null}
-                  style={
+                <p class="preview-label">Open Graph card</p>
+                {ogCardJsx({
+                  siteName,
+                  titleVal,
+                  descriptionVal,
+                  ogStyle,
+                  customImageUrl:
                     ogImageVal.length > 0
-                      ? `${ogStyle};background-image:url(/assets/${encodeURIComponent(page.ogImageAssetId ?? '')})`
-                      : ogStyle
-                  }
-                >
-                  <div class="og-site" data-preview-site>{esc(siteName)}</div>
-                  <div class="og-mid">
-                    <div class="og-tick"></div>
-                    <h3 class="og-title" data-preview-title>{titleVal}</h3>
-                    {descriptionVal.length > 0 ? (
-                      <p class="og-desc" data-preview-desc>{raw(descriptionVal)}</p>
-                    ) : (
-                      <p class="og-desc" data-preview-desc hidden></p>
-                    )}
-                  </div>
-                  <div class="og-stripe"></div>
-                </div>
+                      ? `/assets/${encodeURIComponent(page.ogImageAssetId ?? '')}`
+                      : null,
+                })}
               </div>
 
               <div>
@@ -1150,16 +1216,37 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                   <div
                     class="pv-img"
                     data-preview-img="twitter"
+                    data-has-custom={ogImageVal.length > 0 ? 'true' : null}
                     style={
                       ogImageVal.length > 0
                         ? `background-color:${preset.bg};background-image:url(/assets/${encodeURIComponent(page.ogImageAssetId ?? '')});background-size:cover;background-position:center`
                         : `background-color:${preset.bg}`
                     }
-                  ></div>
+                  >
+                    {ogCardJsx({
+                      siteName,
+                      titleVal,
+                      descriptionVal,
+                      ogStyle,
+                      customImageUrl: null,
+                    })}
+                  </div>
                   <div class="pv-meta">
                     <p class="pv-host" data-preview-host>{publishedHost}</p>
-                    <p class="pv-title" data-preview-title>{titleVal}</p>
-                    <p class="pv-desc" data-preview-desc>{raw(descriptionVal) || 'No description set — Twitter will fall back to the page title.'}</p>
+                    <p
+                      class="pv-title"
+                      data-preview-title
+                      data-empty-text="Untitled page"
+                    >
+                      {titleVal}
+                    </p>
+                    <p
+                      class="pv-desc"
+                      data-preview-desc
+                      data-empty-text="No description set — Twitter falls back to the title."
+                    >
+                      {descriptionVal.length > 0 ? raw(descriptionVal) : 'No description set — Twitter falls back to the title.'}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1170,14 +1257,29 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                   <div
                     class="pv-img"
                     data-preview-img="linkedin"
+                    data-has-custom={ogImageVal.length > 0 ? 'true' : null}
                     style={
                       ogImageVal.length > 0
                         ? `background-color:${preset.bg};background-image:url(/assets/${encodeURIComponent(page.ogImageAssetId ?? '')});background-size:cover;background-position:center`
                         : `background-color:${preset.bg}`
                     }
-                  ></div>
+                  >
+                    {ogCardJsx({
+                      siteName,
+                      titleVal,
+                      descriptionVal,
+                      ogStyle,
+                      customImageUrl: null,
+                    })}
+                  </div>
                   <div class="pv-meta">
-                    <p class="pv-title" data-preview-title>{titleVal}</p>
+                    <p
+                      class="pv-title"
+                      data-preview-title
+                      data-empty-text="Untitled page"
+                    >
+                      {titleVal}
+                    </p>
                     <p class="pv-host" data-preview-host>{publishedHost}</p>
                   </div>
                 </div>
@@ -1204,8 +1306,20 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                       <span class="pv-url" data-preview-canonical>{publishedUrl}</span>
                     </div>
                   </div>
-                  <h3 class="pv-title" data-preview-title>{titleVal}</h3>
-                  <p class="pv-desc" data-preview-desc>{raw(descriptionVal) || 'Add a description above to control what Google shows under the title.'}</p>
+                  <h3
+                    class="pv-title"
+                    data-preview-title
+                    data-empty-text="Untitled page"
+                  >
+                    {titleVal}
+                  </h3>
+                  <p
+                    class="pv-desc"
+                    data-preview-desc
+                    data-empty-text="Add a description above to control what Google shows under the title."
+                  >
+                    {descriptionVal.length > 0 ? raw(descriptionVal) : 'Add a description above to control what Google shows under the title.'}
+                  </p>
                 </div>
               </div>
             </div>
