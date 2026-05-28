@@ -313,7 +313,7 @@ function CustomTemplateTile({ dt }: { dt: CustomTemplateCard }) {
             tabindex={-1}
             title={`${dt.name} preview`}
             loading="lazy"
-            sandbox=""
+            sandbox="allow-scripts"
           />
         </span>
         <span class="template-copy">
@@ -383,7 +383,7 @@ function Page({
                         tabindex={-1}
                         title={`${template.name} preview`}
                         loading="lazy"
-                        sandbox=""
+                        sandbox="allow-scripts"
                       />
                     </span>
                     <span class="template-copy">
