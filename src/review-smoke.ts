@@ -55,6 +55,10 @@ const smokeEnv: Record<string, string> = {
   CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY ?? '',
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
   UNLOCK_SIGNING_SECRET: SMOKE_UNLOCK_SIGNING_SECRET,
+  // Required at the render boundary now that Turnstile threads through ctx
+  // (see ADR-touched batch 1 finding #3). Real production keys live in
+  // wrangler secrets; smoke uses a stub the renderer treats as a valid key.
+  TURNSTILE_SITE_KEY: 'turnstile-smoke-key',
 };
 
 async function responseText(path: string): Promise<{ status: number; body: string }> {
@@ -553,6 +557,7 @@ assert(
 const publicRouteSource = await readSource('./routes/public.ts');
 const publishRouteSource = await readSource('./routes/api/publish.ts');
 const indexSource = await readSource('./index.ts');
+const socketRouteSource = await readSource('./live/socket-route.ts');
 const siteRoomSource = await readSource('./live/site-room.ts');
 const unlockRouteSource = await readSource('./password/unlock-route.ts');
 const renderSource = await readSource('./canvas/render.ts');
@@ -566,10 +571,10 @@ assert(
 assert(
   publishRouteSource.includes('buildPublishBroadcastPayload') &&
     publishRouteSource.includes('htmlBySlug') &&
-    /renderCanvasSnapshot\(\s*snapshot,\s*'\/assets',\s*siteId,\s*\{\s*renderPages:\s*\[targetPage\]\s*\}/.test(
+    /renderCanvasSnapshot\(\s*snapshot,\s*'\/assets',\s*siteId,\s*\{\s*renderPages:\s*\[targetPage\],\s*turnstileSiteKey,?\s*\}/.test(
       publishRouteSource,
     ),
-  'expected publish broadcast render to emit page-scoped html and pass site id through so live-updated forms keep a valid action',
+  'expected publish broadcast render to emit page-scoped html and pass site id + turnstile key through so live-updated forms keep a valid action and bot protection',
 );
 assert(
   publishRouteSource.includes('published side effects failed; restored previous published state') &&
@@ -599,9 +604,9 @@ assert(
 );
 assert(
   publicRouteSource.includes('role=visitor') &&
-    indexSource.includes("app.get('/__live'") &&
-    indexSource.includes('verifyEditToken') &&
-    indexSource.includes('role=editor'),
+    indexSource.includes("app.route('/__live', socketRoute)") &&
+    socketRouteSource.includes('verifyEditToken') &&
+    socketRouteSource.includes('role=editor'),
   'expected /__live to separate unauthenticated visitor sockets from authenticated editor sockets',
 );
 assert(
@@ -750,7 +755,7 @@ try {
 // the POC's "Owner can save/publish/ask AI without losing local edits" flow
 // wired even though review-smoke does not boot a browser.
 
-const canvasIndexSource = await readSource('./editor/canvas-index.tsx');
+const canvasIndexSource = await readSource('./editor/route.tsx');
 const canvasClientSource = await readSource('./editor/canvas-client.ts');
 const canvasApiSource = await readSource('./routes/api/canvas.ts');
 const publishApiSource = await readSource('./routes/api/publish.ts');

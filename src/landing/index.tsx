@@ -54,4 +54,16 @@ function Page() {
 
 landing.get('/', (c) => c.html(<Page />));
 
+// Brand favicon — served regardless of which landing path is hit. Kept here
+// (next to the rest of the brand surface) rather than in src/index.ts so
+// that asset and entry concerns don't entangle.
+const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0d1117"/><text x="4" y="24" font-family="monospace" font-size="22" font-weight="700" fill="#22d3ee">r1</text></svg>`;
+
+landing.get('/favicon.ico', (c) =>
+  c.body(FAVICON_SVG, 200, {
+    'content-type': 'image/svg+xml',
+    'cache-control': 'public, max-age=86400',
+  }),
+);
+
 export default landing;
