@@ -942,6 +942,95 @@ assert(
   'expected icon-only interaction-mode toolbar buttons to expose accessible labels',
 );
 
+// -- File-input discipline -----------------------------------------------
+//
+// A `<input type="file">` created via document.createElement must be in
+// the DOM before .click() is called on it. Chromium silently no-ops the
+// click on a detached file input as a user-gesture security measure, so
+// the picker never opens and the upload button looks dead with no error.
+// This is exactly the bug shape that broke the Bg image Upload (see
+// commit 8ee3068). Every file input must either be appended to the DOM
+// before .click(), or never .click()ed (used purely as a side channel).
+function scanFileInputDiscipline(source: string, label: string): string[] {
+  const violations: string[] = [];
+  const lines = source.split('\n');
+  const declRe =
+    /^\s*(?:var|let|const)\s+(\w+)\s*=\s*document\.createElement\(\s*["']input["']\s*\)/;
+  const decls: Array<{ name: string; line: number }> = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = declRe.exec(lines[i]);
+    if (m) decls.push({ name: m[1], line: i });
+  }
+  for (let d = 0; d < decls.length; d++) {
+    const { name, line: declLine } = decls[d];
+    // Scope the analysis to the window from this declaration up to the
+    // next declaration with the same identifier (otherwise we'd conflate
+    // unrelated reuses of common names like `fileInput`).
+    let scopeEnd = lines.length;
+    for (let f = d + 1; f < decls.length; f++) {
+      if (decls[f].name === name) {
+        scopeEnd = decls[f].line;
+        break;
+      }
+    }
+    const typeRe = new RegExp(`\\b${name}\\.type\\s*=\\s*["']file["']`);
+    let isFileInput = false;
+    for (let i = declLine; i < Math.min(scopeEnd, declLine + 15); i++) {
+      if (typeRe.test(lines[i])) {
+        isFileInput = true;
+        break;
+      }
+    }
+    if (!isFileInput) continue;
+    // Source-line ORDER doesn't matter at runtime: appendChild can appear
+    // textually after .click() because the click is usually inside an event
+    // handler closure that fires later. The bug shape is .click() existing
+    // anywhere on the variable WITHOUT any appendChild on it anywhere in
+    // the same lexical scope.
+    const clickRe = new RegExp(`\\b${name}\\.click\\(\\s*\\)`);
+    const appendRe = new RegExp(`\\.appendChild\\(\\s*${name}\\s*\\)`);
+    let clickLine = -1;
+    let hasAppend = false;
+    for (let i = declLine; i < scopeEnd; i++) {
+      if (clickLine < 0 && clickRe.test(lines[i])) clickLine = i;
+      if (!hasAppend && appendRe.test(lines[i])) hasAppend = true;
+      if (clickLine >= 0 && hasAppend) break;
+    }
+    if (clickLine >= 0 && !hasAppend) {
+      violations.push(
+        `${label}:${declLine + 1}: file input "${name}" .click() at line ${clickLine + 1} but never appendChild(${name}) — Chromium will silently no-op the click and the picker won't open`,
+      );
+    }
+  }
+  return violations;
+}
+
+// Self-test: feed a synthetic bad pattern (the exact shape of the bg-image
+// bug) through the scanner and assert it fires. This stops the lint itself
+// from regressing into a no-op.
+const fileInputLintSelfTest = scanFileInputDiscipline(
+  [
+    'function buildInspector() {',
+    '  bgImgUpload.addEventListener("click", function() {',
+    '    var inp = document.createElement("input");',
+    '    inp.type = "file";',
+    '    inp.click();',
+    '  });',
+    '}',
+  ].join('\n'),
+  'self-test',
+);
+assert(
+  fileInputLintSelfTest.length === 1 && fileInputLintSelfTest[0].includes('"inp"'),
+  `file-input-discipline lint self-test failed: expected 1 violation for "inp", got ${JSON.stringify(fileInputLintSelfTest)}`,
+);
+
+const fileInputErrors = scanFileInputDiscipline(canvasClientSource, 'canvas-client.ts');
+assert(
+  fileInputErrors.length === 0,
+  `file-input discipline violations:\n  ` + fileInputErrors.join('\n  '),
+);
+
 const tsconfigSource = await readSource('../tsconfig.json');
 const tsconfig = JSON.parse(tsconfigSource) as { exclude?: string[] };
 assert(
