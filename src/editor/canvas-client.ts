@@ -1252,7 +1252,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function undo() {
-    if (undoStack.length <= 1 || !state) return;
+    // Visible no-op feedback: the keyboard handler runs globally on window,
+    // so Ctrl+Z fires regardless of which UI surface has focus. Without a
+    // status flash, a no-op undo looks identical to a non-firing shortcut,
+    // which reads as "Ctrl+Z only works when something is selected."
+    if (!state) { setStatus("Nothing to undo"); return; }
+    if (undoStack.length <= 1) { setStatus("Nothing to undo"); return; }
     undoRedoing = true;
     redoStack.push(structuredClone(state));
     undoStack.pop();
@@ -1265,7 +1270,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function redo() {
-    if (redoStack.length === 0 || !state) return;
+    if (!state) { setStatus("Nothing to redo"); return; }
+    if (redoStack.length === 0) { setStatus("Nothing to redo"); return; }
     undoRedoing = true;
     undoStack.push(structuredClone(state));
     state = structuredClone(redoStack.pop());
@@ -7914,7 +7920,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (sectionNode) {
         const sid = sectionNode.getAttribute('data-rev01-section');
         if (sid) { selectSection(sid); selectElement(null); }
+        return;
       }
+      // Background click inside the canvas viewport (artboard padding or
+      // the gutter around pages): drop the active section and element so the
+      // selection outline clears and the inspector goes back to its empty
+      // state. Clicks on the sidebar/inspector/topbar reach here too via the
+      // document-level mousedown listener below.
+      if (selectedSectionId) selectSection(null);
+      if (selectedElementId) selectElement(null);
     });
 
     root.addEventListener("dblclick", function(ev) {
