@@ -284,7 +284,30 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
 
   function initCountUp() {
     var nodes = document.querySelectorAll('[data-count-to]');
-    if (!nodes.length || !window.IntersectionObserver) return;
+    if (!nodes.length) return;
+    function animate(node, target) {
+      if (target === 0) { node.textContent = '0'; return; }
+      var dur = 1200;
+      var start = performance.now();
+      function tick(now) {
+        var p = Math.min((now - start) / dur, 1);
+        var eased = 1 - Math.pow(1 - p, 3);
+        node.textContent = String(Math.round(target * eased));
+        if (p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+    if (!window.IntersectionObserver) {
+      for (var i = 0; i < nodes.length; i++) {
+        var t = parseInt(nodes[i].getAttribute('data-count-to'), 10);
+        if (!isNaN(t)) animate(nodes[i], t);
+      }
+      return;
+    }
+    // threshold:0 — a single visible pixel is enough. The old threshold of
+    // 0.5 never fired for stat-line items rendered partially in the fold,
+    // so the SSR'd value was replaced with '0' and the count-up never ran
+    // until the visitor scrolled past it.
     var obs = new IntersectionObserver(function(entries) {
       for (var i = 0; i < entries.length; i++) {
         if (!entries[i].isIntersecting) continue;
@@ -292,20 +315,9 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
         var target = parseInt(el.getAttribute('data-count-to'), 10);
         if (isNaN(target)) continue;
         obs.unobserve(el);
-        if (target === 0) { el.textContent = '0'; continue; }
-        var dur = 1200;
-        var start = performance.now();
-        (function(node, t) {
-          function tick(now) {
-            var p = Math.min((now - start) / dur, 1);
-            var eased = 1 - Math.pow(1 - p, 3);
-            node.textContent = String(Math.round(t * eased));
-            if (p < 1) requestAnimationFrame(tick);
-          }
-          requestAnimationFrame(tick);
-        })(el, target);
+        animate(el, target);
       }
-    }, { threshold: 0.5 });
+    }, { threshold: 0 });
     for (var i = 0; i < nodes.length; i++) {
       nodes[i].textContent = '0';
       obs.observe(nodes[i]);
