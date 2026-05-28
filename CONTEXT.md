@@ -176,7 +176,7 @@ The act of creating an Editable Site by scraping an external website at a given 
 _Avoid_: Migration, clone, copy, conversion
 
 **Scraper Service**:
-An external service that loads a URL in a headless browser, extracts page structure and assets, and returns a CanvasSiteState.
+An external service that loads a URL in a headless browser, extracts page structure and assets, and returns a EditableSite.
 _Avoid_: Crawler, spider, proxy, converter
 
 **Import Mapping**:

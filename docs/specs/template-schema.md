@@ -6,7 +6,7 @@
 ## Goal
 
 Define the Template Seed vocabulary and the seed-to-site flow for the canvas
-builder. A Template Seed stores a complete `CanvasSiteState`: Style Kit choice,
+builder. A Template Seed stores a complete `EditableSite`: Style Kit choice,
 Canvas Pages, shared header/footer Sections, and optional site-wide publish
 settings. Creating a site copies that state into a new Editable Site.
 
@@ -26,7 +26,7 @@ type TemplateSeed = {
   id: string;
   name: string;
   tagline: string;
-  state: CanvasSiteState;
+  state: EditableSite;
 };
 ```
 
@@ -41,7 +41,7 @@ Rules:
 ## 2. Canvas Site State
 
 ```typescript
-type CanvasSiteState = {
+type EditableSite = {
   styleKit: StyleKit;
   pages: CanvasPage[];
   header?: CanvasSection;
@@ -97,7 +97,7 @@ Rules:
   used by the route layer.
 - `title` is required and feeds dashboard labels and SEO title output.
 - `sections` contains the page body Sections only; shared header/footer
-  Sections live on `CanvasSiteState`.
+  Sections live on `EditableSite`.
 - Optional SEO and metadata fields are rendered by the publish and public host
   layers.
 
@@ -180,7 +180,7 @@ paragraph grouping belongs to Sections and Pages, not to the inline text model.
 2. Client submits `{ templateId, siteName, subdomain }` to the site creation
    route.
 3. Server resolves the Template Seed from `src/templates/registry.ts`.
-4. Server deep-clones the seed's `CanvasSiteState`.
+4. Server deep-clones the seed's `EditableSite`.
 5. Server materialises any seed assets for the Owner.
 6. Server creates a new Editable Site row with the cloned state.
 7. Dashboard sends the Owner to the Canvas Editor for the new site.

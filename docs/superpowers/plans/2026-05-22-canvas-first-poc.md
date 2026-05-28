@@ -82,7 +82,7 @@ export interface TextElement extends BaseElement {
 
 - `rewriteText` op signature becomes `{ kind: 'rewriteText'; elementId: string; content: InlineRun[] }` — not `text: string`.
 - The LLM tool `rewriteText(elementId, content)` accepts the run array directly. The tool's schema description must instruct the model to produce the run array, with examples showing bold and link marks.
-- The preview endpoint dry-runs `applyCanvasAgentOp` then `validateCanvasSiteState`; an invalid run array (e.g. forbidden mark type or bad link href) is rejected loudly.
+- The preview endpoint dry-runs `applyCanvasAgentOp` then `validateEditableSite`; an invalid run array (e.g. forbidden mark type or bad link href) is rejected loudly.
 - A "plain string in, runs out" convenience helper is NOT added — the agent always speaks the rich-text contract.
 
 **Fixture (`src/canvas/fixtures/home.json`):**
@@ -104,7 +104,7 @@ These are the cross-cutting invariants the POC commits to. They override looser 
 
 ### Single-page POC
 
-- Every `CanvasSiteState` and `PublishedSnapshot` has **exactly one** `CanvasPage`. The validator rejects 0 pages and 2+ pages. The dashboard, the canvas editor, the canvas API, the publish endpoint, and the agent ops all treat `state.pages[0]` as canonical and never index further.
+- Every `EditableSite` and `PublishedSnapshot` has **exactly one** `CanvasPage`. The validator rejects 0 pages and 2+ pages. The dashboard, the canvas editor, the canvas API, the publish endpoint, and the agent ops all treat `state.pages[0]` as canonical and never index further.
 - Page URLs do not appear in the editor route, publish endpoint, or AI ops. The plan's `pages[]` array is retained in the schema as a forward-compat shape, but the validator pins length to 1.
 - If a future task wants multi-page, it must change the validator first.
 
@@ -352,7 +352,7 @@ export interface CanvasPage {
   sections: CanvasSection[];
 }
 
-export interface CanvasSiteState {
+export interface EditableSite {
   styleKit: StyleKit;
   pages: CanvasPage[];
 }
@@ -374,15 +374,15 @@ Create `src/canvas/smoke.ts`:
 ```ts
 import fixture from './fixtures/home.json';
 import { renderCanvasSnapshot } from './render';
-import type { CanvasSiteState, PublishedSnapshot } from './schema';
-import { validateCanvasSiteState, validatePublishedSnapshot } from './validate';
+import type { EditableSite, PublishedSnapshot } from './schema';
+import { validateEditableSite, validatePublishedSnapshot } from './validate';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
 }
 
-const editable = fixture as CanvasSiteState;
-const editableResult = validateCanvasSiteState(editable);
+const editable = fixture as EditableSite;
+const editableResult = validateEditableSite(editable);
 assert(editableResult.valid, editableResult.valid ? '' : editableResult.errors.join('; '));
 
 const snapshot: PublishedSnapshot = {
@@ -405,7 +405,7 @@ console.log('[canvas:smoke] OK');
 
 - [ ] **Step 3: Implement the validator**
 
-Create `src/canvas/validate.ts` with `validateCanvasSiteState` and `validatePublishedSnapshot`. It must reject:
+Create `src/canvas/validate.ts` with `validateEditableSite` and `validatePublishedSnapshot`. It must reject:
 
 - unknown style kit
 - unknown element type
@@ -494,7 +494,7 @@ git commit -m "feat: add canvas document model"
 Modify `src/db/schema.ts` imports to use canvas types:
 
 ```ts
-import type { CanvasSiteState, CanvasPage, PublishedSnapshot, StyleKit } from '../canvas/schema';
+import type { EditableSite, CanvasPage, PublishedSnapshot, StyleKit } from '../canvas/schema';
 ```
 
 Update `site` with:
@@ -502,7 +502,7 @@ Update `site` with:
 ```ts
 subdomain: text('subdomain').notNull().unique(),
 styleKit: text('style_kit').notNull().$type<StyleKit>(),
-editableState: jsonb('editable_state').notNull().$type<CanvasSiteState>(),
+editableState: jsonb('editable_state').notNull().$type<EditableSite>(),
 publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
 publishedVersion: integer('published_version').notNull().default(0),
 ```
@@ -533,13 +533,13 @@ Modify `src/templates/registry.ts` to export:
 
 ```ts
 import seed from '../canvas/fixtures/home.json';
-import type { CanvasSiteState } from '../canvas/schema';
+import type { EditableSite } from '../canvas/schema';
 
 export interface TemplateSeed {
   id: 'starter-canvas';
   name: string;
   tagline: string;
-  state: CanvasSiteState;
+  state: EditableSite;
 }
 
 export const starterTemplate: TemplateSeed = {
@@ -547,7 +547,7 @@ export const starterTemplate: TemplateSeed = {
   name: 'Starter Canvas',
   tagline:
     'A desktop canvas site with editable sections, text, media, actions, shapes, containers, style kits, and motion.',
-  state: seed as CanvasSiteState,
+  state: seed as EditableSite,
 };
 
 export function getTemplateSeed(id: string): TemplateSeed | null {
@@ -627,7 +627,7 @@ git commit -m "feat: create canvas sites from one template"
 Create `src/routes/api/canvas.ts` with:
 
 - `GET /api/canvas/sites/:siteId` returns `{ siteId, name, subdomain, editableState, publishedVersion }`
-- `PUT /api/canvas/sites/:siteId` accepts full `CanvasSiteState`, validates it, writes `site.editableState`, and returns `{ ok: true }`
+- `PUT /api/canvas/sites/:siteId` accepts full `EditableSite`, validates it, writes `site.editableState`, and returns `{ ok: true }`
 - `POST /api/canvas/sites/:siteId/style-kit` accepts `{ styleKit }`, validates against `STYLE_KITS`, updates `editableState.styleKit` and `site.styleKit`
 
 All routes must run `clerkAuth()` then `requireAuth()` and verify ownership through `customer`.
@@ -653,7 +653,7 @@ No page id is needed for the POC because the editable site owns one canvas page.
 
 - [ ] **Step 4: Add pure save smoke**
 
-In `src/review-smoke.ts`, add validator assertions that `validateCanvasSiteState` rejects a section with an element wider than the page and rejects an autoplay video that is not muted.
+In `src/review-smoke.ts`, add validator assertions that `validateEditableSite` rejects a section with an element wider than the page and rejects an autoplay video that is not muted.
 
 - [ ] **Step 5: Verify**
 
@@ -1125,11 +1125,11 @@ In `src/canvas/smoke.ts`, add:
 
 - [ ] **Step 4: API defence**
 
-In `src/routes/api/canvas.ts`'s PUT route, the existing `validateCanvasSiteState` call now rejects multi-page payloads automatically. Add a small explicit early check that the body's `pages` is an array of length 1 before passing to the validator, so the error response is more specific. Keep validator-returned errors as the source of truth.
+In `src/routes/api/canvas.ts`'s PUT route, the existing `validateEditableSite` call now rejects multi-page payloads automatically. Add a small explicit early check that the body's `pages` is an array of length 1 before passing to the validator, so the error response is more specific. Keep validator-returned errors as the source of truth.
 
 - [ ] **Step 5: Review smoke**
 
-In `src/review-smoke.ts`, add a `validateCanvasSiteState` assertion that a two-page state is rejected with "exactly one canvas page" in the message.
+In `src/review-smoke.ts`, add a `validateEditableSite` assertion that a two-page state is rejected with "exactly one canvas page" in the message.
 
 - [ ] **Step 6: Verify**
 
@@ -1261,7 +1261,7 @@ export function assetResponse(mediaType: string, bytesBase64: string): Response 
   });
 }
 
-// Walks a CanvasSiteState (or PublishedSnapshot.pages) and returns every assetId
+// Walks a EditableSite (or PublishedSnapshot.pages) and returns every assetId
 // referenced by a media element (including posterAssetId). Used by:
 // - publish to verify all referenced assets exist before snapshotting;
 // - public /assets/:assetId to scope serving to the current snapshot only.
@@ -1390,7 +1390,7 @@ git commit -m "feat: seed media assets + publish-scoped public asset serving"
 Create `src/agent/canvas-ops.ts`:
 
 ```ts
-import type { CanvasSiteState, CanvasSection } from '../canvas/schema';
+import type { EditableSite, CanvasSection } from '../canvas/schema';
 
 export type CanvasAgentOp =
   | { kind: 'rewriteText'; elementId: string; content: InlineRun[] }
@@ -1403,8 +1403,8 @@ export type CanvasAgentOp =
     }
   | { kind: 'insertSection'; afterSectionId: string | null; section: CanvasSection };
 
-export function applyCanvasAgentOp(state: CanvasSiteState, op: CanvasAgentOp): CanvasSiteState {
-  const next = structuredClone(state) as CanvasSiteState;
+export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): EditableSite {
+  const next = structuredClone(state) as EditableSite;
   const page = next.pages[0];
   if (!page) throw new Error('canvas agent op requires at least one page');
   if (op.kind === 'rewriteText') {
@@ -1457,7 +1457,7 @@ Every entry in `SECTION_RECIPE_IDS` MUST have a factory. Each factory:
 - Produces a fully-formed `CanvasSection` with deterministic ids (`sec-{recipe}-{shortRand}`, elements `el-{role}-{shortRand}`).
 - Honours the rich-text content model (no plain-string `text` anywhere).
 - References asset ids supplied via `assetIds`; falls back to placeholder seed ids ONLY if `assetIds` is empty AND the brief explicitly asks for it. Default behaviour: the caller MUST supply real asset ids (the preview endpoint generates or uploads them first).
-- Produces output that passes `validateCanvasSiteState` when slotted into a single-page state.
+- Produces output that passes `validateEditableSite` when slotted into a single-page state.
 
 `insertSection` op switches from accepting a freeform `section: CanvasSection` to:
 
@@ -1488,7 +1488,7 @@ Create `src/routes/api/canvas-agent.ts`:
 - parses tool output into `CanvasAgentOp[]`
 - For each `insertSection` op, the recipe factory runs first; the resulting section is validated.
 - For each `replaceMedia` op, verifies the referenced `assetId` belongs to the site.
-- validates the full result by dry-running ops through `applyCanvasAgentOp` and `validateCanvasSiteState`
+- validates the full result by dry-running ops through `applyCanvasAgentOp` and `validateEditableSite`
 - returns `{ previewId, ops, previewState }`
 
 - [ ] **Step 4: Add apply endpoint**

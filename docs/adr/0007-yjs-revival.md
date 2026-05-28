@@ -32,7 +32,7 @@ The choice is hard to reverse because the persistence shape — what bytes go on
 
 ## Decisions
 
-1. **The canonical operation model is a Yjs document. `CanvasSiteState` becomes a projection of that document.**
+1. **The canonical operation model is a Yjs document. `EditableSite` becomes a projection of that document.**
 
    **Why:** the lived outcome that requires concurrent edits to feel correct — two Owners typing at once, neither losing work — is a CRDT problem, and Yjs is the most production-proven CRDT for the canvas shape we have. Hand-rolled LWW is rejected because the silent-data-loss failure mode is exactly the failure mode the project's all-or-nothing posture refuses. Automerge is rejected because its Cloudflare Worker integration story is less well-trodden and the previous code path the project carried for Yjs over a Durable Object reduces the scaffold cost of this option to roughly a day rather than a week.
 
@@ -40,7 +40,7 @@ The choice is hard to reverse because the persistence shape — what bytes go on
 
    **Why:** the deferred decision in the design conversation — whether to also persist a per-edit op log between publishes — was resolved against persistence. The lived outcome of version history is "I can see my past published sites and roll back to one," which is precisely satisfied by snapshots tied to publish events. Persisting the op log between publishes adds storage cost, a compaction job, and a stronger durability guarantee than the published-version restore actually requires. The current decision keeps the in-memory `Y.Doc` inside `SiteRoom` as the live op log for connected editors; if all editors disconnect, the latest projection to `site.editableState` is the recoverable state, and the publish-time snapshot is what version history reads.
 
-3. **The Yjs document and the JSON `CanvasSiteState` form a bridge contract maintained in one place.**
+3. **The Yjs document and the JSON `EditableSite` form a bridge contract maintained in one place.**
 
    **Why:** every other feature that touches the editable state — agent ops, theme switches, asset references, validators — must continue to work against the JSON shape; they should not become Yjs-aware. A single projection module owns `encode(state) → Y.Doc` and `decode(doc) → state` and a debounced `attachAutosave` that writes the projection to Postgres. Co-edit consumes the doc directly; everything else consumes the projection. Pushing Yjs awareness into every feature would explode the surface area of the decision; centralising it keeps Yjs an internal organ rather than a system-wide colour.
 

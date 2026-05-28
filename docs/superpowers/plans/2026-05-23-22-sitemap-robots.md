@@ -28,8 +28,8 @@ Every Published Site exposes a valid `sitemap.xml` and `robots.txt` at its root.
 Phase 0 (with #21):
 
 ```ts
-// CanvasSiteState gets:
-export interface CanvasSiteState {
+// EditableSite gets:
+export interface EditableSite {
   // ... existing
   siteNoIndex?: boolean;
 }
@@ -50,7 +50,7 @@ export interface CanvasSiteState {
 
 ## Contract with neighbors
 
-- Reads `PublishedSnapshot.pages[*].noIndex`, `publishedAt`, and `CanvasSiteState.siteNoIndex`.
+- Reads `PublishedSnapshot.pages[*].noIndex`, `publishedAt`, and `EditableSite.siteNoIndex`.
 - Published Address composition matches the resolved host used by the request.
 
 ## Smoke test

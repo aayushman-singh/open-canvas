@@ -1,4 +1,4 @@
-import type { CanvasElement, CanvasPage, CanvasSection, CanvasSiteState } from '../src/canvas/schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from '../src/canvas/schema.js';
 import { rewriteDeadContactUrlsInState } from './fix-dead-contact-urls.ts';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -39,7 +39,7 @@ function page(id: string, slug: string, elements: CanvasElement[]): CanvasPage {
   };
 }
 
-function state(pages: CanvasPage[]): CanvasSiteState {
+function state(pages: CanvasPage[]): EditableSite {
   return { styleKit: 'charcoal', pages };
 }
 

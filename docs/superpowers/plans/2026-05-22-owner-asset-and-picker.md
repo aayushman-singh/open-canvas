@@ -526,9 +526,9 @@ import { ownerAsset, type NewOwnerAsset } from '../../db/schema.js';
 
 export function prepareSeedOwnerAssetsForSite(
   customerId: string,
-  state: CanvasSiteState,
+  state: EditableSite,
 ):
-  | { ok: true; editableState: CanvasSiteState; seedRows: NewOwnerAsset[] }
+  | { ok: true; editableState: EditableSite; seedRows: NewOwnerAsset[] }
   | { ok: false; unknownSeedIds: string[]; assetKindErrors: AssetReferenceError[] } {
   // existing body, but every row uses { id, customerId, mediaType, bytesBase64, kind, alt }
   // — drop the per-site asset id remap if it existed.
@@ -1271,7 +1271,7 @@ assets.delete('/me/assets/:assetId', async (c) => {
 Add a helper next to `findAssetUsage`:
 
 ```ts
-export function clearAssetReferences(state: CanvasSiteState, assetId: string): CanvasSiteState {
+export function clearAssetReferences(state: EditableSite, assetId: string): EditableSite {
   // Walk pages → sections → elements. For every media element where
   // assetId or posterAssetId equals the doomed id, replace with an empty
   // string. Return a new state — do not mutate.

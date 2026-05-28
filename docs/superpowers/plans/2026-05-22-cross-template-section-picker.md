@@ -93,10 +93,10 @@ Request body:
 Response 200:
 
 ```json
-{ "editableState": { "...": "full updated CanvasSiteState" } }
+{ "editableState": { "...": "full updated EditableSite" } }
 ```
 
-On any validation failure (resulting state fails `validateCanvasSiteState`, asset materialisation reports unknown seed IDs, etc.) → 500 with `{ error: string, details?: string[] }`. **No fallback** — fail loudly per the global "Failure Handling" rule. If the resulting state would be invalid, do not persist; return the error.
+On any validation failure (resulting state fails `validateEditableSite`, asset materialisation reports unknown seed IDs, etc.) → 500 with `{ error: string, details?: string[] }`. **No fallback** — fail loudly per the global "Failure Handling" rule. If the resulting state would be invalid, do not persist; return the error.
 
 ---
 
@@ -524,8 +524,8 @@ import { customer, site, siteAsset } from '../../db/schema.js';
 import { SECTION_CATALOG } from '../../templates/section-catalog.js';
 import { allTemplateSeeds } from '../../templates/registry.js';
 import { importSectionIntoSite } from '../../canvas/section-import.js';
-import { validateCanvasSiteState } from '../../canvas/validate.js';
-import type { CanvasSiteState } from '../../canvas/schema.js';
+import { validateEditableSite } from '../../canvas/validate.js';
+import type { EditableSite } from '../../canvas/schema.js';
 import type { AppEnv } from '../../index.js';
 
 const sections = new Hono<AppEnv>();
@@ -619,7 +619,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     return c.json({ error: 'forbidden' }, 403);
   }
 
-  const state = siteRecord.editableState as CanvasSiteState;
+  const state = siteRecord.editableState as EditableSite;
   const page = state.pages[0];
   if (!page) {
     return c.json({ error: 'site editable state has no page' }, 500);
@@ -648,7 +648,7 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
 
   page.sections.splice(insertAt, 0, importResult.section);
 
-  const validation = validateCanvasSiteState(state);
+  const validation = validateEditableSite(state);
   if (!validation.valid) {
     return c.json(
       { error: 'imported section produced invalid state', details: validation.errors },
@@ -1352,7 +1352,7 @@ Mitigation: Acceptable — fail loud, owner refreshes the page, client re-fetche
 Mitigation: The asset insert is `INSERT INTO siteAsset VALUES (...)` with unique IDs; the only realistic failure is a PK collision, which would mean the asset already exists — in which case our `existingAssetIds` filter should have excluded it. If a collision does happen anyway, the site state would have an asset ID matching an already-existing row, so the references still resolve. Document this in `section-import.ts` and add a follow-up issue if Neon batch atomicity becomes a real concern.
 
 **Risk 4: Owner imports a section whose `recipeId` is not in the target site's expected set.**
-Mitigation: `validateCanvasSiteState` runs against the updated state before persisting. Any unknown recipe ID causes a 500 with details. Recipes are global ([src/canvas/recipes.ts:56-65](src/canvas/recipes.ts#L56-L65)), so this should not happen unless schemas drift.
+Mitigation: `validateEditableSite` runs against the updated state before persisting. Any unknown recipe ID causes a 500 with details. Recipes are global ([src/canvas/recipes.ts:56-65](src/canvas/recipes.ts#L56-L65)), so this should not happen unless schemas drift.
 
 **Risk 5: Two concurrent imports race — owner double-clicks "Use" twice.**
 Mitigation: The endpoint reads the current `editableState` per request, so the second import sees the result of the first. Both succeed in order. The client's `setStatus('Inserting section…')` does not disable the slot, so the user may accidentally insert twice. Acceptable for MVP — the Owner can use the existing delete-section toolbar to remove duplicates.

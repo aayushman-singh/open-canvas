@@ -36,7 +36,7 @@ export interface StyleKitPreset {
 }
 
 // site-level setting added in editableState:
-export interface CanvasSiteState {
+export interface EditableSite {
   // ... existing
   darkModeEnabled?: boolean;
 }

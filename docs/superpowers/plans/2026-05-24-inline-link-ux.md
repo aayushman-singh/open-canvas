@@ -71,7 +71,7 @@ const blankTargetText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const blankTargetState: CanvasSiteState = {
+const blankTargetState: EditableSite = {
   styleKit: 'charcoal',
   symbols: [],
   pages: [
@@ -92,7 +92,7 @@ const blankTargetState: CanvasSiteState = {
     },
   ],
 };
-const blankTargetResult = validateCanvasSiteState(blankTargetState);
+const blankTargetResult = validateEditableSite(blankTargetState);
 assert(
   blankTargetResult.valid,
   blankTargetResult.valid
@@ -123,7 +123,7 @@ const badTargetText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const badTargetState: CanvasSiteState = {
+const badTargetState: EditableSite = {
   styleKit: 'charcoal',
   symbols: [],
   pages: [
@@ -144,7 +144,7 @@ const badTargetState: CanvasSiteState = {
     },
   ],
 };
-const badTargetResult = validateCanvasSiteState(badTargetState);
+const badTargetResult = validateEditableSite(badTargetState);
 assert(
   !badTargetResult.valid,
   'expected validator to reject link mark with target="_self"',
@@ -168,7 +168,7 @@ const noTargetText: TextElement = {
   fontWeight: 400,
   align: 'left',
 };
-const noTargetState: CanvasSiteState = {
+const noTargetState: EditableSite = {
   styleKit: 'charcoal',
   symbols: [],
   pages: [
@@ -189,7 +189,7 @@ const noTargetState: CanvasSiteState = {
     },
   ],
 };
-const noTargetResult = validateCanvasSiteState(noTargetState);
+const noTargetResult = validateEditableSite(noTargetState);
 assert(
   noTargetResult.valid,
   noTargetResult.valid

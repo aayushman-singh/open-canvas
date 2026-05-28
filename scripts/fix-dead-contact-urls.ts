@@ -27,7 +27,7 @@ import type {
   CanvasElement,
   CanvasPage,
   CanvasSection,
-  CanvasSiteState,
+  EditableSite,
   PublishedSnapshot,
 } from '../src/canvas/schema.js';
 
@@ -55,7 +55,7 @@ function rewritePage(page: CanvasPage): number {
 }
 
 export function stateHasContactPage(
-  state: CanvasSiteState | PublishedSnapshot,
+  state: EditableSite | PublishedSnapshot,
 ): boolean {
   return state.pages.some(
     (page) => page.slug.trim().toLowerCase().replace(/^\/+|\/+$/g, '') === 'contact',
@@ -63,7 +63,7 @@ export function stateHasContactPage(
 }
 
 export function rewriteDeadContactUrlsInState(
-  state: CanvasSiteState | PublishedSnapshot,
+  state: EditableSite | PublishedSnapshot,
 ): number {
   if (stateHasContactPage(state)) return 0;
   let touched = 0;

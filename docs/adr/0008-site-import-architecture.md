@@ -22,7 +22,7 @@ The scraper runs as a standalone HTTP service on a VPS, using Playwright with Ch
 
 ### Computed position baking at 1440px
 
-The scraper opens the page at a 1440px viewport (matching the editor's default page width), calls `getBoundingClientRect()` on every meaningful element, and uses the computed pixel coordinates as the `box` values in the CanvasSiteState. This produces a flat list of absolutely positioned elements per section — faithful to where elements actually rendered, not an inference of layout intent.
+The scraper opens the page at a 1440px viewport (matching the editor's default page width), calls `getBoundingClientRect()` on every meaningful element, and uses the computed pixel coordinates as the `box` values in the EditableSite. This produces a flat list of absolutely positioned elements per section — faithful to where elements actually rendered, not an inference of layout intent.
 
 ### Section detection via semantic landmarks
 
@@ -34,7 +34,7 @@ The scraper extracts computed colors from all visible elements, clusters by hue,
 
 ### Asset download at scrape time
 
-All detected images, videos, and accessible WOFF2 `@font-face` files are downloaded during the scrape and returned alongside the CanvasSiteState. The Worker uploads media to Owner Assets, uploads imported WOFF2 files to the site-font store, and rewrites canvas media references plus custom Style Kit font tokens. No imported media URL survives as an external runtime dependency.
+All detected images, videos, and accessible WOFF2 `@font-face` files are downloaded during the scrape and returned alongside the EditableSite. The Worker uploads media to Owner Assets, uploads imported WOFF2 files to the site-font store, and rewrites canvas media references plus custom Style Kit font tokens. No imported media URL survives as an external runtime dependency.
 
 ## Alternatives considered
 

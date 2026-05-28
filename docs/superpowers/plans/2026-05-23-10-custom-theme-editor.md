@@ -33,7 +33,7 @@ Phase 0:
 
 ```ts
 // src/canvas/schema.ts (Phase 0)
-export interface CanvasSiteState {
+export interface EditableSite {
   styleKit: StyleKit; // selector — picks built-in OR 'custom'
   customStyleKit?: StyleKitPreset; // only set when styleKit === 'custom'
   pages: CanvasPage[];

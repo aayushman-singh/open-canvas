@@ -270,7 +270,7 @@ Password columns also allow inconsistent states:
 
 ### Recommended Action
 
-Add check constraints in SQL migrations for scalar enums and cross-column invariants. Do not over-constrain JSONB canvas state in Postgres; that belongs in `validateCanvasSiteState`.
+Add check constraints in SQL migrations for scalar enums and cross-column invariants. Do not over-constrain JSONB canvas state in Postgres; that belongs in `validateEditableSite`.
 
 Example:
 
@@ -543,14 +543,14 @@ This preserves self-documenting routes while removing copy/paste drift.
 
 ### Current Shape
 
-`src/canvas/validate.ts` validates the full `CanvasSiteState` in one large pure-function file: pages, sections, element types, roles, style kit presets, and cross-field checks.
+`src/canvas/validate.ts` validates the full `EditableSite` in one large pure-function file: pages, sections, element types, roles, style kit presets, and cross-field checks.
 
 ### Recommended Action
 
 Keep the public API stable:
 
 ```ts
-validateCanvasSiteState(state)
+validateEditableSite(state)
 ```
 
 Split internals by concern:

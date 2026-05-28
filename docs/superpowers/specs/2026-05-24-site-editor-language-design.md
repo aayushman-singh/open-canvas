@@ -17,7 +17,7 @@ Owners need the editing surface to describe their goal in their own language: th
 
 ## Non-Goals
 
-- Renaming the data model types (`CanvasSiteState`, `CanvasPage`, `CanvasSection`, `CanvasElement`).
+- Renaming the data model types (`EditableSite`, `CanvasPage`, `CanvasSection`, `CanvasElement`).
 - Redesigning the editor chrome.
 - Changing zoom, pan, fit, reset, or selection behavior.
 - Creating a broader brand voice guide.

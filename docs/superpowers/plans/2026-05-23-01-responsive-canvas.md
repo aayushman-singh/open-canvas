@@ -63,7 +63,7 @@ export interface ResponsiveOverrides {
 
 ## Contract with neighbors
 
-- Exports `renderResponsiveCss(state: CanvasSiteState): string` consumed by `src/canvas/render.ts` and the Published Snapshot public handler.
+- Exports `renderResponsiveCss(state: EditableSite): string` consumed by `src/canvas/render.ts` and the Published Snapshot public handler.
 - Reads `BaseElement.responsive?` if present, else derives from `box` using a single deterministic scaling rule.
 - The public renderer wraps each Section in a CSS container query (`@container`) so resizing changes the Visitor view without JS.
 
