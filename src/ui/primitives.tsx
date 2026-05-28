@@ -1,10 +1,5 @@
 import type { Child } from 'hono/jsx';
-import type {
-  ButtonVariant,
-  ButtonSize,
-  BadgeVariant,
-  PillVariant,
-} from './types';
+import type { ButtonVariant, ButtonSize, BadgeVariant, PillVariant } from './types';
 
 function classes(...parts: Array<string | undefined | false>): string {
   return parts.filter(Boolean).join(' ');
@@ -72,9 +67,7 @@ export function Pill({
   children?: Child;
 }) {
   return (
-    <span class={classes('rev01-ui-pill', `rev01-ui-pill--${variant}`, userClass)}>
-      {children}
-    </span>
+    <span class={classes('rev01-ui-pill', `rev01-ui-pill--${variant}`, userClass)}>{children}</span>
   );
 }
 
