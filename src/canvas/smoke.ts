@@ -710,7 +710,7 @@ const badSectionRoleResult = validateCanvasSiteState(badSectionRoleState);
 assert(!badSectionRoleResult.valid, 'expected validator to reject an unknown section role');
 assert(
   !badSectionRoleResult.valid &&
-    badSectionRoleResult.errors.some((m) => m.includes('role must be header|footer|body')),
+    badSectionRoleResult.errors.some((m) => m.includes('role must be one of [header, footer, body]')),
   'expected bad-section-role rejection to mention the allowed roles',
 );
 

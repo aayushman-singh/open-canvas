@@ -23,6 +23,7 @@ import {
   SHAPE_VARIANTS,
   STYLE_KITS,
   SURFACE_VARIANTS,
+  TEXT_ROLES,
   type ActionVariant,
   type BackgroundEffect,
   type BackgroundSize,
@@ -69,6 +70,21 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
   return typeof value === 'string' && (allowed as readonly string[]).includes(value);
+}
+
+// Type-narrow `value` to one of `allowed`. On failure, append a uniform
+// "must be one of [a, b, c] (got X)" error and return false so callers can
+// guard subsequent field reads. Single source of truth for the union-narrow
+// error format across every element/section/page/site discriminant.
+function assertOneOf<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  path: string,
+  errors: string[],
+): value is T {
+  if (isOneOf<T>(value, allowed)) return true;
+  errors.push(`${path} must be one of [${allowed.join(', ')}] (got ${describe(value)})`);
+  return false;
 }
 
 /** Render an unknown value as a short, safe string for error messages. */
@@ -188,11 +204,7 @@ function validateMotion(motion: unknown, basePath: string, errors: string[]): vo
     errors.push(`${basePath}.motion must be an object when present`);
     return;
   }
-  if (!isOneOf<MotionPreset>(motion.preset, MOTION_PRESETS)) {
-    errors.push(
-      `${basePath}.motion.preset must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(motion.preset)})`,
-    );
-  }
+  assertOneOf<MotionPreset>(motion.preset, MOTION_PRESETS, `${basePath}.motion.preset`, errors);
   if (motion.delayMs !== undefined && !isFiniteNumber(motion.delayMs)) {
     errors.push(`${basePath}.motion.delayMs must be a finite number when present`);
   }
@@ -343,26 +355,13 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   }
   const p = `${basePath}.elementStyle`;
   if (value.backgroundColor !== undefined) {
-    if (typeof value.backgroundColor !== 'string') {
-      errors.push(`${p}.backgroundColor must be a string`);
-    } else {
-      const issue = pinnedStyleValueIssue(value.backgroundColor);
-      if (issue !== null) {
-        errors.push(`${p}.backgroundColor value ${JSON.stringify(value.backgroundColor)} contains ${issue}`);
-      }
-    }
+    validateInjectionSafeString(value.backgroundColor, 'backgroundColor', p, errors);
   }
-  if (value.backgroundImageAssetId !== undefined) {
-    if (typeof value.backgroundImageAssetId !== 'string') {
-      errors.push(`${p}.backgroundImageAssetId must be a string`);
-    } else if (!ASSET_ID_RE.test(value.backgroundImageAssetId)) {
-      errors.push(`${p}.backgroundImageAssetId must be an asset id, not a path or URL`);
-    }
+  if (value.backgroundImageAssetId !== undefined && !isAssetIdLike(value.backgroundImageAssetId)) {
+    errors.push(`${p}.backgroundImageAssetId must be an asset id, not a path or URL`);
   }
   if (value.backgroundSize !== undefined) {
-    if (!isOneOf<BackgroundSize>(value.backgroundSize, BACKGROUND_SIZES)) {
-      errors.push(`${p}.backgroundSize must be cover|contain (got ${describe(value.backgroundSize)})`);
-    }
+    assertOneOf<BackgroundSize>(value.backgroundSize, BACKGROUND_SIZES, `${p}.backgroundSize`, errors);
   }
   if (value.borderRadius !== undefined) {
     if (!isFiniteNumber(value.borderRadius) || value.borderRadius < 0) {
@@ -370,14 +369,7 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
     }
   }
   if (value.borderColor !== undefined) {
-    if (typeof value.borderColor !== 'string') {
-      errors.push(`${p}.borderColor must be a string`);
-    } else {
-      const issue = pinnedStyleValueIssue(value.borderColor);
-      if (issue !== null) {
-        errors.push(`${p}.borderColor value ${JSON.stringify(value.borderColor)} contains ${issue}`);
-      }
-    }
+    validateInjectionSafeString(value.borderColor, 'borderColor', p, errors);
   }
   if (value.borderWidth !== undefined) {
     if (!isFiniteNumber(value.borderWidth) || value.borderWidth < 0) {
@@ -390,46 +382,22 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
     }
   }
   if (value.boxShadow !== undefined) {
-    if (typeof value.boxShadow !== 'string') {
-      errors.push(`${p}.boxShadow must be a string`);
-    } else {
-      const issue = pinnedStyleValueIssue(value.boxShadow);
-      if (issue !== null) {
-        errors.push(`${p}.boxShadow value ${JSON.stringify(value.boxShadow)} contains ${issue}`);
-      }
-    }
+    validateInjectionSafeString(value.boxShadow, 'boxShadow', p, errors);
   }
   if (value.color !== undefined) {
-    if (typeof value.color !== 'string') {
-      errors.push(`${p}.color must be a string`);
-    } else {
-      const issue = pinnedStyleValueIssue(value.color);
-      if (issue !== null) {
-        errors.push(`${p}.color value ${JSON.stringify(value.color)} contains ${issue}`);
-      }
-    }
+    validateInjectionSafeString(value.color, 'color', p, errors);
   }
   if (value.overflow !== undefined) {
-    if (!isOneOf<OverflowValue>(value.overflow, OVERFLOW_VALUES)) {
-      errors.push(`${p}.overflow must be visible|hidden (got ${describe(value.overflow)})`);
-    }
+    assertOneOf<OverflowValue>(value.overflow, OVERFLOW_VALUES, `${p}.overflow`, errors);
   }
 }
 
 function validatePageMotionLayout(page: Record<string, unknown>, basePath: string, errors: string[]): void {
   if (page.entranceAnimation !== undefined) {
-    if (!isOneOf<MotionPreset>(page.entranceAnimation, MOTION_PRESETS)) {
-      errors.push(
-        `${basePath}.entranceAnimation must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(page.entranceAnimation)})`,
-      );
-    }
+    assertOneOf<MotionPreset>(page.entranceAnimation, MOTION_PRESETS, `${basePath}.entranceAnimation`, errors);
   }
   if (page.scrollTriggerMode !== undefined) {
-    if (!isOneOf<ScrollTriggerMode>(page.scrollTriggerMode, SCROLL_TRIGGER_MODES)) {
-      errors.push(
-        `${basePath}.scrollTriggerMode must be on-scroll|on-load (got ${describe(page.scrollTriggerMode)})`,
-      );
-    }
+    assertOneOf<ScrollTriggerMode>(page.scrollTriggerMode, SCROLL_TRIGGER_MODES, `${basePath}.scrollTriggerMode`, errors);
   }
   if (page.pageBackground !== undefined) {
     if (typeof page.pageBackground !== 'string' || page.pageBackground.length === 0) {
@@ -448,11 +416,7 @@ function validatePageMotionLayout(page: Record<string, unknown>, basePath: strin
     }
   }
   if (page.defaultMotionPreset !== undefined) {
-    if (!isOneOf<MotionPreset>(page.defaultMotionPreset, MOTION_PRESETS)) {
-      errors.push(
-        `${basePath}.defaultMotionPreset must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(page.defaultMotionPreset)})`,
-      );
-    }
+    assertOneOf<MotionPreset>(page.defaultMotionPreset, MOTION_PRESETS, `${basePath}.defaultMotionPreset`, errors);
   }
   if (page.sectionGap !== undefined) {
     if (!isFiniteNumber(page.sectionGap) || page.sectionGap < 0 || page.sectionGap > 120) {
@@ -523,10 +487,12 @@ function validateTextContent(content: unknown, idLabel: string, errors: string[]
         );
         return;
       }
-      if (!isOneOf<InlineMarkType>(mark.type, INLINE_MARK_TYPES)) {
-        errors.push(
-          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type must be one of [${INLINE_MARK_TYPES.join(', ')}] (got ${describe(mark.type)})`,
-        );
+      if (!assertOneOf<InlineMarkType>(
+        mark.type,
+        INLINE_MARK_TYPES,
+        `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type`,
+        errors,
+      )) {
         return;
       }
       if (seenTypes.has(mark.type)) {
@@ -624,10 +590,7 @@ function validateElement(
   if (!isNonEmptyString(element.id)) {
     errors.push(`${basePath}.id must be a non-empty string`);
   }
-  if (!isOneOf<ElementType>(element.type, ELEMENT_TYPES)) {
-    errors.push(
-      `${basePath}.type must be one of [${ELEMENT_TYPES.join(', ')}] (got ${describe(element.type)})`,
-    );
+  if (!assertOneOf<ElementType>(element.type, ELEMENT_TYPES, `${basePath}.type`, errors)) {
     return;
   }
 
@@ -640,12 +603,13 @@ function validateElement(
     case 'text': {
       const idLabel = isNonEmptyString(element.id) ? element.id : '<unknown>';
       validateTextContent(element.content, idLabel, errors);
-      if (!isOneOf(element.role, ['heading', 'body', 'label'] as const)) {
-        errors.push(`${basePath}.role must be heading|body|label (got ${describe(element.role)})`);
-      }
+      assertOneOf(element.role, TEXT_ROLES, `${basePath}.role`, errors);
       if (!isFiniteNumber(element.fontSize) || element.fontSize <= 0) {
         errors.push(`${basePath}.fontSize must be a positive number`);
       }
+      // fontWeight is a NUMBER union (400|500|600|700) not a string union, so
+      // it doesn't go through assertOneOf — that helper compares string values
+      // with includes().
       if (
         element.fontWeight !== 400 &&
         element.fontWeight !== 500 &&
@@ -653,20 +617,14 @@ function validateElement(
         element.fontWeight !== 700
       ) {
         errors.push(
-          `${basePath}.fontWeight must be 400|500|600|700 (got ${describe(element.fontWeight)})`,
+          `${basePath}.fontWeight must be one of [400, 500, 600, 700] (got ${describe(element.fontWeight)})`,
         );
       }
-      if (!isOneOf(element.align, ['left', 'center', 'right'] as const)) {
-        errors.push(`${basePath}.align must be left|center|right (got ${describe(element.align)})`);
-      }
+      assertOneOf(element.align, ['left', 'center', 'right'] as const, `${basePath}.align`, errors);
       break;
     }
     case 'media': {
-      if (!isOneOf<MediaKind>(element.mediaKind, MEDIA_KINDS)) {
-        errors.push(
-          `${basePath}.mediaKind must be one of [${MEDIA_KINDS.join(', ')}] (got ${describe(element.mediaKind)})`,
-        );
-      }
+      assertOneOf<MediaKind>(element.mediaKind, MEDIA_KINDS, `${basePath}.mediaKind`, errors);
       if (typeof element.assetId !== 'string') {
         errors.push(
           `${basePath}.assetId must be a string (empty string allowed for unfilled slots)`,
@@ -680,9 +638,7 @@ function validateElement(
       if (typeof element.alt !== 'string') {
         errors.push(`${basePath}.alt must be a string`);
       }
-      if (!isOneOf(element.fit, ['cover', 'contain'] as const)) {
-        errors.push(`${basePath}.fit must be cover|contain (got ${describe(element.fit)})`);
-      }
+      assertOneOf<BackgroundSize>(element.fit, BACKGROUND_SIZES, `${basePath}.fit`, errors);
       if (element.playback !== undefined && !isRecord(element.playback)) {
         errors.push(`${basePath}.playback must be an object when present`);
       }
@@ -701,33 +657,19 @@ function validateElement(
         errors.push(`${basePath}.label must be a non-empty string`);
       }
       validateActionHref(element.href, basePath + '.href', errors, validPageIds);
-      if (!isOneOf<ActionVariant>(element.variant, ACTION_VARIANTS)) {
-        errors.push(
-          `${basePath}.variant must be one of [${ACTION_VARIANTS.join(', ')}] (got ${describe(element.variant)})`,
-        );
-      }
+      assertOneOf<ActionVariant>(element.variant, ACTION_VARIANTS, `${basePath}.variant`, errors);
       break;
     }
     case 'shape': {
-      if (!isOneOf<ShapeVariant>(element.variant, SHAPE_VARIANTS)) {
-        errors.push(
-          `${basePath}.variant must be one of [${SHAPE_VARIANTS.join(', ')}] (got ${describe(element.variant)})`,
-        );
-      }
+      assertOneOf<ShapeVariant>(element.variant, SHAPE_VARIANTS, `${basePath}.variant`, errors);
       break;
     }
     case 'container': {
-      if (!isOneOf<SurfaceVariant>(element.variant, SURFACE_VARIANTS)) {
-        errors.push(
-          `${basePath}.variant must be one of [${SURFACE_VARIANTS.join(', ')}] (got ${describe(element.variant)})`,
-        );
-      }
+      assertOneOf<SurfaceVariant>(element.variant, SURFACE_VARIANTS, `${basePath}.variant`, errors);
       break;
     }
     case 'collection': {
-      if (!isOneOf(element.mode, ['manual', 'page-bound'] as const)) {
-        errors.push(`${basePath}.mode must be manual|page-bound (got ${describe(element.mode)})`);
-      }
+      assertOneOf(element.mode, ['manual', 'page-bound'] as const, `${basePath}.mode`, errors);
       const childWidth =
         isRecord(element.box) && isFiniteNumber(element.box.w) && element.box.w > 0
           ? element.box.w
@@ -806,16 +748,18 @@ function validateElement(
           if (!isRecord(element.sort)) {
             errors.push(`${basePath}.sort must be an object when present`);
           } else {
-            if (!isOneOf(element.sort.field, ['publishedDate', 'title'] as const)) {
-              errors.push(
-                `${basePath}.sort.field must be publishedDate|title (got ${describe(element.sort.field)})`,
-              );
-            }
-            if (!isOneOf(element.sort.order, ['asc', 'desc'] as const)) {
-              errors.push(
-                `${basePath}.sort.order must be asc|desc (got ${describe(element.sort.order)})`,
-              );
-            }
+            assertOneOf(
+              element.sort.field,
+              ['publishedDate', 'title'] as const,
+              `${basePath}.sort.field`,
+              errors,
+            );
+            assertOneOf(
+              element.sort.order,
+              ['asc', 'desc'] as const,
+              `${basePath}.sort.order`,
+              errors,
+            );
           }
         }
         if (element.cardTemplate !== undefined) {
@@ -837,11 +781,12 @@ function validateElement(
               if (!isNonEmptyString(elementId)) {
                 errors.push(`${basePath}.fieldBindings keys must be non-empty element ids`);
               }
-              if (!isOneOf(field, PAGE_METADATA_FIELDS)) {
-                errors.push(
-                  `${basePath}.fieldBindings["${elementId}"] must be one of [${PAGE_METADATA_FIELDS.join(', ')}] (got ${describe(field)})`,
-                );
-              }
+              assertOneOf(
+                field,
+                PAGE_METADATA_FIELDS,
+                `${basePath}.fieldBindings["${elementId}"]`,
+                errors,
+              );
             }
           }
         }
@@ -874,18 +819,12 @@ function validateSection(
   } else {
     localIds.add(section.id);
   }
-  if (!isOneOf<SectionRecipeId>(section.recipeId, SECTION_RECIPE_IDS)) {
-    errors.push(
-      `${basePath}.recipeId must be one of [${SECTION_RECIPE_IDS.join(', ')}] (got ${describe(section.recipeId)})`,
-    );
-  }
+  assertOneOf<SectionRecipeId>(section.recipeId, SECTION_RECIPE_IDS, `${basePath}.recipeId`, errors);
   if (!isNonEmptyString(section.name)) {
     errors.push(`${basePath}.name must be a non-empty string`);
   }
-  if (section.role !== undefined && !isOneOf<SectionRole>(section.role, SECTION_ROLES)) {
-    errors.push(
-      `${basePath}.role must be header|footer|body when present (got ${describe(section.role)})`,
-    );
+  if (section.role !== undefined) {
+    assertOneOf<SectionRole>(section.role, SECTION_ROLES, `${basePath}.role`, errors);
   }
   const minHeight =
     section.role === 'header' || section.role === 'footer'
@@ -900,18 +839,16 @@ function validateSection(
       `${basePath}.height must be a finite number in [${String(minHeight)}, ${String(SECTION_HEIGHT_MAX)}] (got ${describe(section.height)})`,
     );
   }
-  if (
-    section.backgroundEffect !== undefined &&
-    !isOneOf<BackgroundEffect>(section.backgroundEffect, BACKGROUND_EFFECTS)
-  ) {
-    errors.push(
-      `${basePath}.backgroundEffect must be one of [${BACKGROUND_EFFECTS.join(', ')}] (got ${describe(section.backgroundEffect)})`,
+  if (section.backgroundEffect !== undefined) {
+    assertOneOf<BackgroundEffect>(
+      section.backgroundEffect,
+      BACKGROUND_EFFECTS,
+      `${basePath}.backgroundEffect`,
+      errors,
     );
   }
-  if (section.entrance !== undefined && !isOneOf<MotionPreset>(section.entrance, MOTION_PRESETS)) {
-    errors.push(
-      `${basePath}.entrance must be one of [${MOTION_PRESETS.join(', ')}] (got ${describe(section.entrance)})`,
-    );
+  if (section.entrance !== undefined) {
+    assertOneOf<MotionPreset>(section.entrance, MOTION_PRESETS, `${basePath}.entrance`, errors);
   }
   validateSectionTrigger(section.trigger, pathJoin(basePath, 'trigger'), errors);
   validateBackgroundVideo(section.backgroundVideo, pathJoin(basePath, 'backgroundVideo'), errors);
@@ -936,10 +873,7 @@ function validateSectionTrigger(trigger: unknown, basePath: string, errors: stri
     errors.push(`${basePath} must be an object when present`);
     return;
   }
-  if (!isOneOf(trigger.type, POPUP_TRIGGER_TYPES)) {
-    errors.push(
-      `${basePath}.type must be one of [${POPUP_TRIGGER_TYPES.join(', ')}] (got ${describe(trigger.type)})`,
-    );
+  if (!assertOneOf(trigger.type, POPUP_TRIGGER_TYPES, `${basePath}.type`, errors)) {
     return;
   }
   if (trigger.type === 'exit-intent') {
@@ -1112,11 +1046,7 @@ function validateEditableShape(state: unknown, errors: string[]): void {
     errors.push('state must be an object');
     return;
   }
-  if (!isOneOf<StyleKit>(state.styleKit, STYLE_KITS)) {
-    errors.push(
-      `styleKit must be one of [${STYLE_KITS.join(', ')}] (got ${describe(state.styleKit)})`,
-    );
-  }
+  assertOneOf<StyleKit>(state.styleKit, STYLE_KITS, 'styleKit', errors);
   // Site-level optional fields. customStyleKit is required when styleKit ===
   // 'custom'; the other four (defaultLocale, siteNoIndex, darkModeEnabled,
   // faviconAssetId) are always optional. Each is typed-narrowed here so junk
