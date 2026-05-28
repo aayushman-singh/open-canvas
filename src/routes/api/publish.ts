@@ -10,8 +10,8 @@
 //   2. Load the site row scoped to the current Owner; missing → 404.
 //   3. Re-validate the editableState. Invalid → 400 with the error list,
 //      do NOT publish.
-//   4. Build PublishedSnapshot { version: prev+1, publishedAt, styleKit,
-//      pages } and re-validate it (defence in depth).
+//   4. Build PublishedSnapshot { version: prev+1, publishedAt,
+//      ...editableState } and re-validate it (defence in depth).
 //   5. UPDATE the row: publishedSnapshot, publishedVersion, updatedAt.
 //   6. Rebuild search, capture timeline, and POST to SITE_ROOM/broadcast
 //      keyed by the site id. Broadcast errors throw so the route never reports
@@ -72,9 +72,13 @@ interface PreviousPublishState {
   version: number;
 }
 
+// Short, response-safe failure description. Stack traces stay in the raw
+// `console.error(..., { error })` calls (which format the full stack in the
+// log) and never enter strings that may surface to JSON responses through
+// rethrown Error messages.
 function describeError(error: unknown): string {
   if (error instanceof Error) {
-    return error.stack ?? error.message;
+    return error.message;
   }
   return String(error);
 }
@@ -162,11 +166,13 @@ async function runPublishedSideEffects(args: {
     }
   } catch (error) {
     const sideEffectFailure = describeError(error);
+    // Pass the raw error so console.error renders the full stack — describeError
+    // returns only the message, which is what we surface to the JSON response.
     console.error('[publish] published side effects failed; restoring previous published state', {
       siteId: args.siteId,
       failedVersion: args.snapshot.version,
       previousVersion: args.previous.version,
-      error: sideEffectFailure,
+      error,
     });
     try {
       await restorePreviousPublishState({
@@ -182,8 +188,8 @@ async function runPublishedSideEffects(args: {
         siteId: args.siteId,
         failedVersion: args.snapshot.version,
         previousVersion: args.previous.version,
-        sideEffectFailure,
-        rollbackFailure,
+        sideEffectError: error,
+        rollbackError,
       });
       throw new Error(
         `published side effects failed and rollback failed: sideEffect=${sideEffectFailure}; rollback=${rollbackFailure}`,
@@ -193,7 +199,7 @@ async function runPublishedSideEffects(args: {
       siteId: args.siteId,
       failedVersion: args.snapshot.version,
       previousVersion: args.previous.version,
-      error: sideEffectFailure,
+      error,
     });
     throw new Error(
       `published side effects failed; restored previous published state: ${sideEffectFailure}`,
@@ -359,32 +365,15 @@ publishApi.post('/sites/:siteId', async (c) => {
     }
   }
 
+  // PublishedSnapshot = EditableSite & { version, publishedAt }. Every
+  // EditableSite field — required and optional — is part of the published
+  // contract, and validateSiteShape (invoked inside both validateEditableSite
+  // and validatePublishedSnapshot) gates each one. Spread the validated
+  // editable state and stamp the two publish-only fields on top.
   const snapshot: PublishedSnapshot = {
+    ...row.editableState,
     version: row.publishedVersion + 1,
     publishedAt: new Date().toISOString(),
-    styleKit: row.editableState.styleKit,
-    pages: row.editableState.pages,
-    ...(row.editableState.header !== undefined
-      ? { header: row.editableState.header }
-      : {}),
-    ...(row.editableState.footer !== undefined
-      ? { footer: row.editableState.footer }
-      : {}),
-    ...(row.editableState.customStyleKit !== undefined
-      ? { customStyleKit: row.editableState.customStyleKit }
-      : {}),
-    ...(row.editableState.defaultLocale !== undefined
-      ? { defaultLocale: row.editableState.defaultLocale }
-      : {}),
-    ...(row.editableState.siteNoIndex !== undefined
-      ? { siteNoIndex: row.editableState.siteNoIndex }
-      : {}),
-    ...(row.editableState.darkModeEnabled !== undefined
-      ? { darkModeEnabled: row.editableState.darkModeEnabled }
-      : {}),
-    ...(row.editableState.faviconAssetId !== undefined
-      ? { faviconAssetId: row.editableState.faviconAssetId }
-      : {}),
   };
 
   const snapshotValidation = validatePublishedSnapshot(snapshot);
@@ -466,7 +455,7 @@ publishApi.post('/sites/:siteId/unpublish', async (c) => {
     .set({
       publishedSnapshot: null,
       publishedVersion: 0,
-      updatedAt: new Date(),
+      updatedAt: sql`now()`,
     })
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .returning({ id: site.id });
