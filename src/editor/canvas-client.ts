@@ -4302,25 +4302,31 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bgImgClear.textContent = "x";
       bgImgClear.className = "style-btn-clear";
       bgImgClear.disabled = !es.backgroundImageAssetId;
-      bgImgUpload.addEventListener("click", function() {
-        var inp = document.createElement("input");
-        inp.type = "file";
-        inp.accept = "image/*";
-        inp.addEventListener("change", function() {
-          if (!inp.files || inp.files.length === 0) return;
-          var file = inp.files[0];
-          setStatus("Uploading background...", "info");
-          postAssetUpload(file, "", element.id).then(function(result) {
-            es.backgroundImageAssetId = result.assetId;
-            if (!es.backgroundSize) es.backgroundSize = "cover";
-            onStyleChange();
-            renderInspector();
-            setStatus("Background image set", "ok");
-          }).catch(function(err) {
-            setStatus("Upload failed: " + err.message, "error");
-          });
+      // File input lives in the DOM so the picker actually opens. Chromium
+      // silently no-ops .click() on a detached input[type=file] as a
+      // user-gesture security measure — mirroring the main media upload at
+      // line ~4855 which also appends its hidden input to the row.
+      var bgImgFileInput = document.createElement("input");
+      bgImgFileInput.type = "file";
+      bgImgFileInput.accept = "image/*";
+      bgImgFileInput.style.display = "none";
+      bgImgFileInput.addEventListener("change", function() {
+        if (!bgImgFileInput.files || bgImgFileInput.files.length === 0) return;
+        var file = bgImgFileInput.files[0];
+        setStatus("Uploading background...", "info");
+        postAssetUpload(file, "", element.id).then(function(result) {
+          es.backgroundImageAssetId = result.assetId;
+          if (!es.backgroundSize) es.backgroundSize = "cover";
+          onStyleChange();
+          renderInspector();
+          setStatus("Background image set", "ok");
+        }).catch(function(err) {
+          setStatus("Upload failed: " + err.message, "error");
         });
-        inp.click();
+      });
+      bgImgUpload.addEventListener("click", function() {
+        bgImgFileInput.value = "";
+        bgImgFileInput.click();
       });
       bgImgClear.addEventListener("click", function() {
         delete es.backgroundImageAssetId;
@@ -4331,6 +4337,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bgImgRow.appendChild(bgImgThumb);
       bgImgRow.appendChild(bgImgUpload);
       bgImgRow.appendChild(bgImgClear);
+      bgImgRow.appendChild(bgImgFileInput);
       inspector.appendChild(field("Bg image", bgImgRow));
 
       if (es.backgroundImageAssetId) {
