@@ -56,6 +56,48 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
   const MOTION_PRESETS = ["none", "fade-up", "fade-down", "fade-in", "fade-right", "slide-left", "slide-up", "slide-right", "scale-in", "zoom-out", "blur-in", "rotate-in", "flip-in", "bounce-in", "stagger-children", "slow-drift", "parallax-soft"];
   const INLINE_MARK_TYPES = ["bold", "italic", "underline", "strike", "code", "highlight", "link"];
+  // Canonical nesting order for inline marks. Outermost first: link wraps every
+  // other mark so anchor styling stays intact when marks combine; the typographic
+  // tags (strong, em, u, s, mark, code) nest inside in this exact sequence so the
+  // editor preview matches the server renderer (src/canvas/render.ts) and the
+  // serializer's adjacent-run dedupe by JSON string stays reliable.
+  // Three locations within this file MUST stay in lockstep with this list:
+  //   1. activeMarksFor's order map (DOM->runs serializer sort).
+  //   2. buildRunNode's wrap() sequence (runs->DOM nest order is the REVERSE
+  //      of CANONICAL_MARK_ORDER because wrap() pushes innermost first).
+  //   3. Any future inline-mark consumer added to this script.
+  const CANONICAL_MARK_ORDER = ["link", "bold", "italic", "underline", "strike", "highlight", "code"];
+  // Scroll-trigger modes for page entrance animations. Mirrors schema's
+  // SCROLL_TRIGGER_MODES; if you add a mode there, add it here too.
+  const SCROLL_TRIGGER_MODES = ["on-load", "on-scroll"];
+  // Minimum drag/resize size for a positioned element, in canvas px. Mirrored in
+  // server-side validate.ts / render.ts bounds.
+  const MIN_ELEMENT_SIZE_PX = 24;
+  // Seek offset for video poster extraction. Some codecs emit a black frame at
+  // exactly t=0, so we step in a hair past zero (clamped to half-duration for
+  // very short clips).
+  const FIRST_FRAME_SEEK_SECONDS = 0.05;
+  // Hard ceiling on the video-poster extraction promise. A corrupted or
+  // unsupported codec can leave loadeddata/seeked events un-fired; without this
+  // the UI silently hangs on "Loading...". Loud failure on timeout.
+  const POSTER_EXTRACTION_TIMEOUT_MS = 30000;
+  // Text element font bounds. Mirror src/canvas/validate.ts (server enforces
+  // the same range on PUT). If you change either side here, mirror it there
+  // or the server will reject what the inspector accepts.
+  const TEXT_FONT_SIZE_MIN = 12;
+  const TEXT_FONT_SIZE_MAX = 96;
+  // Allowed numeric font weights for text elements. Mirrors schema.ts's
+  // TextElement.fontWeight union.
+  const TEXT_FONT_WEIGHT_CHOICES = ["400", "500", "600", "700"];
+  // Subresource integrity for the Cropper.js v2.1.1 ESM bundle on jsDelivr.
+  // Sourced at:
+  //   curl -s https://cdn.jsdelivr.net/npm/cropperjs@2.1.1/dist/cropper.esm.js \
+  //     | openssl dgst -sha384 -binary | openssl base64 -A
+  // If you bump CROPPER_CDN's version, recompute this hash. The runtime verifies
+  // the downloaded bytes against this before evaluating the module — a CDN or
+  // npm compromise that ships different bytes for the same version trips a loud
+  // error instead of executing attacker JS inside the Owner's session.
+  const CROPPER_SRI_SHA384 = "yCR/qrwwtTzBEzopZRNsQRqJmomeGgAikrPg/5vB2wkQLsM3OGRnEktc9gpN1KDg";
   // -- href allowlist (mirrors src/canvas/validate.ts isAllowedHref) -------
   // Centralised so the inline-link mark toolbar uses the SAME rules as the
   // server validator. If you change one, change the other.
@@ -1155,7 +1197,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           } else if (body && body.error) {
             detail = body.error;
           }
-        } catch (_) { /* ignore */ }
+        } catch (_) {
+          // JSON parse can fail when the server returns an empty body or a
+          // non-JSON 5xx page. We've already captured response.statusText into
+          // detail above; this catch deliberately swallows the parse error so
+          // the user-facing message stays the HTTP status text rather than a
+          // confusing "SyntaxError" toast. The real save failure (the !ok
+          // response itself) is the loud signal.
+        }
         setStatus("Save failed: " + detail, "error");
         return false;
       }
@@ -1189,6 +1238,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function scheduleSave() {
     captureForUndo();
+    // Two save paths, picked by whether the Yjs co-edit channel is attached:
+    //   1. coEditConnection present: every mutation projects into the Y.Doc
+    //      and the DO autosaves to Postgres. Status reads "Synced".
+    //   2. coEditConnection absent (boot before WS attach, or co-edit not
+    //      enabled for this Owner): debounced 500ms HTTP PUT. Status reads
+    //      "Saved" on success.
     var coEditSent = coEditSync();
     if (coEditConnection) {
       if (coEditSent) {
@@ -1274,6 +1329,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // Apply Owner-pinned CSS overrides. Allowlist-driven: the key must look
+  // like a CSS property name, and the value must contain none of the
+  // structural delimiters (;, :, {, }) that would let an attacker break out
+  // of the declaration. The server's validate.ts pinnedStyleValueIssue
+  // rejects on overlapping rules at PUT time; this filter is the editor's
+  // local pre-flight so a forbidden value never renders even before save.
+  // If you change either rule, mirror it in validate.ts or the editor will
+  // accept what the server rejects (and vice versa).
   function applyPinnedStyle(wrapper, element) {
     if (!element.pinnedStyle) return;
     for (const key of Object.keys(element.pinnedStyle)) {
@@ -1323,10 +1386,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // Build the nested-mark DOM for one InlineRun. Mark nesting order must
-  // match the server renderer in src/canvas/render.ts so the editor preview
-  // and the published HTML agree visually:
+  // match CANONICAL_MARK_ORDER (and the server renderer in src/canvas/render.ts)
+  // so the editor preview and the published HTML agree visually:
   //   <a> outermost (only when link mark present)
   //   <strong>, <em>, <u>, <s>, <mark>, <code> innermost
+  // wrap() pushes a new outer wrapper around the current inner, so the calls
+  // below execute in the REVERSE of CANONICAL_MARK_ORDER: innermost (code)
+  // first, link last. Keep these two lists in sync.
   function hasMark(run, type) {
     if (!run.marks || !Array.isArray(run.marks)) return false;
     for (let i = 0; i < run.marks.length; i++) {
@@ -1426,7 +1492,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (element.mediaKind === "image") {
       const img = document.createElement("img");
       img.setAttribute("src", previewUrl);
-      img.setAttribute("alt", typeof element.alt === "string" ? element.alt : "");
+      const altText = typeof element.alt === "string" ? element.alt : "";
+      img.setAttribute("alt", altText);
+      // Mirror the public renderer's a11y rule: empty alt means decorative,
+      // which signals screen readers to skip the image. Without this the
+      // editor preview reports differently from the published page.
+      if (altText.length === 0) img.setAttribute("aria-hidden", "true");
       img.style.width = "100%";
       img.style.height = "100%";
       img.style.objectFit = element.fit === "contain" ? "contain" : "cover";
@@ -1458,26 +1529,27 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  // Client-side mirror of resolveActionHref in src/canvas/schema.ts. Returns
+  // the renderable href string ("#" for unknown shapes). String-typed hrefs
+  // are tolerated because migrateState may not have run yet on a session
+  // whose first render fires before the migrate pass completes.
+  function resolveActionHref(href) {
+    if (href && href.type === "external") return href.url || "#";
+    if (href && href.type === "page") {
+      for (var pi = 0; pi < state.pages.length; pi++) {
+        if (state.pages[pi].id === href.pageId) return "/" + state.pages[pi].slug;
+      }
+      return "#";
+    }
+    if (typeof href === "string") return href;
+    return "#";
+  }
+
   function buildActionBody(element) {
     var node = document.createElement("a");
     node.className = "rev01-action";
     node.setAttribute("data-variant", element.variant);
-    var resolvedHref = "#";
-    if (element.href && element.href.type === "external") {
-      resolvedHref = element.href.url;
-    } else if (element.href && element.href.type === "page") {
-      var linkedPage = null;
-      for (var pi = 0; pi < state.pages.length; pi++) {
-        if (state.pages[pi].id === element.href.pageId) {
-          linkedPage = state.pages[pi];
-          break;
-        }
-      }
-      resolvedHref = linkedPage ? "/" + linkedPage.slug : "#";
-    } else if (typeof element.href === "string") {
-      resolvedHref = element.href;
-    }
-    node.setAttribute("href", resolvedHref);
+    node.setAttribute("href", resolveActionHref(element.href));
     // Plain click selects the action element on canvas (default selection
     // flow). Alt-click navigates instead — internal page hrefs swap the
     // active artboard, external hrefs open in a new tab.
@@ -2392,11 +2464,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return true;
   }
 
+  // Re-pack a section's element z values to 0..N-1 preserving relative
+  // order. bringToFront/sendToBack widen the range every call, so without
+  // this a long edit session drifts z toward Number.MAX_SAFE_INTEGer until
+  // arithmetic precision becomes visible.
+  function renormalizeZ(section) {
+    if (!section || !Array.isArray(section.elements)) return;
+    const items = section.elements
+      .map(function (el, i) { return { el: el, idx: i, z: typeof el.box.z === "number" ? el.box.z : 0 }; })
+      .sort(function (a, b) { return a.z - b.z || a.idx - b.idx; });
+    for (let i = 0; i < items.length; i++) items[i].el.box.z = i;
+  }
+
   function applyZOrderAction(section, element, action) {
     if (action === "front") bringToFront(section, element);
     else if (action === "back") sendToBack(section, element);
     else if (action === "forward") nudgeZ(section, element, 1);
     else if (action === "backward") nudgeZ(section, element, -1);
+    renormalizeZ(section);
     renderAll();
     selectElement(element.id);
     scheduleSave();
@@ -2470,7 +2555,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // the same verbs for elements so Owners don't have to remember a keyboard
   // shortcut (Delete still works for deletion).
   function duplicateElement(section, element) {
-    var clone = JSON.parse(JSON.stringify(element));
+    var clone = structuredClone(element);
     clone.id = newElementId();
     if (clone.box && typeof clone.box === "object") {
       if (typeof clone.box.x === "number") clone.box.x = clone.box.x + 20;
@@ -2770,11 +2855,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     const fontSize = document.createElement("input");
     fontSize.type = "number";
-    fontSize.min = "12"; fontSize.max = "96";
+    fontSize.min = String(TEXT_FONT_SIZE_MIN); fontSize.max = String(TEXT_FONT_SIZE_MAX);
     fontSize.value = String(element.fontSize);
     fontSize.addEventListener("change", () => {
       const n = Number(fontSize.value);
-      if (Number.isFinite(n) && n >= 12 && n <= 96) {
+      if (Number.isFinite(n) && n >= TEXT_FONT_SIZE_MIN && n <= TEXT_FONT_SIZE_MAX) {
         element.fontSize = n;
         rebuildElement(element.id);
         scheduleSave();
@@ -2782,7 +2867,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
     inspector.appendChild(field("Font size", fontSize));
 
-    const weight = selectInput(["400", "500", "600", "700"], String(element.fontWeight));
+    const weight = selectInput(TEXT_FONT_WEIGHT_CHOICES, String(element.fontWeight));
     weight.addEventListener("change", () => {
       element.fontWeight = Number(weight.value);
       rebuildElement(element.id);
@@ -3880,7 +3965,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var preset = t.getAttribute("data-motion-preset");
       if (!preset || preset === "none") continue;
       t.removeAttribute("data-motion-preset");
-      // Force reflow so the browser restarts the animation.
+      // Force layout so the browser restarts the CSS animation. Reading
+      // offsetWidth is the load-bearing op (any layout read works); the
+      // void operator discards the value to keep linters quiet about a
+      // useless expression. Without this read the browser may batch the
+      // attribute remove + set into a single style change and skip the
+      // animation entirely.
       void t.offsetWidth;
       t.setAttribute("data-motion-preset", preset);
     }
@@ -3945,7 +4035,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     h4b.textContent = "Animation trigger";
     group2.appendChild(h4b);
 
-    var triggerSel = selectInput(["on-load", "on-scroll"], page.scrollTriggerMode || "on-load");
+    var triggerSel = selectInput(SCROLL_TRIGGER_MODES, page.scrollTriggerMode || "on-load");
     triggerSel.addEventListener("change", function() {
       page.scrollTriggerMode = triggerSel.value;
       applyPageStyles(page);
@@ -4565,15 +4655,49 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // generated assets that snapped to a nearby preset rather than the exact
   // slot ratio).
   // Cropper.js v2 is pulled on demand from jsDelivr the first time the Owner
-  // picks a file; import is cached so subsequent uploads are immediate. Pinned
-  // to a specific version so jsDelivr cache hits and the CDN side can't ship
-  // breaking changes silently. The library registers custom elements as a
-  // side-effect of the import, so we just need the module to evaluate.
+  // picks a file; import is cached so subsequent uploads are immediate.
+  //
+  // Threat model: version pinning alone DOES NOT pin content — a compromised
+  // jsDelivr or npm publish could replace the bytes served at this URL with
+  // attacker code that then runs inside the Owner's authenticated editor
+  // session (edit-token theft, arbitrary mutations). To close that, we fetch
+  // the module bytes ourselves, verify SHA-384 against CROPPER_SRI_SHA384
+  // pinned at the top of this file, then import via a Blob URL. A mismatch
+  // throws loudly — no silent fallback to "load it anyway."
+  //
+  // The library registers custom elements as a side-effect of the import, so
+  // we just need the module to evaluate after integrity has been verified.
   const CROPPER_CDN = "https://cdn.jsdelivr.net/npm/cropperjs@2.1.1/dist/cropper.esm.js";
   let cropperLoadPromise = null;
   function loadCropper() {
     if (!cropperLoadPromise) {
-      cropperLoadPromise = import(CROPPER_CDN);
+      cropperLoadPromise = (async function() {
+        const response = await fetch(CROPPER_CDN, { cache: "force-cache" });
+        if (!response.ok) {
+          throw new Error("Cropper.js fetch failed: HTTP " + response.status + " from " + CROPPER_CDN);
+        }
+        const bytes = await response.arrayBuffer();
+        const digest = await crypto.subtle.digest("SHA-384", bytes);
+        // Encode digest as base64 to compare against CROPPER_SRI_SHA384.
+        const digestBytes = new Uint8Array(digest);
+        let bin = "";
+        for (let i = 0; i < digestBytes.length; i++) bin += String.fromCharCode(digestBytes[i]);
+        const actual = btoa(bin);
+        if (actual !== CROPPER_SRI_SHA384) {
+          throw new Error(
+            "Cropper.js SRI mismatch: expected sha384=" + CROPPER_SRI_SHA384 +
+            " but got sha384=" + actual + " from " + CROPPER_CDN +
+            ". Refusing to import potentially tampered code.",
+          );
+        }
+        const blob = new Blob([bytes], { type: "application/javascript" });
+        const blobUrl = URL.createObjectURL(blob);
+        try {
+          return await import(blobUrl);
+        } finally {
+          URL.revokeObjectURL(blobUrl);
+        }
+      })();
     }
     return cropperLoadPromise;
   }
@@ -4659,8 +4783,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         const outWidth = Math.max(1, Math.round(boxW));
         const outHeight = Math.max(1, Math.round(boxH));
         // GIF -> PNG because re-encoding a GIF through canvas loses
-        // animation; PNG keeps the still output lossless. Other browser-safe
-        // image types pass through unchanged.
+        // animation; PNG keeps the still output lossless. The list below is
+        // the set of mime types that canvas.toBlob() is REQUIRED to support
+        // by HTML spec. Anything not in this list (AVIF, HEIC, future Apple
+        // formats, exotic camera RAW) re-encodes to PNG so we never hand
+        // toBlob a type the browser would silently fall back on. If a new
+        // type becomes universally toBlob-supported, add it here.
         const reEncodableTypes = ["image/jpeg", "image/png", "image/webp"];
         const outType =
           typeof sourceMediaType === "string" && reEncodableTypes.indexOf(sourceMediaType) >= 0
@@ -4706,10 +4834,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // Extracts a representative first frame from a video File as a PNG Blob,
   // so the poster can be cropped to the slot's aspect ratio. Seeks slightly
-  // past t=0 because some codecs emit a black frame at exactly zero.
+  // past t=0 (FIRST_FRAME_SEEK_SECONDS) because some codecs emit a black
+  // frame at exactly zero. The whole extraction is wrapped in a
+  // POSTER_EXTRACTION_TIMEOUT_MS race so a corrupted/unsupported codec that
+  // never fires loadeddata or seeked fails loudly instead of leaving the
+  // upload UI stuck.
   async function extractVideoFirstFrame(file) {
     const url = URL.createObjectURL(file);
-    try {
+    let timeoutHandle = null;
+    const timeout = new Promise(function (_res, rej) {
+      timeoutHandle = setTimeout(function () {
+        rej(new Error("video poster extraction timed out after " + POSTER_EXTRACTION_TIMEOUT_MS + "ms"));
+      }, POSTER_EXTRACTION_TIMEOUT_MS);
+    });
+    const work = (async function () {
       const video = document.createElement("video");
       video.src = url;
       video.muted = true;
@@ -4722,7 +4860,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       await new Promise(function (res, rej) {
         video.onseeked = function () { res(undefined); };
         video.onerror = function () { rej(new Error("video seek failed")); };
-        const target = Math.min(0.05, (video.duration || 1) / 2);
+        const target = Math.min(FIRST_FRAME_SEEK_SECONDS, (video.duration || 1) / 2);
         try { video.currentTime = target; } catch (e) { rej(e); }
       });
       const cv = document.createElement("canvas");
@@ -4740,7 +4878,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           "image/png",
         );
       });
+    })();
+    try {
+      return await Promise.race([work, timeout]);
     } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       URL.revokeObjectURL(url);
     }
   }
@@ -6127,8 +6269,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       cur = cur.parentNode;
     }
     // Order the marks deterministically so adjacent-run dedupe by JSON
-    // string is reliable.
-    const order = { link: 0, bold: 1, italic: 2, underline: 3, strike: 4, highlight: 5, code: 6 };
+    // string is reliable. Derived from CANONICAL_MARK_ORDER so the single
+    // source of truth at the top of this file controls every consumer.
+    const order = {};
+    for (var oi = 0; oi < CANONICAL_MARK_ORDER.length; oi++) order[CANONICAL_MARK_ORDER[oi]] = oi;
     marks.sort((a, b) => order[a.type] - order[b.type]);
     return marks;
   }
@@ -7321,7 +7465,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!start) return;
     const originalBox = Object.assign({}, found.element.box);
     const page = currentPage();
-    const pageWidth = page ? page.width : 1440;
+    // Page width is required by the schema; a missing page here means the
+    // element being dragged has no page, which is a bug worth surfacing.
+    if (!page) throw new Error("beginDrag: element " + elementId + " has no active page");
+    const pageWidth = page.width;
     const sectionHeight = found.section.height;
 
     function onMove(ev) {
@@ -7360,7 +7507,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!start) return;
     const ob = Object.assign({}, found.element.box);
     const page = currentPage();
-    const pageWidth = page ? page.width : 1440;
+    // Page width is required by the schema; a missing page here means the
+    // element being resized has no page, which is a bug worth surfacing.
+    if (!page) throw new Error("beginResize: element " + elementId + " has no active page");
+    const pageWidth = page.width;
     const sectionHeight = found.section.height;
     const moveX = dir.includes("e") || dir.includes("w");
     const moveY = dir.includes("s") || dir.includes("n");
@@ -7381,8 +7531,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (fromTop) { ny = ob.y + dy; nh = ob.h - dy; }
         else { nh = ob.h + dy; }
       }
-      if (nw < 24) { if (fromLeft) nx = ob.x + ob.w - 24; nw = 24; }
-      if (nh < 24) { if (fromTop) ny = ob.y + ob.h - 24; nh = 24; }
+      if (nw < MIN_ELEMENT_SIZE_PX) { if (fromLeft) nx = ob.x + ob.w - MIN_ELEMENT_SIZE_PX; nw = MIN_ELEMENT_SIZE_PX; }
+      if (nh < MIN_ELEMENT_SIZE_PX) { if (fromTop) ny = ob.y + ob.h - MIN_ELEMENT_SIZE_PX; nh = MIN_ELEMENT_SIZE_PX; }
       if (nx < 0) { nw += nx; nx = 0; }
       if (ny < 0) { nh += ny; ny = 0; }
       if (nx + nw > pageWidth) nw = pageWidth - nx;
@@ -8857,6 +9007,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       const body = await response.json();
+      // Minimal shape guard against server-response drift. The full schema
+      // lives server-side in src/canvas/schema.ts; here we only assert the
+      // bare bones the editor needs to boot. Anything else (missing fields,
+      // bad element types) surfaces loudly later via render / migrate paths
+      // instead of silently coercing the editor into a broken state.
+      if (!body || typeof body !== "object" || !body.editableState || typeof body.editableState !== "object" || !Array.isArray(body.editableState.pages)) {
+        throw new Error("GET site returned an unexpected body shape (missing editableState.pages array)");
+      }
       state = body.editableState;
       if (state) state = migrateState(state);
       if (state && state.pages && state.pages.length > 0) {
