@@ -60,6 +60,17 @@ function cfClientFor(env: Bindings) {
   });
 }
 
+// Both CF_API_TOKEN and CF_ZONE_ID must be present for the custom-domain
+// surface to work at all. Without them, `cfClientFor` throws synchronously
+// and the Worker returns a bare 502 with no JSON body, leaving the
+// dashboard with nothing to render. Catching it here lets us surface a
+// clear JSON error the dashboard can display.
+function missingCfConfig(env: Bindings): string | null {
+  if (!env.CF_API_TOKEN) return 'CF_API_TOKEN';
+  if (!env.CF_ZONE_ID) return 'CF_ZONE_ID';
+  return null;
+}
+
 router.post('/', async (c) => {
   const customerId = await resolveCustomerId(c);
   if (!customerId) {
@@ -76,10 +87,30 @@ router.post('/', async (c) => {
     return c.json({ error: 'request body must be JSON with { hostname }' }, 400);
   }
   const hostname = typeof body.hostname === 'string' ? body.hostname : '';
-  const result = await registerCustomDomain(
-    { db: db(c.env), cf: cfClientFor(c.env) },
-    { siteId, customerId, hostname },
-  );
+  const missing = missingCfConfig(c.env);
+  if (missing) {
+    console.error('[custom-domain] register blocked — env missing', { missing, siteId });
+    return c.json(
+      { error: `custom domains are not configured on this deployment (missing ${missing})` },
+      503,
+    );
+  }
+  let result: Awaited<ReturnType<typeof registerCustomDomain>>;
+  try {
+    result = await registerCustomDomain(
+      { db: db(c.env), cf: cfClientFor(c.env) },
+      { siteId, customerId, hostname },
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[custom-domain] register threw uncaught', {
+      siteId,
+      customerId,
+      hostname,
+      err,
+    });
+    return c.json({ error: `failed to register domain: ${message}` }, 500);
+  }
   switch (result.status) {
     case 'created':
       return c.json({ ok: true, domain: serialiseDomain(result.row) }, 201);
@@ -163,6 +194,14 @@ router.delete('/:hostname', async (c) => {
   const hostname = c.req.param('hostname');
   if (!siteId || !hostname) {
     return c.json({ error: 'site or hostname missing' }, 404);
+  }
+  const missing = missingCfConfig(c.env);
+  if (missing) {
+    console.error('[custom-domain] delete blocked — env missing', { missing, siteId });
+    return c.json(
+      { error: `custom domains are not configured on this deployment (missing ${missing})` },
+      503,
+    );
   }
   const result = await deleteCustomDomain(
     { db: db(c.env), cf: cfClientFor(c.env) },
