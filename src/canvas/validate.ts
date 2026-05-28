@@ -23,12 +23,9 @@ import {
   SHAPE_VARIANTS,
   STYLE_KITS,
   SURFACE_VARIANTS,
-  TEXT_ROLES,
   type ActionVariant,
   type BackgroundEffect,
   type BackgroundSize,
-  type CanvasElement,
-  type CanvasPage,
   type CanvasSection,
   type CanvasSiteState,
   type ElementType,
@@ -36,7 +33,6 @@ import {
   type MediaKind,
   type MotionPreset,
   type OverflowValue,
-  type PublishedSnapshot,
   type ScrollTriggerMode,
   type SectionRecipeId,
   type SectionRole,
@@ -66,6 +62,14 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
+}
+
+// One predicate for "is this a date string that Date can parse?". Both
+// `Date.parse + Number.isFinite` and `new Date + Number.isNaN(getTime())`
+// do the same thing; the file previously carried both idioms. Date.parse
+// returns NaN for unparseable input, and NaN is not finite — single check.
+function isParseableDate(value: string): boolean {
+  return Number.isFinite(Date.parse(value));
 }
 
 function isOneOf<T extends string>(value: unknown, allowed: readonly T[]): value is T {
@@ -430,7 +434,12 @@ function validatePageMotionLayout(page: Record<string, unknown>, basePath: strin
   }
 }
 
-function registerElementId(
+// Assert that `element.id` has not been seen before in this page/scope and
+// register it as seen. The seen-set (`pageIds`) is mutated as a side effect
+// so callers can keep walking the tree without re-passing the set; the
+// "assert" framing names the failure mode (duplicate) since that is the only
+// observable outcome at the call site.
+function assertUniqueElementId(
   element: unknown,
   elementPath: string,
   pageIds: Set<string>,
@@ -533,8 +542,8 @@ function validateCollectionChildren(
   childHeight: number,
   basePath: string,
   errors: string[],
-  pageIds?: Set<string>,
-  validPageIds: Set<string> | null = null,
+  pageIds: Set<string>,
+  validPageIds: Set<string> | null,
 ): void {
   if (!Array.isArray(children)) {
     errors.push(`${basePath} must be an array`);
@@ -542,7 +551,7 @@ function validateCollectionChildren(
   }
   children.forEach((child, idx) => {
     const childPath = pathJoin(basePath, idx);
-    if (pageIds) registerElementId(child, childPath, pageIds, errors);
+    assertUniqueElementId(child, childPath, pageIds, errors);
     validateElement(child, childWidth, childHeight, childPath, errors, validPageIds, pageIds);
   });
 }
@@ -553,8 +562,8 @@ function validateCollectionEntries(
   childHeight: number,
   basePath: string,
   errors: string[],
-  pageIds?: Set<string>,
-  validPageIds: Set<string> | null = null,
+  pageIds: Set<string>,
+  validPageIds: Set<string> | null,
 ): void {
   if (!Array.isArray(entries)) {
     errors.push(`${basePath} must be an array`);
@@ -581,7 +590,7 @@ function validateElement(
   basePath: string,
   errors: string[],
   validPageIds: Set<string> | null,
-  pageIds?: Set<string>,
+  pageIds: Set<string>,
 ): void {
   if (!isRecord(element)) {
     errors.push(`${basePath} must be an object`);
@@ -590,20 +599,23 @@ function validateElement(
   if (!isNonEmptyString(element.id)) {
     errors.push(`${basePath}.id must be a non-empty string`);
   }
-  if (!assertOneOf<ElementType>(element.type, ELEMENT_TYPES, `${basePath}.type`, errors)) {
-    return;
-  }
+  // Accumulate the type-discriminant error but keep validating box, motion,
+  // and style — those checks are independent of the type-specific switch
+  // below. Only skip the switch when the discriminant is unknown.
+  const knownType = assertOneOf<ElementType>(element.type, ELEMENT_TYPES, `${basePath}.type`, errors);
 
   validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
   validateMotion(element.motion, basePath, errors);
   validatePinnedStyle(element.pinnedStyle, basePath, errors);
   validateElementStyle(element.elementStyle, basePath, errors);
 
+  if (!knownType) return;
+
   switch (element.type) {
     case 'text': {
       const idLabel = isNonEmptyString(element.id) ? element.id : '<unknown>';
       validateTextContent(element.content, idLabel, errors);
-      assertOneOf(element.role, TEXT_ROLES, `${basePath}.role`, errors);
+      assertOneOf(element.role, ['heading', 'body', 'label'] as const, `${basePath}.role`, errors);
       if (!isFiniteNumber(element.fontSize) || element.fontSize <= 0) {
         errors.push(`${basePath}.fontSize must be a positive number`);
       }
@@ -851,7 +863,7 @@ function validateSection(
     assertOneOf<MotionPreset>(section.entrance, MOTION_PRESETS, `${basePath}.entrance`, errors);
   }
   validateSectionTrigger(section.trigger, pathJoin(basePath, 'trigger'), errors);
-  validateBackgroundVideo(section.backgroundVideo, pathJoin(basePath, 'backgroundVideo'), errors);
+  validateBackgroundVideo(section.backgroundVideoAssetId, pathJoin(basePath, 'backgroundVideoAssetId'), errors);
   if (!Array.isArray(section.elements)) {
     errors.push(`${basePath}.elements must be an array`);
     return;
@@ -862,7 +874,7 @@ function validateSection(
   section.elements.forEach((element, idx) => {
     const path = pathJoin(basePath, 'elements');
     const elementPath = pathJoin(path, idx);
-    registerElementId(element, elementPath, localIds, errors);
+    assertUniqueElementId(element, elementPath, localIds, errors);
     validateElement(element, pageWidth, effectiveHeight, elementPath, errors, validPageIds, localIds);
   });
 }
@@ -959,7 +971,7 @@ function validatePage(
   if (page.publishedDate !== undefined) {
     if (!isNonEmptyString(page.publishedDate)) {
       errors.push(`${basePath}.publishedDate must be a non-empty string when present`);
-    } else if (!Number.isFinite(Date.parse(page.publishedDate))) {
+    } else if (!isParseableDate(page.publishedDate)) {
       errors.push(`${basePath}.publishedDate must be parseable as a date`);
     }
   }
@@ -1028,7 +1040,7 @@ function validatePage(
   });
 }
 
-function validatePageSetShape(pages: unknown[], errors: string[]): void {
+function validatePageCardinality(pages: unknown[], errors: string[]): void {
   const custom404Count = pages.filter(
     (page) => isRecord(page) && page.slug === CUSTOM_404_PAGE_SLUG,
   ).length;
@@ -1041,7 +1053,7 @@ function validatePageSetShape(pages: unknown[], errors: string[]): void {
   }
 }
 
-function validateEditableShape(state: unknown, errors: string[]): void {
+function validateSiteShape(state: unknown, errors: string[]): void {
   if (!isRecord(state)) {
     errors.push('state must be an object');
     return;
@@ -1080,7 +1092,7 @@ function validateEditableShape(state: unknown, errors: string[]): void {
     errors.push('pages must be a non-empty array');
     return;
   }
-  validatePageSetShape(state.pages, errors);
+  validatePageCardinality(state.pages, errors);
   const validPageIds = new Set<string>();
   const pageSlugs = new Set<string>();
   state.pages.forEach((page, idx) => {
@@ -1106,7 +1118,10 @@ function validateEditableShape(state: unknown, errors: string[]): void {
   // Site-wide header and footer are optional top-level sections. When present,
   // validate them with the same section validator used for page sections.
   // Use PAGE_WIDTH_MAX as the width bound since header/footer span the full
-  // viewport and are not tied to a single page's width.
+  // viewport and are not tied to a single page's width. validateSectionRolePlacement
+  // is intentionally skipped here — it checks position-in-array for inline
+  // header/footer sections, but state.header / state.footer are standalone
+  // fields, not array entries, so there is no positional invariant to assert.
   if (state.header !== undefined) {
     const headerIds = new Set<string>();
     validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds);
@@ -1159,7 +1174,7 @@ function validatePublishedMediaReferences(snapshot: unknown, errors: string[]): 
 
 export function validateCanvasSiteState(state: unknown): ValidationResult {
   const errors: string[] = [];
-  validateEditableShape(state, errors);
+  validateSiteShape(state, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }
@@ -1174,19 +1189,16 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   }
   if (!isNonEmptyString(snapshot.publishedAt)) {
     errors.push('publishedAt must be a non-empty ISO date string');
-  } else {
-    const parsed = new Date(snapshot.publishedAt);
-    if (Number.isNaN(parsed.getTime())) {
-      errors.push(`publishedAt "${snapshot.publishedAt}" is not a parseable Date`);
-    }
+  } else if (!isParseableDate(snapshot.publishedAt)) {
+    errors.push(`publishedAt "${snapshot.publishedAt}" is not a parseable Date`);
   }
   // Re-use the editable validator on the full snapshot. Passing the snapshot
   // directly (rather than a stripped {styleKit, pages, header, footer} literal)
-  // lets the site-level field validators inside validateEditableShape see
+  // lets the site-level field validators inside validateSiteShape see
   // customStyleKit / defaultLocale / siteNoIndex / darkModeEnabled /
   // faviconAssetId — otherwise those fields silently round-trip onto the
   // snapshot via the spread at publish.ts:373-386.
-  validateEditableShape(snapshot, errors);
+  validateSiteShape(snapshot, errors);
   validatePublishedMediaReferences(snapshot, errors);
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
@@ -1259,5 +1271,3 @@ export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
   return { valid: false, errors };
 }
 
-// Re-exported types for downstream callers that only depend on validate.ts.
-export type { CanvasElement, CanvasPage, CanvasSection, CanvasSiteState, PublishedSnapshot };
