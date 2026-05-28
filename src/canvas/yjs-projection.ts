@@ -95,6 +95,7 @@ import type {
   CanvasSection,
   CanvasSiteState,
   ContainerElement,
+  ElementStyle,
   InlineMark,
   InlineRun,
   MediaElement,
@@ -254,12 +255,43 @@ function encodeInlineRuns(runs: InlineRun[]): Y.Array<Y.Map<unknown>> {
   return out;
 }
 
+function encodeElementStyle(style: ElementStyle): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  setIfDefined(out, 'backgroundColor', style.backgroundColor);
+  setIfDefined(out, 'backgroundImageAssetId', style.backgroundImageAssetId);
+  setIfDefined(out, 'backgroundSize', style.backgroundSize);
+  setIfDefined(out, 'borderRadius', style.borderRadius);
+  setIfDefined(out, 'borderColor', style.borderColor);
+  setIfDefined(out, 'borderWidth', style.borderWidth);
+  setIfDefined(out, 'opacity', style.opacity);
+  setIfDefined(out, 'boxShadow', style.boxShadow);
+  setIfDefined(out, 'color', style.color);
+  setIfDefined(out, 'overflow', style.overflow);
+  return out;
+}
+
+function decodeElementStyle(map: Y.Map<unknown>): ElementStyle {
+  const out: ElementStyle = {};
+  if (map.has('backgroundColor')) out.backgroundColor = map.get('backgroundColor') as string;
+  if (map.has('backgroundImageAssetId')) out.backgroundImageAssetId = map.get('backgroundImageAssetId') as string;
+  if (map.has('backgroundSize')) out.backgroundSize = map.get('backgroundSize') as NonNullable<ElementStyle['backgroundSize']>;
+  if (map.has('borderRadius')) out.borderRadius = map.get('borderRadius') as number;
+  if (map.has('borderColor')) out.borderColor = map.get('borderColor') as string;
+  if (map.has('borderWidth')) out.borderWidth = map.get('borderWidth') as number;
+  if (map.has('opacity')) out.opacity = map.get('opacity') as number;
+  if (map.has('boxShadow')) out.boxShadow = map.get('boxShadow') as string;
+  if (map.has('color')) out.color = map.get('color') as string;
+  if (map.has('overflow')) out.overflow = map.get('overflow') as NonNullable<ElementStyle['overflow']>;
+  return out;
+}
+
 function encodeBaseElementFields(target: Y.Map<unknown>, el: BaseElement): void {
   target.set('id', el.id);
   target.set('type', el.type);
   target.set('box', encodePositionedBox(el.box));
   if (el.motion !== undefined) target.set('motion', encodeMotion(el.motion));
   if (el.pinnedStyle !== undefined) target.set('pinnedStyle', encodeStringRecord(el.pinnedStyle));
+  if (el.elementStyle !== undefined) target.set('elementStyle', encodeElementStyle(el.elementStyle));
   if (el.responsive !== undefined) target.set('responsive', encodeResponsive(el.responsive));
 }
 
@@ -844,6 +876,9 @@ function decodeBaseElement(map: Y.Map<unknown>): BaseElement {
   if (map.has('motion')) out.motion = decodeMotion(map.get('motion') as Y.Map<unknown>);
   if (map.has('pinnedStyle')) {
     out.pinnedStyle = decodeStringRecord(map.get('pinnedStyle') as Y.Map<string>);
+  }
+  if (map.has('elementStyle')) {
+    out.elementStyle = decodeElementStyle(map.get('elementStyle') as Y.Map<unknown>);
   }
   if (map.has('responsive')) {
     out.responsive = decodeResponsive(map.get('responsive') as Y.Map<unknown>);
