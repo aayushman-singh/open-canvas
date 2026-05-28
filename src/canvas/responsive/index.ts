@@ -1,6 +1,6 @@
 // src/canvas/responsive/index.ts
 //
-// Public entry for the responsive subsystem (Wishlist #1, Wave 1).
+// Public entry for the responsive subsystem.
 //
 // One function, `renderResponsiveCss(snapshot)`, consumed by
 // `src/canvas/render.ts`. It returns a complete `<style>...</style>` block
@@ -8,11 +8,12 @@
 // injects the result verbatim ahead of the `pagesHtml` body — see the
 // single-hook insertion in `renderCanvasSnapshot`.
 //
-// The empty-string return is the all-or-nothing failure rule applied to
-// "nothing to do": when no element has an override AND every page already
-// fits a phone viewport, emitting a style block would be incidental noise.
-// We return '' so existing fixtures render byte-for-byte identical to the
-// pre-responsive output.
+// The empty-string return is the "nothing to do" signal: when no element has
+// an override AND every page already fits a phone viewport, emitting a style
+// block would be incidental noise. We return '' so existing fixtures render
+// byte-for-byte identical to the pre-responsive output. This is not a
+// degraded mode — it is the correct output for a snapshot that does not need
+// responsive scaling.
 
 import type { CanvasElement, PublishedSnapshot } from '../schema.js';
 
@@ -42,6 +43,14 @@ export type {
 // Identity-keyed: callers that mutate a snapshot in place must build a new
 // object, which they already do (PublishedSnapshot is constructed once per
 // publish at publish.ts:219 and never mutated after).
+//
+// Scope: this cache is per-request only. A `PublishedSnapshot` is a fresh JS
+// object every time it is read from the DB, so a public request that loads
+// the same site again gets a new identity and a cold cache. The cache only
+// pays off inside one `renderCanvasSnapshot` call tree (e.g. publish-time
+// payload assembly looping over every page of the same snapshot object). The
+// WeakMap guarantees the entry is collected when the snapshot is, so this
+// will never hold references across requests.
 const responsiveCssCache = new WeakMap<PublishedSnapshot, string>();
 
 export function renderResponsiveCss(snapshot: PublishedSnapshot): string {

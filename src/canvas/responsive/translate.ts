@@ -74,11 +74,18 @@ export interface ResolvedBox {
  * The full resolved layout for one Positioned Element across the two smaller
  * breakpoints. Desktop is the canonical source-of-truth (the `box` field on
  * the element) and never appears here — the renderer already emits it inline.
+ *
+ * `tabletHasOverride` / `phoneHasOverride` flag whether the element carries
+ * any Owner-authored override at that breakpoint (including `hidden: true`).
+ * The CSS emitter uses these to skip emitting redundant rules for elements
+ * on small pages that already fit the breakpoint's design width unscaled.
  */
 export interface ResolvedElementLayout {
   elementId: string;
   tablet: ResolvedBox;
+  tabletHasOverride: boolean;
   phone: ResolvedBox;
+  phoneHasOverride: boolean;
 }
 
 /**
@@ -105,7 +112,16 @@ export interface ResolvedPageLayout {
   elements: ResolvedElementLayout[];
 }
 
-/** Linear interpolation factor for a named smaller breakpoint. */
+/**
+ * Linear interpolation factor for a named smaller breakpoint.
+ *
+ * The `'desktop'` branch returns 1 by definition — the desktop box is the
+ * source-of-truth and is emitted inline by the renderer, so the responsive
+ * pipeline never calls this with `'desktop'`. The branch exists to make the
+ * function total over `Breakpoint` (otherwise the `switch` would need a
+ * non-exhaustive default), which keeps it usable from any caller that
+ * already holds a `Breakpoint` value.
+ */
 export function scaleFactor(pageWidth: number, breakpoint: Breakpoint): number {
   if (pageWidth <= 0) return 1;
   switch (breakpoint) {
@@ -147,19 +163,32 @@ export function resolveElementBox(
 /**
  * Resolve every element + section + page width across a Published Snapshot.
  * The CSS emitter walks this structure once and produces the `<style>` body.
+ *
+ * Site-wide header/footer sections (when present on the snapshot) are merged
+ * into every page's resolved layout so the emitter produces matching tablet +
+ * phone rules for them. Without this merge those sections inherit the desktop
+ * width inline and never reflow at smaller viewports — visitors see them
+ * locked at design width while the rest of the page scales.
  */
 export function resolveSnapshotLayout(snapshot: PublishedSnapshot): ResolvedPageLayout[] {
-  return snapshot.pages.map((page) => resolvePageLayout(page));
+  const sharedSections: CanvasSection[] = [];
+  if (snapshot.header) sharedSections.push(snapshot.header);
+  if (snapshot.footer) sharedSections.push(snapshot.footer);
+  return snapshot.pages.map((page) => resolvePageLayout(page, sharedSections));
 }
 
-function resolvePageLayout(page: CanvasPage): ResolvedPageLayout {
+function resolvePageLayout(
+  page: CanvasPage,
+  sharedSections: readonly CanvasSection[],
+): ResolvedPageLayout {
   const tabletScale = scaleFactor(page.width, 'tablet');
   const phoneScale = scaleFactor(page.width, 'phone');
-  const sections: ResolvedSectionLayout[] = page.sections.map((section) =>
+  const allSections: CanvasSection[] = [...sharedSections, ...page.sections];
+  const sections: ResolvedSectionLayout[] = allSections.map((section) =>
     resolveSectionLayout(section, page.width, tabletScale, phoneScale),
   );
   const elements: ResolvedElementLayout[] = [];
-  for (const section of page.sections) {
+  for (const section of allSections) {
     for (const element of section.elements) {
       elements.push(resolveElementLayout(element, page.width));
     }
@@ -197,6 +226,8 @@ function resolveElementLayout(element: CanvasElement, pageWidth: number): Resolv
   return {
     elementId: element.id,
     tablet: resolveElementBox(element, pageWidth, 'tablet'),
+    tabletHasOverride: element.responsive?.tablet !== undefined,
     phone: resolveElementBox(element, pageWidth, 'phone'),
+    phoneHasOverride: element.responsive?.phone !== undefined,
   };
 }

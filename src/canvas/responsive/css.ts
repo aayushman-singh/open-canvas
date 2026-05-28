@@ -22,7 +22,12 @@
 
 import { PHONE_MAX_PX, TABLET_MAX_PX } from './breakpoints.js';
 import { escapeCssIdent } from './escape.js';
-import type { ResolvedBox, ResolvedPageLayout } from './translate.js';
+import {
+  PHONE_DESIGN_WIDTH,
+  TABLET_DESIGN_WIDTH,
+  type ResolvedBox,
+  type ResolvedPageLayout,
+} from './translate.js';
 
 /**
  * Build the CSS body (no `<style>` tags). Returns the empty string when no
@@ -52,8 +57,16 @@ function buildBreakpointBlock(
   breakpoint: 'tablet' | 'phone',
   mediaMaxPx: number,
 ): string {
+  const designWidth = breakpoint === 'tablet' ? TABLET_DESIGN_WIDTH : PHONE_DESIGN_WIDTH;
   const rules: string[] = [];
   for (const page of layouts) {
+    // Pages already narrower than the breakpoint's design width fit the
+    // viewport unscaled. Per-element rules for those pages would just
+    // re-emit the desktop box (with a stray scale-up clamped by the design
+    // width) — pure noise. We still emit the page + section rules so the
+    // outer width caps at the design width, then skip every element rule
+    // that has no Owner-authored override at this breakpoint.
+    const pageFitsBreakpointUnscaled = page.desktopWidth <= designWidth;
     const pageWidth = breakpoint === 'tablet' ? page.tablet.w : page.phone.w;
     rules.push(pageRule(page.pageId, pageWidth));
     for (const section of page.sections) {
@@ -61,6 +74,9 @@ function buildBreakpointBlock(
       rules.push(sectionRule(section.sectionId, dims.w, dims.h));
     }
     for (const element of page.elements) {
+      const hasOverride =
+        breakpoint === 'tablet' ? element.tabletHasOverride : element.phoneHasOverride;
+      if (pageFitsBreakpointUnscaled && !hasOverride) continue;
       const box = breakpoint === 'tablet' ? element.tablet : element.phone;
       rules.push(elementRule(element.elementId, box));
     }
@@ -73,6 +89,12 @@ function pageRule(pageId: string, widthPx: number): string {
   return `${sel} { width: ${String(widthPx)}px !important; }`;
 }
 
+// Sections also emit `width !important` even though their parent page has the
+// same scaled width. The renderer stamps the desktop page-width inline on
+// every `.rev01-section` (see `renderSection` in `render.ts`), so without
+// overriding the section's own inline width the section would stay at the
+// desktop width and overflow the scaled page. Two `width` declarations on
+// the cascade is the cheapest way to override both wrappers' inline styles.
 function sectionRule(sectionId: string, widthPx: number, heightPx: number): string {
   const sel = `[data-rev01-section="${escapeCssIdent(sectionId)}"]`;
   return `${sel} { width: ${String(widthPx)}px !important; height: ${String(heightPx)}px !important; }`;
