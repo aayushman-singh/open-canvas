@@ -105,6 +105,7 @@ if (firstImport.ok) {
     targetCustomerId,
     sourceSection: headerSection,
     existingAssetIds: new Set<string>(),
+    existingByHash: new Map(),
   });
   assert(seedImport.ok, 'seed import with header role must succeed');
   if (seedImport.ok) {
@@ -216,6 +217,7 @@ if (firstImport.ok) {
     targetCustomerId,
     sourceSection: heroSection,
     existingAssetIds: new Set<string>(),
+    existingByHash: new Map(),
   });
   assert(out.ok, 'hero import for regex regression test must succeed');
   if (out.ok) {
