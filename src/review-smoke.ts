@@ -816,7 +816,7 @@ assert(
   siteSettingsSource.includes('let configPatchChain = Promise.resolve();') &&
     siteSettingsSource.includes('function queueConfigPatch') &&
     siteSettingsSource.includes('queueConfigPatch({ faviconAssetId: assetIdOrNull }') &&
-    siteSettingsSource.includes('queueConfigPatch({ [key]: apiValue }'),
+    /queueConfigPatch\(\s*\{\s*\[key\]: apiValue\s*\}/.test(siteSettingsSource),
   'expected all site config PATCH writes on settings page to use the serialized queue',
 );
 assert(

@@ -531,7 +531,7 @@ function esc(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
 }
 
-function clientScript(siteId: string): string {
+export function clientScript(siteId: string): string {
   const sid = JSON.stringify(siteId);
   return String.raw`
 const rev01SiteSettingsConfig = (() => {
@@ -926,24 +926,48 @@ const rev01SiteSettingsConfig = (() => {
   const queueConfigPatch = rev01SiteSettingsConfig.queueConfigPatch;
   const toggles = document.querySelectorAll('input[data-config-key]');
   toggles.forEach((cb) => {
+    const key = cb.getAttribute('data-config-key');
+    if (!key) return;
+    const inverted = cb.getAttribute('data-invert') === 'true';
+    const stateEl = cb.closest('.toggle-row')?.querySelector('[data-toggle-state]');
+    const stateOn = cb.getAttribute('data-on-label') ?? 'On';
+    const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
+    function apiValueFromChecked(checked) {
+      return inverted ? !checked : checked;
+    }
+    function checkedFromApiValue(value) {
+      return inverted ? !value : value;
+    }
+    function renderSavedState(apiValue) {
+      if (stateEl) stateEl.textContent = checkedFromApiValue(apiValue) ? stateOn : stateOff;
+    }
+    let savedApiValue = apiValueFromChecked(cb.checked);
+    let nextQueueId = 0;
+    let latestQueueId = 0;
     cb.addEventListener('change', () => {
-      const key = cb.getAttribute('data-config-key');
-      const inverted = cb.getAttribute('data-invert') === 'true';
-      const apiValue = inverted ? !cb.checked : cb.checked;
-      const stateEl = cb.closest('.toggle-row')?.querySelector('[data-toggle-state]');
-      const stateOn = cb.getAttribute('data-on-label') ?? 'On';
-      const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
+      const apiValue = apiValueFromChecked(cb.checked);
+      const queueId = nextQueueId + 1;
+      nextQueueId = queueId;
+      latestQueueId = queueId;
       // Do NOT disable the checkbox while the PATCH is in flight — disabled
       // inputs don't fire 'change' on subsequent clicks, so a rapid second
-      // toggle would be silently eaten. queueConfigPatch already serialises
-      // the requests server-side, and apiValue is captured here at click
-      // time, so back-to-back toggles all land in order.
-      queueConfigPatch({ [key]: apiValue }, () => {
-          if (stateEl) stateEl.textContent = cb.checked ? stateOn : stateOff;
-        }, (message) => {
-          cb.checked = !cb.checked;
+      // toggle would be silently eaten. queueConfigPatch serialises requests
+      // in this browser session, and apiValue is captured here at click time,
+      // so back-to-back toggles all land in order.
+      queueConfigPatch(
+        { [key]: apiValue },
+        () => {
+          savedApiValue = apiValue;
+          if (latestQueueId === queueId) renderSavedState(apiValue);
+        },
+        (message) => {
+          if (latestQueueId === queueId) {
+            cb.checked = checkedFromApiValue(savedApiValue);
+            renderSavedState(savedApiValue);
+          }
           alert(message);
-        });
+        },
+      );
     });
   });
 })();
