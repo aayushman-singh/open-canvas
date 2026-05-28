@@ -264,7 +264,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 15.4 | Add button (sidebar) | Click Button → action element appears | PASS (MCP) |
 | 15.5 | Add shape (sidebar) | Click Shape → shape element appears | PASS (MCP) |
 | 15.6 | Add container (sidebar) | Click Container → container element appears | PASS (MCP) |
-| 15.7 | Add chart (sidebar) | Click Chart → chart element appears | FAIL — Chart button absent from sidebar Add panel; only in section toolbar |
+| 15.7 | Add chart (sidebar) | Click Chart → chart element appears | PASS (code audit) |
 | 15.8 | Add text (section toolbar) | +T button on section → text in that section | PASS (MCP) |
 | 15.9 | Add image (section toolbar) | +Img button on section → image in that section | PASS (MCP) |
 | 15.10 | Add video (section toolbar) | +Vid button on section → video in that section | PASS (MCP) |
@@ -273,6 +273,13 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 15.13 | Add container (section toolbar) | +▢ button on section → container in that section | PASS (MCP) |
 | 15.14 | Add chart (section toolbar) | +📊 button on section → chart in that section | PASS (MCP) |
 | 15.15 | Add blank section | "Blank section" from sidebar Add panel | PASS (MCP) |
+| 15.16 | Add form (sidebar) | Click Form in Add panel → form element appears | — |
+| 15.17 | Add embed (sidebar) | Click Embed in Add panel → embed element appears | — |
+| 15.18 | Add code (sidebar) | Click Code in Add panel → code element appears | — |
+| 15.19 | Add accordion (sidebar) | Click Accordion in Add panel → accordion element appears | — |
+| 15.20 | Add carousel (sidebar) | Click Carousel in Add panel → carousel element appears | — |
+| 15.21 | Add table (sidebar) | Click Table in Add panel → table element appears | — |
+| 15.22 | Add nav (sidebar) | Click Nav in Add panel → nav element appears | — |
 
 ---
 
@@ -1016,6 +1023,111 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 64.7 | Sandbox attributes | All embeds have `allow-scripts allow-same-origin allow-popups allow-forms` | — |
 | 64.8 | Lazy loading | Embeds have `loading="lazy"` | — |
 | 64.9 | Invalid URL placeholder | Invalid embed URL shows placeholder instead of broken iframe | — |
+
+---
+
+## 65. Editor Link Popover & Canvas Link Handling
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 65.1 | Inline link hover popover | Hover rich-text link → floating popover shows URL and actions | — |
+| 65.2 | Inline link selection pin | Selecting/caret-inside link pins popover until dismissed | — |
+| 65.3 | Open inline link | Popover Open button opens link in a new tab | — |
+| 65.4 | Edit inline link | Popover Edit opens the link edit modal with current URL | — |
+| 65.5 | Unlink inline link | Popover Unlink removes link mark but preserves text | — |
+| 65.6 | Action link popover | Selecting an action element auto-pins link popover for its destination | — |
+| 65.7 | Nav link popover | Hover/click nav links exposes link popover without navigating away from editor | — |
+| 65.8 | Visitor-view preview | Popover shows a small preview styled like the published visitor link | — |
+| 65.9 | Editor click safety | Canvas links remain inspectable/clickable without breaking text caret editing | — |
+
+---
+
+## 66. Dashboard Site Cards & Redesigned Settings
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 66.1 | Site card click expands | Clicking a non-button/card area opens expanded site details | — |
+| 66.2 | Expanded card dismissal | Backdrop click or Escape closes expanded card | — |
+| 66.3 | Details button ARIA | 3-dot details button toggles `aria-expanded` correctly | — |
+| 66.4 | Detail row navigation | Hosting/password/search/dark-mode rows deep-link to settings anchors | — |
+| 66.5 | Domain detail navigation | Custom domain row links to Domains page | — |
+| 66.6 | Analytics detail navigation | Analytics row links to site Addons page | — |
+| 66.7 | Settings hosting summary | Settings page shows plan, CDN, style kit, publish status, and address | — |
+| 66.8 | Password card | Enable/update/disable password protection from redesigned settings | — |
+| 66.9 | Search indexing toggle | Toggle `siteNoIndex` from settings and revert on failed save | — |
+| 66.10 | Visitor dark mode toggle | Toggle `darkModeEnabled` from settings and persist via canvas config API | — |
+| 66.11 | Collaborator list | Settings page lists collaborator email, role, active/pending status | — |
+| 66.12 | Collaborator removal | Remove button confirms then deletes collaborator row | — |
+
+---
+
+## 67. Template Gallery & Apogee Showcase
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 67.1 | Apogee listed | Template gallery includes "Apogee Showcase" | — |
+| 67.2 | Apogee preview renders | Apogee iframe preview renders without "Preview unavailable" tombstone | — |
+| 67.3 | All element types covered | Apogee fixture includes all 15 canonical element types including `symbol-instance` | PASS (code audit) |
+| 67.4 | Community tab | Community tab shows built-in templates plus global custom templates | — |
+| 67.5 | Personal tab | Personal tab shows private owner templates | — |
+| 67.6 | Personal empty state | Empty Personal tab explains how to save a private template | — |
+| 67.7 | Preview scale | Template iframes use dashboard-aligned thumbnail scale across viewport widths | — |
+
+---
+
+## 68. AI Tool Surface & Apply Flow
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 68.1 | 15 mutating tools exposed | Canvas/chat agent tool list includes all mutating operation names | PASS (code audit) |
+| 68.2 | query_site tool | Chat model can request token-capped site summary/full listing | — |
+| 68.3 | query_assets tool | Chat model can request uploaded asset metadata before media ops | — |
+| 68.4 | Tool preview stream | Mutating tool calls stream as op-preview cards | — |
+| 68.5 | Accept applies op | Clicking Accept applies previewed op through canvas-agent apply route | — |
+| 68.6 | Parser rejects bad args | Invalid tool args return explicit parse errors | — |
+| 68.7 | Element type mismatch rejected | `updateElement` with wrong `elementType` fails loudly | — |
+| 68.8 | Page ops | Agent can add/update/delete pages via preview/apply | — |
+| 68.9 | Site config ops | Agent can set style kit, dark mode, locale/noindex config via preview/apply | — |
+
+---
+
+## 69. Security Hardening Regression Checks
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 69.1 | Editor link XSS | Link mark URLs/text cannot inject script/HTML into editor or published output | — |
+| 69.2 | Theme panel attr escaping | Theme panel owner-controlled attributes are escaped | — |
+| 69.3 | Version timeline XSS | Snapshot/version labels do not reach unsafe `innerHTML` | — |
+| 69.4 | SMTP header injection | Form email values cannot inject mail headers | — |
+| 69.5 | GA ID validation | Invalid GA measurement ID rejected server-side | — |
+| 69.6 | Chart SVG attribute escaping | Legend/label values cannot break out of SVG attributes | — |
+| 69.7 | CSS selector escaping | User-controlled element IDs are escaped before selector construction | — |
+| 69.8 | Timing-safe compare | Password/signature comparisons do not short-circuit by prefix | — |
+| 69.9 | Admin auth null-safety | Missing auth context returns explicit unauthorized/admin failure | — |
+| 69.10 | System-message leak guard | Agent throws when a system message would leak into persisted chat history | — |
+
+---
+
+## 70. Published/Public Runtime Changes
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 70.1 | Live payload validation | Visitor live script rejects malformed WebSocket payloads with console error | — |
+| 70.2 | Current-path live update | Publish broadcast updates the currently viewed slug only when HTML exists | — |
+| 70.3 | Visitor count UI removed | Published pages do not render a viewer-count presence pill | PASS (code audit) |
+| 70.4 | Responsive CSS memoized | Re-rendering same snapshot identity does not recompute responsive CSS | — |
+| 70.5 | Published favicon | Snapshot `faviconAssetId` emits `<link rel="icon">` | — |
+| 70.6 | Custom-domain on-site editing | Custom-domain public site can enter editor mode with origin-bound edit token | — |
+
+---
+
+## 71. E2E Infrastructure
+
+| # | Feature | Test Description | Status |
+|---|---------|-----------------|--------|
+| 71.1 | User-flow suite shape | Playwright suite is organized around auth experience, infrastructure, published site, and visitor journey | PASS (code audit) |
+| 71.2 | Production targeting | Playwright config can target deployed production URL rather than only local dev | — |
+| 71.3 | Browser-level checks | Tests exercise clicks/navigation/visitor flows instead of only API calls | — |
 
 ---
 
