@@ -15,7 +15,7 @@
 import type { ActionHref } from './elements/action.js';
 import type { CanvasPage } from './schema.js';
 
-const ALLOWED_HREF_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'] as const;
+export const ALLOWED_HREF_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'] as const;
 
 /**
  * Compute the rendered URL for an `ActionHref`.
