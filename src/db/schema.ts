@@ -30,6 +30,9 @@ const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
 type LegacyDocumentJSON = Record<string, unknown>;
 type LegacyThemeTokenSet = Record<string, unknown>;
 
+export const BILLING_PLANS = ['free', 'pro', 'team'] as const;
+export type BillingPlan = (typeof BILLING_PLANS)[number];
+
 export const customer = pgTable('customer', {
   id: text('id')
     .primaryKey()
@@ -39,6 +42,7 @@ export const customer = pgTable('customer', {
   displayName: text('display_name'),
   bio: text('bio'),
   timezone: text('timezone').notNull().default('UTC'),
+  plan: text('plan').notNull().default('free').$type<BillingPlan>(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
