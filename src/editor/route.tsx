@@ -129,7 +129,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <style>{raw(canvasEditorStyles)}</style>
         {clerkPublishableKey && raw(`<script>
 (function(){
-  var pk = "${clerkPublishableKey}";
+  var pk = ${JSON.stringify(clerkPublishableKey)};
   var raw = atob(pk.replace(/^pk_(test|live)_/, ""));
   if (raw.endsWith("$")) raw = raw.slice(0, -1);
   var s = document.createElement("script");

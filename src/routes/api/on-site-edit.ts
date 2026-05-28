@@ -135,13 +135,30 @@ onSiteEditRoute.get('/', async (c) => {
 
   const cookieValue = buildEditTokenCookieHeader(token, new URL(c.req.url).host);
 
-  const siteIdJson = JSON.stringify(siteId);
-  const tokenJson = JSON.stringify(token);
-  const stateJson = JSON.stringify(state);
-  const returnOriginJson = JSON.stringify(returnOrigin);
-
   return c.html(
-    `<!DOCTYPE html>
+    renderPopupCloseDocument({ siteId, token, state, returnOrigin }),
+    200,
+    { 'Set-Cookie': cookieValue },
+  );
+});
+
+interface PopupCloseDocumentInput {
+  siteId: string;
+  token: string;
+  state: string;
+  returnOrigin: string | undefined;
+}
+
+// Renders the popup-close page returned to the on-site editor popup.
+// postMessage is targeted at the caller-verified returnOrigin (never '*') so the
+// edit-ready event cannot leak to a malicious opener after the popup navigates.
+function renderPopupCloseDocument(input: PopupCloseDocumentInput): string {
+  const siteIdJson = JSON.stringify(input.siteId);
+  const tokenJson = JSON.stringify(input.token);
+  const stateJson = JSON.stringify(input.state);
+  const returnOriginJson = JSON.stringify(input.returnOrigin);
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -172,10 +189,7 @@ onSiteEditRoute.get('/', async (c) => {
     setTimeout(function() { window.close(); }, 600);
   </script>
 </body>
-</html>`,
-    200,
-    { 'Set-Cookie': cookieValue },
-  );
-});
+</html>`;
+}
 
 export default onSiteEditRoute;
