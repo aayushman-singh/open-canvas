@@ -116,9 +116,11 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
 // message — the implicit `undefined()` crash minifies to "fn is not a function"
 // and tells you neither.
 function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
-  const fn = RENDER_DISPATCH[element.type] as
-    | ((el: CanvasElement, ctx: ElementRenderCtx) => string)
-    | undefined;
+  const fn = Object.hasOwn(RENDER_DISPATCH, element.type)
+    ? (RENDER_DISPATCH as Record<string, (el: CanvasElement, ctx: ElementRenderCtx) => string>)[
+        element.type
+      ]
+    : undefined;
   if (typeof fn !== 'function') {
     throw new Error(
       `renderElementBody: no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,

@@ -8,6 +8,7 @@ import fixture from './fixtures/home.json';
 import { renderCanvasSnapshot } from './render.js';
 import type {
   BuiltInStyleKit,
+  CanvasElement,
   CanvasPage,
   CanvasSection,
   CanvasSiteState,
@@ -908,5 +909,99 @@ try {
   );
 }
 assert(rendererThrew, 'expected renderer to throw on unknown style kit (no silent fallback)');
+
+function assertRenderDispatchFailure(
+  badSnapshot: PublishedSnapshot,
+  expectedMessagePart: string,
+  message: string,
+): void {
+  let threw = false;
+  try {
+    renderCanvasSnapshot(badSnapshot, '/assets');
+  } catch (err) {
+    threw = true;
+    assert(
+      err instanceof Error && err.message.includes(expectedMessagePart),
+      `${message}: expected error to include ${expectedMessagePart}, got ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+  assert(threw, message);
+}
+
+const prototypeTopLevelElement = {
+  id: 'el-prototype-to-string',
+  type: 'toString',
+  box: { x: 0, y: 0, w: 100, h: 40, z: 1 },
+} as unknown as CanvasElement;
+assertRenderDispatchFailure(
+  {
+    version: 1,
+    publishedAt: '2026-05-28T00:00:00.000Z',
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-prototype-top-level',
+        slug: 'prototype-top-level',
+        title: 'Prototype Top Level',
+        width: 960,
+        sections: [
+          {
+            id: 'section-prototype-top-level',
+            recipeId: 'custom',
+            name: 'Prototype Top Level',
+            height: 120,
+            elements: [prototypeTopLevelElement],
+          },
+        ],
+      },
+    ],
+  },
+  'type="toString" id="el-prototype-to-string"',
+  'expected renderer to reject inherited Object.prototype dispatch keys at top level',
+);
+
+const prototypeCollectionChild = {
+  id: 'el-prototype-constructor',
+  type: 'constructor',
+  box: { x: 0, y: 0, w: 100, h: 40, z: 1 },
+} as unknown as CanvasElement;
+assertRenderDispatchFailure(
+  {
+    version: 1,
+    publishedAt: '2026-05-28T00:00:00.000Z',
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-prototype-collection',
+        slug: 'prototype-collection',
+        title: 'Prototype Collection',
+        width: 960,
+        sections: [
+          {
+            id: 'section-prototype-collection',
+            recipeId: 'custom',
+            name: 'Prototype Collection',
+            height: 240,
+            elements: [
+              {
+                id: 'el-collection-prototype-child',
+                type: 'collection',
+                box: { x: 0, y: 0, w: 400, h: 160, z: 1 },
+                mode: 'manual',
+                entryTemplate: [],
+                entries: [[prototypeCollectionChild]],
+                layout: { columns: 1, gap: 0 },
+              } as unknown as CanvasElement,
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  'renderElementBody (collection child): no RENDER_DISPATCH entry for element type="constructor" id="el-prototype-constructor"',
+  'expected renderer to reject inherited Object.prototype dispatch keys in collection children',
+);
 
 console.log('[canvas:smoke] OK');

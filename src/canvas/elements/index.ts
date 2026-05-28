@@ -97,9 +97,11 @@ export type RenderDispatch = {
 // at runtime, so an out-of-union value (legacy data, failed migration) is
 // possible and we surface it explicitly with the element id + type.
 function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
-  const fn = RENDER_DISPATCH[element.type] as
-    | ((el: CanvasElement, ctx: ElementRenderCtx) => string)
-    | undefined;
+  const fn = Object.hasOwn(RENDER_DISPATCH, element.type)
+    ? (RENDER_DISPATCH as Record<string, (el: CanvasElement, ctx: ElementRenderCtx) => string>)[
+        element.type
+      ]
+    : undefined;
   if (typeof fn !== 'function') {
     throw new Error(
       `renderElementBody (collection child): no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,
