@@ -4282,6 +4282,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bgImgClear.type = "button";
       bgImgClear.textContent = "x";
       bgImgClear.className = "style-btn-clear";
+      bgImgClear.title = "Remove background image";
       bgImgClear.disabled = !es.backgroundImageAssetId;
       // File input lives in the DOM so the picker actually opens. Chromium
       // silently no-ops .click() on a detached input[type=file] as a
@@ -4486,6 +4487,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         onStyleChange();
       });
       inspector.appendChild(field("Overflow", overflowSelect));
+
+      // -- Reset all element styles. The per-property × buttons only clear
+      // their own slot; this nukes the entire elementStyle so an Owner who
+      // wants a clean slate doesn't have to walk every control.
+      var resetRow = document.createElement("div");
+      resetRow.className = "style-row";
+      var resetBtn = document.createElement("button");
+      resetBtn.type = "button";
+      resetBtn.className = "style-btn-clear";
+      resetBtn.textContent = "Reset all";
+      resetBtn.title = "Remove every per-element style override on this element";
+      resetBtn.disabled = !element.elementStyle;
+      resetBtn.addEventListener("click", function() {
+        delete element.elementStyle;
+        rebuildElement(element.id);
+        renderInspector();
+        scheduleSave();
+      });
+      resetRow.appendChild(resetBtn);
+      inspector.appendChild(field("Reset", resetRow));
     })();
 
     // Motion controls.
