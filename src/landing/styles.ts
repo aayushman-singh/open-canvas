@@ -237,7 +237,7 @@ section {
 
 .hero-grid {
   display: grid;
-  grid-template-columns: 1.05fr 1.15fr 0.95fr;
+  grid-template-columns: 0.62fr 1.78fr 0.78fr;
   min-height: clamp(560px, calc(100vh - 160px), 920px);
 }
 
