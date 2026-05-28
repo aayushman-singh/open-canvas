@@ -109,15 +109,21 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
 
 // Dispatch indirection — the public renderer never imports element-specific
 // render fns. The Phase 0 RENDER_DISPATCH table is the single source of truth
-// for "given an element of type T, produce the inner HTML." Type-narrowed via
-// the dispatch map so each render fn sees the right Extract<...> shape.
+// for "given an element of type T, produce the inner HTML." The table is
+// compile-time exhaustive on CanvasElement['type'], but `element.type` comes
+// from JSONB at runtime, so an out-of-union value is possible (legacy data,
+// failed migration). Catch it explicitly with element id + type in the
+// message — the implicit `undefined()` crash minifies to "fn is not a function"
+// and tells you neither.
 function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
-  // The double cast is needed because TypeScript cannot infer that
-  // `RENDER_DISPATCH[element.type]` accepts `element` whose type is the union
-  // — it only accepts the narrowed `Extract` shape. The map keys are
-  // exhaustive on the union (enforced by the `RenderDispatch` mapped type)
-  // and the discriminant `.type` is preserved through this call.
-  const fn = RENDER_DISPATCH[element.type] as (el: CanvasElement, ctx: ElementRenderCtx) => string;
+  const fn = RENDER_DISPATCH[element.type] as
+    | ((el: CanvasElement, ctx: ElementRenderCtx) => string)
+    | undefined;
+  if (typeof fn !== 'function') {
+    throw new Error(
+      `renderElementBody: no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,
+    );
+  }
   return fn(element, ctx);
 }
 

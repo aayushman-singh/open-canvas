@@ -92,8 +92,19 @@ export type RenderDispatch = {
   ) => string;
 };
 
+// Used by the `collection` dispatch entry below to render each child element.
+// See the matching comment in `src/canvas/render.ts` — `element.type` is JSONB
+// at runtime, so an out-of-union value (legacy data, failed migration) is
+// possible and we surface it explicitly with the element id + type.
 function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
-  const fn = RENDER_DISPATCH[element.type] as (el: CanvasElement, ctx: ElementRenderCtx) => string;
+  const fn = RENDER_DISPATCH[element.type] as
+    | ((el: CanvasElement, ctx: ElementRenderCtx) => string)
+    | undefined;
+  if (typeof fn !== 'function') {
+    throw new Error(
+      `renderElementBody (collection child): no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,
+    );
+  }
   return fn(element, ctx);
 }
 

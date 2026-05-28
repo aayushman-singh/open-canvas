@@ -963,6 +963,23 @@ interface SiteCard {
   searchIndexing: boolean;
 }
 
+// Visible placeholder when a single site's editableState fails to render.
+// This is an explicit alternative behaviour (loudly logged below) so one
+// broken site does not 500 the whole dashboard — the owner can still see
+// every other card, click Edit on the broken card, and fix the data.
+const THUMB_FAILED_HTML =
+  '<!DOCTYPE html><html><head><style>' +
+  'body{margin:0;display:flex;align-items:center;justify-content:center;' +
+  'height:100vh;background:#1a1116;color:#ffb5b5;' +
+  'font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;' +
+  'text-align:center;padding:16px;box-sizing:border-box}' +
+  'strong{display:block;font-size:15px;margin-bottom:6px}' +
+  'span{opacity:.7;font-size:12px}' +
+  '</style></head><body><div>' +
+  '<strong>Preview failed</strong>' +
+  '<span>Open editor to inspect.</span>' +
+  '</div></body></html>';
+
 function buildCards(
   rows: Array<{
     id: string;
@@ -978,6 +995,16 @@ function buildCards(
 ): SiteCard[] {
   return rows.map((row) => {
     const state = row.editableState;
+    let thumbHtml: string;
+    try {
+      thumbHtml = buildThumbHtml(state, row.id, origin);
+    } catch (error) {
+      console.error(
+        `dashboard: buildThumbHtml failed for siteId=${row.id} name=${JSON.stringify(row.name)} subdomain=${JSON.stringify(row.subdomain)}`,
+        error,
+      );
+      thumbHtml = THUMB_FAILED_HTML;
+    }
     return {
       siteId: row.id,
       siteName: row.name,
@@ -985,7 +1012,7 @@ function buildCards(
       styleKit: row.styleKit,
       publishedVersion: row.publishedVersion,
       updatedAt: row.updatedAt,
-      thumbHtml: buildThumbHtml(state, row.id, origin),
+      thumbHtml,
       passwordEnabled: row.passwordEnabled,
       darkModeEnabled: state.darkModeEnabled ?? false,
       searchIndexing: !(state.siteNoIndex ?? false),
