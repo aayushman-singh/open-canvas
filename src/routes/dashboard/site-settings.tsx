@@ -933,14 +933,16 @@ const rev01SiteSettingsConfig = (() => {
       const stateEl = cb.closest('.toggle-row')?.querySelector('[data-toggle-state]');
       const stateOn = cb.getAttribute('data-on-label') ?? 'On';
       const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
-      cb.disabled = true;
+      // Do NOT disable the checkbox while the PATCH is in flight — disabled
+      // inputs don't fire 'change' on subsequent clicks, so a rapid second
+      // toggle would be silently eaten. queueConfigPatch already serialises
+      // the requests server-side, and apiValue is captured here at click
+      // time, so back-to-back toggles all land in order.
       queueConfigPatch({ [key]: apiValue }, () => {
           if (stateEl) stateEl.textContent = cb.checked ? stateOn : stateOff;
         }, (message) => {
           cb.checked = !cb.checked;
           alert(message);
-        }).finally(() => {
-          cb.disabled = false;
         });
     });
   });
