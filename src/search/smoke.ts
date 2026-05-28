@@ -157,7 +157,6 @@ function makeFixtureSnapshot(version: number, page: CanvasPage): PublishedSnapsh
 function makeFixtureSiteState(page: CanvasPage): CanvasSiteState {
   return {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [page],
   };
 }

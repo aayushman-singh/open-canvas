@@ -29,7 +29,6 @@ const PAGE_WIDTH = 1440;
 function wrapInState(section: import('../schema.js').CanvasSection): CanvasSiteState {
   return {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [{ id: 'page-1', slug: 'home', title: 'Smoke', width: PAGE_WIDTH, sections: [section] }],
   };
 }
@@ -697,7 +696,6 @@ for (const kit of BUILT_IN_STYLE_KITS) {
 
   const state: CanvasSiteState = {
     styleKit: kit,
-    symbols: [],
     pages: [{ id: 'page-1', slug: 'home', title: 'Smoke', width: PAGE_WIDTH, sections: [section] }],
   };
   const result = validateCanvasSiteState(state);

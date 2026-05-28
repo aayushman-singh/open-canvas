@@ -144,7 +144,6 @@ function makeSnapshot(state: CanvasSiteState): PublishedSnapshot {
 function makeMinimalState(styleKit: CanvasSiteState['styleKit']): CanvasSiteState {
   return {
     styleKit,
-    symbols: [],
     pages: [
       {
         id: 'page-home',

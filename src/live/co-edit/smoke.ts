@@ -328,7 +328,6 @@ async function waitFor(predicate: () => boolean, timeoutMs: number, label: strin
 
 const initialState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-home',

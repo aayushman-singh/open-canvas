@@ -4,14 +4,8 @@
 //   docs/superpowers/plans/2026-05-23-16-multi-page-nav.md
 //
 // A NavElement renders a navigation strip that contains an optional logo asset and an
-// ordered list of links. The element is stored once on the site as the single
-// inner element of a "Site Nav" SymbolMaster (see `src/symbols/nav-bootstrap.ts`)
-// and dropped onto each Canvas Page as a SymbolInstance — so editing the nav
-// once propagates to every page, and a Visitor sees the same bar in the same
-// place across the site. The merge / instance machinery is the Wave 3 #14
-// override-style Symbols feature; nothing in this file knows about Symbols
-// directly. We just emit the bar HTML; symbol-instance.ts wraps us through the
-// merge resolver at render time.
+// ordered list of links. The element is dropped onto each Canvas Page so the
+// same bar shows up across the site.
 //
 // ---------------------------------------------------------------------------
 // LAYOUT SLOTS
@@ -185,26 +179,8 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
 }
 
 /**
- * Recipe id reserved for the "Site Nav" symbol's section. The bootstrap in
- * `src/symbols/nav-bootstrap.ts` stamps this on the SymbolMaster's section so
- * the public renderer + dashboard can recognise it without keying off the
- * symbol's display name.
+ * Recipe id reserved for nav sections. Re-exported through
+ * `src/canvas/elements/index.ts` for callers that need to identify nav
+ * sections by recipe id.
  */
 export const NAV_RECIPE_ID = 'site-nav' as const;
-
-/**
- * Canonical display name for the per-site nav symbol. Owners can rename it,
- * but the bootstrap creates the master with this exact string. The dashboard
- * editor surfaces the name as the page heading.
- */
-export const SITE_NAV_SYMBOL_NAME = 'Site Nav';
-
-/**
- * Stable id used by the bootstrap when creating the per-site Nav SymbolMaster.
- * Idempotency depends on this being the same string across calls: the second
- * bootstrap call looks up `state.symbols` by this id and short-circuits when
- * found. The `nav-` prefix distinguishes nav from generic Owner-authored
- * symbols (whose ids are `sym-<uuid>`); a single site has at most one master
- * with this id by design.
- */
-export const SITE_NAV_SYMBOL_ID = 'sym-site-nav' as const;

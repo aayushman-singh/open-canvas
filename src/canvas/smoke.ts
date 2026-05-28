@@ -48,7 +48,6 @@ assert(html.includes('data-rev01-media-kind="image"'), 'expected rendered image 
 
 const pageMotionLayoutState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-motion-layout',
@@ -110,7 +109,6 @@ assert(
 
 const badPageMotionLayoutResult = validateCanvasSiteState({
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-bad-motion-layout',
@@ -183,7 +181,6 @@ const javascriptLinkText: TextElement = {
 };
 const javascriptLinkState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-evil',
@@ -231,7 +228,6 @@ const blankTargetText: TextElement = {
 };
 const blankTargetState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-blank-target',
@@ -283,7 +279,6 @@ const badTargetText: TextElement = {
 };
 const badTargetState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-bad-target',
@@ -322,7 +317,6 @@ const noTargetText: TextElement = {
 };
 const noTargetState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-no-target',
@@ -481,7 +475,6 @@ const pageLinkHtml = renderCanvasSnapshot(
     publishedAt: '2026-05-25T00:00:00.000Z',
     styleKit: pageLinkState.styleKit,
     pages: pageLinkState.pages,
-    symbols: pageLinkState.symbols,
   },
   '/assets',
 );
@@ -506,7 +499,6 @@ assert(
           publishedAt: '2026-05-25T00:00:00.000Z',
           styleKit: pageLinkState.styleKit,
           pages: pageLinkState.pages,
-          symbols: pageLinkState.symbols,
         },
         '/assets',
       );
@@ -632,7 +624,6 @@ function roleTestSection(
 function roleTestState(sections: CanvasSection[]): CanvasSiteState {
   return {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [
       {
         id: 'page-role-test',

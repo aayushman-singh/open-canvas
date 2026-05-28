@@ -116,7 +116,6 @@ const heroHeading: TextElement = {
 
 const editableState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-home',

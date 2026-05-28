@@ -158,7 +158,6 @@ assert(!emptyPagesState.valid, 'expected canvas site state with no pages to be i
 
 const editableEmptyMediaState: CanvasSiteState = {
   styleKit: 'charcoal',
-  symbols: [],
   pages: [
     {
       id: 'page-empty-media',

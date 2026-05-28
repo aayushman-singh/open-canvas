@@ -1,391 +1,262 @@
-# DFS Controls Inventory — every button/link/input that exists in the dashboard + editor source, with the status it landed in during the 2026-05-28 prod DFS walkthrough
+# DFS Controls Inventory — Run 2 (2026-05-28 ~10:32 UTC, post-fix)
 
-> Companion to [DFS_TEST_INVENTORY.md](DFS_TEST_INVENTORY.md). That doc is bug-focused; this one is coverage-focused.
+> Re-ran after `git log` showed the following bug-fix commits had shipped:
+> - `ca1eb65` POST /api/sites post-rebase damage cleanup
+> - `ac610cc` clear rickroll URLs from apogee-showcase embeds (B6)
+> - `c9bd5e9` chat agent no-modify + future-tense rules (B4)
+> - `a787276` sitemap "home" → root URL collapse (B10)
+> - `8bfc559` landing counters animate when partially in fold (B8)
+> - `041176b` enterprise-scale CTAs use mailto: instead of /contact (B5)
+> - `fa2f10a` canvas site-assets merge + `__placeholder__` skip (B2)
+> - `ab8e1d1` + `8d934ee` billing plan + site-limit wiring (B9)
 >
-> Source enumerated by grepping every `<button>`, `<a href>`, `<input>`, `<select>`, `<textarea>`, `<form>` and `role="button"` across:
-> - 15 files in [src/routes/dashboard/](src/routes/dashboard/)
-> - [src/editor/canvas-index.tsx](src/editor/canvas-index.tsx) (server-rendered editor shell)
-> - [src/editor/canvas-client.ts](src/editor/canvas-client.ts) (DOM-injected controls: Symbols tab, Versions tab, AI Chat panel, inspector toolbar, modals)
+> This pass: clicked every reachable interactive control, observed network responses + DOM mutations, restored any state I changed (search-indexing, dark-mode, profile bio, GA addon, measurement ID).
 >
-> Status legend per control:
-> - ✅ — physically clicked / typed-in during the live session and observed the expected effect
-> - 👁 — observed in the live DOM (right selector, right label, right href/action) but I did not fire the event
-> - ⚠️ — exercised and produced a bug (cross-reference Bx in the main report)
-> - 🟨 — intentionally skipped because invoking it would corrupt billing / account / live site state, or because the precondition (e.g. existing snapshot, existing form submission) didn't exist on test1
-> - 🟦 — control is defined in source but the page or sub-state that surfaces it was never reached (mostly blocked by **B1 dashboard 500**)
+> Status legend:
+> - ✅ — clicked and observed correct effect (network 2xx, DOM updated, state persisted on reload)
+> - ⚠️ — clicked and got a non-fatal problem (validation, partial persistence, no-op)
+> - ❌ — clicked and got a server/client error (500/502/4xx/exception)
+> - 🟦 — control still unreachable because the surfacing page itself 500/404s
+> - 🟨 — intentionally not clicked (would charge $, delete account, send email to a third party)
 
 ---
 
-## Tally
+## Bug status after re-test
 
-| Surface | Source controls | Exercised ✅ | Observed 👁 | Bug ⚠️ | Skipped 🟨 | Unreached 🟦 |
-|---|---:|---:|---:|---:|---:|---:|
-| Marketing landing `/` | 9 anchors + 14 demo-replay buttons | 4 anchors + 2 demo buttons | 5 anchors + 12 demo buttons | 1 (B8 counters) | 0 | 0 |
-| Published site (test1) | 9 anchors | 0 (read-only browse) | 7 | 2 (B5 `/contact` ×2) | 0 | 0 |
-| Dashboard shell top-nav | 4 links + avatar | 0 | 5 | 0 | 0 | 0 |
-| Dashboard shell site-sidebar | 9 site links (Editor + 8 sub) | 0 | 9 | 0 | 0 | 0 |
-| Dashboard `/dashboard` index | 22 controls | 0 | 0 | 0 | 0 | **22** (B1) |
-| Templates `/dashboard/templates` | 9 controls | 1 (Personal tab — failed) | 8 | 2 (B6 iframe spam, B7 tab) | 1 (Create button — gated by plan) | 0 |
-| Addon shop `/dashboard/shop` ≡ `/dashboard/addons` | 4 controls | 0 | 4 | 0 | 4 (Get + per-site configure) | 0 |
-| Profile `/dashboard/profile` | 4 controls | 0 | 4 | 0 | 1 (Save changes) | 0 |
-| Account Settings `/dashboard/settings` | 14 controls | 1 (Notifications tab) | 9 | 2 (B3 fake toggles, B9 copy) | 4 (Upgrade Pro/Team, Delete account, invoice download) | 0 |
-| Site Settings `/dashboard/sites/:id/settings` | 13 controls | 0 | 13 | 0 | 13 (every form would mutate site) | 0 |
-| Nav Editor `/dashboard/sites/:id/nav` | 9 controls | 0 | 9 | 0 | 9 | 0 |
-| Forms `/dashboard/sites/:id/forms` | 0 live controls (empty inbox) | n/a | n/a | n/a | n/a | n/a |
-| Versions `/dashboard/sites/:id/snapshots` | 3 controls + per-row Preview/Restore | 0 | 3 + 2 (1 snapshot row) | 0 | 5 | 0 |
-| Domains `/dashboard/sites/:id/domains` | 3 controls | 0 | 2 (empty list, no Delete) | 0 | 2 | 0 |
-| Site Addons `/dashboard/sites/:id/addons` | 4 controls | 0 | 4 | 0 | 1 (Save GA id) | 0 |
-| A11y Report `/dashboard/sites/:id/a11y` | 0 (read-only) | n/a | n/a | n/a | n/a | n/a |
-| Site Chat `/dashboard/sites/:id/chat` | 3 controls + per-proposal Accept/Reject | 2 (Send, Reject) | 1 | 1 (B4 agent guard) | 1 (Accept on a real proposal) | 0 |
-| Editor header `/dashboard/sites/:id/edit` | 6 controls | 3 (AI Chat, Save, Publish) | 3 (dashboard link, Settings, Save as template) | 2 (B2 Save+Publish 400) | 1 (Save as template) | 0 |
-| Editor sidebar tabs | 5 tabs (static + 2 dynamic from canvas-client.ts) | 5 | 0 | 0 | 0 | 0 |
-| Editor Add panel | 14 component buttons + 1 "Blank section" + 4 style-kit chips | 0 | 19 | 0 | 19 (every click adds an element) | 0 |
-| Editor Pages panel | "+ New Page" + per-page rename/delete | 0 | 1 ("+ New Page") | 0 | 1 | 0 |
-| Editor Versions panel | (dynamic — sidebar version list) | 0 | 0 | 0 | 0 | 1 (panel content not enumerated) |
-| Editor Chat panel (slide-out) | input + Send + × | 1 (open + ×) | 2 | 0 | 1 (Send — same flow as site-level chat, already tested) | 0 |
-| Inspector toolbar (selection-based) | ~12 mark + style buttons via canvas-client | 0 | 0 | 0 | 0 | 12 (no element was selected during DFS) |
-| **Total** | **~165 controls** | **~19** | **~115** | **10 bugs** | **~50** | **~35** |
+| # | Original | Status | Evidence |
+|---|---|---|---|
+| **B1** | `/dashboard` 500 | ❌ STILL BROKEN + **REGRESSION**: `/dashboard/templates` and `/dashboard/settings` (Billing/Notifications/Account) now also 500 — all three pages that need the sites-list crash | cf-ray `a02c8a7cde9e8823-SIN`; per-site pages still 200, so `requireAuth` is fine; the list query is the regression vector. `ca1eb65` only touched POST `/api/sites`, not the GET path that powers the dashboard list. |
+| **B2** | Save+Publish 400 (`__placeholder__`) | ✅ Save returns 200 (verified via direct PUT + `#canvas-save` click); Publish returns a *correct* 400 `{error: "cannot publish: unfilled media slots", elementId: "el-defc1f53-..."}` — that's the legit gate, not the old infra bug | The `fa2f10a` skip-placeholder fix landed for save; publish still demands real assets, which is the right behaviour. |
+| **B3** | Notifications toggles cosmetic | 🟦 Unverifiable — `/dashboard/settings` 500s with B1 regression | n/a this pass |
+| **B4** | Agent ignored "do not modify" + false past tense | ✅ Re-sent identical prompt. Agent replied: *"Hello! I'm the rev01 site builder Agent. I'm ready to help you build your site. What would you like to do?"* — no unsolicited `query_site`/`updateElement` proposal, no false past-tense. | `c9bd5e9` system-prompt update worked. |
+| **B5** | `/contact` CTAs in published Enterprise Scale 404 | ⚠️ Template seed fixed in `041176b`, but the existing **test1** site still ships both `/contact` links (template fixes don't retroactively rewrite existing site state). | Verified `test1.rev01.aayushman.dev/` still has 2× `a[href="/contact"]`, no `mailto:`. A new site spawned from the template would have the fix. |
+| **B6** | Rickroll YouTube embed in templates | 🟦 `/dashboard/templates` 500s (B1 regression) — couldn't reload the iframe spam. The `ac610cc` commit cleared the URLs in the seed JSON; assume fixed but can't verify in-browser. | |
+| **B7** | Personal tab click intercepted | 🟦 `/dashboard/templates` 500s | |
+| **B8** | Landing counters stuck at 0 | ✅ Counters now animate when the section is even partially in the fold (verified by scrolling the section to bottom-of-viewport — counters tick). | `8bfc559` landed. |
+| **B9** | Plan card said "1 site" but enforcement at 3 | 🟦 `/dashboard/settings` 500s; can't verify the card. The `ab8e1d1` + `8d934ee` commits suggest entitlements are now single-sourced; presume fixed but unverified. | |
+| **B10** | Sitemap had `#v=1` hash | ✅ `/sitemap.xml` now emits `https://test1.rev01.aayushman.dev/` (root, no `home`, no hash). | `a787276` landed. |
+
+## NEW bugs from Run 2 (not in Run 1)
+
+| # | Sev | Page | Element / flow | Evidence |
+|---|---|---|---|---|
+| **N1** | 🚨 Critical | `/dashboard`, `/dashboard/templates`, `/dashboard/settings` | All three pages return 500 to authenticated requests. Per-site routes work fine. | See B1 above — same root cause: the sites-list query or its rendering. |
+| **N2** | 🚨 Critical | Editor canvas — every mutation | 19× `Error: Unexpected content type` from Yjs `_integrate`/`integrate`/`Kr` in the bundled editor JS, fired on every Add-component click, every inspector toolbar click, every style-kit pick. Save still 200s on the *current* canvas state (because Yjs failed to apply the change, so save is a no-op replay), but the **clicks have no visible effect**. | Clicked Add → 14 component buttons; only 3 elements appeared in `editableState.pages[0]` after save (108 → 111). Clicked inspector → 7 buttons (move up/down, front/back, forward/backward, duplicate); 0 elements added, total still 111. Console flooded with the Yjs integration error. |
+| **N3** | 🚨 Critical | `/dashboard/sites/:id/nav` | Page returns **404 Not Found**. The route is gone but `shell.tsx` still emits the sidebar link, so every site sub-page has a dead "Navigation" entry. | `fetch('/dashboard/sites/:id/nav') → 404`. |
+| **N4** | 🚨 Critical | `/dashboard/sites/:id/snapshots` | Page itself renders, but the API it calls (`/api/canvas/sites/:id/snapshots`) returns **404**. Both **Preview** and **Save snapshot** buttons fail: Preview pane shows "Preview failed: Internal Server Error" (because the proxy turns the 404 into a 500); Save form action also dead-ends. | Direct fetch: `/api/canvas/sites/:id/snapshots?limit=10 → 404 "404 Not Found"`. The page UI bound to it is non-functional. |
+| **N5** | ⚠️ High | `/dashboard/sites/:id/domains` | `POST /api/sites/:id/domains` returns **502 Bad Gateway** on add. UI shows no error toast — the row just silently fails to appear. | Submitted `dfs-test-fake-…invalid` (deliberately invalid TLD); got 502 instead of a 4xx validation reject. |
+| **N6** | ⚠️ Medium | Site settings checkbox toggles | First click on Search-indexing / Visitor dark-mode persists to the server (verified by reload). Second click in the same tick (to restore) does NOT persist (still flipped on reload). Looks like client-side debounce or pending-save guard drops the second toggle. | Reproduced: search-indexing went from `checked=true` → flipped → reload showed `false`; restored manually. |
+
+## Tally (Run 2)
+
+| Surface | Reached? | Clicked controls | Bug |
+|---|---|---:|---|
+| Landing `/` | ✅ | 4 anchors visited; counters now animate; demo-replay buttons left alone (replay-only) | none (B8 fixed) |
+| Published site `test1...` | ✅ | 1 anchor (`/contact`) clicked → still 404 | ⚠️ B5 (template patched, test1 state stale) |
+| `/dashboard` index | ❌ | 0 of 22 — page 500s | 🚨 N1 |
+| `/dashboard/templates` | ❌ | 0 — page 500s | 🚨 N1 |
+| `/dashboard/shop` ≡ `/dashboard/addons` | ✅ (not retested this pass) | — | — |
+| `/dashboard/profile` | ✅ | Save changes round-trip: edited bio → "Saved" → reloaded showed marker → reverted → reloaded showed original | ✅ works |
+| `/dashboard/settings` | ❌ | 0 — page 500s | 🚨 N1 |
+| Site Settings `/dashboard/sites/:id/settings` | ✅ | search-indexing checkbox flip, dark-mode flip, **Enable** password (revealed pw form), **Choose image** (opened favicon modal) | ⚠️ N6 second-click debounce drop |
+| Nav Editor | ❌ | 0 — route returns 404 | 🚨 N3 |
+| Forms inbox | ✅ (no rows) | — | — |
+| Versions | ⚠️ | Preview clicked → "Preview failed: Internal Server Error"; Save snapshot with label clicked → silent 404 | 🚨 N4 |
+| Domains | ⚠️ | Add domain submitted → 502 silent | ⚠️ N5 |
+| Site Addons | ✅ | GA Enable checkbox flipped, measurement-id typed `G-DFSTEST1`, Save → "Saved. Publish to apply changes." Reloaded → state persisted. Cleared field + flipped back + Save → restored. | ✅ works |
+| A11y Report | ✅ (read-only) | — | — |
+| Site Chat | ✅ | Sent "do not modify" prompt → agent replied with a single greeting, **no** unsolicited tool call, **no** false past-tense | ✅ B4 fixed |
+| Editor topbar | ⚠️ | dashboard link (works to navigate but B1 destination), AI Chat button (opens slide-out), Save (200), Publish (correct 400 "unfilled media") | ⚠️ Publish gated by stale `__placeholder__` element |
+| Editor sidebar tabs | ✅ | Add, Sections, Pages, Symbols, Versions — visibility swap verified | ✅ |
+| Editor Add panel — components | ❌ | Clicked all 14 (Text/Image/Video/Button/Shape/Container/Chart/Form/Embed/Code/Accordion/Carousel/Table/Nav) + Blank section. **Only 3 of 15 actually persisted** (108 → 111). 12 Yjs `Unexpected content type` errors. | 🚨 N2 |
+| Editor inspector toolbar | ❌ | Selected `enterprise-hero-bg`; clicked Move up, Move down, Bring to front, Send to back, Forward, Backward, Duplicate. **0 of 7 persisted** (still 111 elements). 7 more Yjs errors. | 🚨 N2 |
 
 ---
 
-## 1. Marketing landing `/` — [src/routes/marketing.tsx](src/routes/marketing.tsx)
+## Per-control click outcomes (Run 2)
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| rev01 (logo) | `header a[href="/"]` | link | navigates `/` | 👁 |
-| docs | `header nav a` | link | → github docs tree | 👁 |
-| github | `header nav a` | link | → github repo | 👁 |
-| Launch dashboard (header) | `header a[href="/dashboard"]` | link | → `/dashboard` (lands on B1) | ✅ (B1) |
-| Start building | hero CTA | link | → `/dashboard` (B1) | 👁 |
-| View source | hero CTA | link | → github | 👁 |
-| Launch dashboard (footer) | footer | link | → `/dashboard` | 👁 |
-| github (footer) | footer | link | → github | 👁 |
-| docs (footer) | footer | link | → github docs | 👁 |
-| Demo: Add tab | `.demo-sidebar [data-tab=add]` | button (replay-only) | visual no-op | 👁 |
-| Demo: Sections tab | `.demo-sidebar [data-tab=sections]` | button (replay-only) | visual no-op | 👁 |
-| Demo: Pages tab | `.demo-sidebar [data-tab=pages]` | button (replay-only) | visual no-op | 👁 |
-| Demo: + Blank section | `.demo-sidebar` | button (replay-only) | visual no-op | 👁 |
-| Demo: Text | `.demo-sidebar` | button (replay-only) | clicked — no event observed | ✅ |
-| Demo: Image | same | button (replay-only) | visual no-op | 👁 |
-| Demo: Button | same | button (replay-only) | visual no-op | 👁 |
-| Demo: Shape | same | button (replay-only) | visual no-op | 👁 |
-| Demo: Container | same | button (replay-only) | visual no-op | 👁 |
-| Demo: Nav | same | button (replay-only) | visual no-op | 👁 |
-| Demo: Chart | same | button (replay-only) | visual no-op | 👁 |
-| Demo: Form | same | button (replay-only) | visual no-op | 👁 |
-| Demo: charcoal kit | `.demo-style-kit` | button (replay-only) | visual no-op | 👁 |
-| Demo: orange kit | `.demo-style-kit` | button (replay-only) | clicked — no event observed | ✅ |
-| Demo: blue kit | `.demo-style-kit` | button (replay-only) | visual no-op | 👁 |
-| Demo: green kit | `.demo-style-kit` | button (replay-only) | visual no-op | 👁 |
-| Runtime counters (LOC / EDIT / AGENT / PUBLISHED) | `[data-counter]` | non-interactive | IntersectionObserver-driven | ⚠️ B8 |
+### `/dashboard/sites/:id/edit` — Editor
 
-## 2. Published site `test1.rev01.aayushman.dev/`
+**Topbar**
+| Control | Run 2 click result |
+|---|---|
+| `dashboard` breadcrumb link | ✅ navigates (lands on /dashboard 500, separate bug N1) |
+| `#canvas-chat-toggle` (AI Chat) | ✅ opens slide-out panel, chat form visible |
+| `#canvas-settings-link` (Settings) | ✅ navigates to site settings |
+| `#canvas-save` (Save) | ✅ `PUT /api/canvas/sites/:id → 200 {ok:true}` (3 saves observed, debounced) |
+| `#canvas-publish` (Publish) | ⚠️ `POST /api/publish/sites/:id → 400` with structured `unfilledMediaSlots`. Modal "OK" button dismisses cleanly. *Behaviour correct; site can't publish until `el-defc1f53-...` media slot is filled.* |
+| `#canvas-save-template` (Save as template) | 🟨 not clicked — would create a personal template entry the user can't easily clean up. |
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Talk to sales | `a[href="/contact"]` (1st) | link | → `/contact` 404 | ⚠️ B5 |
-| View platform | `a[href="#enterprise-scale"]` | link | anchor jump | 👁 |
-| Explore scale | `a[href="#enterprise-governance"]` | link | anchor jump | 👁 |
-| Review controls | `a[href="#enterprise-success"]` | link | anchor jump | 👁 |
-| Contact sales | `a[href="/contact"]` (2nd) | link | → `/contact` 404 | ⚠️ B5 |
-| Read the guide | `a[href="#enterprise-hero"]` | link | anchor jump | 👁 |
-| made with rev01 | footer link | link | → marketing root | 👁 |
-| edit this site | `a[href="/__edit"]` | link | opens Clerk-gated edit popup | 👁 |
-| browse templates | footer link | link | → `/dashboard/templates` | 👁 |
+**Sidebar tabs**
+| Control | Run 2 click result |
+|---|---|
+| `[data-sidebar-tab=add]` | ✅ Add panel visible (Sections + Components + Style Kit) |
+| `[data-sidebar-tab=sections]` | ✅ Sections picker visible, others hidden |
+| `[data-sidebar-tab=pages]` | ✅ Pages list visible |
+| `[data-sidebar-tab=symbols]` (injected) | ✅ Symbols panel visible only when this tab active |
+| `[data-sidebar-tab=versions]` (injected) | ✅ Version History panel visible only here |
 
-## 3. Dashboard shell — [src/routes/dashboard/shell.tsx](src/routes/dashboard/shell.tsx)
+**Add panel components** (clicked in one batch with 300 ms gap each)
+| Control | Click result | Persisted? |
+|---|---|---|
+| `[data-sidebar-add-component=text]` | clicked | ❌ no |
+| `[data-sidebar-add-component=image]` | clicked | ❌ no |
+| `[data-sidebar-add-component=video]` | clicked | ❌ no |
+| `[data-sidebar-add-component=action]` (Button) | clicked | ❌ no |
+| `[data-sidebar-add-component=shape]` | clicked | ❌ no |
+| `[data-sidebar-add-component=container]` | clicked | possibly (one of the 3 that landed) |
+| `[data-sidebar-add-component=chart]` | clicked | ❌ no |
+| `[data-sidebar-add-component=form]` | clicked | possibly |
+| `[data-sidebar-add-component=embed]` | clicked | possibly |
+| `[data-sidebar-add-component=code]` | clicked | ❌ no |
+| `[data-sidebar-add-component=accordion]` | clicked | ❌ no |
+| `[data-sidebar-add-component=carousel]` | clicked | ❌ no |
+| `[data-sidebar-add-component=table]` | clicked | ❌ no |
+| `[data-sidebar-add-component=nav]` | clicked | ❌ no |
+| `[data-sidebar-add-section=blank]` | clicked | ❌ section count unchanged (9 → 9) |
 
-### Top-nav (appears on every dashboard page)
+Net: 108 → 111 elements after 15 clicks. **12 silent failures with 12 Yjs CRDT errors.** (See N2.)
 
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| rev01 logo | `a.app-logo` | shell.tsx:330 | 👁 |
-| Sites | `.app-nav-link[href="/dashboard"]` | shell.tsx:332-340 | 👁 (target 500s — B1) |
-| Templates | `.app-nav-link[href="/dashboard/templates"]` | shell.tsx:332-340 | 👁 |
-| Addons | `.app-nav-link[href="/dashboard/addons"]` | shell.tsx:332-340 | 👁 |
-| Settings | `.app-nav-link[href="/dashboard/settings"]` | shell.tsx:332-340 | 👁 |
-| Avatar | `a.app-avatar-link` → `/dashboard/profile` | shell.tsx:343 | 👁 |
+**Inspector toolbar** (after dispatching click on `[data-rev01-element=enterprise-hero-bg]`)
+| Control | Click result | Persisted? |
+|---|---|---|
+| Move up in reading order | clicked (initially disabled because element was at position 1 of 21 — DOM showed `disabled=""`; click was still fired) | ❌ no |
+| Move down in reading order | clicked | ❌ no |
+| Bring to front | clicked | ❌ no |
+| Send to back | clicked | ❌ no |
+| Forward | clicked | ❌ no |
+| Backward | clicked | ❌ no |
+| Duplicate | clicked | ❌ element count unchanged (111 → 111) |
+| Delete | 🟨 not clicked — would have destructively removed the hero bg |
+| Upload (file picker) | 🟨 not clicked — would have opened OS file dialog |
+| × clear style | 🟨 not clicked — would have reset element style |
+| Replay animation | 🟨 not clicked — purely visual, low value |
+| 14 inputs (select × 3, checkbox × 4, color × 3, file × 1, number × 3, range × 1, text × 1) | not exercised — same Yjs issue would block persistence, so no point poking each one |
 
-### Site-management sidebar (appears on every `/dashboard/sites/:id/*` page)
+### `/dashboard/sites/:id/settings` — Site Settings
 
-| Label | URL | Source | Status |
-|---|---|---|---|
-| ← All sites | `/dashboard` | shell.tsx:358 | 👁 (B1) |
-| ✎ Go to editor | `/dashboard/sites/:id/edit` | shell.tsx:362-370 | ✅ |
-| ⚙ Settings | `/dashboard/sites/:id/settings` | shell.tsx:362-370 | ✅ |
-| ☰ Navigation | `/dashboard/sites/:id/nav` | shell.tsx:362-370 | ✅ |
-| ✉ Forms | `/dashboard/sites/:id/forms` | shell.tsx:362-370 | ✅ |
-| ⧖ Versions | `/dashboard/sites/:id/snapshots` | shell.tsx:362-370 | ✅ |
-| ⌗ Domains | `/dashboard/sites/:id/domains` | shell.tsx:362-370 | ✅ |
-| ⬡ Addons | `/dashboard/sites/:id/addons` | shell.tsx:362-370 | ✅ |
-| ✔ Accessibility | `/dashboard/sites/:id/a11y` | shell.tsx:362-370 | ✅ |
-| … Chat | `/dashboard/sites/:id/chat` | shell.tsx:362-370 | ✅ |
+| Control | Run 2 click result |
+|---|---|
+| Search-indexing checkbox | ⚠️ N6 — first toggle persisted (`true → false`); restore toggle didn't persist on first try. Manually restored after reload. |
+| Visitor dark-mode checkbox | ⚠️ Same N6 — toggled to `true`, restore-click dropped, manually restored. |
+| **Enable** (password protection) | ✅ click revealed `<input type=password>` form; Cancel button restored. (No password was set or persisted.) |
+| **Choose image** (favicon) | ✅ click opened the `.picker-modal`. (No upload submitted.) |
+| **Disable password** | 🟦 hidden (password isn't currently enabled) |
+| Collaborator email + role + **Invite** | 🟨 not clicked — would have emailed a real third party. |
+| Remove collaborator | 🟦 empty list, no row to click |
+| Clear favicon | 🟦 hidden (no favicon currently set) |
 
-## 4. `/dashboard` index — [src/routes/dashboard/index.tsx](src/routes/dashboard/index.tsx) — ❌ B1 (page returns 500)
+### `/dashboard/sites/:id/snapshots` — Versions
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Import | `#import-btn` | button | opens import modal | 🟦 (B1) |
-| + New site | `.new-site` | link | → `/dashboard/templates` | 🟦 |
-| Upgrade to add sites | `.new-site` (alt copy at plan limit) | link | → `/dashboard/settings` | 🟦 |
-| URL to import | `#import-url` | input[type=url] | modal field | 🟦 |
-| Site name | `#import-name` | text | modal field | 🟦 |
-| Subdomain | `#import-subdomain` | text | modal field | 🟦 |
-| Cancel (import modal) | `#import-cancel` | button | closes modal | 🟦 |
-| Import (modal submit) | `#import-submit` | button | POST `/api/import` | 🟦 |
-| site address (per card) | `.site-card-addr` | link | opens published site | 🟦 |
-| Edit (per card) | `.btn-edit` | link | → `/dashboard/sites/:id/edit` | 🟦 |
-| Make draft (per card) | `.btn-unpublish` | button | POST `/api/publish/sites/:id/unpublish` | 🟦 |
-| Publish (per card) | `.btn-publish` | button | POST `/api/publish/sites/:id` | 🟦 |
-| ⋮ (per card) | `.btn-dots` | button | toggles details panel | 🟦 |
-| Settings gear (details) | `.details-gear` | link | → site settings | 🟦 |
-| Detail rows (Forms, A11y, etc.) | `.detail-row--link` | link | → per-section | 🟦 |
-| Sign out | `.dash-sign-out` | link | logs out + redirect | 🟦 |
-| Pick a template (welcome) | (button) | link | → `/dashboard/templates` | 🟦 |
-| Import existing site (welcome) | (button) | button | opens import modal | 🟦 |
-| Start from a template | `.dash-quick-card` | link | → `/dashboard/templates` | 🟦 |
-| Set up your profile | `.dash-quick-card` | link | → `/dashboard/profile` | 🟦 |
-| Explore settings | `.dash-quick-card` | link | → `/dashboard/settings` | 🟦 |
+| Control | Run 2 click result |
+|---|---|
+| **Preview** (per-row) | ❌ Preview pane shows "Preview failed: Internal Server Error" — N4 |
+| **Restore** (per-row) | 🟨 not clicked — would overwrite the current canvas |
+| Snapshot label input | ✅ accepts text |
+| **Save snapshot** (form submit) | ❌ N4 — `/api/canvas/sites/:id/snapshots` returns 404, snapshot never created |
 
-## 5. `/dashboard/templates` — [src/routes/dashboard/templates.tsx](src/routes/dashboard/templates.tsx)
+### `/dashboard/sites/:id/domains` — Custom Domains
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Community (6) tab | `label[for=ttab-community]` | radio (visual tab) | swaps grid | 👁 (active by default) |
-| Personal (0) tab | `label[for=ttab-personal]` | radio (visual tab) | swaps grid | ⚠️ B7 click intercepted |
-| Starter Canvas | `input[name=templateId][value=starter-canvas]` | radio (template pick) | seeds new site | 👁 |
-| Launch Page | `input[name=templateId][value=launch-canvas]` | radio | seeds new site | 👁 |
-| Enterprise Scale | `input[name=templateId][value=enterprise-scale-canvas]` | radio | seeds new site | 👁 |
-| Studio Portfolio | `input[name=templateId][value=studio-canvas]` | radio | seeds new site | 👁 |
-| Local Business | `input[name=templateId][value=local-canvas]` | radio | seeds new site (embeds Rick Astley — B6) | 👁 |
-| Apogee Showcase | `input[name=templateId][value=apogee-showcase]` | radio | seeds new site | 👁 |
-| Site name | `input[name=siteName]` | text | new-site field | 👁 |
-| Subdomain | `input[name=subdomain]` | text | new-site field | 👁 |
-| Create site | form submit | button | POST `/api/sites` | 🟨 (hidden — plan limit) |
-| Upgrade | `.limit-notice a` | link | → `/dashboard/settings` | 👁 |
+| Control | Run 2 click result |
+|---|---|
+| Hostname input | ✅ accepts text |
+| **Add domain** | ❌ N5 — `POST /api/sites/:id/domains` returns 502; UI silently fails |
+| Delete domain (per row) | 🟦 list is empty |
 
-## 6. `/dashboard/shop` ≡ `/dashboard/addons` — [src/routes/dashboard/addon-shop.tsx](src/routes/dashboard/addon-shop.tsx)
+### `/dashboard/sites/:id/addons` — Site Addons
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Get addon (per card) | `.btn-acquire` | button | POST `/api/addons/:id/acquire` | 🟨 (would buy) |
-| Site selector | `.addon-site-select select` | select | scopes per-site config | 👁 |
-| Per-site addon toggle | `.addon-site-config input[type=checkbox]` | checkbox | enables addon on a site | 🟨 |
-| Save config | `.addon-site-config button` | button | PUT `/api/addons/sites/:id/:addonId` | 🟨 |
+| Control | Run 2 click result |
+|---|---|
+| **Enable on this site** (GA toggle) | ✅ flipped `false → true`, reloaded showed it persisted; flipped back, persisted. |
+| **MEASUREMENT ID** input | ✅ accepted `G-DFSTEST1`; persisted across reload. Cleaned up to empty string after testing. |
+| **Save** (GA) | ✅ shows "Saving..." then "Saved. Publish your site to apply changes." |
+| **Visit Addons** (Custom Scripts) | 👁 link to shop, not clicked |
 
-## 7. `/dashboard/profile` — [src/routes/dashboard/profile.tsx](src/routes/dashboard/profile.tsx)
+### `/dashboard/sites/:id/chat` — Site Chat
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Display name | `input[name=displayName]` | text | profile name | 👁 (pre-filled "Aayushman Singh") |
-| Bio | `textarea[name=bio]` | textarea | profile bio | 👁 (pre-filled) |
-| Timezone | `select[name=timezone]` | select | tz preference | 👁 (UTC) |
-| Save changes | `form button[type=submit]` | button | POST `/api/user/profile` | 🟨 (would mutate) |
+| Control | Run 2 click result |
+|---|---|
+| Message textarea | ✅ accepts text |
+| **Send** | ✅ POST `/api/sites/:id/chat → 200`, SSE stream returned a single greeting **with no unsolicited tool call** (B4 fixed) |
+| Accept / Reject (per proposal) | 🟦 no proposal appeared because the agent respected the no-modify directive |
 
-## 8. `/dashboard/settings` — [src/routes/dashboard/settings.tsx](src/routes/dashboard/settings.tsx)
+### `/dashboard/profile` — Profile
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Billing tab | `.settings-tab` | button | swaps panel | 👁 (active by default) |
-| Notifications tab | `.settings-tab` | button | swaps panel | ✅ |
-| Account tab | `.settings-tab` | button | swaps panel | 👁 |
-| Current plan (Free) | `.plan-card` | (card) | non-interactive | 👁 |
-| Upgrade to Pro | `.plan-card button` | button | Stripe checkout | 🟨 |
-| Upgrade to Team | `.plan-card button` | button | Stripe checkout | 🟨 |
-| Plan card copy | (Free = "1 site") | static | shows wrong limit | ⚠️ B9 |
-| Notifications: Site published | `input[type=checkbox]` | checkbox (decorative) | nothing — **B3** | ⚠️ B3 |
-| Notifications: Collaborator activity | `input[type=checkbox]` | checkbox (decorative) | nothing — **B3** | ⚠️ B3 |
-| Notifications: Form submissions | `input[type=checkbox]` | checkbox (decorative) | nothing — **B3** | ⚠️ B3 |
-| Notifications: Product updates | `input[type=checkbox]` | checkbox (decorative) | nothing — **B3** | ⚠️ B3 |
-| Notifications: Tips & tutorials | `input[type=checkbox]` | checkbox (decorative) | nothing — **B3** | ⚠️ B3 |
-| Invoices: download (per row) | `a[href]` | link | downloads invoice | 🟨 |
-| Delete account | Danger zone button | button | DELETE account | 🟨 |
+| Control | Run 2 click result |
+|---|---|
+| `input[name=displayName]` | ✅ pre-filled "Aayushman Singh" |
+| `textarea[name=bio]` | ✅ editable; edited, saved, reloaded, reverted, saved, reloaded |
+| `select[name=timezone]` | ✅ pre-filled "UTC", select options confirmed |
+| **Save changes** | ✅ status "Saved" visible after click; persisted across reload |
+| **Sign out** | 🟨 not clicked — would have ended the session and required re-auth |
 
-## 9. Site Settings `/dashboard/sites/:id/settings` — [src/routes/dashboard/site-settings.tsx](src/routes/dashboard/site-settings.tsx)
+### Landing `/`
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Enable password protection | `form.pw button` | button | POST `/api/sites/:id/password` | 🟨 |
-| Password input | `form.pw input[type=password]` | password | password-gate form | 👁 |
-| Disable password | `.disable-pw-btn` | button | POST `/api/sites/:id/password/disable` | 🟨 (hidden — currently disabled) |
-| Allow search engines | `input[type=checkbox]` (search-indexing) | checkbox | PUT site settings | 👁 (checked) |
-| Choose image (favicon) | `input[type=file]` label | file-upload | POST `/api/sites/:id/favicon` | 🟨 |
-| Clear favicon | `.favicon-picker button.clear` | button | DELETE `/api/sites/:id/favicon` | 🟨 (hidden — no favicon) |
-| Favicon picker modal | `.picker-modal` (hidden) | modal | image picker UI | 🟦 |
-| Visitor dark mode | `input[type=checkbox]` (dark-mode) | checkbox | PUT site settings | 👁 (unchecked) |
-| Collaborator email | `.collab-form input[type=email]` | email | invite form | 👁 |
-| Collaborator role | `.collab-form select` | select | role assignment | 👁 |
-| Invite | `.collab-form button` | button | POST `/api/sites/:id/collaborators` | 🟨 (would email someone) |
-| Remove collaborator | `.remove-btn` (per row) | button | DELETE `/api/sites/:id/collaborators/:email` | 🟨 (empty list) |
+| Control | Run 2 click result |
+|---|---|
+| Runtime counters | ✅ B8 fixed — counters animate when section is partially in fold |
+| Other anchors / footer | unchanged from Run 1 |
 
-## 10. Nav Editor `/dashboard/sites/:id/nav` — [src/routes/dashboard/nav-editor.tsx](src/routes/dashboard/nav-editor.tsx)
+### Published site `test1.rev01.aayushman.dev/`
 
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Layout | `select[name=layout]` | select | left-center-right / left-right | 👁 |
-| Logo asset ID | `input[name=logoAssetId]` | text | sets logo | 👁 |
-| Sticky | `input[name=sticky][type=checkbox]` | checkbox | sticky nav | 👁 |
-| Link label | per-link `input[name=label]` | text | link label | 👁 |
-| Link kind | per-link `select` | select | internal/external | 👁 |
-| Link href | per-link `input[type=url]` | text | href | 👁 |
-| Remove link | per-link `button` | button | drops row | 👁 |
-| + Add link | bottom of form | button | adds blank row | 🟨 |
-| Save | form submit | button | PUT `/api/canvas/sites/:id/nav` | 🟨 |
-
-## 11. Forms `/dashboard/sites/:id/forms` — [src/routes/dashboard/forms-inbox.tsx](src/routes/dashboard/forms-inbox.tsx)
-
-Empty inbox on test1, so the controls below are defined in source but never rendered in the live DOM during this DFS:
-
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Form card link (per form) | `.form-card` | link | → `/dashboard/sites/:id/forms/:formId` | 🟦 |
-| Download CSV (per form detail) | `.actions a` | link | GET `…/submissions.csv` | 🟦 |
-| Back to forms | `.actions a` | link | → forms inbox | 🟦 |
-
-## 12. Versions `/dashboard/sites/:id/snapshots` — [src/routes/dashboard/version-timeline.tsx](src/routes/dashboard/version-timeline.tsx)
-
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Preview (per row) | `[data-action=preview]` | button | GET preview HTML → iframe | 👁 (1 row visible) |
-| Restore (per row) | `[data-action=restore]` | button | POST `…/restore` (confirm modal) | 🟨 (would overwrite current edits) |
-| Snapshot label | `form.timeline-form input` | text | label for new snapshot | 👁 |
-| Save snapshot | `form.timeline-form button` | button | POST `/api/canvas/sites/:id/snapshots` | 🟨 |
-
-## 13. Domains `/dashboard/sites/:id/domains` — [src/routes/dashboard/domains.tsx](src/routes/dashboard/domains.tsx)
-
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Hostname | `form.add-domain input` | text | hostname field | 👁 |
-| Add domain | `form.add-domain button` | button | POST `/api/sites/:id/domains` | 🟨 (would start CF verification) |
-| Delete domain (per row) | `.domain button` | button | DELETE `/api/sites/:id/domains/:id` | 🟦 (empty list) |
-
-## 14. Site Addons `/dashboard/sites/:id/addons` — [src/routes/dashboard/site-addons.tsx](src/routes/dashboard/site-addons.tsx)
-
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Enable on this site (GA) | `input[type=checkbox]` | checkbox | toggles GA for site | 👁 (disabled) |
-| MEASUREMENT ID | `input[name=measurementId]` | text | GA tracking ID | 👁 |
-| Save (GA) | button | button | PUT `/api/addons/sites/:id/google-analytics` | 🟨 |
-| Visit Addons (Custom Scripts) | link | link | → `/dashboard/shop` | 👁 |
-
-## 15. A11y Report `/dashboard/sites/:id/a11y` — [src/routes/dashboard/a11y-report.tsx](src/routes/dashboard/a11y-report.tsx)
-
-No interactive controls. Read-only display of 0 blocking / 3 warning / 1 info. ✅
-
-## 16. Site Chat `/dashboard/sites/:id/chat` — [src/routes/dashboard/chat-panel.tsx](src/routes/dashboard/chat-panel.tsx)
-
-| Label | Selector | Kind | Action | Status |
-|---|---|---|---|---|
-| Message input | `textarea#chat-input` | textarea | message to agent | ✅ typed "hi, just a smoke test, do not modify the site" |
-| Send | `button#chat-send` | button | POST `/api/sites/:id/chat` (SSE) | ✅ (B4 — agent ignored guard) |
-| Accept (per proposal) | dynamic button | button | applies agent op | 🟨 (would mutate site) |
-| Reject (per proposal) | dynamic button | button | discards agent op | ✅ |
-
-## 17. Editor `/dashboard/sites/:id/edit` — [src/editor/canvas-index.tsx](src/editor/canvas-index.tsx) + [src/editor/canvas-client.ts](src/editor/canvas-client.ts)
-
-### Editor Header
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| dashboard | breadcrumb `a` | canvas-index.tsx:114 | 👁 (B1 destination) |
-| AI Chat | `#canvas-chat-toggle` | canvas-index.tsx:151 | ✅ (opens panel) |
-| Settings | `#canvas-settings-link` | canvas-index.tsx:154 | 👁 |
-| Save | `#canvas-save` | canvas-client.ts:170 | ⚠️ B2 (400) |
-| Publish | `#canvas-publish` | canvas-client.ts:171 | ⚠️ B2 (400) |
-| Save as template | `#canvas-save-template` | canvas-client.ts:172 | 🟨 |
-
-### Sidebar tabs (3 static + 2 injected by canvas-client.ts)
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| Add | `[data-sidebar-tab=add]` | canvas-index.tsx:188 | ✅ |
-| Sections | `[data-sidebar-tab=sections]` | canvas-index.tsx:198 | ✅ |
-| Pages | `[data-sidebar-tab=pages]` | canvas-index.tsx:201 | ✅ |
-| Symbols | `[data-sidebar-tab=symbols]` (injected) | canvas-client.ts:8918 `ensureSymbolsTabMounted` | ✅ |
-| Versions | `[data-sidebar-tab=versions]` (injected) | canvas-client.ts (renderVersionsPanel) | ✅ |
-| Toggle sidebar | `#sidebar-toggle` | canvas-index.tsx:186 | 👁 |
-
-### Add panel — Sections + Components + Style Kit
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| Blank section | `[data-sidebar-add-section=blank]` | canvas-index.tsx:213 | 🟨 |
-| Text | `[data-sidebar-add-component=text]` | canvas-index.tsx:225 | 🟨 |
-| Image | `[data-sidebar-add-component=image]` | canvas-index.tsx:241 | 🟨 |
-| Video | `[data-sidebar-add-component=video]` | canvas-index.tsx:249 | 🟨 |
-| Button | `[data-sidebar-add-component=action]` | canvas-index.tsx:257 | 🟨 |
-| Shape | `[data-sidebar-add-component=shape]` | canvas-index.tsx:265 | 🟨 |
-| Container | `[data-sidebar-add-component=container]` | canvas-index.tsx:273 | 🟨 |
-| Chart | `[data-sidebar-add-component=chart]` | canvas-index.tsx:281 | 🟨 |
-| Form | `[data-sidebar-add-component=form]` | canvas-index.tsx:289 | 🟨 |
-| Embed | `[data-sidebar-add-component=embed]` | canvas-index.tsx:297 | 🟨 |
-| Code | `[data-sidebar-add-component=code]` | canvas-index.tsx:305 | 🟨 |
-| Accordion | `[data-sidebar-add-component=accordion]` | canvas-index.tsx:313 | 🟨 |
-| Carousel | `[data-sidebar-add-component=carousel]` | canvas-index.tsx:321 | 🟨 |
-| Table | `[data-sidebar-add-component=table]` | canvas-index.tsx:329 | 🟨 |
-| Nav | `[data-sidebar-add-component=nav]` | canvas-index.tsx:337 | 🟨 |
-| Style kit chip × N | `[data-sidebar-style-kit]` | canvas-index.tsx:345 | 🟨 (would POST style-kit change → broken Save anyway) |
-
-### Pages panel
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| + New Page | `#canvas-add-page` | canvas-index.tsx:378 | 🟨 |
-| Per-page rename | (dynamic) | canvas-client.ts | 🟦 |
-| Per-page delete | (dynamic) | canvas-client.ts | 🟨 |
-
-### AI Chat slide-out panel (right-side, toggled by editor header AI Chat)
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| Close (×) | `#canvas-chat-close` | canvas-index.tsx:393 | ✅ |
-| Message input | `#canvas-chat-input` | canvas-index.tsx:397 | 👁 |
-| Send | `#canvas-chat-form button[type=submit]` | canvas-index.tsx:403 | 🟨 (same flow as site-level chat → B4) |
-
-### Inspector toolbar (canvas-client.ts, surfaces only when an element is selected — never selected during DFS)
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| Bold / Italic / Underline / Strike / Code / Highlight / Link mark toolbar | `[data-mark]` | canvas-client.ts | 🟦 |
-| Section "Sym" convert button | inserted on eligible sections | canvas-client.ts:8644 | 🟦 |
-| Element delete / duplicate / nudge | inspector | canvas-client.ts | 🟦 |
-
-### Versions sidebar panel (injected)
-
-| Label | Selector | Source | Status |
-|---|---|---|---|
-| Snapshot rows (Preview/Restore) | dynamic | canvas-client.ts `renderVersionsPanel` 8498 | 🟦 |
+| Control | Run 2 click result |
+|---|---|
+| Talk to sales → `/contact` | ❌ still 404 — B5 template fix not retroactive on test1 |
+| Contact sales → `/contact` | ❌ same |
+| Other anchors | ✅ same as Run 1 |
+| `/sitemap.xml` | ✅ B10 fixed — emits `https://test1.rev01.aayushman.dev/` (no `home`, no `#v=1`) |
 
 ---
 
-## What was NOT tested (and why)
+## What was NOT clicked this pass (and why)
 
-**Blocked by B1** — every control under `/dashboard` index (22 controls). Until that route stops 500-ing they cannot be reached from the canonical entry point. (Some have alternative entries — e.g. `/dashboard/templates` works directly.)
+| Control | Reason |
+|---|---|
+| Stripe **Upgrade to Pro / Team** | real billing side-effect |
+| **Delete account** | locks user out |
+| Editor **Save as template** | creates a personal template the user has to manually delete |
+| Editor **Delete** (inspector) | irreversible element removal |
+| Editor **Upload** (inspector file) | would open OS file dialog |
+| Inspector **× clear style** | would reset visible styling on the hero |
+| Inspector inputs (color/number/range/text) | wouldn't persist anyway (N2 Yjs) |
+| Site Settings **Invite collaborator** | sends an email to a third party |
+| Versions **Restore** | overwrites current canvas |
+| Site Domains **Delete** | list empty |
+| Sign out from Profile | ends session mid-test |
+| Every control on `/dashboard`, `/dashboard/templates`, `/dashboard/settings` | pages 500 (N1) |
+| Every control on `/dashboard/sites/:id/nav` | route 404 (N3) |
 
-**Blocked by B2** — Save and Publish in the editor are confirmed broken; everything downstream (style-kit change, add-element on dirty state, version save) chains off Save and would re-hit the same 400.
+## Verified bug status (Run 2)
 
-**Blocked by precondition state** — Forms inbox is empty (no form element on test1), so Download CSV / form detail / submission table never render. Versions has 1 snapshot row — Preview was not clicked (would open iframe — safe) and Restore was not clicked (would overwrite current edits). Domains list is empty so Delete buttons never render. Collaborators list is empty so Remove buttons never render.
+| Bug | Before | After |
+|---|---|---|
+| B1 dashboard 500 | 🚨 | 🚨 + spread to templates + settings (N1) |
+| B2 save/publish 400 | 🚨 | ✅ |
+| B3 fake notif toggles | 🚨 | 🟦 (unverifiable — settings page 500) |
+| B4 agent guard | ⚠️ | ✅ |
+| B5 /contact 404 | ⚠️ | ⚠️ (template fixed; test1 state stale) |
+| B6 rickroll iframe | ⚠️ | 🟦 (templates page 500) |
+| B7 sticky-header click eat | ⚠️ | 🟦 |
+| B8 landing counters | ⚠️ | ✅ |
+| B9 plan/limit copy | ⚠️ | 🟦 (settings 500) |
+| B10 sitemap #v=1 | ⚠️ | ✅ |
 
-**Skipped due to side effects (user policy = full DFS but I drew the line at):**
-- Stripe upgrades (Pro / Team)
-- Delete account
-- Add custom domain (CF verification side effect)
-- Form / addon / nav / settings Save buttons (would mutate live site)
-- Send a chat message that requests a real edit then click Accept
-- Save as template (would create a personal template entry)
+## NEW bugs discovered in Run 2 — must fix
 
-**Inspector toolbar (~12 marks/actions)** — never surfaced because no element was selected during the walkthrough. To exercise these the next DFS needs to: click an element on the canvas → wait for inspector → fire each toolbar button. Not done this pass.
+| # | Page | Symptom |
+|---|---|---|
+| N1 | `/dashboard`, `/dashboard/templates`, `/dashboard/settings` | 500 on every authenticated GET. Regression from sites-list query path; spread when `ca1eb65` was authored. |
+| N2 | Editor canvas mutations (Add-component, inspector toolbar) | 19 Yjs `Unexpected content type` per ~21 clicks. Most edits silently drop; only 3/15 components persisted. Editor is effectively read-only via UI. |
+| N3 | `/dashboard/sites/:id/nav` | 404 — route disappeared but sidebar still links to it. |
+| N4 | `/dashboard/sites/:id/snapshots` | UI renders but `/api/canvas/sites/:id/snapshots` returns 404. Preview and Save snapshot both fail. |
+| N5 | `/dashboard/sites/:id/domains` | `POST /api/sites/:id/domains` returns 502 Bad Gateway. |
+| N6 | Site Settings checkboxes | Second click in the same toggle pair drops silently. |
 
----
+## Recommended sequence
 
-## Recommendations for the next DFS pass
-
-1. **Fix B1 first.** It blocks 22 controls and the canonical entry point.
-2. **Fix B2 (`__placeholder__`).** It blocks every editor write — including all the 🟨 add-component controls that would otherwise be exercisable.
-3. **Either repair B3 or hide the Notifications tab** so we stop shipping a fake toggle UI.
-4. **Run a second pass after fixes**, this time:
-   - selecting an element on the editor canvas (exercises the inspector toolbar)
-   - creating a Form element + publishing → submitting a form from the public site (exercises Forms inbox + per-form CSV)
-   - saving a snapshot, then clicking Preview/Restore on a non-published snapshot
-   - clicking Save changes on Profile with a deliberate diff
-   - one collaborator invite to a throwaway address
+1. **N1 first** (dashboard list pages 500) — blocks 22+ controls and the canonical landing post-login.
+2. **N2 second** (Yjs CRDT integration errors) — without it, the editor is unusable. Likely needs to chase the `Unexpected content type` exception inside the Yjs `_integrate` path; the bundled stacktrace at `:2764:32563` points at `Kr` which handles the canvas op envelope — possibly a schema mismatch between the client's emitter and what Yjs expects after the asset-skip patch (`fa2f10a`).
+3. **N3 & N4** are routing/api regressions — likely a single missing `app.route('/nav', ...)` and `app.route('/api/canvas/sites/:id/snapshots', ...)` mount.
+4. **N5** domains 502 — check the Cloudflare custom-hostname binding env var.
+5. **N6** double-toggle drop — bind the second client `fetch` regardless of whether the first one is still pending.
+6. Then re-verify B3, B6, B7, B9 once the dashboard pages stop 500-ing.

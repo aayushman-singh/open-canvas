@@ -60,7 +60,6 @@ function assert(condition: unknown, message: string): asserts condition {
 function makeState(headingText: string): CanvasSiteState {
   return {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [
       {
         id: 'page-home',

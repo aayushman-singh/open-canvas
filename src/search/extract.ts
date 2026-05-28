@@ -137,9 +137,6 @@ export function extractElementText(el: CanvasElement): string | null {
     // text:
     //   - media: alt/caption are handled by the a11y subsystem (#15).
     //   - shape, container: decorative.
-    //   - symbol-instance: text lives on the master, not the instance — the
-    //     master's section is walked separately if the indexer expands it.
-    //     Wave 3 #14 will refine the symbol semantics; for now we skip.
     //   - accordion, carousel, form, nav: not part of the Wave-3 scope. The
     //     plan's scope list explicitly enumerates the supported types.
     default:

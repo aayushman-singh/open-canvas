@@ -278,7 +278,6 @@ assert(
 const popupState: CanvasSiteState = {
   styleKit: popupSnapshot.styleKit,
   pages: popupSnapshot.pages,
-  symbols: [],
 };
 const popupRoundTrip = decodeYDoc(encodeYDoc(popupState));
 assert(

@@ -90,12 +90,6 @@ function mirrorPage(page: CanvasPage): CanvasPage {
  * - RTL pages are deep-cloned down to the box level so the input snapshot
  *   is never mutated.
  * - The decision uses {@link isRtl} against `page.locale ?? defaultLocale`.
- *
- * Symbols are NOT walked: a SymbolInstance carries its own box (mirrored
- * via the section walk), and the symbol-master section is rendered through
- * a separate per-instance translation step in `canvas/elements/symbol-instance.ts`.
- * Mirroring master geometry here would double-flip when the section walk
- * already mirrored the instance's outer box.
  */
 export function applyRtlMirror(snapshot: PublishedSnapshot): PublishedSnapshot {
   // Structural probe for `defaultLocale` — same pattern used in

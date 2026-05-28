@@ -140,7 +140,6 @@ assert(
 const state: CanvasSiteState = {
   styleKit: snapshot.styleKit,
   pages: snapshot.pages,
-  symbols: [],
 };
 const roundTrip = decodeYDoc(encodeYDoc(state));
 assert(
