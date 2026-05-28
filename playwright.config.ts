@@ -9,7 +9,7 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
   timeout: 30_000,
   use: {
-    baseURL: 'http://127.0.0.1:8787',
+    baseURL: process.env.BASE_URL || 'http://127.0.0.1:8787',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -19,10 +19,12 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npx wrangler dev',
-    url: 'http://127.0.0.1:8787/health',
-    reuseExistingServer: true,
-    timeout: 30_000,
-  },
+  ...(!process.env.BASE_URL && {
+    webServer: {
+      command: 'npx wrangler dev',
+      url: 'http://127.0.0.1:8787/health',
+      reuseExistingServer: true,
+      timeout: 30_000,
+    },
+  }),
 });
