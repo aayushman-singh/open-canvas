@@ -59,7 +59,9 @@ const snapshot: PublishedSnapshot = {
   ],
 };
 
-const html = renderCanvasSnapshot(snapshot, '/assets');
+const html = renderCanvasSnapshot(snapshot, '/assets', '', {
+  turnstileSiteKey: 'turnstile-test-key',
+});
 
 const validation = validateCanvasSiteState(snapshot);
 assert(validation.valid, 'expected video background snapshot to pass validation');

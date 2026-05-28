@@ -196,7 +196,9 @@ assert(resolved.accent === '#ff7a59', 'expected resolved kit to expose the custo
 // --------------------------------------------------------------------------
 
 const customSnapshot = makeSnapshot(customState);
-const html = renderCanvasSnapshot(customSnapshot, '/assets', 'site-themes-smoke');
+const html = renderCanvasSnapshot(customSnapshot, '/assets', 'site-themes-smoke', {
+  turnstileSiteKey: 'turnstile-test-key',
+});
 assert(
   html.includes('data-style-kit="custom"'),
   'expected rendered HTML to carry data-style-kit="custom"',
@@ -261,6 +263,7 @@ try {
     },
     '/assets',
     'site-themes-smoke',
+    { turnstileSiteKey: 'turnstile-test-key' },
   );
 } catch (err) {
   renderMissingThrew = true;

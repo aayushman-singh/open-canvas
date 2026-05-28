@@ -1,34 +1,18 @@
 // src/canvas/elements/form.ts
 //
-// Wave 2 #7 — Forms subsystem renderer.
+// Forms subsystem renderer.
 //
 // Emits a real semantic <form method="post" action="/__rev01/forms/<siteId>/<id>">.
 // Every visible field becomes an <input>/<textarea>/<select>; the field id is
 // reused as the form-data key so the submit-handler payload shape is stable
 // and deterministic.
 //
-// A Cloudflare Turnstile widget is inserted before the submit button when a
-// public Turnstile site key has been configured at module-init time (see
-// `configureFormRender` below). The submit-side validator is the source of
-// truth for bot protection; the widget is the Visitor-facing token producer.
-//
-// -- Turnstile site key plumbing decision (Wave 2 #7) -----------------------
-//
-// The shared `ElementRenderCtx` (`src/canvas/elements/index.ts`) is Phase-0
-// frozen — Wave 2 cannot edit it without re-opening the contract. The
-// Turnstile public site key is per-deployment (single `env.TURNSTILE_SITE_KEY`
-// secret), not per-element nor per-page, so it doesn't need to ride on the
-// per-render context anyway. Wave-2-owned `configureFormRender({...})` is
-// called once by the main thread during Worker boot (after env vars are
-// available, before any request fires) and the renderer reads the module-
-// local value. If the configure function is never called, the renderer
-// silently omits the widget — the submit-side handler still hard-fails on a
-// missing Turnstile token, so the bot-protection invariant holds.
-//
-// This is documented in the implementation notes in the plan brief and is
-// the only "extension to the render ctx" Wave 2 needs. Future waves that
-// need true per-render ctx data must coordinate with the main thread to
-// extend `ElementRenderCtx`.
+// A Cloudflare Turnstile widget is always emitted before the submit button.
+// The renderer takes the public site key on the per-render context; callers
+// resolve it from env. A null/empty key surfaces as a thrown error at the
+// boundary where rendering is initiated — the submit-side validator hard-
+// fails on a missing token, so a no-widget form would be unsubmittable dead
+// UX, never an acceptable degraded mode.
 
 import { escapeAttr, escapeHtml } from './render-utils.js';
 import type { BaseElement } from '../schema.js';
@@ -58,37 +42,28 @@ export interface FormRenderCtx {
   siteId: string;
   pageSlug: string;
   styleKit: string;
+  /**
+   * Cloudflare Turnstile public site key. Always non-empty; resolved by the
+   * caller from env. Missing env at the boundary throws via
+   * requireTurnstileSiteKey, not here.
+   */
+  turnstileSiteKey: string;
 }
-
-// ---------------------------------------------------------------------------
-// Module-local configuration set by `configureFormRender`. The renderer reads
-// these values when emitting the widget block. Defaults are "no widget" so
-// dev environments and smokes that don't configure Turnstile render without it.
-// ---------------------------------------------------------------------------
-
-interface FormRenderConfig {
-  turnstileSiteKey: string | null;
-}
-
-const config: FormRenderConfig = {
-  turnstileSiteKey: null,
-};
 
 /**
- * Wire the renderer's Turnstile site key once at Worker boot. Subsequent calls
- * overwrite the value, which is how the smoke harness restores defaults
- * between assertions. Pass `null` to disable Turnstile widget emission.
- *
- * Main-thread integration: call this from the Worker init path with
- * `env.TURNSTILE_SITE_KEY` before mounting the forms routers.
+ * Resolve env.TURNSTILE_SITE_KEY into a non-empty string or throw. The single
+ * boundary where the env contract is enforced; every call site that wants to
+ * render the canvas threads the result through ElementRenderCtx.
  */
-export function configureFormRender(next: { turnstileSiteKey: string | null }): void {
-  config.turnstileSiteKey = next.turnstileSiteKey;
-}
-
-/** @internal Used by the smoke to inspect the current configuration. */
-export function getFormRenderConfigForTest(): Readonly<FormRenderConfig> {
-  return config;
+export function requireTurnstileSiteKey(env: { TURNSTILE_SITE_KEY?: string | undefined }): string {
+  const key = env.TURNSTILE_SITE_KEY;
+  if (typeof key !== 'string' || key.length === 0) {
+    throw new Error(
+      'TURNSTILE_SITE_KEY env var must be a non-empty string. Forms cannot render without ' +
+        'a public Turnstile site key — the submit-side validator hard-fails on a missing token.',
+    );
+  }
+  return key;
 }
 
 function renderField(field: FormFieldDef, formId: string): string {
@@ -155,14 +130,10 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
   // to the widget; the Cloudflare CDN caches it so multiple forms on the same
   // page share a single network fetch. Renderer pure-HTML output only — no
   // JS-side handlers.
-  const turnstileSiteKey = config.turnstileSiteKey;
-  const turnstileBlock =
-    typeof turnstileSiteKey === 'string' && turnstileSiteKey.length > 0
-      ? [
-          `<div class="cf-turnstile" data-sitekey="${escapeAttr(turnstileSiteKey)}"></div>`,
-          `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`,
-        ].join('')
-      : '';
+  const turnstileBlock = [
+    `<div class="cf-turnstile" data-sitekey="${escapeAttr(ctx.turnstileSiteKey)}"></div>`,
+    `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`,
+  ].join('');
 
   return [
     `<form class="rev01-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}">`,

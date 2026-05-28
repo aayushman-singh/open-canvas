@@ -29,6 +29,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { resolvePrimaryPage, snapshotForPageSlug } from '../../canvas/page-routing';
 import { renderCanvasSnapshot } from '../../canvas/render';
+import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
 import { db, type Db } from '../../db/client';
@@ -50,6 +51,9 @@ interface Bindings {
   ASSETS_BUCKET: R2Bucket;
   // Satori/resvg wasm module slot used by the OG rasteriser.
   OG_RESVG_WASM?: WebAssembly.Module;
+  // Cloudflare Turnstile public site key — required at the render boundary
+  // when any page in the snapshot contains a form element.
+  TURNSTILE_SITE_KEY?: string;
 }
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -201,6 +205,7 @@ function renderPublishedPageHtml(
   snapshot: PublishedSnapshot,
   pageSlug: string,
   siteId: string,
+  turnstileSiteKey: string,
 ): string {
   const pageSnapshot = snapshotForPageSlug(snapshot, pageSlug);
   const targetPage = pageSnapshot.pages[0];
@@ -208,7 +213,10 @@ function renderPublishedPageHtml(
     throw new Error(`renderPublishedPageHtml: no page for slug ${JSON.stringify(pageSlug)}`);
   }
   return injectInteractiveRuntime(
-    renderCanvasSnapshot(snapshot, '/assets', siteId, { renderPages: [targetPage] }),
+    renderCanvasSnapshot(snapshot, '/assets', siteId, {
+      renderPages: [targetPage],
+      turnstileSiteKey,
+    }),
     pageSnapshot,
   );
 }
@@ -216,11 +224,12 @@ function renderPublishedPageHtml(
 function buildPublishBroadcastPayload(
   snapshot: PublishedSnapshot,
   siteId: string,
+  turnstileSiteKey: string,
 ): PublishBroadcastPayload {
   const defaultSlug = resolvePrimaryPage(snapshot).slug;
   const htmlBySlug: Record<string, string> = {};
   for (const page of snapshot.pages) {
-    htmlBySlug[page.slug] = renderPublishedPageHtml(snapshot, page.slug, siteId);
+    htmlBySlug[page.slug] = renderPublishedPageHtml(snapshot, page.slug, siteId, turnstileSiteKey);
   }
   const html = htmlBySlug[defaultSlug];
   if (html === undefined) {
@@ -388,7 +397,7 @@ publishApi.post('/sites/:siteId', async (c) => {
 
   let broadcastPayload: PublishBroadcastPayload;
   try {
-    broadcastPayload = buildPublishBroadcastPayload(snapshot, row.id);
+    broadcastPayload = buildPublishBroadcastPayload(snapshot, row.id, requireTurnstileSiteKey(c.env));
   } catch (renderErr) {
     const msg = renderErr instanceof Error ? renderErr.message : String(renderErr);
     console.error('[publish] render failed:', msg);

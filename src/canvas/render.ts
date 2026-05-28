@@ -281,16 +281,22 @@ function renderPage(
  */
 export interface RenderSnapshotOptions {
   /**
-   * Wave 3 #21 — per-page `<head>` meta emitter. When provided, the renderer
-   * calls this for each page in the snapshot. The body wrapper produced by
+   * Cloudflare Turnstile public site key. Required, non-empty. Callers resolve
+   * it from env via requireTurnstileSiteKey(); a missing or empty env var
+   * fails at that boundary, not here.
+   */
+  turnstileSiteKey: string;
+  /**
+   * Per-page `<head>` meta emitter. When provided, the renderer calls this
+   * for each page in the snapshot. The body wrapper produced by
    * `renderCanvasSnapshot` is a `<main>` element with no `<head>`, so the
-   * emitted strings are NOT currently spliced into the body — the renderer
-   * concatenates them and returns them via the return value's structure
-   * (see overload below). The visitor-facing route owns the actual
-   * `<head>` envelope and calls `renderCanvasHead` (sibling exported from
-   * `src/seo/meta-emit.ts`) for the page the visitor is reading; this hook
-   * exists so future renderers (e.g. multi-page static export) can wire
-   * head emission per page through the same seam.
+   * emitted strings are NOT spliced into the body — the renderer
+   * concatenates them and returns them via the return value's structure.
+   * The visitor-facing route owns the actual `<head>` envelope and calls
+   * `renderCanvasHead` (sibling exported from `src/seo/meta-emit.ts`) for
+   * the page the visitor is reading; this hook exists so future renderers
+   * (e.g. multi-page static export) can wire head emission per page through
+   * the same seam.
    */
   emitHeadMeta?: (page: CanvasPage) => string;
   /**
@@ -305,23 +311,12 @@ export interface RenderSnapshotOptions {
  * Render the body of a Published Snapshot. The returned string is a
  * self-contained `<main>` block — the caller wraps it in the document
  * envelope (`<html>…<head>…</head><body>` etc.).
- *
- * Backwards-compatible signature:
- *   - 1st positional: `snapshot`           (required)
- *   - 2nd positional: `assetBasePath`      (required)
- *   - 3rd positional: `siteId`             (optional, default '')
- *   - 4th positional: `opts` (`RenderSnapshotOptions`) — additive, Wave 3 #21.
- *
- * The signature stays positional through `siteId` so existing call sites
- * keep working without edit. New consumers should prefer passing `opts`
- * (the only forward-extensible slot) rather than adding more positional
- * arguments.
  */
 export function renderCanvasSnapshot(
   snapshot: PublishedSnapshot,
   assetBasePath: string,
   siteId: string = '',
-  opts: RenderSnapshotOptions = {},
+  opts: RenderSnapshotOptions,
 ): string {
   // Belt-and-braces: even though the validator rejects unknown kits at the API
   // boundary, the renderer refuses to emit HTML for a kit that has no preset
@@ -341,6 +336,7 @@ export function renderCanvasSnapshot(
     customPreset,
     siteId,
     pages: snapshot.pages,
+    turnstileSiteKey: opts.turnstileSiteKey,
   };
   const pagesToRender = opts.renderPages ?? snapshot.pages;
   const pagesHtml = pagesToRender

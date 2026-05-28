@@ -44,7 +44,9 @@ const snapshot: PublishedSnapshot = {
   pages: editable.pages,
 };
 
-const html = renderCanvasSnapshot(snapshot, '/assets');
+const html = renderCanvasSnapshot(snapshot, '/assets', '', {
+  turnstileSiteKey: 'turnstile-test-key',
+});
 
 // --- Assertion 1: exactly one <style data-rev01-responsive> block ----------
 const styleOpenRegex = /<style data-rev01-responsive>/g;

@@ -26,14 +26,15 @@ import {
   verifyEditToken,
   EDIT_TOKEN_COOKIE,
   signEditToken,
-  EDIT_TOKEN_MAX_AGE,
+  buildEditTokenCookieHeader,
 } from '../auth/edit-token';
 import { verifyInviteToken } from '../auth/invite-token';
 import { buildInviteErrorResponse } from '../auth/invite-error-page';
-import { editorPageJsx, type EditorPageOptions } from '../editor/canvas-index';
+import { editorPageJsx, type EditorPageOptions } from '../editor/route';
 import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
 import { renderCanvasSnapshot } from '../canvas/render';
+import { requireTurnstileSiteKey } from '../canvas/elements/form';
 import type { PublishedSnapshot } from '../canvas/schema';
 import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
@@ -379,22 +380,15 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   siteRow: PublicSiteRow,
 ): Promise<Response> {
   // Token transfer: the auth popup passes the signed token via postMessage,
-  // and the bootstrap page redirects here with ?__transfer=<token>. We verify
-  // it and set a cookie scoped to the current host (critical for custom
-  // domains where the .rev01.aayushman.dev cookie isn't readable).
+  // and the bootstrap page redirects here with ?__transfer=<token>. The helper
+  // decides whether to domain-scope (rev01 subdomain) or host-scope (custom
+  // domain) based on the request host.
   const requestUrl = new URL(c.req.url);
   const transfer = requestUrl.searchParams.get('__transfer');
   if (transfer) {
     const tp = await verifyEditToken(transfer, c.env.UNLOCK_SIGNING_SECRET);
     if (tp && tp.siteId === siteRow.id) {
-      const cookie = [
-        `${EDIT_TOKEN_COOKIE}=${transfer}`,
-        'Path=/',
-        'HttpOnly',
-        'Secure',
-        'SameSite=Lax',
-        `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
-      ].join('; ');
+      const cookie = buildEditTokenCookieHeader(transfer, requestUrl.host);
       return new Response(null, {
         status: 302,
         headers: { Location: '/?edit', 'Set-Cookie': cookie },
@@ -489,6 +483,11 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   // COALESCE keeps the original acceptedAt timestamp if the invitee re-clicks
   // an old link after already accepting — preserves audit data and lets the
   // same handler serve both first-accept and re-visit flows.
+  //
+  // The invitedEmail match is belt-and-suspenders against a row being
+  // rewritten under a different invitee out-of-band — not an identity check
+  // against the accepting party. The accept flow is bearer-token by design;
+  // see ADR-0010.
   const updated = await database
     .update(siteCollaborator)
     .set({ acceptedAt: sql`COALESCE(${siteCollaborator.acceptedAt}, NOW())` })
@@ -524,14 +523,7 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
-  const cookieValue = [
-    `${EDIT_TOKEN_COOKIE}=${editToken}`,
-    'Path=/',
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax',
-    `Max-Age=${EDIT_TOKEN_MAX_AGE}`,
-  ].join('; ');
+  const cookieValue = buildEditTokenCookieHeader(editToken, new URL(c.req.url).host);
 
   return new Response(null, {
     status: 302,
@@ -810,7 +802,10 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const customKitCss =
     pageRenderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
   const snapshotHtml = injectInteractiveRuntime(
-    renderCanvasSnapshot(renderSnapshot, '/assets', siteRow.id, { renderPages: [currentPage] }),
+    renderCanvasSnapshot(renderSnapshot, '/assets', siteRow.id, {
+      renderPages: [currentPage],
+      turnstileSiteKey: requireTurnstileSiteKey(c.env),
+    }),
     renderSnapshot,
   );
   // Wave 2 #8 — Content-Security-Policy. Aggregates per-snapshot frame-src

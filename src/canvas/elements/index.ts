@@ -79,6 +79,12 @@ export interface ElementRenderCtx {
   pageSlug: string;
   /** All pages in the snapshot — needed by action element to resolve page links. */
   pages: CanvasPage[];
+  /**
+   * Cloudflare Turnstile public site key. Required, non-empty. Callers resolve
+   * it from env via requireTurnstileSiteKey() and fail loudly at that boundary
+   * if the env var is missing.
+   */
+  turnstileSiteKey: string;
 }
 
 /**
@@ -121,6 +127,7 @@ export const RENDER_DISPATCH: RenderDispatch = {
       siteId: ctx.siteId,
       pageSlug: ctx.pageSlug,
       styleKit: ctx.styleKit,
+      turnstileSiteKey: ctx.turnstileSiteKey,
     }),
   embed: (el, ctx) => renderEmbed(el, { styleKit: ctx.styleKit }),
   chart: (el, ctx) =>

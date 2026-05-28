@@ -23,6 +23,7 @@ import { requireAuth } from '../../auth/require-auth.js';
 import { requireAdmin } from '../../auth/require-admin.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
+import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
 import type { CanvasSiteState, PublishedSnapshot } from '../../canvas/schema.js';
 import { validateCanvasSiteState } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
@@ -41,6 +42,7 @@ type Bindings = {
   DATABASE_URL: string;
   ADMIN_CLERK_USER_IDS?: string;
   ASSETS_BUCKET: R2Bucket;
+  TURNSTILE_SITE_KEY?: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -298,7 +300,12 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
     ...(tmpl.siteState.footer ? { footer: tmpl.siteState.footer } : {}),
     ...(tmpl.siteState.customStyleKit ? { customStyleKit: tmpl.siteState.customStyleKit } : {}),
   };
-  const html = renderCanvasSnapshot(snapshot, `/api/custom-templates/${c.req.param('id')}/assets`);
+  const html = renderCanvasSnapshot(
+    snapshot,
+    `/api/custom-templates/${c.req.param('id')}/assets`,
+    '',
+    { turnstileSiteKey: requireTurnstileSiteKey(c.env) },
+  );
 
   return c.html(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escapeHtmlText(tmpl.name)} preview</title><style>${canvasPublishedStyles}</style><style>${previewStyles}</style></head><body>${html}</body></html>`,

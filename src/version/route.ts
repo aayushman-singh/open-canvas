@@ -22,6 +22,7 @@ import { customer, site } from '../db/schema.js';
 import { captureManual } from './capture.js';
 import { listSnapshots } from './list.js';
 import { renderSnapshotPreview, PreviewRenderError } from './preview-render.js';
+import { requireTurnstileSiteKey } from '../canvas/elements/form.js';
 import { restoreSnapshot, RestoreError } from './restore.js';
 
 interface Bindings {
@@ -29,6 +30,7 @@ interface Bindings {
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   SITE_ROOM: DurableObjectNamespace;
+  TURNSTILE_SITE_KEY?: string;
 }
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -183,7 +185,13 @@ versionRoute.get('/:snapshotId/preview', async (c) => {
     return c.json({ error: 'snapshot not found' }, 404);
   }
   try {
-    const result = await renderSnapshotPreview(ownedSiteId, snapshotId, database, '/assets');
+    const result = await renderSnapshotPreview(
+      ownedSiteId,
+      snapshotId,
+      database,
+      '/assets',
+      requireTurnstileSiteKey(c.env),
+    );
     return c.json({
       ok: true,
       html: result.html,

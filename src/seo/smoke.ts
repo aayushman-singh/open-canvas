@@ -344,6 +344,7 @@ assert(
 const collected: string[] = [];
 const snapshotMulti = makeSnapshot([page1, page4]);
 renderCanvasSnapshot(snapshotMulti, '/assets', SITE_ID, {
+  turnstileSiteKey: 'turnstile-test-key',
   emitHeadMeta: (page) => {
     collected.push(page.slug);
     return emitPageMeta(page, { siteId: SITE_ID, host: HOST, snapshot: snapshotMulti });

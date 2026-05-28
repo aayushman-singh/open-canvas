@@ -6,6 +6,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { renderCanvasSnapshot } from '../../canvas/render';
+import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
@@ -42,6 +43,7 @@ type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
+  TURNSTILE_SITE_KEY?: string;
 };
 
 export const templatesRoute = new Hono<{ Bindings: Bindings; Variables: ClerkAuthVariables }>();
@@ -267,7 +269,13 @@ const previewStyles = `
   html, body { margin: 0; overflow: hidden; background: #05070c; }
 `;
 
-function PreviewPage({ template }: { template: TemplateSeed }) {
+function PreviewPage({
+  template,
+  turnstileSiteKey,
+}: {
+  template: TemplateSeed;
+  turnstileSiteKey: string;
+}) {
   const snapshot: PublishedSnapshot = {
     version: 1,
     publishedAt: '2026-05-22T00:00:00.000Z',
@@ -277,7 +285,12 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
     ...(template.state.footer ? { footer: template.state.footer } : {}),
     ...(template.state.customStyleKit ? { customStyleKit: template.state.customStyleKit } : {}),
   };
-  const html = renderCanvasSnapshot(snapshot, `/dashboard/templates/${template.id}/assets`);
+  const html = renderCanvasSnapshot(
+    snapshot,
+    `/dashboard/templates/${template.id}/assets`,
+    '',
+    { turnstileSiteKey },
+  );
 
   return (
     <html lang="en">
@@ -461,7 +474,7 @@ templatesRoute.get('/:templateId/preview', (c) => {
   if (!template) {
     return c.text('template not found', 404);
   }
-  return c.html(<PreviewPage template={template} />);
+  return c.html(<PreviewPage template={template} turnstileSiteKey={requireTurnstileSiteKey(c.env)} />);
 });
 
 templatesRoute.get('/:templateId/assets/:assetId', (c) => {

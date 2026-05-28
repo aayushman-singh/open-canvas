@@ -6,6 +6,8 @@
 
 import fixture from './fixtures/home.json';
 import { renderCanvasSnapshot } from './render.js';
+
+const TURNSTILE_TEST_KEY = 'turnstile-test-key';
 import type {
   BuiltInStyleKit,
   CanvasElement,
@@ -41,7 +43,7 @@ const snapshot: PublishedSnapshot = {
 const publishedResult = validatePublishedSnapshot(snapshot);
 assert(publishedResult.valid, publishedResult.valid ? '' : publishedResult.errors.join('; '));
 
-const html = renderCanvasSnapshot(snapshot, '/assets');
+const html = renderCanvasSnapshot(snapshot, '/assets', '', { turnstileSiteKey: TURNSTILE_TEST_KEY });
 assert(html.includes('data-rev01-page="page-home"'), 'expected rendered home page marker');
 assert(html.includes('data-rev01-section="section-hero"'), 'expected rendered hero section marker');
 assert(html.includes('data-rev01-element="hero-heading"'), 'expected rendered heading marker');
@@ -88,6 +90,8 @@ const pageMotionLayoutHtml = renderCanvasSnapshot(
     pages: pageMotionLayoutState.pages,
   },
   '/assets',
+  '',
+  { turnstileSiteKey: TURNSTILE_TEST_KEY },
 );
 assert(
   pageMotionLayoutHtml.includes(
@@ -352,7 +356,9 @@ const blankTargetSnapshot: PublishedSnapshot = {
   styleKit: 'charcoal',
   pages: blankTargetState.pages,
 };
-const blankTargetHtml = renderCanvasSnapshot(blankTargetSnapshot, '/assets');
+const blankTargetHtml = renderCanvasSnapshot(blankTargetSnapshot, '/assets', '', {
+  turnstileSiteKey: TURNSTILE_TEST_KEY,
+});
 assert(
   blankTargetHtml.includes('target="_blank"'),
   'expected rendered HTML to include target="_blank" for link mark with target set',
@@ -369,7 +375,9 @@ const noTargetSnapshot: PublishedSnapshot = {
   styleKit: 'charcoal',
   pages: noTargetState.pages,
 };
-const noTargetHtml = renderCanvasSnapshot(noTargetSnapshot, '/assets');
+const noTargetHtml = renderCanvasSnapshot(noTargetSnapshot, '/assets', '', {
+  turnstileSiteKey: TURNSTILE_TEST_KEY,
+});
 assert(
   !noTargetHtml.includes('target='),
   'expected rendered HTML to NOT include target= for link mark without target',
@@ -478,6 +486,8 @@ const pageLinkHtml = renderCanvasSnapshot(
     pages: pageLinkState.pages,
   },
   '/assets',
+  '',
+  { turnstileSiteKey: TURNSTILE_TEST_KEY },
 );
 assert(
   pageLinkHtml.includes('href="/second#pricing"'),
@@ -502,6 +512,8 @@ assert(
           pages: pageLinkState.pages,
         },
         '/assets',
+        '',
+        { turnstileSiteKey: TURNSTILE_TEST_KEY },
       );
       return false;
     } catch {
@@ -600,6 +612,7 @@ const headerFormHtml = renderCanvasSnapshot(
   },
   '/assets',
   'site-form',
+  { turnstileSiteKey: TURNSTILE_TEST_KEY },
 );
 assert(
   headerFormHtml.includes('name="pageSlug" value="form-a"') &&
@@ -883,7 +896,9 @@ for (const kit of BUILT_IN_STYLE_KITS) {
 
 // Renderer must stamp data-variant on action / shape / container wrappers and
 // data-role on text wrappers, so the kit CSS variant selectors match.
-const rendered = renderCanvasSnapshot(snapshot, '/assets');
+const rendered = renderCanvasSnapshot(snapshot, '/assets', '', {
+  turnstileSiteKey: TURNSTILE_TEST_KEY,
+});
 assert(
   rendered.includes('data-element-type="action"'),
   'expected rendered HTML to contain at least one [data-element-type="action"] wrapper',
@@ -900,7 +915,9 @@ assert(
 // boundary) would normally have stopped — defence in depth.
 let rendererThrew = false;
 try {
-  renderCanvasSnapshot({ ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit }, '/assets');
+  renderCanvasSnapshot({ ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit }, '/assets', '', {
+    turnstileSiteKey: TURNSTILE_TEST_KEY,
+  });
 } catch (err) {
   rendererThrew = true;
   assert(
@@ -917,7 +934,7 @@ function assertRenderDispatchFailure(
 ): void {
   let threw = false;
   try {
-    renderCanvasSnapshot(badSnapshot, '/assets');
+    renderCanvasSnapshot(badSnapshot, '/assets', '', { turnstileSiteKey: TURNSTILE_TEST_KEY });
   } catch (err) {
     threw = true;
     assert(

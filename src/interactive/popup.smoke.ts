@@ -64,7 +64,7 @@ const popupSnapshot: PublishedSnapshot = {
   ],
 };
 
-const popupHtml = renderCanvasSnapshot(popupSnapshot, '/assets');
+const popupHtml = renderCanvasSnapshot(popupSnapshot, '/assets', '', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
   popupHtml.includes('data-rev01-popup="true"'),
@@ -118,7 +118,7 @@ const normalSnapshot: PublishedSnapshot = {
   ],
 };
 
-const normalHtml = renderCanvasSnapshot(normalSnapshot, '/assets');
+const normalHtml = renderCanvasSnapshot(normalSnapshot, '/assets', '', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
   !normalHtml.includes('data-rev01-popup'),
@@ -200,7 +200,7 @@ const delaySnapshot: PublishedSnapshot = {
   ],
 };
 
-const delayHtml = renderCanvasSnapshot(delaySnapshot, '/assets');
+const delayHtml = renderCanvasSnapshot(delaySnapshot, '/assets', '', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
   delayHtml.includes('data-rev01-trigger-type="delay"'),

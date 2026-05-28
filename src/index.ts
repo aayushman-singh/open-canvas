@@ -1,40 +1,28 @@
 import { Hono } from 'hono';
-import ownerAssetsApi from './assets/route';
 import landing from './landing';
 import { dashboard } from './routes/dashboard';
 import { templatesRoute } from './routes/dashboard/templates';
 import sites from './routes/api/sites';
 import { importRouter } from './routes/api/import';
-import canvasApi from './routes/api/canvas';
-import canvasAgentApi from './routes/api/canvas-agent';
-import publishApi from './routes/api/publish';
-import sectionsApi from './routes/api/sections';
-import slotHistoryApi from './routes/api/slot-history';
-import canvasEditor from './editor/canvas-index';
+import ownerApi from './routes/api/owner-app';
+import canvasEditor from './editor/route';
 import { handlePublicRequest, type PublicEnv } from './routes/public';
-// Wave 1 routers wired by main thread after parallel-agent merge.
 import versionRoute from './version/route';
 import customDomainRouter from './custom-domain/route';
 import ogRoute from './og-image/route';
-import { scheduled as customDomainScheduled } from './custom-domain/cron';
-// Wave 2 routers wired by main thread after parallel-agent merge.
+import { scheduled } from './scheduled';
 import formsRouter from './forms/route';
 import formsInboxRoute from './routes/dashboard/forms-inbox';
 import unlockRoute from './password/unlock-route';
 import passwordAdminRoute from './password/admin-route';
 import siteSettingsRoute from './routes/dashboard/site-settings';
 import themeRoute from './themes/route';
-import { configureFormRender } from './canvas/elements/form';
-// Wave 3 routers wired by main thread after parallel-agent merge.
 import searchRouter from './search/route';
 import a11yRoute from './a11y/route';
 import a11yReportRoute from './routes/dashboard/a11y-report';
 import pageSettingsRoute from './routes/dashboard/page-settings';
-// Wave 4 routers wired by main thread after parallel-agent merge.
 import sitemapRouter from './seo/sitemap/route';
-// Wave 5 routers wired by main thread after parallel-agent merge.
 import fontsRouter from './fonts/route';
-import chatApi from './agent/chat/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
 import addonShopRoute from './routes/dashboard/addon-shop';
 import siteAddonsRoute from './routes/dashboard/site-addons';
@@ -44,45 +32,20 @@ import accountSettingsRoute from './routes/dashboard/settings';
 import { domainsRoute } from './routes/dashboard/domains';
 import versionTimelineRoute from './routes/dashboard/version-timeline';
 import profileApi from './routes/api/profile';
-// Section library + custom template routes
-import {
-  librarySectionsOwner,
-  librarySectionsAdmin,
-} from './routes/api/library-sections';
-import {
-  customTemplatesOwner,
-  customTemplatesAdmin,
-} from './routes/api/custom-templates';
+// Admin-only mounts for the section library + custom template subsystems.
+// The owner-facing routes for these subsystems live inside ownerApi and reach
+// both /api/* and /__api/*; admin tooling stays on /api/* only.
+import { librarySectionsAdmin } from './routes/api/library-sections';
+import { customTemplatesAdmin } from './routes/api/custom-templates';
 import { editTokenAuth } from './auth/middleware';
 import editTokenRefreshRoute from './auth/refresh-route';
 import signOutRoute from './auth/sign-out-route';
-import { verifyEditToken } from './auth/edit-token';
-import { db } from './db/client';
 import onSiteEditRoute from './routes/api/on-site-edit';
 import collaboratorsApi from './routes/api/collaborators';
 import inviteRedirectRoute from './auth/invite-redirect-route';
-import { hasLiveEditorSocketAccess } from './live/editor-auth';
+import socketRoute from './live/socket-route';
 
 const app = new Hono<PublicEnv>();
-
-// Wave 2 #7 — Forms boot hook. The Turnstile public site key is read from
-// env on first request and cached at module scope (the renderer reads from a
-// module-local config, see src/canvas/elements/form.ts). Without it the form
-// element renders no Turnstile widget; the server-side verifier still hard-
-// fails any submission missing the token, so the bot-protection invariant
-// holds. One-shot — runs once per isolate cold-start.
-let formRenderConfigured = false;
-app.use('*', async (c, next) => {
-  if (!formRenderConfigured) {
-    const turnstileSiteKey =
-      typeof c.env.TURNSTILE_SITE_KEY === 'string' && c.env.TURNSTILE_SITE_KEY.length > 0
-        ? c.env.TURNSTILE_SITE_KEY
-        : null;
-    configureFormRender({ turnstileSiteKey });
-    formRenderConfigured = true;
-  }
-  await next();
-});
 
 // Public host router runs FIRST. If the request host belongs to a Published
 // Site (*.rev01.aayushman.dev minus the app host), serve the snapshot here.
@@ -94,41 +57,7 @@ app.use('*', async (c, next) => {
   await next();
 });
 
-app.get('/__live', async (c) => {
-  const siteId = c.req.query('siteId');
-  if (!siteId || !/^[A-Za-z0-9-]+$/.test(siteId)) {
-    return c.text('site not found', 404);
-  }
-
-  const upgrade = c.req.header('upgrade');
-  if (upgrade !== 'websocket') {
-    return c.text('expected websocket upgrade', 426);
-  }
-
-  const wsToken = c.req.query('wsToken');
-  const payload = await verifyEditToken(wsToken, c.env.UNLOCK_SIGNING_SECRET);
-  if (!payload || payload.siteId !== siteId) {
-    return c.text('unauthorized', 401);
-  }
-
-  const database = db(c.env);
-  const hasAccess = await hasLiveEditorSocketAccess(database, siteId, payload.customerId);
-  if (!hasAccess) {
-    return c.text('unauthorized', 401);
-  }
-
-  const id = c.env.SITE_ROOM.idFromName(siteId);
-  const stub = c.env.SITE_ROOM.get(id);
-  return stub.fetch(
-    new Request(
-      `https://do.invalid/socket?siteId=${encodeURIComponent(siteId)}&role=editor`,
-      {
-        method: 'GET',
-        headers: c.req.raw.headers,
-      },
-    ),
-  );
-});
+app.route('/__live', socketRoute);
 
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
 
@@ -140,42 +69,27 @@ app.route('/sign-out', signOutRoute);
 // subdomain's /__accept-invite handler with the same token.
 app.route('/__invite', inviteRedirectRoute);
 
-app.get('/favicon.ico', (c) => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0d1117"/><text x="4" y="24" font-family="monospace" font-size="22" font-weight="700" fill="#22d3ee">r1</text></svg>`;
-  return c.body(svg, 200, {
-    'content-type': 'image/svg+xml',
-    'cache-control': 'public, max-age=86400',
-  });
-});
-
+// The favicon route lives inside `landing` next to the rest of the brand
+// surface (see src/landing/index.tsx).
 app.route('/', landing);
 
 app.route('/dashboard/templates', templatesRoute);
 app.route('/dashboard', canvasEditor);
 app.route('/dashboard', dashboard);
+// The shared owner-rooted API surface: mounted on /api/* for the dashboard
+// (Clerk-session auth) and on /__api/* for the on-site editor (edit-token
+// auth) below. See src/routes/api/owner-app.ts for the route list and the
+// drift-prevention rationale.
+app.route('/api', ownerApi);
 app.route('/api/sites', sites);
 app.route('/api/import', importRouter);
-app.route('/api/canvas', canvasApi);
-app.route('/api/canvas-agent', canvasAgentApi);
-app.route('/api/publish', publishApi);
-// Owner-rooted asset endpoints per ADR 0004 + ADR 0006. Mounted alongside
-// the legacy `/api/canvas/sites/:siteId/assets` bridge in canvas.ts; the
-// editor still calls the legacy path during this Phase 0 cutover.
-app.route('/api/owner/assets', ownerAssetsApi);
-app.route('/api', slotHistoryApi);
-app.route('/api', sectionsApi);
-// Section library + custom template mounts.
-app.route('/api/library', librarySectionsOwner);
+// Admin-only mounts (NOT in ownerApi — editor never hits these).
 app.route('/api/admin/library', librarySectionsAdmin);
-app.route('/api/custom-templates', customTemplatesOwner);
 app.route('/api/admin/custom-templates', customTemplatesAdmin);
 app.route('/api', collaboratorsApi);
-// Wave 1 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
 app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);
 app.route('/og', ogRoute);
-// Wave 2 mounts. The themes router exposes /api/sites/:siteId/custom-theme;
-// the password admin router exposes /api/sites/:siteId/password.
 app.route('/api/forms', formsRouter);
 app.route('/dashboard', formsInboxRoute);
 app.route('/dashboard', siteSettingsRoute);
@@ -189,35 +103,26 @@ app.route('/__rev01/unlock', unlockRoute);
 // Visitor-facing form submissions. The public-host router lets this path fall
 // through only after the password gate has passed.
 app.route('/__rev01/forms', formsRouter);
-// Wave 3 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
-// a11y (#15) lives under /api/sites/:siteId/...
 app.route('/api/sites', a11yRoute);
 app.route('/dashboard', a11yReportRoute);
 app.route('/dashboard', pageSettingsRoute);
-// Site search (#13) — visitor-facing endpoint on the public-host path.
-// public.ts lets this path fall through only after the password gate has
-// passed. The handler reads the request Host to resolve site id.
+// Site search — visitor-facing endpoint on the public-host path. public.ts
+// lets this path fall through only after the password gate has passed. The
+// handler reads the request Host to resolve site id.
 app.route('/__rev01/search', searchRouter);
-// Wave 4 mounts.
-// Sitemap.xml + robots.txt (#22) on public-host root paths. public.ts must
-// fall through (return null) for `/sitemap.xml` and `/robots.txt` — see the
+// Sitemap.xml + robots.txt on public-host root paths. public.ts must fall
+// through (return null) for `/sitemap.xml` and `/robots.txt` — see the
 // fallthrough block in handlePublicRequest.
 app.route('/', sitemapRouter);
-// Wave 5 mounts.
-// Custom fonts (#12) — public `GET /fonts/:contentHash` + Owner-scoped
-// `/api/sites/:siteId/fonts` verbs. The router is root-mounted so both
-// paths reach their handlers.
+// Custom fonts: public `GET /fonts/:contentHash` + Owner-scoped
+// `/api/sites/:siteId/fonts` verbs. Router is root-mounted so both paths
+// reach their handlers.
 app.route('/', fontsRouter);
-// AI chat (#23) — multi-turn agent over CanvasSiteState. Mounts at
-// /api/sites so the inner routes become /api/sites/:siteId/chat and
-// /api/sites/:siteId/chat/stream.
-app.route('/api/sites', chatApi);
 app.route('/dashboard', chatPanelRoute);
-// Addon system (ADR 0009)
+// Addon system — see docs/adr/0009-addon-entitlement-model.md.
 app.route('/dashboard', addonShopRoute);
 app.route('/dashboard', siteAddonsRoute);
 app.route('/api/addons', addonsApi);
-// Profile & account settings
 app.route('/dashboard', profileRoute);
 app.route('/dashboard', accountSettingsRoute);
 app.route('/dashboard', domainsRoute);
@@ -227,28 +132,23 @@ app.route('/api/profile', profileApi);
 // cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
 app.route('/api/on-site-edit', onSiteEditRoute);
 
-// On-site editor API proxy — same sub-app handlers mounted under /__api with
-// edit-token auth instead of Clerk sessions. The public host router
-// (public.ts) returns null for /__api/* paths so they fall through here.
-// editTokenAuth() validates the __rev01_edit cookie and populates the same
-// auth context variables that clerkAuth()+requireAuth() would, so the
-// sub-apps' built-in clerkAuth() short-circuits (auth already set).
+// On-site editor API proxy — same ownerApi handlers as /api/* but gated by
+// edit-token auth instead of the dashboard's Clerk session. The public host
+// router (public.ts) returns null for /__api/* paths so they fall through
+// here. editTokenAuth() validates the __rev01_edit cookie and populates the
+// same auth context variables that clerkAuth()+requireAuth() would, so each
+// inner sub-app's built-in clerkAuth() short-circuits (auth already set).
 app.use('/__api/*', editTokenAuth());
+// /__api/edit-token must be mounted BEFORE the ownerApi catch-all because
+// the refresh route reads the verified edit-token payload set by the
+// editTokenAuth middleware above and does its own re-sign, while ownerApi's
+// inner sub-apps would happily 404 on the unknown /__api/edit-token path.
+// The auth gate has already run by the time either mount is reached.
 app.route('/__api/edit-token', editTokenRefreshRoute);
-app.route('/__api/canvas', canvasApi);
-app.route('/__api/canvas-agent', canvasAgentApi);
-app.route('/__api/publish', publishApi);
-app.route('/__api/owner/assets', ownerAssetsApi);
-app.route('/__api', slotHistoryApi);
-app.route('/__api', sectionsApi);
-app.route('/__api/library', librarySectionsOwner);
-app.route('/__api/custom-templates', customTemplatesOwner);
-app.route('/__api/sites', chatApi);
+app.route('/__api', ownerApi);
 
 export { SiteRoom } from './live/site-room';
-// Phase 0 scaffold — Wave 2 #7 (forms) DO class. The binding lives in
-// wrangler.toml; the implementation throws until Wave 2 lands. See
-// docs/superpowers/plans/2026-05-23-07-forms.md.
+// Forms rate-limiter DurableObject. Binding lives in wrangler.toml.
 export { FormRateLimiter } from './live/form-rate-limiter';
 // Named export so tests can use Hono's `.request(...)` helper directly.
 // (The default export is the Worker module-object Cloudflare expects:
@@ -256,10 +156,8 @@ export { FormRateLimiter } from './live/form-rate-limiter';
 export { app };
 
 // Worker default export carries both the request handler and the cron
-// `scheduled` handler. The cron-trigger expression lives in wrangler.toml
-// `[triggers]`; the handler dispatches to per-feature scheduled tasks.
-// Wave 1 #5 (custom domains) owns the only scheduled task today.
+// `scheduled` handler. See src/scheduled.ts for the cron dispatcher.
 export default {
   fetch: app.fetch.bind(app),
-  scheduled: customDomainScheduled,
+  scheduled,
 };

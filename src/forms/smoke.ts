@@ -25,7 +25,6 @@
 import { and, count, eq, gte, lt, sql } from 'drizzle-orm';
 
 import {
-  configureFormRender,
   renderForm,
   type FormElement,
   type FormFieldDef,
@@ -557,11 +556,11 @@ function makeRateLimiterNamespace(
 // ---------------------------------------------------------------------------
 
 function runRenderForm(): void {
-  configureFormRender({ turnstileSiteKey: 'turnstile-public-key-stub' });
   const html = renderForm(formElement, {
     siteId: SITE_ID,
     pageSlug: PAGE_SLUG,
     styleKit: 'charcoal',
+    turnstileSiteKey: 'turnstile-public-key-stub',
   });
   assert(
     html.includes(`action="/__rev01/forms/${SITE_ID}/${FORM_ID}"`),
@@ -573,25 +572,13 @@ function runRenderForm(): void {
   assert(html.includes('name="message"'), '1.5 renderForm: textarea present');
   assert(
     html.includes('class="cf-turnstile"'),
-    '1.6 renderForm: Turnstile widget present when configured',
+    '1.6 renderForm: Turnstile widget always present (per-render ctx key)',
   );
   assert(
     html.includes('data-sitekey="turnstile-public-key-stub"'),
-    '1.7 renderForm: Turnstile site key wired',
+    '1.7 renderForm: Turnstile site key wired from ctx',
   );
-  // Submit button.
   assert(html.includes('Send message'), '1.8 renderForm: submit label rendered');
-  // Disable the widget for the next tests.
-  configureFormRender({ turnstileSiteKey: null });
-  const without = renderForm(formElement, {
-    siteId: SITE_ID,
-    pageSlug: PAGE_SLUG,
-    styleKit: 'charcoal',
-  });
-  assert(
-    !without.includes('class="cf-turnstile"'),
-    '1.9 renderForm: Turnstile widget OMITTED when not configured',
-  );
 }
 
 // ---------------------------------------------------------------------------

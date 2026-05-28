@@ -58,6 +58,7 @@ export async function renderSnapshotPreview(
   snapshotId: string,
   db: Db,
   assetBasePath: string,
+  turnstileSiteKey: string,
 ): Promise<PreviewRenderResult> {
   const rows = await db
     .select({
@@ -102,7 +103,7 @@ export async function renderSnapshotPreview(
     ...(state.siteNoIndex !== undefined ? { siteNoIndex: state.siteNoIndex } : {}),
     ...(state.darkModeEnabled !== undefined ? { darkModeEnabled: state.darkModeEnabled } : {}),
   };
-  const html = renderCanvasSnapshot(publishedView, assetBasePath, siteId);
+  const html = renderCanvasSnapshot(publishedView, assetBasePath, siteId, { turnstileSiteKey });
 
   return {
     html,

@@ -11,6 +11,7 @@ import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge, Pill } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
+import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import type { PublishedSnapshot, CanvasSiteState } from '../../canvas/schema';
 
@@ -21,6 +22,7 @@ type Bindings = {
   CLERK_TEST_SECRET_KEY?: string;
   DEV_PUBLIC_HOST?: string;
   DATABASE_URL: string;
+  TURNSTILE_SITE_KEY?: string;
 };
 
 export const dashboard = new Hono<{ Bindings: Bindings; Variables: ClerkAuthVariables }>();
@@ -77,7 +79,12 @@ function formatBytes(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
-function buildThumbHtml(state: CanvasSiteState, siteId: string, origin: string): string {
+function buildThumbHtml(
+  state: CanvasSiteState,
+  siteId: string,
+  origin: string,
+  turnstileSiteKey: string,
+): string {
   const snapshot: PublishedSnapshot = {
     version: 0,
     publishedAt: new Date().toISOString(),
@@ -91,6 +98,7 @@ function buildThumbHtml(state: CanvasSiteState, siteId: string, origin: string):
     snapshot,
     `/api/canvas/sites/${siteId}/assets`,
     siteId,
+    { turnstileSiteKey },
   );
   return [
     '<!DOCTYPE html><html><head>',
@@ -993,12 +1001,13 @@ function buildCards(
     passwordEnabled: boolean;
   }>,
   origin: string,
+  turnstileSiteKey: string,
 ): SiteCard[] {
   return rows.map((row) => {
     const state = row.editableState;
     let thumbHtml: string;
     try {
-      thumbHtml = buildThumbHtml(state, row.id, origin);
+      thumbHtml = buildThumbHtml(state, row.id, origin, turnstileSiteKey);
     } catch (error) {
       console.error(
         `dashboard: buildThumbHtml failed for siteId=${row.id} name=${JSON.stringify(row.name)} subdomain=${JSON.stringify(row.subdomain)}`,
@@ -1140,7 +1149,7 @@ dashboard.get('/', async (c) => {
       .where(eq(site.customerId, customerId))
       .orderBy(desc(site.createdAt));
 
-    cards = buildCards(rows, origin);
+    cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));
     publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
 
     const sb = await database

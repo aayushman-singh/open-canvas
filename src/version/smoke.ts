@@ -673,6 +673,7 @@ async function runRestoreSwapsAndCapturesSafety(): Promise<void> {
     publishOne.id,
     dbShim as unknown as Db,
     '/assets',
+    'turnstile-test-key',
   );
   assert(preview.html.includes('First'), 'expected preview HTML to contain restored heading text');
   assert(preview.reason === 'publish', 'preview should reflect publish reason');
