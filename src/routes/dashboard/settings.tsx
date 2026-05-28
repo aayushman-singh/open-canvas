@@ -1,6 +1,12 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { eq, sql, count, sum } from 'drizzle-orm';
+import {
+  billingPlanInvoiceAmount,
+  billingPlanLabel,
+  siteLimitForPlan,
+  storageLimitForPlan,
+} from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
@@ -302,25 +308,31 @@ const tabScript = raw(`<script>
 
 const PLANS = [
   {
+    id: 'free',
     name: 'Free',
     price: '$0',
     period: '/mo',
     features: ['1 site', 'Community templates', 'rev01 subdomain', '100 MB storage'],
-    current: true,
   },
   {
+    id: 'pro',
     name: 'Pro',
     price: '$19',
     period: '/mo',
     features: ['Unlimited sites', 'Custom domains', 'Remove branding', '10 GB storage'],
-    current: false,
   },
   {
+    id: 'team',
     name: 'Team',
     price: '$49',
     period: '/mo',
-    features: ['Everything in Pro', '5 team seats', 'Shared asset library', 'Priority support', '50 GB storage'],
-    current: false,
+    features: [
+      'Everything in Pro',
+      '5 team seats',
+      'Shared asset library',
+      'Priority support',
+      '50 GB storage',
+    ],
   },
 ];
 
@@ -332,10 +344,25 @@ const INVOICES = [
 
 const NOTIFICATIONS = [
   { id: 'publish', title: 'Site published', desc: 'When a site is published or updated', on: true },
-  { id: 'collab', title: 'Collaborator activity', desc: 'When someone joins or edits a shared site', on: true },
+  {
+    id: 'collab',
+    title: 'Collaborator activity',
+    desc: 'When someone joins or edits a shared site',
+    on: true,
+  },
   { id: 'forms', title: 'Form submissions', desc: 'New form submissions on your sites', on: false },
-  { id: 'product', title: 'Product updates', desc: 'New features, improvements, and announcements', on: true },
-  { id: 'tips', title: 'Tips & tutorials', desc: 'Helpful guides to get the most out of rev01', on: false },
+  {
+    id: 'product',
+    title: 'Product updates',
+    desc: 'New features, improvements, and announcements',
+    on: true,
+  },
+  {
+    id: 'tips',
+    title: 'Tips & tutorials',
+    desc: 'Helpful guides to get the most out of rev01',
+    on: false,
+  },
 ];
 
 settingsRoute.get('/settings', async (c) => {
@@ -344,9 +371,8 @@ settingsRoute.get('/settings', async (c) => {
     throw new Error('settings page reached without a resolved user');
   }
 
-  const primaryEmail = user.emailAddresses.find(
-    (addr) => addr.id === user.primaryEmailAddressId,
-  )?.emailAddress ?? '';
+  const primaryEmail =
+    user.emailAddresses.find((addr) => addr.id === user.primaryEmailAddressId)?.emailAddress ?? '';
 
   const database = db(c.env);
 
@@ -359,24 +385,33 @@ settingsRoute.get('/settings', async (c) => {
     });
 
   const customerRow = await database
-    .select({ id: customer.id, displayName: customer.displayName })
+    .select({ id: customer.id, displayName: customer.displayName, plan: customer.plan })
     .from(customer)
     .where(eq(customer.clerkUserId, user.id))
     .limit(1);
   const customerId = customerRow[0]?.id;
+  const customerPlan = customerRow[0]?.plan ?? 'free';
 
   let siteCount = 0;
   let storageBytes = 0;
   if (customerId) {
-    const sc = await database.select({ count: count() }).from(site).where(eq(site.customerId, customerId));
+    const sc = await database
+      .select({ count: count() })
+      .from(site)
+      .where(eq(site.customerId, customerId));
     siteCount = sc[0]?.count ?? 0;
 
-    const sb = await database.select({ total: sum(ownerAsset.byteSize) }).from(ownerAsset).where(eq(ownerAsset.customerId, customerId));
+    const sb = await database
+      .select({ total: sum(ownerAsset.byteSize) })
+      .from(ownerAsset)
+      .where(eq(ownerAsset.customerId, customerId));
     storageBytes = Number(sb[0]?.total ?? 0);
   }
 
-  const FREE_SITE_LIMIT = 3;
-  const FREE_STORAGE_LIMIT = 100 * 1024 * 1024;
+  const currentPlanLabel = billingPlanLabel(customerPlan);
+  const currentInvoiceAmount = billingPlanInvoiceAmount(customerPlan);
+  const siteLimit = siteLimitForPlan(customerPlan);
+  const storageLimit = storageLimitForPlan(customerPlan);
 
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
@@ -384,10 +419,7 @@ settingsRoute.get('/settings', async (c) => {
   return c.html(
     <DashboardShell
       title="rev01 — settings"
-      crumbs={[
-        { label: 'Dashboard', href: '/dashboard' },
-        { label: 'Settings' },
-      ]}
+      crumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]}
       activePath="/dashboard/settings"
       pageStyles={settingsStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
@@ -395,24 +427,39 @@ settingsRoute.get('/settings', async (c) => {
       <h1>Settings</h1>
 
       <div class="settings-tabs" role="tablist">
-        <button class="settings-tab" role="tab" aria-selected="true" data-tab="tab-billing">Billing</button>
-        <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-notifications">Notifications</button>
-        <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-account">Account</button>
+        <button class="settings-tab" role="tab" aria-selected="true" data-tab="tab-billing">
+          Billing
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-notifications">
+          Notifications
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-account">
+          Account
+        </button>
       </div>
 
       <div class="settings-panel" id="tab-billing" data-active="true">
         <div class="settings-section">
           <h3>Plan</h3>
-          <p class="desc">You're on the Free plan. Upgrade to unlock more sites and custom domains.</p>
+          <p class="desc">
+            {customerPlan === 'free'
+              ? "You're on the Free plan. Upgrade to unlock more sites and custom domains."
+              : `You're on the ${currentPlanLabel} plan.`}
+          </p>
           <div class="plan-grid">
             {PLANS.map((plan) => (
-              <div class={`plan-card${plan.current ? ' plan-card--current' : ''}`}>
+              <div class={`plan-card${plan.id === customerPlan ? ' plan-card--current' : ''}`}>
                 <p class="plan-name">{plan.name}</p>
-                <p class="plan-price">{plan.price}<span class="period">{plan.period}</span></p>
+                <p class="plan-price">
+                  {plan.price}
+                  <span class="period">{plan.period}</span>
+                </p>
                 <ul class="plan-features">
-                  {plan.features.map((f) => <li>{f}</li>)}
+                  {plan.features.map((f) => (
+                    <li>{f}</li>
+                  ))}
                 </ul>
-                {!plan.current && (
+                {plan.id !== customerPlan && (
                   <Button variant="secondary" style="margin-top:16px;width:100%">
                     Upgrade to {plan.name}
                   </Button>
@@ -429,17 +476,29 @@ settingsRoute.get('/settings', async (c) => {
             <div class="usage-card">
               <div class="label">Sites</div>
               <div class="value">{String(siteCount)}</div>
-              <div class="of">of {String(FREE_SITE_LIMIT)} on Free</div>
+              <div class="of">
+                {siteLimit === null
+                  ? `Unlimited on ${currentPlanLabel}`
+                  : `of ${String(siteLimit)} on ${currentPlanLabel}`}
+              </div>
               <div class="usage-bar">
-                <div class="usage-bar-fill" style={`width:${Math.min(100, (siteCount / FREE_SITE_LIMIT) * 100)}%`} />
+                <div
+                  class="usage-bar-fill"
+                  style={`width:${siteLimit === null ? 100 : Math.min(100, (siteCount / siteLimit) * 100)}%`}
+                />
               </div>
             </div>
             <div class="usage-card">
               <div class="label">Storage</div>
               <div class="value">{formatBytes(storageBytes)}</div>
-              <div class="of">of {formatBytes(FREE_STORAGE_LIMIT)} on Free</div>
+              <div class="of">
+                of {formatBytes(storageLimit)} on {currentPlanLabel}
+              </div>
               <div class="usage-bar">
-                <div class="usage-bar-fill" style={`width:${Math.min(100, (storageBytes / FREE_STORAGE_LIMIT) * 100)}%`} />
+                <div
+                  class="usage-bar-fill"
+                  style={`width:${Math.min(100, (storageBytes / storageLimit) * 100)}%`}
+                />
               </div>
             </div>
           </div>
@@ -461,9 +520,11 @@ settingsRoute.get('/settings', async (c) => {
               {INVOICES.map((inv) => (
                 <tr>
                   <td>{inv.date}</td>
-                  <td>{inv.description}</td>
-                  <td>{inv.amount}</td>
-                  <td><Badge variant="success">{inv.status}</Badge></td>
+                  <td>{currentPlanLabel} plan</td>
+                  <td>{currentInvoiceAmount}</td>
+                  <td>
+                    <Badge variant="success">{inv.status}</Badge>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -496,7 +557,11 @@ settingsRoute.get('/settings', async (c) => {
           <p class="desc">Manage your rev01 account.</p>
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" style="width:48px;height:48px;border-radius:50%;border:2px solid var(--line)" />
+              <img
+                src={avatarUrl}
+                alt=""
+                style="width:48px;height:48px;border-radius:50%;border:2px solid var(--line)"
+              />
             ) : (
               <div style="width:48px;height:48px;border-radius:50%;background:rgba(125,211,252,0.12);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;font-size:20px">
                 {(displayName ?? primaryEmail ?? '?').charAt(0).toUpperCase()}
@@ -506,14 +571,23 @@ settingsRoute.get('/settings', async (c) => {
               <div style="font-weight:600">{displayName ?? primaryEmail.split('@')[0]}</div>
               <div style="font-size:13px;color:var(--faint)">{primaryEmail}</div>
             </div>
-            <Button variant="secondary" href="/dashboard/profile" style="margin-left:auto">Edit profile</Button>
+            <Button variant="secondary" href="/dashboard/profile" style="margin-left:auto">
+              Edit profile
+            </Button>
           </div>
         </div>
 
         <div class="settings-section danger-zone">
           <h3>Danger zone</h3>
-          <p class="desc">Permanently delete your account and all associated data. This cannot be undone.</p>
-          <button class="btn-danger" onclick="__rev01Modal.alert('Account deletion is not available in the demo.', 'Not available')">Delete account</button>
+          <p class="desc">
+            Permanently delete your account and all associated data. This cannot be undone.
+          </p>
+          <button
+            class="btn-danger"
+            onclick="__rev01Modal.alert('Account deletion is not available in the demo.', 'Not available')"
+          >
+            Delete account
+          </button>
         </div>
       </div>
 

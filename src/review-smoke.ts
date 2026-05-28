@@ -48,8 +48,7 @@ function assert(condition: boolean, message: string): asserts condition {
 // DATABASE_URL even for the 404 path (we want a real "no row" answer, not a
 // crash from a missing env var). Pull from process.env so the smoke remains
 // deterministic against the empty dev DB.
-const SMOKE_UNLOCK_SIGNING_SECRET =
-  process.env.UNLOCK_SIGNING_SECRET ?? 'smoke-test-secret';
+const SMOKE_UNLOCK_SIGNING_SECRET = process.env.UNLOCK_SIGNING_SECRET ?? 'smoke-test-secret';
 
 const smokeEnv: Record<string, string> = {
   DATABASE_URL: process.env.DATABASE_URL ?? '',
@@ -482,6 +481,30 @@ assert(
     siteLimitMigration.includes('CREATE TRIGGER'),
   'expected a database trigger migration to enforce the free site limit under concurrent inserts',
 );
+const planAwareSiteLimitMigration = await readSource('../drizzle/0008_plan_aware_site_limit.sql');
+assert(
+  planAwareSiteLimitMigration.includes("WHEN 'free' THEN 3") &&
+    planAwareSiteLimitMigration.includes("WHEN 'pro' THEN NULL") &&
+    planAwareSiteLimitMigration.includes("WHEN 'team' THEN NULL"),
+  'expected plan-aware site limit trigger to cap free sites and leave paid plans uncapped',
+);
+const importApiLimitSource = await readSource('./routes/api/import.ts');
+for (const [name, source] of [
+  ['sites API', sitesApiSource],
+  ['import API', importApiLimitSource],
+] as const) {
+  assert(
+    source.includes('plan: customer.plan') &&
+      source.includes('const customerPlan = customerRecord.plan') &&
+      source.includes('siteLimitForPlan(customerPlan)') &&
+      source.includes('isSiteLimitViolation(err)'),
+    `expected ${name} site-limit enforcement to honor customer.plan and route trigger errors through the shared detector`,
+  );
+}
+assert(
+  sitesApiSource.includes("e.message.includes('site limit exceeded')"),
+  'expected site-limit trigger detector to recognize the new plan-aware trigger message',
+);
 const sectionsApiSource = await readSource('./routes/api/sections.ts');
 assert(
   sectionsApiSource.includes('.where(and(eq(site.id, siteId), eq(site.customerId, customerId)))'),
@@ -509,6 +532,23 @@ assert(
 assert(
   !dashboardSource.includes('let editorLink'),
   'expected dashboard not to collapse owned sites into a single editorLink',
+);
+const billingSettingsSource = await readSource('./routes/dashboard/settings.tsx');
+for (const [name, source] of [
+  ['templates page', templatesPageSource],
+  ['dashboard', dashboardSource],
+  ['billing settings', billingSettingsSource],
+] as const) {
+  assert(
+    source.includes('plan: customer.plan') && source.includes('siteLimitForPlan(customerPlan)'),
+    `expected ${name} site-limit UI to honor customer.plan instead of hardcoding the Free cap`,
+  );
+}
+assert(
+  dashboardSource.includes('const atSiteLimit = siteLimit !== null') &&
+    !templatesPageSource.includes("You've reached your Free plan limit (3 sites)") &&
+    billingSettingsSource.includes('plan.id === customerPlan'),
+  'expected paid-plan dashboard UI not to present Free as the current capped plan',
 );
 
 const publicRouteSource = await readSource('./routes/public.ts');
@@ -769,9 +809,7 @@ const legacyUploadBridgeSource = canvasApiSource.slice(
   canvasApiSource.indexOf('interface GenerateAssetInput'),
 );
 assert(
-  !/uploadOwnerAsset[\s\S]*siteId:\s*result\.site\.id[\s\S]*\);/.test(
-    legacyUploadBridgeSource,
-  ),
+  !/uploadOwnerAsset[\s\S]*siteId:\s*result\.site\.id[\s\S]*\);/.test(legacyUploadBridgeSource),
   'expected legacy JSON asset bridge not to pass siteId without elementId to uploadOwnerAsset',
 );
 assert(

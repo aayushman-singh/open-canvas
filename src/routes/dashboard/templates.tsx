@@ -9,6 +9,7 @@ import { renderCanvasSnapshot } from '../../canvas/render';
 import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
+import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customer, customTemplate, site } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
@@ -249,10 +250,10 @@ interface CustomTemplateCard {
 
 function Page({
   customTemplates,
-  atSiteLimit,
+  siteLimitErrorMessage,
 }: {
   customTemplates: CustomTemplateCard[];
-  atSiteLimit: boolean;
+  siteLimitErrorMessage: string | null;
 }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   return (
@@ -355,10 +356,9 @@ function Page({
           </label>
         </div>
 
-        {atSiteLimit ? (
+        {siteLimitErrorMessage ? (
           <p class="limit-notice">
-            You've reached your Free plan limit (3 sites). <a href="/dashboard/settings">Upgrade</a>{' '}
-            to create more.
+            {siteLimitErrorMessage} <a href="/dashboard/settings">Upgrade</a> to create more.
           </p>
         ) : (
           <Button variant="primary" type="submit">
@@ -405,15 +405,16 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
 templatesRoute.get('/', async (c) => {
   const auth = c.get('auth');
   let customTemplates: CustomTemplateCard[] = [];
-  let atSiteLimit = false;
+  let siteLimitErrorMessage: string | null = null;
   if (auth.userId) {
     const database = db(c.env);
     const customerRow = await database
-      .select({ id: customer.id })
+      .select({ id: customer.id, plan: customer.plan })
       .from(customer)
       .where(eq(customer.clerkUserId, auth.userId))
       .limit(1);
-    const customerId = customerRow[0]?.id;
+    const customerRecord = customerRow[0];
+    const customerId = customerRecord?.id;
 
     const whereClause = customerId
       ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
@@ -433,14 +434,19 @@ templatesRoute.get('/', async (c) => {
     customTemplates = rows;
 
     if (customerId) {
-      const FREE_SITE_LIMIT = 3;
+      const customerPlan = customerRecord.plan;
       const countRows = await database
         .select({ count: sql<number>`count(*)::int` })
         .from(site)
         .where(eq(site.customerId, customerId));
-      atSiteLimit = (countRows[0]?.count ?? 0) >= FREE_SITE_LIMIT;
+      const siteLimit = siteLimitForPlan(customerPlan);
+      if (siteLimit !== null && (countRows[0]?.count ?? 0) >= siteLimit) {
+        siteLimitErrorMessage = siteLimitError(customerPlan);
+      }
     }
   }
 
-  return c.html(<Page customTemplates={customTemplates} atSiteLimit={atSiteLimit} />);
+  return c.html(
+    <Page customTemplates={customTemplates} siteLimitErrorMessage={siteLimitErrorMessage} />,
+  );
 });

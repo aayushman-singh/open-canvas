@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { desc, eq, sql, sum } from 'drizzle-orm';
+import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/middleware';
@@ -53,8 +54,18 @@ const THUMB_SCALE = 0.24;
 
 function formatDate(d: Date): string {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return `${months[d.getUTCMonth()]} ${String(d.getUTCDate())}`;
 }
@@ -66,11 +77,7 @@ function formatBytes(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
-function buildThumbHtml(
-  state: CanvasSiteState,
-  siteId: string,
-  origin: string,
-): string {
+function buildThumbHtml(state: CanvasSiteState, siteId: string, origin: string): string {
   const snapshot: PublishedSnapshot = {
     version: 0,
     publishedAt: new Date().toISOString(),
@@ -87,15 +94,13 @@ function buildThumbHtml(
   // unavailable" tombstone — silent failure mode that hid the missing config
   // for an unknown stretch of time. Surface real errors instead.
   configureSymbolInstanceRender({ symbols: state.symbols ?? [] });
-  const canvasHtml = renderCanvasSnapshot(
-    snapshot,
-    `/api/canvas/sites/${siteId}/assets`,
-    siteId,
-  );
+  const canvasHtml = renderCanvasSnapshot(snapshot, `/api/canvas/sites/${siteId}/assets`, siteId);
   return [
     '<!DOCTYPE html><html><head>',
     `<base href="${origin}/">`,
-    '<style>', canvasPublishedStyles, '</style>',
+    '<style>',
+    canvasPublishedStyles,
+    '</style>',
     '</head><body style="margin:0;overflow:hidden;background:#0a0a0a">',
     canvasHtml,
     '</body></html>',
@@ -992,15 +997,7 @@ function buildCards(
   });
 }
 
-function DetailRow({
-  label,
-  href,
-  children,
-}: {
-  label: string;
-  href?: string;
-  children: unknown;
-}) {
+function DetailRow({ label, href, children }: { label: string; href?: string; children: unknown }) {
   const inner = (
     <>
       <span class="detail-label">{label}</span>
@@ -1015,7 +1012,9 @@ function DetailRow({
     return (
       <a class="detail-row detail-row--link" href={href}>
         {inner}
-        <span class="detail-chevron" aria-hidden="true">›</span>
+        <span class="detail-chevron" aria-hidden="true">
+          ›
+        </span>
       </a>
     );
   }
@@ -1063,7 +1062,9 @@ function DetailsPanel({ s }: { s: SiteCard }) {
           <Pill variant={s.searchIndexing ? 'on' : 'off'}>{s.searchIndexing ? 'On' : 'Off'}</Pill>
         </DetailRow>
         <DetailRow label="Visitor dark mode" href={`${editBase}/settings#dark-mode`}>
-          <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>{s.darkModeEnabled ? 'Toggleable' : 'Locked'}</Pill>
+          <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>
+            {s.darkModeEnabled ? 'Toggleable' : 'Locked'}
+          </Pill>
         </DetailRow>
         <DetailRow label="Analytics" href={`${editBase}/addons`}>
           <Pill variant="off">Not connected</Pill>
@@ -1107,11 +1108,12 @@ dashboard.get('/', async (c) => {
     });
 
   const customerRow = await database
-    .select({ id: customer.id, displayName: customer.displayName })
+    .select({ id: customer.id, displayName: customer.displayName, plan: customer.plan })
     .from(customer)
     .where(eq(customer.clerkUserId, user.id))
     .limit(1);
   const customerId = customerRow[0]?.id;
+  const customerPlan = customerRow[0]?.plan ?? 'free';
 
   const origin = new URL(c.req.url).origin;
 
@@ -1147,8 +1149,10 @@ dashboard.get('/', async (c) => {
   const { publishableKey } = resolveClerkKeys(c.env);
   const signOutUrl = buildSignOutUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url, '/'));
 
-  const FREE_SITE_LIMIT = 3;
-  const atSiteLimit = cards.length >= FREE_SITE_LIMIT;
+  const siteLimit = siteLimitForPlan(customerPlan);
+  const atSiteLimit = siteLimit !== null && cards.length >= siteLimit;
+  const planLabel = billingPlanLabel(customerPlan);
+  const storageLimit = storageLimitForPlan(customerPlan);
 
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
@@ -1165,33 +1169,62 @@ dashboard.get('/', async (c) => {
         <div class="dash-stat-card">
           <div class="stat-label">Total sites</div>
           <div class="stat-value">{String(cards.length)}</div>
-          <div class="stat-sub">of {String(FREE_SITE_LIMIT)} on Free</div>
+          <div class="stat-sub">
+            {siteLimit === null
+              ? `Unlimited on ${planLabel}`
+              : `of ${String(siteLimit)} on ${planLabel}`}
+          </div>
         </div>
         <div class="dash-stat-card">
           <div class="stat-label">Published</div>
-          <div class="stat-value"><span class="accent">{String(publishedCount)}</span></div>
-          <div class="stat-sub">{cards.length > 0 ? `${Math.round((publishedCount / cards.length) * 100)}% of sites` : 'No sites yet'}</div>
+          <div class="stat-value">
+            <span class="accent">{String(publishedCount)}</span>
+          </div>
+          <div class="stat-sub">
+            {cards.length > 0
+              ? `${Math.round((publishedCount / cards.length) * 100)}% of sites`
+              : 'No sites yet'}
+          </div>
         </div>
         <div class="dash-stat-card">
           <div class="stat-label">Storage used</div>
           <div class="stat-value">{formatBytes(storageBytes)}</div>
-          <div class="stat-sub">of 100 MB on Free</div>
+          <div class="stat-sub">
+            of {formatBytes(storageLimit)} on {planLabel}
+          </div>
         </div>
         <div class="dash-stat-card">
           <div class="stat-label">Plan</div>
-          <div class="stat-value">Free</div>
-          <div class="stat-sub"><a href="/dashboard/settings" style="font-size:12px">Upgrade</a></div>
+          <div class="stat-value">{planLabel}</div>
+          <div class="stat-sub">
+            <a href="/dashboard/settings" style="font-size:12px">
+              {customerPlan === 'free' ? 'Upgrade' : 'Manage'}
+            </a>
+          </div>
         </div>
       </div>
 
       <div class="dash-header">
         <h1>Your sites</h1>
         <div class="dash-header-actions">
-          <Button variant="secondary" class="import-site" id="import-btn" disabled title="Site import is disabled in the public POC. Run the scraper locally to enable.">Import</Button>
-          {atSiteLimit
-            ? <Button variant="primary" class="new-site" href="/dashboard/settings">Upgrade to add sites</Button>
-            : <Button variant="primary" class="new-site" href="/dashboard/templates">+ New site</Button>
-          }
+          <Button
+            variant="secondary"
+            class="import-site"
+            id="import-btn"
+            disabled
+            title="Site import is disabled in the public POC. Run the scraper locally to enable."
+          >
+            Import
+          </Button>
+          {atSiteLimit ? (
+            <Button variant="primary" class="new-site" href="/dashboard/settings">
+              Upgrade to add sites
+            </Button>
+          ) : (
+            <Button variant="primary" class="new-site" href="/dashboard/templates">
+              + New site
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1202,7 +1235,9 @@ dashboard.get('/', async (c) => {
               <h2>Import a website</h2>
               <p class="import-sub">Paste any public URL to import it as an editable site.</p>
             </div>
-            <button type="button" class="import-close" id="import-close" aria-label="Close">&times;</button>
+            <button type="button" class="import-close" id="import-close" aria-label="Close">
+              &times;
+            </button>
           </div>
           <div class="import-field">
             <label for="import-url">URL to import</label>
@@ -1211,24 +1246,40 @@ dashboard.get('/', async (c) => {
           <div class="import-arrow">&#x2193; auto-filled from URL</div>
           <div class="import-field">
             <label for="import-name">Site name</label>
-            <input type="text" id="import-name" placeholder="My Imported Site" maxlength={80} required />
+            <input
+              type="text"
+              id="import-name"
+              placeholder="My Imported Site"
+              maxlength={80}
+              required
+            />
           </div>
           <div class="import-field">
-            <label for="import-subdomain">Subdomain <small>(optional)</small></label>
+            <label for="import-subdomain">
+              Subdomain <small>(optional)</small>
+            </label>
             <input type="text" id="import-subdomain" placeholder="auto-generated from name" />
             <p class="field-hint">.rev01.aayushman.dev</p>
           </div>
           <div class="import-error" id="import-error"></div>
-          <div class="import-progress" id="import-progress">Importing... this may take up to 30 seconds.</div>
+          <div class="import-progress" id="import-progress">
+            Importing... this may take up to 30 seconds.
+          </div>
           <div class="import-actions">
-            <Button variant="secondary" class="btn-import-cancel" id="import-cancel">Cancel</Button>
-            <Button variant="primary" class="btn-import-submit" id="import-submit">Import</Button>
+            <Button variant="secondary" class="btn-import-cancel" id="import-cancel">
+              Cancel
+            </Button>
+            <Button variant="primary" class="btn-import-submit" id="import-submit">
+              Import
+            </Button>
           </div>
         </div>
       </div>
       <p class="dash-sub">
         Signed in as {primaryEmail}.{' '}
-        <a class="dash-sign-out" href={signOutUrl}>Sign out</a>
+        <a class="dash-sign-out" href={signOutUrl}>
+          Sign out
+        </a>
       </p>
 
       {cards.length > 0 ? (
@@ -1265,7 +1316,13 @@ dashboard.get('/', async (c) => {
                   <span class="site-card-date">Updated {formatDate(s.updatedAt)}</span>
                 </div>
                 <div class="site-card-actions">
-                  <Button variant="primary" class="btn-edit" href={`/dashboard/sites/${s.siteId}/edit`}>Edit</Button>
+                  <Button
+                    variant="primary"
+                    class="btn-edit"
+                    href={`/dashboard/sites/${s.siteId}/edit`}
+                  >
+                    Edit
+                  </Button>
                   {s.publishedVersion > 0 ? (
                     <Button
                       variant="secondary"
@@ -1300,10 +1357,23 @@ dashboard.get('/', async (c) => {
         <>
           <div class="dash-welcome">
             <h2>Welcome to rev01</h2>
-            <p>Build your first client site in minutes. Pick a template, customize with the canvas editor, and publish to a live URL.</p>
+            <p>
+              Build your first client site in minutes. Pick a template, customize with the canvas
+              editor, and publish to a live URL.
+            </p>
             <div class="dash-welcome-actions">
-              <Button variant="primary" href="/dashboard/templates">Pick a template</Button>
-              <Button variant="secondary" class="import-site" id="import-btn" disabled title="Site import is disabled in the public POC. Run the scraper locally to enable.">Import existing site</Button>
+              <Button variant="primary" href="/dashboard/templates">
+                Pick a template
+              </Button>
+              <Button
+                variant="secondary"
+                class="import-site"
+                id="import-btn"
+                disabled
+                title="Site import is disabled in the public POC. Run the scraper locally to enable."
+              >
+                Import existing site
+              </Button>
             </div>
           </div>
           <div class="dash-quick">

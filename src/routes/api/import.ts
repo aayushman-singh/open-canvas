@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { sha256Hex, contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import type {
   CanvasSiteState,
   CanvasPage,
@@ -22,7 +23,7 @@ import type {
 } from '../../canvas/schema';
 import { MOTION_PRESETS } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
-import { validateSubdomain } from './sites';
+import { isSiteLimitViolation, validateSubdomain } from './sites';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site, siteFont } from '../../db/schema';
 import { fontContentHashToR2Key } from '../../fonts/upload';
@@ -95,9 +96,6 @@ export interface PreparedImportedAssets {
 }
 
 const MOTION_PRESET_SET = new Set<string>(MOTION_PRESETS);
-// Import creates a brand-new site, so it enforces the free-plan site cap
-// before doing scraper work or writing imported assets.
-const FREE_SITE_LIMIT = 3;
 
 function isValidMotionPreset(p: string): p is MotionPreset {
   return MOTION_PRESET_SET.has(p);
@@ -117,8 +115,13 @@ importRouter.post('/', async (c) => {
 
   const url = (body.url || '').trim();
   const siteName = (body.siteName || '').trim();
-  const subdomain = (body.subdomain || '').trim().toLowerCase() ||
-    siteName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 63);
+  const subdomain =
+    (body.subdomain || '').trim().toLowerCase() ||
+    siteName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 63);
 
   if (!url) return c.json({ error: 'url is required' }, 400);
   if (!siteName) return c.json({ error: 'siteName is required' }, 400);
@@ -137,14 +140,16 @@ importRouter.post('/', async (c) => {
 
   const database = db(c.env);
   const customerRow = await database
-    .select({ id: customer.id })
+    .select({ id: customer.id, plan: customer.plan })
     .from(customer)
     .where(eq(customer.clerkUserId, auth.userId))
     .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) {
+  const customerRecord = customerRow[0];
+  if (!customerRecord) {
     return c.json({ error: 'no customer row for current user - visit /dashboard first' }, 409);
   }
+  const customerId = customerRecord.id;
+  const customerPlan = customerRecord.plan;
 
   const existingSite = await database
     .select({ id: site.id })
@@ -160,11 +165,9 @@ importRouter.post('/', async (c) => {
     .from(site)
     .where(eq(site.customerId, customerId));
   const siteCount = siteCountRows[0]?.value ?? 0;
-  if (siteCount >= FREE_SITE_LIMIT) {
-    return c.json(
-      { error: `Free plan allows up to ${String(FREE_SITE_LIMIT)} sites. Upgrade to create more.` },
-      403,
-    );
+  const siteLimit = siteLimitForPlan(customerPlan);
+  if (siteLimit !== null && siteCount >= siteLimit) {
+    return c.json({ error: siteLimitError(customerPlan) }, 403);
   }
 
   const scraperUrl = c.env.SCRAPER_URL;
@@ -270,12 +273,7 @@ importRouter.post('/', async (c) => {
       return c.json({ error: 'subdomain is already taken' }, 409);
     }
     if (isSiteLimitViolation(err)) {
-      return c.json(
-        {
-          error: `Free plan allows up to ${String(FREE_SITE_LIMIT)} sites. Upgrade to create more.`,
-        },
-        403,
-      );
+      return c.json({ error: siteLimitError(customerPlan) }, 403);
     }
     throw err;
   }
@@ -666,7 +664,9 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
           : {}),
       }));
       if (content.length === 0) {
-        throw new Error(`scraped text element has no text content at x=${String(box.x)} y=${String(box.y)}`);
+        throw new Error(
+          `scraped text element has no text content at x=${String(box.x)} y=${String(box.y)}`,
+        );
       }
       const result: TextElement = {
         id: baseId,
@@ -796,19 +796,5 @@ function isUniqueViolation(err: unknown): boolean {
   if (e.code === '23505') return true;
   if (typeof e.message === 'string' && e.message.includes('duplicate key value')) return true;
   if (e.cause) return isUniqueViolation(e.cause);
-  return false;
-}
-
-function isSiteLimitViolation(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as { code?: unknown; message?: unknown; cause?: unknown };
-  if (
-    e.code === '23514' &&
-    typeof e.message === 'string' &&
-    e.message.includes('free site limit exceeded')
-  ) {
-    return true;
-  }
-  if (e.cause) return isSiteLimitViolation(e.cause);
   return false;
 }

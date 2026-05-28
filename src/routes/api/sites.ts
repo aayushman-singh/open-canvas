@@ -4,13 +4,14 @@ import { contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { collectReferencedAssets } from '../../assets/site-assets';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSection, CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, customTemplate, ownerAsset, site } from '../../db/schema';
-import { canReadScopedLibraryRow } from './library-access';
 import { getTemplateSeed } from '../../templates/registry';
+import { canReadScopedLibraryRow } from './library-access';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -21,7 +22,6 @@ type Bindings = {
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
 export const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
-const FREE_SITE_LIMIT = 3;
 
 // Reserved subdomains under *.rev01.aayushman.dev:
 // - www/api/app/admin: standard reservations.
@@ -125,13 +125,13 @@ function isUniqueViolation(err: unknown): boolean {
   return false;
 }
 
-function isSiteLimitViolation(err: unknown): boolean {
+export function isSiteLimitViolation(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as { code?: unknown; message?: unknown; cause?: unknown };
   if (
     e.code === '23514' &&
     typeof e.message === 'string' &&
-    e.message.includes('free site limit exceeded')
+    (e.message.includes('site limit exceeded') || e.message.includes('free site limit exceeded'))
   ) {
     return true;
   }
@@ -139,8 +139,8 @@ function isSiteLimitViolation(err: unknown): boolean {
   return false;
 }
 
-function siteLimitResponse(c: Context<Env>) {
-  const error = `Free plan allows up to ${String(FREE_SITE_LIMIT)} sites. Upgrade to create more.`;
+function siteLimitResponse(c: Context<Env>, plan: string) {
+  const error = siteLimitError(plan);
   if (wantsJson(c)) {
     return c.json({ error }, 403);
   }
@@ -332,25 +332,28 @@ sites.post('/', async (c) => {
   const database = db(c.env);
 
   const customerRow = await database
-    .select({ id: customer.id })
+    .select({ id: customer.id, plan: customer.plan })
     .from(customer)
     .where(eq(customer.clerkUserId, auth.userId))
     .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) {
+  const customerRecord = customerRow[0];
+  if (!customerRecord) {
     return c.json(
       { error: 'no customer row for current user - visit /dashboard first to materialise it' },
       409,
     );
   }
+  const customerId = customerRecord.id;
+  const customerPlan = customerRecord.plan;
 
   const siteCountRows = await database
     .select({ value: count() })
     .from(site)
     .where(eq(site.customerId, customerId));
   const siteCount = siteCountRows[0]?.value ?? 0;
-  if (siteCount >= FREE_SITE_LIMIT) {
-    return siteLimitResponse(c);
+  const siteLimit = siteLimitForPlan(customerPlan);
+  if (siteLimit !== null && siteCount >= siteLimit) {
+    return siteLimitResponse(c, customerPlan);
   }
 
   let editableState: CanvasSiteState;
@@ -472,7 +475,7 @@ sites.post('/', async (c) => {
     }
   } catch (err) {
     if (isSiteLimitViolation(err)) {
-      return siteLimitResponse(c);
+      return siteLimitResponse(c, customerPlan);
     }
     if (isUniqueViolation(err)) {
       return c.json({ error: 'subdomain is already taken' }, 409);
