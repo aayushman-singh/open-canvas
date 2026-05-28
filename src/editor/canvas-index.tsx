@@ -92,6 +92,11 @@ export function editorPageJsx(opts: EditorPageOptions) {
   const apiBase = context === 'public' ? '/__api' : '/api';
   const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
   const publicAddress = `${subdomain}.rev01.aayushman.dev`;
+  const settingsPath = `/dashboard/sites/${encodeURIComponent(siteId)}/settings`;
+  const settingsHref =
+    context === 'public'
+      ? `https://rev01.aayushman.dev/dashboard/sites/${encodeURIComponent(siteId)}/settings`
+      : settingsPath;
 
   const breadcrumbs =
     context === 'public' ? (
@@ -148,7 +153,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
             </button>
             <a
               id="canvas-settings-link"
-              href={`/dashboard/sites/${siteId}/settings`}
+              href={settingsHref}
               title="Open site settings"
             >
               Settings

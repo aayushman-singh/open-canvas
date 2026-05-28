@@ -189,8 +189,9 @@ function runReferenceWalkTests(): void {
   assert(ids.has('video-id'), 'expected collectReferencedAssetIds to keep media assetId');
   assert(ids.has('poster-id'), 'expected collectReferencedAssetIds to keep posterAssetId');
 
-  const siteRoot = {
+  const siteRoot: AssetReferenceRoot & { faviconAssetId: string } = {
     pages,
+    faviconAssetId: 'favicon-id',
     header: {
       id: 'site-header',
       recipeId: 'custom',
@@ -227,8 +228,9 @@ function runReferenceWalkTests(): void {
         },
       ],
     },
-  } satisfies AssetReferenceRoot;
+  };
   const siteIds = collectReferencedAssetIds(siteRoot);
+  assert(siteIds.has('favicon-id'), 'expected site favicon asset to be reachable');
   assert(siteIds.has('logo-id'), 'expected header nav logo asset to be reachable');
   assert(siteIds.has('footer-bg-video-id'), 'expected footer background video asset to be reachable');
   assert(siteIds.has('slide-image-id'), 'expected footer carousel slide asset to be reachable');
@@ -583,9 +585,11 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
     subdomain: 'my-site',
     publishedVersion: 1,
     editableState: {
+      faviconAssetId: 'asset-uuid-2',
       pages: [
         {
           slug: 'home',
+          ogImageAssetId: 'asset-uuid-2',
           sections: [
             {
               elements: [
@@ -597,9 +601,11 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
       ],
     },
     publishedSnapshot: {
+      faviconAssetId: 'asset-uuid-2',
       pages: [
         {
           slug: 'home',
+          ogImageAssetId: 'asset-uuid-2',
           sections: [
             {
               elements: [
@@ -668,13 +674,25 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
   );
   if (reportResult.status === 'confirm_required') {
     assert(
-      reportResult.references.length === 2,
-      `expected editable + published references, got ${String(reportResult.references.length)}`,
+      reportResult.references.length === 6,
+      `expected editable + published favicon, OG, and media references, got ${String(reportResult.references.length)}`,
     );
-    const editableRef = reportResult.references.find((ref) => ref.source === 'editable');
-    const publishedRef = reportResult.references.find((ref) => ref.source === 'published');
+    const editableRef = reportResult.references.find(
+      (ref) => ref.source === 'editable' && ref.role === 'asset',
+    );
+    const publishedRef = reportResult.references.find(
+      (ref) => ref.source === 'published' && ref.role === 'asset',
+    );
+    const editableFaviconRef = reportResult.references.find(
+      (ref) => ref.source === 'editable' && ref.role === 'favicon',
+    );
+    const editableOgRef = reportResult.references.find(
+      (ref) => ref.source === 'editable' && ref.role === 'og-image',
+    );
     assert(editableRef !== undefined, 'expected reference report to include editable source');
     assert(publishedRef !== undefined, 'expected reference report to include published source');
+    assert(editableFaviconRef !== undefined, 'expected reference report to include favicon source');
+    assert(editableOgRef !== undefined, 'expected reference report to include page OG source');
     assert(editableRef.siteId === 'site-1', `expected siteId site-1, got ${editableRef.siteId}`);
     assert(
       editableRef.elementId === 'el-1',
@@ -710,8 +728,23 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
     'expected delete cascade to write a cleared editableState',
   );
   const firstElement = (
-    updatedState as { pages: Array<{ sections: Array<{ elements: unknown[] }> }> }
+    updatedState as {
+      faviconAssetId?: string;
+      pages: Array<{ ogImageAssetId?: string; sections: Array<{ elements: unknown[] }> }>;
+    }
   ).pages[0]?.sections[0]?.elements[0] as { assetId?: string } | undefined;
+  const updatedRoot = updatedState as {
+    faviconAssetId?: string;
+    pages: Array<{ ogImageAssetId?: string }>;
+  };
+  assert(
+    updatedRoot.faviconAssetId === undefined,
+    `expected delete cascade to clear faviconAssetId, got ${String(updatedRoot.faviconAssetId)}`,
+  );
+  assert(
+    updatedRoot.pages[0]?.ogImageAssetId === undefined,
+    `expected delete cascade to clear ogImageAssetId, got ${String(updatedRoot.pages[0]?.ogImageAssetId)}`,
+  );
   assert(
     firstElement?.assetId === '',
     `expected delete cascade to clear editable assetId, got ${String(firstElement?.assetId)}`,

@@ -22,7 +22,14 @@ import type {
 export interface ReferencedAsset {
   assetId: string;
   expectedKind: MediaKind;
-  role: 'asset' | 'poster' | 'og-image' | 'background-video' | 'nav-logo' | 'carousel-slide';
+  role:
+    | 'asset'
+    | 'poster'
+    | 'og-image'
+    | 'favicon'
+    | 'background-video'
+    | 'nav-logo'
+    | 'carousel-slide';
   path: string;
   mediaElementId?: string;
 }
@@ -45,6 +52,7 @@ export interface UnfilledAssetReference {
 
 export interface AssetReferenceRoot {
   pages: CanvasPage[];
+  faviconAssetId?: string;
   header?: CanvasSection;
   footer?: CanvasSection;
   symbols?: SymbolMaster[];
@@ -61,6 +69,7 @@ function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
     ? { pages: source }
     : {
         pages: source.pages,
+        ...(source.faviconAssetId !== undefined ? { faviconAssetId: source.faviconAssetId } : {}),
         ...(source.header !== undefined ? { header: source.header } : {}),
         ...(source.footer !== undefined ? { footer: source.footer } : {}),
         ...(source.symbols !== undefined ? { symbols: source.symbols } : {}),
@@ -159,6 +168,7 @@ function collectSectionReferences(
 export function collectReferencedAssets(source: AssetReferenceSource): ReferencedAsset[] {
   const root = referenceRootFrom(source);
   const out: ReferencedAsset[] = [];
+  pushReference(out, root.faviconAssetId, 'image', 'favicon', 'faviconAssetId');
   for (const [pageIdx, page] of root.pages.entries()) {
     pushReference(
       out,

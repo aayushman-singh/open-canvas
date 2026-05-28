@@ -722,6 +722,8 @@ const publishApiSource = await readSource('./routes/api/publish.ts');
 const importApiSource = await readSource('./routes/api/import.ts');
 const addonsApiSource = await readSource('./routes/api/addons.ts');
 const addonsRegistrySource = await readSource('./addons/registry.ts');
+const siteSettingsSource = await readSource('./routes/dashboard/site-settings.tsx');
+const pageSettingsSource = await readSource('./routes/dashboard/page-settings.tsx');
 assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
@@ -771,6 +773,22 @@ assert(
     legacyUploadBridgeSource,
   ),
   'expected legacy JSON asset bridge not to pass siteId without elementId to uploadOwnerAsset',
+);
+assert(
+  !siteSettingsSource.includes("fd.append('siteId', SITE_ID);") &&
+    !pageSettingsSource.includes("fd.append('siteId', SITE_ID);"),
+  'expected favicon and SEO picker uploads not to send partial slot-history metadata',
+);
+assert(
+  canvasApiSource.includes('assetIsImageForCustomer') &&
+    canvasApiSource.includes('kind: ownerAsset.kind') &&
+    canvasApiSource.includes("row?.kind === 'image'"),
+  'expected favicon and OG image saves to require an owned image asset, not just any owned asset',
+);
+assert(
+  canvasIndexSource.includes('const settingsHref =') &&
+    canvasIndexSource.includes('https://rev01.aayushman.dev/dashboard/sites/'),
+  'expected on-site editor Settings link to point at the app dashboard host',
 );
 assert(
   !/const value = body\.config\[field\.key\];\s*if \(value === undefined\) continue;/.test(
@@ -958,25 +976,27 @@ function scanFileInputDiscipline(source: string, label: string): string[] {
     /^\s*(?:var|let|const)\s+(\w+)\s*=\s*document\.createElement\(\s*["']input["']\s*\)/;
   const decls: Array<{ name: string; line: number }> = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = declRe.exec(lines[i]);
-    if (m) decls.push({ name: m[1], line: i });
+    const m = declRe.exec(lines[i] ?? '');
+    const name = m?.[1];
+    if (name !== undefined) decls.push({ name, line: i });
   }
-  for (let d = 0; d < decls.length; d++) {
-    const { name, line: declLine } = decls[d];
+  for (const [d, decl] of decls.entries()) {
+    const { name, line: declLine } = decl;
     // Scope the analysis to the window from this declaration up to the
     // next declaration with the same identifier (otherwise we'd conflate
     // unrelated reuses of common names like `fileInput`).
     let scopeEnd = lines.length;
     for (let f = d + 1; f < decls.length; f++) {
-      if (decls[f].name === name) {
-        scopeEnd = decls[f].line;
+      const nextDecl = decls[f];
+      if (nextDecl && nextDecl.name === name) {
+        scopeEnd = nextDecl.line;
         break;
       }
     }
     const typeRe = new RegExp(`\\b${name}\\.type\\s*=\\s*["']file["']`);
     let isFileInput = false;
     for (let i = declLine; i < Math.min(scopeEnd, declLine + 15); i++) {
-      if (typeRe.test(lines[i])) {
+      if (typeRe.test(lines[i] ?? '')) {
         isFileInput = true;
         break;
       }
@@ -992,8 +1012,9 @@ function scanFileInputDiscipline(source: string, label: string): string[] {
     let clickLine = -1;
     let hasAppend = false;
     for (let i = declLine; i < scopeEnd; i++) {
-      if (clickLine < 0 && clickRe.test(lines[i])) clickLine = i;
-      if (!hasAppend && appendRe.test(lines[i])) hasAppend = true;
+      const lineText = lines[i] ?? '';
+      if (clickLine < 0 && clickRe.test(lineText)) clickLine = i;
+      if (!hasAppend && appendRe.test(lineText)) hasAppend = true;
       if (clickLine >= 0 && hasAppend) break;
     }
     if (clickLine >= 0 && !hasAppend) {
@@ -1021,7 +1042,7 @@ const fileInputLintSelfTest = scanFileInputDiscipline(
   'self-test',
 );
 assert(
-  fileInputLintSelfTest.length === 1 && fileInputLintSelfTest[0].includes('"inp"'),
+  fileInputLintSelfTest.length === 1 && (fileInputLintSelfTest[0] ?? '').includes('"inp"'),
   `file-input-discipline lint self-test failed: expected 1 violation for "inp", got ${JSON.stringify(fileInputLintSelfTest)}`,
 );
 

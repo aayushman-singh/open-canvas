@@ -764,7 +764,6 @@ function clientScript(siteId: string): string {
       setStatus('Uploading ' + file.name + '…', false);
       const fd = new FormData();
       fd.append('file', file);
-      fd.append('siteId', SITE_ID);
       try {
         const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
         if (!r.ok) {

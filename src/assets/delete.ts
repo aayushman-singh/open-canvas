@@ -39,7 +39,7 @@ export interface AssetReference {
   publishedAddress: string | null;
   pageSlug: string;
   elementId: string;
-  role: 'asset' | 'poster';
+  role: 'asset' | 'poster' | 'og-image' | 'favicon';
 }
 
 interface OwnerSiteAssetScanRow {
@@ -164,11 +164,42 @@ function collectFromPages(
   siteName: string,
   source: 'editable' | 'published',
   publishedAddress: string | null,
-  state: CanvasSiteState | { pages: CanvasSiteState['pages'] },
+  state:
+    | CanvasSiteState
+    | PublishedSnapshot
+    | { pages: CanvasSiteState['pages']; faviconAssetId?: string },
   assetId: string,
 ): void {
   const seen = new Set<string>();
+  if (state.faviconAssetId === assetId) {
+    const key = 'site|favicon|favicon';
+    seen.add(key);
+    out.push({
+      siteId,
+      siteName,
+      source,
+      publishedAddress,
+      pageSlug: '',
+      elementId: 'site',
+      role: 'favicon',
+    });
+  }
   for (const page of state.pages) {
+    if (page.ogImageAssetId === assetId) {
+      const key = `${page.slug}|page|og-image`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push({
+          siteId,
+          siteName,
+          source,
+          publishedAddress,
+          pageSlug: page.slug,
+          elementId: 'page',
+          role: 'og-image',
+        });
+      }
+    }
     for (const section of page.sections) {
       for (const element of section.elements) {
         if (element.type !== 'media') continue;
@@ -211,9 +242,17 @@ function clearAssetReferences(
   state: CanvasSiteState,
   assetId: string,
 ): { changed: false; state: CanvasSiteState } | { changed: true; state: CanvasSiteState } {
+  let rootChanged = false;
+  let rootState = state;
+  if (state.faviconAssetId === assetId) {
+    const { faviconAssetId: _removed, ...rest } = state;
+    void _removed;
+    rootState = rest;
+    rootChanged = true;
+  }
   let pagesChanged = false;
-  const pages = state.pages.map((page) => {
-    let pageChanged = false;
+  const pages = rootState.pages.map((page) => {
+    let pageChanged = page.ogImageAssetId === assetId;
     const sections = page.sections.map((section) => {
       let sectionChanged = false;
       const elements = section.elements.map((element) => {
@@ -235,9 +274,13 @@ function clearAssetReferences(
     });
     if (!pageChanged) return page;
     pagesChanged = true;
-    return { ...page, sections };
+    const nextPage = { ...page, sections };
+    if (nextPage.ogImageAssetId === assetId) {
+      delete nextPage.ogImageAssetId;
+    }
+    return nextPage;
   });
 
-  if (!pagesChanged) return { changed: false, state };
-  return { changed: true, state: { ...state, pages } };
+  if (!rootChanged && !pagesChanged) return { changed: false, state };
+  return { changed: true, state: { ...rootState, pages } };
 }

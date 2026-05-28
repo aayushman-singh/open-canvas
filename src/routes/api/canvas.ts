@@ -293,9 +293,9 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
       delete next.faviconAssetId;
     } else if (typeof raw === 'string') {
       const assetId = raw.trim();
-      const exists = await assetExistsForCustomer(c.env, assetId, result.ownerCustomerId);
-      if (!exists) {
-        return c.json({ error: 'faviconAssetId does not match an asset you own' }, 400);
+      const isImage = await assetIsImageForCustomer(c.env, assetId, result.ownerCustomerId);
+      if (!isImage) {
+        return c.json({ error: 'faviconAssetId does not match an image asset you own' }, 400);
       }
       next.faviconAssetId = assetId;
     } else {
@@ -314,18 +314,19 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
   });
 });
 
-async function assetExistsForCustomer(
+async function assetIsImageForCustomer(
   env: Bindings,
   assetId: string,
   customerId: string,
 ): Promise<boolean> {
   const database = db(env);
   const rows = await database
-    .select({ id: ownerAsset.id })
+    .select({ id: ownerAsset.id, kind: ownerAsset.kind })
     .from(ownerAsset)
     .where(and(eq(ownerAsset.id, assetId), eq(ownerAsset.customerId, customerId)))
     .limit(1);
-  return rows.length > 0;
+  const row = rows[0];
+  return row?.kind === 'image';
 }
 
 canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
@@ -350,13 +351,13 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const ogImageAssetId = optionalStringPatch(body, 'ogImageAssetId');
   if ('error' in ogImageAssetId) return c.json({ error: ogImageAssetId.error }, 400);
   if (ogImageAssetId.present && ogImageAssetId.value !== undefined) {
-    const exists = await assetExistsForCustomer(
+    const isImage = await assetIsImageForCustomer(
       c.env,
       ogImageAssetId.value,
       result.ownerCustomerId,
     );
-    if (!exists) {
-      return c.json({ error: 'ogImageAssetId does not match an asset you own' }, 400);
+    if (!isImage) {
+      return c.json({ error: 'ogImageAssetId does not match an image asset you own' }, 400);
     }
   }
   const canonical = optionalStringPatch(body, 'canonical');
