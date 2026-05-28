@@ -245,8 +245,12 @@ function buildPageLoc(
   protocol: 'https' | 'http',
   version: number,
 ): string {
-  // Empty slug ('home' equivalent) → root URL.
-  const slugPath = page.slug.length > 0 ? `/${page.slug}` : '/';
+  // Empty slug, or the conventional `home` alias for the index page, both
+  // collapse to the root URL. Without the `home` branch the sitemap would
+  // advertise `/home#v=N` while the rendered site also serves the same
+  // page at `/`, splitting crawler attribution across two URLs.
+  const isRoot = page.slug.length === 0 || page.slug === 'home';
+  const slugPath = isRoot ? '/' : `/${page.slug}`;
   return `${protocol}://${host}${slugPath}#v=${String(version)}`;
 }
 
