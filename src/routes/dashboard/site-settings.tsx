@@ -654,6 +654,9 @@ function clientScript(siteId: string): string {
 // inline here so site-settings remains a single-file route.
 (() => {
   const SITE_ID = ${sid};
+  function assetUrl(id) {
+    return '/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/assets/' + encodeURIComponent(id);
+  }
   const picker = document.querySelector('[data-asset-picker="favicon"]');
   if (!picker) return;
   const modal = document.querySelector('[data-picker-modal]');
@@ -687,7 +690,7 @@ function clientScript(siteId: string): string {
         const tile = document.createElement('button');
         tile.type = 'button';
         tile.className = 'picker-tile';
-        tile.style.backgroundImage = 'url(/assets/' + encodeURIComponent(a.id) + ')';
+        tile.style.backgroundImage = 'url(' + assetUrl(a.id) + ')';
         tile.title = a.alt || a.id;
         tile.addEventListener('click', () => commit(a.id));
         modalGrid.appendChild(tile);
@@ -718,7 +721,7 @@ function clientScript(siteId: string): string {
       picker.setAttribute('data-asset-id', assetIdOrNull || '');
       if (thumb) {
         if (assetIdOrNull) {
-          thumb.style.backgroundImage = 'url(/assets/' + encodeURIComponent(assetIdOrNull) + ')';
+          thumb.style.backgroundImage = 'url(' + assetUrl(assetIdOrNull) + ')';
           thumb.setAttribute('data-has-image', 'true');
           thumb.textContent = '';
         } else {
@@ -989,7 +992,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             class="fv-thumb"
             data-picker-thumb
             data-has-image={owned.faviconAssetId ? 'true' : 'false'}
-            style={owned.faviconAssetId ? `background-image:url(/assets/${encodeURIComponent(owned.faviconAssetId)})` : ''}
+            style={owned.faviconAssetId ? `background-image:url(/api/canvas/sites/${encodeURIComponent(owned.id)}/assets/${encodeURIComponent(owned.faviconAssetId)})` : ''}
           >
             {owned.faviconAssetId ? '' : 'none'}
           </div>

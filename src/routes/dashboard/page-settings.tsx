@@ -665,6 +665,11 @@ function clientScript(siteId: string, pageId: string): string {
 (() => {
   const SITE_ID = ${sid};
   const PAGE_ID = ${pid};
+  // Asset thumbnails on the dashboard host go through the owner-auth canvas
+  // API. The bare /assets/<id> URL only resolves on a published-site host.
+  function assetUrl(id) {
+    return '/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/assets/' + encodeURIComponent(id);
+  }
   const form = document.querySelector('form.seo');
   if (!form) return;
   const err = form.querySelector('.err');
@@ -793,7 +798,7 @@ function clientScript(siteId: string, pageId: string): string {
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'picker-tile';
-      tile.style.backgroundImage = 'url(/assets/' + encodeURIComponent(a.id) + ')';
+      tile.style.backgroundImage = 'url(' + assetUrl(a.id) + ')';
       tile.setAttribute('data-asset-id', a.id);
       tile.title = a.alt || a.id;
       if (a.alt) {
@@ -828,7 +833,7 @@ function clientScript(siteId: string, pageId: string): string {
     if (hidden) hidden.value = assetId;
     activePicker.setAttribute('data-asset-id', assetId);
     if (thumb) {
-      thumb.style.backgroundImage = 'url(/assets/' + encodeURIComponent(assetId) + ')';
+      thumb.style.backgroundImage = 'url(' + assetUrl(assetId) + ')';
       thumb.setAttribute('data-has-image', 'true');
       thumb.textContent = '';
     }
@@ -837,7 +842,7 @@ function clientScript(siteId: string, pageId: string): string {
     if (chooseBtn) chooseBtn.textContent = 'Change image';
     // Update every OG card preview (standalone + the embedded copies inside
     // the Twitter and LinkedIn image slots) and the platform image slots.
-    const url = 'url(/assets/' + encodeURIComponent(assetId) + ')';
+    const url = 'url(' + assetUrl(assetId) + ')';
     document.querySelectorAll('[data-preview="og"]').forEach((og) => {
       og.setAttribute('data-has-custom', 'true');
       og.style.backgroundImage = url;
@@ -1047,6 +1052,10 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const categoryVal = esc(page.category ?? '');
 
   // -- Preview data --------------------------------------------------------
+  // Asset URL for dashboard previews — goes through owner-auth canvas API.
+  // The bare /assets/<id> path only resolves on the published-site host.
+  const assetUrl = (id: string) =>
+    `/api/canvas/sites/${encodeURIComponent(siteId)}/assets/${encodeURIComponent(id)}`;
   const publishedHost = `${subdomain}.rev01.aayushman.dev`;
   const publishedUrl = `https://${publishedHost}${page.slug.length > 0 ? `/${page.slug}` : '/'}`;
   // Initials for the SERP favicon fallback (when no custom favicon is set).
@@ -1125,7 +1134,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                   class="thumb"
                   data-picker-thumb
                   data-has-image={ogImageVal.length > 0 ? 'true' : 'false'}
-                  style={ogImageVal.length > 0 ? `background-image:url(/assets/${encodeURIComponent(page.ogImageAssetId ?? '')})` : ''}
+                  style={ogImageVal.length > 0 ? `background-image:url(${assetUrl(page.ogImageAssetId ?? '')})` : ''}
                 >
                   {ogImageVal.length > 0 ? '' : 'auto'}
                 </div>
@@ -1205,7 +1214,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                   ogStyle,
                   customImageUrl:
                     ogImageVal.length > 0
-                      ? `/assets/${encodeURIComponent(page.ogImageAssetId ?? '')}`
+                      ? assetUrl(page.ogImageAssetId ?? '')
                       : null,
                 })}
               </div>
@@ -1219,7 +1228,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                     data-has-custom={ogImageVal.length > 0 ? 'true' : null}
                     style={
                       ogImageVal.length > 0
-                        ? `background-color:${preset.bg};background-image:url(/assets/${encodeURIComponent(page.ogImageAssetId ?? '')});background-size:cover;background-position:center`
+                        ? `background-color:${preset.bg};background-image:url(${assetUrl(page.ogImageAssetId ?? '')});background-size:cover;background-position:center`
                         : `background-color:${preset.bg}`
                     }
                   >
@@ -1260,7 +1269,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                     data-has-custom={ogImageVal.length > 0 ? 'true' : null}
                     style={
                       ogImageVal.length > 0
-                        ? `background-color:${preset.bg};background-image:url(/assets/${encodeURIComponent(page.ogImageAssetId ?? '')});background-size:cover;background-position:center`
+                        ? `background-color:${preset.bg};background-image:url(${assetUrl(page.ogImageAssetId ?? '')});background-size:cover;background-position:center`
                         : `background-color:${preset.bg}`
                     }
                   >
@@ -1297,7 +1306,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                     <div
                       class="pv-favicon"
                       data-preview-favicon
-                      style={faviconAssetId ? `background-image:url(/assets/${encodeURIComponent(faviconAssetId)})` : ''}
+                      style={faviconAssetId ? `background-image:url(${assetUrl(faviconAssetId)})` : ''}
                     >
                       {faviconAssetId ? '' : siteInitial}
                     </div>
