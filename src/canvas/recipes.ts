@@ -17,8 +17,14 @@
 //   - Honours the rich-text content model: every `TextElement.content` is
 //     an `InlineRun[]` with no plain-string text fields.
 //   - Slots real asset ids from `input.assetIds` when present. When the
-//     recipe needs media and no asset id was supplied, it falls back to the
-//     seed registry ids (`seed-hero-poster-1` / `seed-feature-canvas-1`).
+//     recipe needs an image and no asset id was supplied, it substitutes
+//     the bundled seed registry ids (`seed-hero-poster-1` /
+//     `seed-feature-canvas-1`). These ids are inserted as real `ownerAsset`
+//     rows by `prepareSeedAssetsForCustomer` at site-materialisation time,
+//     so the substitution is an explicit default — not a silent fallback.
+//     `video-hero` follows the same rule but reports the substituted
+//     element as `mediaKind: 'image'` because the registry has no video
+//     seed; the recipe surface stays honest about what the renderer emits.
 //   - Produces output that passes `validateEditableSite` when wrapped in
 //     a single-page state. The canvas-agent smoke enforces this.
 //
@@ -35,6 +41,7 @@ import {
   type SectionRecipeId,
   type StyleKit,
 } from './schema.js';
+import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 
 export interface RecipeFactoryInput {
   /**
@@ -54,11 +61,12 @@ export interface RecipeFactoryInput {
    * - `cards` — gallery / grid recipes consume the first N from this array.
    * - `gallery` — alias for `cards` when the brief mentions a gallery shape.
    *
-   * When omitted, recipes that need media fall back to bundled seed registry
-   * ids (`seed-hero-poster-1`, `seed-feature-canvas-1`). The agent route still
-   * verifies those ids exist as `ownerAsset` rows before returning a preview,
-   * so an unmaterialised site fails loudly instead of silently publishing a
-   * dangling reference.
+   * When omitted, image-bearing recipes substitute bundled seed registry ids
+   * (`seed-hero-poster-1`, `seed-feature-canvas-1`); `video-hero` does the
+   * same but flips `mediaKind` to `image` so the renderer does not lie. The
+   * agent route still verifies seed ids exist as `ownerAsset` rows before
+   * returning a preview, so an unmaterialised site fails loudly instead of
+   * silently publishing a dangling reference.
    */
   assetIds?: { hero?: string; cards?: string[]; gallery?: string[] };
 }
@@ -69,11 +77,23 @@ export type RecipeFactory = (input: RecipeFactoryInput) => CanvasSection;
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-// Stable seed asset ids used as fallbacks. These match
-// `src/canvas/seed-assets.ts` exactly — if we rename a seed there, the
-// fallback here must be updated in lockstep.
+// Stable seed asset ids used as the default image when a recipe needs one
+// and the caller did not supply `assetIds.hero` / `assetIds.cards`. The keys
+// are asserted against `SEED_ASSET_REGISTRY` at module load so a rename in
+// seed-assets.ts breaks the build here instead of producing a dangling
+// reference at runtime.
 const SEED_HERO_POSTER_ID = 'seed-hero-poster-1';
 const SEED_FEATURE_CANVAS_ID = 'seed-feature-canvas-1';
+if (!(SEED_HERO_POSTER_ID in SEED_ASSET_REGISTRY)) {
+  throw new Error(
+    `recipes.ts: SEED_ASSET_REGISTRY is missing "${SEED_HERO_POSTER_ID}" — rename seeds in lockstep`,
+  );
+}
+if (!(SEED_FEATURE_CANVAS_ID in SEED_ASSET_REGISTRY)) {
+  throw new Error(
+    `recipes.ts: SEED_ASSET_REGISTRY is missing "${SEED_FEATURE_CANVAS_ID}" — rename seeds in lockstep`,
+  );
+}
 
 function shortRand(): string {
   return crypto.randomUUID().slice(0, 8);
@@ -101,13 +121,31 @@ function runOf(text: string): InlineRun[] {
   return [{ text }];
 }
 
-function briefOr(brief: string, fallback: string): string {
+function briefOr(brief: string, placeholder: string): string {
   const trimmed = brief.trim();
-  return trimmed.length > 0 ? trimmed : fallback;
+  return trimmed.length > 0 ? trimmed : placeholder;
 }
 
-function pickHero(input: RecipeFactoryInput): string {
+function pickHeroImage(input: RecipeFactoryInput): string {
   return input.assetIds?.hero ?? SEED_HERO_POSTER_ID;
+}
+
+/**
+ * `video-hero` honestly wants a video asset, but the seed registry only has
+ * an image (1x1 PNG). When the caller supplies a hero asset id we trust it
+ * points at an uploaded video and report `mediaKind: 'video'`. When no id
+ * is supplied we use the image seed and report `mediaKind: 'image'` so the
+ * rendered element does not lie about what it is. The recipe name still
+ * reads "video hero" because the layout/intent is the same shape.
+ */
+function pickHeroMedia(
+  input: RecipeFactoryInput,
+): { assetId: string; mediaKind: 'image' | 'video' } {
+  const heroId = input.assetIds?.hero;
+  if (typeof heroId === 'string' && heroId.length > 0) {
+    return { assetId: heroId, mediaKind: 'video' };
+  }
+  return { assetId: SEED_HERO_POSTER_ID, mediaKind: 'image' };
 }
 
 function pickCard(input: RecipeFactoryInput, index: number): string {
@@ -131,6 +169,16 @@ function pickGalleryItem(input: RecipeFactoryInput, index: number): string {
 // ---------------------------------------------------------------------------
 // Factories — one per SectionRecipeId. Layouts are conservative: each fits
 // inside the canonical 1440-wide page with section heights in [240, 1400].
+//
+// Owner-edit-required placeholders (every recipe emits some of these — the
+// Owner sees them in the editor and rewrites them via `rewriteText` /
+// link picker before publishing):
+//   - Action `href: { type: 'external', url: '#' }` is a "no real link
+//     yet" marker — validates as an in-page anchor (scroll-to-top) so the
+//     section lands valid, but the Owner is expected to swap it.
+//   - `testimonial-row` ships one quote driven by `input.brief` plus three
+//     hardcoded English placeholders. Multi-quote briefs are out of scope
+//     for the recipe; the Owner edits quotes 2/3/4 after the section lands.
 // ---------------------------------------------------------------------------
 
 function buildHeroSplit(input: RecipeFactoryInput): CanvasSection {
@@ -152,7 +200,9 @@ function buildHeroSplit(input: RecipeFactoryInput): CanvasSection {
         fontSize: 60,
         fontWeight: 700,
         align: 'left',
-        motion: { preset: 'fade-up', delayMs: 50 },
+        // No per-element motion — the section-level `entrance: 'fade-up'`
+        // already drives the heading. Adding a duplicate preset here used
+        // to fight the section entrance; other hero recipes never had it.
       },
       {
         id: makeElementId('body'),
@@ -177,7 +227,7 @@ function buildHeroSplit(input: RecipeFactoryInput): CanvasSection {
         type: 'media',
         box: { x: 760, y: 100, w: 600, h: 540, z: 2 },
         mediaKind: 'image',
-        assetId: pickHero(input),
+        assetId: pickHeroImage(input),
         alt: 'Hero illustration',
         fit: 'cover',
       },
@@ -496,7 +546,33 @@ function buildTestimonialRow(input: RecipeFactoryInput): CanvasSection {
 
 function buildVideoHero(input: RecipeFactoryInput): CanvasSection {
   const headline = briefOr(input.brief, 'Watch it in motion.');
-  const heroId = pickHero(input);
+  const hero = pickHeroMedia(input);
+  const videoBox = { x: 760, y: 80, w: 600, h: 600, z: 2 };
+  const videoId = makeElementId('video');
+  const videoAlt = hero.mediaKind === 'video' ? 'Hero video' : 'Hero video poster';
+  // Branch on kind so the discriminated-union narrowing holds. Same layout,
+  // honest reporting: image when we substituted the seed PNG, video when
+  // the caller supplied a real uploaded asset id.
+  const videoElement =
+    hero.mediaKind === 'video'
+      ? {
+          id: videoId,
+          type: 'media' as const,
+          box: videoBox,
+          mediaKind: 'video' as const,
+          assetId: hero.assetId,
+          alt: videoAlt,
+          fit: 'cover' as const,
+        }
+      : {
+          id: videoId,
+          type: 'media' as const,
+          box: videoBox,
+          mediaKind: 'image' as const,
+          assetId: hero.assetId,
+          alt: videoAlt,
+          fit: 'cover' as const,
+        };
   return {
     id: makeSectionId('video-hero'),
     recipeId: 'video-hero',
@@ -525,19 +601,7 @@ function buildVideoHero(input: RecipeFactoryInput): CanvasSection {
         fontWeight: 400,
         align: 'left',
       },
-      {
-        id: makeElementId('video'),
-        type: 'media',
-        box: { x: 760, y: 80, w: 600, h: 600, z: 2 },
-        // The hero asset id is conventionally an image (poster); when the
-        // Owner uploads a real video the agent picks the video id. We mark
-        // this as `image` because the registry's seed-hero-poster-1 is a
-        // PNG; switching to video requires a real uploaded asset.
-        mediaKind: 'image',
-        assetId: heroId,
-        alt: 'Hero video poster',
-        fit: 'cover',
-      },
+      videoElement,
     ],
   };
 }
