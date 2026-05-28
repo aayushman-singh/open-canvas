@@ -12,17 +12,17 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { CanvasSection, EditableSite, PublishedSnapshot, StyleKit } from '../canvas/schema';
 
-// -- Postgres `bytea` custom column (Phase 0 — Wave 1 #3 version history) ----
+// -- Postgres `bytea` custom column -------------------------------------------
 //
 // Drizzle does not ship a first-class `bytea` builder. We declare it via
-// `customType` so the Wave 1 version-history agent can store Yjs snapshot
-// blobs without round-tripping through base64. The JS side reads/writes
-// `Uint8Array`; the SQL side is `bytea`. The Neon HTTP driver normally
-// returns bytea as a Buffer (Uint8Array subclass) via its built-in
-// parseBytea type parser, but the response shape can vary across Neon
-// runtime versions / pooled vs direct connections. Decode Postgres'
-// textual `\x...` representation explicitly and reject malformed bytes
-// instead of handing Y.applyUpdate a corrupt update.
+// `customType` so version-history can store Yjs snapshot blobs without
+// round-tripping through base64. The JS side reads/writes `Uint8Array`; the
+// SQL side is `bytea`. The Neon HTTP driver normally returns bytea as a
+// Buffer (Uint8Array subclass) via its built-in parseBytea type parser, but
+// the response shape can vary across Neon runtime versions / pooled vs
+// direct connections. Decode Postgres' textual `\x...` representation
+// explicitly and reject malformed bytes instead of handing Y.applyUpdate a
+// corrupt update.
 const BYTEA_HEX_RE = /^[0-9a-fA-F]*$/;
 
 export function decodeByteaDriverValue(value: unknown): Uint8Array {
@@ -67,6 +67,9 @@ export const customer = pgTable('customer', {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
+  // Denormalized cache of the Clerk-owned email — Clerk is the source of truth
+  // for uniqueness, so no unique index here. Used by collaborator-invite flows
+  // to look up an existing customer by email before they sign in.
   email: text('email').notNull(),
   displayName: text('display_name'),
   bio: text('bio'),
@@ -127,10 +130,10 @@ export const site = pgTable(
     editableState: jsonb('editable_state').notNull().$type<EditableSite>(),
     publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
     publishedVersion: integer('published_version').notNull().default(0),
-    // Wave 2 #9 — password-protected publish. `passwordEnabled` is the visitor-
-    // gate switch; `passwordHash` is the PBKDF2 hash + salt blob set by the
-    // owner; `passwordSetAt` lets the unlock cookie's iat be compared so
-    // password changes invalidate previously-issued cookies.
+    // Password-protected publish. `passwordEnabled` is the visitor-gate switch;
+    // `passwordHash` is the PBKDF2 hash + salt blob set by the owner;
+    // `passwordSetAt` lets the unlock cookie's iat be compared so password
+    // changes invalidate previously-issued cookies.
     passwordEnabled: boolean('password_enabled').notNull().default(false),
     passwordHash: text('password_hash'),
     passwordSetAt: timestamp('password_set_at', { withTimezone: true }),
@@ -145,7 +148,8 @@ export const site = pgTable(
 export type Site = typeof site.$inferSelect;
 export type NewSite = typeof site.$inferInsert;
 
-export type CollaboratorRole = 'editor' | 'viewer';
+export const COLLABORATOR_ROLES = ['editor', 'viewer'] as const;
+export type CollaboratorRole = (typeof COLLABORATOR_ROLES)[number];
 
 export const siteCollaborator = pgTable(
   'site_collaborator',
@@ -269,14 +273,12 @@ export type SlotHistory = typeof slotHistory.$inferSelect;
 export type NewSlotHistory = typeof slotHistory.$inferInsert;
 
 // ===========================================================================
-// Phase 0 scaffold tables — declared here, unused until the owning wave
-// agent fills in the corresponding feature dir. Each table's column shape is
-// frozen by the per-feature plan referenced in the leading comment. Adding
-// columns is fine in a future migration; renaming or retyping is a contract
-// break.
+// Feature-scaffold tables. Each table's column shape is the contract for the
+// owning feature directory. Adding columns is fine in a future migration;
+// renaming or retyping is a contract break.
 // ===========================================================================
 
-// -- customDomain (Wave 1 #5 — see plan 05-custom-domains.md) ---------------
+// -- customDomain -------------------------------------------------------------
 //
 // One row per Owner-registered custom hostname. `cfHostnameId` is the
 // Cloudflare for SaaS Custom Hostname id returned from the API; the public
@@ -310,7 +312,7 @@ export const customDomain = pgTable(
 export type CustomDomain = typeof customDomain.$inferSelect;
 export type NewCustomDomain = typeof customDomain.$inferInsert;
 
-// -- formSubmission (Wave 2 #7 — see plan 07-forms.md) ----------------------
+// -- formSubmission -----------------------------------------------------------
 //
 // One row per visitor form submission. `formElementId` is the Owner-authored
 // FormElement id (lives inside `site.editableState`); `payload` is the raw
@@ -344,7 +346,7 @@ export const formSubmission = pgTable(
 export type FormSubmission = typeof formSubmission.$inferSelect;
 export type NewFormSubmission = typeof formSubmission.$inferInsert;
 
-// -- siteSnapshot (Wave 1 #3 — see plan 03-version-history.md) --------------
+// -- siteSnapshot -------------------------------------------------------------
 //
 // One row per Yjs snapshot capture (publish or manual). `yjsSnapshotBytes`
 // stores the result of `Y.encodeStateAsUpdate(doc)` — the bytea custom
@@ -376,7 +378,7 @@ export const siteSnapshot = pgTable(
 export type SiteSnapshot = typeof siteSnapshot.$inferSelect;
 export type NewSiteSnapshot = typeof siteSnapshot.$inferInsert;
 
-// -- siteFont (Wave 5 #12 — see plan 12-custom-fonts.md) --------------------
+// -- siteFont -----------------------------------------------------------------
 //
 // One row per Owner-uploaded WOFF2 font file. Bytes live in R2 keyed by
 // `contentHash`; the `font:<contentHash>` token resolves at render time to a
@@ -409,7 +411,7 @@ export const siteFont = pgTable(
 export type SiteFont = typeof siteFont.$inferSelect;
 export type NewSiteFont = typeof siteFont.$inferInsert;
 
-// -- siteSearchEntry (Wave 3 #13 — see plan 13-site-search.md) --------------
+// -- siteSearchEntry ----------------------------------------------------------
 //
 // One row per text-bearing element in a Published Snapshot. The `tsv`
 // column is a generated `tsvector` populated by a raw-SQL migration applied
@@ -445,7 +447,7 @@ export const siteSearchEntry = pgTable(
 export type SiteSearchEntry = typeof siteSearchEntry.$inferSelect;
 export type NewSiteSearchEntry = typeof siteSearchEntry.$inferInsert;
 
-// -- chatSession (Wave 5 #23 — see plan 23-ai-chat.md) ----------------------
+// -- chatSession --------------------------------------------------------------
 //
 // One row per Owner ↔ Agent chat session. Messages array carries the
 // turn-by-turn payload (`role`, `content`, optional `toolCalls`). Sessions
