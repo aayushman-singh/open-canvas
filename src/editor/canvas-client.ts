@@ -2008,21 +2008,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       rh.setAttribute("data-resize-dir", dirs[di]);
       wrapper.appendChild(rh);
     }
-    var dragHandle = document.createElement("button");
-    dragHandle.type = "button";
-    dragHandle.className = "element-drag-handle";
-    dragHandle.setAttribute("data-element-drag-handle", element.id);
-    dragHandle.setAttribute("aria-label", "Drag to move");
-    dragHandle.title = "Drag to move";
-    dragHandle.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
-      '<circle cx="5.5" cy="4" r="1.2" fill="currentColor"/>' +
-      '<circle cx="10.5" cy="4" r="1.2" fill="currentColor"/>' +
-      '<circle cx="5.5" cy="8" r="1.2" fill="currentColor"/>' +
-      '<circle cx="10.5" cy="8" r="1.2" fill="currentColor"/>' +
-      '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/>' +
-      '<circle cx="10.5" cy="12" r="1.2" fill="currentColor"/>' +
-      '</svg>';
-    wrapper.appendChild(dragHandle);
     var trigger = document.createElement("button");
     trigger.type = "button";
     trigger.className = "element-menu-trigger";
@@ -6908,21 +6893,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function attachPointerHandlers() {
     root.addEventListener("mousedown", (ev) => {
       if (interactionMode === "pan") return;
-      if (ev.target instanceof Element) {
-        // Drag handle on element wrapper — works for any element type,
-        // including text (which the default click flow blocks below).
-        const dh = ev.target.closest("[data-element-drag-handle]");
-        if (dh) {
-          const wrapper = dh.closest('.rev01-element');
-          const elementId = wrapper && wrapper.getAttribute('data-rev01-element');
-          if (wrapper && elementId) {
-            if (selectedElementId !== elementId) selectElement(elementId);
-            beginDrag(ev, wrapper);
-            ev.preventDefault();
-          }
-          return;
-        }
-      }
       if (ev.target instanceof Element && (ev.target.closest("[data-element-menu-trigger]") || ev.target.closest("[data-element-menu]"))) return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {

@@ -885,11 +885,11 @@ body[data-placement-active="true"] .rev01-section-slot {
 .resize-handle-se { bottom: -5px; right: -5px; cursor: nwse-resize; }
 .resize-handle-sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
 
-/* -- Element drag handle + 3-dot context menu trigger, above top-left -- */
-.rev01-element .element-drag-handle,
+/* -- Element context menu (3-dot trigger, above top-left, selected only) -- */
 .rev01-element .element-menu-trigger {
   position: absolute;
   top: -28px;
+  left: 0;
   width: 22px;
   height: 22px;
   display: none;
@@ -899,30 +899,17 @@ body[data-placement-active="true"] .rev01-section-slot {
   border: 1px solid var(--rev01-hairline-strong);
   border-radius: 4px;
   color: var(--rev01-fg);
+  font-size: 14px;
   line-height: 1;
+  cursor: pointer;
   z-index: 10001;
   padding: 0;
-}
-.rev01-element .element-drag-handle {
-  left: 0;
-  cursor: move;
-}
-.rev01-element .element-drag-handle svg {
-  display: block;
-  pointer-events: none;
-}
-.rev01-element .element-menu-trigger {
-  left: 26px;
-  font-size: 14px;
   letter-spacing: 1px;
-  cursor: pointer;
 }
-.rev01-element[data-selected="true"] .element-drag-handle,
 .rev01-element[data-selected="true"] .element-menu-trigger,
 .rev01-element .element-menu-trigger[data-menu-open="true"] {
   display: flex;
 }
-.rev01-element .element-drag-handle:hover,
 .rev01-element .element-menu-trigger:hover {
   background: var(--rev01-accent-soft);
   border-color: var(--rev01-accent);
@@ -931,7 +918,7 @@ body[data-placement-active="true"] .rev01-section-slot {
 .element-menu {
   position: absolute;
   top: 24px;
-  left: 26px;
+  left: 0;
   min-width: 180px;
   background: var(--rev01-bg-panel-strong);
   border: 1px solid var(--rev01-hairline-strong);
