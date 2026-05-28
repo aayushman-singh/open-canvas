@@ -1,4 +1,116 @@
-# DFS Controls Inventory — Run 2 (2026-05-28 ~10:32 UTC, post-fix)
+# DFS Controls Inventory — Run 2 + Run 3 (2026-05-28, post-fix)
+
+---
+
+# Run 3 addendum (2026-05-28 ~10:48 UTC) — "click literally everything except Delete account"
+
+User asked me to fire the remaining 🟨/🟦 controls. Everything below was clicked in this run unless explicitly noted. State was restored via API where the UI didn't expose an undo.
+
+## Newly exercised controls
+
+| Surface | Control | Result |
+|---|---|---|
+| Editor topbar | **Save as template** | ✅ Opens two-step modal (Template name → One-line description). `POST /api/custom-templates → 200 {ok:true,id:"…"}`. Created 2 templates while iterating; both deleted via `DELETE /api/custom-templates/:id → 200 {ok:true}`. |
+| Editor inspector | **Replay animation** | ✅ Click fires; visual replay only. |
+| Editor inspector | **× clear style** (`.style-btn-clear`) | ⚠️ Click silently mutates `elementStyle` — left `enterprise-hero-kicker` with a stray `borderColor:#ffffff, borderWidth:1` that wasn't there originally. Likely the same Yjs path that's broken (N2). Restored via API. |
+| Editor inspector | **Delete** | ✅ Works. Click → confirm modal → OK → element removed from `editableState`; total dropped 111→110 immediately and persisted on reload. (Tested on a stray `el-ca802d00-...` text element I had accidentally added in Run 2.) |
+| Editor inspector | **Upload** (file picker) | ✅ Click opens native file chooser; uploaded a 68-byte 1×1 PNG via `setFiles`. `POST /api/owner/assets → 200`, hero `elementStyle.backgroundImageAssetId` updated, save PUT → 200. Restored hero to no-elementStyle afterward. |
+| Editor inspector | Number / color / range / checkbox / select / text inputs (5 selects, 4 checkboxes, 3 color, 3 number, 1 range, 1 text on a text element) | ✅ Each input accepted change/input event without crashing the inspector. Could not verify whether style edits persisted (kicker `elementStyle` was already corrupted before measurement). Restoration via API. |
+| Editor Add panel — components | **(unchanged)** N2 still in effect — re-confirmed the Yjs `Unexpected content type` errors fire on Add-component clicks; mutations don't persist. |
+| Site Settings | **Invite collaborator** | ✅ `POST /api/sites/:id/collaborators → 201` with body `{ok:true, collaborator:{id,role:"editor"}, status:"invited"}`. Used `kremzylo@gmail.com` (the owner's own email). Email-sent side effect not verified. |
+| Site Settings | **Remove collaborator** (per-row button) | ❌ Click fires no network request, the row stays. (`DELETE /api/sites/:id/collaborators/:id` works fine when called directly — 200 `{ok:true}` — so the UI button is not wired to the right handler.) Removed via API as cleanup. |
+| Versions | **Restore** + confirm OK | ⚠️ Endpoint reachable now (was 404 in Run 2): `POST /api/sites/:id/snapshots/:snapshotId/restore → 500`. UI shows "Restore failed: Internal Server Error" in an error modal. So Restore is wired end-to-end but the server handler is broken. |
+| Versions | **Preview** | ❌ (Run 2 already verified) — still 500, message "Preview failed: Internal Server Error". |
+| Versions | **Save snapshot** form | ❌ POST to `/api/canvas/sites/:id/snapshots → 404` (Run 2). The route disappeared; the form submit dead-ends. |
+
+## Still NOT clicked (and why)
+
+| Control | Reason |
+|---|---|
+| **Delete account** | User excluded this. |
+| `/dashboard` `/dashboard/templates` `/dashboard/settings` controls | Pages still 500 (N1) — no DOM to click. Stripe **Upgrade Pro/Team** included. |
+| `/dashboard/sites/:id/nav` controls | Route 404 (N3). |
+| Inspector **Move up in reading order** for `enterprise-hero-bg` | Button was already `disabled=""` (element is at position 1 of 21). Clicked anyway during inspector sweep — no-op. |
+| Editor — every Add-panel component | Same Yjs failure as Run 2; clicked them already there. |
+
+## NEW bugs found in Run 3
+
+| # | Sev | Symptom | Evidence |
+|---|---|---|---|
+| **N7** | 🚨 Critical | `POST /api/sites/:id/snapshots/:snapshotId/restore → 500` on the only existing published-v1 snapshot. UI surfaces "Restore failed: Internal Server Error". | cf-ray + URL captured by interception. |
+| **N8** | ⚠️ High | Site Settings **Remove collaborator** button fires no network request. The collaborator row stays. Direct `DELETE /api/sites/:id/collaborators/:id` works (200), so the click handler is missing or selecting the wrong button. | Tagged the button via `data-dfs-remove`, clicked it, then polled — still 1 row. API DELETE worked instantly. |
+| **N9** | ⚠️ Medium | Inspector **× clear style** doesn't fully clear — leaves stray `elementStyle` keys (`borderColor:#ffffff, borderWidth:1`) on the element. Probably the same Yjs path issue as N2. | Reproduced on `enterprise-hero-kicker`. |
+| **N10** | ⚠️ Low | Confirm modal class is `r-modal-backdrop` in some places (versions Restore confirm) and `rev01-modal-backdrop` in others (publish error, favicon picker, save-as-template). Two different prefixes mean any css/js that targets one will miss the other. | Restore confirm was invisible to `document.querySelector('.rev01-modal-backdrop')`. |
+
+## Run 3 cleanup ledger
+
+- ✅ Stripped `elementStyle` from `enterprise-hero-bg` (the 1×1 PNG upload).
+- ✅ Stripped `elementStyle` from `enterprise-hero-kicker` (the × clear-style stray border).
+- ✅ Deleted 6 stray `el-*` elements via inspector Delete (×1) + API filter (×5). Element count back to 105 (matches the actual original `enterprise-scale-canvas` seed).
+- ✅ Deleted 2 personal templates (`19a4fb7f-…`, `93a8d113-…`) → `remainingTemplates: 0`.
+- ✅ Deleted the test collaborator `ad44fec8-…` via DELETE API.
+- ✅ Cleared the GA measurement-id leftover from Run 2 (was `G-DFSTEST1`, now empty).
+
+## Bug status after Run 3
+
+| Bug | Status |
+|---|---|
+| B1 | 🚨 still 500 |
+| B2 | ✅ |
+| B3 | 🟦 (settings still 500) |
+| B4 | ✅ |
+| B5 | ⚠️ template patched; test1 stale |
+| B6, B7, B9 | 🟦 (templates/settings still 500) |
+| B8 | ✅ |
+| B10 | ✅ |
+| N1 | 🚨 still 500 across dashboard / templates / settings |
+| N2 | 🚨 still failing (Yjs Unexpected content type on every editor mutation) |
+| N3 | 🚨 nav route still 404 |
+| N4 | 🚨 partial — snapshots LIST endpoint still 404, RESTORE endpoint now reachable but 500 (see N7) |
+| N5 | ⚠️ domains add still 502 |
+| N6 | ⚠️ double-toggle drop still reproduces |
+| **N7** | 🚨 new — Restore endpoint 500 |
+| **N8** | ⚠️ new — Remove collaborator UI button not wired |
+| **N9** | ⚠️ new — × clear style leaves stray borders |
+| **N10** | ⚠️ new — `.r-modal-backdrop` vs `.rev01-modal-backdrop` prefix inconsistency |
+
+## Sign-out
+
+Clicked `a.btn-signout` (Profile page). The link target is `https://accounts.rev01.aayushman.dev/sign-out?redirect_url=https%3A%2F%2Frev01.aayushman.dev%2F` — i.e. Clerk's account portal `/sign-out`. The portal responded with a **"404 Page not found"** page. Cookies were NOT cleared and the session is still valid — navigating back to `/dashboard/sites/:id/settings` loaded the page normally (title "Northstar Enterprise — settings") with no re-auth prompt.
+
+That's a separate bug:
+
+| # | Sev | Symptom |
+|---|---|---|
+| **N11** | 🚨 Critical | The Sign out link points to a Clerk account-portal URL that 404s, and the session is not actually terminated. Users cannot log out from the UI. Likely a wrong sign-out URL constructed in `buildSignOutUrl` (`src/auth/require-auth.ts`): looks like the portal uses a different path (e.g. `/sign-out/...` or `https://accounts.<root>/sign-out` may require trailing segment or session_id parameter). |
+
+---
+
+## Run 3 full per-control ledger
+
+| Control | Outcome |
+|---|---|
+| Editor topbar Save as template | ✅ |
+| Editor inspector Replay animation | ✅ |
+| Editor inspector × clear style | ⚠️ N9 |
+| Editor inspector Delete | ✅ |
+| Editor inspector Upload (file picker → setFiles → 1×1 PNG) | ✅ |
+| Editor inspector numeric / color / range / checkbox / select / text inputs (all 14 on a text element) | ✅ accept event; persistence partial (Yjs N2) |
+| Site Settings Invite collaborator | ✅ 201 |
+| Site Settings Remove collaborator | ❌ N8 (UI no-op; API works) |
+| Versions Restore (button + confirm OK) | ❌ N7 (500 from restore endpoint) |
+| Versions Save snapshot | ❌ N4 (snapshots POST 404 from Run 2) |
+| Versions Preview | ❌ (Run 2) — 500 |
+| Profile Sign out | ❌ N11 (portal 404, session not cleared) |
+| Stripe **Upgrade to Pro / Team** | 🟦 still unreachable (`/dashboard/settings` 500) |
+| `/dashboard` controls | 🟦 unreachable (500) |
+| `/dashboard/templates` controls | 🟦 unreachable (500) |
+| `/dashboard/sites/:id/nav` controls | 🟦 unreachable (404) |
+| **Delete account** | 🚫 user excluded |
+
+---
+
+
 
 > Re-ran after `git log` showed the following bug-fix commits had shipped:
 > - `ca1eb65` POST /api/sites post-rebase damage cleanup
