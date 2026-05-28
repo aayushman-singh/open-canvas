@@ -265,15 +265,6 @@ export interface RenderSnapshotOptions {
    */
   turnstileSiteKey: string;
   /**
-   * Per-page `<head>` meta emitter. The renderer invokes this for every page
-   * in render order; the result is discarded by this body renderer (the
-   * `<main>` block does not own `<head>`). The hook exists so the seo
-   * subsystem's smoke can verify the contract and so future static-export
-   * consumers have one canonical seam that walks every page; visitor-facing
-   * head emission goes through `renderCanvasHead` in `src/seo/meta-emit.ts`.
-   */
-  emitHeadMeta?: (page: CanvasPage) => string;
-  /**
    * Optional body-page subset. Link resolution, responsive CSS, and other
    * whole-site context still come from `snapshot`; only the emitted
    * `<article>` list is narrowed.
@@ -320,10 +311,5 @@ export function renderCanvasSnapshot(
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');
   const responsiveStyle = renderResponsiveCss(snapshot);
-  if (opts.emitHeadMeta) {
-    for (const page of pagesToRender) {
-      void opts.emitHeadMeta(page);
-    }
-  }
   return `<main class="rev01-site" data-style-kit="${escapeAttr(snapshot.styleKit)}">${responsiveStyle}${pagesHtml}</main>`;
 }

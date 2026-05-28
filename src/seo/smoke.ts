@@ -13,15 +13,14 @@
 //   5. HTML entities in title/description escaped correctly.
 //   6. Site-level siteNoIndex overrides per-page (always noindex).
 //
-// Bonus: round-trips through `renderCanvasSnapshot`'s additive
-// `emitHeadMeta` hook to prove the contract holds.
+// Bonus: direct per-page `emitPageMeta` invocation matches the contract
+// callers rely on (one head meta block per page, in render order).
 
-import { renderCanvasSnapshot } from '../canvas/render.js';
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
 import { emitPageMeta, renderCanvasHead, resolveLang, resolveNoIndex } from './meta-emit.js';
 import { resolveOgUrl } from './og-resolve.js';
 
-function assert(condition: boolean, message: string): void {
+function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     process.stderr.write(`[seo:smoke] FAIL — ${message}\n`);
     process.exit(1);
@@ -340,19 +339,24 @@ assert(
   'renderCanvasHead: missing page returns empty head meta without falling back',
 );
 
-// renderCanvasSnapshot — additive emitHeadMeta hook is invoked per page.
-const collected: string[] = [];
+// Per-page meta emission — callers walk snapshot.pages and invoke
+// emitPageMeta directly. Asserts the head meta block is produced for every
+// page in render order, and that each page's title surfaces in its own block.
 const snapshotMulti = makeSnapshot([page1, page4]);
-renderCanvasSnapshot(snapshotMulti, '/assets', SITE_ID, {
-  turnstileSiteKey: 'turnstile-test-key',
-  emitHeadMeta: (page) => {
-    collected.push(page.slug);
-    return emitPageMeta(page, { siteId: SITE_ID, host: HOST, snapshot: snapshotMulti });
-  },
-});
+const [firstMeta, secondMeta, ...extraMeta] = snapshotMulti.pages.map((page) =>
+  emitPageMeta(page, { siteId: SITE_ID, host: HOST, snapshot: snapshotMulti }),
+);
 assert(
-  collected.length === 2 && collected[0] === 'about' && collected[1] === 'contact',
-  'render hook: emitHeadMeta must be invoked once per page in order',
+  firstMeta !== undefined && secondMeta !== undefined && extraMeta.length === 0,
+  'per-page meta: emitPageMeta must produce exactly one block per page in the snapshot',
+);
+assert(
+  firstMeta.includes('<title>About Us</title>'),
+  'per-page meta: first page block must carry the first page title',
+);
+assert(
+  secondMeta.includes('<title>Contact</title>'),
+  'per-page meta: second page block must carry the second page title',
 );
 
 // ---------------------------------------------------------------------------
