@@ -93,6 +93,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // -- State migration: old string hrefs -> ActionHref union ---------------
+  //
+  // Runs on every editor load by design. A one-shot DB migration is rejected
+  // because Yjs co-edit (ADR 0007) projects state through the client; old
+  // peers writing legacy string hrefs would silently break a "migrated"
+  // database, and the operation is cheap (linear over elements, no I/O).
+  // The loud failure mode is "Action hrefs render as #"; the migration
+  // fixes that in memory before render. If a tool ever needs to claim
+  // "all stored data is in the new shape" the DB migration becomes
+  // appropriate — until then the in-memory pass is the right floor.
   function migrateState(s) {
     if (!s || !s.pages) return s;
     function migrateSection(section) {
@@ -152,8 +161,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let reelViewMode = "tile";
   let activePageId = null;
   let pagePositions = [];
-  var PAGE_GAP = 120;
-  var ARTBOARD_LABEL_HEIGHT = 40;
+  const PAGE_GAP = 120;
+  const ARTBOARD_LABEL_HEIGHT = 40;
   const root = document.getElementById("canvas-root");
   const inspector = document.getElementById("canvas-inspector");
   const statusEl = document.getElementById("canvas-status");
@@ -253,39 +262,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function fitToPage(pageId) {
     if (!viewport) return;
-    var pos = typeof getPagePosition === "function" ? getPagePosition(pageId || (currentPage() && currentPage().id)) : null;
-    if (!pos) {
-      // Fallback for single-page mode before multi-page is wired
-      var page = currentPage();
-      if (!page) return;
-      var rect = viewport.getBoundingClientRect();
-      var totalHeight = 0;
-      for (var i = 0; i < page.sections.length; i++) {
-        totalHeight += page.sections[i].height || 0;
-      }
-      var availW = rect.width - 128;
-      var availH = rect.height - 128;
-      if (availW <= 0 || availH <= 0) return;
-      var scaleX = availW / page.width;
-      var scaleY = availH / totalHeight;
-      camera.zoom = clampZoom(Math.min(scaleX, scaleY), ZOOM_MAX_FIT);
-      camera.x = (rect.width - page.width * camera.zoom) / 2;
-      camera.y = (rect.height - totalHeight * camera.zoom) / 2;
-      applyCameraTransform();
-      return;
-    }
-    var rect2 = viewport.getBoundingClientRect();
-    var padX = 64;
-    var padY = 64;
-    var availW2 = rect2.width - padX * 2;
-    var availH2 = rect2.height - padY * 2;
-    if (availW2 <= 0 || availH2 <= 0) return;
-    var scaleX2 = availW2 / pos.width;
-    var scaleY2 = availH2 / pos.height;
-    var newZoom = clampZoom(Math.min(scaleX2, scaleY2), ZOOM_MAX_FIT);
+    var page = currentPage();
+    var pos = getPagePosition(pageId || (page && page.id));
+    if (!pos) return;
+    var rect = viewport.getBoundingClientRect();
+    var pad = 64;
+    var availW = rect.width - pad * 2;
+    var availH = rect.height - pad * 2;
+    if (availW <= 0 || availH <= 0) return;
+    var scaleX = availW / pos.width;
+    var scaleY = availH / pos.height;
+    var newZoom = clampZoom(Math.min(scaleX, scaleY), ZOOM_MAX_FIT);
     camera.zoom = newZoom;
-    camera.x = (rect2.width - pos.width * newZoom) / 2 - pos.x * newZoom;
-    camera.y = (rect2.height - pos.height * newZoom) / 2 - pos.y * newZoom;
+    camera.x = (rect.width - pos.width * newZoom) / 2 - pos.x * newZoom;
+    camera.y = (rect.height - pos.height * newZoom) / 2 - pos.y * newZoom;
     applyCameraTransform();
   }
 
@@ -885,6 +875,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function newElementId() { return "el-" + uuid(); }
   function newSectionId() { return "sec-" + uuid(); }
+  function newPageId() { return "page-" + uuid(); }
 
   function currentPage() {
     if (!state || !Array.isArray(state.pages) || state.pages.length === 0) return null;
@@ -1008,7 +999,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!state) return;
     var idx = state.pages.length + 1;
     var newPage = {
-      id: "page-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+      id: newPageId(),
       slug: "page-" + idx,
       title: "Page " + idx,
       width: 1440,

@@ -6,8 +6,8 @@
 //   - a small container reset that lets the absolute-positioned canvas
 //     elements (built by renderCanvasSnapshot) lay out correctly.
 //
-// The kit token table USED to live here as hand-maintained selectors. As of
-// T8 the source of truth is `src/canvas/style-kits.ts` — a single
+// The kit token table USED to live here as hand-maintained selectors. The
+// source of truth is now `src/canvas/style-kits.ts` — a single
 // `STYLE_KIT_PRESETS` map consumed by both the editor preview and this
 // visitor stylesheet. There is exactly one place that knows how to translate
 // a preset into CSS.

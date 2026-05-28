@@ -23,6 +23,7 @@
 import { contentHashToR2Key, extFromMediaType } from '../assets/hash.js';
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import type { CanvasSection } from './schema.js';
+import { newId, rolePrefix } from './util/id.js';
 
 export interface ImportSectionInput {
   /**
@@ -62,19 +63,6 @@ export type ImportSectionResult =
   | { ok: true; section: CanvasSection; newAssetRows: ImportedAssetRow[] }
   | { ok: false; errors: string[] };
 
-function rolePrefix(originalId: string): string {
-  const lastDash = originalId.lastIndexOf('-');
-  if (lastDash <= 0) return originalId || 'el';
-  const tail = originalId.slice(lastDash + 1);
-  if (/^[a-f0-9]{8}$/i.test(tail)) return originalId.slice(0, lastDash);
-  return originalId;
-}
-
-function newId(prefix: string): string {
-  const random = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
-  return `${prefix}-${random}`;
-}
-
 function materialisedAssetId(targetCustomerId: string, rawSeedId: string): string {
   return `seed-${targetCustomerId}-${rawSeedId}`;
 }
@@ -82,6 +70,9 @@ function materialisedAssetId(targetCustomerId: string, rawSeedId: string): strin
 export function importSectionIntoSite(input: ImportSectionInput): ImportSectionResult {
   const { targetCustomerId, sourceSection, existingAssetIds, existingByHash } = input;
   const cloned = structuredClone(sourceSection);
+  // Imported sections become body sections in the target site; `role` is
+  // reserved for the single site-wide header/footer pair and would mark the
+  // imported clone as a second header/footer.
   delete cloned.role;
   const errors: string[] = [];
 

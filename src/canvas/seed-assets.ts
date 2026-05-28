@@ -97,6 +97,6 @@ export function isSeedAssetId(id: string): boolean {
 
 export function getSeedAsset(id: string): SeedAsset | null {
   return Object.prototype.hasOwnProperty.call(SEED_ASSET_REGISTRY, id)
-    ? (SEED_ASSET_REGISTRY[id] ?? null)
+    ? SEED_ASSET_REGISTRY[id]!
     : null;
 }

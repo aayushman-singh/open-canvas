@@ -4,12 +4,13 @@
 // the seed-only `importSectionIntoSite` to handle arbitrary Owner Assets
 // referenced via an AssetManifestEntry[] snapshot.
 //
-// ID regeneration reuses the same rolePrefix + newId pattern from
-// section-import.ts. Asset transfer creates new ownerAsset rows for the
-// target Owner pointing to the same R2 content-hash (per ADR 0004).
+// ID regeneration shares `rolePrefix` + `newId` with section-import.ts via
+// `./util/id.js`. Asset transfer creates new ownerAsset rows for the target
+// Owner pointing to the same R2 content-hash (per ADR 0004).
 
 import type { CanvasSection } from './schema.js';
 import type { AssetManifestEntry } from '../db/schema.js';
+import { newId, rolePrefix } from './util/id.js';
 
 export interface LibraryImportInput {
   targetCustomerId: string;
@@ -35,22 +36,12 @@ export type LibraryImportResult =
   | { ok: true; section: CanvasSection; newAssetRows: ImportedAssetRow[] }
   | { ok: false; errors: string[] };
 
-function rolePrefix(originalId: string): string {
-  const lastDash = originalId.lastIndexOf('-');
-  if (lastDash <= 0) return originalId || 'el';
-  const tail = originalId.slice(lastDash + 1);
-  if (/^[a-f0-9]{8}$/i.test(tail)) return originalId.slice(0, lastDash);
-  return originalId;
-}
-
-function newId(prefix: string): string {
-  const random = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
-  return `${prefix}-${random}`;
-}
-
 export function importLibrarySectionIntoSite(input: LibraryImportInput): LibraryImportResult {
   const { targetCustomerId, sourceSection, assetManifest, existingAssetsByHash } = input;
   const cloned = structuredClone(sourceSection);
+  // Imported sections become body sections in the target site; `role` is
+  // reserved for the single site-wide header/footer pair and would mark the
+  // imported clone as a second header/footer.
   delete cloned.role;
   const errors: string[] = [];
 
