@@ -1,6 +1,5 @@
 {
   "styleKit": "charcoal",
-  "symbols": [],
   "pages": [
     {
       "id": "page-enterprise-scale",
@@ -69,7 +68,7 @@
               "type": "action",
               "box": { "x": 80, "y": 608, "w": 180, "h": 56, "z": 3 },
               "label": "Talk to sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "solid"
             },
             {
@@ -1046,7 +1045,7 @@
               "type": "action",
               "box": { "x": 484, "y": 434, "w": 210, "h": 58, "z": 2 },
               "label": "Contact sales",
-              "href": { "type": "external", "url": "/contact" },
+              "href": { "type": "external", "url": "mailto:hello@example.com" },
               "variant": "solid"
             },
             {
