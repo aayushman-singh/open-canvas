@@ -1,7 +1,7 @@
 // src/canvas/elements/carousel.ts
 //
-// Wave 4 #17 — Carousel element. A horizontal slider of image slides with
-// optional caption + link, optional prev/next arrows, optional dot navigation.
+// Carousel element. A horizontal slider of image slides with optional
+// caption + link, optional prev/next arrows, optional dot navigation.
 //
 // Render output is a pure DOM tree carrying `data-rev01-*` markers consumed
 // by the shared interactive runtime injected once per snapshot (see
@@ -17,7 +17,7 @@
 //   - Arrows are real `<button>`s — focusable, Enter/Space activates by
 //     default. Dots are also `<button>`s for the same reason.
 //
-// Out of scope (per plan): auto-play, multi-row carousels, touch inertia.
+// Out of scope: auto-play, multi-row carousels, touch inertia.
 
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml } from './render-utils.js';
@@ -41,7 +41,12 @@ export interface CarouselRenderCtx {
   assetBasePath: string;
 }
 
-function renderSlide(slide: CarouselSlide, index: number, assetBasePath: string): string {
+function renderSlide(
+  slide: CarouselSlide,
+  index: number,
+  total: number,
+  assetBasePath: string,
+): string {
   const src = `${assetBasePath}/${slide.assetId}`;
   const captionHtml =
     typeof slide.caption === 'string' && slide.caption.length > 0
@@ -64,7 +69,7 @@ function renderSlide(slide: CarouselSlide, index: number, assetBasePath: string)
     `data-rev01-carousel-slide="${escapeAttr(slide.id)}" `,
     `data-rev01-carousel-slide-index="${String(index)}" `,
     `role="group" aria-roledescription="slide" `,
-    `aria-label="${escapeAttr(`${String(index + 1)} of ${String(0)}`)}">`,
+    `aria-label="${escapeAttr(`${String(index + 1)} of ${String(total)}`)}">`,
     mediaHtml,
     captionHtml,
     `</figure>`,
@@ -77,17 +82,8 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
   void ctx.styleKit;
 
   const total = el.slides.length;
-  // Per-slide aria-label needs `total`; re-emit slides with the correct
-  // denominator (the helper above renders `0` as a placeholder so callers
-  // see the shape; we patch it here with a simple replace because the slide
-  // helper is private and only this caller exists).
   const slidesHtml = el.slides
-    .map((slide, idx) =>
-      renderSlide(slide, idx, ctx.assetBasePath).replace(
-        `aria-label="${escapeAttr(`${String(idx + 1)} of ${String(0)}`)}"`,
-        `aria-label="${escapeAttr(`${String(idx + 1)} of ${String(total)}`)}"`,
-      ),
-    )
+    .map((slide, idx) => renderSlide(slide, idx, total, ctx.assetBasePath))
     .join('');
 
   const arrowsHtml = el.showArrows

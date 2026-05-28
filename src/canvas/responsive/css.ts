@@ -20,11 +20,9 @@
 // `!important` for this reason; it is the only acceptable use site for the
 // flag in this module.
 
+import { PHONE_MAX_PX, TABLET_MAX_PX } from './breakpoints.js';
 import { escapeCssIdent } from './escape.js';
 import type { ResolvedBox, ResolvedPageLayout } from './translate.js';
-
-const TABLET_MAX_PX = 1023;
-const PHONE_MAX_PX = 767;
 
 /**
  * Build the CSS body (no `<style>` tags). Returns the empty string when no

@@ -1,13 +1,12 @@
 // src/canvas/elements/chart.ts
 //
-// Wave 2 #11 — Chart Element. Server-rendered SVG charts (bar / line / area /
-// pie / donut) with palette derived from the active Style Kit's accent.
-// No client-side JS; visitors see a static SVG that scales to the element
-// box via `viewBox` + `preserveAspectRatio="xMidYMid meet"`.
+// Chart Element. Server-rendered SVG charts (bar / line / area / pie / donut)
+// with palette derived from the active Style Kit's accent. No client-side JS;
+// visitors see a static SVG that scales to the element box via `viewBox` +
+// `preserveAspectRatio="xMidYMid meet"`.
 //
-// Phase 0 left the interface frozen; the body of `renderChart` is filled in
-// here. The five chart-kind renderers live under `src/charts/`. All math is
-// pure (no DOM, no I/O).
+// The five chart-kind renderers live under `src/charts/`. All math is pure
+// (no DOM, no I/O).
 
 import type { BaseElement } from '../schema.js';
 import { renderAreaChartBody } from '../../charts/area.js';
@@ -74,6 +73,10 @@ export function renderChart(el: ChartElement, ctx: ChartRenderCtx): string {
     case 'area':
       body = renderAreaChartBody(el, palette, width, height);
       break;
+    default: {
+      const exhaustive: never = el.kind;
+      throw new Error(`renderChart: unhandled ChartKind ${JSON.stringify(exhaustive)}`);
+    }
   }
   // `role="img"` + a synthesised aria-label so assistive tech reads "bar
   // chart, 3 series across 4 categories" rather than diving into the inner

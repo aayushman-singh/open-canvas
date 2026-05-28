@@ -50,7 +50,7 @@
 
 import type { BaseElement } from '../schema.js';
 
-import { escapeAttr, escapeHtml } from './render-utils.js';
+import { escapeAttr, escapeCssAttrId, escapeHtml } from './render-utils.js';
 import { buildTablePhoneCollapseCss } from './table-responsive.js';
 
 export interface TableColumn {
@@ -85,8 +85,7 @@ export interface TableRenderCtx {
  * selector matches that wrapper and only that wrapper.
  */
 function scopeSelector(elementId: string): string {
-  const escaped = elementId.replace(/[\\"]/g, '\\$&');
-  return `[data-rev01-element="${escaped}"]`;
+  return `[data-rev01-element="${escapeCssAttrId(elementId)}"]`;
 }
 
 /**

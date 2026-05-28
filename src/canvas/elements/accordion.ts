@@ -1,8 +1,8 @@
 // src/canvas/elements/accordion.ts
 //
-// Wave 4 #17 — Accordion element. A collapsible list of items: each item has
-// a focusable header (the `title`) and a body of inline rich text that toggles
-// open/closed when the visitor clicks (or focuses + Enter/Space).
+// Accordion element. A collapsible list of items: each item has a focusable
+// header (the `title`) and a body of inline rich text that toggles open/closed
+// when the visitor clicks (or focuses + Enter/Space).
 //
 // Render output is a pure DOM tree carrying `data-rev01-*` markers consumed
 // by the shared interactive runtime injected once per snapshot (see
@@ -21,7 +21,7 @@
 //     attribute on toggle) — assistive tech skips collapsed regions.
 
 import type { BaseElement, InlineRun } from '../schema.js';
-import { escapeAttr, escapeHtml, findLinkMark, hasMark } from './render-utils.js';
+import { escapeAttr, escapeHtml, renderInlineRun } from './render-utils.js';
 
 export interface AccordionItem {
   id: string;
@@ -37,29 +37,6 @@ export interface AccordionElement extends BaseElement {
 
 export interface AccordionRenderCtx {
   styleKit: string;
-}
-
-/**
- * Render one inline run into HTML, matching the mark-nesting order used by
- * `renderText` so identical run shapes produce byte-identical output. Kept
- * local to this file rather than imported from `text.ts` to keep the per-
- * element files free of cross-element imports — render-utils is the shared
- * surface.
- */
-function renderInlineRun(run: InlineRun): string {
-  const escapedText = escapeHtml(run.text);
-  let inner = escapedText;
-  if (hasMark(run, 'code')) inner = `<code>${inner}</code>`;
-  if (hasMark(run, 'highlight')) inner = `<mark>${inner}</mark>`;
-  if (hasMark(run, 'strike')) inner = `<s>${inner}</s>`;
-  if (hasMark(run, 'underline')) inner = `<u>${inner}</u>`;
-  if (hasMark(run, 'italic')) inner = `<em>${inner}</em>`;
-  if (hasMark(run, 'bold')) inner = `<strong>${inner}</strong>`;
-  const link = findLinkMark(run);
-  if (link) {
-    inner = `<a class="rev01-inline-link" href="${escapeAttr(link.href)}">${inner}</a>`;
-  }
-  return `<span>${inner}</span>`;
 }
 
 function renderInlineRuns(runs: InlineRun[]): string {

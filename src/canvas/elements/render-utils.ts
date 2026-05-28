@@ -58,6 +58,16 @@ export function styleFromEntries(entries: ReadonlyArray<readonly [string, string
   return entries.map(([k, v]) => `${k}:${v}`).join(';');
 }
 
+/**
+ * Escape an id for safe embedding inside a CSS attribute-selector string
+ * of the shape `[data-rev01-element="<id>"]`. Backslash-escapes `\` and `"`
+ * so a stray quote cannot break out of the selector. The schema validator
+ * already constrains ids to a slug-like shape; this is defence-in-depth.
+ */
+export function escapeCssAttrId(value: string): string {
+  return value.replace(/[\\"]/g, '\\$&');
+}
+
 /** Find the link mark in a run (zero or one allowed by the validator). */
 export function findLinkMark(run: InlineRun): Extract<InlineMark, { type: 'link' }> | null {
   if (!run.marks) return null;
@@ -73,4 +83,34 @@ export function hasMark(run: InlineRun, type: InlineMark['type']): boolean {
     if (mark.type === type) return true;
   }
   return false;
+}
+
+/**
+ * Render one inline run into HTML with a fixed mark-nesting order:
+ *
+ *   <a> outermost (only when a link mark is present)
+ *   <strong>, <em>, <u>, <s>, <mark>, <code> (innermost wraps the text node)
+ *
+ * The order is deliberately stable so identical content arrays always
+ * produce byte-identical HTML — required for diff stability, snapshot
+ * rendering, and the editor's round-trip serializer.
+ *
+ * The bare <span> wrapper is kept even for no-mark runs because it gives
+ * the editor a stable DOM addressing target per run.
+ */
+export function renderInlineRun(run: InlineRun): string {
+  let inner = escapeHtml(run.text);
+  if (hasMark(run, 'code')) inner = `<code>${inner}</code>`;
+  if (hasMark(run, 'highlight')) inner = `<mark>${inner}</mark>`;
+  if (hasMark(run, 'strike')) inner = `<s>${inner}</s>`;
+  if (hasMark(run, 'underline')) inner = `<u>${inner}</u>`;
+  if (hasMark(run, 'italic')) inner = `<em>${inner}</em>`;
+  if (hasMark(run, 'bold')) inner = `<strong>${inner}</strong>`;
+  const link = findLinkMark(run);
+  if (link) {
+    const targetAttr =
+      link.target === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
+    inner = `<a class="rev01-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${inner}</a>`;
+  }
+  return `<span>${inner}</span>`;
 }

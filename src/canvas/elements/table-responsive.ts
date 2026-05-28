@@ -4,7 +4,7 @@
 //
 // ─── Strategy (inline scoped CSS) ──────────────────────────────────────────
 //
-// The Wave 1 #1 responsive subsystem (`src/canvas/responsive/css.ts`) emits a
+// The responsive subsystem (`src/canvas/responsive/css.ts`) emits a
 // `<style data-rev01-responsive>` block per Published Snapshot. Its rules
 // govern element-box dimensions ONLY — `left/top/width/height` per breakpoint,
 // `display: none` when an Owner hides an element on a breakpoint. It does not,
@@ -13,10 +13,10 @@
 //
 // So Table emits its own `<style>` block alongside its HTML, scoped tightly to
 // `[data-rev01-element="<id>"]`, and uses the SAME phone media-query breakpoint
-// (`max-width: 767px`, matching `PHONE_MAX_PX` in `responsive/css.ts`) so the
-// two layers fire together. Visitors at a phone-band viewport see both the
-// box-scale (from the responsive subsystem) and the row-stack collapse (from
-// here) take effect at once.
+// (`PHONE_MAX_PX` from `responsive/breakpoints.ts`) so the two layers fire
+// together. Visitors at a phone-band viewport see both the box-scale (from
+// the responsive subsystem) and the row-stack collapse (from here) take
+// effect at once.
 //
 // ─── Why `display: block` (not `display: grid` / `flex`) ────────────────────
 //
@@ -36,7 +36,8 @@
 // when descended `<tr>` carry `<th scope>` references — the visual collapse
 // does not change the accessible name of each cell.
 
-const PHONE_MAX_PX = 767;
+import { PHONE_MAX_PX } from '../responsive/breakpoints.js';
+import { escapeCssAttrId } from './render-utils.js';
 
 /**
  * Build the phone-collapse CSS rules for a single Table element. Returns the
@@ -48,8 +49,7 @@ const PHONE_MAX_PX = 767;
  * page collapse independently and the rules can never leak to anything else.
  */
 export function buildTablePhoneCollapseCss(elementId: string): string {
-  const escaped = elementId.replace(/[\\"]/g, '\\$&');
-  const scope = `[data-rev01-element="${escaped}"]`;
+  const scope = `[data-rev01-element="${escapeCssAttrId(elementId)}"]`;
   const inner = [
     // Strip native table layout.
     `${scope} table.rev01-table,`,
