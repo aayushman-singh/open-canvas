@@ -34,11 +34,17 @@ import type {
 import { isElementNode } from './tree.js';
 
 const SECTION_HEIGHT_MIN = 240;
+// NOTE: validate.ts uses SECTION_HEIGHT_MAX = 1400. The engine clamps lower
+// because LLM-designed sections aren't allowed to stretch to the full editor
+// maximum. A 1300px hand-edited section passes validate but the engine clamps
+// designSection input to 1200. Keep these two ceilings intentionally distinct.
 const SECTION_HEIGHT_MAX = 1200;
 const FONT_SIZE_MIN = 12;
 const FONT_SIZE_MAX = 96;
 const CONTAINER_PADDING_MAX = 80;
 const ROOT_PADDING = 60;
+// LLM-designed sections are capped at 30 elements to keep tool-call payloads
+// small and the resolved tree readable in the editor.
 const MAX_ELEMENTS = 30;
 
 const GAP_PX: Record<GapToken, number> = {
@@ -55,7 +61,7 @@ function shortRand(): string {
   return crypto.randomUUID().slice(0, 8);
 }
 
-interface BoundingBox {
+interface LayoutBox {
   x: number;
   y: number;
   w: number;
@@ -88,6 +94,11 @@ function resolveFont(token: FontToken, preset: StyleKitPreset): string {
   }
 }
 
+// A "pin" is a hard style override on a single element — written into
+// `pinnedStyle` so the style-kit cascade can't change it. We only pin when
+// the element diverges from the role default (e.g. heading using `body`
+// font instead of `display`); matching defaults stay un-pinned so a future
+// style-kit swap can re-style them.
 function needsColorPin(color: ColorToken): boolean {
   return color !== 'text';
 }
@@ -260,13 +271,16 @@ function createCanvasElement(
     case 'media': {
       const media = requireMediaProps(node);
       ctx.imagePrompts.set(id, media.imagePrompt);
+      // mediaKind is hardcoded to 'image' because the layout tree has no
+      // video affordance yet — the LLM cannot request a video element via
+      // this path. Video heroes flow through a separate recipe builder.
       return {
         id,
         type: 'media',
         box,
         mediaKind: 'image',
         assetId: '',
-        alt: media.imagePrompt || 'Generated image',
+        alt: media.imagePrompt,
         fit: media.fit,
       };
     }
@@ -277,7 +291,7 @@ function createCanvasElement(
         type: 'action',
         box,
         label: action.label,
-        href: action.href || '#',
+        href: action.href,
         variant: action.variant,
       };
     }
@@ -302,7 +316,7 @@ function createCanvasElement(
   }
 }
 
-function resolveNode(node: LayoutNode | ElementNode, box: BoundingBox, ctx: ResolveContext): void {
+function resolveNode(node: LayoutNode | ElementNode, box: LayoutBox, ctx: ResolveContext): void {
   if (isElementNode(node)) {
     const posBox: PositionedBox = {
       x: Math.round(box.x),
@@ -328,67 +342,71 @@ function resolveNode(node: LayoutNode | ElementNode, box: BoundingBox, ctx: Reso
   }
 }
 
-function resolveStack(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): void {
+function withParentAlign(ctx: ResolveContext, align: LayoutAlign, fn: () => void): void {
+  const prevAlign = ctx.parentAlign;
+  ctx.parentAlign = align;
+  try {
+    fn();
+  } finally {
+    ctx.parentAlign = prevAlign;
+  }
+}
+
+function resolveStack(node: LayoutNode, box: LayoutBox, ctx: ResolveContext): void {
   const direction = node.direction ?? 'column';
   const gap = GAP_PX[node.gap ?? 'normal'];
   const align = node.align ?? 'start';
   const children = node.children;
   if (children.length === 0) return;
 
-  const prevAlign = ctx.parentAlign;
-  ctx.parentAlign = align;
-
-  // Separate background containers from flow children.
-  const bgContainers: ElementNode[] = [];
-  const flowChildren: (LayoutNode | ElementNode)[] = [];
-  for (const child of children) {
-    if (isElementNode(child) && isBackgroundContainer(child)) {
-      bgContainers.push(child);
-    } else {
-      flowChildren.push(child);
+  withParentAlign(ctx, align, () => {
+    // Separate background containers from flow children.
+    const bgContainers: ElementNode[] = [];
+    const flowChildren: (LayoutNode | ElementNode)[] = [];
+    for (const child of children) {
+      if (isElementNode(child) && isBackgroundContainer(child)) {
+        bgContainers.push(child);
+      } else {
+        flowChildren.push(child);
+      }
     }
-  }
 
-  // Background containers span the full parent box at lower z.
-  for (const bg of bgContainers) {
-    const posBox: PositionedBox = {
-      x: Math.round(box.x),
-      y: Math.round(box.y),
-      w: Math.max(1, Math.round(box.w)),
-      h: Math.max(1, Math.round(box.h)),
-      z: ctx.zCounter++,
+    // Background containers span the full parent box at lower z.
+    for (const bg of bgContainers) {
+      const posBox: PositionedBox = {
+        x: Math.round(box.x),
+        y: Math.round(box.y),
+        w: Math.max(1, Math.round(box.w)),
+        h: Math.max(1, Math.round(box.h)),
+        z: ctx.zCounter++,
+      };
+      ctx.elements.push(createCanvasElement(bg, posBox, ctx));
+    }
+
+    // Compute padded content area if a background container defines padding.
+    const rawPadding =
+      bgContainers.length > 0 ? (bgContainers[0]!.element.container?.padding ?? 0) : 0;
+    const padding = clamp(rawPadding, 0, CONTAINER_PADDING_MAX);
+    const contentBox: LayoutBox = {
+      x: box.x + padding,
+      y: box.y + padding,
+      w: Math.max(1, box.w - padding * 2),
+      h: Math.max(1, box.h - padding * 2),
     };
-    ctx.elements.push(createCanvasElement(bg, posBox, ctx));
-  }
 
-  // Compute padded content area if a background container defines padding.
-  const rawPadding =
-    bgContainers.length > 0 ? (bgContainers[0]!.element.container?.padding ?? 0) : 0;
-  const padding = clamp(rawPadding, 0, CONTAINER_PADDING_MAX);
-  const contentBox: BoundingBox = {
-    x: box.x + padding,
-    y: box.y + padding,
-    w: Math.max(1, box.w - padding * 2),
-    h: Math.max(1, box.h - padding * 2),
-  };
+    if (flowChildren.length === 0) return;
 
-  if (flowChildren.length === 0) {
-    ctx.parentAlign = prevAlign;
-    return;
-  }
-
-  if (direction === 'column') {
-    resolveColumnStack(flowChildren, contentBox, gap, ctx);
-  } else {
-    resolveRowStack(flowChildren, contentBox, gap, ctx);
-  }
-
-  ctx.parentAlign = prevAlign;
+    if (direction === 'column') {
+      resolveColumnStack(flowChildren, contentBox, gap, ctx);
+    } else {
+      resolveRowStack(flowChildren, contentBox, gap, ctx);
+    }
+  });
 }
 
 function resolveColumnStack(
   children: (LayoutNode | ElementNode)[],
-  box: BoundingBox,
+  box: LayoutBox,
   gap: number,
   ctx: ResolveContext,
 ): void {
@@ -428,7 +446,7 @@ function resolveColumnStack(
 
 function resolveRowStack(
   children: (LayoutNode | ElementNode)[],
-  box: BoundingBox,
+  box: LayoutBox,
   gap: number,
   ctx: ResolveContext,
 ): void {
@@ -466,71 +484,64 @@ function resolveRowStack(
   }
 }
 
-function resolveGrid(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): void {
+function resolveGrid(node: LayoutNode, box: LayoutBox, ctx: ResolveContext): void {
   const columns = node.columns ?? 3;
   const gap = GAP_PX[node.gap ?? 'normal'];
   const align = node.align ?? 'start';
   const children = node.children;
   if (children.length === 0) return;
 
-  const prevAlign = ctx.parentAlign;
-  ctx.parentAlign = align;
+  withParentAlign(ctx, align, () => {
+    const totalGap = gap * (columns - 1);
+    const colWidth = (box.w - totalGap) / columns;
+    const rows = Math.ceil(children.length / columns);
+    const rowGap = gap;
+    const totalRowGap = rowGap * (rows - 1);
+    const rowHeight = (box.h - totalRowGap) / rows;
 
-  const totalGap = gap * (columns - 1);
-  const colWidth = (box.w - totalGap) / columns;
-  const rows = Math.ceil(children.length / columns);
-  const rowGap = gap;
-  const totalRowGap = rowGap * (rows - 1);
-  const rowHeight = (box.h - totalRowGap) / rows;
+    for (let i = 0; i < children.length; i++) {
+      const col = i % columns;
+      const row = Math.floor(i / columns);
+      const child = children[i]!;
 
-  for (let i = 0; i < children.length; i++) {
-    const col = i % columns;
-    const row = Math.floor(i / columns);
-    const child = children[i]!;
-
-    resolveNode(
-      child,
-      {
-        x: box.x + col * (colWidth + gap),
-        y: box.y + row * (rowHeight + rowGap),
-        w: colWidth,
-        h: rowHeight,
-      },
-      ctx,
-    );
-  }
-
-  ctx.parentAlign = prevAlign;
+      resolveNode(
+        child,
+        {
+          x: box.x + col * (colWidth + gap),
+          y: box.y + row * (rowHeight + rowGap),
+          w: colWidth,
+          h: rowHeight,
+        },
+        ctx,
+      );
+    }
+  });
 }
 
-function resolveSplit(node: LayoutNode, box: BoundingBox, ctx: ResolveContext): void {
+function resolveSplit(node: LayoutNode, box: LayoutBox, ctx: ResolveContext): void {
   const ratio = node.ratio ?? '1:1';
   const gap = GAP_PX[node.gap ?? 'normal'];
   const align = node.align ?? 'start';
   const children = node.children;
-
-  const prevAlign = ctx.parentAlign;
-  ctx.parentAlign = align;
-
-  if (children.length === 0) {
-    ctx.parentAlign = prevAlign;
-    return;
-  }
+  if (children.length === 0) return;
   if (children.length !== 2) {
-    ctx.parentAlign = prevAlign;
     throw new Error(`split layout requires exactly 2 children (got ${String(children.length)})`);
   }
 
-  const [leftRatio, rightRatio] = parseSplitRatio(ratio);
-  const totalRatio = leftRatio + rightRatio;
-  const availableWidth = box.w - gap;
-  const leftWidth = (availableWidth * leftRatio) / totalRatio;
-  const rightWidth = (availableWidth * rightRatio) / totalRatio;
+  withParentAlign(ctx, align, () => {
+    const [leftRatio, rightRatio] = parseSplitRatio(ratio);
+    const totalRatio = leftRatio + rightRatio;
+    const availableWidth = box.w - gap;
+    const leftWidth = (availableWidth * leftRatio) / totalRatio;
+    const rightWidth = (availableWidth * rightRatio) / totalRatio;
 
-  resolveNode(children[0]!, { x: box.x, y: box.y, w: leftWidth, h: box.h }, ctx);
-  resolveNode(children[1]!, { x: box.x + leftWidth + gap, y: box.y, w: rightWidth, h: box.h }, ctx);
-
-  ctx.parentAlign = prevAlign;
+    resolveNode(children[0]!, { x: box.x, y: box.y, w: leftWidth, h: box.h }, ctx);
+    resolveNode(
+      children[1]!,
+      { x: box.x + leftWidth + gap, y: box.y, w: rightWidth, h: box.h },
+      ctx,
+    );
+  });
 }
 
 function parseSplitRatio(ratio: SplitRatio): [number, number] {
@@ -567,7 +578,7 @@ export function resolveDesignSection(
     parentAlign: 'start',
   };
 
-  const rootBox: BoundingBox = {
+  const rootBox: LayoutBox = {
     x: ROOT_PADDING,
     y: ROOT_PADDING,
     w: pageWidth - ROOT_PADDING * 2,
@@ -576,6 +587,13 @@ export function resolveDesignSection(
 
   resolveNode(input.layout, rootBox, ctx);
 
+  // Section-bounds clamp. This is the documented contract — not a silent
+  // error-masking fallback — for content-overflow scenarios: hug-children
+  // whose intrinsic size exceeds the section height legitimately need their
+  // last element clipped to the section box. Validate output (boundary smoke
+  // case 14) depends on this behaviour. A genuine resolver bug would still
+  // surface as a visibly truncated element in the editor, not as silently
+  // corrupted layout data.
   for (const el of ctx.elements) {
     el.box.x = clamp(el.box.x, 0, pageWidth - 1);
     el.box.y = clamp(el.box.y, 0, height - 1);
