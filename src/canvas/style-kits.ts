@@ -695,20 +695,25 @@ function buildMotionBlock(kitName: string): string {
   const rules: string[] = [];
   for (const p of MOTION_PRESETS) {
     if (p === 'none') continue;
-    if (p === 'stagger-children') continue;
     if (p === 'bounce-in') continue;
+    if (p === 'stagger-children') continue;
     if (p === 'slow-drift') continue;
+    if (p === 'parallax-soft') continue;
     rules.push(entranceRule(p));
   }
+  // Emit the four trailing presets in canonical schema order
+  // (bounce-in, stagger-children, slow-drift, parallax-soft) so the CSS
+  // cascade matches `MOTION_PRESETS` exactly.
   rules.push(
     `[data-style-kit=${sk}] [data-motion-preset="bounce-in"] {\n  animation: ${ns}-bounce-in ${dur} ${eas} both;\n  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);\n}`,
   );
   rules.push(
-    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: ${ns}-slow-drift calc(${dur} * 4) ease-in-out infinite;\n}`,
-  );
-  rules.push(
     `[data-style-kit=${sk}] [data-motion-preset="stagger-children"] {\n  animation: ${ns}-fade-up ${dur} ${eas} both;\n}`,
   );
+  rules.push(
+    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: ${ns}-slow-drift calc(${dur} * 4) ease-in-out infinite;\n}`,
+  );
+  rules.push(entranceRule('parallax-soft'));
   return rules.join('\n');
 }
 
@@ -727,8 +732,8 @@ function buildTextRules(kitName: string): string {
 function buildKitBlock(kitName: string, preset: StyleKitPreset): string {
   const parts: string[] = [
     buildKitTokenBlock(kitName, preset),
-    buildTextRules(kitName),
     buildShapeBlock(kitName, preset),
+    buildTextRules(kitName),
   ];
   for (const variant of ACTION_VARIANTS) {
     const block = buildActionVariantBlock(kitName, variant, preset.actionVariants[variant]);
