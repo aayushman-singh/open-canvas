@@ -2,7 +2,9 @@
 
 **Date:** 2026-05-28
 **Status:** Approved
-**Codebase facts verified against:** `src/canvas/elements/collection.ts`, `src/canvas/validate.ts`, `src/canvas/yjs-projection.ts`, `src/editor/canvas-client.ts`, `src/editor/canvas-index.tsx`.
+**Codebase facts verified against:** `src/canvas/elements/collection.ts`, `src/canvas/validate.ts`, `src/canvas/yjs-projection.ts`, `src/editor/canvas-client.ts`, `src/editor/route.tsx`.
+
+**Anchor note:** Cited line numbers may drift slightly; the durable anchors are the named symbols (`findElement`, `addComponentFromSidebar`, the inspector dispatch object). The file `route.tsx` was formerly named `canvas-index.tsx` — all references updated. `validate.ts` was refactored after this spec was first authored (extract `assertOneOf` + `validateInjectionSafeString`); re-verify the cited collection-validation region by symbol at implementation.
 
 ## WHY
 
@@ -11,7 +13,7 @@ Collection is the 15th element type in the canvas schema. Its renderer exists ([
 Two truths surfaced while reading the code:
 
 1. **The renderer uses `entries` and `layout` to lay out children, and emits `mode` as a `data-collection-mode` attribute on the wrapper.** It does not read `filter`, `sort`, `cardTemplate`, or `fieldBindings`. Those fields are validated by `src/canvas/validate.ts` and round-tripped by yjs-projection but no materializer code populates `entries` from page metadata. So `mode: 'page-bound'` is currently a silent no-op — picking it would let the owner save config that never renders.
-2. **`findElement()` does not recurse into Collection.** Existing click-to-inspect is broken for nested children: clicking a text inside a Collection entry walks past `[data-rev01-element]`, looks up the id in the flat top-level elements list ([canvas-client.ts:1128-1148](src/editor/canvas-client.ts#L1128-L1148)), misses, and silently hides the inspector.
+2. **`findElement()` does not recurse into Collection.** Existing click-to-inspect is broken for nested children: clicking a text inside a Collection entry walks past `[data-rev01-element]`, looks up the id in the flat top-level elements list ([canvas-client.ts:1127 (`findElement`)](src/editor/canvas-client.ts#L1128-L1148)), misses, and silently hides the inspector.
 
 This spec ships a manual-only Collection UI and fixes the click-through path. Page-bound mode and its associated config UI are explicitly deferred until a materializer exists.
 
@@ -38,7 +40,7 @@ This spec ships a manual-only Collection UI and fixes the click-through path. Pa
 
 ## Hard Constraints
 
-- Must not break existing inspectors (13-element dispatch at canvas-client.ts:4195-4209 must still resolve correctly).
+- Must not break existing inspectors (13-element dispatch at canvas-client.ts:4219-4231 must still resolve correctly).
 - Must not break the existing flat-element click path — recursion into Collection is appended after the flat search misses.
 - All cloned children must have globally-unique ids — no reuse of existing element ids.
 - Schema (`src/canvas/elements/collection.ts`, `src/canvas/validate.ts`) is not modified.
@@ -50,7 +52,7 @@ This spec ships a manual-only Collection UI and fixes the click-through path. Pa
 
 ### 1.1 Add panel button
 
-Insert as the 15th button in `canvas-index.tsx` inside `<div class="rev01-sidebar-command-grid">` after the existing 14th button (around line 337):
+Insert as the 15th button in `route.tsx` inside `<div class="rev01-sidebar-command-grid">` after the existing 14th button (around line 337):
 
 ```jsx
 <button
@@ -63,7 +65,7 @@ Insert as the 15th button in `canvas-index.tsx` inside `<div class="rev01-sideba
 </button>
 ```
 
-The existing `[data-sidebar-add-component]` delegated listener at canvas-client.ts:8315-8322 calls `addComponentFromSidebar(component)`. No new wiring required at that layer.
+The existing `[data-sidebar-add-component]` delegated listener at canvas-client.ts:8339-8344 calls `addComponentFromSidebar(component)`. No new wiring required at that layer.
 
 ### 1.2 Factory branch
 
@@ -97,7 +99,7 @@ The seed entry guarantees the canvas shows a real, clickable text element immedi
 
 ### 2.1 Extended lookup
 
-Modify `findElement(elementId)` at canvas-client.ts:1128-1148. After the existing flat search misses, walk each section's top-level elements for Collection, then walk each Collection's `entries[][]`:
+Modify `findElement(elementId)` at canvas-client.ts:1127 (`findElement`). After the existing flat search misses, walk each section's top-level elements for Collection, then walk each Collection's `entries[][]`:
 
 ```js
 function searchInCollection(collectionEl, section) {
@@ -135,7 +137,7 @@ The selection-outline writer (canvas-client.ts:5439) uses `[data-rev01-element="
 
 ### 3.1 Register the builder
 
-Add `collection: buildCollectionInspector` to the dispatch object at canvas-client.ts:4195-4209.
+Add `collection: buildCollectionInspector` to the dispatch object at canvas-client.ts:4219-4231.
 
 ### 3.2 `buildCollectionInspector(element)`
 

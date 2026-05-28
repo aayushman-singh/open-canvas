@@ -4,6 +4,8 @@
 **Status:** Approved
 **Codebase facts verified against:** `src/routes/dashboard/templates.tsx`, `src/routes/api/custom-templates.ts`, `src/editor/canvas-client.ts`, `src/canvas/page-routing.ts`, `src/canvas/elements/render-utils.ts` (sanitizer reference).
 
+**Anchor note:** Cited line numbers in `canvas-client.ts` may drift slightly; durable anchors: `updatePageSidebar`, `renamePage`, `window.__rev01Modal`. `CUSTOM_404_PAGE_SLUG` at `page-routing.ts:10` is verified current. `CustomTemplateTile` location in `templates.tsx` should be re-located by name if needed.
+
 ## WHY
 
 Two unrelated but small UI gaps, bundled into one spec to avoid two near-empty design documents:
@@ -42,7 +44,7 @@ Two unrelated but small UI gaps, bundled into one spec to avoid two near-empty d
 - `page.slug` remains the single source of truth for "is this page the 404." No parallel `is404` boolean.
 - Sanitizer behavior in `renamePage` is unchanged; only the call site adds a guard to skip slug rewrite when `page.slug === '_404'`.
 - Personal-template Delete UI never renders for community templates.
-- The 404 toggle reuses `window.__rev01Modal.confirm` (defined at canvas-client.ts:873, available in the editor context).
+- The 404 toggle reuses `window.__rev01Modal.confirm` (defined at canvas-client.ts:871 (`window.__rev01Modal`), available in the editor context).
 
 ---
 
@@ -150,7 +152,7 @@ No new server work.
 
 ### 2.1 New 404 toggle in the page sidebar
 
-Modify `updatePageSidebar` at [canvas-client.ts:953-1004](src/editor/canvas-client.ts#L953-L1004). Insert a button after the SEO link and before the Del button:
+Modify `updatePageSidebar` at [canvas-client.ts:952 (`updatePageSidebar`)](src/editor/canvas-client.ts#L953-L1004). Insert a button after the SEO link and before the Del button:
 
 ```js
 var is404 = page.slug === '_404';
@@ -243,7 +245,7 @@ async function toggle404Page(pageId) {
 
 ### 2.3 Rename gate — preserve `_404`
 
-Modify `renamePage` at canvas-client.ts:1034-1058. Currently:
+Modify `renamePage` at canvas-client.ts:`renamePage` (~1034). Currently:
 
 ```js
 // derive newSlug from newTitle ...
@@ -307,7 +309,7 @@ If `src/routes/public-404.smoke.ts` exists, ensure it still passes; this work do
 | `window.__rev01Modal` may not be available on the templates dashboard page (it's defined in canvas-client.ts which loads in the editor only). | The delete handler falls back to `window.confirm`. Acceptable for the dashboard. If a project-wide modal helper exists in the dashboard shell, prefer it; otherwise the native confirm is honest enough. |
 | Deleting a personal template that's selected as the active radio leaves the form in an inconsistent state. | v1 punts: the tile removes itself; owner picks another. A second-tab race condition is out of scope. |
 | The 404 toggle button is rendered inside an already-narrow actions span next to Rename / SEO / Del. | Text "404" is the narrowest reasonable label. CSS `font-size: 11px` keeps it compact. On extremely narrow viewports the actions wrap; acceptable. |
-| Conflict modal uses `__rev01Modal.confirm`; in the editor this is always loaded (canvas-client.ts:873). | No mitigation — verified call site is editor-only. |
+| Conflict modal uses `__rev01Modal.confirm`; in the editor this is always loaded (canvas-client.ts:871 (`window.__rev01Modal`)). | No mitigation — verified call site is editor-only. |
 | `renamePage` gate preserves `_404` when the page is renamed. If an owner expects rename to also clear the 404 status, they may be surprised. | Documented behavior. The status text after rename always shows the new title; if the slug stayed `_404` the displayed slug span shows `/_404`, so it's visible. |
 | Owner deletes their normal "Home" page while a `_404` page exists; `resolvePrimaryPage` then throws on publish. | Existing gate `if (state.pages.length > 1)` allows delete in this scenario. The renderer's loud failure is the right behavior — publish surfaces the error rather than serving a 404-only site. Out of scope to also gate Delete by "is this the only non-404 page". File as follow-up if owners report. |
 | Sanitizer-derived demoted slug may collide with another page's slug, leading to the `-2` suffix appearing without warning. | The numeric suffix is the standard collision resolution already used by `renamePage`. Documented. Owner can rename later if they dislike the suffix. |

@@ -4,6 +4,8 @@
 **Status:** Approved
 **Codebase facts verified against:** `src/i18n/rtl-rules.ts`, `src/i18n/mirror.ts`, `src/i18n/render-hook.ts`, `src/i18n/locale-resolve.ts`, `src/canvas/schema.ts`, `src/seo/meta-emit.ts`, `src/routes/public.ts`, `src/routes/dashboard/page-settings.tsx`, `src/routes/dashboard/site-settings.tsx`, `src/routes/api/canvas.ts`, `src/editor/canvas-client.ts`.
 
+**Anchor note:** Cited line numbers in `canvas-client.ts` may drift; durable anchors are `createZoomToolbar`, the `data-mode-action` dispatch, and the `page.scrollTriggerMode` picker inside `renderPageInspector`. `meta-emit.ts` and `render-hook.ts` have shifted slightly since first author; re-locate `resolveLang` and `prepareRender` by name. PATCH route surface in `src/routes/api/canvas.ts` was moved into `ownerApi` sub-app by commit 5666057 — verify route mount at implementation.
+
 ## WHY
 
 Three gaps interlock:
@@ -189,7 +191,7 @@ Extend the toolbar in `canvas-client.ts:365-403`. Insert after the Pan mode butt
 }
 ```
 
-The existing `data-mode-action` switch (lines 404-407) gains an `rtl` case.
+The existing `data-mode-action` switch (lines 402-411) gains an `rtl` case.
 
 ### 4.2 Apply mirror on render
 

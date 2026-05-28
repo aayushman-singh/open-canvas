@@ -4,11 +4,13 @@
 **Status:** Approved
 **Codebase facts verified against:** `src/canvas/schema.ts`, `src/canvas/render.ts`, `src/editor/canvas-client.ts`, `src/interactive/popup.ts`, `src/interactive/inject.ts`.
 
+**Anchor note:** Cited line numbers in `canvas-client.ts` may drift slightly; durable anchors: `renderSectionInspector`, `isPinnedSection`, `replayAnimations`, `buildCarouselInspector` (asset-picker pattern reference), `field`, `selectInput`. Schema and renderer citations in `schema.ts` (lines 80 / 149 / 331 / 334) and `render.ts:202-227` are still valid as of this revision.
+
 ## WHY
 
-`renderSectionInspector` at [canvas-client.ts:3811-3871](src/editor/canvas-client.ts#L3811-L3871) currently exposes only section name and five action buttons (Duplicate / Move up / Move down / Save to library / Delete) plus Generate-with-AI. The schema's `CanvasSection` interface ([schema.ts:334-345](src/canvas/schema.ts#L334-L345)) defines five additional fields that the public renderer actively consumes — but no editor UI sets them:
+`renderSectionInspector` at [canvas-client.ts:3834 (`renderSectionInspector`)](src/editor/canvas-client.ts#L3811-L3871) currently exposes only section name and five action buttons (Duplicate / Move up / Move down / Save to library / Delete) plus Generate-with-AI. The schema's `CanvasSection` interface ([schema.ts:334-345](src/canvas/schema.ts#L334-L345)) defines five additional fields that the public renderer actively consumes — but no editor UI sets them:
 
-1. **`role` (`'header' | 'footer' | 'body'`)** — read at [render.ts:220](src/canvas/render.ts#L220) into `data-section-role` and at [canvas-client.ts:2140-2154](src/editor/canvas-client.ts#L2140-L2154) into `isPinnedSection`. Today the only thing that sets it is template seeds or AI generation; owners cannot toggle.
+1. **`role` (`'header' | 'footer' | 'body'`)** — read at [render.ts:220](src/canvas/render.ts#L220) into `data-section-role` and at [canvas-client.ts:2145 (`isPinnedSection`)](src/editor/canvas-client.ts#L2140-L2154) into `isPinnedSection`. Today the only thing that sets it is template seeds or AI generation; owners cannot toggle.
 
 2. **`backgroundEffect` (`BackgroundEffect` enum)** — read at [render.ts:204, 227](src/canvas/render.ts#L204) into `data-bg-effect` for CSS hooks. Six values (`none / grain / grid / soft-light / paper / glass`).
 
@@ -67,7 +69,7 @@ This spec adds picker UI for each of the five fields, with conflict prevention f
 
 Action buttons (Duplicate / Move up / Move down / Save to library / Delete / Generate with AI) stay at the bottom.
 
-The existing `rev01-section-inspector-grid` class continues to wrap the action buttons. The new fields use the `field(label, input)` helper at [canvas-client.ts:2335-2343](src/editor/canvas-client.ts#L2335-L2343) (the same one used by element inspectors) so the styling is consistent.
+The existing `rev01-section-inspector-grid` class continues to wrap the action buttons. The new fields use the `field(label, input)` helper at [canvas-client.ts:2340 (`field`)](src/editor/canvas-client.ts#L2335-L2343) (the same one used by element inspectors) so the styling is consistent.
 
 ## 2. Role Picker With Conflict Prevention
 
@@ -163,7 +165,7 @@ Same shape as background effect: delete for `"none"`, set otherwise, rebuild, sa
 
 ### 4.3 Replay handler
 
-Extend the existing `replayAnimations(scope)` at [canvas-client.ts:3874-3895](src/editor/canvas-client.ts#L3874-L3895) to accept a section id. New branch:
+Extend the existing `replayAnimations(scope)` at [canvas-client.ts:3897 (`replayAnimations`)](src/editor/canvas-client.ts#L3874-L3895) to accept a section id. New branch:
 
 ```js
 } else {
@@ -185,7 +187,7 @@ Extend the existing `replayAnimations(scope)` at [canvas-client.ts:3874-3895](sr
 
 ### 5.1 DOM
 
-Mirrors carousel slide upload at [canvas-client.ts:3397-3426](src/editor/canvas-client.ts#L3397-L3426):
+Mirrors carousel slide upload at [canvas-client.ts:3406 (`buildCarouselInspector` — asset picker pattern)](src/editor/canvas-client.ts#L3397-L3426):
 
 ```js
 var thumbWrap = document.createElement("div");

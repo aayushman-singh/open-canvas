@@ -4,6 +4,8 @@
 **Status:** Approved
 **BUTTONS.md gaps closed:** §25 (undo/redo keyboard-only), §26 (visitor dark-mode preview missing in editor)
 
+**Anchor note:** Cited line numbers in `canvas-client.ts` and `route.tsx` are durable to a few-line drift; if a citation looks off at implementation time, re-locate by the named symbol (e.g. `captureForUndo`, `window.__rev01Modal`, `createZoomToolbar`). The file `route.tsx` was formerly named `canvas-index.tsx` — all references updated.
+
 ## WHY
 
 Two editor capabilities exist in code but cannot be reached by mouse:
@@ -48,7 +50,7 @@ Both gaps are pure UI work. Backend, schema, and runtime state are already in pl
 ### 1.1 Undo button
 
 - DOM: `<button id="canvas-undo" type="button" class="rev01-header-tool" aria-label="Undo" title="Undo (Ctrl+Z)">↶</button>`
-- Lives in the top header (`canvas-index.tsx:147-184`), inserted right after `{breadcrumbs}` (line 148). Reads as part of the document-action cluster, before the address bar.
+- Lives in the top header (`route.tsx:147-184`), inserted right after `{breadcrumbs}` (line 148). Reads as part of the document-action cluster, before the address bar.
 
 ### 1.2 Redo button
 

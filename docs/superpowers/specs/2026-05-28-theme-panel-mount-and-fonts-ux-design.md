@@ -2,7 +2,9 @@
 
 **Date:** 2026-05-28
 **Status:** Approved
-**Codebase facts verified against:** `src/themes/panel.tsx`, `src/themes/route.ts`, `src/fonts/route.ts`, `src/fonts/face-emit.ts`, `src/fonts/resolve.ts`, `src/fonts/upload.ts`, `src/fonts/validate.ts`, `src/editor/canvas-index.tsx`, `src/editor/canvas-client.ts`, `src/index.ts`.
+**Codebase facts verified against:** `src/themes/panel.tsx`, `src/themes/route.ts`, `src/fonts/route.ts`, `src/fonts/face-emit.ts`, `src/fonts/resolve.ts`, `src/fonts/upload.ts`, `src/fonts/validate.ts`, `src/editor/route.tsx`, `src/editor/canvas-client.ts`, `src/index.ts`.
+
+**Anchor note:** Cited line numbers in `panel.tsx` may drift — that file has uncommitted modifications. Durable anchors: `CustomFontsSection`, `customFontsClientScript`, `[data-rev01-custom-fonts]`, `window.__rev01Modal`. The file `route.tsx` was formerly named `canvas-index.tsx` — all references updated.
 
 ## WHY
 
@@ -36,7 +38,7 @@ This spec mounts the existing panel as a 4th editor sidebar tab and layers two U
 - No keyboard shortcut for switching sidebar tabs.
 - No persistence of which tab was last active across reloads.
 - No bulk upload — single-file form per upload (matches the existing API).
-- No changes to the API surface or to `src/themes/panel.tsx`'s server-rendered JSX. Edits are confined to the client script inside `CustomFontsSection` and to `canvas-index.tsx` for mount + styles.
+- No changes to the API surface or to `src/themes/panel.tsx`'s server-rendered JSX. Edits are confined to the client script inside `CustomFontsSection` and to `route.tsx` for mount + styles.
 
 ## Hard Constraints
 
@@ -44,7 +46,7 @@ This spec mounts the existing panel as a 4th editor sidebar tab and layers two U
 - `ThemePanel`'s server JSX is not modified — additive changes only.
 - `THEME_PANEL_STYLES` is emitted once on the editor page and is scoped under `[data-rev01-theme-panel]`; no editor-chrome selectors are touched.
 - The existing tab dispatch at `canvas-client.ts:7999-8022` handles arbitrary `data-sidebar-tab` values; no new dispatch code is added.
-- The new fonts-UX logic depends on `window.__rev01Modal` (defined at `canvas-client.ts:873`), which is always loaded on the editor page.
+- The new fonts-UX logic depends on `window.__rev01Modal` (defined at `canvas-client.ts:871 (`window.__rev01Modal`)`), which is always loaded on the editor page.
 - Smart-detect never overwrites a field the owner has already typed.
 
 ---
@@ -53,7 +55,7 @@ This spec mounts the existing panel as a 4th editor sidebar tab and layers two U
 
 ### 1.1 New sidebar tab
 
-In `canvas-index.tsx:187-204`, append a 4th tab button to `<div class="rev01-sidebar-tabs">`:
+In `route.tsx:187-204`, append a 4th tab button to `<div class="rev01-sidebar-tabs">`:
 
 ```jsx
 <button
@@ -91,10 +93,10 @@ Append a sibling panel next to the existing `add` / `sections` / `pages` panels:
 
 ### 1.3 State threading
 
-`canvas-index.tsx` already receives `styleKit` as a prop. Two additions:
+`route.tsx` already receives `styleKit` as a prop. Two additions:
 
 - `activeStyleKit: StyleKit` — direct from `state.styleKit`.
-- `activePreset: StyleKitPreset` — resolved by the route handler that renders `canvas-index.tsx`:
+- `activePreset: StyleKitPreset` — resolved by the route handler that renders `route.tsx`:
   - When `state.styleKit === 'custom'`, use `state.customStyleKit`.
   - Otherwise, look up the preset in `BUILT_IN_STYLE_KITS` (already exported from `src/canvas/schema.ts`).
 
@@ -102,7 +104,7 @@ The route caller does the resolution and passes both. The exact call site is one
 
 ### 1.4 Panel styles injection
 
-In `canvas-index.tsx`'s `<head>`, alongside existing styles, emit:
+In `route.tsx`'s `<head>`, alongside existing styles, emit:
 
 ```jsx
 <style>{raw(THEME_PANEL_STYLES)}</style>
