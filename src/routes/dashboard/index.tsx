@@ -703,6 +703,7 @@ const importScript = raw(`<script>
 
   var closeBtn = document.getElementById('import-close');
 
+  if (openBtn.hasAttribute('disabled')) return;
   openBtn.addEventListener('click', openModal);
   cancelBtn.addEventListener('click', closeModal);
   closeBtn.addEventListener('click', closeModal);
@@ -1107,7 +1108,7 @@ dashboard.get('/', async (c) => {
       <div class="dash-header">
         <h1>Your sites</h1>
         <div class="dash-header-actions">
-          <Button variant="secondary" class="import-site" id="import-btn">Import</Button>
+          <Button variant="secondary" class="import-site" id="import-btn" disabled title="Site import is disabled in the public POC. Run the scraper locally to enable.">Import</Button>
           {atSiteLimit
             ? <Button variant="primary" class="new-site" href="/dashboard/settings">Upgrade to add sites</Button>
             : <Button variant="primary" class="new-site" href="/dashboard/templates">+ New site</Button>
@@ -1223,7 +1224,7 @@ dashboard.get('/', async (c) => {
             <p>Build your first client site in minutes. Pick a template, customize with the canvas editor, and publish to a live URL.</p>
             <div class="dash-welcome-actions">
               <Button variant="primary" href="/dashboard/templates">Pick a template</Button>
-              <Button variant="secondary" class="import-site" id="import-btn">Import existing site</Button>
+              <Button variant="secondary" class="import-site" id="import-btn" disabled title="Site import is disabled in the public POC. Run the scraper locally to enable.">Import existing site</Button>
             </div>
           </div>
           <div class="dash-quick">
