@@ -1,6 +1,6 @@
 // src/editor/canvas-client.ts
 //
-// Browser-side bootstrap for the desktop Canvas Editor (T4). Exported as a
+// Browser-side bootstrap for the desktop Canvas Editor. Exported as a
 // function that returns a string of inlined JavaScript so the editor route
 // can embed it in the page via raw(). The script:
 //
@@ -15,6 +15,11 @@
 // params.siteId, which the route validates against /^[A-Za-z0-9-]+$/ before
 // calling this function — see the throw in canvasClientScript. Everything
 // inside the literal is plain JavaScript, not TypeScript.
+//
+// Maintenance note: escape sequences are interpreted once by this TypeScript
+// template literal and then again by the generated browser script. Run
+// `bun run review:smoke` after editing string-heavy code here; that smoke
+// imports the emitted client as JavaScript and catches broken escaping.
 
 export interface CanvasClientScriptParams {
   siteId: string;
@@ -569,7 +574,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // -- Modal overlay (text + select) -------------------------------------
-  // Replaces the five window.prompt sites. Single-modal stack — calling
+  // Single-modal stack: calling
   // openTextModal/openSelectModal while another is open throws loud so we
   // don't silently hide one behind another. Escape and backdrop click
   // resolve to null; Enter submits single-line; Ctrl/Cmd+Enter submits
@@ -1462,7 +1467,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
-  // -- Wave 2 #11 chart editor extensibility slot ------------------------
+  // -- Chart editor preview ----------------------------------------------
   //
   // The editor preview renders an inline approximation of the server SVG
   // so the Owner sees colour bands + a kind hint while typing into the
@@ -1867,7 +1872,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       case "table": return buildTableBody(element);
       case "nav": return buildNavBody(element);
       case "collection": return buildCollectionBody(element);
-      // Wave 3 #14 — symbol-instance editor placeholder. Renders a card that
+      // Symbol-instance editor placeholder. Renders a card that
       // identifies the referenced master by name + lists override count. The
       // public renderer does the real merge + render at publish/preview time;
       // the editor surface is intentionally minimal because instances should
@@ -2387,7 +2392,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return group;
   }
 
-  // -- Wave 2 #11 chart editor data grid ---------------------------------
+  // -- Chart editor data grid --------------------------------------------
   //
   // Renders directly into the inspector. Re-renders the whole chart block
   // on every structural change (add/remove series or category) so we don't
@@ -3119,6 +3124,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!Array.isArray(element.items)) element.items = [];
     var itemListHost = document.createElement("div");
 
+    // Accordion item bodies are stored as InlineRun[] but edited in a compact
+    // inspector control. Render the saved runs as escaped HTML; only the small
+    // mark allowlist below is converted back into tags.
     function runsToHtml(runs) {
       var out = "";
       for (var ri = 0; ri < runs.length; ri++) {
@@ -7044,7 +7052,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (component === "action") return "add-action";
     if (component === "shape") return "add-shape";
     if (component === "container") return "add-container";
-    // Wave 2 #11 — sidebar entry for chart elements.
     if (component === "chart") return "add-chart";
     if (component === "form") return "add-form";
     if (component === "embed") return "add-embed";
@@ -7163,9 +7170,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         box: defaultBox(section, 480, 320),
       });
     } else if (action === "add-chart") {
-      // Wave 2 #11 — additive chart element creation. Default to a small
-      // bar chart with two series across three categories so the Owner has
-      // something to edit in the data grid the moment they click +Chart.
+      // Default to a small bar chart with two series across three categories
+      // so the Owner has something to edit in the data grid immediately.
       addElementToSection(section, {
         id: newElementId(),
         type: "chart",
@@ -7308,13 +7314,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     } else if (action === "save-to-library") {
       void saveToLibrary(section);
     } else if (action === "convert-to-symbol") {
-      // Wave 3 #14 — "Convert to Symbol": lift the section into a new
-      // SymbolMaster on the site, then replace its slot with a symbol-instance
-      // element wrapped in a new host section.
+      // Convert to Symbol: lift the section into a new SymbolMaster on the
+      // site, then replace its slot with a symbol-instance element wrapped in
+      // a new host section.
       void convertSectionToSymbol(section, idx, page);
     } else if (action === "detach-instance") {
-      // Wave 3 #14 — "Detach": inline the master + overrides into the host
-      // section, removing the symbol-instance reference.
+      // Detach: inline the master + overrides into the host section, removing
+      // the symbol-instance reference.
       void detachInstanceInSection(section, idx, page);
     }
   }
@@ -7588,8 +7594,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Sections picker (cross-template catalog) --------------------------
   // sectionsCatalog: null = unloaded; [] = loaded-empty; [...] = loaded.
-  // pendingImport stays null until the Owner clicks "Use" on a card —
-  // Task 6 will read it to render drop slots on the canvas.
+  // pendingImport stays null until the Owner clicks "Use" on a card; the
+  // canvas renderer reads it to show drop slots.
   let sectionsCatalog = null;
   let pendingImport = null;
   let activeTemplateFilter = 'all';
@@ -8152,7 +8158,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     window.addEventListener("blur", endTemporaryPan);
   }
 
-  // -- Wave 3 #14 — Symbols (masters + instances + override UX) ----------
+  // -- Symbols (masters + instances + override UX) -----------------------
   //
   // The server-side authoritative store is CanvasSiteState.symbols plus the
   // 'symbol-instance' element type. This editor surface is additive: it adds
@@ -8162,9 +8168,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //
   // All persistence flows through the same PUT /api/canvas/sites/:siteId path
   // the rest of the editor uses — we do NOT call the symbol HTTP router from
-  // here for the POC because the pure functions on the canvas state are
-  // simpler to drive. The HTTP router exists for cross-process consumers
-  // (Wave 4 #16 nav) and standalone agent flows.
+  // here because the pure functions on the canvas state are simpler to drive.
+  // The HTTP router exists for cross-process consumers and standalone agent
+  // flows.
   //
   // ----------------------------------------------------------------------
 
@@ -8341,7 +8347,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       return;
     }
 
-    // Mirror src/symbols/merge.ts MERGE PRECEDENCE rule (Wave 3 contract).
+    // Mirror src/symbols/merge.ts merge precedence.
     // Deep-clone master, then apply each override via Object.assign on the
     // matching inner element. Strip 'type'/'id' from overrides defensively.
     const detached = deepCloneCanvas(master.section);
@@ -8893,10 +8899,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           if (viewport) viewport.classList.toggle("sidebar-collapsed", collapsed);
         });
       }
-      // Wave 3 #14 — inject the "Components" tab dynamically because the
-      // canvas-index.tsx shell is frozen for this wave. The tab + panel
-      // mount immediately so the Owner can click into it; the panel's
-      // contents render lazily on first activation.
+      // Inject tabs dynamically so the static canvas shell can stay focused
+      // on layout. The tab + panel mount immediately; contents render lazily
+      // on first activation.
       ensureSymbolsTabMounted();
       ensureVersionsTabMounted();
       attachSidebarActions();

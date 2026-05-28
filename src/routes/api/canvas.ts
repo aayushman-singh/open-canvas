@@ -102,6 +102,14 @@ async function persistEditableState(
   return null;
 }
 
+/**
+ * Resolve site access for canvas API routes and preserve the Owner customer id.
+ *
+ * Collaborators can read or edit according to `requiredRole`, but DB writes
+ * still target the Owner's `site.customerId`. Keeping that distinction local
+ * prevents privilege escalation bugs where a collaborator's customer id is
+ * accidentally used as the site owner.
+ */
 async function loadCanvasSiteAccess(
   c: Context<Env>,
   siteId: string,

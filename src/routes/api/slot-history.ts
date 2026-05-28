@@ -1,8 +1,11 @@
 // src/routes/api/slot-history.ts
 //
-// Slot History endpoints — per-MediaElement MRU record of every Owner Asset
-// ever applied to that element. Editor-only (never read by visitors).
-// See ADR 0004 decision 4 and the Slot History entry in CONTEXT.md.
+// Slot History endpoints: per-MediaElement MRU record of every Owner Asset
+// ever applied to that element. Editor-only; visitors never read this data.
+//
+// Reads join back to owner_asset and filter by the current Owner. That keeps
+// stale or maliciously inserted rows from exposing another Owner's asset
+// metadata through the editor history UI.
 
 import { Hono } from 'hono';
 import { and, desc, eq } from 'drizzle-orm';

@@ -8,16 +8,17 @@
 // `env.WEBHOOK_SIGNING_SECRET`; receivers verify the signature to confirm the
 // request came from rev01.
 //
-// Project-policy notes:
-//   - The webhook is fire-and-forget from the request handler's perspective —
-//     the submit response does NOT wait for the webhook before answering the
-//     Visitor. But "fire-and-forget" is NOT "don't bother knowing the
-//     outcome": every delivery is logged loud, success or failure, with the
-//     URL + status + duration. A silent fallback (e.g. "retry queue") is
-//     out of scope; the user gets the loud-log audit trail and the dashboard
-//     inbox is the source of truth for the submission itself.
-//   - A 5-second timeout caps the in-flight outbound call so a hostile
-//     webhook URL can't pin a Worker invocation forever.
+// Operational contract:
+//   - The submit handler awaits delivery so failures are observable in the
+//     same execution path. Every success or failure is logged with URL, status,
+//     duration, and transport details.
+//   - Delivery failure does not delete or mutate the stored submission; the
+//     dashboard inbox remains the source of truth for captured form data.
+//   - URL validation rejects credentials, non-http(s) schemes, and obvious
+//     loopback/private literal hosts before fetch. This is an SSRF guardrail;
+//     it is intentionally explicit instead of silently rewriting destinations.
+//   - A 5-second timeout caps the outbound call so a hostile webhook URL cannot
+//     pin a Worker invocation forever.
 
 const SIGNATURE_HEADER = 'X-Rev01-Signature';
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -223,6 +224,9 @@ function describeUrl(value: string): string {
 }
 
 function blockedWebhookHost(hostname: string): string | null {
+  // Reject literal loopback/private/reserved hosts before making the outbound
+  // request. DNS rebinding protection would need resolver-level checks; this
+  // helper covers the cases visible from the configured URL itself.
   const host = hostname.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
   if (host === 'localhost' || host.endsWith('.localhost')) return host;
   if (isBlockedIpv4Host(host)) return host;

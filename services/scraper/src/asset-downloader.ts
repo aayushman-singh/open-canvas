@@ -177,6 +177,8 @@ async function fetchPublicUrl(
       Referer: sourceUrl,
     },
   });
+  // Re-check the final response URL because Fetch implementations may expose
+  // a resolved URL even when redirects are handled manually.
   await assertPublicHttpUrl(response.url || url);
 
   if (response.status >= 300 && response.status < 400) {

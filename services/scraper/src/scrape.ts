@@ -35,6 +35,9 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
     );
     await page.setViewport({ width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
     await page.setRequestInterception(true);
+    // SSRF guard: validate every browser request, not just the top-level URL.
+    // Pages can redirect or load subresources from private networks after the
+    // initial URL has already passed validation.
     page.on('request', (request) => {
       void assertPublicHttpUrl(request.url())
         .then(() => request.continue())

@@ -1,8 +1,5 @@
 // src/canvas/elements/code.ts
 //
-// Wishlist #19 — Code Block. Wave 4 owner: see
-// docs/superpowers/plans/2026-05-23-19-code-block.md.
-//
 // CodeElement interface (frozen at Phase 0) + the render function that
 // hands the source to Shiki for tokenisation and wraps the result with
 // kit-themed chrome.
@@ -10,7 +7,7 @@
 // The Shiki bundle (11 languages + 1 light theme + the JavaScript regex
 // engine) lives in `src/code/highlight.ts`. This file's only job is:
 //   1. Decide between the Shiki path (supported language) and the plain
-//      pre/code fallback (unsupported language).
+//      pre/code path (unsupported language).
 //   2. Emit the outer wrapper that carries the kit's `panel` background
 //      and the kit's `fontFamilyMono` typeface.
 
@@ -55,7 +52,7 @@ export interface CodeRenderCtx {
 /**
  * Render a Code element. Returns a single `<div class="rev01-code-block">`
  * wrapper containing either the Shiki-highlighted `<pre>` or, for an
- * unsupported language, the plain pre/code fallback.
+ * unsupported language, plain escaped pre/code output.
  *
  * Surface chrome:
  *   - Background colour is the Style Kit's `panel` token.
@@ -66,16 +63,9 @@ export interface CodeRenderCtx {
  * but the wrapper chrome works even when no extra CSS loads.
  */
 export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
-  // Kit lookup goes through `resolveStyleKitWithCustom` so a site using
-  // the Wave 2 #10 custom theme still gets a real preset back. The
-  // resolver throws on unknown kits, matching the project's
-  // fail-loudly-on-bad-state policy.
-  //
-  // We pass a minimal stub: we only have the kit *name* here, not the
-  // full `CanvasSiteState`. The renderer never reaches code elements
-  // when the site uses `'custom'` without a populated `customStyleKit`,
-  // because the canvas validator would already have rejected the state
-  // upstream — so a built-in resolution path is enough at this layer.
+  // Custom kits are resolved once per render and passed through context. Keep
+  // the resolved preset request-scoped so concurrent renders cannot share style
+  // data through module globals.
   let panel: string;
   let fontMono: string;
   let radius: string;
@@ -95,7 +85,7 @@ export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
     radius = preset.radius;
   }
 
-  // Branch: curated language → Shiki, anything else → plain fallback.
+  // Branch: curated language -> Shiki, anything else -> plain pre/code.
   // The language field on the interface is statically narrowed to
   // CodeLanguage; the `isSupportedLanguage` guard exists for defence in
   // depth (a hand-edited / migration-corrupted state could carry an

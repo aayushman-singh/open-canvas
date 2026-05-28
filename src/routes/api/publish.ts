@@ -32,14 +32,10 @@ import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
-// Wave 1 post-publish hooks. Per-plan contracts:
-//   - Snapshot capture for the version-history timeline (#3).
-//   - OG-image pre-render to R2 keyed by snapshot.version (#6).
+// Post-publish side effects that are part of the published-site contract:
+// version timeline capture, OG-image pre-rendering, and search indexing.
 import { captureOnPublish } from '../../version/capture';
 import { onPublishGenerateOg } from '../../og-image/on-publish';
-// Wave 3 pre/post-publish hooks.
-//   - Pre-publish: a11y audit refuses to publish on blocking issues (#15).
-//   - Post-publish: search index rebuild for the visitor-facing search (#13).
 import { runAudit } from '../../a11y/audit';
 import { rebuildSearchIndex } from '../../search/indexer';
 import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
@@ -50,10 +46,9 @@ interface Bindings {
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   SITE_ROOM: DurableObjectNamespace;
-  // Wave 1 #6 — OG image pre-render at publish writes to R2.
+  // OG image pre-render writes generated images to R2 during publish.
   ASSETS_BUCKET: R2Bucket;
-  // Wave 1 #6 — Satori/resvg wasm module slot (optional; the rasteriser
-  // falls back to a disk read on Bun and an on-demand fetch in Workers).
+  // Satori/resvg wasm module slot used by the OG rasteriser.
   OG_RESVG_WASM?: WebAssembly.Module;
 }
 
@@ -150,9 +145,9 @@ publishApi.post('/sites/:siteId', async (c) => {
     return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
   }
 
-  // Wave 3 #15 — accessibility audit gate. Blocks publish when blocking issues
-  // exist (e.g. missing alt text, contrast < 3.0, empty page title). Warnings
-  // and info-level findings do NOT block. 422 is the structured failure code.
+  // Accessibility audit gate. Blocking issues (for example missing alt text,
+  // contrast < 3.0, or empty page title) stop publish with a structured 422.
+  // Warnings and info-level findings do not block.
   const auditReport = runAudit(row.editableState);
   if (auditReport.blockerCount > 0) {
     return c.json(
@@ -266,6 +261,10 @@ publishApi.post('/sites/:siteId', async (c) => {
     return c.json({ error: 'render failed', detail: msg }, 500);
   }
 
+  // Publish is all-or-nothing: generated OG images, snapshots, search index,
+  // and live broadcast are part of the external publish contract. Let failures
+  // throw so the Owner does not see a successful publish with missing side
+  // effects.
   await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
 
   await database

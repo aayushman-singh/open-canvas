@@ -1,9 +1,11 @@
 // src/auth/accessible-site.ts
 //
-// Permission helper that resolves a site for the current user if they are
-// the owner OR an accepted collaborator with a sufficient role. Replaces
-// the owner-only `loadOwnedSite` pattern for endpoints that collaborators
-// should also reach (canvas load/save, asset upload, etc.).
+// Permission helper for routes that operate on an Editable Site.
+//
+// A Clerk user can reach a site when they are either the owner or an accepted
+// collaborator whose role satisfies the route's required role. Callers get
+// `null` for both "not found" and "not allowed" so routes do not leak whether
+// a site id exists.
 
 import { and, eq, isNotNull } from 'drizzle-orm';
 import type { CollaboratorRole } from '../db/schema';
@@ -45,6 +47,12 @@ export function accessRoleMeetsRequirement(
 
 type Db = ReturnType<typeof import('../db/client').db>;
 
+/**
+ * Resolve the site visible to a Clerk user at the requested access level.
+ *
+ * Ownership is checked first because it is the common path and because owner
+ * access is always the canonical source of `customerId` for later writes.
+ */
 export async function loadAccessibleSite(
   database: Db,
   clerkUserId: string,

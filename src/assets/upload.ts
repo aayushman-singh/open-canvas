@@ -1,7 +1,10 @@
 // src/assets/upload.ts
 //
-// POST /api/owner/assets handler — Owner-rooted asset upload per ADR 0004
-// (Owner Asset is the root) and ADR 0006 (R2 originals, content-hash keys).
+// Owner-rooted asset upload service for the dashboard and editor.
+//
+// Original bytes are stored under content-hash R2 keys, while `owner_asset`
+// rows remain per Owner. That keeps shared object storage deduplicated without
+// merging owner-specific metadata, permissions, or library history.
 //
 // Flow:
 //   1. Parse the multipart form: file blob + optional `alt` text + optional
@@ -12,7 +15,8 @@
 //   4. Otherwise: probe image dimensions (null for video), put the bytes into
 //      R2 with put-if-missing semantics (the R2 object may already exist if
 //      another Owner uploaded the same bytes), insert the ownerAsset row,
-//      optionally append a `slot_history` row if siteId+elementId came in.
+//      optionally append a `slot_history` row if siteId+elementId came in
+//      and the site belongs to this Owner.
 //
 // Failure handling is loud: any malformed input or unsupported media type
 // returns a 400 with a precise error string. R2/DB errors propagate.
@@ -111,7 +115,7 @@ export async function uploadOwnerAsset(
 
   // Dedup probe — per Owner. Two Owners uploading the same bytes share the
   // R2 object but get distinct ownerAsset rows; the same Owner re-uploading
-  // returns the existing row (per the brief's section 0.6.E spec).
+  // returns the existing row, per the upload contract.
   const existing = await deps.db
     .select()
     .from(ownerAsset)
@@ -200,6 +204,9 @@ async function recordOwnedSiteSlotUse(
   elementId: string,
   ownerAssetId: string,
 ): Promise<void> {
+  // Slot history feeds the editor's "recently used here" UI. Check site
+  // ownership before inserting so a malicious caller cannot poison another
+  // Owner's MRU list by guessing site and element ids.
   const siteRows = await db
     .select({ id: site.id })
     .from(site)

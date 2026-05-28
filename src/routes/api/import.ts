@@ -95,6 +95,8 @@ export interface PreparedImportedAssets {
 }
 
 const MOTION_PRESET_SET = new Set<string>(MOTION_PRESETS);
+// Import creates a brand-new site, so it enforces the free-plan site cap
+// before doing scraper work or writing imported assets.
 const FREE_SITE_LIMIT = 3;
 
 function isValidMotionPreset(p: string): p is MotionPreset {
@@ -287,6 +289,14 @@ importRouter.post('/', async (c) => {
   );
 });
 
+/**
+ * Validate the user-supplied source URL before handing it to the scraper.
+ *
+ * This is the first SSRF guardrail: reject credentials, non-http(s) schemes,
+ * localhost, and literal private/reserved IP ranges in the URL itself. The
+ * scraper also validates each browser request it makes, because redirects and
+ * page subresources can point somewhere different from the top-level URL.
+ */
 function parseImportSourceUrl(
   raw: string,
 ): { ok: true; url: string } | { ok: false; error: string } {
@@ -313,6 +323,8 @@ function parseImportSourceUrl(
 }
 
 function blockedImportHost(hostname: string): string | null {
+  // Literal host checks only. Hostnames are left intact for the scraper's
+  // request-time guard, where redirects and subresources are visible.
   const host = hostname.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
   if (host === 'localhost' || host.endsWith('.localhost')) return host;
   if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return null;
@@ -597,6 +609,13 @@ function primaryFontFamily(value: string): string | null {
   return first.replace(/^['"]|['"]$/g, '');
 }
 
+/**
+ * Convert one scraper node into the Canvas document model.
+ *
+ * The importer is fail-loud: unsupported element kinds or missing media assets
+ * throw instead of dropping content. Silent skips make imported pages look
+ * "successful" while losing user-visible material.
+ */
 function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): CanvasElement {
   const baseId = crypto.randomUUID();
   const box = {

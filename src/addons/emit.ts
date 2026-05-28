@@ -1,4 +1,11 @@
 // src/addons/emit.ts
+//
+// Compose enabled addon scripts for a published site.
+//
+// Addon rows are site-scoped, but entitlement is customer-scoped. Every emit
+// pass verifies that the site Owner still owns the addon before including its
+// scripts. Unknown addon ids throw because silently skipping them would hide
+// registry/schema drift during publish.
 
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client';

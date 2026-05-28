@@ -48,6 +48,13 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   return Object.values(value).every((entry) => typeof entry === 'string');
 }
 
+/**
+ * Runtime guard for JSON bodies accepted by the site-addon endpoint.
+ *
+ * Hono's `c.req.json<T>()` is only a TypeScript assertion; external callers can
+ * still send arrays, numbers, or nested objects. Rejecting those shapes here
+ * keeps addon config predictable for both emitters and future migrations.
+ */
 function parseSiteAddonBody(
   value: unknown,
 ): { ok: true; enabled: boolean; config: Record<string, string> } | { ok: false; error: string } {

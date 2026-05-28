@@ -1,11 +1,11 @@
 // src/seo/meta-emit.ts
 //
-// Wishlist #21 — emits the `<head>` SEO meta block for a Published Page.
+// Emits the `<head>` SEO meta block for a Published Page.
 //
 // Pure HTML composition. The caller (the main thread in `src/routes/public.ts`
 // via `renderCanvasHead`) splices the returned string into the document head.
 //
-// Tag inventory (per plan 2026-05-23-21-seo-meta.md):
+// Tag inventory:
 //
 //   - `<title>`                                — page.title (required field).
 //   - `<meta name="description">`              — page.description, when set.
@@ -21,8 +21,7 @@
 //
 // All user-controlled strings are escaped via local HTML/attribute escapers.
 // These are inlined here (rather than imported from `canvas/elements/render-utils`)
-// to keep `src/seo/` independent of canvas internals — Wave 3 file-ownership
-// boundary.
+// to keep `src/seo/` independent of canvas internals.
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
 import { CUSTOM_404_PAGE_SLUG } from '../canvas/page-routing.js';
@@ -56,7 +55,7 @@ export interface EmitMetaContext {
 }
 
 // ---------------------------------------------------------------------------
-// Escapers — local to this module (Wave 3 boundary).
+// Escapers — local to this module.
 // ---------------------------------------------------------------------------
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -100,12 +99,9 @@ export function resolveLang(page: CanvasPage, snapshot: PublishedSnapshot): stri
   if (typeof page.locale === 'string' && page.locale.length > 0) {
     return page.locale;
   }
-  // PublishedSnapshot does not currently carry `defaultLocale` — that field
-  // lives on `CanvasSiteState`. The publish path may or may not have copied
-  // it across (Wave 5 #25 owns the i18n routing wiring). We probe the
-  // snapshot via a structural type to avoid coupling: if a future publish
-  // mirror surfaces `defaultLocale`, we honour it; otherwise we fall back
-  // to 'en'.
+  // PublishedSnapshot does not currently declare `defaultLocale`; it belongs
+  // to CanvasSiteState. Probe structurally so older snapshots fall back to
+  // 'en' and newer snapshots can carry the locale without changing this API.
   const snapAny = snapshot as PublishedSnapshot & { defaultLocale?: unknown };
   if (typeof snapAny.defaultLocale === 'string' && snapAny.defaultLocale.length > 0) {
     return snapAny.defaultLocale;
@@ -120,9 +116,8 @@ export function resolveLang(page: CanvasPage, snapshot: PublishedSnapshot): stri
  */
 export function resolveNoIndex(page: CanvasPage, snapshot: PublishedSnapshot): boolean {
   if (page.slug === CUSTOM_404_PAGE_SLUG) return true;
-  // Same structural probe as `resolveLang` — `siteNoIndex` is declared on
-  // `CanvasSiteState`, not on the snapshot type today. Wave 5 / publish-path
-  // changes may surface it; we honour it whenever it is present.
+  // Same structural probe as `resolveLang`: `siteNoIndex` belongs to
+  // CanvasSiteState today, but published snapshots may carry it.
   const snapAny = snapshot as PublishedSnapshot & { siteNoIndex?: unknown };
   if (snapAny.siteNoIndex === true) return true;
   return page.noIndex === true;
@@ -138,9 +133,9 @@ function resolveCanonical(page: CanvasPage, ctx: EmitMetaContext): string | null
   }
   if (ctx.host.length === 0) return null;
   const protocol = ctx.protocol ?? 'https';
-  // The page slug is the path. Per the Wave 5 #25 caveat in the brief, this
-  // module does NOT prepend locale segments — the i18n router owns that.
-  // Empty slug ('home' equivalent) emits a bare root URL.
+  // The page slug is the path. Locale-prefixed routes are owned by the i18n
+  // router, so this helper does not prepend locale segments. Empty slug
+  // ('home' equivalent) emits a bare root URL.
   const path = page.slug.length > 0 ? `/${page.slug}` : '/';
   return `${protocol}://${ctx.host}${path}`;
 }
