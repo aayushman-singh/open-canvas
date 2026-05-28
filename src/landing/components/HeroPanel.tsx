@@ -8,60 +8,76 @@ export function HeroPanel(props: { kind: Kind }) {
 
 function EditorPanel() {
   return (
-    <div class="hero-panel" aria-label="editor pane">
+    <div class="hero-panel" aria-label="editor sidebar">
       <div class="heading">
         <span class="kind">editor</span>
         <span>home.canvas.json</span>
       </div>
-      <div class="body">
-        <div class="editor-layout">
-          <aside class="editor-tree" aria-hidden="true">
-            <div class="row">
-              <span class="icon">{'>'}</span>
-              <span>pages/</span>
-            </div>
-            <div class="row active" style="margin-left: 0.6rem;">
-              <span class="icon">·</span>
-              <span>home</span>
-            </div>
-            <div class="row" style="margin-left: 0.6rem;">
-              <span class="icon">·</span>
-              <span>menu</span>
-            </div>
-            <div class="row" style="margin-left: 0.6rem;">
-              <span class="icon">·</span>
-              <span>about</span>
-            </div>
-            <div class="row">
-              <span class="icon">{'>'}</span>
-              <span>theme/</span>
-            </div>
-            <div class="row">
-              <span class="icon">{'>'}</span>
-              <span>assets/</span>
-            </div>
-          </aside>
-          <div class="editor-doc">
-            <div class="demo-heading" role="presentation">
-              Brewed in small batches.
-              <span class="cursor-token" aria-hidden="true">
-                <span class="bar"></span>
-                <span class="chip">you</span>
-              </span>
-            </div>
-            <p>
-              A neighbourhood roastery turning single-origin beans into a daily ritual. Open seven
-              days, walk-ins welcome.
-            </p>
-            <p class="agent-line">
-              Pour-over flights every Saturday morning&mdash;reservations encouraged
-              <span class="cursor-token agent" aria-hidden="true">
-                <span class="bar"></span>
-                <span class="chip">&lt;agent: drafting hero...&gt;</span>
-              </span>
-            </p>
+      <div class="body" style="padding:0;">
+        <aside class="demo-sidebar" id="demo-sidebar" aria-hidden="true">
+          <div class="demo-sb-tabs">
+            <button type="button" class="active" data-tab="add">Add</button>
+            <button type="button" data-tab="sections">Sections</button>
+            <button type="button" data-tab="pages">Pages</button>
           </div>
-        </div>
+
+          <div class="demo-sb-upload" id="demo-sb-upload" hidden>
+            <div class="row">
+              <span class="filename">hero.jpg</span>
+              <span class="pct">0%</span>
+            </div>
+            <div class="bar">
+              <div class="fill"></div>
+            </div>
+          </div>
+
+          <div class="demo-sb-panel" data-panel="add">
+            <div class="demo-sb-group">
+              <h2>Sections</h2>
+              <button type="button" class="demo-sb-cmd">+ Blank section</button>
+            </div>
+            <div class="demo-sb-group">
+              <h2>Components</h2>
+              <div class="demo-sb-cmd-grid">
+                <button type="button" data-cmp="text">Text</button>
+                <button type="button" data-cmp="image">Image</button>
+                <button type="button" data-cmp="button">Button</button>
+                <button type="button" data-cmp="shape">Shape</button>
+                <button type="button" data-cmp="container">Container</button>
+                <button type="button" data-cmp="nav">Nav</button>
+                <button type="button" data-cmp="chart">Chart</button>
+                <button type="button" data-cmp="form">Form</button>
+              </div>
+            </div>
+            <div class="demo-sb-group">
+              <h2>Style Kit</h2>
+              <div class="demo-sb-kit-grid">
+                <button type="button" class="active" data-kit="charcoal">charcoal</button>
+                <button type="button" data-kit="orange-editorial">orange</button>
+                <button type="button" data-kit="blue-saas">blue</button>
+                <button type="button" data-kit="green-organic">green</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="demo-sb-panel" data-panel="sections" hidden>
+            <div class="demo-sb-empty">Saved sections appear here.</div>
+          </div>
+
+          <div class="demo-sb-panel" data-panel="pages" hidden>
+            <div class="demo-sb-page-list">
+              <div class="demo-sb-page-item" data-active="true">
+                <span class="title">Home</span>
+                <span class="slug">/</span>
+              </div>
+              <div class="demo-sb-page-item">
+                <span class="title">About</span>
+                <span class="slug">/about</span>
+              </div>
+            </div>
+            <button type="button" class="demo-sb-action">+ New page</button>
+          </div>
+        </aside>
       </div>
     </div>
   );
