@@ -345,7 +345,10 @@ addonShopRoute.get('/addons', async (c) => {
   let ownedAddonIds = new Set<string>();
   let sites: Array<{ id: string; name: string }> = [];
   // stateByAddon[addonId][siteId] = { enabled, config }
-  const stateByAddon: Record<string, Record<string, { enabled: boolean; config: Record<string, string> }>> = {};
+  const stateByAddon: Record<
+    string,
+    Record<string, { enabled: boolean; config: Record<string, string> }>
+  > = {};
 
   if (customerId) {
     const entRows = await database
@@ -371,7 +374,7 @@ addonShopRoute.get('/addons', async (c) => {
         const perAddon = stateByAddon[row.addonId] ?? (stateByAddon[row.addonId] = {});
         perAddon[row.siteId] = {
           enabled: row.enabled,
-          config: (row.config as Record<string, string>) ?? {},
+          config: row.config ?? {},
         };
       }
     }
@@ -457,7 +460,9 @@ addonShopRoute.get('/addons', async (c) => {
                       </div>
                     ))}
                     <div class="addon-save-row">
-                      <button type="button" class="btn-save" data-save>Save</button>
+                      <button type="button" class="btn-save" data-save>
+                        Save
+                      </button>
                       <p class="addon-msg" role="status" aria-live="polite"></p>
                     </div>
                   </div>
@@ -475,7 +480,9 @@ addonShopRoute.get('/addons', async (c) => {
         })}
       </div>
 
-      <script type="application/json" id="addon-state">{raw(stateJson)}</script>
+      <script type="application/json" id="addon-state">
+        {raw(stateJson)}
+      </script>
       <script>{raw(clientScript())}</script>
     </DashboardShell>,
   );
