@@ -35,11 +35,24 @@ export type {
  * a block in that case would only add noise without changing rendered
  * behaviour.
  */
+// Cache the rendered CSS by snapshot identity. The publish path calls this
+// once per page (via `buildPublishBroadcastPayload`'s loop) with the same
+// snapshot object — without memoization that produces O(pages × elements)
+// duplicate work and on big sites blows past the 30 s Worker CPU budget.
+// Identity-keyed: callers that mutate a snapshot in place must build a new
+// object, which they already do (PublishedSnapshot is constructed once per
+// publish at publish.ts:219 and never mutated after).
+const responsiveCssCache = new WeakMap<PublishedSnapshot, string>();
+
 export function renderResponsiveCss(snapshot: PublishedSnapshot): string {
+  const cached = responsiveCssCache.get(snapshot);
+  if (cached !== undefined) return cached;
   const layouts = resolveSnapshotLayout(snapshot);
   const hasOverride = snapshotHasResponsiveOverride(snapshot);
   const body = buildResponsiveCssBody(layouts, hasOverride);
-  return wrapInStyleBlock(body);
+  const result = wrapInStyleBlock(body);
+  responsiveCssCache.set(snapshot, result);
+  return result;
 }
 
 function snapshotHasResponsiveOverride(snapshot: PublishedSnapshot): boolean {
