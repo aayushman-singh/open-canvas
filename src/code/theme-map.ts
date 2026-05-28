@@ -1,6 +1,6 @@
 // src/code/theme-map.ts
 //
-// Wishlist #19 — Code Block. Wave 4 owner.
+// Wishlist #19 - Code Snippet. Wave 4 owner.
 //
 // Maps a Style Kit name to the Shiki theme variant we will use when
 // rendering code snippets. The POC is light-only (every kit gets the same

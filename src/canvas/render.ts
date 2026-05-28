@@ -138,7 +138,6 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
       return element.alt === '' ? ' aria-hidden="true"' : '';
     case 'text':
     case 'action':
-    case 'symbol-instance':
     case 'form':
     case 'embed':
     case 'chart':
@@ -169,7 +168,6 @@ function variantAttr(element: CanvasElement): string {
     case 'code':
       return ` data-variant="${escapeAttr(element.language)}"`;
     case 'media':
-    case 'symbol-instance':
     case 'form':
     case 'embed':
     case 'accordion':
@@ -288,8 +286,8 @@ export interface RenderSnapshotOptions {
    */
   emitHeadMeta?: (page: CanvasPage) => string;
   /**
-   * Optional body-page subset. Link resolution, responsive CSS, symbols, and
-   * other whole-site context still come from `snapshot`; only the emitted
+   * Optional body-page subset. Link resolution, responsive CSS, and other
+   * whole-site context still come from `snapshot`; only the emitted
    * `<article>` list is narrowed.
    */
   renderPages?: CanvasPage[];

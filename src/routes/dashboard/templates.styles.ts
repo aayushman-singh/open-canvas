@@ -62,7 +62,7 @@ main {
   padding: clamp(1.5rem, 4vh, 3rem) clamp(1rem, 3vw, 2rem) 4rem;
 }
 
-.topbar {
+.templates-header {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -74,18 +74,18 @@ main {
   margin-bottom: clamp(1.25rem, 3vh, 2rem);
 }
 
-.topbar .crumbs { color: var(--fg-faint); letter-spacing: 0.06em; text-transform: uppercase; }
-.topbar .crumbs .sep { color: var(--fg-faint); margin: 0 0.4rem; }
-.topbar .crumbs .here { color: var(--accent); }
-.topbar nav { margin-left: auto; display: inline-flex; gap: 1.1rem; }
-.topbar nav a {
+.templates-header .crumbs { color: var(--fg-faint); letter-spacing: 0.06em; text-transform: uppercase; }
+.templates-header .crumbs .sep { color: var(--fg-faint); margin: 0 0.4rem; }
+.templates-header .crumbs .here { color: var(--accent); }
+.templates-header nav { margin-left: auto; display: inline-flex; gap: 1.1rem; }
+.templates-header nav a {
   color: var(--fg-mute);
   text-decoration: none;
   border-bottom: 1px solid transparent;
   padding-bottom: 1px;
 }
-.topbar nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
-.topbar nav a:hover { color: var(--fg); }
+.templates-header nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+.templates-header nav a:hover { color: var(--fg); }
 
 .head {
   display: flex;

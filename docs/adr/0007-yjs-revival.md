@@ -3,7 +3,9 @@
 **Status:** Accepted
 **Date:** 2026-05-23
 **Author:** Aayushman Singh
-**Supersedes:** the "retire ProseMirror + Yjs" treatment of Yjs in ADR 0003 (the ProseMirror retirement stands; Yjs is reintroduced under different responsibilities).
+**Supersedes:** the ADR 0003 treatment that retired Yjs together with the
+legacy flow-document editor path. The legacy path stays retired; Yjs is
+reintroduced under different responsibilities.
 
 ## Context
 
@@ -14,7 +16,11 @@ The gamma-parity POC adds two features that fight each other if their underlying
 
 Treated as separate paradigms, these two features build conflicting plumbing: co-edit wants the source of truth to be a mutable stream of ops, version history wants it to be an immutable sequence of frozen states. A site cannot have both, simultaneously, as the source of truth without one of them being a derivative view.
 
-ADR 0003 retired ProseMirror as the page model and noted that the Yjs supporting code was kept on disk as inert reference. The retirement of Yjs was framed alongside ProseMirror because at the time both pieces served the flow-document model that was being abandoned. Yjs itself is paradigm-agnostic: it works as well over canvas JSON as it did over flow documents.
+ADR 0003 retired the old flow-document page model and noted that the Yjs
+supporting code was kept on disk as inert reference. The retirement of Yjs was
+framed alongside that old page model because both pieces served the same
+abandoned document shape. Yjs itself is paradigm-agnostic: it works as well
+over canvas JSON as it did over flow documents.
 
 Three options exist for the operation model:
 
@@ -40,7 +46,13 @@ The choice is hard to reverse because the persistence shape — what bytes go on
 
 4. **The previously retired `src/multiplayer/*` reference code is the seed for the projection module and the sync protocol; it is not revived wholesale.**
 
-   **Why:** the retired files exist because they encoded ProseMirror schema assumptions that no longer hold. Reviving them in place would drag those assumptions back in. The decision is to re-author the projection and sync protocol cleanly in `src/canvas/yjs-projection.ts` and `src/live/co-edit/` against the canvas schema, reading the retired code as reference for the WebSocket message handling and the `Y.Doc` ↔ Durable Object glue rather than as starting code.
+   **Why:** the retired files exist because they encoded old flow-document
+   assumptions that no longer hold. Reviving them in place would drag those
+   assumptions back in. The decision is to re-author the projection and sync
+   protocol cleanly in `src/canvas/yjs-projection.ts` and `src/live/co-edit/`
+   against the canvas schema, reading the retired code as reference for the
+   WebSocket message handling and the `Y.Doc` ↔ Durable Object glue rather
+   than as starting code.
 
 ## Out of scope
 
@@ -63,7 +75,9 @@ This ADR does not decide:
 
 **Negative:**
 
-- The retired `Y` dependency comes back into `package.json`. ADR 0003's framing of "retired" must be revised in this ADR; that framing turns out to have conflated ProseMirror's retirement with Yjs's.
+- The retired `Y` dependency comes back into `package.json`. ADR 0003's
+  framing of "retired" must be revised in this ADR; that framing turns out to
+  have conflated the old editor path's retirement with Yjs's.
 - Every editor mutation now flows through `Y.Doc` transactions instead of direct JSON mutation. Existing editor client code has to be re-wired with the discipline that "the doc is the truth"; bugs where some path mutates the projection without going through the doc are a real failure mode that smoke tests must catch.
 - A debounced projection write is now part of the autosave path. Tuning the debounce window — too short wastes Postgres writes; too long widens the cold-recovery loss window — is a real decision that lands in the plan layer.
 - Reasoning about a Yjs document inside a Durable Object is a more demanding model than the previous "mutate JSON, broadcast diff" approach. New contributors will need a primer.

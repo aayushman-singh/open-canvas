@@ -67,7 +67,7 @@ Accepted ADRs:
 | 16  | Multi-page nav (uses #14)                  | `src/canvas/elements/nav.ts` + editor surface | `nav:smoke`          |
 | 17  | Accordion + carousel + interactive runtime | `src/interactive/`                            | `interactive:smoke`  |
 | 18  | Table primitive                            | `src/canvas/elements/table.ts`                | `table:smoke`        |
-| 19  | Code block (Shiki)                         | `src/canvas/elements/code.ts`                 | `code:smoke`         |
+| 19  | Code snippet (Shiki)                       | `src/canvas/elements/code.ts`                 | `code:smoke`         |
 | 20  | Light/dark visitor toggle                  | `src/themes/visitor-mode/`                    | `visitor-mode:smoke` |
 | 21  | SEO meta + page metadata                   | `src/seo/`                                    | `seo:smoke`          |
 | 22  | Sitemap + robots generation                | `src/seo/sitemap/` (sibling under #21)        | `sitemap:smoke`      |
@@ -115,7 +115,7 @@ Wave 3 (Tier A — set 2)
 Wave 4 (Tier B + bridge)
   #17 accordion/carousel + interactive runtime
   #18 table
-  #19 code block
+  #19 code snippet
   #22 sitemap/robots — reads #21 fields (Wave 3 done)
   #16 nav            — NEEDS #14 done (Wave 3)
 

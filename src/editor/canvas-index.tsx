@@ -1,6 +1,6 @@
 // Canvas editor route — GET /dashboard/sites/:siteId/edit
 //
-// Server-renders the desktop Canvas Editor shell: topbar (crumbs, address
+// Server-renders the desktop Canvas Editor shell: header (crumbs, address
 // chip, style-kit toggles, Save, Publish), canvas area (#canvas-root), the
 // inspector (#canvas-inspector), and the status line. The browser bootstrap
 // is shipped inline via canvasClientScript and takes over from there.
@@ -144,7 +144,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
       </head>
       <body>
         <main class="rev01-editor" data-style-kit={styleKit}>
-          <header class="rev01-editor-topbar">
+          <header class="rev01-editor-header">
             {breadcrumbs}
             <span class="address">{publicAddress}</span>
             <span class="spacer" />
@@ -226,7 +226,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="text"
-                    title="Add a text block"
+                    title="Add text"
                   >
                     Text
                   </button>
@@ -298,7 +298,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     type="button"
                     class="rev01-sidebar-command"
                     data-sidebar-add-component="code"
-                    title="Add a code snippet block"
+                    title="Add a code snippet"
                   >
                     Code
                   </button>

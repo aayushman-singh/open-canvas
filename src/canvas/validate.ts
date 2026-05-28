@@ -1039,42 +1039,6 @@ function validateEditableShape(state: unknown, errors: string[]): void {
     const footerIds = new Set<string>();
     validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds);
   }
-  // Phase 0 scaffold: `symbols` is the Wave 3 #14 entry point. Permissive
-  // here — missing is treated as empty; present must be an array. Inner
-  // shape validation lives in the Wave 3 owner's code (validation rules
-  // for SymbolMaster structure are out of scope for the scaffold).
-  if (state.symbols !== undefined && !Array.isArray(state.symbols)) {
-    errors.push(`symbols must be an array when present (got ${describe(state.symbols)})`);
-  }
-  if (Array.isArray(state.symbols)) {
-    const symbolIds = new Set<string>();
-    state.symbols.forEach((symbol, idx) => {
-      const symbolPath = `symbols[${String(idx)}]`;
-      if (!isRecord(symbol)) {
-        errors.push(`${symbolPath} must be an object`);
-        return;
-      }
-      if (!isNonEmptyString(symbol.id)) {
-        errors.push(`${symbolPath}.id must be a non-empty string`);
-      } else if (symbolIds.has(symbol.id)) {
-        errors.push(`${symbolPath}.id "${symbol.id}" is duplicated across symbols`);
-      } else {
-        symbolIds.add(symbol.id);
-      }
-      if (!isNonEmptyString(symbol.name)) {
-        errors.push(`${symbolPath}.name must be a non-empty string`);
-      }
-      const symbolLocalIds = new Set<string>();
-      validateSection(
-        symbol.section,
-        PAGE_WIDTH_MAX,
-        `${symbolPath}.section`,
-        errors,
-        symbolLocalIds,
-        validPageIds,
-      );
-    });
-  }
 }
 
 function validatePublishedMediaReferencesInSection(
@@ -1115,16 +1079,6 @@ function validatePublishedMediaReferences(snapshot: unknown, errors: string[]): 
   if (snapshot.footer !== undefined) {
     validatePublishedMediaReferencesInSection(snapshot.footer, 'footer', errors);
   }
-  if (Array.isArray(snapshot.symbols)) {
-    snapshot.symbols.forEach((symbol, idx) => {
-      if (!isRecord(symbol)) return;
-      validatePublishedMediaReferencesInSection(
-        symbol.section,
-        `symbols[${String(idx)}].section`,
-        errors,
-      );
-    });
-  }
 }
 
 export function validateCanvasSiteState(state: unknown): ValidationResult {
@@ -1158,7 +1112,6 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
       pages: snapshot.pages,
       header: snapshot.header,
       footer: snapshot.footer,
-      symbols: snapshot.symbols ?? [],
     },
     errors,
   );
@@ -1229,9 +1182,6 @@ export function validateSeedFixture(state: CanvasSiteState): ValidationResult {
   }
   validateSeedSection(state.header, 'header');
   validateSeedSection(state.footer, 'footer');
-  for (let idx = 0; idx < state.symbols.length; idx++) {
-    validateSeedSection(state.symbols[idx]?.section, `symbols[${String(idx)}].section`);
-  }
 
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };

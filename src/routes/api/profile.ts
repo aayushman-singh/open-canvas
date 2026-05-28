@@ -52,12 +52,17 @@ profileApi.get('/', async (c) => {
 
 profileApi.patch('/', async (c) => {
   const auth = c.get('auth');
-  const body = await c.req.json<{
+  let body: {
     displayName?: string;
     bio?: string;
     timezone?: string;
     plan?: string;
-  }>();
+  };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'request body must be valid JSON' }, 400);
+  }
 
   const updates: Record<string, unknown> = { updatedAt: sql`now()` };
 

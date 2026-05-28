@@ -1,4 +1,4 @@
-# Code block (Shiki)
+# Code snippet (Shiki)
 
 **Wishlist #:** 19 **Tier:** B **Wave:** 4 **Status:** queued
 **Depends on:** Phase 0 ✓ (`code` ElementType stub)
@@ -6,7 +6,7 @@
 
 ## User-visible outcome
 
-An Owner adds a Code Block, picks a language (TypeScript, Python, Rust, Go, JSON, Bash, etc.), pastes code, and sees syntax-highlighted output styled to match the site's Style Kit. Visitors see the same highlighted code as static HTML — no client-side JS.
+An Owner adds a Code Snippet, picks a language (TypeScript, Python, Rust, Go, JSON, Bash, etc.), pastes code, and sees syntax-highlighted output styled to match the site's Style Kit. Visitors see the same highlighted code as static HTML — no client-side JS.
 
 ## Scope in
 

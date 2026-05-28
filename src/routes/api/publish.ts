@@ -39,7 +39,6 @@ import { captureOnPublish } from '../../version/capture';
 import { onPublishGenerateOg } from '../../og-image/on-publish';
 import { runAudit } from '../../a11y/audit';
 import { rebuildSearchIndex } from '../../search/indexer';
-import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
 import { injectInteractiveRuntime } from '../../interactive/inject';
 
 interface Bindings {
@@ -365,7 +364,6 @@ publishApi.post('/sites/:siteId', async (c) => {
     ...(row.editableState.customStyleKit !== undefined
       ? { customStyleKit: row.editableState.customStyleKit }
       : {}),
-    symbols: row.editableState.symbols,
     ...(row.editableState.defaultLocale !== undefined
       ? { defaultLocale: row.editableState.defaultLocale }
       : {}),
@@ -387,8 +385,6 @@ publishApi.post('/sites/:siteId', async (c) => {
     // published contract and we want to know loudly.
     return c.json({ error: 'published snapshot invalid', errors: snapshotValidation.errors }, 500);
   }
-
-  configureSymbolInstanceRender({ symbols: snapshot.symbols ?? [] });
 
   let broadcastPayload: PublishBroadcastPayload;
   try {

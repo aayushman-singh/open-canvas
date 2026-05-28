@@ -142,6 +142,10 @@ export function isSiteLimitViolation(err: unknown): boolean {
 }
 
 function siteLimitResponse(c: Context<Env>, plan: BillingPlan) {
+  const { siteLimit } = entitlementsFor(plan);
+  if (isUnlimited(siteLimit)) {
+    return null;
+  }
   const error = siteLimitExceededMessage(plan);
   if (wantsJson(c)) {
     return c.json({ error }, 403);
@@ -165,6 +169,19 @@ function customerSeedAssetId(customerId: string, seedAssetId: string): string {
 export function prepareSeedAssetsForCustomer(
   customerId: string,
   state: CanvasSiteState,
+  /**
+   * Existing (contentHash → ownerAsset.id) for this customer. When a seed's
+   * contentHash already maps to an existing asset row, the canvas state is
+   * rewritten to reference that existing id instead of materialising a new
+   * `seed-{customerId}-{seedId}` row. Required for correctness under the
+   * `owner_asset_customer_content_hash_unique` constraint — without this map,
+   * the insert would silently no-op on conflict and the canvas state would
+   * point at an id that doesn't exist.
+   *
+   * Pass an empty Map when the caller has no existing assets for this
+   * customer (e.g. first site).
+   */
+  existingByHash: Map<string, string>,
 ): PreparedSeedAssets {
   const editableState = structuredClone(state);
   const mappedIds = new Map<string, string>();
@@ -192,14 +209,14 @@ export function prepareSeedAssetsForCustomer(
       continue;
     }
     if (mappedIds.has(reference.assetId)) continue;
-    const existingMaterializedId = materializedIdByContentHash.get(seed.contentHash);
-    if (existingMaterializedId) {
-      mappedIds.set(reference.assetId, existingMaterializedId);
+    const existingId = existingByHash.get(seed.contentHash);
+    if (existingId !== undefined) {
+      mappedIds.set(reference.assetId, existingId);
       continue;
     }
     const materializedId = customerSeedAssetId(customerId, reference.assetId);
     mappedIds.set(reference.assetId, materializedId);
-    materializedIdByContentHash.set(seed.contentHash, materializedId);
+    existingByHash.set(seed.contentHash, materializedId);
     seedRows.push({
       id: materializedId,
       customerId,
@@ -241,6 +258,15 @@ export function prepareSeedAssetsForCustomer(
       const element = section.elements[elementIdx];
       if (!element) continue;
       const elementPath = `${sectionPath}.elements[${String(elementIdx)}]`;
+      const esBgImage = element.elementStyle?.backgroundImageAssetId;
+      if (typeof esBgImage === 'string' && esBgImage.length > 0) {
+        const mapped = materializeAssetId(
+          esBgImage,
+          `${elementPath}.elementStyle.backgroundImageAssetId`,
+        );
+        if (typeof mapped !== 'string') return mapped.missing;
+        element.elementStyle = { ...element.elementStyle, backgroundImageAssetId: mapped };
+      }
       if (element.type === 'media') {
         const mapped = materializeAssetId(element.assetId, `${elementPath}.assetId`);
         if (typeof mapped !== 'string') return mapped.missing;
@@ -278,10 +304,18 @@ export function prepareSeedAssetsForCustomer(
   }
 
   for (const [pageIdx, page] of editableState.pages.entries()) {
+    const pagePath = `pages[${String(pageIdx)}]`;
+    if (typeof page.ogImageAssetId === 'string' && page.ogImageAssetId.length > 0) {
+      const mapped = materializeAssetId(page.ogImageAssetId, `${pagePath}.ogImageAssetId`);
+      if (typeof mapped !== 'string') {
+        return { ok: false, unknownSeedIds: [mapped.missing], assetKindErrors: [] };
+      }
+      page.ogImageAssetId = mapped;
+    }
     for (const [sectionIdx, section] of page.sections.entries()) {
       const missing = materializeSectionAssets(
         section,
-        `pages[${String(pageIdx)}].sections[${String(sectionIdx)}]`,
+        `${pagePath}.sections[${String(sectionIdx)}]`,
       );
       if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
     }
@@ -290,9 +324,15 @@ export function prepareSeedAssetsForCustomer(
   if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
   missing = materializeSectionAssets(editableState.footer, 'footer');
   if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
-  for (const [idx, symbol] of editableState.symbols.entries()) {
-    missing = materializeSectionAssets(symbol.section, `symbols[${String(idx)}].section`);
-    if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
+  if (
+    typeof editableState.faviconAssetId === 'string' &&
+    editableState.faviconAssetId.length > 0
+  ) {
+    const mapped = materializeAssetId(editableState.faviconAssetId, 'faviconAssetId');
+    if (typeof mapped !== 'string') {
+      return { ok: false, unknownSeedIds: [mapped.missing], assetKindErrors: [] };
+    }
+    editableState.faviconAssetId = mapped;
   }
 
   return { ok: true, editableState, seedRows };
@@ -355,7 +395,8 @@ sites.post('/', async (c) => {
       .where(eq(site.customerId, customerId));
     const siteCount = siteCountRows[0]?.value ?? 0;
     if (siteCount >= siteLimit) {
-      return siteLimitResponse(c, currentPlanId);
+      const response = siteLimitResponse(c, currentPlanId);
+      if (response) return response;
     }
   }
 
@@ -364,7 +405,16 @@ sites.post('/', async (c) => {
 
   const seed = getTemplateSeed(templateId);
   if (seed) {
-    const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seed.state);
+    // Pre-fetch the customer's existing asset (contentHash → id) so the seed
+    // materialiser can reuse rows under the `(customer_id, content_hash)`
+    // unique constraint instead of generating a fresh id and getting silently
+    // skipped on insert.
+    const existingAssets = await database
+      .select({ id: ownerAsset.id, contentHash: ownerAsset.contentHash })
+      .from(ownerAsset)
+      .where(eq(ownerAsset.customerId, customerId));
+    const existingByHash = new Map(existingAssets.map((r) => [r.contentHash, r.id]));
+    const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seed.state, existingByHash);
     if (!preparedSeedAssets.ok) {
       return c.json(
         {
@@ -478,7 +528,10 @@ sites.post('/', async (c) => {
     }
   } catch (err) {
     if (isSiteLimitViolation(err)) {
-      return siteLimitResponse(c, currentPlanId);
+      const response = siteLimitResponse(c, currentPlanId);
+      if (response) return response;
+      console.error('site_limit_drift', { customerId, plan: currentPlanId, err });
+      throw err;
     }
     if (isUniqueViolation(err)) {
       return c.json({ error: 'subdomain is already taken' }, 409);

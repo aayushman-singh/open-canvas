@@ -51,7 +51,7 @@ body {
   min-height: 100vh;
 }
 
-/* Body-scroll editor shell: the editor chrome (topbar / left dock / right
+/* Body-scroll editor shell: the editor chrome (header / left dock / right
    dock / status bar / zoom toolbar / AI panel / modal) is fixed-positioned
    so the canvas area sits in normal document flow. The browser's native
    body scrollbar is the ONLY scrollbar — no inner cells scroll. This means
@@ -72,7 +72,7 @@ body.rev01-modal-open {
    the inner <main class="rev01-site">, so the editor preview and the
    published render share the same tokens. */
 
-.rev01-editor-topbar {
+.rev01-editor-header {
   position: sticky;
   top: 0;
   z-index: 200;
@@ -87,20 +87,20 @@ body.rev01-modal-open {
   font-size: 12px;
 }
 
-.rev01-editor-topbar .crumbs {
+.rev01-editor-header .crumbs {
   display: flex;
   align-items: center;
   gap: 6px;
   color: var(--rev01-fg-mute);
 }
-.rev01-editor-topbar .crumbs .sep {
+.rev01-editor-header .crumbs .sep {
   color: var(--rev01-fg-faint);
 }
-.rev01-editor-topbar .crumbs .here {
+.rev01-editor-header .crumbs .here {
   color: var(--rev01-fg);
 }
 
-.rev01-editor-topbar .address {
+.rev01-editor-header .address {
   margin-left: 8px;
   padding: 4px 10px;
   border-radius: 999px;
@@ -109,14 +109,14 @@ body.rev01-modal-open {
   color: var(--rev01-fg-mute);
 }
 
-.rev01-editor-topbar .spacer {
+.rev01-editor-header .spacer {
   flex: 1 1 auto;
 }
 
-.rev01-editor-topbar #canvas-save,
-.rev01-editor-topbar #canvas-publish,
-.rev01-editor-topbar #canvas-save-template,
-.rev01-editor-topbar #canvas-settings-link {
+.rev01-editor-header #canvas-save,
+.rev01-editor-header #canvas-publish,
+.rev01-editor-header #canvas-save-template,
+.rev01-editor-header #canvas-settings-link {
   appearance: none;
   border: 1px solid var(--rev01-hairline-strong);
   background: var(--rev01-bg-panel-strong);
@@ -128,17 +128,17 @@ body.rev01-modal-open {
   text-decoration: none;
   line-height: 1.4;
 }
-.rev01-editor-topbar #canvas-save:hover,
-.rev01-editor-topbar #canvas-save-template:hover,
-.rev01-editor-topbar #canvas-settings-link:hover {
+.rev01-editor-header #canvas-save:hover,
+.rev01-editor-header #canvas-save-template:hover,
+.rev01-editor-header #canvas-settings-link:hover {
   border-color: var(--rev01-accent);
 }
-.rev01-editor-topbar #canvas-publish[disabled] {
+.rev01-editor-header #canvas-publish[disabled] {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.rev01-editor-topbar #canvas-chat-toggle {
+.rev01-editor-header #canvas-chat-toggle {
   appearance: none;
   border: 1px solid var(--rev01-accent);
   background: var(--rev01-accent-soft);
@@ -149,11 +149,11 @@ body.rev01-modal-open {
   border-radius: 6px;
   cursor: pointer;
 }
-.rev01-editor-topbar #canvas-chat-toggle:hover {
+.rev01-editor-header #canvas-chat-toggle:hover {
   background: var(--rev01-accent);
   color: var(--rev01-bg);
 }
-.rev01-editor-topbar #canvas-chat-toggle.active {
+.rev01-editor-header #canvas-chat-toggle.active {
   background: var(--rev01-accent);
   color: var(--rev01-bg);
 }
@@ -652,7 +652,7 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 
 /* Floating zoom toolbar pinned to the top-left of the canvas area, just
-   inside the sidebar dock and below the topbar. Fixed so it stays visible
+   inside the sidebar dock and below the header. Fixed so it stays visible
    while the body scrolls; sits above the canvas via z-index. */
 .rev01-zoom-toolbar {
   position: fixed;
@@ -1886,7 +1886,7 @@ body[data-placement-active="true"] .rev01-section-slot {
 
 /* Inspector kit summary — a small read-only readout of the active kit's
    accent / display font / motion duration. Helps the Owner see at a glance
-   which kit they're editing without having to scroll the topbar. */
+   which kit they're editing without having to scroll the header. */
 .rev01-kit-summary {
   margin: 12px 0;
   padding: 8px 10px;
@@ -1912,9 +1912,9 @@ body[data-placement-active="true"] .rev01-section-slot {
   border: 1px solid var(--rev01-hairline);
 }
 
-/* Presence indicator pill in the editor topbar. Hidden by default; the
+/* Presence indicator pill in the editor header. Hidden by default; the
    client script unhides when count > 1. */
-.rev01-editor-topbar [data-rev01-presence] {
+.rev01-editor-header [data-rev01-presence] {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid var(--rev01-hairline);
@@ -1923,7 +1923,7 @@ body[data-placement-active="true"] .rev01-section-slot {
   font-family: var(--rev01-font-mono);
   font-size: 11px;
 }
-.rev01-editor-topbar [data-rev01-presence][hidden] {
+.rev01-editor-header [data-rev01-presence][hidden] {
   display: none;
 }
 

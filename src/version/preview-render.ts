@@ -19,7 +19,6 @@ import * as Y from 'yjs';
 import { renderCanvasSnapshot } from '../canvas/render.js';
 import type { PublishedSnapshot } from '../canvas/schema.js';
 import { decodeYDoc } from '../canvas/yjs-projection.js';
-import { configureSymbolInstanceRender } from '../canvas/elements/symbol-instance.js';
 import type { Db } from '../db/client.js';
 import { siteSnapshot } from '../db/schema.js';
 
@@ -99,12 +98,10 @@ export async function renderSnapshotPreview(
     ...(state.header !== undefined ? { header: state.header } : {}),
     ...(state.footer !== undefined ? { footer: state.footer } : {}),
     ...(state.customStyleKit !== undefined ? { customStyleKit: state.customStyleKit } : {}),
-    symbols: state.symbols,
     ...(state.defaultLocale !== undefined ? { defaultLocale: state.defaultLocale } : {}),
     ...(state.siteNoIndex !== undefined ? { siteNoIndex: state.siteNoIndex } : {}),
     ...(state.darkModeEnabled !== undefined ? { darkModeEnabled: state.darkModeEnabled } : {}),
   };
-  configureSymbolInstanceRender({ symbols: publishedView.symbols ?? [] });
   const html = renderCanvasSnapshot(publishedView, assetBasePath, siteId);
 
   return {

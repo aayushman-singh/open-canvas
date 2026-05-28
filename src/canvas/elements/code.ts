@@ -18,7 +18,7 @@ import { getStyleKitPreset } from '../style-kits.js';
 import {
   highlightCode,
   isSupportedLanguage,
-  renderPlainCodeBlock,
+  renderPlainCodeSnippet,
 } from '../../code/highlight.js';
 import { escapeAttr, escapeCssValue } from './render-utils.js';
 
@@ -50,7 +50,7 @@ export interface CodeRenderCtx {
 }
 
 /**
- * Render a Code element. Returns a single `<div class="rev01-code-block">`
+ * Render a Code element. Returns a single `<div class="rev01-code-snippet">`
  * wrapper containing either the Shiki-highlighted `<pre>` or, for an
  * unsupported language, plain escaped pre/code output.
  *
@@ -95,7 +95,7 @@ export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
         styleKit: ctx.styleKit,
         showLineNumbers: el.showLineNumbers,
       })
-    : renderPlainCodeBlock(el.source, el.language, {
+    : renderPlainCodeSnippet(el.source, el.language, {
         styleKit: ctx.styleKit,
         showLineNumbers: el.showLineNumbers,
       });
@@ -124,7 +124,7 @@ export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
     `data-line-numbers="${el.showLineNumbers ? 'true' : 'false'}"`,
   ].join(' ');
 
-  return `<div class="rev01-code-block" ${dataAttrs} style="${style}">${inner}</div>`;
+  return `<div class="rev01-code-snippet" ${dataAttrs} style="${style}">${inner}</div>`;
 }
 
 export const CODE_RECIPE_ID = 'code-card' as const;

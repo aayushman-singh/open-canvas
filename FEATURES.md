@@ -40,7 +40,7 @@
 28. [Interactive Elements](#28-interactive-elements)
 29. [Embed Support](#29-embed-support)
 30. [Charts (SVG)](#30-charts-svg)
-31. [Code Blocks (Syntax Highlighting)](#31-code-blocks-syntax-highlighting)
+31. [Code Snippets (Syntax Highlighting)](#31-code-snippets-syntax-highlighting)
 32. [Collections (Dynamic Content)](#32-collections-dynamic-content)
 33. [Addon System](#33-addon-system)
 34. [Auto-Translate (i18n / RTL)](#34-auto-translate-i18n--rtl)
@@ -81,7 +81,7 @@ The core editing experience. A desktop-first visual editor where the owner drags
 |---|---|
 | Drag-and-drop positioning | Free-form element placement on a canvas grid |
 | Element inspector panel | Right-side panel with type-specific property editors for each element |
-| Topbar controls | Breadcrumbs, subdomain chip, AI button, Chat button, Save, Publish, Save as template |
+| Editor header controls | Breadcrumbs, published-address chip, AI button, Chat button, Save, Publish, Save as template |
 | AI Chat panel | Slide-out chat panel in editor — multi-turn SSE streaming with Gemini 2.5 Pro, op-preview with inline Accept buttons that apply canvas changes |
 | AI Agent prompt | "AI" button opens prompt modal for natural-language canvas edits with preview/accept flow across text, media, element, section, page, style-kit, and site-config operations |
 | Section management | Insert, remove, reorder, duplicate canvas sections via film-reel panel |
@@ -145,7 +145,7 @@ Each element type has a dedicated inspector panel when selected:
 
 ## 2. Design Primitives (15 Element Types)
 
-Every visual building block available on the canvas. Each is server-rendered to pure HTML — no client framework in published output.
+Every visual primitive available on the canvas. Each is server-rendered to pure HTML — no client framework in published output.
 
 | # | Element | Description | Key Features |
 |---|---------|-------------|--------------|
@@ -157,7 +157,7 @@ Every visual building block available on the canvas. Each is server-rendered to 
 | 6 | **Symbol Instance** | Reusable component placement | Renders a symbol master on any page with inherited structure and override support |
 | 7 | **Form** | Data collection | Text, email, textarea, checkbox, select fields; Turnstile bot protection; webhook delivery |
 | 8 | **Embed** | Third-party content | YouTube, Vimeo, Loom, Figma, Spotify, SoundCloud, CodePen, Twitter/X, Google Maps, generic iframe |
-| 9 | **Code** | Syntax-highlighted blocks | 11 languages (TS, JS, Python, Rust, Go, JSON, Bash, SQL, HTML, CSS, Markdown); optional line numbers |
+| 9 | **Code** | Syntax-highlighted snippets | 11 languages (TS, JS, Python, Rust, Go, JSON, Bash, SQL, HTML, CSS, Markdown); optional line numbers |
 | 10 | **Chart** | Data visualization | Bar, line, pie, donut, area; server-rendered SVG; kit-derived colors; multi-series |
 | 11 | **Table** | Data tables | Column alignment, zebra striping, responsive card collapse on phone, scoped inline CSS |
 | 12 | **Accordion** | Collapsible sections | Rich text body, multi-open support, keyboard accessible (Enter/Space) |
@@ -641,7 +641,7 @@ All charts are server-rendered SVG (no client JavaScript). Colors derived from k
 
 ---
 
-## 31. Code Blocks (Syntax Highlighting)
+## 31. Code Snippets (Syntax Highlighting)
 
 11 supported languages via Shiki:
 
@@ -980,7 +980,7 @@ Proxy endpoints under `/__api/` using edit-token cookie instead of Clerk: canvas
 | API endpoints | 90+ |
 | Dashboard panels | 14 |
 | Dashboard sidebar links | 9 |
-| Editor topbar actions | 5 (AI, Chat, Save, Publish, Save as template) |
+| Editor header actions | 5 (AI, Chat, Save, Publish, Save as template) |
 | Canvas agent mutating tools | 15 |
 | Chat read-only tools | 2 (`query_site`, `query_assets`) |
 | E2E inventory areas | 71 |

@@ -34,7 +34,7 @@ Target: `https://rev01.aayushman.dev` (main) + `*.rev01.aayushman.dev` (publishe
 
 ### Layout
 1. Navigate to `/dashboard/sites/:siteId/edit`
-2. Verify top bar: breadcrumb (rev01 / dashboard / {name}), subdomain display, Save, Translate, Publish, Save as template
+2. Verify editor header: breadcrumb (rev01 / dashboard / {name}), published-address display, Save, Publish, Save as template
 3. Verify left sidebar: Add / Sections / Symbols tabs
 4. Verify Add panel: Blank section, Components (Text/Image/Video/Button/Shape/Container), Style Kit buttons
 5. Verify canvas renders all sections with positioned elements

@@ -1,6 +1,6 @@
 // src/code/smoke.ts
 //
-// Wishlist #19 — Code Block. Wave 4 smoke. Asserts:
+// Wishlist #19 - Code Snippet. Wave 4 smoke. Asserts:
 //
 //   1. TS snippet highlighted → output contains `<span style="color: ...">`
 //      tokens from Shiki.
@@ -19,7 +19,7 @@ import {
   getHighlighter,
   highlightCode,
   isSupportedLanguage,
-  renderPlainCodeBlock,
+  renderPlainCodeSnippet,
 } from './highlight.js';
 import { SHIKI_LIGHT_THEME, themeForStyleKit } from './theme-map.js';
 
@@ -104,13 +104,13 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
 // --------------------------------------------------------------------------
 // Assertion 2: unsupported language → plain pre/code fallback. The element
 // interface ships only the 11 curated languages, but runtime guards still
-// route an unknown string through `renderPlainCodeBlock`. We exercise both
+// route an unknown string through `renderPlainCodeSnippet`. We exercise both
 // the direct helper and the renderer's branch via a TypeScript cast — the
 // renderer-side branch is the load-bearing one for migrated/corrupted state.
 // --------------------------------------------------------------------------
 {
   // Direct call.
-  const plain = renderPlainCodeBlock("alert('hi')", 'brainfuck', {
+  const plain = renderPlainCodeSnippet("alert('hi')", 'brainfuck', {
     styleKit: 'blue-saas',
     showLineNumbers: false,
   });
@@ -130,7 +130,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
   // The source must be HTML-escaped — single quotes pass through, but
   // angle brackets / ampersands would not. Sanity-check by escaping
   // something hostile.
-  const hostile = renderPlainCodeBlock('<script>alert(1)</script>', 'wat', {
+  const hostile = renderPlainCodeSnippet('<script>alert(1)</script>', 'wat', {
     styleKit: 'charcoal',
     showLineNumbers: false,
   });
@@ -169,8 +169,8 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
     'renderCode: expected plain fallback for unsupported language at renderer boundary',
   );
   assert(
-    out.includes('rev01-code-block'),
-    'renderCode: expected outer rev01-code-block wrapper even for plain fallback',
+    out.includes('rev01-code-snippet'),
+    'renderCode: expected outer rev01-code-snippet wrapper even for plain fallback',
   );
 }
 
@@ -212,7 +212,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
   // Plain path — 3 source lines, unsupported language.
   const plainSnippet = `line one\nline two\nline three`;
   const expectedPlainLines = 3;
-  const plain = renderPlainCodeBlock(plainSnippet, 'foo-lang', {
+  const plain = renderPlainCodeSnippet(plainSnippet, 'foo-lang', {
     styleKit: 'green-organic',
     showLineNumbers: true,
   });
@@ -270,7 +270,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
     showLineNumbers: true,
   };
   const out = renderCode(el, { styleKit: 'charcoal' });
-  assert(out.startsWith('<div class="rev01-code-block"'), 'wrapper: expected rev01-code-block div');
+  assert(out.startsWith('<div class="rev01-code-snippet"'), 'wrapper: expected rev01-code-snippet div');
   // Charcoal panel is #16171a — see `src/canvas/style-kits.ts`. We assert
   // the literal hex so a kit drift trips the smoke loudly.
   assert(

@@ -4,9 +4,9 @@
 
 **Goal:** Rebuild rev01 as a desktop canvas site builder where an owner creates one template-based site, edits positioned text/media/actions/shapes/containers, switches deterministic style kits, previews AI edits, publishes a whole-site snapshot, and open visitor tabs at the published address update immediately.
 
-**Architecture:** Keep the existing Cloudflare Worker, Hono routes, Clerk auth, Drizzle/Neon store, and Gemini adapter pattern. Replace the ProseMirror page model with canvas JSON: a site has canvas pages, each page has ordered canvas sections, each section has positioned design primitives. Publish promotes the current editable site into a stored published snapshot and broadcasts the new rendered HTML through a site Durable Object.
+**Architecture:** Keep the existing Cloudflare Worker, Hono routes, Clerk auth, Drizzle/Neon store, and Gemini adapter pattern. Replace the legacy flow-document page model with canvas JSON: a site has canvas pages, each page has ordered canvas sections, each section has positioned design primitives. Publish promotes the current editable site into a stored published snapshot and broadcasts the new rendered HTML through a site Durable Object.
 
-**Rich text scope (2026-05-22 amendment):** ProseMirror remains retired as the _page_ model. Rich text lives **only inside a `TextElement`** as a flat array of inline runs — no block structure (no paragraphs/lists/blockquotes). The text element's `role` (heading / body / label), `fontSize`, `fontWeight`, `align`, and `box` are unchanged; what changes is the content shape. See "Rich Text Content Model" below for the exact contract; Task 4.5 retrofits Task 1's schema/validator/renderer/fixture and Task 4's editor to honour it before Task 5 ships publish.
+**Rich text scope (2026-05-22 amendment):** The old page-model editor remains retired. Rich text lives **only inside a `TextElement`** as a flat array of inline runs — no block structure (no paragraphs/lists/blockquotes). The text element's `role` (heading / body / label), `fontSize`, `fontWeight`, `align`, and `box` are unchanged; what changes is the content shape. See "Rich Text Content Model" below for the exact contract; Task 4.5 retrofits Task 1's schema/validator/renderer/fixture and Task 4's editor to honour it before Task 5 ships publish.
 
 **Tech Stack:** Cloudflare Workers, Hono JSX, Drizzle ORM, Neon serverless Postgres, Clerk, Durable Objects, vanilla browser JS, Gemini adapter via `@google/genai`.
 
@@ -187,7 +187,7 @@ Retire after replacement is passing:
 - `src/document/*`
 - `src/multiplayer/*`
 - old `src/editor/client.ts`, `src/editor/index.tsx`, `src/editor/styles.ts`
-- old ProseMirror imports and dependencies
+- old flow-document imports and dependencies
 
 ---
 
@@ -690,7 +690,7 @@ Create `src/editor/canvas-index.tsx` route `GET /dashboard/sites/:siteId/edit`. 
 
 - auth-gate owner
 - verify site ownership
-- render topbar with site name, public address, style-kit choices, save button, publish button
+- render editor header with site name, public address, style-kit choices, save button, publish button
 - include `<div id="canvas-root"></div>`
 - inline `canvasClientScript({ siteId })`
 - include `canvasEditorStyles`
@@ -1645,7 +1645,7 @@ git commit -m "feat: add style kits and presence indicator"
 
 ---
 
-### Task 9: Retire Old ProseMirror Path And Update Docs
+### Task 9: Retire Old Flow-Document Path And Update Docs
 
 **Files:**
 
@@ -1670,16 +1670,10 @@ In `src/index.ts`, remove:
 
 In `wrangler.toml`, remove `PAGE_DO` only after no imports reference `PageDocument`.
 
-- [ ] **Step 3: Remove ProseMirror dependencies**
+- [ ] **Step 3: Remove legacy document-editor dependencies**
 
-In `package.json`, remove:
-
-- `prosemirror-model`
-- `prosemirror-state`
-- `prosemirror-transform`
-- `y-prosemirror`
-- `y-protocols`
-- `yjs`
+In `package.json`, remove the legacy document-editor package family and any
+sync packages used only by that retired path.
 
 Keep a dependency only if a remaining canvas/live file imports it.
 
@@ -1691,7 +1685,7 @@ Update README pitch to:
 rev01 is a desktop canvas site builder where an owner starts from one template, edits positioned design primitives with AI help, switches deterministic style kits, and publishes to a real public address that updates open visitor tabs immediately.
 ```
 
-Update `RECON.md` to mark ProseMirror/Yjs as superseded by ADR 0003.
+Update `RECON.md` to mark the legacy flow-document editor and its sync path as superseded by ADR 0003.
 
 - [ ] **Step 5: Verify full reset**
 
@@ -1710,7 +1704,7 @@ Expected: all pass.
 
 ```bash
 git add -A
-git commit -m "refactor: retire prosemirror poc path"
+git commit -m "refactor: retire legacy document poc path"
 ```
 
 ---

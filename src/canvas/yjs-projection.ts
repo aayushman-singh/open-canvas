@@ -26,13 +26,7 @@
 //   'siteNoIndex'?     -> boolean
 //   'darkModeEnabled'? -> boolean
 //   'faviconAssetId'?  -> string
-//   'symbols'          -> Y.Array<Y.Map<unknown>>    (SymbolMaster[])
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
-//
-// Each SymbolMaster Y.Map:
-//   'id'       -> string
-//   'name'     -> string
-//   'section'  -> Y.Map<unknown>                     (CanvasSection)
 //
 // Each CanvasPage Y.Map:
 //   'id'              -> string
@@ -67,7 +61,6 @@
 //   'content'?    -> Y.Array<Y.Map<unknown>>         (TextElement.content :: InlineRun[])
 //                    Per ADR 0007 "Out of scope" item 1, each run is an
 //                    opaque Y.Map; per-character text CRDT is a future ADR.
-//   'overrides'?  -> Y.Map<Y.Map<unknown>>           (SymbolInstance overrides)
 //
 // InlineRun Y.Map:
 //   'text'   -> string
@@ -105,7 +98,6 @@ import type {
   ShapeElement,
   StyleKit,
   StyleKitPreset,
-  SymbolMaster,
   TextElement,
 } from './schema.js';
 import type {
@@ -122,8 +114,6 @@ import type {
   FormFieldDef,
   NavElement,
   NavLink,
-  SymbolInstanceElement,
-  SymbolInstanceOverrides,
   TableColumn,
   TableElement,
   TableRow,
@@ -146,8 +136,8 @@ function setIfDefined<T>(map: Y.Map<unknown>, key: string, value: T | undefined)
 
 /**
  * Generic JSON → Y type encoder for the catch-all branches of the sorted-key
- * walkers (`encodeCustomStyleKit`, `encodeNestedTokenRecord`,
- * `encodeSymbolInstanceOverrides`). Those walkers deliberately iterate
+ * walkers (`encodeCustomStyleKit`, `encodeNestedTokenRecord`). Those walkers
+ * deliberately iterate
  * Object.keys instead of destructuring named fields so future schema additions
  * don't require per-field encode/decode pairs. This function is the terminal
  * case: if a value is a plain object or array rather than a primitive, wrap it
@@ -358,56 +348,6 @@ function encodeContainerElement(el: ContainerElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
   out.set('variant', el.variant);
-  return out;
-}
-
-function encodeSymbolInstanceOverrides(overrides: SymbolInstanceOverrides): Y.Map<Y.Map<unknown>> {
-  const out = new Y.Map<Y.Map<unknown>>();
-  for (const elementId of Object.keys(overrides).sort()) {
-    const patch = overrides[elementId];
-    if (patch === undefined) continue;
-    const patchMap = new Y.Map<unknown>();
-    // The override is a Partial<CanvasElement> — we copy primitive fields and
-    // nested compound fields the same way we encode whole elements, but every
-    // field is optional. Iterate over a fixed superset of known field names
-    // in alphabetical order for determinism.
-    const fieldNames = Object.keys(patch).sort();
-    for (const field of fieldNames) {
-      const value = (patch as Record<string, unknown>)[field];
-      if (value === undefined) continue;
-      // Compound fields known to need Y types:
-      if (field === 'box' && isPositionedBox(value)) {
-        patchMap.set('box', encodePositionedBox(value));
-        continue;
-      }
-      if (field === 'motion' && isMotion(value)) {
-        patchMap.set('motion', encodeMotion(value));
-        continue;
-      }
-      if (field === 'pinnedStyle' && isStringRecord(value)) {
-        patchMap.set('pinnedStyle', encodeStringRecord(value));
-        continue;
-      }
-      if (field === 'responsive' && isResponsive(value)) {
-        patchMap.set('responsive', encodeResponsive(value));
-        continue;
-      }
-      if (field === 'content' && Array.isArray(value)) {
-        patchMap.set('content', encodeInlineRuns(value as InlineRun[]));
-        continue;
-      }
-      patchMap.set(field, encodeJsonValue(value));
-    }
-    out.set(elementId, patchMap);
-  }
-  return out;
-}
-
-function encodeSymbolInstanceElement(el: SymbolInstanceElement): Y.Map<unknown> {
-  const out = new Y.Map<unknown>();
-  encodeBaseElementFields(out, el);
-  out.set('symbolId', el.symbolId);
-  out.set('overrides', encodeSymbolInstanceOverrides(el.overrides));
   return out;
 }
 
@@ -635,8 +575,6 @@ function encodeElement(el: CanvasElement): Y.Map<unknown> {
       return encodeShapeElement(el);
     case 'container':
       return encodeContainerElement(el);
-    case 'symbol-instance':
-      return encodeSymbolInstanceElement(el);
     case 'form':
       return encodeFormElement(el);
     case 'embed':
@@ -718,14 +656,6 @@ function encodePage(page: CanvasPage): Y.Map<unknown> {
   return out;
 }
 
-function encodeSymbolMaster(symbol: SymbolMaster): Y.Map<unknown> {
-  const out = new Y.Map<unknown>();
-  out.set('id', symbol.id);
-  out.set('name', symbol.name);
-  out.set('section', encodeSection(symbol.section));
-  return out;
-}
-
 function encodeCustomStyleKit(preset: StyleKitPreset): Y.Map<unknown> {
   // The preset is a plain JSON tree with a known field set. We store it as
   // a Y.Map of primitives + nested Y.Maps for the three Record<X, Tokens>
@@ -787,10 +717,6 @@ export function encodeYDoc(state: CanvasSiteState): Y.Doc {
     setIfDefined(root, 'siteNoIndex', state.siteNoIndex);
     setIfDefined(root, 'darkModeEnabled', state.darkModeEnabled);
     setIfDefined(root, 'faviconAssetId', state.faviconAssetId);
-
-    const symbols = new Y.Array<Y.Map<unknown>>();
-    for (const symbol of state.symbols) symbols.push([encodeSymbolMaster(symbol)]);
-    root.set('symbols', symbols);
 
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
@@ -961,15 +887,6 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       };
       return el;
     }
-    case 'symbol-instance': {
-      const el: SymbolInstanceElement = {
-        ...base,
-        type,
-        symbolId: map.get('symbolId') as string,
-        overrides: decodeSymbolInstanceOverrides(map.get('overrides') as Y.Map<Y.Map<unknown>>),
-      };
-      return el;
-    }
     case 'form': {
       const fields = (map.get('fields') as Y.Array<Y.Map<unknown>>).map(decodeFormFieldDef);
       const el: FormElement = {
@@ -1123,38 +1040,6 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
   }
 }
 
-function decodeSymbolInstanceOverrides(map: Y.Map<Y.Map<unknown>>): SymbolInstanceOverrides {
-  const out: SymbolInstanceOverrides = {};
-  for (const [elementId, patchMap] of map.entries()) {
-    const patch: Record<string, unknown> = {};
-    for (const [field, value] of patchMap.entries()) {
-      if (field === 'box' && value instanceof Y.Map) {
-        patch.box = decodePositionedBox(value as Y.Map<unknown>);
-        continue;
-      }
-      if (field === 'motion' && value instanceof Y.Map) {
-        patch.motion = decodeMotion(value as Y.Map<unknown>);
-        continue;
-      }
-      if (field === 'pinnedStyle' && value instanceof Y.Map) {
-        patch.pinnedStyle = decodeStringRecord(value as Y.Map<string>);
-        continue;
-      }
-      if (field === 'responsive' && value instanceof Y.Map) {
-        patch.responsive = decodeResponsive(value as Y.Map<unknown>);
-        continue;
-      }
-      if (field === 'content' && value instanceof Y.Array) {
-        patch.content = decodeInlineRuns(value as Y.Array<Y.Map<unknown>>);
-        continue;
-      }
-      patch[field] = decodeJsonValue(value);
-    }
-    out[elementId] = patch;
-  }
-  return out;
-}
-
 function decodeFormFieldDef(map: Y.Map<unknown>): FormFieldDef {
   const field: FormFieldDef = {
     id: map.get('id') as string,
@@ -1288,14 +1173,6 @@ function decodePage(map: Y.Map<unknown>): CanvasPage {
   return page;
 }
 
-function decodeSymbolMaster(map: Y.Map<unknown>): SymbolMaster {
-  return {
-    id: map.get('id') as string,
-    name: map.get('name') as string,
-    section: decodeSection(map.get('section') as Y.Map<unknown>),
-  };
-}
-
 function decodeCustomStyleKit(map: Y.Map<unknown>): StyleKitPreset {
   const out: Record<string, unknown> = {};
   for (const [key, value] of map.entries()) {
@@ -1337,7 +1214,6 @@ export function decodeYDoc(doc: Y.Doc): CanvasSiteState {
   const state: CanvasSiteState = {
     styleKit: root.get('styleKit') as StyleKit,
     pages: (root.get('pages') as Y.Array<Y.Map<unknown>>).map(decodePage),
-    symbols: (root.get('symbols') as Y.Array<Y.Map<unknown>>).map(decodeSymbolMaster),
   };
   if (root.has('customStyleKit')) {
     state.customStyleKit = decodeCustomStyleKit(root.get('customStyleKit') as Y.Map<unknown>);

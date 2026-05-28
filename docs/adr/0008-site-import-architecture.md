@@ -6,7 +6,7 @@
 
 ## Context
 
-Owners want to create an Editable Site by importing an existing website — paste a URL, get an editable site. The import must work for any public URL, not only Webflow sites. The imported site must preserve the source's layout structure accurately: spatial relationships between elements must be correct, though pixel-perfect reproduction is not required.
+Owners want to create an Editable Site by importing an existing website — paste a URL, get an editable site. The import must work for any public URL, not only sites produced by one builder. The imported site must preserve the source's layout structure accurately: spatial relationships between elements must be correct, though pixel-perfect reproduction is not required.
 
 Three subproblems drive the architecture:
 

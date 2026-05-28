@@ -3,7 +3,7 @@
 // Wave 4 #16 — Multi-page nav. See:
 //   docs/superpowers/plans/2026-05-23-16-multi-page-nav.md
 //
-// A NavElement renders a top bar that contains an optional logo asset and an
+// A NavElement renders a navigation strip that contains an optional logo asset and an
 // ordered list of links. The element is stored once on the site as the single
 // inner element of a "Site Nav" SymbolMaster (see `src/symbols/nav-bootstrap.ts`)
 // and dropped onto each Canvas Page as a SymbolInstance — so editing the nav

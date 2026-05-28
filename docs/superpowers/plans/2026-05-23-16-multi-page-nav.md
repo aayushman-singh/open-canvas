@@ -6,7 +6,7 @@
 
 ## User-visible outcome
 
-An Owner with multiple Canvas Pages adds a Nav Element. The Nav lives once as a Symbol; instances appear on every page automatically. Editing the Nav (adding a link, changing the logo) once updates every page. Visitors see a top bar at the same place on each page with links to the other pages.
+An Owner with multiple Canvas Pages adds a Nav Element. The Nav lives once as a Symbol; instances appear on every page automatically. Editing the Nav (adding a link, changing the logo) once updates every page. Visitors see a shared navigation strip at the same place on each page with links to the other pages.
 
 ## Scope in
 

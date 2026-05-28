@@ -275,6 +275,11 @@ importRouter.post('/', async (c) => {
       return c.json({ error: 'subdomain is already taken' }, 409);
     }
     if (isSiteLimitViolation(err)) {
+      const { siteLimit } = entitlementsFor(currentPlanId);
+      if (isUnlimited(siteLimit)) {
+        console.error('site_limit_drift', { plan: currentPlanId, err });
+        throw err;
+      }
       return c.json({ error: siteLimitExceededMessage(currentPlanId) }, 403);
     }
     throw err;
@@ -474,7 +479,6 @@ export function buildCanvasSiteState(
     styleKit: 'custom',
     customStyleKit: buildCustomStyleKit(data, fontFamilyTokenMap),
     pages: [page],
-    symbols: [],
   };
 }
 

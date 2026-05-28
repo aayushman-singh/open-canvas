@@ -271,7 +271,6 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
 
   const next: CanvasSiteState = {
     ...result.site.editableState,
-    symbols: [...(result.site.editableState.symbols ?? [])],
     pages: result.site.editableState.pages,
   };
 

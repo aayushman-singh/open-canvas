@@ -27,12 +27,10 @@ import themeRoute from './themes/route';
 import { configureFormRender } from './canvas/elements/form';
 // Wave 3 routers wired by main thread after parallel-agent merge.
 import searchRouter from './search/route';
-import symbolsRouter from './symbols/route';
 import a11yRoute from './a11y/route';
 import a11yReportRoute from './routes/dashboard/a11y-report';
 import pageSettingsRoute from './routes/dashboard/page-settings';
 // Wave 4 routers wired by main thread after parallel-agent merge.
-import navEditorRoute from './routes/dashboard/nav-editor';
 import sitemapRouter from './seo/sitemap/route';
 // Wave 5 routers wired by main thread after parallel-agent merge.
 import fontsRouter from './fonts/route';
@@ -182,8 +180,7 @@ app.route('/__rev01/unlock', unlockRoute);
 // through only after the password gate has passed.
 app.route('/__rev01/forms', formsRouter);
 // Wave 3 mounts. Per-feature plans in docs/superpowers/plans/2026-05-23-*.md.
-// Symbols (#14) and a11y (#15) live under /api/sites/:siteId/...
-app.route('/api/sites/:siteId/symbols', symbolsRouter);
+// a11y (#15) lives under /api/sites/:siteId/...
 app.route('/api/sites', a11yRoute);
 app.route('/dashboard', a11yReportRoute);
 app.route('/dashboard', pageSettingsRoute);
@@ -192,8 +189,6 @@ app.route('/dashboard', pageSettingsRoute);
 // passed. The handler reads the request Host to resolve site id.
 app.route('/__rev01/search', searchRouter);
 // Wave 4 mounts.
-// Nav editor UI (#16) lives under /dashboard.
-app.route('/dashboard', navEditorRoute);
 // Sitemap.xml + robots.txt (#22) on public-host root paths. public.ts must
 // fall through (return null) for `/sitemap.xml` and `/robots.txt` — see the
 // fallthrough block in handlePublicRequest.

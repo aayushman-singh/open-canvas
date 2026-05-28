@@ -117,19 +117,6 @@ const syntheticElements: CanvasElement[] = [
     variant: 'glass',
   },
   {
-    id: 'el-symbol-instance',
-    type: 'symbol-instance',
-    box: { x: 0, y: 560, w: 400, h: 100, z: 1 },
-    symbolId: 'sym-1',
-    overrides: {
-      'inner-el-1': {
-        box: { x: 10, y: 10, w: 50, h: 50, z: 2 },
-        motion: { preset: 'scale-in' },
-        pinnedStyle: { color: 'red' },
-      },
-    },
-  },
-  {
     id: 'el-form',
     type: 'form',
     box: { x: 0, y: 680, w: 400, h: 300, z: 1 },
@@ -267,30 +254,6 @@ const syntheticPage: CanvasPage = {
 const syntheticState: CanvasSiteState = {
   styleKit: 'orange-editorial',
   pages: [syntheticPage],
-  symbols: [
-    {
-      id: 'sym-1',
-      name: 'Reusable hero',
-      section: {
-        id: 'sym-section-1',
-        recipeId: 'hero-split',
-        name: 'Sym hero',
-        height: 600,
-        elements: [
-          {
-            id: 'inner-el-1',
-            type: 'text',
-            box: { x: 0, y: 0, w: 200, h: 60, z: 1 },
-            content: [{ text: 'Inner heading' }],
-            role: 'heading',
-            fontSize: 32,
-            fontWeight: 600,
-            align: 'center',
-          },
-        ],
-      },
-    },
-  ],
   header: {
     id: 'site-header',
     recipeId: 'custom',

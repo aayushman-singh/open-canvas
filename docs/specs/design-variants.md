@@ -39,7 +39,7 @@ The goal: **avoid the default-shadcn / default-tailwind aesthetic** that 90% of 
 - Below it, a single live element: a real `document.json` rendering in a bordered box, with a Yjs cursor visibly editing it.
 - No video, no 3D.
 
-**One-liner for recruiter:** "Looks like nothing else on Webflow's homepage."
+**One-liner for recruiter:** "Looks like nothing else in a no-code gallery."
 
 **Risks:** Polarizing — some will read as "too design-school." Works only if executed precisely; mediocre brutalism reads as broken.
 
@@ -163,7 +163,7 @@ The goal: **avoid the default-shadcn / default-tailwind aesthetic** that 90% of 
 | GPU / mobile cost | low | low | high | medium |
 | Recruiter "wow" risk | high — polarizing | medium — sells calm | medium — generic-2024 risk | high — polarizing |
 | Engineering signal carried | strong (no chrome to hide behind) | medium | low (chrome can mask) | strong (live data visible) |
-| Differentiator vs Webflow/Framer | strongest | medium | weakest | strong |
+| Differentiator vs site-builder incumbents | strongest | medium | weakest | strong |
 | Fits "AI-native multiplayer" pitch | medium | weak | strong | strongest |
 | Maintenance cost | low | low | medium | high |
 

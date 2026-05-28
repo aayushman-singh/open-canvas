@@ -16,7 +16,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | G4 | Section toolbar | No "Sym" (convert to symbol) button | **fixed** |
 | G5 | Templates page | 5 templates — spec said 3 seed names | outdated-spec |
 | G6 | Dashboard card | Expanded card backdrop intercepts all clicks until Escape | minor |
-| G7 | Editor topbar | No "Translate" button | **fixed** |
+| G7 | Editor header | No "Translate" button | **fixed** |
 | G8 | Sidebar overlap | Sidebar covers leftmost canvas elements at 100% zoom | **fixed** |
 | G9 | Editor boot | `state.symbols` not iterable on pre-symbol sites | **fixed** |
 | G10 | Template previews | Iframe thumbnails garbled at preview scale | cosmetic |
@@ -228,13 +228,13 @@ Exhaustive inventory of testable features for end-to-end coverage.
 
 | # | Feature | Test Description | Status |
 |---|---------|-----------------|--------|
-| 13.1 | Editor load | Canvas editor renders with topbar, sidebar, canvas, inspector, status | PASS (MCP) |
+| 13.1 | Editor load | Canvas editor renders with header, sidebar, canvas, inspector, status | PASS (MCP) |
 | 13.2 | Site state load | Editable state fetched and rendered on canvas | PASS (MCP) |
-| 13.3 | Topbar buttons | Save, Publish, Save-as-Template buttons visible | PASS (MCP) |
+| 13.3 | Editor header buttons | Save, Publish, Save-as-Template buttons visible | PASS (MCP) |
 | 13.4 | Sidebar tabs | Add tab and Sections tab functional | PASS (MCP) |
 | 13.5 | Inspector panel | Right panel updates based on selection | PASS (MCP) |
 | 13.6 | Status line | Footer shows ready/saving/error status | — |
-| 13.7 | Presence badge | Live collaborator count in topbar | — |
+| 13.7 | Presence badge | Live collaborator count in editor header | — |
 
 ---
 
@@ -424,7 +424,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 |---|---------|-----------------|--------|
 | 22.1 | Autosave (debounced) | Changes auto-saved after 500ms idle | — |
 | 22.2 | Manual save (Ctrl+S) | Keyboard shortcut flushes pending save | — |
-| 22.3 | Save button | Topbar Save button triggers save | — |
+| 22.3 | Save button | Editor header Save button triggers save | — |
 | 22.4 | Save status feedback | "Saving..." → "Saved" in status line | — |
 | 22.5 | Save error feedback | Failed save shows error in status line | — |
 | 22.6 | Publish | Publish button → site available at subdomain | — |
@@ -432,7 +432,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 22.8 | Publish creates snapshot | Version history updated after publish | — |
 | 22.9 | Publish triggers OG image | OG image regenerated on publish | — |
 | 22.10 | Publish rebuilds search index | Full-text index updated | — |
-| 22.11 | Save as template | Topbar button saves current state as template | — |
+| 22.11 | Save as template | Editor header button saves current state as template | — |
 
 ---
 
@@ -505,7 +505,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 | 27.7 | Shape rendering | SVG shapes render correctly | — |
 | 27.8 | Container rendering | Layout containers render with children | — |
 | 27.9 | Chart rendering | Charts render with data visualization | — |
-| 27.10 | Code block rendering | Syntax-highlighted code blocks | — |
+| 27.10 | Code snippet rendering | Syntax-highlighted code snippets | — |
 | 27.11 | Symbol instance rendering | Symbol instances resolve to inlined content | — |
 | 27.12 | Navigation rendering | Site-wide nav renders on all pages | — |
 | 27.13 | Custom fonts | @font-face declarations load custom WOFF2 | — |
@@ -786,7 +786,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 
 | # | Feature | Test Description | Status |
 |---|---------|-----------------|--------|
-| 47.1 | Chat button in topbar | Editor topbar shows "Chat" button | — |
+| 47.1 | Chat button in editor header | Editor header shows "Chat" button | — |
 | 47.2 | Panel toggle | Clicking Chat opens 360px slide-out panel on right | — |
 | 47.3 | Panel close | Clicking × or Chat again closes the panel | — |
 | 47.4 | Input field | Panel has text input with "Ask the agent..." placeholder | — |
@@ -805,7 +805,7 @@ Exhaustive inventory of testable features for end-to-end coverage.
 
 | # | Feature | Test Description | Status |
 |---|---------|-----------------|--------|
-| 48.1 | AI button in topbar | Editor topbar shows cyan "AI" button | — |
+| 48.1 | AI button in editor header | Editor header shows cyan "AI" button | — |
 | 48.2 | Prompt modal | Clicking AI opens text modal with "Describe the change..." | — |
 | 48.3 | Preview flow | Submitting prompt calls /canvas-agent/preview and shows result panel | — |
 | 48.4 | Accept/dismiss | Preview panel has Accept and Dismiss buttons | — |

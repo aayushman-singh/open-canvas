@@ -10,7 +10,7 @@ The file has **four fields**. Nothing else. No file lists, no API tables, no imp
 
 ### Name
 
-The subsystem's name — exactly as it appears in `src/<name>/`. Conceptual, not technological (`page-document`, not `ProseMirrorDocStore`).
+The subsystem's name — exactly as it appears in `src/<name>/`. Conceptual, not technological (`site-room`, not `DurableObjectSyncService`).
 
 ### Definition
 

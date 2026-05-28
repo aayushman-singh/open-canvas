@@ -63,7 +63,6 @@ function validateSectionForLibrary(section: CanvasSection): { valid: true } | { 
   }
   const syntheticState: CanvasSiteState = {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [{ id: 'validate-page', slug: 'home', title: 'Validate', width: 1440, sections: [section] }],
   };
   return validateCanvasSiteState(syntheticState);

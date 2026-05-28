@@ -3,6 +3,7 @@ node_modules/
 .turbo/
 .cache/
 dist/
+dist-test/
 build/
 out/
 .wrangler/
@@ -27,3 +28,9 @@ PARALLEL_AGENT.md
 .playwright-mcp/
 package-lock.json
 e2e-screenshots/
+playwright-report/
+test-results/
+dfs/
+/*.png
+e2e/live-driver/.profile/
+e2e/live-driver/screenshots/

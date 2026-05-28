@@ -501,7 +501,7 @@ export { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 // override per-element via inline `style="..."` without fighting specificity.
 //
 // Custom-property prefix `--rev01-kit-*` is intentional: it sits beside the
-// editor-chrome's `--rev01-*` namespace without colliding. Chrome (topbar,
+// editor-chrome's `--rev01-*` namespace without colliding. Chrome (header,
 // inspector, status) uses `--rev01-accent`/`--rev01-bg` for its own dark UI;
 // kit consumers read `--rev01-kit-accent`/`--rev01-kit-bg`. The legacy
 // `--kit-bg`/`--kit-fg`/`--kit-accent` aliases are also emitted so the
@@ -522,7 +522,7 @@ function declaration(prop: string, value: string | number): string {
 function buildKitTokenBlock(kitName: string, preset: StyleKitPreset): string {
   // Kit tokens are namespaced `--rev01-kit-*` to keep them off the editor
   // chrome's `--rev01-*` namespace. Editor chrome (src/editor/canvas-styles.ts)
-  // sets its own `--rev01-bg`/`--rev01-accent` on :root for the topbar,
+  // sets its own `--rev01-bg`/`--rev01-accent` on :root for the header,
   // inspector, and status bar; those are unrelated to the document being
   // edited. Per-kit visuals live entirely behind the `--rev01-kit-*` prefix
   // plus the legacy `--kit-*` aliases that the existing editor / public CSS

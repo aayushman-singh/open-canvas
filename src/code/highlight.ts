@@ -1,6 +1,6 @@
 // src/code/highlight.ts
 //
-// Wishlist #19 — Code Block. Wave 4 owner.
+// Wishlist #19 - Code Snippet. Wave 4 owner.
 //
 // Shiki wrapper, fine-grained bundle, **synchronous**. We load EXACTLY the
 // 11 curated languages + 1 light theme + the JavaScript regex engine.
@@ -25,7 +25,7 @@
 //
 // Failure policy: if Shiki throws on a token it cannot lex, we let the
 // error propagate. Unsupported *languages* fall back to a plain pre/code
-// block via `renderPlainCodeBlock`; any other failure is loud per the
+// snippet via `renderPlainCodeSnippet`; any other failure is loud per the
 // global "no silent fallbacks" rule.
 
 import {
@@ -118,7 +118,7 @@ export interface HighlightCtx {
  * Unsupported language: this function ONLY runs when the language is
  * curated; passing an unsupported language is a programming error and
  * throws loudly (callers must check `isSupportedLanguage(...)` first and
- * route to `renderPlainCodeBlock`).
+ * route to `renderPlainCodeSnippet`).
  */
 export function highlightCode(
   source: string,
@@ -168,7 +168,7 @@ export function highlightCode(
  * Lives here (not in code.ts) so the smoke test can hit it directly and so
  * the "Shiki vs plain" decision sits in one module.
  */
-export function renderPlainCodeBlock(
+export function renderPlainCodeSnippet(
   source: string,
   language: string,
   ctx: HighlightCtx,

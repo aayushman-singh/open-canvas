@@ -88,15 +88,6 @@ const settingsStyles = `
     margin: 0 0 20px;
   }
 
-  .plan-status {
-    min-height: 18px;
-    margin: -6px 0 14px;
-    font-size: 13px;
-    color: var(--faint);
-  }
-  .plan-status[data-tone="success"] { color: var(--accent); }
-  .plan-status[data-tone="error"] { color: #ff6b6b; }
-
   .plan-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -313,42 +304,6 @@ const tabScript = raw(`<script>
       if (target) target.setAttribute('data-active', 'true');
     });
   });
-
-  var planButtons = document.querySelectorAll('[data-plan-id]');
-  var planStatus = document.getElementById('plan-status');
-  function setStatus(text, tone) {
-    if (!planStatus) return;
-    planStatus.textContent = text || '';
-    planStatus.setAttribute('data-tone', tone || '');
-  }
-  planButtons.forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var planId = btn.getAttribute('data-plan-id');
-      if (!planId || btn.disabled) return;
-      var originalText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Updating...';
-      setStatus('', '');
-      fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ plan: planId }),
-      }).then(function(res) {
-        return res.json().then(function(body) { return { ok: res.ok, body: body }; });
-      }).then(function(result) {
-        if (!result.ok) {
-          throw new Error(result.body && result.body.error ? result.body.error : 'Plan update failed');
-        }
-        setStatus('Plan updated. Reloading...', 'success');
-        window.location.reload();
-      }).catch(function(err) {
-        btn.disabled = false;
-        btn.textContent = originalText;
-        setStatus(err && err.message ? err.message : 'Plan update failed', 'error');
-      });
-    });
-  });
 })();
 </script>`);
 
@@ -364,7 +319,7 @@ const PLANS: Array<{
     name: 'Free',
     price: '$0',
     period: '/mo',
-    features: ['1 site', 'Community templates', 'rev01 subdomain', '100 MB storage'],
+    features: ['3 sites', 'Community templates', 'rev01 subdomain', '100 MB storage'],
   },
   {
     id: 'pro',
@@ -386,29 +341,6 @@ const INVOICES = [
   { date: 'May 2026', description: 'Free plan', amount: '$0.00', status: 'Paid' },
   { date: 'Apr 2026', description: 'Free plan', amount: '$0.00', status: 'Paid' },
   { date: 'Mar 2026', description: 'Free plan', amount: '$0.00', status: 'Paid' },
-];
-
-const NOTIFICATIONS = [
-  { id: 'publish', title: 'Site published', desc: 'When a site is published or updated', on: true },
-  {
-    id: 'collab',
-    title: 'Collaborator activity',
-    desc: 'When someone joins or edits a shared site',
-    on: true,
-  },
-  { id: 'forms', title: 'Form submissions', desc: 'New form submissions on your sites', on: false },
-  {
-    id: 'product',
-    title: 'Product updates',
-    desc: 'New features, improvements, and announcements',
-    on: true,
-  },
-  {
-    id: 'tips',
-    title: 'Tips & tutorials',
-    desc: 'Helpful guides to get the most out of rev01',
-    on: false,
-  },
 ];
 
 settingsRoute.get('/settings', async (c) => {
@@ -490,8 +422,7 @@ settingsRoute.get('/settings', async (c) => {
       <div class="settings-panel" id="tab-billing" data-active="true">
         <div class="settings-section">
           <h3>Plan</h3>
-          <p class="desc">You're on the {currentPlan.name} plan. {currentPlanId === 'team' ? 'You have access to every rev01 feature.' : 'Upgrade to unlock more sites and custom domains.'}</p>
-          <div id="plan-status" class="plan-status" role="status" aria-live="polite" />
+          <p class="desc">You're on the {currentPlan.name} plan. {currentPlanId === 'team' ? 'You have access to every rev01 feature.' : 'Plan changes are coming soon — contact support to switch plans.'}</p>
           <div class="plan-grid">
             {PLANS.map((plan) => {
               const isCurrent = plan.id === currentPlanId;
@@ -502,17 +433,9 @@ settingsRoute.get('/settings', async (c) => {
                   <ul class="plan-features">
                     {plan.features.map((f) => <li>{f}</li>)}
                   </ul>
-                  {isCurrent ? (
-                    <Button variant="secondary" style="margin-top:16px;width:100%" disabled>
-                      Current plan
-                    </Button>
-                  ) : (
-                    <Button variant="secondary" style="margin-top:16px;width:100%" data-plan-id={plan.id}>
-                      {PLANS.findIndex((p) => p.id === plan.id) < PLANS.findIndex((p) => p.id === currentPlanId)
-                        ? `Downgrade to ${plan.name}`
-                        : `Upgrade to ${plan.name}`}
-                    </Button>
-                  )}
+                  <Button variant="secondary" style="margin-top:16px;width:100%" disabled>
+                    {isCurrent ? 'Current plan' : 'Coming soon'}
+                  </Button>
                 </div>
               );
             })}
@@ -573,19 +496,11 @@ settingsRoute.get('/settings', async (c) => {
       <div class="settings-panel" id="tab-notifications" data-active="false">
         <div class="settings-section">
           <h3>Email notifications</h3>
-          <p class="desc">Choose which emails you want to receive.</p>
-          {NOTIFICATIONS.map((n) => (
-            <div class="notif-row">
-              <div class="notif-info">
-                <h4>{n.title}</h4>
-                <p>{n.desc}</p>
-              </div>
-              <label class="toggle">
-                <input type="checkbox" checked={n.on} />
-                <span class="toggle-track" />
-              </label>
-            </div>
-          ))}
+          <p class="desc">
+            Per-event email preferences aren't wired up in this build. You'll receive
+            transactional account emails (sign-in, publish receipts) regardless; everything
+            else lands here once the notifications service ships.
+          </p>
         </div>
       </div>
 

@@ -41,8 +41,8 @@ A curated visual system for a site, including colours, typography, surfaces, sha
 _Avoid_: CSS theme, skin, preset
 
 **Design Primitive**:
-A reusable visual building block that can be positioned, styled, and combined to recreate many reference designs.
-_Avoid_: Webflow clone, component library, arbitrary CSS
+A reusable visual primitive that can be positioned, styled, and combined to recreate many reference designs.
+_Avoid_: Reference-site clone, component library, arbitrary CSS
 
 **Motion Preset**:
 A curated animation behaviour that can be applied to a section or positioned element.
@@ -90,11 +90,11 @@ _Avoid_: Section type, section kind, section category
 
 **Section**:
 An interchangeable page region the owner can insert, remove, reorder, or replace. A body-role section; the default.
-_Avoid_: Block, component, template slice
+_Avoid_: Component, template slice
 
 **Header Section**:
 A site-wide section with the header role, rendered before every canvas page. At most one per editable site. Cannot be reordered into page body sections or duplicated.
-_Avoid_: Nav bar, top bar, header component
+_Avoid_: Nav bar, site chrome, header component
 
 **Footer Section**:
 A site-wide section with the footer role, rendered after every canvas page. At most one per editable site. Cannot be reordered into page body sections or duplicated.
@@ -106,15 +106,15 @@ _Avoid_: Full-page canvas, freeform page, absolute page layer
 
 **Content Element**:
 An editable item inside a section, such as text, media, an action, a shape, or a container.
-_Avoid_: Block, widget, layer
+_Avoid_: Widget, layer
 
 **Media Element**:
 A content element that displays an image or video asset.
-_Avoid_: Image block, video widget, embed
+_Avoid_: Media module, video widget, embed
 
 **Positioned Element**:
 A content element with a position and size inside a canvas section.
-_Avoid_: Flow block, DOM node, layer
+_Avoid_: Flow item, DOM node, layer
 
 **Film Reel**:
 A right-side panel that shows all sections of a canvas page as miniature thumbnails, used for visual reordering and blank section insertion.

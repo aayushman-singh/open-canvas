@@ -112,13 +112,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     migrateSection(s.header);
     migrateSection(s.footer);
-    if (Array.isArray(s.symbols)) {
-      for (var symIdx = 0; symIdx < s.symbols.length; symIdx++) {
-        if (s.symbols[symIdx]) {
-          migrateSection(s.symbols[symIdx].section);
-        }
-      }
-    }
     return s;
   }
 
@@ -1093,12 +1086,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     scanSection(state.header, "Header");
     scanSection(state.footer, "Footer");
-    if (Array.isArray(state.symbols)) {
-      for (var symIdx = 0; symIdx < state.symbols.length; symIdx++) {
-        var symbol = state.symbols[symIdx];
-        if (symbol) scanSection(symbol.section, "Symbol " + (symbol.name || symbol.id));
-      }
-    }
     return refs;
   }
 
@@ -1262,7 +1249,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     redoStack.push(structuredClone(state));
     undoStack.pop();
     state = structuredClone(undoStack[undoStack.length - 1]);
-    if (state && !Array.isArray(state.symbols)) state.symbols = [];
     renderAll();
     scheduleSave();
     undoRedoing = false;
@@ -1275,7 +1261,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     undoRedoing = true;
     undoStack.push(structuredClone(state));
     state = structuredClone(redoStack.pop());
-    if (state && !Array.isArray(state.symbols)) state.symbols = [];
     renderAll();
     scheduleSave();
     undoRedoing = false;
@@ -1975,12 +1960,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       case "table": return buildTableBody(element);
       case "nav": return buildNavBody(element);
       case "collection": return buildCollectionBody(element);
-      // Symbol-instance editor placeholder. Renders a card that
-      // identifies the referenced master by name + lists override count. The
-      // public renderer does the real merge + render at publish/preview time;
-      // the editor surface is intentionally minimal because instances should
-      // be primarily edited via the Symbol panel (master edits propagate).
-      case "symbol-instance": return buildSymbolInstanceBody(element);
     }
     throw new Error("unsupported editor element type: " + String(element.type));
   }
@@ -3853,7 +3832,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var grid = document.createElement("div");
     grid.className = "rev01-section-inspector-grid";
 
-    var hasInstance = section.elements.some(function(e) { return e && e.type === "symbol-instance"; });
     var pinned = isPinnedSection(section);
     var defs = [];
     if (!pinned) {
@@ -3862,9 +3840,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       defs.push({ label: "Move down", action: "move-down", tip: "Move this section down on the page" });
     }
     defs.push({ label: "Save to library", action: "save-to-library", tip: "Save this section for reuse on other pages" });
-    if (!hasInstance) {
-      defs.push({ label: "Convert to symbol", action: "convert-to-symbol", tip: "Turn this section into a reusable symbol" });
-    }
     defs.push({ label: "Delete section", action: "delete-section", danger: true, tip: "Remove this section from the page" });
 
     for (var i = 0; i < defs.length; i++) {
@@ -4878,34 +4853,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       scheduleSave();
     });
     actionsCol.appendChild(altInput);
-
-    if (element.mediaKind === "image") {
-      const genRow = document.createElement("div");
-      genRow.style.cssText = "display:flex;gap:4px;";
-
-      const promptInput = document.createElement("textarea");
-      promptInput.rows = 1;
-      promptInput.placeholder = "Describe image...";
-      promptInput.style.cssText = "flex:1;min-width:0;font-size:11px;resize:none;box-sizing:border-box;" +
-        "appearance:none;background:var(--rev01-bg-panel);border:1px solid var(--rev01-hairline);" +
-        "color:var(--rev01-fg);border-radius:4px;padding:4px 6px;font-family:inherit;";
-
-      const genBtn = document.createElement("button");
-      genBtn.type = "button";
-      genBtn.textContent = "AI";
-      genBtn.addEventListener("click", () => {
-        const prompt = promptInput.value.trim();
-        if (!prompt) {
-          setStatus("Enter a prompt first", "error");
-          return;
-        }
-        generateImageForElement(element, prompt);
-      });
-
-      genRow.appendChild(promptInput);
-      genRow.appendChild(genBtn);
-      actionsCol.appendChild(genRow);
-    }
 
     const historyLabel = document.createElement("div");
     historyLabel.className = "picker-row-label";
@@ -7160,7 +7107,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       state = body.editableState;
       if (state) state = migrateState(state);
-      if (state && !Array.isArray(state.symbols)) state.symbols = [];
       selectedSectionId = null;
       selectedElementId = null;
       if (mainEl && state && state.styleKit) {
@@ -7283,18 +7229,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   async function aiReplaceMedia(elementId) {
     if (aiBusy) return;
+    const found = findElement(elementId);
+    if (!found || found.element.type !== "media" || found.element.mediaKind !== "image") {
+      setStatus("AI generation supports image elements only", "error");
+      return;
+    }
     const brief = await openTextModal({
       title: "AI media",
-      label: "Describe the asset",
+      label: "Describe the image",
       placeholder: "Sunset over ocean",
       multiline: true,
     });
     if (brief === null || brief.trim().length === 0) return;
-    const prompt =
-      "Replace the media element with id=" + elementId +
-      " by calling replaceMedia with an asset id that already exists on this site. " +
-      "Owner brief: " + brief;
-    runAiPreview(prompt);
+    await generateImageForElement(found.element, brief.trim());
   }
 
   async function aiCreateSection(afterSectionId) {
@@ -7776,15 +7723,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       scheduleSave();
     } else if (action === "save-to-library") {
       void saveToLibrary(section);
-    } else if (action === "convert-to-symbol") {
-      // Convert to Symbol: lift the section into a new SymbolMaster on the
-      // site, then replace its slot with a symbol-instance element wrapped in
-      // a new host section.
-      void convertSectionToSymbol(section, idx, page);
-    } else if (action === "detach-instance") {
-      // Detach: inline the master + overrides into the host section, removing
-      // the symbol-instance reference.
-      void detachInstanceInSection(section, idx, page);
     }
   }
 
@@ -7925,7 +7863,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // Background click inside the canvas viewport (artboard padding or
       // the gutter around pages): drop the active section and element so the
       // selection outline clears and the inspector goes back to its empty
-      // state. Clicks on the sidebar/inspector/topbar reach here too via the
+      // state. Clicks on the sidebar/inspector/header reach here too via the
       // document-level mousedown listener below.
       if (selectedSectionId) selectSection(null);
       if (selectedElementId) selectElement(null);
@@ -7946,6 +7884,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (!selectedElementId) return;
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
+      if (target.closest('.rev01-modal-backdrop')) return;
+      if (target.closest('.rev01-ai-panel')) return;
       if (inspector && inspector.contains(target)) return;
       if (target.closest('#canvas-reel')) return;
       if (target.closest('.rev01-element')) return;
@@ -8326,7 +8266,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       state = body.editableState;
       if (state) state = migrateState(state);
-      if (state && !Array.isArray(state.symbols)) state.symbols = [];
       selectedSectionId = null;
       selectedElementId = null;
       pendingImport = null;
@@ -8527,7 +8466,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // exit (opens published URL in new tab + leaves editor) and an
       // unambiguous "Continue editing" path that just dismisses. Replaces the
       // 4-second status-line flash that was easy to miss.
-      var addrEl = document.querySelector(".rev01-editor-topbar .address");
+      var addrEl = document.querySelector(".rev01-editor-header .address");
       var publishedHost = addrEl && addrEl.textContent ? addrEl.textContent.trim() : "";
       var modalTitle = "Published" + versionSuffix;
       var modalMessage = publishedHost
@@ -8662,318 +8601,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     window.addEventListener("blur", endTemporaryPan);
   }
 
-  // -- Symbols (masters + instances + override UX) -----------------------
-  //
-  // The server-side authoritative store is CanvasSiteState.symbols plus the
-  // 'symbol-instance' element type. This editor surface is additive: it adds
-  // a "Symbols" tab to the sidebar, a "Sym" button to eligible section
-  // toolbars, an "Add symbol instance" entry to the Add panel, and a small
-  // visual placeholder for symbol-instance elements.
-  //
-  // All persistence flows through the same PUT /api/canvas/sites/:siteId path
-  // the rest of the editor uses — we do NOT call the symbol HTTP router from
-  // here because the pure functions on the canvas state are simpler to drive.
-  // The HTTP router exists for cross-process consumers and standalone agent
-  // flows.
-  //
-  // ----------------------------------------------------------------------
-
-  function newSymbolMasterId() { return "sym-" + uuid(); }
-
-  // Deep-clone an arbitrary canvas section/element/etc. Using JSON because
-  // structuredClone is available but the rest of the editor uses this
-  // exact idiom (see section duplication around line 3148).
-  function deepCloneCanvas(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  function findSymbolMaster(symbolId) {
-    if (!state || !Array.isArray(state.symbols)) return null;
-    for (const s of state.symbols) {
-      if (s && s.id === symbolId) return s;
-    }
-    return null;
-  }
-
-  // Locate the symbol-instance element inside a host section. The editor's
-  // "Convert to Symbol" treats every section as eligible, but the host
-  // section created when an instance is dropped contains exactly ONE
-  // symbol-instance element (matching the publish-time render structure).
-  function findInstanceElementInSection(section) {
-    if (!section || !Array.isArray(section.elements)) return null;
-    for (const el of section.elements) {
-      if (el && el.type === "symbol-instance") return el;
-    }
-    return null;
-  }
-
-  // Find every page+section+element location of a symbol-instance pointing
-  // at the given symbolId. Returns [] when none.
-  function findInstancesOfSymbol(symbolId) {
-    const hits = [];
-    if (!state || !Array.isArray(state.pages)) return hits;
-    for (const page of state.pages) {
-      if (!page || !Array.isArray(page.sections)) continue;
-      for (const section of page.sections) {
-        if (!section || !Array.isArray(section.elements)) continue;
-        for (const el of section.elements) {
-          if (el && el.type === "symbol-instance" && el.symbolId === symbolId) {
-            hits.push({ pageId: page.id, sectionId: section.id, elementId: el.id });
-          }
-        }
-      }
-    }
-    return hits;
-  }
-
-  // Visual placeholder for a symbol-instance in the editor. The published
-  // renderer does the real master-merge + emit; here we just show a card
-  // identifying the symbol and the override count so the Owner has something
-  // to interact with at the right slot.
-  function buildSymbolInstanceBody(element) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "rev01-symbol-instance-placeholder";
-    wrapper.style.display = "flex";
-    wrapper.style.flexDirection = "column";
-    wrapper.style.alignItems = "center";
-    wrapper.style.justifyContent = "center";
-    wrapper.style.gap = "8px";
-    wrapper.style.padding = "24px";
-    wrapper.style.width = "100%";
-    wrapper.style.height = "100%";
-    wrapper.style.boxSizing = "border-box";
-    wrapper.style.border = "2px dashed rgba(255,255,255,0.35)";
-    wrapper.style.borderRadius = "12px";
-    wrapper.style.background = "rgba(255,255,255,0.04)";
-    wrapper.style.color = "rgba(255,255,255,0.85)";
-    wrapper.style.font = "12px/1.4 system-ui, sans-serif";
-    wrapper.style.pointerEvents = "none";
-
-    const master = findSymbolMaster(element.symbolId);
-    const title = document.createElement("strong");
-    title.textContent = "Symbol: " + (master ? master.name : "(missing master " + element.symbolId + ")");
-    title.style.fontSize = "14px";
-    wrapper.appendChild(title);
-
-    const meta = document.createElement("span");
-    const overrideCount = element.overrides ? Object.keys(element.overrides).length : 0;
-    const elementCount = master && master.section && Array.isArray(master.section.elements)
-      ? master.section.elements.length : 0;
-    meta.textContent = elementCount + " element" + (elementCount === 1 ? "" : "s")
-      + ", " + overrideCount + " override" + (overrideCount === 1 ? "" : "s");
-    meta.style.opacity = "0.7";
-    wrapper.appendChild(meta);
-
-    if (!master) {
-      meta.style.color = "#ff8080";
-      meta.textContent = "Master not found — Detach or remove this instance.";
-    }
-
-    return wrapper;
-  }
-
-  // ---- Convert to Symbol -----------------------------------------------
-  //
-  // Lift the given section into a new SymbolMaster, then replace the
-  // section's page slot with a host section containing ONE symbol-instance
-  // element pointing at the master. We prompt for a name; cancel aborts.
-  //
-  // Refuses if the section already contains a symbol-instance — nested
-  // symbols are forbidden by the scope-out. The Owner should detach first.
-  async function convertSectionToSymbol(section, idx, page) {
-    if (!state) return;
-    if (findInstanceElementInSection(section)) {
-      setStatus("This section already contains a symbol instance — nested symbols are not supported", "error");
-      return;
-    }
-    if (!Array.isArray(section.elements) || section.elements.length === 0) {
-      setStatus("Add at least one element before converting to a Symbol", "error");
-      return;
-    }
-
-    const name = await openTextModal({
-      title: "Convert to Symbol",
-      label: "Symbol name",
-      defaultValue: section.name || "Symbol",
-    });
-    if (name === null || name.trim().length === 0) return;
-
-    if (!Array.isArray(state.symbols)) state.symbols = [];
-
-    // The master's section is a DEEP CLONE of the original — masters live
-    // independently from any one page slot. The original page slot then
-    // becomes a host section wrapping a symbol-instance.
-    const masterId = newSymbolMasterId();
-    const masterSection = deepCloneCanvas(section);
-    state.symbols.push({ id: masterId, name: name.trim(), section: masterSection });
-
-    // Build the host section + instance.
-    const instance = {
-      id: newElementId(),
-      type: "symbol-instance",
-      symbolId: masterId,
-      overrides: {},
-      box: { x: 0, y: 0, w: page.width, h: section.height, z: 1 },
-    };
-    const host = {
-      id: newSectionId(),
-      recipeId: section.recipeId,
-      name: section.name + " (instance)",
-      height: section.height,
-      elements: [instance],
-    };
-    page.sections.splice(idx, 1, host);
-
-    selectedSectionId = host.id;
-    selectedElementId = instance.id;
-    renderAll();
-    renderSymbolsPanelIfMounted();
-    scheduleSave();
-    setStatus("Converted to Symbol: " + name.trim(), "ok");
-  }
-
-  // ---- Detach instance -------------------------------------------------
-  //
-  // Reverse of "Convert to Symbol" for one instance: replace the host section
-  // with a fresh CanvasSection whose content is the master + overrides applied.
-  // The master itself is unchanged. All ids in the new section are regenerated
-  // so subsequent detaches of OTHER instances of the same symbol don't collide.
-  async function detachInstanceInSection(section, idx, page) {
-    if (!state) return;
-    const instance = findInstanceElementInSection(section);
-    if (!instance) {
-      setStatus("No symbol instance to detach in this section", "error");
-      return;
-    }
-    const master = findSymbolMaster(instance.symbolId);
-    if (!master) {
-      setStatus("Master not found for symbol " + instance.symbolId, "error");
-      return;
-    }
-
-    // Mirror src/symbols/merge.ts merge precedence.
-    // Deep-clone master, then apply each override via Object.assign on the
-    // matching inner element. Strip 'type'/'id' from overrides defensively.
-    const detached = deepCloneCanvas(master.section);
-    detached.id = newSectionId();
-    for (let i = 0; i < detached.elements.length; i++) {
-      const inner = detached.elements[i];
-      if (!inner) continue;
-      const patch = instance.overrides && instance.overrides[inner.id];
-      if (patch && typeof patch === "object") {
-        const safe = Object.assign({}, patch);
-        delete safe.type;
-        delete safe.id;
-        Object.assign(inner, safe);
-      }
-      inner.id = newElementId();
-    }
-
-    page.sections.splice(idx, 1, detached);
-    selectedSectionId = detached.id;
-    selectedElementId = null;
-    renderAll();
-    renderSymbolsPanelIfMounted();
-    scheduleSave();
-    setStatus("Detached instance of: " + master.name, "ok");
-  }
-
-  // ---- Add symbol instance from sidebar --------------------------------
-  //
-  // Wraps a fresh symbol-instance in a new host section. The Owner is asked
-  // to pick a master; cancel aborts. Refuses when the site has no masters
-  // yet (the right next move is "Convert to Symbol" on an existing section).
-  async function addSymbolInstanceFromSidebar() {
-    if (!state) return;
-    const symbols = Array.isArray(state.symbols) ? state.symbols : [];
-    if (symbols.length === 0) {
-      setStatus("No Symbols yet — convert a section first", "error");
-      return;
-    }
-    const choice = await openSelectModal({
-      title: "Add symbol instance",
-      label: "Symbol",
-      options: symbols.map((s) => ({ value: s.id, label: s.name })),
-      okLabel: "Add",
-    });
-    if (choice === null) return;
-
-    const page = currentPage();
-    if (!page) return;
-    const master = findSymbolMaster(choice);
-    if (!master) {
-      setStatus("Master not found: " + choice, "error");
-      return;
-    }
-    const height = (master.section && typeof master.section.height === "number") ? master.section.height : 320;
-    const instance = {
-      id: newElementId(),
-      type: "symbol-instance",
-      symbolId: choice,
-      overrides: {},
-      box: { x: 0, y: 0, w: page.width, h: height, z: 1 },
-    };
-    const host = {
-      id: newSectionId(),
-      recipeId: master.section.recipeId || "cta-band",
-      name: master.name + " (instance)",
-      height,
-      elements: [instance],
-    };
-
-    const selectedIndex = selectedSectionId
-      ? page.sections.findIndex((s) => s.id === selectedSectionId)
-      : -1;
-    const insertAt = selectedIndex >= 0 ? selectedIndex + 1 : page.sections.length;
-    page.sections.splice(insertAt, 0, host);
-    selectedSectionId = host.id;
-    selectedElementId = instance.id;
-    renderAll();
-    scheduleSave();
-    setStatus("Added instance of " + master.name, "ok");
-  }
-
-  // ---- Symbols sidebar panel ------------------------------------------
-  //
-  // Dynamically injected (the page shell in canvas-index.tsx is frozen for
-  // this wave). We add a "Symbols" tab button next to "Add" / "Sections", a
-  // panel listing every master with rename / delete / detach-all-and-delete
-  // actions, and the "Add symbol instance" sidebar command.
-
-  function ensureSymbolsTabMounted() {
-    if (!sidebar) return null;
-    const tabsRow = sidebar.querySelector(".rev01-sidebar-tabs");
-    if (!tabsRow) return null;
-    if (sidebar.querySelector('[data-sidebar-tab="symbols"]')) {
-      return sidebar.querySelector('[data-sidebar-panel="symbols"]');
-    }
-
-    const tabButton = document.createElement("button");
-    tabButton.type = "button";
-    tabButton.setAttribute("role", "tab");
-    tabButton.setAttribute("aria-selected", "false");
-    tabButton.setAttribute("data-sidebar-tab", "symbols");
-    tabButton.textContent = "Symbols";
-    tabsRow.appendChild(tabButton);
-
-    const panel = document.createElement("div");
-    panel.className = "rev01-sidebar-panel";
-    panel.setAttribute("role", "tabpanel");
-    panel.setAttribute("aria-label", "Symbols");
-    panel.setAttribute("data-sidebar-panel", "symbols");
-    panel.hidden = true;
-    sidebar.appendChild(panel);
-
-    // Wire tab activation manually — attachSidebarTabs() in the existing
-    // boot path queried the tab buttons once at boot, so a newly-added tab
-    // misses the listener. We replicate the activate() behaviour locally.
-    tabButton.addEventListener("click", () => {
-      activateSidebarTab("symbols");
-    });
-
-    return panel;
-  }
-
   function activateSidebarTab(tabName) {
     const tabButtons = sidebar ? sidebar.querySelectorAll('[data-sidebar-tab]') : [];
     const panels = sidebar ? sidebar.querySelectorAll('[data-sidebar-panel]') : [];
@@ -8985,163 +8612,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     panels.forEach((p) => {
       p.hidden = p.getAttribute("data-sidebar-panel") !== tabName;
     });
-    if (tabName === "symbols") {
-      renderSymbolsPanel();
-    }
     if (tabName === "versions") {
       renderVersionsPanel();
     }
     if (tabName === "pages") {
       updatePageSidebar();
     }
-  }
-
-  function renderSymbolsPanelIfMounted() {
-    if (!sidebar) return;
-    const panel = sidebar.querySelector('[data-sidebar-panel="symbols"]');
-    if (panel && !panel.hidden) renderSymbolsPanel();
-  }
-
-  function renderSymbolsPanel() {
-    const panel = ensureSymbolsTabMounted();
-    if (!panel) return;
-    panel.replaceChildren();
-
-    const group = document.createElement("section");
-    group.className = "rev01-sidebar-group";
-    const heading = document.createElement("h2");
-    heading.textContent = "Symbols";
-    group.appendChild(heading);
-
-    const symbols = state && Array.isArray(state.symbols) ? state.symbols : [];
-    if (symbols.length === 0) {
-      const empty = document.createElement("p");
-      empty.style.opacity = "0.7";
-      empty.textContent = "No Symbols yet. Use Sym on a section to create one.";
-      group.appendChild(empty);
-    } else {
-      const list = document.createElement("ul");
-      list.style.listStyle = "none";
-      list.style.margin = "0";
-      list.style.padding = "0";
-      list.style.display = "flex";
-      list.style.flexDirection = "column";
-      list.style.gap = "8px";
-      for (const sym of symbols) {
-        list.appendChild(buildSymbolListItem(sym));
-      }
-      group.appendChild(list);
-    }
-
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.className = "rev01-sidebar-command";
-    addBtn.textContent = "Add symbol instance";
-    addBtn.addEventListener("click", () => { void addSymbolInstanceFromSidebar(); });
-    group.appendChild(addBtn);
-
-    panel.appendChild(group);
-  }
-
-  function buildSymbolListItem(sym) {
-    const li = document.createElement("li");
-    li.style.padding = "10px";
-    li.style.border = "1px solid rgba(255,255,255,0.12)";
-    li.style.borderRadius = "8px";
-    li.style.display = "flex";
-    li.style.flexDirection = "column";
-    li.style.gap = "8px";
-
-    const head = document.createElement("div");
-    head.style.display = "flex";
-    head.style.alignItems = "center";
-    head.style.justifyContent = "space-between";
-    head.style.gap = "8px";
-    const nameEl = document.createElement("strong");
-    nameEl.textContent = sym.name;
-    head.appendChild(nameEl);
-    const count = findInstancesOfSymbol(sym.id).length;
-    const countEl = document.createElement("span");
-    countEl.style.opacity = "0.7";
-    countEl.style.fontSize = "11px";
-    countEl.textContent = count + " instance" + (count === 1 ? "" : "s");
-    head.appendChild(countEl);
-    li.appendChild(head);
-
-    const actions = document.createElement("div");
-    actions.style.display = "flex";
-    actions.style.gap = "6px";
-    actions.style.flexWrap = "wrap";
-
-    const renameBtn = document.createElement("button");
-    renameBtn.type = "button";
-    renameBtn.textContent = "Rename";
-    renameBtn.addEventListener("click", () => { void renameSymbolPrompt(sym.id); });
-    actions.appendChild(renameBtn);
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.classList.add("danger");
-    deleteBtn.addEventListener("click", () => { void deleteSymbolMasterPrompt(sym.id); });
-    actions.appendChild(deleteBtn);
-
-    li.appendChild(actions);
-    return li;
-  }
-
-  async function renameSymbolPrompt(symbolId) {
-    const sym = findSymbolMaster(symbolId);
-    if (!sym) return;
-    const next = await openTextModal({
-      title: "Rename Symbol",
-      label: "Symbol name",
-      defaultValue: sym.name,
-    });
-    if (next === null || next.trim().length === 0) return;
-    sym.name = next.trim();
-    renderAll();
-    renderSymbolsPanelIfMounted();
-    scheduleSave();
-    setStatus("Renamed", "ok");
-  }
-
-  async function deleteSymbolMasterPrompt(symbolId) {
-    if (!state || !Array.isArray(state.symbols)) return;
-    const sym = findSymbolMaster(symbolId);
-    if (!sym) return;
-    const locations = findInstancesOfSymbol(symbolId);
-    if (locations.length > 0) {
-      // Refuse-and-offer-escape: the Owner must explicitly confirm
-      // "Detach all & delete" before we collapse instances to copies.
-      const confirmed = await openSelectModal({
-        title: "Delete “" + sym.name + "”",
-        label: locations.length + " instance" + (locations.length === 1 ? "" : "s") + " reference this symbol",
-        options: [
-          { value: "cancel", label: "Cancel" },
-          { value: "detach", label: "Detach all instances to copies, then delete" },
-        ],
-        okLabel: "Continue",
-      });
-      if (confirmed !== "detach") return;
-      // Detach every instance site-wide (single-page POC = single page, but
-      // we still walk pages defensively).
-      for (const loc of locations) {
-        const page = state.pages.find((p) => p.id === loc.pageId);
-        if (!page) continue;
-        const sectionIdx = page.sections.findIndex((s) => s.id === loc.sectionId);
-        if (sectionIdx < 0) continue;
-        const section = page.sections[sectionIdx];
-        await detachInstanceInSection(section, sectionIdx, page);
-      }
-    }
-    // Remove the master.
-    const idx = state.symbols.findIndex((s) => s.id === symbolId);
-    if (idx >= 0) state.symbols.splice(idx, 1);
-    renderAll();
-    renderSymbolsPanelIfMounted();
-    scheduleSave();
-    setStatus("Deleted symbol: " + sym.name, "ok");
   }
 
   // -- Version History sidebar tab -----------------------------------------
@@ -9371,7 +8847,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const body = await response.json();
       state = body.editableState;
       if (state) state = migrateState(state);
-      if (state && !Array.isArray(state.symbols)) state.symbols = [];
       if (state && state.pages && state.pages.length > 0) {
         activePageId = state.pages[0].id;
       }
@@ -9406,7 +8881,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // Inject tabs dynamically so the static canvas shell can stay focused
       // on layout. The tab + panel mount immediately; contents render lazily
       // on first activation.
-      ensureSymbolsTabMounted();
       ensureVersionsTabMounted();
       attachSidebarActions();
       updatePageSidebar();

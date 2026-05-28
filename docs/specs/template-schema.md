@@ -1,132 +1,206 @@
-# Template schema spec
+# Template Seed Schema
 
-**Status:** Draft
-**Date:** 2026-05-21
+**Status:** Current
+**Date:** 2026-05-28
 
 ## Goal
 
-Define the document vocabulary, the template descriptor format, and the seed-to-site flow. A template is a **seed document**: creating a site copies the template's document into a new row, and editing the site is editing that document. No per-block versioning, no field mappings, no per-template build.
+Define the Template Seed vocabulary and the seed-to-site flow for the canvas
+builder. A Template Seed stores a complete `CanvasSiteState`: Style Kit choice,
+Canvas Pages, shared header/footer Sections, and optional site-wide publish
+settings. Creating a site copies that state into a new Editable Site.
 
 This spec is the source of truth for:
-1. The **document model** — ProseMirror node and mark vocabulary every template and every site must conform to.
-2. The **template descriptor** — sidecar metadata describing a template to the catalog.
-3. The **seed → site flow** — what happens when a user clicks "Use template."
 
-The schema is derived directly from product requirements, not from any external reference. Vocabulary covers the minimum set of structural primitives a Gamma-style page composer needs.
+1. The **Template Seed** shape copied into a new Editable Site.
+2. The **Canvas Site State** vocabulary every seed must satisfy.
+3. The **seed to Editable Site flow** when an Owner starts from a seed.
 
-## 1. Document model
+The source of truth in code is `src/canvas/schema.ts`; seed definitions live in
+`src/templates/registry.ts` and fixture JSON lives in `src/canvas/fixtures/`.
 
-A page is one document. A site is N pages. The TypeScript schema in `src/document/schema.ts` is the source of truth — TipTap's runtime schema and the renderer both consume it.
-
-### 1.1 Design principles
-
-- **Composition over configuration.** A small set of primitives that compose, not a large set of pre-baked block types.
-- **Semantic, not visual.** A node says what it is (`actions`, `media`), not how it looks. Visual variation lives in attrs (`variant`, `align`, `style`) and theme tokens.
-- **Renderer-friendly.** Every node maps to a small, predictable HTML output. No node requires conditional walking, lookback, or external data.
-- **Editor-friendly.** Every node has obvious insertion, deletion, and selection behaviour in TipTap.
-- **Agent-friendly.** Every node is constructible by Claude tool-use without ambiguity.
-
-### 1.2 Node types
-
-| Node | Kind | Required attrs | Optional attrs | Children |
-|---|---|---|---|---|
-| `doc` | root | — | — | `1+ section` |
-| `section` | block | `kind` (`hero` \| `feature` \| `pricing` \| `gallery` \| `cta` \| `footer` \| `custom`) | `surface` (theme-token ref), `padding` (`sm` \| `md` \| `lg`), `bg` (url or theme-token ref) | `block+` |
-| `heading` | block | `level` (1–6) | `align` (`start` \| `center` \| `end`) | `inline+` |
-| `paragraph` | block | — | `align` | `inline*` |
-| `media` | atom-block | `src`, `mediaType` (`image` \| `video` \| `iframe`) | `alt`, `aspectRatio`, `loading` (`lazy` \| `eager`) | — |
-| `actions` | block | — | `align` | `1+ action` |
-| `action` | inline-block | `href`, `label` | `variant` (`primary` \| `secondary` \| `ghost`), `newTab` (bool) | — |
-| `columns` | block | `count` (`2` \| `3` \| `4`) | `gap` (`sm` \| `md` \| `lg`) | `column+` |
-| `column` | block | — | `width` (`auto` \| `1/2` \| `1/3` \| `2/3` \| `1/4` \| `3/4`), `align` | `block+` |
-| `divider` | atom-block | — | `style` (`line` \| `dot` \| `space`) | — |
-| `list` | block | `style` (`bullet` \| `numbered` \| `check`) | — | `listItem+` |
-| `listItem` | block | — | — | `inline+` |
-| `text` | leaf | — | `marks` | — |
-
-**Content groups:**
-- `block` = `heading | paragraph | media | actions | columns | divider | list`
-- `inline` = `text` (carries marks)
-
-### 1.3 Marks
-
-| Mark | Attrs | Excludes |
-|---|---|---|
-| `bold` | — | — |
-| `italic` | — | — |
-| `underline` | — | — |
-| `code` | — | all others |
-| `link` | `href`, `target`, `rel` | — |
-| `color` | `value` (theme-token ref or hex) | — |
-| `highlight` | `value` (theme-token ref or hex) | — |
-
-### 1.4 Notes on omissions
-
-- **No collection / repeater node.** Pages are static documents. Listing pages (blog index, gallery feed) are out of MVP scope; when they land they become a separate page kind, not a node inside `doc`.
-- **No icon node.** Icons go through `media` with an SVG src.
-- **No subscript / superscript marks.** Out of scope for the launch templates.
-- **No strikethrough.** Edit history makes strikethrough redundant.
-
-## 2. Template descriptor
-
-Stored alongside the seed document in the `templates` table.
+## 1. Template Seed
 
 ```typescript
-type TemplateDescriptor = {
-  id: string;                    // url-safe slug, e.g. "acme-coffee"
-  name: string;                  // display name
-  tagline: string;               // 1-line pitch
-  category: 'business' | 'portfolio' | 'landing' | 'product' | 'blog';
-  thumbnail: string;             // R2 url
-  designLanguage: DesignLanguageId; // see design-variants.md
-  tokens: ThemeTokenSet;         // baseline tokens; user can override per site
-  pages: TemplatePage[];         // 1+ pages
-};
-
-type TemplatePage = {
-  slug: string;                  // url path, e.g. "/", "/about"
-  title: string;
-  doc: DocumentJSON;             // the seed ProseMirror document
-};
-
-type ThemeTokenSet = {
-  paletteSeed: string;           // OKLCH hex; rest derived
-  font: { heading: string; body: string };
-  radius: 'none' | 'sm' | 'md' | 'lg' | 'full';
-  density: 'compact' | 'normal' | 'comfortable';
+type TemplateSeed = {
+  id: string;
+  name: string;
+  tagline: string;
+  state: CanvasSiteState;
 };
 ```
 
-## 3. Seed → site flow
+Rules:
 
-1. User clicks "Use template" on a `TemplateDescriptor`.
-2. `POST /api/sites` with `{ templateId, siteName }`.
-3. Server:
-   - Creates a `Site` row.
-   - For each `TemplatePage`, creates a `Page` row with `doc = deepClone(template.pages[i].doc)`.
-   - Copies `template.tokens` into `Site.tokens`.
-   - Returns `siteId`.
-4. Dashboard navigates to `/dashboard/sites/<siteId>`.
-5. Editor loads page 0 via `GET /api/pages/<pageId>` → renders TipTap with `doc`.
+- `id` is a stable URL-safe identifier.
+- `name` and `tagline` are dashboard copy only.
+- `state` is deep-cloned before it becomes an Editable Site.
+- A seed must not depend on per-owner records except through Owner Asset ids
+  that the seed materialisation step is prepared to copy or remap.
 
-No per-template build. No Wrangler deploy. No R2 archive. Adding a template is one INSERT.
+## 2. Canvas Site State
 
-## 4. Validator
+```typescript
+type CanvasSiteState = {
+  styleKit: StyleKit;
+  pages: CanvasPage[];
+  header?: CanvasSection;
+  footer?: CanvasSection;
+  customStyleKit?: StyleKitPreset;
+  defaultLocale?: string;
+  siteNoIndex?: boolean;
+  darkModeEnabled?: boolean;
+  faviconAssetId?: string;
+};
+```
 
-`src/document/validate.ts` — pure function `validateDocument(doc: unknown) → { valid: true } | { valid: false, errors: string[] }`.
+Rules:
 
-Checks:
-- Root type is `doc`.
-- At least one `section`.
-- All node and mark types exist in the schema.
-- Required attrs present.
-- Text nodes have no children.
-- `media.mediaType` matches expected `src` shape (image url for `image`, video url for `video`, allowlisted host for `iframe`).
+- `pages` contains one or more Canvas Pages.
+- `styleKit` is one of the built-in Style Kits or `custom`.
+- `customStyleKit` is required when `styleKit` is `custom`.
+- `header` and `footer`, when present, are site-wide Sections rendered on every
+  Canvas Page.
+- Publish settings (`defaultLocale`, `siteNoIndex`, `darkModeEnabled`,
+  `faviconAssetId`) are copied into the Published Snapshot on publish.
 
-Does not enforce ProseMirror content expressions at the JSON level — TipTap enforces those at edit time. The validator is for catalog-upload safety and AI-agent output checks.
+## 3. Canvas Page
 
-## 5. Open follow-ups
+```typescript
+type CanvasPage = {
+  id: string;
+  slug: string;
+  title: string;
+  width: number;
+  sections: CanvasSection[];
+  description?: string;
+  ogImageAssetId?: string;
+  canonical?: string;
+  noIndex?: boolean;
+  locale?: string;
+  entranceAnimation?: MotionPreset;
+  scrollTriggerMode?: ScrollTriggerMode;
+  pageBackground?: string;
+  defaultMotionPreset?: MotionPreset;
+  sectionGap?: number;
+  maxWidth?: number;
+  publishedDate?: string;
+  author?: string;
+  tags?: string[];
+  category?: string;
+};
+```
 
-- **Per-page theme override.** v1 keeps tokens site-wide; per-page override is post-MVP.
-- **Embed allowlist.** Hardcoded: `youtube.com`, `vimeo.com`, `loom.com`, `codesandbox.io`, `figma.com`. Validator rejects anything else.
-- **Schema versioning.** Add `Site.schemaVersion: 1` column when the first breaking change ships. Until then, no version field is needed.
+Rules:
+
+- `slug` is the visitor path segment; `/` is represented by the homepage slug
+  used by the route layer.
+- `title` is required and feeds dashboard labels and SEO title output.
+- `sections` contains the page body Sections only; shared header/footer
+  Sections live on `CanvasSiteState`.
+- Optional SEO and metadata fields are rendered by the publish and public host
+  layers.
+
+## 4. Canvas Section
+
+```typescript
+type CanvasSection = {
+  id: string;
+  recipeId: SectionRecipeId;
+  name: string;
+  height: number;
+  role?: 'header' | 'footer' | 'body';
+  backgroundEffect?: BackgroundEffect;
+  entrance?: MotionPreset;
+  trigger?: { type: 'exit-intent' | 'delay' | 'scroll'; value?: number };
+  backgroundVideo?: string;
+  elements: CanvasElement[];
+};
+```
+
+Rules:
+
+- `role` defaults to `body`.
+- A Section owns a bounded two-dimensional editing space.
+- `elements` are positioned Content Elements rendered in deterministic order.
+- `recipeId` records the Section Recipe used to create the Section; `custom`
+  is valid for owner-authored shapes.
+
+## 5. Content Elements
+
+Every Content Element has:
+
+```typescript
+type BaseElement = {
+  id: string;
+  type: ElementType;
+  box: PositionedBox;
+  motion?: { preset: MotionPreset; delayMs?: number };
+  pinnedStyle?: Record<string, string>;
+  elementStyle?: ElementStyle;
+  responsive?: ResponsiveOverrides;
+};
+```
+
+Current `ElementType` values:
+
+| Type | Purpose |
+| --- | --- |
+| `text` | Rich inline text with roles, marks, alignment, and typography controls. |
+| `media` | Image or video Owner Asset display. |
+| `action` | Visitor-facing link or page action. |
+| `shape` | Decorative or structural shape primitive. |
+| `container` | Surface primitive for grouping or visual framing. |
+| `form` | Visitor submission form. |
+| `embed` | Allowlisted external frame. |
+| `chart` | Static chart rendered as SVG. |
+| `accordion` | Interactive disclosure set. |
+| `carousel` | Interactive slide set. |
+| `table` | Structured tabular content. |
+| `code` | Syntax-highlighted code snippet. |
+| `nav` | Visitor navigation element. |
+| `collection` | Manual or page-backed collection display. |
+
+Text content is an ordered list of inline runs:
+
+```typescript
+type InlineRun = {
+  text: string;
+  marks?: InlineMark[];
+};
+```
+
+Inline marks are intentionally small: bold, italic, underline, strike, code,
+highlight, and link. A Text Element remains one positioned visual paragraph;
+paragraph grouping belongs to Sections and Pages, not to the inline text model.
+
+## 6. Seed To Editable Site Flow
+
+1. Owner selects a Template Seed in the dashboard.
+2. Client submits `{ templateId, siteName, subdomain }` to the site creation
+   route.
+3. Server resolves the Template Seed from `src/templates/registry.ts`.
+4. Server deep-clones the seed's `CanvasSiteState`.
+5. Server materialises any seed assets for the Owner.
+6. Server creates a new Editable Site row with the cloned state.
+7. Dashboard sends the Owner to the Canvas Editor for the new site.
+
+No per-seed build, per-seed Worker, or external deployment step exists in this
+flow. Publish later promotes the Editable Site state into a Published Snapshot.
+
+## 7. Validation
+
+Validation lives in `src/canvas/validate.ts` and related element-level modules.
+It checks:
+
+- State has at least one Canvas Page.
+- Every Page, Section, and Content Element has a stable id.
+- Element `type` values are known.
+- Required element fields are present and valid.
+- Action links use supported target shapes.
+- Media references point to Owner Asset ids and carry alt text.
+- Style Kit selection is valid, including the `custom` requirements.
+- Inline marks are known and link marks use allowed URLs.
+
+The validator fails loudly with explicit errors. It does not substitute default
+state or silently skip invalid elements.

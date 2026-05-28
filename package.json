@@ -35,6 +35,7 @@
     "assets:smoke": "bun run src/assets/smoke.ts",
     "auth-access:smoke": "bun run src/auth/access.smoke.ts",
     "seed:assets": "bun run src/assets/seed-script.ts",
+    "seed:apogee-demo": "bun run scripts/seed-apogee-demo.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",
     "sections:smoke": "bun run src/routes/api/sections-smoke.ts",

@@ -37,10 +37,6 @@ export const ELEMENT_TYPES = [
   'action',
   'shape',
   'container',
-  // Phase 0 scaffold — element bodies defined in `src/canvas/elements/<type>.ts`
-  // and re-exported via `src/canvas/elements/index.ts`. Their render stubs
-  // throw until the owning wave agent fills them in.
-  'symbol-instance',
   'form',
   'embed',
   'chart',
@@ -313,7 +309,6 @@ import type { CodeElement } from './elements/code.js';
 import type { EmbedElement } from './elements/embed.js';
 import type { FormElement } from './elements/form.js';
 import type { NavElement } from './elements/nav.js';
-import type { SymbolInstanceElement } from './elements/symbol-instance.js';
 import type { TableElement } from './elements/table.js';
 import type { CollectionElement } from './elements/collection.js';
 
@@ -323,7 +318,6 @@ export type CanvasElement =
   | ActionElement
   | ShapeElement
   | ContainerElement
-  | SymbolInstanceElement
   | FormElement
   | EmbedElement
   | ChartElement
@@ -348,23 +342,6 @@ export interface CanvasSection {
   trigger?: { type: 'exit-intent' | 'delay' | 'scroll'; value?: number };
   backgroundVideo?: string;
   elements: CanvasElement[];
-}
-
-// -- SymbolMaster (Wave 3 #14 — see plan 14-symbols) ------------------------
-//
-// A SymbolMaster is a site-level reusable section. Symbol Instances reference
-// it by id (see `SymbolInstanceElement` in `elements/symbol-instance.ts`) and
-// optionally override individual inner element fields. Editing the master
-// propagates to every instance; overrides survive master edits.
-//
-// Storage: lives in `CanvasSiteState.symbols[]` for the POC (Yjs-friendly).
-// A `siteSymbol` DB table is reserved in Phase 0 for future cross-site
-// sharing but is not the source of truth today.
-export interface SymbolMaster {
-  id: string;
-  name: string;
-  /** The master content — a complete CanvasSection rendered when an Instance resolves. */
-  section: CanvasSection;
 }
 
 export interface CanvasPage {
@@ -417,11 +394,6 @@ export interface CanvasSiteState {
    */
   customStyleKit?: StyleKitPreset;
   /**
-   * Wave 3 #14 — site-level symbol masters. Empty array on every existing
-   * fixture; the Wave 3 owner adds CRUD that mutates this array.
-   */
-  symbols: SymbolMaster[];
-  /**
    * Wave 5 #25 — default locale for pages with no explicit `locale`. Optional
    * everywhere; `'en'` when absent.
    */
@@ -456,8 +428,6 @@ export interface PublishedSnapshot {
   footer?: CanvasSection;
   /** Mirror of `CanvasSiteState.customStyleKit` carried through publish. */
   customStyleKit?: StyleKitPreset;
-  /** Mirror of `CanvasSiteState.symbols`; the renderer needs masters to resolve instances. */
-  symbols?: SymbolMaster[];
   /** Mirror of `CanvasSiteState.defaultLocale`; used by public `<html lang>`. */
   defaultLocale?: string;
   /** Mirror of `CanvasSiteState.siteNoIndex`; used by SEO meta emission. */

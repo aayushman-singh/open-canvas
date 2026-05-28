@@ -1,27 +1,10 @@
 // src/canvas/elements/index.ts
 //
-// Phase 0 element registry — frozen contract.
-//
-// CHOICE (Phase 0 scaffold): the five original element interfaces
-// (text, media, action, shape, container) stay defined inline in
-// `src/canvas/schema.ts`. Their render functions used to be inline in
-// `src/canvas/render.ts`; in Phase 0 they were moved into per-element files
-// under this directory (text.ts, media.ts, action.ts, shape.ts,
-// container.ts) so that every element type has the SAME shape on disk —
-// "one element, one file, one render fn, optional recipe constant."
-//
-// The nine new ElementType files (form, embed, chart, accordion, carousel,
-// table, code, nav, symbol-instance) follow the same shape; their render
-// fns throw `Error('TODO: implement in Wave N')` until the owning wave
-// agent fills them in.
-//
-// Render dispatch — `RENDER_DISPATCH[el.type](el, ctx)` — is consumed by
-// `src/canvas/render.ts`. That file is frozen after Phase 0 so wave agents
-// add their entry by editing the element file, not the renderer.
-//
-// The dispatch signature uniformly takes `(el, ctx)`. `ctx` is the
-// `ElementRenderCtx` declared below — a single shape every render fn reads
-// from, regardless of whether it cares about every field.
+// Element registry — single import point for every element interface and the
+// dispatch table consumed by `src/canvas/render.ts`. The five originals
+// (text, media, action, shape, container) are defined inline in
+// `src/canvas/schema.ts`; the rest live in per-element files in this
+// directory. Each render fn has the uniform signature `(el, ctx)`.
 
 import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
@@ -37,7 +20,6 @@ import { renderForm } from './form.js';
 import { renderMedia } from './media.js';
 import { renderNav } from './nav.js';
 import { renderShape } from './shape.js';
-import { renderSymbolInstance } from './symbol-instance.js';
 import { renderTable } from './table.js';
 import { renderText } from './text.js';
 
@@ -58,7 +40,6 @@ export type { CodeElement, CodeLanguage } from './code.js';
 export type { EmbedElement } from './embed.js';
 export type { FormElement, FormFieldDef, FormFieldKind } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
-export type { SymbolInstanceElement, SymbolInstanceOverrides } from './symbol-instance.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
 export type {
   CollectionElement,
@@ -122,12 +103,6 @@ export const RENDER_DISPATCH: RenderDispatch = {
   action: (el, ctx) => renderAction(el, { pages: ctx.pages }),
   shape: (el) => renderShape(el),
   container: (el) => renderContainer(el),
-  // Phase 0 stubs — each throws until its wave agent lands.
-  'symbol-instance': (el, ctx) =>
-    renderSymbolInstance(el, {
-      styleKit: ctx.styleKit,
-      assetBasePath: ctx.assetBasePath,
-    }),
   form: (el, ctx) =>
     renderForm(el, {
       siteId: ctx.siteId,

@@ -27,6 +27,7 @@ for (const seed of allTemplateSeeds) {
     targetCustomerId,
     sourceSection: sourceSection,
     existingAssetIds,
+    existingByHash: new Map(),
   });
   assert(result.ok, `import failed for ${seed.id}: ${result.ok ? '' : result.errors.join('; ')}`);
 
@@ -70,14 +71,17 @@ const firstImport = importSectionIntoSite({
   targetCustomerId,
   sourceSection: firstSection,
   existingAssetIds: new Set<string>(),
+  existingByHash: new Map(),
 });
 assert(firstImport.ok, 'first import must succeed');
 if (firstImport.ok) {
   const seenSet = new Set(firstImport.newAssetRows.map((r) => r.id));
+  const seenByHash = new Map(firstImport.newAssetRows.map((r) => [r.contentHash, r.id]));
   const secondImport = importSectionIntoSite({
     targetCustomerId,
     sourceSection: firstSection,
     existingAssetIds: seenSet,
+    existingByHash: seenByHash,
   });
   assert(secondImport.ok, 'second import must succeed');
   if (secondImport.ok) {

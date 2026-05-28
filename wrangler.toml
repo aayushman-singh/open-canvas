@@ -36,10 +36,10 @@ class_name = "SiteRoom"
 name = "FORM_RATE_LIMITER"
 class_name = "FormRateLimiter"
 
-# v1 introduced the legacy per-page PageDocument DO (ProseMirror + Yjs).
-# v3 drops it after the canvas-first POC (T9) replaced the live-collab
-# surface with SiteRoom. The v1 tag must remain so the migration ledger
-# stays linear; v3's `deleted_classes` removes the class on next deploy.
+# v1 introduced the legacy per-page PageDocument DO. v3 drops it after the
+# canvas-first POC (T9) replaced the live-collab surface with SiteRoom. The
+# v1 tag must remain so the migration ledger stays linear; v3's
+# `deleted_classes` removes the class on next deploy.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["PageDocument"]

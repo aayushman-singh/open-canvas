@@ -6,7 +6,6 @@ import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { renderCanvasSnapshot } from '../../canvas/render';
-import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
 import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
@@ -90,6 +89,62 @@ const pageStyles = `
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 16px;
+  }
+  .ttab-radio {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    scroll-margin-top: 72px;
+  }
+  .ttab-bar {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .ttab-bar label {
+    padding: 8px 16px;
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background 140ms ease, color 140ms ease;
+  }
+  .ttab-bar label:hover {
+    color: var(--text);
+  }
+  #ttab-community:checked ~ .ttab-bar label[for='ttab-community'],
+  #ttab-personal:checked ~ .ttab-bar label[for='ttab-personal'] {
+    background: var(--accent);
+    color: #05070c;
+  }
+  .ttab-radio:focus-visible ~ .ttab-bar label[for='ttab-community'],
+  .ttab-radio:focus-visible ~ .ttab-bar label[for='ttab-personal'] {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .ttab-panel { display: none; }
+  #ttab-community:checked ~ .ttab-panel[data-tab='community'],
+  #ttab-personal:checked ~ .ttab-panel[data-tab='personal'] {
+    display: block;
+  }
+  .ttab-empty {
+    padding: 40px 24px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .ttab-empty strong {
+    color: var(--text);
+    display: block;
+    margin-bottom: 6px;
   }
   .template {
     display: grid;
@@ -222,9 +277,7 @@ function PreviewPage({ template }: { template: TemplateSeed }) {
     ...(template.state.header ? { header: template.state.header } : {}),
     ...(template.state.footer ? { footer: template.state.footer } : {}),
     ...(template.state.customStyleKit ? { customStyleKit: template.state.customStyleKit } : {}),
-    ...(template.state.symbols?.length ? { symbols: template.state.symbols } : {}),
   };
-  configureSymbolInstanceRender({ symbols: template.state.symbols ?? [] });
   const html = renderCanvasSnapshot(snapshot, `/dashboard/templates/${template.id}/assets`);
 
   return (
@@ -249,14 +302,46 @@ interface CustomTemplateCard {
   visibility: string;
 }
 
+function CustomTemplateTile({ dt }: { dt: CustomTemplateCard }) {
+  return (
+    <label class="template">
+      <input type="radio" name="templateId" value={dt.id} required checked={false} />
+      <span class="template-body">
+        <span class="template-preview">
+          <iframe
+            src={`/api/custom-templates/${dt.id}/preview`}
+            scrolling="no"
+            tabindex={-1}
+            title={`${dt.name} preview`}
+            loading="lazy"
+            sandbox=""
+          />
+        </span>
+        <span class="template-copy">
+          <span>
+            <h2>{dt.name}</h2>
+            <p>{dt.tagline}</p>
+          </span>
+          <span class="kit">{dt.styleKit}</span>
+        </span>
+      </span>
+    </label>
+  );
+}
+
 function Page({
-  customTemplates,
-  siteLimitErrorMessage,
+  communityCustomTemplates,
+  personalCustomTemplates,
+  atSiteLimit,
 }: {
-  customTemplates: CustomTemplateCard[];
-  siteLimitErrorMessage: string | null;
+  communityCustomTemplates: CustomTemplateCard[];
+  personalCustomTemplates: CustomTemplateCard[];
+  atSiteLimit: boolean;
 }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
+  const communityCount = allTemplateSeeds.length + communityCustomTemplates.length;
+  const personalCount = personalCustomTemplates.length;
+  const hasAnyCustom = communityCustomTemplates.length + personalCustomTemplates.length > 0;
   return (
     <DashboardShell
       title="rev01 — create site"
@@ -273,64 +358,65 @@ function Page({
       <form method="post" action="/api/sites">
         <fieldset>
           <legend>Template</legend>
-          <div class="templates">
-            {allTemplateSeeds.map((template, idx) => (
-              <label class="template">
-                <input
-                  type="radio"
-                  name="templateId"
-                  value={template.id}
-                  required
-                  checked={idx === 0 && customTemplates.length === 0}
-                />
-                <span class="template-body">
-                  <span class="template-preview">
-                    <iframe
-                      src={`/dashboard/templates/${template.id}/preview`}
-                      scrolling="no"
-                      tabindex={-1}
-                      title={`${template.name} preview`}
-                      loading="lazy"
-                      sandbox=""
-                    />
-                  </span>
-                  <span class="template-copy">
-                    <span>
-                      <h2>{template.name}</h2>
-                      <p>{template.tagline}</p>
+          <input type="radio" id="ttab-community" name="__ttab" class="ttab-radio" checked />
+          <input type="radio" id="ttab-personal" name="__ttab" class="ttab-radio" />
+          <div class="ttab-bar" role="tablist">
+            <label for="ttab-community">Community ({communityCount})</label>
+            <label for="ttab-personal">Personal ({personalCount})</label>
+          </div>
+
+          <div class="ttab-panel" data-tab="community">
+            <div class="templates">
+              {allTemplateSeeds.map((template, idx) => (
+                <label class="template">
+                  <input
+                    type="radio"
+                    name="templateId"
+                    value={template.id}
+                    required
+                    checked={idx === 0 && !hasAnyCustom}
+                  />
+                  <span class="template-body">
+                    <span class="template-preview">
+                      <iframe
+                        src={`/dashboard/templates/${template.id}/preview`}
+                        scrolling="no"
+                        tabindex={-1}
+                        title={`${template.name} preview`}
+                        loading="lazy"
+                        sandbox=""
+                      />
                     </span>
-                    <span class="kit">{template.state.styleKit}</span>
-                  </span>
-                </span>
-              </label>
-            ))}
-            {customTemplates.map((dt) => (
-              <label class="template">
-                <input type="radio" name="templateId" value={dt.id} required checked={false} />
-                <span class="template-body">
-                  <span class="template-preview">
-                    <iframe
-                      src={`/api/custom-templates/${dt.id}/preview`}
-                      scrolling="no"
-                      tabindex={-1}
-                      title={`${dt.name} preview`}
-                      loading="lazy"
-                      sandbox=""
-                    />
-                  </span>
-                  <span class="template-copy">
-                    <span>
-                      <h2>{dt.name}</h2>
-                      <p>{dt.tagline}</p>
-                    </span>
-                    <span class="kit">
-                      {dt.styleKit}
-                      {dt.visibility === 'private' ? ' · yours' : ''}
+                    <span class="template-copy">
+                      <span>
+                        <h2>{template.name}</h2>
+                        <p>{template.tagline}</p>
+                      </span>
+                      <span class="kit">{template.state.styleKit}</span>
                     </span>
                   </span>
-                </span>
-              </label>
-            ))}
+                </label>
+              ))}
+              {communityCustomTemplates.map((dt) => (
+                <CustomTemplateTile dt={dt} />
+              ))}
+            </div>
+          </div>
+
+          <div class="ttab-panel" data-tab="personal">
+            {personalCustomTemplates.length === 0 ? (
+              <div class="ttab-empty">
+                <strong>No personal templates yet</strong>
+                Save a site as a template from the editor to start your private library. Personal
+                templates are only visible to you.
+              </div>
+            ) : (
+              <div class="templates">
+                {personalCustomTemplates.map((dt) => (
+                  <CustomTemplateTile dt={dt} />
+                ))}
+              </div>
+            )}
           </div>
         </fieldset>
 
@@ -405,8 +491,9 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
 
 templatesRoute.get('/', async (c) => {
   const auth = c.get('auth');
-  let customTemplates: CustomTemplateCard[] = [];
-  let siteLimitErrorMessage: string | null = null;
+  let communityCustomTemplates: CustomTemplateCard[] = [];
+  let personalCustomTemplates: CustomTemplateCard[] = [];
+  let atSiteLimit = false;
   if (auth.userId) {
     const database = db(c.env);
     const customerRow = await database
@@ -432,7 +519,13 @@ templatesRoute.get('/', async (c) => {
       .from(customTemplate)
       .where(whereClause);
 
-    customTemplates = rows;
+    for (const row of rows) {
+      if (row.visibility === 'private') {
+        personalCustomTemplates.push(row);
+      } else {
+        communityCustomTemplates.push(row);
+      }
+    }
 
     if (customerId) {
       const { siteLimit } = entitlementsFor(currentPlanId);
@@ -447,6 +540,10 @@ templatesRoute.get('/', async (c) => {
   }
 
   return c.html(
-    <Page customTemplates={customTemplates} siteLimitErrorMessage={siteLimitErrorMessage} />,
+    <Page
+      communityCustomTemplates={communityCustomTemplates}
+      personalCustomTemplates={personalCustomTemplates}
+      atSiteLimit={atSiteLimit}
+    />,
   );
 });

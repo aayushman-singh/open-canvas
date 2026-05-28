@@ -932,7 +932,7 @@ assert(
 );
 assert(
   !canvasIndexSource.includes('<span class="style-kits"'),
-  'expected style-kit controls to move out of the topbar',
+  'expected style-kit controls to move out of the editor header',
 );
 assert(
   canvasClientSource.includes('const sidebar = document.getElementById("canvas-sidebar")'),
@@ -1410,8 +1410,8 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
-const preparedForCustomerA = prepareSeedAssetsForCustomer('customer-a', starterTemplate.state);
-const preparedForCustomerB = prepareSeedAssetsForCustomer('customer-b', starterTemplate.state);
+const preparedForCustomerA = prepareSeedAssetsForCustomer('customer-a', starterTemplate.state, new Map());
+const preparedForCustomerB = prepareSeedAssetsForCustomer('customer-b', starterTemplate.state, new Map());
 assert(preparedForCustomerA.ok, 'expected seed asset preparation for customer-a to succeed');
 assert(preparedForCustomerB.ok, 'expected seed asset preparation for customer-b to succeed');
 const preparedAIds = new Set(
@@ -1458,7 +1458,7 @@ try {
   );
 
   t6SiteId = crypto.randomUUID();
-  const preparedT6 = prepareSeedAssetsForCustomer(t6CustomerId, starterTemplate.state);
+  const preparedT6 = prepareSeedAssetsForCustomer(t6CustomerId, starterTemplate.state, new Map());
   assert(preparedT6.ok, 'expected T6 seed asset preparation to succeed');
   await smokeDb.insert(site).values({
     id: t6SiteId,

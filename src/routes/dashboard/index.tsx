@@ -11,7 +11,6 @@ import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge, Pill } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
-import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import type { PublishedSnapshot, CanvasSiteState } from '../../canvas/schema';
 
@@ -87,15 +86,12 @@ function buildThumbHtml(state: CanvasSiteState, siteId: string, origin: string):
     ...(state.header ? { header: state.header } : {}),
     ...(state.footer ? { footer: state.footer } : {}),
     ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
-    ...(state.symbols?.length ? { symbols: state.symbols } : {}),
   };
-  // Wire symbol masters before render. Without this, any site with a
-  // symbol-instance element (e.g. the Apogee Showcase template) throws on
-  // render. A previous try/catch swallowed the throw and produced a "Preview
-  // unavailable" tombstone — silent failure mode that hid the missing config
-  // for an unknown stretch of time. Surface real errors instead.
-  configureSymbolInstanceRender({ symbols: state.symbols ?? [] });
-  const canvasHtml = renderCanvasSnapshot(snapshot, `/api/canvas/sites/${siteId}/assets`, siteId);
+  const canvasHtml = renderCanvasSnapshot(
+    snapshot,
+    `/api/canvas/sites/${siteId}/assets`,
+    siteId,
+  );
   return [
     '<!DOCTYPE html><html><head>',
     `<base href="${origin}/">`,

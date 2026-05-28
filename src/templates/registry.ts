@@ -108,7 +108,7 @@ export const launchTemplate = buildTemplate({
   id: 'launch-canvas',
   name: 'Launch Page',
   tagline:
-    'A crisp product-launch starting point with a strong hero, proof blocks, and a direct CTA.',
+    'A crisp product-launch starting point with a strong hero, proof sections, and a direct CTA.',
   styleKit: 'blue-saas',
   title: 'Launch Page',
   heroHeading: [
@@ -174,7 +174,7 @@ export const apogeeShowcaseTemplate: TemplateSeed = {
   id: 'apogee-showcase',
   name: 'Apogee Showcase',
   tagline:
-    'A multi-page showcase site — dark, bold, and loaded with every element type. Carousels, charts, forms, code blocks, accordions, embeds, and more.',
+    'A multi-page showcase site — dark, bold, and loaded with every element type. Carousels, charts, forms, code snippets, accordions, embeds, and more.',
   state: structuredClone(apogeeShowcaseSeed) as CanvasSiteState,
 };
 

@@ -187,10 +187,12 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     }
 
     const existingAssetIds = new Set(existingAssetRows.map((r) => r.id));
+    const existingByHash = new Map(existingAssetRows.map((r) => [r.contentHash, r.id]));
     const importResult = importSectionIntoSite({
       targetCustomerId: customerId,
       sourceSection,
       existingAssetIds,
+      existingByHash,
     });
     if (!importResult.ok) {
       return c.json({ error: 'section import failed', details: importResult.errors }, 500);

@@ -44,9 +44,6 @@ import { buildEmbedCsp } from '../embed/csp';
 // site row is resolved; returns a gate Response when the visitor must unlock,
 // or null to continue serving the snapshot.
 import { requireUnlock } from '../password/middleware';
-// Wave 3 #14 — symbol-instance render needs the site's symbols table injected
-// before renderCanvasSnapshot runs. The configure call is per-render scope.
-import { configureSymbolInstanceRender } from '../canvas/elements/symbol-instance';
 // Wave 3 #21 — per-page <head> meta emission (title / description / OG / Twitter
 // / canonical / robots / lang).
 import { renderCanvasHead, resolveLang } from '../seo/meta-emit';
@@ -772,11 +769,6 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     }
     return response;
   }
-
-  // Wave 3 #14 — inject the site's symbol-master table into the symbol-instance
-  // render fn before the snapshot is materialised. snapshot.symbols is the
-  // single source of truth; missing means the site has zero symbols.
-  configureSymbolInstanceRender({ symbols: siteRow.publishedSnapshot.symbols ?? [] });
 
   // Wave 4 #17 — wrap rendered snapshot HTML with the interactive runtime
   // <script> tag when the snapshot contains accordion / carousel elements.
