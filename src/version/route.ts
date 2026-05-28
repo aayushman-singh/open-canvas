@@ -159,7 +159,13 @@ versionRoute.post('/:snapshotId/restore', async (c) => {
     if (err instanceof RestoreError) {
       return c.json({ error: err.message }, err.status as 400);
     }
-    throw err;
+    // Surface the real cause to the Owner — they own this site and need
+    // actionable error text rather than a generic 500. Without this, a
+    // bytea-decode or DB-update failure becomes an inscrutable "Restore
+    // failed: Internal Server Error" in the dashboard modal.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[version/restore] unexpected restore failure', { siteId, snapshotId, err });
+    return c.json({ error: `restore failed: ${message}` }, 500);
   }
 });
 

@@ -17,13 +17,31 @@ import type { CanvasSection, CanvasSiteState, PublishedSnapshot, StyleKit } from
 // Drizzle does not ship a first-class `bytea` builder. We declare it via
 // `customType` so the Wave 1 version-history agent can store Yjs snapshot
 // blobs without round-tripping through base64. The JS side reads/writes
-// `Uint8Array`; the SQL side is `bytea`. If a future deployment hits a
-// driver that returns hex (`\x...`) strings rather than `Buffer`, the
-// `fromDriver` shim should be revisited; for now we accept whatever the
-// Neon driver hands back as-is — Wave 1 owns the read-side handling.
+// `Uint8Array`; the SQL side is `bytea`. The Neon HTTP driver normally
+// returns bytea as a Buffer (Uint8Array subclass) via its built-in
+// parseBytea type parser, but the response shape can vary across Neon
+// runtime versions / pooled vs direct connections — we defensively
+// coerce strings of the form `\x...` and any non-Uint8Array ArrayLike
+// to a Uint8Array so downstream consumers (Y.applyUpdate) never see a
+// hex string.
 const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
   dataType() {
     return 'bytea';
+  },
+  fromDriver(value: unknown): Uint8Array {
+    if (value instanceof Uint8Array) return value;
+    if (typeof value === 'string') {
+      if (value.startsWith('\\x')) {
+        const hex = value.slice(2);
+        const out = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < out.length; i += 1) {
+          out[i] = Number.parseInt(hex.substr(i * 2, 2), 16);
+        }
+        return out;
+      }
+      throw new Error(`bytea fromDriver: unrecognised string format (expected \\x… hex)`);
+    }
+    throw new Error(`bytea fromDriver: unsupported driver type ${typeof value}`);
   },
 });
 
