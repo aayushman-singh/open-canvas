@@ -235,7 +235,6 @@ export type SiteNav = {
 const SITE_NAV_ITEMS: Omit<SiteNavItem, 'href'>[] = [
   { label: 'Go to editor', icon: '✎' },
   { label: 'Settings', icon: '⚙' },
-  { label: 'Navigation', icon: '☰' },
   { label: 'Forms', icon: '✉' },
   { label: 'Versions', icon: '⧖' },
   { label: 'Domains', icon: '⌗' },
@@ -247,7 +246,6 @@ const SITE_NAV_ITEMS: Omit<SiteNavItem, 'href'>[] = [
 const SITE_NAV_PATHS: Record<string, string> = {
   'Go to editor': 'edit',
   Settings: 'settings',
-  Navigation: 'nav',
   Forms: 'forms',
   Versions: 'snapshots',
   Domains: 'domains',
