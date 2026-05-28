@@ -1,8 +1,8 @@
 // src/themes/contrast-guard.ts
 //
-// Wave 2 #10 — UI-friendly wrapper around `src/theme/contrast.ts`. The theme
-// panel renders inline warnings when an Owner picks a colour combination that
-// breaks accessibility minimums. The panel does not need WCAG verdicts on
+// UI-friendly wrapper around `src/theme/contrast.ts`. The theme panel renders
+// inline warnings when an Owner picks a colour combination that breaks
+// accessibility minimums. The panel does not need WCAG verdicts on
 // AA/AAA-normal/large columns; it only needs:
 //
 //   1. Is the bg/text pair under the AA-normal threshold (4.5:1)?

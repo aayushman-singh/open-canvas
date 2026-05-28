@@ -1,7 +1,7 @@
 // src/themes/visitor-mode/smoke.ts
 //
-// `bun run visitor-mode:smoke` — exercises Wave 3 #20 (light/dark visitor
-// toggle). Hermetic: no DB, no Hono, no live route.
+// `bun run visitor-mode:smoke` — exercises the light/dark visitor toggle.
+// Hermetic: no DB, no Hono, no live route.
 //
 // Coverage:
 //   1. `emitDualModeCss(charcoal-with-dark)` contains both `:root {` and

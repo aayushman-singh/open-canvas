@@ -1,9 +1,8 @@
 // src/themes/visitor-mode/toggle-element.ts
 //
-// Wave 3 #20 — The mode-toggle Element. Owners drop this as a Section Recipe
-// or pin it near navigation; the public renderer prints it verbatim. The
-// element is a real `<button>` with the accessibility scaffolding visitors
-// expect:
+// The mode-toggle Element. Owners drop this as a Section Recipe or pin it
+// near navigation; the public renderer prints it verbatim. The element is a
+// real `<button>` with the accessibility scaffolding visitors expect:
 //
 //   - `aria-pressed` — reflects the current mode. The toggle script updates
 //     it on every click so screen readers announce the change.
@@ -17,10 +16,10 @@
 // per-request templating, so the result is module-level cached.
 //
 // Why a string, not JSX: this module is consumed by the public renderer's
-// HTML emitter (Wave 0 boundary). The renderer stamps strings into the body
-// HTML it returns; everything has to be a self-contained chunk. JSX through
-// hono/html would work too, but a string keeps the path simple — the toggle
-// has no dynamic content.
+// HTML emitter. The renderer stamps strings into the body HTML it returns;
+// everything has to be a self-contained chunk. JSX through hono/html would
+// work too, but a string keeps the path simple — the toggle has no dynamic
+// content.
 
 /**
  * The HTML for the mode-toggle button, including its inline script. Drop
@@ -52,8 +51,7 @@ export function renderModeToggleHtml(): string {
 
 /**
  * Standalone toggle SCRIPT — exported so a future caller (e.g. auto-injection
- * near nav, owned by Wave 4 #16) can wire it up to its own DOM without
- * needing the wrapper HTML.
+ * near nav) can wire it up to its own DOM without needing the wrapper HTML.
  */
 export const MODE_TOGGLE_SCRIPT: string = String.raw`
 (function(){

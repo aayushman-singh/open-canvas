@@ -1,6 +1,6 @@
 // src/themes/smoke.ts
 //
-// `bun run themes:smoke` — exercises Wave 2 #10 (custom theme editor).
+// `bun run themes:smoke` — exercises the custom theme editor.
 //
 // Coverage:
 //   1. Author a valid custom kit; `resolveStyleKitWithCustom` returns it
@@ -120,8 +120,8 @@ function buildCustomKit(): StyleKitPreset {
       'slow-drift': { transform: 'translateY(0px)' },
       'parallax-soft': { transform: 'translateY(6px)' },
     },
-    // Forward-compat with Wave 3 #20 — when the dark feature lands, this
-    // partial gets consumed; until then it must round-trip untouched.
+    // Light/dark forward-compat — the visitor-mode subsystem consumes this
+    // partial; here it must round-trip untouched.
     dark: {
       bg: '#050811',
       text: '#f8fafc',
@@ -208,10 +208,10 @@ assert(
   'expected rendered HTML to include the page marker',
 );
 // The custom kit's tokens are not emitted as a per-kit CSS block by the
-// shared builder (the builder is iterates BUILT_IN_STYLE_KITS only — that is
-// intentional per the Phase 0 scaffold). Recovering the custom tokens at
-// render time happens via `resolveStyleKitWithCustom`. Verify the recovered
-// preset matches what we authored.
+// shared builder (it iterates BUILT_IN_STYLE_KITS only — intentional, since
+// custom kits are per-site). Recovering the custom tokens at render time
+// happens via `resolveStyleKitWithCustom`. Verify the recovered preset
+// matches what we authored.
 const recovered = resolveStyleKitWithCustom({
   styleKit: customSnapshot.styleKit,
   // The published snapshot mirrors the editable state's customStyleKit, but
@@ -451,7 +451,7 @@ assert(
 
 // --------------------------------------------------------------------------
 // Test 7 — `resolveStyleKitWithCustom` re-export on `src/canvas/style-kits.ts`.
-// The render boundary imports from `src/canvas/style-kits.ts`; the Wave 2
+// The render boundary imports from `src/canvas/style-kits.ts`; the `'custom'`
 // dispatch slot must be reachable from there.
 // --------------------------------------------------------------------------
 

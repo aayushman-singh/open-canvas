@@ -1,4 +1,4 @@
-# Asset pipeline migration — Phase 0 plan #2
+# Asset pipeline migration
 
 This document describes the migration from the pre-ADR-0004 `site_asset`
 table (base64-in-Postgres, site-rooted) to the `owner_asset` + `slot_history`
@@ -6,7 +6,7 @@ shape (R2-keyed bytes, Owner-rooted) per ADRs 0004 and 0006.
 
 ## Migration strategy: preserve UUID semantics
 
-Of the two strategies surfaced by Phase 0 Agent 2:
+Two strategies were considered:
 
 - **(a) Preserve id semantics** — the `ownerAsset.id` column keeps existing
   UUID values from the old `siteAsset` rows.

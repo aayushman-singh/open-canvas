@@ -1,8 +1,8 @@
 // src/themes/custom-resolve.ts
 //
-// Wave 2 #10 — Custom theme editor. The renderer treats `styleKit === 'custom'`
-// as a signal to resolve the preset from `EditableSite.customStyleKit`
-// instead of the built-in lookup table. Everything else flows unchanged.
+// Custom theme editor. The renderer treats `styleKit === 'custom'` as a
+// signal to resolve the preset from `EditableSite.customStyleKit` instead of
+// the built-in lookup table. Everything else flows unchanged.
 //
 // This module owns ONE public function — `resolveStyleKitWithCustom` — which
 // the render boundary (and the `'custom'` slot in `src/canvas/style-kits.ts`)
@@ -18,9 +18,8 @@
 //   - per-slot tokens are the expected primitive shape (no nested objects
 //     where strings are expected),
 //   - the optional `dark` partial does not break the parent — keys must be a
-//     subset of `StyleKitPreset` (forward-compat for Wave 3 #20; we do NOT
-//     validate the dark partial deeply because the dark feature owns that
-//     contract).
+//     subset of `StyleKitPreset`; we do NOT validate the dark partial deeply
+//     because the visitor-mode subsystem owns that contract.
 // A failure throws an `Error` whose message names the offending field path.
 
 import {
@@ -125,12 +124,12 @@ export function validateStyleKitPreset(value: unknown, pathPrefix: string): void
   requireActionVariants(v.actionVariants, `${pathPrefix}.actionVariants`);
   requireMotionPresets(v.motionPresets, `${pathPrefix}.motionPresets`);
 
-  // Forward-compat with Wave 3 #20 (light/dark). If `dark` is present it must
-  // be a plain object whose keys are a subset of StyleKitPreset's known keys
-  // — we do NOT recursively validate the dark partial here because its
-  // contract is owned by the dark-mode feature. We DO catch the obvious shape
-  // errors (non-object, array) so a malformed `dark` field surfaces here
-  // instead of inside the #20 resolver.
+  // Light/dark forward-compat. If `dark` is present it must be a plain object
+  // whose keys are a subset of StyleKitPreset's known keys — we do NOT
+  // recursively validate the dark partial here because its contract is owned
+  // by `themes/visitor-mode/`. We DO catch the obvious shape errors
+  // (non-object, array) so a malformed `dark` field surfaces here instead of
+  // inside the visitor-mode resolver.
   if (v.dark !== undefined) {
     if (typeof v.dark !== 'object' || v.dark === null || Array.isArray(v.dark)) {
       throw new Error(

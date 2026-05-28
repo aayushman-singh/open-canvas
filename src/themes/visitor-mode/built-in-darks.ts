@@ -1,11 +1,9 @@
 // src/themes/visitor-mode/built-in-darks.ts
 //
-// Wave 3 #20 — Sidecar table of dark-mode partials for the built-in Style
-// Kits. Lives HERE — not in `src/canvas/style-kits.ts` — because the canvas
-// style-kits module belongs to Wave 2 #10 (custom theme editor) and Wave 3
-// agents must not modify it. Keeping the dark partials in a sibling file
-// gives this Wave 3 feature full ownership of the dark-variant authoring
-// surface for built-ins without crossing wave boundaries.
+// Sidecar table of dark-mode partials for the built-in Style Kits. Lives
+// HERE — not in `src/canvas/style-kits.ts` — so the visitor-mode subsystem
+// owns the dark-variant authoring surface for built-ins without bleeding
+// into the canvas style-kits module.
 //
 // Coverage:
 //   - `charcoal` — already dark by design; the dark variant deepens the bg

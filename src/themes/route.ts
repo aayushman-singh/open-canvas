@@ -1,7 +1,6 @@
 // src/themes/route.ts
 //
-// Wave 2 #10 — Hono router that mounts at `/api/sites/:siteId/custom-theme`.
-// Two verbs:
+// Hono router that mounts at `/api/sites/:siteId/custom-theme`. Two verbs:
 //
 //   PUT    — Owner authors / saves a custom theme. Body: `{ customStyleKit }`.
 //            Stores the kit on the site's editable state and flips the
@@ -11,7 +10,7 @@
 //   DELETE — Owner resets the site to a built-in kit. Body: `{ styleKit }`.
 //            Drops `customStyleKit` and sets `styleKit` to the chosen
 //            built-in. Returns 400 if the chosen built-in is not in the
-//            allowlist (Phase 0 BUILT_IN_STYLE_KITS).
+//            BUILT_IN_STYLE_KITS allowlist.
 //
 // Both endpoints reuse the Clerk-scoped ownership check the rest of the
 // `/api/sites/:siteId/*` mounts use. The main thread wires this up in

@@ -1,8 +1,8 @@
 // src/themes/visitor-mode/resolve.ts
 //
-// Wave 3 #20 — Light/dark visitor toggle. The resolver merges a Style Kit's
-// optional `dark` partial over the light base when the visitor's chosen mode
-// is `'dark'`. It is the SINGLE place that knows how to project a kit for a
+// Light/dark visitor toggle. The resolver merges a Style Kit's optional
+// `dark` partial over the light base when the visitor's chosen mode is
+// `'dark'`. It is the SINGLE place that knows how to project a kit for a
 // given mode; the CSS emitter, the editor panel preview, and the public
 // renderer all funnel through it.
 //
@@ -35,11 +35,12 @@
 //      consumed by the resolver.
 //
 // Failure mode is explicit (all-or-nothing per global instructions): the
-// resolver does not silently drop a malformed dark partial. The Wave 2 #10
-// validator already shape-checks the top-level keys of `dark`; this module
-// trusts that gate and does not re-validate. A truly broken dark partial
-// (wrong runtime shape that slipped past the validator) will throw with a
-// clear path when the offending field is read by the CSS emitter — not here.
+// resolver does not silently drop a malformed dark partial. The custom-kit
+// validator (`themes/custom-resolve.ts`) already shape-checks the top-level
+// keys of `dark`; this module trusts that gate and does not re-validate.
+// A truly broken dark partial (wrong runtime shape that slipped past the
+// validator) will throw with a clear path when the offending field is read
+// by the CSS emitter — not here.
 
 import type { StyleKitPreset } from '../../canvas/schema.js';
 
@@ -86,8 +87,8 @@ export function resolveStyleKitForMode(
   // Top-level scalar overrides. We iterate the known keys of `Partial<StyleKitPreset>`
   // explicitly rather than `Object.assign(out, dark)` so the nested records
   // (`surfaceVariants` etc.) are not blown away wholesale by a partial dark
-  // record. The Wave 2 validator already rejects unknown keys on `dark`, so
-  // there is no "unknown field forwarded" risk.
+  // record. The custom-kit validator already rejects unknown keys on `dark`,
+  // so there is no "unknown field forwarded" risk.
   if (dark.bg !== undefined) out.bg = dark.bg;
   if (dark.panel !== undefined) out.panel = dark.panel;
   if (dark.text !== undefined) out.text = dark.text;
@@ -143,13 +144,14 @@ export function resolveStyleKitForMode(
 }
 
 /**
- * Wave 3 #20 — Built-in dark variants are stored in
- * `src/themes/visitor-mode/built-in-darks.ts`, NOT on `STYLE_KIT_PRESETS`.
- * Why: `src/canvas/style-kits.ts` is Wave 2 #10's territory (the `'custom'`
- * dispatch slot); a Wave 3 agent must not edit it. This helper consults the
- * sibling built-in-darks table and stitches the dark partial onto a built-in
- * kit before resolving. For a kit that already carries `kit.dark` (a custom
- * kit, or a future built-in with an inline dark partial), this is a no-op.
+ * Built-in dark variants are stored in
+ * `src/themes/visitor-mode/built-in-darks.ts`, NOT on `STYLE_KIT_PRESETS` —
+ * keeping them sidecar-only means the visitor-mode subsystem owns the dark
+ * surface without touching `src/canvas/style-kits.ts`. This helper consults
+ * the sibling built-in-darks table and stitches the dark partial onto a
+ * built-in kit before resolving. For a kit that already carries `kit.dark`
+ * (a custom kit, or a future built-in with an inline dark partial), this is
+ * a no-op.
  *
  * Used by `emitDualModeCss` so consumers can call one entry point with a
  * built-in kit id OR a custom kit and get the right dark variant either way.

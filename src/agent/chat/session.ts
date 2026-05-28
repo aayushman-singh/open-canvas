@@ -1,15 +1,15 @@
 // src/agent/chat/session.ts
 //
 // Chat session shape + persistence helpers for the AI chat multi-turn command
-// surface (wishlist #23, Wave 5).
+// surface.
 //
 // A ChatSession is the per-(site, customer) conversation memory the
 // orchestrator turns into LlmMessage[] for each Gemini call. Messages persist
 // across HTTP turns through the `chat_session` Postgres table (declared in
-// `src/db/schema.ts` Phase 0); the orchestrator loads + appends + saves the
-// row in-band on every send-message turn.
+// `src/db/schema.ts`); the orchestrator loads + appends + saves the row
+// in-band on every send-message turn.
 //
-// Token budget strategy (documented in the plan's open questions):
+// Token budget strategy:
 //   * Hard cap: 16,000 tokens of rolling context. The orchestrator trims the
 //     oldest user/assistant pairs off the front of `messages` until the
 //     remaining payload's estimated token count fits. System prompt + the

@@ -1,9 +1,7 @@
 # `src/assets/` — Owner Asset pipeline
 
-**Plan:** `docs/superpowers/plans/2026-05-23-02-asset-pipeline.md`
 **ADRs:** [0004](../../docs/adr/0004-owner-asset.md) (Owner-rooted assets),
 [0006](../../docs/adr/0006-asset-storage-backend.md) (R2 + cf.image transforms)
-**Phase 0 owner:** main thread (Phase 0 Agent 3)
 
 The asset pipeline owns the Owner-rooted media surface: upload, list, read,
 delete. Bytes live in Cloudflare R2 keyed by content hash; the `ownerAsset`

@@ -1,6 +1,6 @@
 // src/agent/chat/orchestrator.ts
 //
-// Multi-turn chat loop for the AI chat command surface (wishlist #23).
+// Multi-turn chat loop for the AI chat command surface.
 //
 // Inputs:
 //   - A `ChatSessionState` with the persisted message history.

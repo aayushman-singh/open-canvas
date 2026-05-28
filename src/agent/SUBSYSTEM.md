@@ -3,7 +3,7 @@
 ## Definition
 
 `agent` owns the constrained AI edit vocabulary for the canvas-first editor.
-Given an Owner prompt and the current `CanvasSiteState`, the HTTP route asks an
+Given an Owner prompt and the current `EditableSite`, the HTTP route asks an
 LLM for tool calls, translates those calls into typed `CanvasAgentOp`s, applies
 them to a cloned canvas state, validates the result, and returns a preview for
 the Owner to accept or dismiss.
@@ -18,7 +18,7 @@ router, and canvas renderer respectively.
 - **`llm-gemini.ts`** -> Gemini adapter used by the canvas-agent route.
 - **`canvas-tools.ts`** -> JSON-schema tool descriptions exposed to the model.
 - **`canvas-ops.ts`** -> pure application of `rewriteText`, `replaceMedia`,
-  and `insertSection` against a cloned `CanvasSiteState`.
+  and `insertSection` against a cloned `EditableSite`.
 - **`canvas-agent-smoke.ts`** -> runtime smoke for recipe coverage, op
   application, and tool schemas.
 

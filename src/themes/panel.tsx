@@ -1,12 +1,12 @@
 // src/themes/panel.tsx
 //
-// Wave 2 #10 — Theme panel that sits in the editor sidebar. Pure JSX (Hono
-// JSX). The panel renders three control groups (colour, typography, surface)
-// against either the active built-in preset (read-only) or the Owner's
-// `customStyleKit` (editable). The "Edit colours" button promotes the active
-// built-in into the custom slot so the Owner can start from a familiar base.
-// A "Reset to built-in" button flips `styleKit` back to a chosen built-in
-// and clears `customStyleKit` from the wire payload.
+// Theme panel that sits in the editor sidebar. Pure JSX (Hono JSX). The panel
+// renders three control groups (colour, typography, surface) against either
+// the active built-in preset (read-only) or the Owner's `customStyleKit`
+// (editable). The "Edit colours" button promotes the active built-in into the
+// custom slot so the Owner can start from a familiar base. A "Reset to
+// built-in" button flips `styleKit` back to a chosen built-in and clears
+// `customStyleKit` from the wire payload.
 //
 // Why pure JSX, no client framework: the editor surface is composed via
 // Hono's `c.html(<...>)` pattern. The panel ships an inline client script
@@ -16,10 +16,10 @@
 // What the panel does NOT do:
 //   - Render the canvas preview itself. The wrapping editor mounts the
 //     panel next to its existing preview frame; the preview re-fetches the
-//     site state after the PUT lands. This is per the plan — the editor
-//     surface is owned by a different file and we don't touch it.
-//   - Custom fonts. Wave 5 #12 handles those; here we surface a fixed list
-//     of safe system / popular Google font stacks.
+//     site state after the PUT lands. The editor surface is owned by a
+//     different file and we don't touch it.
+//   - Custom font uploads (`src/fonts/` owns that surface); here we surface
+//     a fixed list of safe system / popular Google font stacks.
 
 import { raw } from 'hono/html';
 
@@ -35,9 +35,9 @@ import { BUILT_IN_STYLE_KITS } from '../canvas/schema.js';
 import { checkKitContrast, type ContrastWarning } from './contrast-guard.js';
 
 // --------------------------------------------------------------------------
-// Curated type-pair list. Phase 0's plan says "hardcoded list of safe system
-// stack + Inter + Spectral" pending #12; this expands that to seven pairs
-// the Owner can switch between without uploading custom files.
+// Curated type-pair list — seven safe stacks the Owner can switch between
+// without uploading custom font files. Custom font uploads are handled by
+// `src/fonts/`.
 // --------------------------------------------------------------------------
 
 export interface TypePairChoice {
@@ -321,8 +321,8 @@ export function ThemePanel(props: ThemePanelProps) {
         </div>
       </form>
 
-      {/* Wave 3 #20 — Dark variant authoring. Sibling block (NOT inside the
-          existing #10 form) so the byte-for-byte logic above is preserved.
+      {/* Dark variant authoring. Sibling block (NOT inside the existing
+          custom-theme form) so the byte-for-byte logic above is preserved.
           The dark sub-form has its own state, its own client script, and its
           own submit handler that posts to the same /custom-theme endpoint
           with the dark partial merged onto the active custom kit. Renders
@@ -331,16 +331,16 @@ export function ThemePanel(props: ThemePanelProps) {
           not Owner-editable. */}
       {editing ? <DarkVariantSection siteId={props.siteId} preset={props.activePreset} /> : null}
 
-      {/* >>> Wave 5 #12 — Custom fonts section. ADDITIVE seam: lives in its
-          own subtree outside the #10 form (Save/Reset/Promote flow stays
-          byte-for-byte unchanged) and outside the #20 DarkVariantSection
+      {/* Custom fonts section. ADDITIVE seam: lives in its own subtree
+          outside the custom-theme form (Save/Reset/Promote flow stays
+          byte-for-byte unchanged) and outside the DarkVariantSection
           (independent state + client script). Always rendered — Owners can
           upload + manage fonts whether or not they are editing a custom
           theme. Assigning a font to display/body/mono only takes effect
           inside a custom theme; the section surfaces that constraint to
           the Owner via the empty-state label. */}
       <CustomFontsSection siteId={props.siteId} editing={editing} />
-      {/* <<< Wave 5 #12 — end custom fonts section */}
+      {/* end custom fonts section */}
 
       <script type="module">
         {raw(themePanelClientScript(props.siteId, props.activePreset))}
@@ -685,8 +685,8 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
 }
 
 // --------------------------------------------------------------------------
-// Wave 3 #20 — Dark variant authoring. ADDITIVE: lives in its own subtree
-// outside the #10 form so the existing Save / Reset / Promote flow stays
+// Dark variant authoring. ADDITIVE: lives in its own subtree outside the
+// custom-theme form so the existing Save / Reset / Promote flow stays
 // byte-for-byte unchanged. The dark sub-form gathers the same six colour
 // tokens the light form gathers, posts a follow-up PUT with the merged kit
 // (light tokens unchanged + a `dark` partial), and lets the route's
@@ -876,11 +876,11 @@ export {
 export type { ActionVariant, MotionPreset, SurfaceVariant };
 
 // --------------------------------------------------------------------------
-// Wave 5 #12 — Custom fonts section. ADDITIVE: lives in its own subtree so
-// the existing #10 + #20 flows stay byte-for-byte unchanged. The section
+// Custom fonts section. ADDITIVE: lives in its own subtree so the existing
+// custom-theme + dark-variant flows stay byte-for-byte unchanged. The section
 // renders:
 //   - A file picker + name / weight / style inputs for WOFF2 upload, posted
-//     to POST /api/sites/:siteId/fonts (Wave 5 #12 route).
+//     to POST /api/sites/:siteId/fonts (owned by `src/fonts/`).
 //   - A list of the site's current fonts (fetched on mount via GET .../fonts)
 //     with per-row "Assign as display" / "Assign as body" / "Assign as mono"
 //     buttons that rewrite the active custom kit's font tokens via the

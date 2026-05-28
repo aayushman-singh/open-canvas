@@ -1,7 +1,6 @@
 // src/agent/chat/smoke.ts
 //
-// Smoke for the chat orchestrator (wishlist #23 Wave 5). Replaces the
-// stub from Phase 0. Exercises:
+// Smoke for the chat orchestrator. Exercises:
 //
 //   1. Mock LLM returns a 2-turn conversation calling `query_site` then
 //      `propose_op` (rewriteText). Smoke asserts SSE events emit in the

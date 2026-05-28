@@ -1,7 +1,7 @@
 // src/themes/visitor-mode/inline-script.ts
 //
-// Wave 3 #20 — The early `<script>` injected at the top of `<head>` on every
-// Published Site that has `darkModeEnabled === true`. Its job is to stamp
+// The early `<script>` injected at the top of `<head>` on every Published
+// Site that has `darkModeEnabled === true`. Its job is to stamp
 // `data-mode="light"` or `data-mode="dark"` on `<html>` BEFORE first paint
 // so the visitor never sees a Flash Of Unstyled Content (FOUC) when the
 // system colour scheme disagrees with the server-rendered default.
@@ -15,7 +15,7 @@
 //   3. Otherwise, `light` — the implicit default for a fresh visitor on a
 //      system with no preference (or on a browser that does not report one).
 //
-// Constraints (per plan):
+// Constraints:
 //   - ≤200 characters total — the script lives inline in `<head>` and runs
 //     synchronously, so size matters.
 //   - No semicolons inside string literals (they would break the size budget

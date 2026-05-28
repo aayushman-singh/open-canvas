@@ -1,20 +1,18 @@
 // src/themes/visitor-mode/css-emit.ts
 //
-// Wave 3 #20 — Dual-mode CSS emitter. Produces a small CSS string with two
-// blocks:
+// Dual-mode CSS emitter. Produces a small CSS string with two blocks:
 //
 //   :root { ... light tokens ... }
 //   :root[data-mode="dark"] { ... dark tokens ... }
 //
-// This is in ADDITION TO the per-kit CSS that Wave 2's
-// `buildAllStyleKitsCss()` already emits — that one is keyed by
-// `[data-style-kit="<kit>"]` and is mode-agnostic (it emits a single
-// light-only token block per built-in). The dual-mode CSS here lifts the
-// ACTIVE kit's tokens to the `:root` level so the toggle can flip them
-// without re-running the per-kit selector machinery. The two layers stack:
-// the per-kit block sets tokens on the kit-wrapped subtree; this block sets
-// them on `:root` so any descendant that reads `var(--rev01-kit-*)` sees the
-// mode-appropriate value.
+// This is in ADDITION TO the per-kit CSS that `buildAllStyleKitsCss()`
+// already emits — that one is keyed by `[data-style-kit="<kit>"]` and is
+// mode-agnostic (it emits a single light-only token block per built-in).
+// The dual-mode CSS here lifts the ACTIVE kit's tokens to the `:root` level
+// so the toggle can flip them without re-running the per-kit selector
+// machinery. The two layers stack: the per-kit block sets tokens on the
+// kit-wrapped subtree; this block sets them on `:root` so any descendant
+// that reads `var(--rev01-kit-*)` sees the mode-appropriate value.
 //
 // Why :root, not the kit-wrapped subtree:
 //   - Cascade simplicity. `:root[data-mode="dark"]` is one selector; flipping
@@ -66,13 +64,12 @@ export function emitDualModeCss(kit: StyleKitPreset, kitId: string): string {
 }
 
 // --------------------------------------------------------------------------
-// Declaration renderer — same `--rev01-kit-*` namespace the Wave 2 per-kit
-// block uses, so existing CSS that reads `var(--rev01-kit-bg)` works without
+// Declaration renderer — same `--rev01-kit-*` namespace the per-kit block
+// uses, so existing CSS that reads `var(--rev01-kit-bg)` works without
 // modification. We do NOT redeclare the variant records here (surfaceVariants
 // / actionVariants / motionPresets) — those are still styled by the per-kit
 // block keyed off `[data-style-kit]`. The mode-flip story for variants would
-// require a wider refactor of the public stylesheet and is deferred (see
-// "Anything for the other agents" in the wave 3 report).
+// require a wider refactor of the public stylesheet and is deferred.
 // --------------------------------------------------------------------------
 
 function renderTokenDeclarations(kit: StyleKitPreset): string {
