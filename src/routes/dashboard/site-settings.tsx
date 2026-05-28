@@ -41,7 +41,124 @@ siteSettingsRoute.use('*', clerkAuth());
 siteSettingsRoute.use('*', requireAuth());
 
 const pageStyles = `
-  .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
+  h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .lede { margin: 6px 0 28px; color: var(--muted); max-width: 640px; line-height: 1.55; font-size: 14px; }
+  .lede code {
+    background: rgba(125, 211, 252, 0.10);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12.5px;
+  }
+
+  /* Section-anchor highlight: when arriving via /settings#password etc.,
+     pulse the target card briefly so the user sees the destination. */
+  .rev01-ui-card { scroll-margin-top: 24px; transition: border-color 0.4s, box-shadow 0.4s; }
+  .rev01-ui-card:target {
+    border-color: rgba(125, 211, 252, 0.55);
+    box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12);
+  }
+
+  /* --- Hosting summary grid -------------------------------------------- */
+  .hosting-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .hosting-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .hosting-cell .hosting-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+  }
+  .hosting-cell code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  /* --- Toggle switch --------------------------------------------------- */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .toggle-text { display: flex; flex-direction: column; gap: 2px; }
+  .toggle-text .toggle-label { font-size: 14px; color: var(--text); font-weight: 500; }
+  .toggle-text .toggle-state { font-size: 12.5px; color: var(--muted); }
+  .toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    cursor: pointer;
+    z-index: 2;
+  }
+  .toggle-switch .slider {
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--line);
+    transition: background 0.16s, border-color 0.16s;
+  }
+  .toggle-switch .slider::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #cbd5f5;
+    transition: transform 0.18s ease, background 0.18s;
+  }
+  .toggle-switch input:checked + .slider {
+    background: rgba(125, 211, 252, 0.30);
+    border-color: var(--accent);
+  }
+  .toggle-switch input:checked + .slider::before {
+    transform: translateX(20px);
+    background: var(--accent);
+  }
+  .toggle-switch input:focus-visible + .slider {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .toggle-switch input:disabled { cursor: wait; }
+  .toggle-switch input:disabled + .slider { opacity: 0.55; }
+  .hint {
+    margin: 10px 2px 0;
+    font-size: 12.5px;
+    color: var(--faint);
+    line-height: 1.5;
+  }
+
   .status-row {
     display: flex;
     align-items: center;
@@ -49,10 +166,11 @@ const pageStyles = `
     margin-bottom: 18px;
   }
   .status-row .meta { color: var(--muted); font-size: 13px; }
+
   form.pw {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 8px;
+    gap: 10px;
     align-items: end;
   }
   form.pw label {
@@ -64,27 +182,30 @@ const pageStyles = `
   form.pw input[type="password"] {
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: #0c1220;
+    background: var(--bg);
     color: var(--text);
     padding: 10px 12px;
     font-size: 15px;
+    outline: none;
+    transition: border-color 0.12s, box-shadow 0.12s;
   }
-  .err {
+  form.pw input[type="password"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.15);
+  }
+
+  .err, .ok {
     margin-top: 8px;
-    color: #fca5a5;
     font-size: 13px;
     min-height: 18px;
   }
-  .ok {
-    margin-top: 8px;
-    color: #86efac;
-    font-size: 13px;
-    min-height: 18px;
-  }
+  .err { color: #fca5a5; }
+  .ok { color: #86efac; }
+
   .collab-form {
     display: grid;
     grid-template-columns: 1fr auto auto;
-    gap: 8px;
+    gap: 10px;
     align-items: end;
   }
   .collab-form label {
@@ -93,43 +214,50 @@ const pageStyles = `
     font-size: 13px;
     color: var(--muted);
   }
-  .collab-form input[type="email"] {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #0c1220;
-    color: var(--text);
-    padding: 10px 12px;
-    font-size: 15px;
-  }
+  .collab-form input[type="email"],
   .collab-form select {
     border: 1px solid var(--line);
     border-radius: 6px;
-    background: #0c1220;
+    background: var(--bg);
     color: var(--text);
     padding: 10px 12px;
     font-size: 14px;
+    outline: none;
+    transition: border-color 0.12s, box-shadow 0.12s;
   }
+  .collab-form input[type="email"]:focus,
+  .collab-form select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.15);
+  }
+
   .collab-list { list-style: none; padding: 0; margin: 16px 0 0; }
   .collab-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--line);
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
     font-size: 14px;
+    margin-bottom: 8px;
   }
-  .collab-item .email { flex: 1; }
+  .collab-item:last-child { margin-bottom: 0; }
+  .collab-item .email { flex: 1; color: var(--text); }
   .collab-item .role-badge {
     font-size: 11px;
-    padding: 2px 8px;
+    padding: 3px 9px;
     border-radius: 10px;
     background: rgba(34,211,238,0.15);
     color: #22d3ee;
+    text-transform: capitalize;
   }
   .collab-item .status-badge {
     font-size: 11px;
-    padding: 2px 8px;
+    padding: 3px 9px;
     border-radius: 10px;
+    text-transform: capitalize;
   }
   .collab-item .status-badge.pending {
     background: rgba(250,204,21,0.15);
@@ -140,13 +268,19 @@ const pageStyles = `
     color: #86efac;
   }
   .collab-item .remove-btn {
-    background: none;
-    border: 1px solid rgba(252,165,165,0.3);
+    background: transparent;
+    border: 1px solid rgba(252,165,165,0.30);
     color: #fca5a5;
-    border-radius: 4px;
-    padding: 4px 10px;
+    border-radius: 6px;
+    padding: 5px 10px;
     font-size: 12px;
     cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .collab-item .remove-btn:hover {
+    background: rgba(248, 113, 113, 0.08);
+    color: #fda4a4;
+    border-color: rgba(248, 113, 113, 0.55);
   }
 `;
 
@@ -156,6 +290,10 @@ interface OwnedSite {
   subdomain: string;
   passwordEnabled: boolean;
   passwordSetAt: Date | null;
+  styleKit: string;
+  publishedVersion: number;
+  siteNoIndex: boolean;
+  darkModeEnabled: boolean;
 }
 
 async function lookupOwnedSite(
@@ -179,11 +317,26 @@ async function lookupOwnedSite(
       subdomain: site.subdomain,
       passwordEnabled: site.passwordEnabled,
       passwordSetAt: site.passwordSetAt,
+      styleKit: site.styleKit,
+      publishedVersion: site.publishedVersion,
+      editableState: site.editableState,
     })
     .from(site)
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name,
+    subdomain: row.subdomain,
+    passwordEnabled: row.passwordEnabled,
+    passwordSetAt: row.passwordSetAt,
+    styleKit: row.styleKit,
+    publishedVersion: row.publishedVersion,
+    siteNoIndex: row.editableState.siteNoIndex ?? false,
+    darkModeEnabled: row.editableState.darkModeEnabled ?? false,
+  };
 }
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -351,6 +504,46 @@ function clientScript(siteId: string): string {
     });
   }
 })();
+
+// Site-config toggles (search indexing, visitor dark mode). Each toggle
+// checkbox carries data-config-key (the API field) and an optional
+// data-invert=true for the SEO case (UI shows indexable, API stores noindex).
+// Failures revert the checkbox and surface a status message.
+(() => {
+  const SITE_ID = ${sid};
+  const toggles = document.querySelectorAll('input[data-config-key]');
+  toggles.forEach((cb) => {
+    cb.addEventListener('change', async () => {
+      const key = cb.getAttribute('data-config-key');
+      const inverted = cb.getAttribute('data-invert') === 'true';
+      const apiValue = inverted ? !cb.checked : cb.checked;
+      const stateEl = cb.closest('.toggle-row')?.querySelector('[data-toggle-state]');
+      const stateOn = cb.getAttribute('data-on-label') ?? 'On';
+      const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
+      const prevDisabled = cb.disabled;
+      cb.disabled = true;
+      try {
+        const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+          body: JSON.stringify({ [key]: apiValue }),
+        });
+        if (!response.ok) {
+          const bodyText = (await response.text()).trim();
+          cb.checked = !cb.checked;
+          alert('Could not save: ' + (bodyText || response.statusText));
+          return;
+        }
+        if (stateEl) stateEl.textContent = cb.checked ? stateOn : stateOff;
+      } catch (e) {
+        cb.checked = !cb.checked;
+        alert('Network error: ' + (e && e.message ? e.message : String(e)));
+      } finally {
+        cb.disabled = prevDisabled;
+      }
+    });
+  });
+})();
 `;
 }
 
@@ -401,7 +594,41 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         <code>{owned.subdomain}.rev01.aayushman.dev</code>.
       </p>
 
-      <Card>
+      <Card class="hosting-card" id="hosting">
+        <h2>Hosting</h2>
+        <p class="sub">
+          Where this site lives and how visitors reach it. Plan, region, and CDN are managed by
+          rev01; the publish status and address are yours to change.
+        </p>
+        <div class="hosting-grid">
+          <div class="hosting-cell">
+            <span class="hosting-label">Plan</span>
+            <Badge variant="info">Starter</Badge>
+          </div>
+          <div class="hosting-cell">
+            <span class="hosting-label">CDN</span>
+            <Badge variant="info">Cloudflare Edge</Badge>
+          </div>
+          <div class="hosting-cell">
+            <span class="hosting-label">Style kit</span>
+            <Badge variant="neutral">{owned.styleKit}</Badge>
+          </div>
+          <div class="hosting-cell">
+            <span class="hosting-label">Status</span>
+            {owned.publishedVersion > 0 ? (
+              <Badge variant="success">Live · v{String(owned.publishedVersion)}</Badge>
+            ) : (
+              <Badge variant="warning">Draft</Badge>
+            )}
+          </div>
+          <div class="hosting-cell" style="grid-column: 1 / -1">
+            <span class="hosting-label">Address</span>
+            <code>{owned.subdomain}.rev01.aayushman.dev</code>
+          </div>
+        </div>
+      </Card>
+
+      <Card id="password">
         <h2>Password protection</h2>
         <p class="sub">
           When enabled, visitors must enter a password before they see any page of this site. The
@@ -440,7 +667,64 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         ) : null}
       </Card>
 
-      <Card>
+      <Card id="seo">
+        <h2>Search indexing</h2>
+        <p class="sub">
+          Allow search engines like Google and Bing to index this site and surface it in results.
+          Turn this off if you're publishing privately or want to delay public discovery.
+        </p>
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-label">Allow search engines to index this site</span>
+            <span class="toggle-state" data-toggle-state>
+              {owned.siteNoIndex ? 'Hidden from search' : 'Visible in search'}
+            </span>
+          </div>
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={!owned.siteNoIndex}
+              data-config-key="siteNoIndex"
+              data-invert="true"
+              data-on-label="Visible in search"
+              data-off-label="Hidden from search"
+              aria-label="Allow search engines to index this site"
+            />
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        </div>
+        <p class="hint">Takes effect at the next publish — emits <code>&lt;meta name="robots"&gt;</code> across every page.</p>
+      </Card>
+
+      <Card id="dark-mode">
+        <h2>Visitor dark mode</h2>
+        <p class="sub">
+          When on, the public site exposes a light/dark toggle to visitors and ships both token
+          blocks. When off, your site is locked to the Style Kit's default mode.
+        </p>
+        <div class="toggle-row">
+          <div class="toggle-text">
+            <span class="toggle-label">Let visitors switch between light and dark</span>
+            <span class="toggle-state" data-toggle-state>
+              {owned.darkModeEnabled ? 'Toggleable by visitors' : 'Locked to default mode'}
+            </span>
+          </div>
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={owned.darkModeEnabled}
+              data-config-key="darkModeEnabled"
+              data-on-label="Toggleable by visitors"
+              data-off-label="Locked to default mode"
+              aria-label="Let visitors switch between light and dark"
+            />
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        </div>
+        <p class="hint">Takes effect at the next publish — adds the visitor-mode CSS and toggle script to the published site.</p>
+      </Card>
+
+      <Card id="collaborators">
         <h2>Collaborators</h2>
         <p class="sub">
           Add people by email to let them edit this site. They must have a rev01 account. An

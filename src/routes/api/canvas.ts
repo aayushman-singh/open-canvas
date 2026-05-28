@@ -251,6 +251,57 @@ canvasApi.put('/sites/:siteId', async (c) => {
   return c.json({ ok: true });
 });
 
+// PATCH a small set of site-level config flags (siteNoIndex, darkModeEnabled).
+// Lives separate from the full-state PUT above so the settings UI can flip a
+// single toggle without round-tripping ~200KB of canvas state. Body keys are
+// optional; only keys explicitly present in the body are written.
+canvasApi.patch('/sites/:siteId/config', async (c) => {
+  const siteId = c.req.param('siteId');
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
+  if (!result.found) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const body: unknown = await c.req.json();
+  if (!isRecord(body)) {
+    return c.json({ error: 'body must be a JSON object' }, 400);
+  }
+
+  const next: CanvasSiteState = {
+    ...result.site.editableState,
+    symbols: [...(result.site.editableState.symbols ?? [])],
+    pages: result.site.editableState.pages,
+  };
+
+  if ('siteNoIndex' in body) {
+    if (typeof body.siteNoIndex !== 'boolean') {
+      return c.json({ error: 'siteNoIndex must be a boolean' }, 400);
+    }
+    next.siteNoIndex = body.siteNoIndex;
+  }
+  if ('darkModeEnabled' in body) {
+    if (typeof body.darkModeEnabled !== 'boolean') {
+      return c.json({ error: 'darkModeEnabled must be a boolean' }, 400);
+    }
+    next.darkModeEnabled = body.darkModeEnabled;
+  }
+
+  const database = db(c.env);
+  await database
+    .update(site)
+    .set({
+      editableState: next,
+      updatedAt: sql`now()`,
+    })
+    .where(and(eq(site.id, siteId), eq(site.customerId, result.ownerCustomerId)));
+
+  return c.json({
+    ok: true,
+    siteNoIndex: next.siteNoIndex ?? false,
+    darkModeEnabled: next.darkModeEnabled ?? false,
+  });
+});
+
 canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const siteId = c.req.param('siteId');
   const pageId = c.req.param('pageId');

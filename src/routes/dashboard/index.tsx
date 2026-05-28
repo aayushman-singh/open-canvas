@@ -9,6 +9,7 @@ import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge, Pill } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
+import { configureSymbolInstanceRender } from '../../canvas/elements/symbol-instance';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import type { PublishedSnapshot, CanvasSiteState } from '../../canvas/schema';
 
@@ -80,28 +81,25 @@ function buildThumbHtml(
     ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
     ...(state.symbols?.length ? { symbols: state.symbols } : {}),
   };
-  try {
-    const canvasHtml = renderCanvasSnapshot(
-      snapshot,
-      `/api/canvas/sites/${siteId}/assets`,
-      siteId,
-    );
-    return [
-      '<!DOCTYPE html><html><head>',
-      `<base href="${origin}/">`,
-      '<style>', canvasPublishedStyles, '</style>',
-      '</head><body style="margin:0;overflow:hidden;background:#0a0a0a">',
-      canvasHtml,
-      '</body></html>',
-    ].join('');
-  } catch {
-    return [
-      '<html><body style="margin:0;background:#111;color:#555;',
-      'display:flex;align-items:center;justify-content:center;',
-      'height:100vh;font-family:sans-serif">',
-      '<p>Preview unavailable</p></body></html>',
-    ].join('');
-  }
+  // Wire symbol masters before render. Without this, any site with a
+  // symbol-instance element (e.g. the Apogee Showcase template) throws on
+  // render. A previous try/catch swallowed the throw and produced a "Preview
+  // unavailable" tombstone — silent failure mode that hid the missing config
+  // for an unknown stretch of time. Surface real errors instead.
+  configureSymbolInstanceRender({ symbols: state.symbols ?? [] });
+  const canvasHtml = renderCanvasSnapshot(
+    snapshot,
+    `/api/canvas/sites/${siteId}/assets`,
+    siteId,
+  );
+  return [
+    '<!DOCTYPE html><html><head>',
+    `<base href="${origin}/">`,
+    '<style>', canvasPublishedStyles, '</style>',
+    '</head><body style="margin:0;overflow:hidden;background:#0a0a0a">',
+    canvasHtml,
+    '</body></html>',
+  ].join('');
 }
 
 const cardStyles = `
@@ -478,41 +476,96 @@ const cardStyles = `
     display: none;
     border-top: 1px solid var(--line);
     background: var(--bg);
-    padding: 16px 20px;
+    padding: 14px 16px 16px;
   }
   .site-card-details[data-open="true"] {
     display: block;
   }
+  .details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 4px 10px;
+  }
   .details-heading {
-    margin: 0 0 12px;
-    font-size: 12px;
+    margin: 0;
+    font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
     color: var(--faint);
   }
-  .details-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  .details-table tr {
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .details-table tr:last-child { border-bottom: none; }
-  .details-table td {
-    padding: 7px 0;
-    vertical-align: middle;
-  }
-  .details-table td:first-child {
+  .details-gear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
     color: var(--muted);
-    width: 45%;
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
   }
-  .details-table td:last-child {
+  .details-gear:hover {
+    color: var(--accent);
+    background: rgba(125, 211, 252, 0.10);
+  }
+  .details-gear:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .details-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    text-decoration: none;
+    color: inherit;
+  }
+  .detail-row + .detail-row {
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .detail-row--link {
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .detail-row--link:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .detail-row--link:hover .detail-label {
     color: var(--text);
-    text-align: right;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 12px;
+  }
+  .detail-row--link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .detail-label {
+    color: var(--muted);
+    flex: 1;
+    transition: color 0.12s;
+  }
+  .detail-value {
+    display: inline-flex;
+    align-items: center;
+  }
+  .detail-chevron {
+    color: var(--faint);
+    font-size: 16px;
+    line-height: 1;
+    margin-left: 2px;
+    opacity: 0;
+    transition: opacity 0.12s, transform 0.12s;
+  }
+  .detail-row--link:hover .detail-chevron {
+    opacity: 1;
+    transform: translateX(2px);
   }
   .dash-sign-out {
     font-size: 13px;
@@ -950,49 +1003,75 @@ function DetailRow({
 }) {
   const inner = (
     <>
-      <td>{label}</td>
-      <td>{children}</td>
+      <span class="detail-label">{label}</span>
+      <span class="detail-value">{children}</span>
     </>
   );
+  // Previously these rows wrapped <td>s in an <a> inside a <tr>, which is
+  // foster-parented out of the table by the HTML parser — the rendered DOM
+  // had no anchor inside the row, so clicks did nothing. Flat <a> rows in a
+  // flex layout make each row a real link.
   if (href) {
-    return <tr class="detail-link"><a href={href}>{inner}</a></tr>;
+    return (
+      <a class="detail-row detail-row--link" href={href}>
+        {inner}
+        <span class="detail-chevron" aria-hidden="true">›</span>
+      </a>
+    );
   }
-  return <tr>{inner}</tr>;
+  return <div class="detail-row">{inner}</div>;
 }
 
 function DetailsPanel({ s }: { s: SiteCard }) {
   const editBase = `/dashboard/sites/${s.siteId}`;
   return (
     <div class="site-card-details" data-open="false">
-      <p class="details-heading">Site details</p>
-      <table class="details-table">
-        <tbody>
-          <DetailRow label="Hosting" href={`${editBase}/settings`}>
-            <Pill variant="info">Starter</Pill>
-          </DetailRow>
-          <DetailRow label="CDN">
-            <Pill variant="info">Cloudflare Edge</Pill>
-          </DetailRow>
-          <DetailRow label="Custom domain" href={`${editBase}/domains`}>
-            <Pill variant="off">Not configured</Pill>
-          </DetailRow>
-          <DetailRow label="Password protection" href={`${editBase}/settings`}>
-            <Pill variant={s.passwordEnabled ? 'on' : 'off'}>{s.passwordEnabled ? 'On' : 'Off'}</Pill>
-          </DetailRow>
-          <DetailRow label="Search indexing" href={`${editBase}/settings`}>
-            <Pill variant={s.searchIndexing ? 'on' : 'off'}>{s.searchIndexing ? 'On' : 'Off'}</Pill>
-          </DetailRow>
-          <DetailRow label="Visitor dark mode" href={`${editBase}/settings`}>
-            <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>{s.darkModeEnabled ? 'Toggleable' : 'Locked'}</Pill>
-          </DetailRow>
-          <DetailRow label="Analytics" href={`${editBase}/addons`}>
-            <Pill variant="off">Not connected</Pill>
-          </DetailRow>
-          <DetailRow label="Style kit" href={`${editBase}/edit`}>
-            <Pill variant="info">{s.styleKit}</Pill>
-          </DetailRow>
-        </tbody>
-      </table>
+      <div class="details-header">
+        <p class="details-heading">Site details</p>
+        <a
+          class="details-gear"
+          href={`${editBase}/settings`}
+          aria-label="All site settings"
+          title="All settings"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zm7.43 3.5a7.6 7.6 0 0 0-.05-1l2.05-1.6-2-3.46-2.42.97a7.6 7.6 0 0 0-1.73-1l-.37-2.57h-4l-.37 2.57a7.6 7.6 0 0 0-1.73 1l-2.42-.97-2 3.46 2.05 1.6a7.6 7.6 0 0 0 0 2l-2.05 1.6 2 3.46 2.42-.97a7.6 7.6 0 0 0 1.73 1l.37 2.57h4l.37-2.57a7.6 7.6 0 0 0 1.73-1l2.42.97 2-3.46-2.05-1.6c.03-.33.05-.66.05-1z"
+            />
+          </svg>
+        </a>
+      </div>
+      <div class="details-list">
+        <DetailRow label="Hosting" href={`${editBase}/settings#hosting`}>
+          <Pill variant="info">Starter</Pill>
+        </DetailRow>
+        <DetailRow label="CDN">
+          <Pill variant="info">Cloudflare Edge</Pill>
+        </DetailRow>
+        <DetailRow label="Custom domain" href={`${editBase}/domains`}>
+          <Pill variant="off">Not configured</Pill>
+        </DetailRow>
+        <DetailRow label="Password protection" href={`${editBase}/settings#password`}>
+          <Pill variant={s.passwordEnabled ? 'on' : 'off'}>{s.passwordEnabled ? 'On' : 'Off'}</Pill>
+        </DetailRow>
+        <DetailRow label="Search indexing" href={`${editBase}/settings#seo`}>
+          <Pill variant={s.searchIndexing ? 'on' : 'off'}>{s.searchIndexing ? 'On' : 'Off'}</Pill>
+        </DetailRow>
+        <DetailRow label="Visitor dark mode" href={`${editBase}/settings#dark-mode`}>
+          <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>{s.darkModeEnabled ? 'Toggleable' : 'Locked'}</Pill>
+        </DetailRow>
+        <DetailRow label="Analytics" href={`${editBase}/addons`}>
+          <Pill variant="off">Not connected</Pill>
+        </DetailRow>
+        <DetailRow label="Style kit" href={`${editBase}/edit`}>
+          <Pill variant="info">{s.styleKit}</Pill>
+        </DetailRow>
+      </div>
     </div>
   );
 }
