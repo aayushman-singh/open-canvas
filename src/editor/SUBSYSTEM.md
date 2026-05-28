@@ -17,7 +17,7 @@ rendering (`src/canvas/render.ts`). It is the human-facing control surface.
 
 - **site owner** -> drag, resize, type, switch kit, ask the agent, accept or
   dismiss a preview, save, and publish.
-- **canvas API** -> current `CanvasSiteState` plus mutation results.
+- **canvas API** -> current `EditableSite` plus mutation results.
 - **canvas-agent API** -> previewed op lists and accepted edit results.
 - **SiteRoom** -> live presence counts shared with visitor tabs.
 

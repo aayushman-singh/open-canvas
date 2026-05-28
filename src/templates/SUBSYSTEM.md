@@ -3,7 +3,7 @@
 ## Definition
 
 The canvas Template Seed catalog. It exposes the canonical in-process starting
-point used by site creation: seed metadata plus a validated `CanvasSiteState`
+point used by site creation: seed metadata plus a validated `EditableSite`
 whose media ids are materialised from `src/canvas/seed-assets.ts`.
 
 ## Inputs

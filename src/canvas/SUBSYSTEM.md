@@ -5,7 +5,7 @@
 `canvas` owns the **canvas-first document model**: the set of positioned
 design primitives that make up an Editable Site, the deterministic Style
 Kits that paint them, the validator that decides whether a candidate
-`CanvasSiteState` is well-formed, the pure-function renderer that turns one
+`EditableSite` is well-formed, the pure-function renderer that turns one
 into HTML for the Published Address, the seed media + Template Seed fixture
 that bootstraps a fresh site, and the recipe registry the AI agent consults
 when proposing previewed edits. It is the single source of truth for what
@@ -21,7 +21,7 @@ actions + motion tokens — switching kits never mutates element content.
 
 ## Inputs
 
-- **canvas API** — a candidate `CanvasSiteState` (created on site creation
+- **canvas API** — a candidate `EditableSite` (created on site creation
   from the Template Seed, then mutated by the editor and the AI agent),
   validated before persistence.
 - **canvas-agent** — a typed canvas op (`CanvasAgentOp`), applied to the
@@ -36,7 +36,7 @@ actions + motion tokens — switching kits never mutates element content.
 - **canvas API + canvas-agent + publish** — a validation verdict (`{ valid:
 true }` or `{ valid: false, errors }`) describing what is wrong with a
   candidate state or snapshot. Validation never throws.
-- **public host** — a deterministic HTML string for a `(CanvasSiteState,
+- **public host** — a deterministic HTML string for a `(EditableSite,
 StyleKit, assets)` triple (`render.ts`). The renderer throws on unknown
   shapes because its input is supposed to be validated upstream.
 - **canvas-agent** — the recipe catalogue (`recipes.ts`) the agent consults
@@ -46,7 +46,7 @@ StyleKit, assets)` triple (`render.ts`). The renderer throws on unknown
 
 - `schema.ts` — type aliases + enum literal lists (`STYLE_KITS`,
   `ELEMENT_TYPES`, `MEDIA_KINDS`, `ACTION_VARIANTS`, etc.) and the
-  `CanvasSiteState` / `PublishedSnapshot` shapes.
+  `EditableSite` / `PublishedSnapshot` shapes.
 - `validate.ts` — pure-function validator. Also exports `isAllowedHref` for
   the agent-tool surface.
 - `render.ts` — pure-function renderer (`renderCanvasSnapshot`) that emits

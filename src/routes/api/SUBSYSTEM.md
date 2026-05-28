@@ -13,7 +13,7 @@ promotes the editable state to a published snapshot.
 
 - **`sites.ts`** -> create a site from the canonical Template Seed and seed
   media assets.
-- **`canvas.ts`** -> load/save the editable `CanvasSiteState`, upload assets,
+- **`canvas.ts`** -> load/save the editable `EditableSite`, upload assets,
   serve owner-gated asset previews, and change the active Style Kit.
 - **`canvas-agent.ts`** -> produce AI previews and apply accepted op lists
   after validation and asset ownership checks.
