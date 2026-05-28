@@ -98,19 +98,28 @@ export type RenderDispatch = {
   ) => string;
 };
 
-// Used by the `collection` dispatch entry below to render each child element.
-// See the matching comment in `src/canvas/render.ts` — `element.type` is JSONB
-// at runtime, so an out-of-union value (legacy data, failed migration) is
-// possible and we surface it explicitly with the element id + type.
-function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
+/**
+ * Dispatch one element to its registered renderer. `element.type` comes from
+ * JSONB at runtime, so an out-of-union value (legacy data, failed migration)
+ * is possible — surface it explicitly with the element id + type rather than
+ * letting the implicit `undefined()` minify to "fn is not a function" and
+ * tell you neither. `callerLabel` distinguishes top-level dispatch from the
+ * collection child-render seam in the thrown message.
+ */
+export function renderElementBody(
+  element: CanvasElement,
+  ctx: ElementRenderCtx,
+  callerLabel?: string,
+): string {
   const fn = Object.hasOwn(RENDER_DISPATCH, element.type)
     ? (RENDER_DISPATCH as Record<string, (el: CanvasElement, ctx: ElementRenderCtx) => string>)[
         element.type
       ]
     : undefined;
   if (typeof fn !== 'function') {
+    const label = callerLabel !== undefined ? ` (${callerLabel})` : '';
     throw new Error(
-      `renderElementBody (collection child): no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,
+      `renderElementBody${label}: no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,
     );
   }
   return fn(element, ctx);
@@ -156,6 +165,6 @@ export const RENDER_DISPATCH: RenderDispatch = {
     renderCollection(el, {
       styleKit: ctx.styleKit,
       assetBasePath: ctx.assetBasePath,
-      renderChild: (child) => renderElementBody(child, ctx),
+      renderChild: (child) => renderElementBody(child, ctx, 'collection child'),
     }),
 };

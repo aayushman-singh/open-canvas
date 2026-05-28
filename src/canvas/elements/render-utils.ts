@@ -1,21 +1,16 @@
 // src/canvas/elements/render-utils.ts
 //
 // Shared HTML/CSS escaping + small string helpers used by per-element render
-// fns and the renderer dispatcher (src/canvas/render.ts). Pulled out of
-// render.ts as part of the Phase 0 element registry scaffold so individual
-// element files can stay tiny.
+// fns and the renderer dispatcher (src/canvas/render.ts). Element files stay
+// tiny by routing every escape through this surface.
 //
 // All user-controlled strings are escaped at the boundary. Functions are
 // pure — no DOM access, no I/O.
 
 import type { InlineMark, InlineRun } from '../schema.js';
 
-const HTML_ESCAPES: Record<string, string> = {
-  '&': '&amp;',
-  '<': '&lt;',
-  '>': '&gt;',
-};
-
+// The HTML escapes are a strict subset of ATTR_ESCAPES with identical values
+// for the three shared keys, so both escapers share one table.
 const ATTR_ESCAPES: Record<string, string> = {
   '&': '&amp;',
   '<': '&lt;',
@@ -25,7 +20,7 @@ const ATTR_ESCAPES: Record<string, string> = {
 };
 
 export function escapeHtml(value: string): string {
-  return value.replace(/[&<>]/g, (ch) => HTML_ESCAPES[ch] ?? ch);
+  return value.replace(/[&<>]/g, (ch) => ATTR_ESCAPES[ch] ?? ch);
 }
 
 export function escapeAttr(value: string): string {

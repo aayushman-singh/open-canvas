@@ -3,17 +3,16 @@
 // Pure HTML renderer for a Published Snapshot. Emits a self-contained <main>
 // block; the caller wraps it in the full document.
 //
-// Phase 0 scaffold: this file is the dispatcher. Per-element render logic
-// lives in `src/canvas/elements/*.ts` and is wired in via the
-// `RENDER_DISPATCH` table from `src/canvas/elements/index.ts`. Wave agents
-// register new elements by editing the matching file in `elements/`, never
-// by editing this dispatcher.
+// Per-element render logic lives in `src/canvas/elements/*.ts`. This file
+// composes those element renderers with page + section wrappers and threads
+// `ElementRenderCtx` through. New element types are registered by editing
+// the matching file under `elements/`, never this dispatcher.
 //
 // All user-controlled strings are escaped at the boundary. The function is
 // pure — no DOM access, no I/O. The caller passes an assetBasePath so the
 // renderer never has to know how Owner Assets are addressed.
 
-import { RENDER_DISPATCH, type ElementRenderCtx } from './elements/index.js';
+import { renderElementBody, type ElementRenderCtx } from './elements/index.js';
 import {
   escapeAttr,
   escapeCssValue,
@@ -105,28 +104,6 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
     }
   }
   return styleFromEntries(entries);
-}
-
-// Dispatch indirection — the public renderer never imports element-specific
-// render fns. The Phase 0 RENDER_DISPATCH table is the single source of truth
-// for "given an element of type T, produce the inner HTML." The table is
-// compile-time exhaustive on CanvasElement['type'], but `element.type` comes
-// from JSONB at runtime, so an out-of-union value is possible (legacy data,
-// failed migration). Catch it explicitly with element id + type in the
-// message — the implicit `undefined()` crash minifies to "fn is not a function"
-// and tells you neither.
-function renderElementBody(element: CanvasElement, ctx: ElementRenderCtx): string {
-  const fn = Object.hasOwn(RENDER_DISPATCH, element.type)
-    ? (RENDER_DISPATCH as Record<string, (el: CanvasElement, ctx: ElementRenderCtx) => string>)[
-        element.type
-      ]
-    : undefined;
-  if (typeof fn !== 'function') {
-    throw new Error(
-      `renderElementBody: no RENDER_DISPATCH entry for element type=${JSON.stringify(element.type)} id=${JSON.stringify(element.id)}`,
-    );
-  }
-  return fn(element, ctx);
 }
 
 // Decorative-by-default invariant: shape and surface (container) wrappers are

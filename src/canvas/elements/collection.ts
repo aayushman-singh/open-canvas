@@ -76,29 +76,29 @@ function childWrapperStyle(child: CanvasElement): string {
   ]);
 }
 
-function entryHeight(entryElements: CanvasElement[]): number {
-  let bottom = 0;
-  for (const child of entryElements) {
-    bottom = Math.max(bottom, child.box.y + child.box.h);
-  }
-  return bottom;
-}
-
 export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx): string {
-  const gridStyle = `display:grid;grid-template-columns:repeat(${String(el.layout.columns)},1fr);gap:${String(el.layout.gap)}px`;
+  const gridStyle = styleFromEntries([
+    ['display', 'grid'],
+    ['grid-template-columns', `repeat(${String(el.layout.columns)},1fr)`],
+    ['gap', `${String(el.layout.gap)}px`],
+  ]);
 
   const entriesHtml = el.entries
     .map((entryElements, entryIdx) => {
+      // Single pass over entryElements builds cells and tracks the tallest
+      // bottom edge in lockstep — used as the row's min-height so absolutely
+      // positioned cells don't collapse the entry container.
+      let bottom = 0;
+      const cellsHtml = entryElements
+        .map((child) => {
+          bottom = Math.max(bottom, child.box.y + child.box.h);
+          return `<div class="rev01-collection-child" data-element-type="${escapeAttr(child.type)}" data-rev01-element="${escapeAttr(child.id)}" style="${escapeAttr(childWrapperStyle(child))}">${ctx.renderChild(child)}</div>`;
+        })
+        .join('');
       const rowStyle = styleFromEntries([
         ['position', 'relative'],
-        ['min-height', `${String(entryHeight(entryElements))}px`],
+        ['min-height', `${String(bottom)}px`],
       ]);
-      const cellsHtml = entryElements
-        .map(
-          (child) =>
-            `<div class="rev01-collection-child" data-element-type="${escapeAttr(child.type)}" data-rev01-element="${escapeAttr(child.id)}" style="${escapeAttr(childWrapperStyle(child))}">${ctx.renderChild(child)}</div>`,
-        )
-        .join('');
       return `<div class="rev01-collection-entry" data-rev01-entry="${String(entryIdx)}" style="${escapeAttr(rowStyle)}">${cellsHtml}</div>`;
     })
     .join('');
