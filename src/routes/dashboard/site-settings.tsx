@@ -788,38 +788,45 @@ function clientScript(siteId: string): string {
 // checkbox carries data-config-key (the API field) and an optional
 // data-invert=true for the SEO case (UI shows indexable, API stores noindex).
 // Failures revert the checkbox and surface a status message.
+//
+// PATCH requests are serialized through a single promise chain because the
+// server's /config handler is read-modify-write: two concurrent PATCHes load
+// the same prior state, each apply their own diff, and the second write
+// silently overwrites the first. Queueing here keeps each toggle's effect.
 (() => {
   const SITE_ID = ${sid};
   const toggles = document.querySelectorAll('input[data-config-key]');
+  let patchChain = Promise.resolve();
   toggles.forEach((cb) => {
-    cb.addEventListener('change', async () => {
+    cb.addEventListener('change', () => {
       const key = cb.getAttribute('data-config-key');
       const inverted = cb.getAttribute('data-invert') === 'true';
       const apiValue = inverted ? !cb.checked : cb.checked;
       const stateEl = cb.closest('.toggle-row')?.querySelector('[data-toggle-state]');
       const stateOn = cb.getAttribute('data-on-label') ?? 'On';
       const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
-      const prevDisabled = cb.disabled;
       cb.disabled = true;
-      try {
-        const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-          body: JSON.stringify({ [key]: apiValue }),
-        });
-        if (!response.ok) {
-          const bodyText = (await response.text()).trim();
+      patchChain = patchChain.then(async () => {
+        try {
+          const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+            body: JSON.stringify({ [key]: apiValue }),
+          });
+          if (!response.ok) {
+            const bodyText = (await response.text()).trim();
+            cb.checked = !cb.checked;
+            alert('Could not save: ' + (bodyText || response.statusText));
+            return;
+          }
+          if (stateEl) stateEl.textContent = cb.checked ? stateOn : stateOff;
+        } catch (e) {
           cb.checked = !cb.checked;
-          alert('Could not save: ' + (bodyText || response.statusText));
-          return;
+          alert('Network error: ' + (e && e.message ? e.message : String(e)));
+        } finally {
+          cb.disabled = false;
         }
-        if (stateEl) stateEl.textContent = cb.checked ? stateOn : stateOff;
-      } catch (e) {
-        cb.checked = !cb.checked;
-        alert('Network error: ' + (e && e.message ? e.message : String(e)));
-      } finally {
-        cb.disabled = prevDisabled;
-      }
+      });
     });
   });
 })();
