@@ -13,7 +13,6 @@ import { customer, customTemplate, ownerAsset, site, type BillingPlan } from '..
 import { entitlementsFor, isUnlimited, siteLimitExceededMessage } from '../../billing/plans';
 import { canReadScopedLibraryRow } from './library-access';
 import { getTemplateSeed } from '../../templates/registry';
-import { canReadScopedLibraryRow } from './library-access';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -385,7 +384,8 @@ sites.post('/', async (c) => {
       409,
     );
   }
-  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
+  const customerId = customerRecord.id;
+  const currentPlanId: BillingPlan = customerRecord.plan ?? 'free';
   const { siteLimit } = entitlementsFor(currentPlanId);
 
   if (!isUnlimited(siteLimit)) {
