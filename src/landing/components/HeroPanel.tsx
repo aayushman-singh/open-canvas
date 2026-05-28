@@ -91,7 +91,20 @@ function PreviewPanel() {
         <span>your-site.rev01.dev</span>
       </div>
       <div class="body" style="padding:0.4rem;">
-        <div class="demo-canvas" id="demo-canvas" data-kit="charcoal" aria-hidden="true"></div>
+        <div class="demo-canvas" id="demo-canvas" data-kit="charcoal" aria-hidden="true">
+          <div class="demo-cursor" id="demo-cursor-john">
+            <svg class="ptr" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 1 L3 14 L6.5 11 L8.5 14.5 L10.5 13.5 L8.5 10 L13 10 Z" />
+            </svg>
+            <span class="label">john</span>
+          </div>
+          <div class="demo-cursor" id="demo-cursor-agent">
+            <svg class="ptr" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 1 L3 14 L6.5 11 L8.5 14.5 L10.5 13.5 L8.5 10 L13 10 Z" />
+            </svg>
+            <span class="label">agent</span>
+          </div>
+        </div>
       </div>
     </div>
   );

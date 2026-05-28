@@ -238,7 +238,7 @@ section {
 .hero-grid {
   display: grid;
   grid-template-columns: 1.05fr 1.15fr 0.95fr;
-  min-height: 480px;
+  min-height: clamp(560px, calc(100vh - 160px), 920px);
 }
 
 .hero-panel {
@@ -1183,6 +1183,67 @@ footer .when {
 .demo-canvas[data-kit="orange-editorial"] .demo-card { background: #fff; border: 2px solid #221610; border-radius: 0; box-shadow: 6px 6px 0 #d6541b; }
 .demo-canvas[data-kit="blue-saas"] .demo-card { background: #15295a; border: 1px solid rgba(91, 141, 239, 0.35); border-radius: 16px; box-shadow: 0 8px 22px rgba(8, 16, 36, 0.7); }
 .demo-canvas[data-kit="green-organic"] .demo-card { background: #1a3128; border: 1px solid rgba(126, 193, 142, 0.35); border-radius: 28px; box-shadow: 0 8px 22px rgba(8, 18, 12, 0.7); }
+
+/* multiplayer cursors */
+.demo-cursor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 50;
+  pointer-events: none;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  transition:
+    top 0.85s cubic-bezier(0.32, 0.72, 0, 1),
+    left 0.85s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.4s ease;
+}
+
+.demo-cursor.in {
+  opacity: 1;
+}
+
+.demo-cursor .ptr {
+  width: 18px;
+  height: 18px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+
+.demo-cursor .ptr path {
+  fill: var(--cursor-color, #fff);
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+}
+
+.demo-cursor .label {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--cursor-color, #444);
+  border-radius: 3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.02em;
+}
+
+#demo-cursor-john { --cursor-color: #e89441; }
+#demo-cursor-agent { --cursor-color: oklch(0.78 0.15 200); }
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-cursor {
+    transition: opacity 0.2s ease !important;
+  }
+}
 
 /* demo agent log feed */
 #demo-feed {

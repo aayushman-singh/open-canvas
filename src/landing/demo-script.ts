@@ -38,35 +38,37 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
     ['cta-b2',    'demo-btn-outline', 'top:89%;left:54%;font-size:6.5px;padding:3px 10px;',                          'Learn more']
   ];
 
-  // [time, action, target, log_op, log_ref, sidebar_cmp]
+  // [time, action, target, log_op, log_ref, sidebar_cmp, john_pos, agent_pos]
   // sidebar_cmp = data-cmp value to flash in the sidebar Components grid
-  // For 'kit' steps, sidebar_cmp is the kit data-kit value to toggle active
+  //   For 'kit' steps it is the kit data-kit value to toggle active.
+  // john_pos / agent_pos = "X% Y%" strings, positioning each cursor inside
+  //   the canvas. Falsy → cursor stays at previous target.
   var STEPS = [
-    [300,   'show',   'nav',                                          '+section', 'nav',                  'nav'],
-    [500,   'show',   'logo',                                         '+text',    '"rev01"',              'text'],
-    [800,   'show',   'nav-lnk',                                      '+action',  '"Features" ghost',     'button'],
-    [1100,  'show',   'nav-cta',                                      '+action',  '"Get started" solid',  'button'],
-    [1600,  'show',   'hero-bg',                                      '+section', 'hero',                 'container'],
-    [2000,  'type',   'hero-h|Ship a site that feels lived-in.',      '+heading', '"Ship a site..."',     'text'],
-    [3400,  'show',   'hero-p',                                       '+text',    'body paragraph',       'text'],
-    [3900,  'show',   'hero-btn',                                     '+action',  '"Start editing"',      'button'],
-    [4300,  'upload', 'hero.jpg|900',                                  '+media',   'uploading hero.jpg',   'image'],
-    [5300,  'show',   'hero-media',                                   null,       null,                   null],
-    [5500,  'show',   'hero-orb',                                     '+shape',   'circle',               'shape'],
-    [6000,  'show',   'f1,f1-dot,f1-txt',                             '+section', 'features',             'container'],
-    [6300,  'show',   'f2,f2-dot,f2-txt',                             '+container', 'card x2',            'container'],
-    [6600,  'show',   'f3,f3-dot,f3-txt',                             '+container', 'card x3',            'container'],
-    [7100,  'show',   'cta-h',                                        '+heading', '"Publish when..."',    'text'],
-    [7500,  'show',   'cta-b1',                                       '+action',  '"Open editor" pill',   'button'],
-    [7800,  'show',   'cta-b2',                                       null,       null,                   'button'],
-    [9500,  'kit',    'orange-editorial',                              'setTheme', 'orange-editorial',     'orange-editorial'],
-    [11000, 'kit',    'blue-saas',                                     'setTheme', 'blue-saas',            'blue-saas'],
-    [12500, 'kit',    'green-organic',                                 'setTheme', 'green-organic',        'green-organic'],
-    [14000, 'hide',   '',                                              null,       null,                   null]
+    [250,   'show',   'nav',                                          '+section', 'nav',                  'nav',                  '85% 4%',  '12% 4%'],
+    [450,   'show',   'logo',                                         '+text',    '"rev01"',              'text',                 '85% 4%',  '6% 4%'],
+    [700,   'show',   'nav-lnk',                                      '+action',  '"Features" ghost',     'button',               '74% 4%',  '6% 4%'],
+    [950,   'show',   'nav-cta',                                      '+action',  '"Get started" solid',  'button',               '90% 4%',  '6% 4%'],
+    [1400,  'show',   'hero-bg',                                      '+section', 'hero',                 'container',            '50% 30%', '20% 24%'],
+    [1750,  'type',   'hero-h|Ship a site that feels lived-in.',      '+heading', '"Ship a site..."',     'text',                 '55% 30%', '25% 20%'],
+    [3050,  'show',   'hero-p',                                       '+text',    'body paragraph',       'text',                 '55% 30%', '32% 36%'],
+    [3400,  'show',   'hero-btn',                                     '+action',  '"Start editing"',      'button',               '15% 47%', '32% 36%'],
+    [3750,  'upload', 'hero.jpg|500',                                  '+media',   'uploading hero.jpg',   'image',                '78% 28%', '32% 36%'],
+    [4150,  'show',   'hero-media',                                   null,       null,                   null,                   '78% 28%', null],
+    [4400,  'show',   'hero-orb',                                     '+shape',   'circle',               'shape',                '88% 16%', '32% 36%'],
+    [4800,  'show',   'f1,f1-dot,f1-txt',                             '+section', 'features',             'container',            '18% 66%', '60% 30%'],
+    [5050,  'show',   'f2,f2-dot,f2-txt',                             '+container', 'card x2',            'container',            '50% 66%', '60% 30%'],
+    [5300,  'show',   'f3,f3-dot,f3-txt',                             '+container', 'card x3',            'container',            '82% 66%', '60% 30%'],
+    [5700,  'show',   'cta-h',                                        '+heading', '"Publish when..."',    'text',                 '50% 84%', '46% 80%'],
+    [6000,  'show',   'cta-b1',                                       '+action',  '"Open editor" pill',   'button',               '38% 92%', '46% 80%'],
+    [6250,  'show',   'cta-b2',                                       null,       null,                   'button',               '64% 92%', '46% 80%'],
+    [7600,  'kit',    'orange-editorial',                              'setTheme', 'orange-editorial',     'orange-editorial',     '12% 50%', '88% 70%'],
+    [9000,  'kit',    'blue-saas',                                     'setTheme', 'blue-saas',            'blue-saas',            '88% 50%', '12% 70%'],
+    [10400, 'kit',    'green-organic',                                 'setTheme', 'green-organic',        'green-organic',        '12% 30%', '88% 30%'],
+    [11800, 'hide',   '',                                              null,       null,                   null,                   '50% 50%', '50% 50%']
   ];
 
-  var CYCLE = 15500;
-  var canvas, feed, sidebar, uploadBox, els = {}, timers = [];
+  var CYCLE = 13000;
+  var canvas, feed, sidebar, uploadBox, johnCur, agentCur, els = {}, timers = [];
 
   function show(id) { if (els[id]) els[id].classList.add('in'); }
 
@@ -100,6 +102,29 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
         b.classList.remove('active');
       }
     }
+  }
+
+  function moveCursor(cur, pos) {
+    if (!cur || !pos) return;
+    var parts = pos.split(' ');
+    if (parts.length !== 2) return;
+    cur.style.left = parts[0];
+    cur.style.top = parts[1];
+  }
+
+  function showCursors() {
+    if (johnCur) johnCur.classList.add('in');
+    if (agentCur) agentCur.classList.add('in');
+  }
+
+  function hideCursors() {
+    if (johnCur) johnCur.classList.remove('in');
+    if (agentCur) agentCur.classList.remove('in');
+  }
+
+  function resetCursors() {
+    if (johnCur) { johnCur.style.left = '70%'; johnCur.style.top = '8%'; }
+    if (agentCur) { agentCur.style.left = '20%'; agentCur.style.top = '8%'; }
   }
 
   function resetKitButtons() {
@@ -200,8 +225,12 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
     hideAll();
     setKit('charcoal');
     resetKitButtons();
+    resetCursors();
     if (uploadBox) uploadBox.hidden = true;
     while (feed.firstChild) feed.removeChild(feed.firstChild);
+
+    // Bring cursors back in (they linger between cycles for continuity)
+    timers.push(setTimeout(showCursors, 200));
 
     for (var i = 0; i < STEPS.length; i++) {
       (function(step) {
@@ -228,6 +257,9 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
             if (action === 'kit') activateKit(sb);
             else flashCmp(sb);
           }
+          // Cursor movement
+          if (step[6]) moveCursor(johnCur, step[6]);
+          if (step[7]) moveCursor(agentCur, step[7]);
           addLog(step[0], step[3], step[4]);
         }, step[0]));
       })(STEPS[i]);
@@ -285,7 +317,10 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
     feed = document.getElementById('demo-feed');
     sidebar = document.getElementById('demo-sidebar');
     uploadBox = document.getElementById('demo-sb-upload');
+    johnCur = document.getElementById('demo-cursor-john');
+    agentCur = document.getElementById('demo-cursor-agent');
     if (!canvas || !feed) return;
+    resetCursors();
 
     for (var i = 0; i < ELS.length; i++) {
       var def = ELS[i];
