@@ -239,22 +239,10 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
           return;
         }
         if (payload.type === 'presence') {
-          // Task 8: surface the visitor count in the corner pill. Show only
-          // when count > 1 — a lone "1 viewing" is meaningless and would
-          // just leak the fact that the visitor is alone.
-          const count = typeof payload.count === 'number' && Number.isFinite(payload.count)
-            ? payload.count
-            : 0;
-          const pill = document.querySelector('[data-rev01-presence]');
-          const counter = document.querySelector('[data-rev01-presence-count]');
-          if (pill && counter) {
-            if (count > 1) {
-              counter.textContent = String(count);
-              pill.hidden = false;
-            } else {
-              pill.hidden = true;
-            }
-          }
+          // Presence broadcasts are still received over /__live (the DO sends
+          // one to every connection) but visitors no longer see a viewer-count
+          // pill. The editor side keeps its own "N editing" badge wired
+          // through Yjs awareness — that path is independent of this listener.
           return;
         }
       }
@@ -890,15 +878,6 @@ export async function handlePublicRequest<P extends string, I extends Input>(
         </head>
         <body>
           <div data-rev01-public-root>${raw(snapshotHtml)}</div>
-          <aside
-            data-rev01-presence
-            hidden
-            role="status"
-            aria-live="polite"
-            aria-label="People viewing"
-          >
-            👀 <span data-rev01-presence-count>0</span> viewing
-          </aside>
           ${raw(buildPublishedFooterHtml())}
           <script type="module">
             ${raw(visitorScript)};
