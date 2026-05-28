@@ -101,6 +101,27 @@ function resolveInviterName(c: Context<Env>, fallbackEmail: string): string {
   return named || fallbackEmail;
 }
 
+interface ClerkEmailForInviteLookup {
+  emailAddress: string;
+  verification: { status?: string } | null;
+}
+
+interface ClerkUserForInviteLookup {
+  emailAddresses: ClerkEmailForInviteLookup[];
+}
+
+export function clerkUserHasVerifiedEmail(
+  user: ClerkUserForInviteLookup,
+  email: string,
+): boolean {
+  const normalizedEmail = email.trim().toLowerCase();
+  return user.emailAddresses.some(
+    (addr) =>
+      addr.emailAddress.trim().toLowerCase() === normalizedEmail &&
+      addr.verification?.status === 'verified',
+  );
+}
+
 // Local lookup first (cheap), then Clerk Backend API fallback (covers
 // secondary emails that Clerk knows about but we haven't denormalized).
 // Returns null only when neither source can resolve a customer row — the
@@ -120,7 +141,7 @@ async function findCustomerByEmail(
   const clerk = c.get('clerk');
   if (!clerk) return null;
   const clerkResult = await clerk.users.getUserList({ emailAddress: [email] });
-  const clerkUser = clerkResult.data?.[0];
+  const clerkUser = clerkResult.data?.find((user) => clerkUserHasVerifiedEmail(user, email));
   if (!clerkUser) return null;
 
   const byClerkId = await database

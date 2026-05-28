@@ -44,6 +44,7 @@
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",
     "sections:smoke": "bun run src/routes/api/sections-smoke.ts",
     "canvas-state-gate:smoke": "bun run src/routes/api/canvas-state-gate.smoke.ts",
+    "collaborators:smoke": "bun run src/routes/api/collaborators-smoke.ts",
     "site-settings:smoke": "bun run src/routes/dashboard/site-settings.smoke.ts",
     "dashboard-shell:smoke": "bun run src/routes/dashboard/shell.smoke.ts",
     "responsive:smoke": "bun run src/canvas/responsive/smoke.ts",
