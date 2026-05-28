@@ -177,48 +177,48 @@ const shellStyles = `
   .site-sidebar-link[aria-current="page"] .ico { opacity: 1; }
   .site-layout main { flex: 1; min-width: 0; }
 
-  .r-modal-backdrop {
+  .rev01-modal-backdrop {
     position: fixed; inset: 0; z-index: 10000;
     background: rgba(0,0,0,0.6);
     display: flex; align-items: center; justify-content: center;
-    animation: r-modal-in .12s ease-out;
+    animation: rev01-modal-in .12s ease-out;
   }
-  @keyframes r-modal-in { from { opacity: 0 } }
-  .r-modal {
+  @keyframes rev01-modal-in { from { opacity: 0 } }
+  .rev01-modal {
     width: min(440px, calc(100vw - 48px));
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 10px; padding: 24px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     color: var(--text);
-    animation: r-modal-pop .12s ease-out;
+    animation: rev01-modal-pop .12s ease-out;
   }
-  @keyframes r-modal-pop { from { transform: scale(.96); opacity: 0 } }
-  .r-modal h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
-  .r-modal p { margin: 0 0 16px; font-size: 14px; color: var(--muted); line-height: 1.5; white-space: pre-line; }
-  .r-modal input[type="text"] {
+  @keyframes rev01-modal-pop { from { transform: scale(.96); opacity: 0 } }
+  .rev01-modal h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+  .rev01-modal p { margin: 0 0 16px; font-size: 14px; color: var(--muted); line-height: 1.5; white-space: pre-line; }
+  .rev01-modal input[type="text"] {
     width: 100%; background: var(--bg); border: 1px solid var(--line);
     border-radius: 6px; padding: 10px 12px; color: var(--text);
     font: inherit; font-size: 14px; outline: none; margin-bottom: 16px;
   }
-  .r-modal input[type="text"]:focus { border-color: var(--accent); }
-  .r-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-  .r-modal-actions button {
+  .rev01-modal input[type="text"]:focus { border-color: var(--accent); }
+  .rev01-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .rev01-modal-actions button {
     appearance: none; font: inherit; font-size: 13px; font-weight: 500;
     padding: 8px 16px; border-radius: 6px; cursor: pointer;
     transition: background .12s, border-color .12s, color .12s;
   }
-  .r-modal-cancel {
+  .rev01-modal-cancel {
     background: transparent; border: 1px solid var(--line); color: var(--muted);
   }
-  .r-modal-cancel:hover { border-color: var(--accent); color: var(--text); }
-  .r-modal-ok {
+  .rev01-modal-cancel:hover { border-color: var(--accent); color: var(--text); }
+  .rev01-modal-ok {
     background: var(--accent); border: 1px solid var(--accent); color: #080b13;
   }
-  .r-modal-ok:hover { filter: brightness(1.1); }
-  .r-modal-danger {
+  .rev01-modal-ok:hover { filter: brightness(1.1); }
+  .rev01-modal-danger {
     background: #ef4444; border: 1px solid #ef4444; color: #fff;
   }
-  .r-modal-danger:hover { background: #dc2626; border-color: #dc2626; }
+  .rev01-modal-danger:hover { background: #dc2626; border-color: #dc2626; }
 `;
 
 export type Crumb = { href?: string; label: string };
@@ -375,18 +375,18 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
         )}
         <script>{raw(`(function(){
   function _build(o){return new Promise(function(resolve){
-    var bd=document.createElement('div');bd.className='r-modal-backdrop';
-    var m=document.createElement('div');m.className='r-modal';
+    var bd=document.createElement('div');bd.className='rev01-modal-backdrop';
+    var m=document.createElement('div');m.className='rev01-modal';
     m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');
     if(o.title){var h=document.createElement('h3');h.textContent=o.title;m.appendChild(h);}
     if(o.message){var p=document.createElement('p');p.textContent=o.message;m.appendChild(p);}
     var inp=null;
     if(o.type==='prompt'){inp=document.createElement('input');inp.type='text';inp.value=o.defaultValue||'';m.appendChild(inp);}
-    var acts=document.createElement('div');acts.className='r-modal-actions';
+    var acts=document.createElement('div');acts.className='rev01-modal-actions';
     var cancelBtn=null;
-    if(o.type!=='alert'){cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.className='r-modal-cancel';cancelBtn.textContent='Cancel';acts.appendChild(cancelBtn);}
+    if(o.type!=='alert'){cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.className='rev01-modal-cancel';cancelBtn.textContent='Cancel';acts.appendChild(cancelBtn);}
     var ok=document.createElement('button');ok.type='button';
-    ok.className=o.danger?'r-modal-danger':'r-modal-ok';
+    ok.className=o.danger?'rev01-modal-danger':'rev01-modal-ok';
     ok.textContent=o.confirmLabel||'OK';acts.appendChild(ok);m.appendChild(acts);bd.appendChild(m);
     function close(v){document.removeEventListener('keydown',onKey,true);if(bd.parentNode)bd.parentNode.removeChild(bd);resolve(v);}
     function onKey(e){
