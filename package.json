@@ -87,7 +87,7 @@
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "bunx lint-staged && bun run typecheck"
+    "pre-commit": "bunx lint-staged --no-stash && bun run typecheck"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": "eslint --fix"
