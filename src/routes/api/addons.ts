@@ -206,7 +206,16 @@ addonsApi.put('/sites/:siteId/:addonId', async (c) => {
     for (const field of addon.configFields) {
       if (!field.pattern) continue;
       const value = body.config[field.key];
-      if (value === undefined) continue;
+      if (value === undefined || value.trim().length === 0) {
+        return c.json(
+          {
+            error: 'invalid config',
+            field: field.key,
+            hint: field.patternHint ?? `${field.label} is required`,
+          },
+          400,
+        );
+      }
       const regex = new RegExp(field.pattern);
       if (!regex.test(value)) {
         return c.json(

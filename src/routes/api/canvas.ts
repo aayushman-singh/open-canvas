@@ -504,7 +504,6 @@ canvasApi.post('/sites/:siteId/assets', async (c) => {
         bytes: decoded.bytes,
         mediaType: decoded.mediaType,
         alt: parsed.alt,
-        siteId: result.site.id,
       },
     );
     return c.json({

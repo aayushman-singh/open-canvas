@@ -79,16 +79,19 @@ export function Pill({
 }
 
 export function Card({
+  id,
   class: userClass,
   style,
   children,
 }: {
+  id?: string;
   class?: string;
   style?: string;
   children?: Child;
 }) {
   return (
     <section
+      {...(id ? { id } : {})}
       class={classes('rev01-ui-card', userClass)}
       {...(style ? { style } : {})}
     >

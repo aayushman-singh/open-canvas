@@ -36,6 +36,7 @@ export interface PillProps {
 }
 
 export interface CardProps {
+  id?: string;
   class?: string;
   style?: string;
   children?: Child;

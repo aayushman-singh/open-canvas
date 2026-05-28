@@ -212,13 +212,6 @@ importRouter.post('/', async (c) => {
     existingOwnerAssets,
   });
 
-  const r2Bucket = c.env.ASSETS_BUCKET;
-  await Promise.all(
-    preparedAssets.r2Uploads.map(({ key, data, contentType }) =>
-      r2Bucket.put(key, data, { httpMetadata: { contentType } }),
-    ),
-  );
-
   let editableState: CanvasSiteState;
   try {
     editableState = buildCanvasSiteState(
@@ -237,6 +230,13 @@ importRouter.post('/', async (c) => {
       502,
     );
   }
+
+  const r2Bucket = c.env.ASSETS_BUCKET;
+  await Promise.all(
+    preparedAssets.r2Uploads.map(({ key, data, contentType }) =>
+      r2Bucket.put(key, data, { httpMetadata: { contentType } }),
+    ),
+  );
 
   try {
     const siteInsert = database.insert(site).values({

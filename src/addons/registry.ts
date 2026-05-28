@@ -20,9 +20,13 @@ export interface AddonDefinition {
 }
 
 function emitGoogleAnalytics(config: Record<string, string>): string {
-  const mid = config['measurementId'] ?? '';
-  if (!mid) return '';
-  if (!/^G-[A-Z0-9]+$/.test(mid)) return '';
+  const mid = config['measurementId'];
+  if (mid === undefined || mid.length === 0) {
+    throw new Error('[addons/registry] Google Analytics measurementId is required');
+  }
+  if (!/^G-[A-Z0-9]+$/.test(mid)) {
+    throw new Error(`[addons/registry] invalid Google Analytics measurementId: ${mid}`);
+  }
   return [
     `<script async src="https://www.googletagmanager.com/gtag/js?id=${mid}"></script>`,
     '<script>',

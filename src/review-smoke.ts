@@ -35,6 +35,7 @@ import {
   validateSubdomain,
 } from './routes/api/sites';
 import { canReadScopedLibraryRow, escapeHtmlText } from './routes/api/library-access';
+import { getAddon } from './addons/registry';
 import { allTemplateSeeds, getTemplateSeed, starterTemplate } from './templates/registry';
 
 function assert(condition: boolean, message: string): asserts condition {
@@ -526,15 +527,15 @@ assert(
 assert(
   publishRouteSource.includes('buildPublishBroadcastPayload') &&
     publishRouteSource.includes('htmlBySlug') &&
-    /renderCanvasSnapshot\(\s*fullPagesSnapshot,\s*'\/assets',\s*siteId,\s*\{\s*renderPages:\s*\[targetPage\]\s*\}/.test(
+    /renderCanvasSnapshot\(\s*snapshot,\s*'\/assets',\s*siteId,\s*\{\s*renderPages:\s*\[targetPage\]\s*\}/.test(
       publishRouteSource,
     ),
   'expected publish broadcast render to emit page-scoped html and pass site id through so live-updated forms keep a valid action',
 );
 assert(
-  publishRouteSource.includes('throw new Error(message)') &&
+  publishRouteSource.includes('published side effects failed; restored previous published state') &&
     publishRouteSource.includes('[publish]'),
-  'expected publish broadcast failure to throw after logging instead of returning ok',
+  'expected publish broadcast failure to restore previous published state after logging instead of returning ok',
 );
 assert(
   publicRouteSource.includes('prepareRender(path, snapshot)') &&
@@ -718,6 +719,9 @@ const canvasIndexSource = await readSource('./editor/canvas-index.tsx');
 const canvasClientSource = await readSource('./editor/canvas-client.ts');
 const canvasApiSource = await readSource('./routes/api/canvas.ts');
 const publishApiSource = await readSource('./routes/api/publish.ts');
+const importApiSource = await readSource('./routes/api/import.ts');
+const addonsApiSource = await readSource('./routes/api/addons.ts');
+const addonsRegistrySource = await readSource('./addons/registry.ts');
 assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
@@ -738,6 +742,63 @@ assert(
   publishApiSource.includes('cannot publish: unfilled media slots'),
   'expected publish API to reject empty media slots with a 400-level owner error',
 );
+assert(
+  publishApiSource.includes('restorePreviousPublishState') &&
+    publishApiSource.includes('publishedSnapshot: site.publishedSnapshot') &&
+    publishApiSource.includes('published side effects failed; restored previous published state'),
+  'expected publish to restore the prior snapshot/version if post-DB side effects fail',
+);
+assert(
+  !/const\s+fullPagesSnapshot\s*=\s*\{\s*\.\.\.snapshot/.test(publishApiSource),
+  'expected published page rendering to keep the original snapshot identity for responsive CSS memoization',
+);
+const importValidationIndex = importApiSource.indexOf(
+  'const validation = validateCanvasSiteState(editableState)',
+);
+const importR2UploadIndex = importApiSource.indexOf('preparedAssets.r2Uploads.map');
+assert(
+  importValidationIndex !== -1 &&
+    importR2UploadIndex !== -1 &&
+    importValidationIndex < importR2UploadIndex,
+  'expected import to build and validate editable state before writing imported assets to R2',
+);
+const legacyUploadBridgeSource = canvasApiSource.slice(
+  canvasApiSource.indexOf("canvasApi.post('/sites/:siteId/assets'"),
+  canvasApiSource.indexOf('interface GenerateAssetInput'),
+);
+assert(
+  !/uploadOwnerAsset[\s\S]*siteId:\s*result\.site\.id[\s\S]*\);/.test(
+    legacyUploadBridgeSource,
+  ),
+  'expected legacy JSON asset bridge not to pass siteId without elementId to uploadOwnerAsset',
+);
+assert(
+  !/const value = body\.config\[field\.key\];\s*if \(value === undefined\) continue;/.test(
+    addonsApiSource,
+  ),
+  'expected enabled addon config validation to reject missing required pattern fields',
+);
+assert(
+  !addonsRegistrySource.includes("if (!mid) return '';") &&
+    !addonsRegistrySource.includes("if (!/^G-[A-Z0-9]+$/.test(mid)) return '';"),
+  'expected Google Analytics emitter to fail loudly instead of silently omitting invalid config',
+);
+const googleAnalyticsAddon = getAddon('addon_google_analytics');
+assert(googleAnalyticsAddon !== undefined, 'expected Google Analytics addon definition to exist');
+const gaHeadScripts = googleAnalyticsAddon.emitHeadScripts({ measurementId: 'G-ABC123' });
+assert(
+  gaHeadScripts.includes("gtag('config','G-ABC123');"),
+  'expected valid Google Analytics measurement ID to emit gtag config',
+);
+for (const invalidConfig of [{}, { measurementId: '' }, { measurementId: 'UA-123456-1' }]) {
+  let threw = false;
+  try {
+    googleAnalyticsAddon.emitHeadScripts(invalidConfig);
+  } catch {
+    threw = true;
+  }
+  assert(threw, 'expected Google Analytics emitter to throw for missing or invalid measurementId');
+}
 assert(
   canvasClientSource.includes('API_BASE + "/owner/assets"'),
   'expected media picker delete/gallery flow to use the selected owner asset API base',

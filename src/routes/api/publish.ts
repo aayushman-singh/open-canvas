@@ -13,9 +13,10 @@
 //   4. Build PublishedSnapshot { version: prev+1, publishedAt, styleKit,
 //      pages } and re-validate it (defence in depth).
 //   5. UPDATE the row: publishedSnapshot, publishedVersion, updatedAt.
-//   6. Render page-scoped snapshot HTML and POST it to SITE_ROOM/broadcast
+//   6. Rebuild search, capture timeline, and POST to SITE_ROOM/broadcast
 //      keyed by the site id. Broadcast errors throw so the route never reports
-//      success while open visitor tabs missed the update.
+//      success while open visitor tabs missed the update; post-update failures
+//      restore the prior published state before surfacing.
 
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -30,8 +31,8 @@ import { resolvePrimaryPage, snapshotForPageSlug } from '../../canvas/page-routi
 import { renderCanvasSnapshot } from '../../canvas/render';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateCanvasSiteState, validatePublishedSnapshot } from '../../canvas/validate';
-import { db } from '../../db/client';
-import { customer, ownerAsset, site } from '../../db/schema';
+import { db, type Db } from '../../db/client';
+import { customer, ownerAsset, site, siteSearchEntry, siteSnapshot } from '../../db/schema';
 // Post-publish side effects that are part of the published-site contract:
 // version timeline capture, OG-image pre-rendering, and search indexing.
 import { captureOnPublish } from '../../version/capture';
@@ -63,6 +64,140 @@ interface PublishBroadcastPayload {
   defaultSlug: string;
 }
 
+interface PreviousPublishState {
+  snapshot: PublishedSnapshot | null;
+  version: number;
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.stack ?? error.message;
+  }
+  return String(error);
+}
+
+async function restorePreviousPublishState(args: {
+  database: Db;
+  siteId: string;
+  customerId: string;
+  previous: PreviousPublishState;
+  failedVersion: number;
+}): Promise<void> {
+  const rollbackErrors: string[] = [];
+
+  try {
+    const restoredRows = await args.database
+      .update(site)
+      .set({
+        publishedSnapshot: args.previous.snapshot,
+        publishedVersion: args.previous.version,
+        updatedAt: sql`now()`,
+      })
+      .where(and(eq(site.id, args.siteId), eq(site.customerId, args.customerId)))
+      .returning({ id: site.id });
+    if (restoredRows.length === 0) {
+      throw new Error(`site ${args.siteId} disappeared before publish rollback`);
+    }
+  } catch (error) {
+    rollbackErrors.push(`site row: ${describeError(error)}`);
+  }
+
+  try {
+    if (args.previous.snapshot) {
+      await rebuildSearchIndex(args.siteId, args.previous.snapshot, args.database);
+    } else {
+      await args.database.delete(siteSearchEntry).where(eq(siteSearchEntry.siteId, args.siteId));
+    }
+  } catch (error) {
+    rollbackErrors.push(`search index: ${describeError(error)}`);
+  }
+
+  try {
+    await args.database
+      .delete(siteSnapshot)
+      .where(
+        and(
+          eq(siteSnapshot.siteId, args.siteId),
+          eq(siteSnapshot.reason, 'publish'),
+          eq(siteSnapshot.publishedVersion, args.failedVersion),
+        ),
+      );
+  } catch (error) {
+    rollbackErrors.push(`version snapshot: ${describeError(error)}`);
+  }
+
+  if (rollbackErrors.length > 0) {
+    throw new Error(
+      `[publish] rollback failed for site ${args.siteId}: ${rollbackErrors.join('; ')}`,
+    );
+  }
+}
+
+async function runPublishedSideEffects(args: {
+  database: Db;
+  env: Bindings;
+  siteId: string;
+  customerId: string;
+  snapshot: PublishedSnapshot;
+  previous: PreviousPublishState;
+  broadcastPayload: PublishBroadcastPayload;
+}): Promise<void> {
+  try {
+    await rebuildSearchIndex(args.siteId, args.snapshot, args.database);
+    await captureOnPublish(args.siteId, args.snapshot.version, args.database, args.env);
+
+    const id = args.env.SITE_ROOM.idFromName(args.siteId);
+    const stub = args.env.SITE_ROOM.get(id);
+    const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(args.broadcastPayload),
+    });
+    if (!broadcastResponse.ok) {
+      const body = await broadcastResponse.text();
+      throw new Error(`SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`);
+    }
+  } catch (error) {
+    const sideEffectFailure = describeError(error);
+    console.error('[publish] published side effects failed; restoring previous published state', {
+      siteId: args.siteId,
+      failedVersion: args.snapshot.version,
+      previousVersion: args.previous.version,
+      error: sideEffectFailure,
+    });
+    try {
+      await restorePreviousPublishState({
+        database: args.database,
+        siteId: args.siteId,
+        customerId: args.customerId,
+        previous: args.previous,
+        failedVersion: args.snapshot.version,
+      });
+    } catch (rollbackError) {
+      const rollbackFailure = describeError(rollbackError);
+      console.error('[publish] rollback failed after published side effects failure', {
+        siteId: args.siteId,
+        failedVersion: args.snapshot.version,
+        previousVersion: args.previous.version,
+        sideEffectFailure,
+        rollbackFailure,
+      });
+      throw new Error(
+        `published side effects failed and rollback failed: sideEffect=${sideEffectFailure}; rollback=${rollbackFailure}`,
+      );
+    }
+    console.error('[publish] published side effects failed; restored previous published state', {
+      siteId: args.siteId,
+      failedVersion: args.snapshot.version,
+      previousVersion: args.previous.version,
+      error: sideEffectFailure,
+    });
+    throw new Error(
+      `published side effects failed; restored previous published state: ${sideEffectFailure}`,
+    );
+  }
+}
+
 function renderPublishedPageHtml(
   snapshot: PublishedSnapshot,
   pageSlug: string,
@@ -73,9 +208,8 @@ function renderPublishedPageHtml(
   if (!targetPage) {
     throw new Error(`renderPublishedPageHtml: no page for slug ${JSON.stringify(pageSlug)}`);
   }
-  const fullPagesSnapshot = { ...snapshot, pages: snapshot.pages };
   return injectInteractiveRuntime(
-    renderCanvasSnapshot(fullPagesSnapshot, '/assets', siteId, { renderPages: [targetPage] }),
+    renderCanvasSnapshot(snapshot, '/assets', siteId, { renderPages: [targetPage] }),
     pageSnapshot,
   );
 }
@@ -130,6 +264,7 @@ publishApi.post('/sites/:siteId', async (c) => {
       name: site.name,
       subdomain: site.subdomain,
       editableState: site.editableState,
+      publishedSnapshot: site.publishedSnapshot,
       publishedVersion: site.publishedVersion,
     })
     .from(site)
@@ -262,9 +397,9 @@ publishApi.post('/sites/:siteId', async (c) => {
   }
 
   // Publish is all-or-nothing: generated OG images, snapshots, search index,
-  // and live broadcast are part of the external publish contract. Let failures
-  // throw so the Owner does not see a successful publish with missing side
-  // effects.
+  // and live broadcast are part of the external publish contract. Pre-update
+  // failures throw before the published row moves; post-update failures restore
+  // the prior published state before surfacing the error.
   await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
 
   await database
@@ -276,23 +411,18 @@ publishApi.post('/sites/:siteId', async (c) => {
     })
     .where(and(eq(site.id, row.id), eq(site.customerId, customerId)));
 
-  await captureOnPublish(row.id, snapshot.version, database, c.env);
-
-  await rebuildSearchIndex(row.id, snapshot, database);
-
-  const id = c.env.SITE_ROOM.idFromName(row.id);
-  const stub = c.env.SITE_ROOM.get(id);
-  const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(broadcastPayload),
+  await runPublishedSideEffects({
+    database,
+    env: c.env,
+    siteId: row.id,
+    customerId,
+    snapshot,
+    previous: {
+      snapshot: row.publishedSnapshot ?? null,
+      version: row.publishedVersion,
+    },
+    broadcastPayload,
   });
-  if (!broadcastResponse.ok) {
-    const body = await broadcastResponse.text();
-    const message = `SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`;
-    console.error(`[publish] ${message}`);
-    throw new Error(message);
-  }
 
   return c.json({
     ok: true,
