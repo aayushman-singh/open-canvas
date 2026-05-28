@@ -166,6 +166,7 @@ export function prepareSeedAssetsForCustomer(
 ): PreparedSeedAssets {
   const editableState = structuredClone(state);
   const mappedIds = new Map<string, string>();
+  const materializedIdByContentHash = new Map<string, string>();
   const seedRows: SeedOwnerAssetRow[] = [];
   const unknownSeedIds = new Set<string>();
   const assetKindErrors: Array<{
@@ -189,8 +190,14 @@ export function prepareSeedAssetsForCustomer(
       continue;
     }
     if (mappedIds.has(reference.assetId)) continue;
+    const existingMaterializedId = materializedIdByContentHash.get(seed.contentHash);
+    if (existingMaterializedId) {
+      mappedIds.set(reference.assetId, existingMaterializedId);
+      continue;
+    }
     const materializedId = customerSeedAssetId(customerId, reference.assetId);
     mappedIds.set(reference.assetId, materializedId);
+    materializedIdByContentHash.set(seed.contentHash, materializedId);
     seedRows.push({
       id: materializedId,
       customerId,
