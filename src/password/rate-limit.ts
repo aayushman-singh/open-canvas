@@ -8,18 +8,16 @@
 // Implementation strategy:
 //
 //   - In production we delegate to the `FormRateLimiter` Durable Object
-//     class (declared in `wrangler.toml`, owned by Wave 2 #7). The DO is
-//     `kind`-aware: when both #7 forms and #9 password ship, the DO's
-//     storage namespace partitions by `(kind, key)` so the two subsystems
-//     don't collide on the same key space. The contract we depend on is
-//     a `fetch(request)` that takes a `{ kind, key, limit, windowSeconds }`
-//     JSON body and returns `{ allowed: boolean, remaining: number }`.
+//     class (declared in `wrangler.toml`, shared with `src/forms/`). The DO
+//     is `kind`-aware: forms and password subsystems share the DO class but
+//     its storage namespace partitions by `(kind, key)` so the two surfaces
+//     don't collide. The contract we depend on is a `fetch(request)` that
+//     takes a `{ kind, key, limit, windowSeconds }` JSON body and returns
+//     `{ allowed: boolean, remaining: number }`.
 //
-//   - The DO from #7 may not have landed yet. The Phase 0 stub at
-//     `src/live/form-rate-limiter.ts` throws on every call, which would
-//     break our smoke if we called it. To stay decoupled we route through
-//     a `RateLimiter` interface that the smoke implements as an in-process
-//     `Map<key, timestamps[]>`. When #7 lands with a real DO body, the
+//   - The DO body may not have landed yet. To stay decoupled we route
+//     through a `RateLimiter` interface that the smoke implements as an
+//     in-process `Map<key, timestamps[]>`. When the DO body lands the
 //     production caller swaps the implementation by passing the DO-backed
 //     adapter at the call site.
 //
@@ -135,7 +133,7 @@ export class InProcessRateLimiter implements RateLimiter {
 // Durable-Object-backed implementation
 // ---------------------------------------------------------------------------
 //
-// The DO from Wave 2 #7 is the production limiter. The contract we depend on:
+// The shared `FormRateLimiter` DO is the production limiter. The contract we depend on:
 //
 //   POST https://do.invalid/check-and-record
 //     body: { kind, key, limit, windowSeconds }
@@ -147,9 +145,9 @@ export class InProcessRateLimiter implements RateLimiter {
 // own DO instance. The DO storage is per-instance so the partitioning is
 // automatic — we don't have to trust the DO body to honour the `kind` field.
 //
-// #7's stub currently throws on every call. Production usage of this
-// adapter waits on #7's real body landing; until then, callers must pass an
-// InProcessRateLimiter (the smoke does exactly that).
+// The shared DO's stub currently throws on every call. Production usage of
+// this adapter waits on the real DO body landing; until then, callers must
+// pass an InProcessRateLimiter (the smoke does exactly that).
 
 export interface FormRateLimiterDoNamespace {
   idFromName(name: string): DurableObjectId;

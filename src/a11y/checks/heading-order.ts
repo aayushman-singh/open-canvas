@@ -1,6 +1,6 @@
 // src/a11y/checks/heading-order.ts
 //
-// Wave 3 #15 — Heading order check.
+// Heading order check.
 //
 // Schema realities for the POC:
 //   - TextElement.role is just `'heading' | 'body' | 'label'` — it carries NO

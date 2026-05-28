@@ -1,6 +1,6 @@
 // src/i18n/locale-resolve.ts
 //
-// Wishlist #25 — request-path → (locale, pageSlug, page) resolver.
+// Request-path → (locale, pageSlug, page) resolver.
 //
 // Visitor path patterns the resolver recognises:
 //
@@ -110,9 +110,11 @@ function normalisePath(rawPath: string): string {
 }
 
 function resolveDefaultLocale(snapshot: PublishedSnapshot): string {
-  const snapAny = snapshot as PublishedSnapshot & { defaultLocale?: unknown };
-  if (typeof snapAny.defaultLocale === 'string' && snapAny.defaultLocale.length > 0) {
-    return snapAny.defaultLocale;
+  // `defaultLocale` is declared optional on PublishedSnapshot; treat the
+  // empty-string case as "absent" so authors can clear the field without
+  // tripping a different code path.
+  if (typeof snapshot.defaultLocale === 'string' && snapshot.defaultLocale.length > 0) {
+    return snapshot.defaultLocale;
   }
   return 'en';
 }

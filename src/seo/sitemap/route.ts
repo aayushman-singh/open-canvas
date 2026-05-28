@@ -1,17 +1,16 @@
 // src/seo/sitemap/route.ts
 //
-// Wishlist #22 — Public-host router for `GET /sitemap.xml` and
-// `GET /robots.txt`. Mounted on the public host by the main thread (see the
-// agent-report mount lines).
+// Public-host router for `GET /sitemap.xml` and `GET /robots.txt`. Mounted
+// on the public host by the main thread.
 //
 // Lifecycle:
 //   1. Resolve the site row from the Host header. We accept either the
-//      `*.rev01.aayushman.dev` subdomain shape OR a custom domain bound via
-//      Wave 1 #5. Resolution duplicates the helpers in `src/routes/public.ts`
-//      rather than importing from them — the public router does not export
-//      its host-resolution primitives, and Wave 3 #13's search route set the
-//      precedent that the brief explicitly allows the duplication so long as
-//      it is documented.
+//      `*.rev01.aayushman.dev` subdomain shape OR a custom domain (see
+//      `src/custom-domain/`). Resolution duplicates the helpers in
+//      `src/routes/public.ts` rather than importing from them — the public
+//      router does not export its host-resolution primitives, and the
+//      `src/search/route.ts` search route set the precedent that this
+//      duplication is acceptable so long as it is documented.
 //
 //      Documented duplication:
 //        - `extractSubdomain(host)` mirrors the same-named helper in
@@ -51,8 +50,8 @@ import { buildRobotsTxt } from './robots.js';
 
 interface Bindings {
   DATABASE_URL: string;
-  // Wave 1 #5 — custom-domain resolver reads the CF binding to look up the
-  // host row when the host isn't a subdomain Published Address.
+  // Custom-domain resolver reads the CF binding to look up the host row
+  // when the host isn't a subdomain Published Address.
   CF_API_TOKEN?: string;
   CF_ZONE_ID?: string;
 }

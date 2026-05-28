@@ -1,6 +1,6 @@
 // src/interactive/build.ts
 //
-// Wave 4 #17 — Build-time assembly of the interactive runtime. Concatenates
+// Build-time assembly of the interactive runtime. Concatenates
 // the per-element fragments + the entry point into a single IIFE string ready
 // to be inlined into a `<script>` tag by `./inject.ts`.
 //

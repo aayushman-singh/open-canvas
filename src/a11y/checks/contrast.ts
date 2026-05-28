@@ -1,6 +1,6 @@
 // src/a11y/checks/contrast.ts
 //
-// Wave 3 #15 — Text contrast check.
+// Text contrast check.
 //
 // For every TextElement on the page, compute the WCAG contrast ratio between
 // the resolved text colour (Style Kit `text` token) and the resolved background

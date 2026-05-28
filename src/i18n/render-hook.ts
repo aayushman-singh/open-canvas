@@ -1,6 +1,6 @@
 // src/i18n/render-hook.ts
 //
-// Wishlist #25 — main-thread integration helper for `src/routes/public.ts`.
+// Main-thread integration helper for `src/routes/public.ts`.
 //
 // The public router resolves a (locale, page) pair and renders the canvas
 // snapshot. Both steps want the i18n decisions in one place: which page is
@@ -8,10 +8,6 @@
 // whether to mirror element x-coordinates before handing the snapshot to
 // `renderCanvasSnapshot`. This module exposes that decision as one
 // function so the router doesn't sprinkle i18n logic.
-//
-// File-ownership note: this module is owned by Wave 5. The router itself
-// is main-thread territory; this hook returns the precomputed values and
-// the router stitches them in.
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
 import { applyRtlMirror } from './mirror.js';

@@ -1,6 +1,6 @@
 // src/fonts/face-emit.ts
 //
-// Wave 5 #12 — `@font-face` block generator for the public renderer.
+// `@font-face` block generator for the public renderer.
 //
 // The renderer ships uploaded fonts via a per-site stylesheet block emitted
 // alongside the existing canvas styles. Each block declares ONE font face
@@ -23,7 +23,7 @@
 // the uploaded face the moment it lands. The path is relative so the
 // browser inherits the document's origin (works under both the
 // `<subdomain>.rev01.aayushman.dev` host and any Cloudflare-for-SaaS
-// custom hostname Wave 1 #5 owns).
+// custom hostname owned by `src/custom-domain/`).
 
 import {
   collectReferencedFontHashes,

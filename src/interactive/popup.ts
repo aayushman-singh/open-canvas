@@ -1,6 +1,6 @@
 // src/interactive/popup.ts
 //
-// Wave 4 — Popup runtime fragment. Exports a JS source string
+// Popup runtime fragment. Exports a JS source string
 // (`POPUP_RUNTIME_SRC`) that the snapshot-time bundler in `./build.ts`
 // concatenates into the single interactive runtime IIFE.
 //

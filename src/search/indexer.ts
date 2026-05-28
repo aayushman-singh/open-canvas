@@ -1,6 +1,6 @@
 // src/search/indexer.ts
 //
-// Wave 3 #13 — Site search indexer. Called by the main thread from
+// Site search indexer. Called by the main thread from
 // `src/routes/api/publish.ts` immediately after the published-snapshot row
 // update lands. Walks the snapshot via `extractSearchEntries`, then rebuilds
 // the `site_search_entry` rows for the given siteId atomically: DELETE every
@@ -20,7 +20,7 @@
 //   set of (site_id, page_slug, element_id, text, published_version) rows.
 //   The synthetic `__page` element id never collides with a real element id
 //   because the canvas validator rejects double-underscore element ids
-//   (Phase 0 contract — see `validateEditableSite`).
+//   (validator contract — see `validateEditableSite`).
 //
 // Failure mode:
 //   Any DB error propagates to the caller. There is no fallback path that

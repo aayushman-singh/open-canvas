@@ -1,6 +1,6 @@
 // src/seo/sitemap/build.ts
 //
-// Wishlist #22 — sitemap.xml builder.
+// sitemap.xml builder.
 //
 // Pure XML composition. Given a Published Snapshot and the visitor-facing
 // host, returns a sitemap.org-conformant `<urlset>` document listing every
@@ -10,7 +10,7 @@
 // empty (zero `<url>` children), which is the cleanest signal we can give a
 // crawler that "nothing on this host is meant to be indexed."
 //
-// Tag inventory (per plan 2026-05-23-22-sitemap-robots.md):
+// Tag inventory:
 //   - `<loc>`        — `<protocol>://<host>/<slug>` (or `/` for the root page).
 //                      Includes a `#v=<version>` fragment so a republish busts
 //                      crawler caches keyed by URL identity.
@@ -19,7 +19,7 @@
 //                      owner overrides; weekly is the right default for the
 //                      kind of marketing sites this POC targets.
 //
-// Multi-locale annotations (wishlist follow-up #6 — wave-5 #25 i18n parity):
+// Multi-locale annotations (i18n parity — see `src/i18n/`):
 //   - `<xhtml:link rel="alternate" hreflang="…" href="…" />` — one per
 //     non-noIndex sibling translation of the page (INCLUDING self), plus a
 //     single `hreflang="x-default"` pointing at the canonical default-locale
@@ -36,8 +36,8 @@
 //
 // Reuse: `resolveNoIndex` is imported from `../meta-emit.ts` rather than
 // re-derived — that helper is the single source of truth for "is this page
-// crawlable" per Wave 3 #21, and we must agree with the renderer's
-// `<meta name="robots">` decision exactly.
+// crawlable" and we must agree with the renderer's `<meta name="robots">`
+// decision exactly.
 
 import type { CanvasPage, PublishedSnapshot } from '../../canvas/schema.js';
 import { resolveNoIndex } from '../meta-emit.js';
@@ -102,15 +102,13 @@ function localesAgree(a: string, b: string): boolean {
 }
 
 /**
- * Structural probe for `snapshot.defaultLocale`. The published-snapshot type
- * already declares the field but we keep the probe pattern that
- * `src/i18n/locale-resolve.ts` uses so the two stay in lockstep if the field
- * ever moves. Defaults to `'en'` when absent or empty.
+ * Resolve the snapshot's `defaultLocale` to a non-empty string. The field is
+ * optional on PublishedSnapshot; absent or empty values fall through to `'en'`.
+ * Kept in shape with `src/i18n/locale-resolve.ts` so the two agree.
  */
 function resolveDefaultLocale(snapshot: PublishedSnapshot): string {
-  const snapAny = snapshot as PublishedSnapshot & { defaultLocale?: unknown };
-  if (typeof snapAny.defaultLocale === 'string' && snapAny.defaultLocale.length > 0) {
-    return snapAny.defaultLocale;
+  if (typeof snapshot.defaultLocale === 'string' && snapshot.defaultLocale.length > 0) {
+    return snapshot.defaultLocale;
   }
   return 'en';
 }

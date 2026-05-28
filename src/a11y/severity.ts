@@ -1,13 +1,12 @@
 // src/a11y/severity.ts
 //
-// Wave 3 #15 — A11y audit subsystem severity ladder and the default blocker
-// configuration consumed by `runAudit`.
+// A11y audit subsystem severity ladder and the default blocker configuration
+// consumed by `runAudit`.
 //
 // The ladder is purely ordinal — `info` < `warning` < `blocking`. We do NOT
 // derive thresholds from the ladder; checks decide their own thresholds and
 // then map onto a ladder rung. Anything `blocking` refuses publish at the
-// caller (publish.ts) per the contract documented in
-// docs/superpowers/plans/2026-05-23-15-a11y-audit.md.
+// caller (publish.ts).
 //
 // All-or-nothing: a check that crashes (unexpected element shape) MUST report
 // a `blocking` issue with the kind `'audit-crash'` rather than swallow the

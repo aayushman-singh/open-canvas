@@ -1,6 +1,6 @@
 // src/a11y/audit.ts
 //
-// Wave 3 #15 — Top-level a11y audit runner.
+// Top-level a11y audit runner.
 //
 // Contract:
 //   - Pure function: `runAudit(state: EditableSite): AuditReport`.

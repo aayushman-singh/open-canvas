@@ -1,6 +1,6 @@
 // src/fonts/route.ts
 //
-// Wave 5 #12 — Hono router that owns the custom-font surface.
+// Hono router that owns the custom-font surface.
 //
 // Mount shape (main thread wires this up in src/index.ts):
 //

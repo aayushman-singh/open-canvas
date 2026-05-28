@@ -1,6 +1,6 @@
 // src/version/capture.ts
 //
-// Snapshot capture primitives for Wave 1 #3 (version history).
+// Snapshot capture primitives for version history.
 //
 // Two entry points:
 //
@@ -81,11 +81,11 @@ async function captureSnapshot(ctx: CaptureCtx): Promise<void> {
   const doc = encodeYDoc(row.editableState);
   const yjsSnapshotBytes = Y.encodeStateAsUpdate(doc);
 
-  // The insert shape uses the Phase 0 columns. `label` and `publishedVersion`
-  // are nullable; we pass null explicitly so the inserted row matches the
-  // schema's `text` / `integer` nullability rather than relying on drizzle
-  // to map `undefined` to NULL (which it does, but being explicit makes the
-  // captured payload greppable in production logs).
+  // `label` and `publishedVersion` are nullable; we pass null explicitly so
+  // the inserted row matches the schema's `text` / `integer` nullability
+  // rather than relying on drizzle to map `undefined` to NULL (which it does,
+  // but being explicit makes the captured payload greppable in production
+  // logs).
   await ctx.db.insert(siteSnapshot).values({
     siteId: ctx.siteId,
     yjsSnapshotBytes,

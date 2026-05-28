@@ -1,6 +1,6 @@
 // src/i18n/rtl-rules.ts
 //
-// Wishlist #25 — curated RTL locale list + `isRtl(locale)` lookup.
+// Curated RTL locale list + `isRtl(locale)` lookup.
 //
 // Scope is intentionally narrow: the four scripts the POC supports are
 // Arabic (ar), Farsi/Persian (fa), Hebrew (he), and Urdu (ur). We match the

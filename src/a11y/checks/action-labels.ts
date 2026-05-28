@@ -1,6 +1,6 @@
 // src/a11y/checks/action-labels.ts
 //
-// Wave 3 #15 — Action element label presence check.
+// Action element label presence check.
 //
 // An ActionElement renders as an <a class="rev01-action"> — Visitors and
 // screen readers identify it solely by its label text. Empty labels yield

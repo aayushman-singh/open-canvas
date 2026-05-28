@@ -1,6 +1,6 @@
 // src/version/list.ts
 //
-// Paginated snapshot listing for the timeline UI — Wave 1 #3.
+// Paginated snapshot listing for the timeline UI.
 //
 // Pagination shape: cursor-by-`capturedAt`, newest-first. The cursor is the
 // ISO-encoded `capturedAt` of the last entry on the previous page. The

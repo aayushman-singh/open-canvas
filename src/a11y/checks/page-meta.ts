@@ -1,6 +1,6 @@
 // src/a11y/checks/page-meta.ts
 //
-// Wave 3 #15 — Page metadata presence checks.
+// Page metadata presence checks.
 //
 // Two concerns, both feed the eventual SEO + browser-tab UX:
 //
@@ -10,10 +10,10 @@
 //      rendering but is still a publish-time defect — assistive tech and
 //      browser tab UIs treat the page title as the canonical landmark. Block.
 //
-//   2. `CanvasPage.description` — OPTIONAL today, will be promoted to a
-//      meaningful SEO field by Wave 3 #21. The audit emits an `info` issue
+//   2. `CanvasPage.description` — OPTIONAL today, consumed by the SEO meta
+//      emitter (`src/seo/meta-emit.ts`). The audit emits an `info` issue
 //      when a published page has no description so Owners get a visible
-//      reminder once #21 lands. Forward-compat — does NOT block publish.
+//      reminder. Forward-compat — does NOT block publish.
 
 import { DEFAULT_SEVERITY_BY_KIND } from '../severity.js';
 import type { AuditIssue } from '../audit.js';

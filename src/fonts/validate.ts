@@ -1,6 +1,6 @@
 // src/fonts/validate.ts
 //
-// Wave 5 #12 — WOFF2 signature validator.
+// WOFF2 signature validator.
 //
 // Real WOFF2 files start with the four magic bytes `wOF2` (0x77 0x4F 0x46
 // 0x32) followed by the sfnt flavour and table directory. The POC ships the

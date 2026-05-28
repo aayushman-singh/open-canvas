@@ -1,6 +1,6 @@
 // src/fonts/resolve.ts
 //
-// Wave 5 #12 — Resolves `"font:<contentHash>"` references found inside a
+// Resolves `"font:<contentHash>"` references found inside a
 // Style Kit's font tokens (`fontFamilyDisplay` / `fontFamilyBody` /
 // `fontFamilyMono`) into a real CSS `font-family` value chain.
 //

@@ -43,9 +43,10 @@ interface Bindings {
   CF_API_TOKEN?: string;
   CF_ZONE_ID?: string;
   /**
-   * Wave 2 #7's DO. Optional at the type level because #7 may not have
-   * landed; the route falls back to an in-process limiter when missing.
-   * Production deploys ALWAYS have the binding (declared in wrangler.toml).
+   * Shared FormRateLimiter DO (see `src/forms/`). Optional at the type level
+   * because the DO body may not have landed; the route falls back to an
+   * in-process limiter when missing. Production deploys ALWAYS have the
+   * binding (declared in wrangler.toml).
    */
   FORM_RATE_LIMITER?: FormRateLimiterDoNamespace;
 }
@@ -59,8 +60,8 @@ const router = new Hono<Env>();
 // ---------------------------------------------------------------------------
 //
 // The unlock POST arrives on the Visitor's host (`*.rev01.aayushman.dev` or
-// a custom domain bound via Wave 1 #5). We resolve the site row by the same
-// rules `src/routes/public.ts` uses for the snapshot path.
+// a custom domain — see `src/custom-domain/`). We resolve the site row by
+// the same rules `src/routes/public.ts` uses for the snapshot path.
 
 const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
 

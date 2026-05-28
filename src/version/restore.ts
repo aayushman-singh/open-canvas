@@ -1,6 +1,6 @@
 // src/version/restore.ts
 //
-// Restore primitive — Wave 1 #3.
+// Restore primitive — replaces a site's editable state with a captured snapshot.
 //
 // Flow (the order is load-bearing):
 //
@@ -61,10 +61,10 @@ export interface RestoreEnv {
 /**
  * Broadcast payload sent to the SiteRoom DO when a restore lands.
  *
- * The DO handler for this `kind` is owned by Wave 1 #4 (co-edit). Until that
- * lands the Phase 0 stub will reject the body with HTTP 400 — the restore
- * primitive fails loudly because connected editors would otherwise keep
- * stale state after the row swap.
+ * The DO handler for this `kind` is owned by the co-edit subsystem
+ * (`src/live/`). Until that body lands, the SiteRoom stub will reject with
+ * HTTP 400 — the restore primitive fails loudly because connected editors
+ * would otherwise keep stale state after the row swap.
  */
 export interface EditableStateReplacedBroadcast {
   kind: 'editable-state-replaced';
@@ -164,9 +164,10 @@ export async function restoreSnapshot(
     })
     .where(eq(site.id, siteId));
 
-  // Step 5 — SiteRoom broadcast. Wave 1 #4 owns the inbound handler for
-  // this kind. If the DO rejects the payload, the restore request fails
-  // instead of reporting ok=true while editors keep stale state.
+  // Step 5 — SiteRoom broadcast. The co-edit subsystem (`src/live/`) owns
+  // the inbound handler for this kind. If the DO rejects the payload, the
+  // restore request fails instead of reporting ok=true while editors keep
+  // stale state.
   await broadcastReplacement(env, siteId, newState);
 
   return {

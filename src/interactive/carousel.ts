@@ -1,6 +1,6 @@
 // src/interactive/carousel.ts
 //
-// Wave 4 #17 — Carousel runtime fragment. See `./accordion.ts` for the
+// Carousel runtime fragment. See `./accordion.ts` for the
 // single-source-of-truth rationale (string emitted to visitor, evaluated as-is
 // in smoke).
 //

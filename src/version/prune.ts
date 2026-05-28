@@ -1,6 +1,6 @@
 // src/version/prune.ts
 //
-// Pruning policy for the `siteSnapshot` table — Wave 1 #3.
+// Pruning policy for the `siteSnapshot` table.
 //
 // Per the brief:
 //   * Keep the last 50 snapshots per site.

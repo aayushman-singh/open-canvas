@@ -1,6 +1,6 @@
 // src/search/query.ts
 //
-// Wave 3 #13 — Server-side query handler. Composes the FTS SQL against
+// Server-side query handler. Composes the FTS SQL against
 // `site_search_entry`, runs it via `db.execute`, and shapes the result into
 // `{ pageSlug, elementId, snippet }` rows the public route serialises.
 //

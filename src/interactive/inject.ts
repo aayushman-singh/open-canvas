@@ -1,6 +1,6 @@
 // src/interactive/inject.ts
 //
-// Wave 4 #17 — Snapshot-time `<script>` injection. The public route in
+// Snapshot-time `<script>` injection. The public route in
 // `src/routes/public.ts` calls `injectInteractiveRuntime(html, snapshot)` AFTER
 // `renderCanvasSnapshot`; if the snapshot contains at least one accordion or
 // carousel element, this function appends an inline `<script>` carrying the

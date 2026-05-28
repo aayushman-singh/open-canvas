@@ -1,6 +1,6 @@
 // src/interactive/runtime.ts
 //
-// Wave 4 #17 — Top-level interactive runtime. Exports the entry-point JS
+// Top-level interactive runtime. Exports the entry-point JS
 // source string that the snapshot-time bundler in `./build.ts` wraps in an
 // IIFE alongside the per-element hydration fragments.
 //

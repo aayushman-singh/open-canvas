@@ -1,6 +1,6 @@
 // src/a11y/route.ts
 //
-// Wave 3 #15 — Audit-only HTTP endpoint.
+// Audit-only HTTP endpoint.
 //
 //   GET /api/sites/:siteId/a11y
 //

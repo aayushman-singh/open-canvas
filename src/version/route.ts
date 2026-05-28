@@ -1,7 +1,7 @@
 // src/version/route.ts
 //
-// Hono router for version history — Wave 1 #3. Mounted at
-// `/api/sites/:siteId/snapshots` by the main thread (see SUBSYSTEM.md).
+// Hono router for version history. Mounted at
+// `/api/sites/:siteId/snapshots` by the main thread.
 //
 // Endpoints (all Owner-scoped via Clerk + the customer→site ownership
 // check in `resolveOwnedSiteId`):

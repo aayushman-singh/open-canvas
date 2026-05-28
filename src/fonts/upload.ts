@@ -1,11 +1,11 @@
 // src/fonts/upload.ts
 //
-// Wave 5 #12 — Custom font upload primitive.
+// Custom font upload primitive.
 //
-// Storage choice (recorded for the brief): we use a PARALLEL siteFont store
-// rather than reusing the Owner-rooted `ownerAsset` table. Two reasons:
+// Storage choice: we use a PARALLEL siteFont store rather than reusing the
+// Owner-rooted `ownerAsset` table. Two reasons:
 //
-//   1. The schema delta `siteFont` table (Phase 0) is keyed by siteId, not
+//   1. The `siteFont` table is keyed by siteId, not
 //      customerId. The intent — and the existing comment on the table —
 //      is that a font belongs to ONE site so an Owner can adopt different
 //      typography per site without leaking font choices across them.

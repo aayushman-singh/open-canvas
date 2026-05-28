@@ -1,6 +1,6 @@
 // src/a11y/checks/alt-text.ts
 //
-// Wave 3 #15 — Alt-text presence check.
+// Alt-text presence check.
 //
 // Walks a CanvasPage and emits a blocking issue for every MediaElement whose
 // `alt` field is missing or empty (after trim). The MediaElement schema in

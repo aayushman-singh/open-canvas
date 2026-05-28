@@ -1,6 +1,6 @@
 // src/i18n/mirror.ts
 //
-// Wishlist #25 — position-mirror helpers for the RTL render path.
+// Position-mirror helpers for the RTL render path.
 //
 // Given a Positioned Element box on a canvas of total width `canvasWidth`,
 // returns a NEW box with the x-coordinate flipped: `x' = canvasWidth - x - w`.
@@ -92,12 +92,11 @@ function mirrorPage(page: CanvasPage): CanvasPage {
  * - The decision uses {@link isRtl} against `page.locale ?? defaultLocale`.
  */
 export function applyRtlMirror(snapshot: PublishedSnapshot): PublishedSnapshot {
-  // Structural probe for `defaultLocale` — same pattern used in
-  // `src/seo/meta-emit.ts`. The snapshot type does not yet declare it.
-  const snapAny = snapshot as PublishedSnapshot & { defaultLocale?: unknown };
+  // `defaultLocale` is declared optional on PublishedSnapshot; the
+  // empty-string case is treated as "absent" so authors can clear the field.
   const defaultLocale =
-    typeof snapAny.defaultLocale === 'string' && snapAny.defaultLocale.length > 0
-      ? snapAny.defaultLocale
+    typeof snapshot.defaultLocale === 'string' && snapshot.defaultLocale.length > 0
+      ? snapshot.defaultLocale
       : 'en';
 
   const pages = snapshot.pages.map((page) => {

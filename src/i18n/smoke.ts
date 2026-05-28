@@ -215,7 +215,7 @@ eq(noLocaleSection?.elements[0]?.box.x ?? null, 100, '6: no-locale page unchange
 
 // Snapshot-level extras (`defaultLocale`) survive the clone.
 eq(
-  (mirrored as PublishedSnapshot & { defaultLocale?: string }).defaultLocale ?? null,
+  mirrored.defaultLocale ?? null,
   'en',
   '6: defaultLocale extra preserved on cloned snapshot',
 );

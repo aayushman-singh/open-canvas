@@ -1,9 +1,8 @@
 // src/version/preview-render.ts
 //
-// Server-side render of a snapshot for the read-only preview view —
-// Wave 1 #3.
+// Server-side render of a snapshot for the read-only preview view.
 //
-// Per the plan's "Open questions" resolution: the preview path hydrates
+// The preview path hydrates
 // the public renderer directly from the decoded JSON (no Y.Doc bridge in
 // the preview hot path). The Y.Doc bridge is only used on the restore
 // path where the resulting `EditableSite` is what gets persisted.

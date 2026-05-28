@@ -1,6 +1,6 @@
 // src/interactive/accordion.ts
 //
-// Wave 4 #17 — Accordion runtime fragment. This module exports a JS source
+// Accordion runtime fragment. This module exports a JS source
 // string (`ACCORDION_RUNTIME_SRC`) that the snapshot-time bundler in
 // `./build.ts` concatenates into the single interactive runtime IIFE.
 //

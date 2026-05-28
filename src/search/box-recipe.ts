@@ -1,32 +1,29 @@
 // src/search/box-recipe.ts
 //
-// Wave 3 #13 — Opt-in "search box" section recipe. An Owner adds a section
-// produced by this factory to their site to expose a Visitor-facing search
-// box.
+// Opt-in "search box" section recipe. An Owner adds a section produced by
+// this factory to their site to expose a Visitor-facing search box.
 //
-// The brief is explicit: do NOT introduce a new ElementType. We reuse the
-// existing `action` element (which the public renderer already turns into an
-// anchor) and stamp its `href` at `/__rev01/search`. A search submission is
-// a GET to that endpoint; the Visitor's browser handles the redirect when
-// the anchor is clicked. The Owner's site styling (kit-aware action
-// variant) applies as usual.
+// We deliberately do NOT introduce a new ElementType. We reuse the existing
+// `action` element (which the public renderer already turns into an anchor)
+// and stamp its `href` at `/__rev01/search`. A search submission is a GET to
+// that endpoint; the Visitor's browser handles the redirect when the anchor
+// is clicked. The Owner's site styling (kit-aware action variant) applies
+// as usual.
 //
 // Why an action element and not a `<form>`:
 //   - The existing element registry has no `form` rendered as an inline
-//     `<form method="get">` — the `form` element type is the Wave 2 #7 long
-//     form that POSTs to `/api/forms/...`.
+//     `<form method="get">` — the `form` element type is the long form that
+//     POSTs to `/api/forms/...`.
 //   - A new ElementType would require a schema change (`ELEMENT_TYPES`),
-//     which the plan explicitly forbids ("do NOT add to schema").
+//     which is out of scope here.
 //   - The Visitor flow we want is: click → land on the search page. An
-//     anchor is the minimum-complexity primitive that delivers it. The
-//     search page (Wave 3 #13 follow-up — outside this agent's scope)
-//     surfaces the input field and submit button.
+//     anchor is the minimum-complexity primitive that delivers it.
 //
 // The factory returns a `CanvasSection` with `recipeId: 'cta-band'` —
-// `cta-band` is the existing single-call-to-action recipe slot in the Phase
-// 0 `SECTION_RECIPE_IDS` registry, which fits a single action element
-// naturally. The section name carries the `search-box` identity so the
-// editor's "section gallery" can surface it distinctly from a generic CTA.
+// `cta-band` is the existing single-call-to-action recipe slot in
+// `SECTION_RECIPE_IDS`, which fits a single action element naturally. The
+// section name carries the `search-box` identity so the editor's "section
+// gallery" can surface it distinctly from a generic CTA.
 
 import type { ActionElement, CanvasSection } from '../canvas/schema.js';
 

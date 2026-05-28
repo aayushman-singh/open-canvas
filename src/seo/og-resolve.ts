@@ -1,8 +1,8 @@
 // src/seo/og-resolve.ts
 //
-// Wishlist #21 — resolves the Open Graph image URL for a Published Page.
+// Resolves the Open Graph image URL for a Published Page.
 //
-// Precedence (per plan 2026-05-23-21-seo-meta.md):
+// Precedence:
 //   1. Owner-uploaded `page.ogImageAssetId` — if it resolves through the
 //      provided `assetLookup` to a content hash, return `/assets/<hash>`.
 //      Without an assetLookup (the public renderer path), return

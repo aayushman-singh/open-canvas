@@ -1,6 +1,6 @@
 // src/seo/sitemap/robots.ts
 //
-// Wishlist #22 — robots.txt builder.
+// robots.txt builder.
 //
 // Pure string composition. Given a Published Snapshot, the visitor-facing
 // host, and the Published Address that the `Sitemap:` directive should point
@@ -78,8 +78,7 @@ export function buildRobotsTxt(
 
   // Site-level switch: everything off-limits. Per-page entries become
   // redundant — a crawler honouring `Disallow: /` is already done.
-  const snapAny = snapshot as PublishedSnapshot & { siteNoIndex?: unknown };
-  if (snapAny.siteNoIndex === true) {
+  if (snapshot.siteNoIndex === true) {
     return [
       'User-agent: *',
       'Disallow: /',

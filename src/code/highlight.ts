@@ -1,8 +1,8 @@
 // src/code/highlight.ts
 //
-// Wishlist #19 - Code Snippet. Wave 4 owner.
+// Code Snippet — Shiki wrapper, fine-grained bundle, **synchronous**.
 //
-// Shiki wrapper, fine-grained bundle, **synchronous**. We load EXACTLY the
+// We load EXACTLY the
 // 11 curated languages + 1 light theme + the JavaScript regex engine.
 // The umbrella `shiki` entry pulls in every language and theme on the
 // planet (multi-MB) and is forbidden inside the Worker.
@@ -19,9 +19,8 @@
 //
 // The previous async / WASM-engine sketch would have required pre-warming
 // the highlighter before `renderCanvasSnapshot` (a sync function) was
-// called, which would mean editing `src/routes/api/publish.ts` — that file
-// is owned by Phase 0 and locked for Wave 4. The sync engine sidesteps
-// the problem cleanly.
+// called, which would mean editing `src/routes/api/publish.ts`. The sync
+// engine sidesteps the problem cleanly.
 //
 // Failure policy: if Shiki throws on a token it cannot lex, we let the
 // error propagate. Unsupported *languages* fall back to a plain pre/code
