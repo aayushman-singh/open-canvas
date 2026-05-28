@@ -86,6 +86,7 @@ async function persistEditableState(
   siteId: string,
   ownerCustomerId: string,
   nextState: CanvasSiteState,
+  extraSiteFields: { styleKit?: StyleKit } = {},
 ): Promise<Response | null> {
   const validation = validateCanvasSiteState(nextState);
   if (!validation.valid) {
@@ -95,6 +96,7 @@ async function persistEditableState(
   await db(c.env)
     .update(site)
     .set({
+      ...extraSiteFields,
       editableState: nextState,
       updatedAt: sql`now()`,
     })
@@ -301,14 +303,8 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
     }
   }
 
-  const database = db(c.env);
-  await database
-    .update(site)
-    .set({
-      editableState: next,
-      updatedAt: sql`now()`,
-    })
-    .where(and(eq(site.id, siteId), eq(site.customerId, result.ownerCustomerId)));
+  const failure = await persistEditableState(c, siteId, result.ownerCustomerId, next);
+  if (failure) return failure;
 
   return c.json({
     ok: true,
@@ -827,15 +823,10 @@ canvasApi.post('/sites/:siteId/style-kit', async (c) => {
     styleKit: incoming,
   };
 
-  const database = db(c.env);
-  await database
-    .update(site)
-    .set({
-      styleKit: incoming,
-      editableState: nextState,
-      updatedAt: sql`now()`,
-    })
-    .where(and(eq(site.id, siteId), eq(site.customerId, result.ownerCustomerId)));
+  const failure = await persistEditableState(c, siteId, result.ownerCustomerId, nextState, {
+    styleKit: incoming,
+  });
+  if (failure) return failure;
 
   return c.json({ ok: true, styleKit: incoming });
 });
