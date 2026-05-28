@@ -98,9 +98,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // npm compromise that ships different bytes for the same version trips a loud
   // error instead of executing attacker JS inside the Owner's session.
   const CROPPER_SRI_SHA384 = "yCR/qrwwtTzBEzopZRNsQRqJmomeGgAikrPg/5vB2wkQLsM3OGRnEktc9gpN1KDg";
-  // -- href allowlist (mirrors src/canvas/validate.ts isAllowedHref) -------
-  // Centralised so the inline-link mark toolbar uses the SAME rules as the
-  // server validator. If you change one, change the other.
+  // Mirror of canvas/action-href.ts isAllowedHref -- IIFE template-literal cannot import. See ADR 0011 (canvas-element-registry) for build-pipeline ADR.
   const ALLOWED_HREF_SCHEMES = ["http:", "https:", "mailto:", "tel:"];
   function isAllowedHref(href) {
     if (typeof href !== "string" || href.length === 0) return false;

@@ -8,6 +8,12 @@ import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import { PAGE_METADATA_FIELDS } from './elements/collection.js';
 import { escapeCssValue } from './elements/render-utils.js';
+import { isAllowedHref } from './action-href.js';
+
+// Re-export the canonical href allowlist so existing consumers (agent
+// parsers, etc.) that import from './canvas/validate.js' keep working. The
+// implementation lives in ./action-href.js — see the comment block there.
+export { isAllowedHref };
 import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
@@ -49,7 +55,6 @@ const SECTION_HEIGHT_MIN = 240;
 const PINNED_SECTION_HEIGHT_MIN = 48;
 const SECTION_HEIGHT_MAX = 1400;
 
-const ALLOWED_HREF_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:'] as const;
 const POPUP_TRIGGER_TYPES = ['exit-intent', 'delay', 'scroll'] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -142,26 +147,6 @@ function validateActionHref(
     }
   } else {
     errors.push(basePath + '.type must be "external" or "page" (got ' + describe(h.type) + ')');
-  }
-}
-
-/**
- * The single source of truth for href allowlisting. Used by both
- * ActionElement.href and inline link marks inside TextElement.content so the
- * two paths cannot drift.
- */
-export function isAllowedHref(href: string): boolean {
-  // In-page anchor or root-relative path are allowed without scheme.
-  if (href.startsWith('#') || href.startsWith('/')) return true;
-  // Reject the javascript: scheme explicitly even when oddly cased or padded.
-  const trimmed = href.trim().toLowerCase();
-  if (trimmed.startsWith('javascript:')) return false;
-  // Anything else must parse as one of the allow-listed schemes.
-  try {
-    const url = new URL(href);
-    return (ALLOWED_HREF_SCHEMES as readonly string[]).includes(url.protocol);
-  } catch {
-    return false;
   }
 }
 
