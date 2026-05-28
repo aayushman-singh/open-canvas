@@ -85,6 +85,15 @@ export interface ElementRenderCtx {
    * if the env var is missing.
    */
   turnstileSiteKey: string;
+  /**
+   * Wrapper-emitting renderer for a single element. Threaded through ctx so
+   * the collection dispatch can render children with the same `rev01-element`
+   * wrapper, aria/variant/motion/elementStyle attrs as top-level elements —
+   * a body-only child wrapper would silently strip accessibility, kit-CSS
+   * variant matching, and motion. The function reference lives on the ctx
+   * (not as a direct import) to break the renderer/dispatch import cycle.
+   */
+  renderElement: (element: CanvasElement, ctx: ElementRenderCtx) => string;
 }
 
 /**
@@ -165,6 +174,6 @@ export const RENDER_DISPATCH: RenderDispatch = {
     renderCollection(el, {
       styleKit: ctx.styleKit,
       assetBasePath: ctx.assetBasePath,
-      renderChild: (child) => renderElementBody(child, ctx, 'collection child'),
+      renderChild: (child) => ctx.renderElement(child, ctx),
     }),
 };

@@ -1017,7 +1017,7 @@ assertRenderDispatchFailure(
       },
     ],
   },
-  'renderElementBody (collection child): no RENDER_DISPATCH entry for element type="constructor" id="el-prototype-constructor"',
+  'renderElementBody: no RENDER_DISPATCH entry for element type="constructor" id="el-prototype-constructor"',
   'expected renderer to reject inherited Object.prototype dispatch keys in collection children',
 );
 

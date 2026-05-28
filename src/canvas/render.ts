@@ -112,8 +112,8 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
 // (the canonical decorative-image signal); when alt is non-empty, the native
 // `<img alt>` attribute does the work and we do NOT also hide the wrapper.
 // Text and action elements never get ARIA overrides — their defaults are
-// semantically correct (headings/paragraphs, anchor tags). The nine Phase 0
-// element types inherit no decorative status — they speak for themselves.
+// semantically correct (headings/paragraphs, anchor tags). Every other
+// element type carries its own semantics and inherits no decorative status.
 function buildAriaWrapperAttrs(element: CanvasElement): string {
   switch (element.type) {
     case 'shape':
@@ -214,7 +214,7 @@ function renderPage(
   header?: CanvasSection,
   footer?: CanvasSection,
 ): string {
-  const renderWidth = page.maxWidth != null && page.maxWidth < page.width ? page.maxWidth : page.width;
+  const renderWidth = Math.min(page.maxWidth ?? Infinity, page.width);
   const entries: Array<[string, string]> = [
     ['width', `${String(renderWidth)}px`],
     ['margin', '0 auto'],
@@ -253,12 +253,9 @@ function renderPage(
 }
 
 /**
- * Optional renderer options. Each field is additive and back-compat — every
- * existing caller passes the original positional arguments and continues to
- * work without change. Wave 3 #21 (SEO) introduced this options object so
- * the renderer could expose a per-page head-meta hook without becoming a
- * grab-bag of positional parameters; future waves should reuse this seam
- * rather than adding more positional args.
+ * Renderer options collected into one object so callers don't bloat the
+ * positional signature each time a new optional hook lands. New optional
+ * fields should be added here rather than as positional params.
  */
 export interface RenderSnapshotOptions {
   /**
@@ -268,16 +265,12 @@ export interface RenderSnapshotOptions {
    */
   turnstileSiteKey: string;
   /**
-   * Per-page `<head>` meta emitter. When provided, the renderer calls this
-   * for each page in the snapshot. The body wrapper produced by
-   * `renderCanvasSnapshot` is a `<main>` element with no `<head>`, so the
-   * emitted strings are NOT spliced into the body — the renderer
-   * concatenates them and returns them via the return value's structure.
-   * The visitor-facing route owns the actual `<head>` envelope and calls
-   * `renderCanvasHead` (sibling exported from `src/seo/meta-emit.ts`) for
-   * the page the visitor is reading; this hook exists so future renderers
-   * (e.g. multi-page static export) can wire head emission per page through
-   * the same seam.
+   * Per-page `<head>` meta emitter. The renderer invokes this for every page
+   * in render order; the result is discarded by this body renderer (the
+   * `<main>` block does not own `<head>`). The hook exists so the seo
+   * subsystem's smoke can verify the contract and so future static-export
+   * consumers have one canonical seam that walks every page; visitor-facing
+   * head emission goes through `renderCanvasHead` in `src/seo/meta-emit.ts`.
    */
   emitHeadMeta?: (page: CanvasPage) => string;
   /**
@@ -309,7 +302,9 @@ export function renderCanvasSnapshot(
   const customPreset: StyleKitPreset | null =
     snapshot.styleKit === 'custom' ? resolveStyleKitWithCustom(snapshot) : null;
   if (snapshot.styleKit !== 'custom') {
-    getStyleKitPreset(snapshot.styleKit);
+    // Called for its throw-on-missing side effect — the renderer refuses to
+    // emit HTML for a kit that has no preset. `void` marks the discard.
+    void getStyleKitPreset(snapshot.styleKit);
   }
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
     assetBasePath,
@@ -318,28 +313,15 @@ export function renderCanvasSnapshot(
     siteId,
     pages: snapshot.pages,
     turnstileSiteKey: opts.turnstileSiteKey,
+    renderElement,
   };
   const pagesToRender = opts.renderPages ?? snapshot.pages;
   const pagesHtml = pagesToRender
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');
   const responsiveStyle = renderResponsiveCss(snapshot);
-  // Wave 3 #21 — exercise the optional head-meta hook for every page so the
-  // emitter contract is verified at render time. The renderer body does not
-  // splice the result into the `<main>` block (the document envelope owns
-  // `<head>`); the call is wired here for two reasons:
-  //   1. To give future static-export consumers a single canonical seam
-  //      that walks every page.
-  //   2. To force-evaluate the emitter so a mis-shaped hook fails loudly at
-  //      render time rather than the next time the public route inlines its
-  //      output.
-  // The result is discarded — visitor-facing emission goes through the
-  // sibling `renderCanvasHead` exported from `src/seo/meta-emit.ts`.
   if (opts.emitHeadMeta) {
     for (const page of pagesToRender) {
-      // Drop the result — see note above. We invoke the hook for the side
-      // effect of validating its shape and giving future renderers a place
-      // to hook in.
       void opts.emitHeadMeta(page);
     }
   }

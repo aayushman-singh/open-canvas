@@ -15,6 +15,15 @@
 import type { BaseElement, CanvasElement } from '../schema.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 
+// The collection-child wrapper used to add `data-rev01-element`, a positioning
+// style, and a class — but it was a stripped-down clone of the canonical
+// `rev01-element` wrapper, silently dropping aria, variant, motion, and
+// elementStyle data-attrs. ctx.renderChild now returns the full canonical
+// wrapper (see ElementRenderCtx.renderElement); cells emit it directly so
+// every wrapper attr that a top-level element carries is also carried for
+// collection children. Per the user's no-fallback rule, the previous partial
+// wrapper was exactly the silent-degradation pattern banned.
+
 export type CollectionMode = 'manual' | 'page-bound';
 
 export const PAGE_METADATA_FIELDS = [
@@ -65,17 +74,6 @@ export interface CollectionRenderCtx {
   renderChild: (element: CanvasElement) => string;
 }
 
-function childWrapperStyle(child: CanvasElement): string {
-  return styleFromEntries([
-    ['position', 'absolute'],
-    ['left', `${String(child.box.x)}px`],
-    ['top', `${String(child.box.y)}px`],
-    ['width', `${String(child.box.w)}px`],
-    ['height', `${String(child.box.h)}px`],
-    ['z-index', String(child.box.z)],
-  ]);
-}
-
 export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx): string {
   const gridStyle = styleFromEntries([
     ['display', 'grid'],
@@ -92,7 +90,7 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
       const cellsHtml = entryElements
         .map((child) => {
           bottom = Math.max(bottom, child.box.y + child.box.h);
-          return `<div class="rev01-collection-child" data-element-type="${escapeAttr(child.type)}" data-rev01-element="${escapeAttr(child.id)}" style="${escapeAttr(childWrapperStyle(child))}">${ctx.renderChild(child)}</div>`;
+          return ctx.renderChild(child);
         })
         .join('');
       const rowStyle = styleFromEntries([
