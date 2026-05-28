@@ -772,6 +772,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var title = typeof opts.title === "string" ? opts.title : "";
     var message = typeof opts.message === "string" ? opts.message : "";
     var confirmLabel = typeof opts.confirmLabel === "string" ? opts.confirmLabel : "OK";
+    var cancelLabel = typeof opts.cancelLabel === "string" ? opts.cancelLabel : "Cancel";
     var danger = opts.danger === true;
     modalOpen = true;
     return new Promise(function(resolve) {
@@ -795,7 +796,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       actions.className = "rev01-modal-actions";
       var cancel = document.createElement("button");
       cancel.type = "button";
-      cancel.textContent = "Cancel";
+      cancel.textContent = cancelLabel;
       var ok = document.createElement("button");
       ok.type = "button";
       ok.textContent = confirmLabel;
@@ -918,6 +919,42 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         artboards[i].setAttribute("data-active", isActive ? "true" : "false");
       }
     }
+  }
+
+  // Resolve a string href (e.g. "/about", "/about#hero", "about") to a Canvas
+  // Page in the current site state. Returns null when the href is not internal
+  // or no page matches. Strips query + fragment so an Owner-stored "/about#x"
+  // still resolves to the about page.
+  function findPageByHref(href) {
+    if (typeof href !== "string" || href.length === 0) return null;
+    if (!state || !Array.isArray(state.pages)) return null;
+    if (href.charAt(0) === "#") return null;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return null;
+    var path = href.split("#")[0].split("?")[0];
+    if (path.charAt(0) === "/") path = path.slice(1);
+    while (path.length > 1 && path.charAt(path.length - 1) === "/") {
+      path = path.slice(0, -1);
+    }
+    for (var i = 0; i < state.pages.length; i++) {
+      if (state.pages[i].slug === path) return state.pages[i];
+    }
+    return null;
+  }
+
+  // Drive editor navigation from a clicked link: internal pages switch the
+  // active artboard, external/mailto/tel open in a new tab, anchors no-op
+  // (the editor renders the full page; in-page anchors have no meaning here).
+  // Returns true when something was handled, false when the href was rejected
+  // by the allowlist — caller can surface a status message.
+  function goToHrefOnCanvas(href) {
+    var page = findPageByHref(href);
+    if (page) { setActivePage(page.id); return true; }
+    if (typeof href === "string" && href.charAt(0) === "#") return true;
+    if (isAllowedHref(href)) {
+      window.open(href, "_blank", "noopener,noreferrer");
+      return true;
+    }
+    return false;
   }
 
   function updatePageSidebar() {
@@ -1347,8 +1384,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         a.setAttribute("target", "_blank");
         a.setAttribute("rel", "noopener noreferrer");
       }
-      // Don't navigate from inside the editor when the Owner clicks a link.
-      a.addEventListener("click", (ev) => { ev.preventDefault(); });
+      // Owner click semantics:
+      //  - While the parent text element is in edit mode, the click places the
+      //    caret as normal; the link popover surfaces an explicit "Go" button
+      //    so navigation never fights with text editing.
+      //  - Otherwise, navigate on the canvas: internal hrefs swap the active
+      //    page, external hrefs open in a new tab. Alt-click suppresses
+      //    navigation so the Owner can still select the parent element.
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (editingElementId) return;
+        if (ev.altKey) return;
+        goToHrefOnCanvas(a.getAttribute("href") || "");
+      });
       a.appendChild(inner);
       inner = a;
     }
@@ -1448,7 +1496,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       resolvedHref = element.href;
     }
     node.setAttribute("href", resolvedHref);
-    node.addEventListener("click", function(ev) { ev.preventDefault(); });
+    // Plain click selects the action element on canvas (default selection
+    // flow). Alt-click navigates instead — internal page hrefs swap the
+    // active artboard, external hrefs open in a new tab.
+    node.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      if (!ev.altKey) return;
+      ev.stopPropagation();
+      if (element.href && element.href.type === "page") {
+        setActivePage(element.href.pageId);
+        return;
+      }
+      if (element.href && element.href.type === "external") {
+        if (isAllowedHref(element.href.url)) {
+          window.open(element.href.url, "_blank", "noopener,noreferrer");
+        }
+      }
+    });
     node.textContent = element.label;
     return node;
   }
@@ -1822,10 +1886,43 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     nav.style.height = "100%";
     const links = Array.isArray(element.links) ? element.links : [];
     for (let i = 0; i < links.length; i++) {
+      const link = links[i] || {};
       const a = document.createElement("a");
-      a.href = "#";
-      a.textContent = links[i].label || "Link";
-      a.addEventListener("click", function(ev) { ev.preventDefault(); });
+      a.className = "rev01-nav-link";
+      const kind = link.kind === "external" || link.kind === "anchor" ? link.kind : "internal";
+      a.setAttribute("data-rev01-nav-link-kind", kind);
+      let resolvedHref = typeof link.href === "string" ? link.href : "";
+      if (kind === "internal" && resolvedHref.length > 0 && resolvedHref.charAt(0) !== "/") {
+        resolvedHref = "/" + resolvedHref;
+      }
+      a.setAttribute("href", resolvedHref.length > 0 ? resolvedHref : "#");
+      if (kind === "external") {
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener");
+      }
+      a.textContent = link.label || "Link";
+      // Capture href/kind per-iteration so the click handler doesn't see the
+      // last loop value (the surrounding for-loop uses let but the closure is
+      // attached via addEventListener, which is fine — explicit locals make
+      // the intent obvious and survive refactors).
+      (function (capturedHref, capturedKind) {
+        a.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          if (ev.altKey) return;
+          if (capturedKind === "internal") {
+            goToHrefOnCanvas(capturedHref);
+            return;
+          }
+          if (capturedKind === "external") {
+            if (isAllowedHref(capturedHref)) {
+              window.open(capturedHref, "_blank", "noopener,noreferrer");
+            }
+            return;
+          }
+          // anchor: in-page fragments have no canvas-side destination; the
+          // public renderer scrolls, the editor stays put.
+        });
+      })(resolvedHref, kind);
       nav.appendChild(a);
     }
     return nav;
@@ -2389,6 +2486,55 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       btn.addEventListener("click", () => { applyZOrderAction(section, element, action); });
       group.appendChild(btn);
     }
+    return group;
+  }
+
+  // Duplicate and delete verbs for the selected positioned element. Section-
+  // level Duplicate/Delete live in the section toolbar; this group surfaces
+  // the same verbs for elements so Owners don't have to remember a keyboard
+  // shortcut (Delete still works for deletion).
+  function duplicateElement(section, element) {
+    var clone = JSON.parse(JSON.stringify(element));
+    clone.id = newElementId();
+    if (clone.box && typeof clone.box === "object") {
+      if (typeof clone.box.x === "number") clone.box.x = clone.box.x + 20;
+      if (typeof clone.box.y === "number") clone.box.y = clone.box.y + 20;
+    }
+    var idx = section.elements.indexOf(element);
+    if (idx >= 0) section.elements.splice(idx + 1, 0, clone);
+    else section.elements.push(clone);
+    selectedElementId = clone.id;
+    captureForUndo();
+    renderAll();
+    renderInspector();
+    scheduleSave();
+  }
+
+  function deleteElement(section, element) {
+    var idx = section.elements.indexOf(element);
+    if (idx < 0) return;
+    section.elements.splice(idx, 1);
+    closeElementMenu();
+    if (selectedElementId === element.id) selectedElementId = null;
+    captureForUndo();
+    renderAll();
+    renderInspector();
+    scheduleSave();
+  }
+
+  function buildElementActionsGroup(section, element) {
+    const group = document.createElement("div");
+    group.className = "rev01-zorder-buttons";
+    const dup = document.createElement("button");
+    dup.type = "button";
+    dup.textContent = "Duplicate";
+    dup.addEventListener("click", () => { duplicateElement(section, element); });
+    const del = document.createElement("button");
+    del.type = "button";
+    del.textContent = "Delete";
+    del.addEventListener("click", () => { deleteElement(section, element); });
+    group.appendChild(dup);
+    group.appendChild(del);
     return group;
   }
 
@@ -4040,6 +4186,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // change it.
     inspector.appendChild(buildReorderGroup(section, element));
     inspector.appendChild(buildZOrderGroup(section, element));
+    inspector.appendChild(buildElementActionsGroup(section, element));
 
     const inspectorBuilders = {
       text: buildTextInspector,
@@ -5289,12 +5436,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (prev) prev.removeAttribute("data-selected");
     }
     selectedElementId = elementId;
+    // Dismiss any link popover anchored to the previously selected element.
+    // A new selection either replaces it (action elements re-pin below) or
+    // there's nothing to show for the new selection.
+    if (linkPopoverPinned) removeLinkPopover();
     if (elementId) {
       if (isReelOpen) closeReel();
       const next = root.querySelector('[data-rev01-element="' + cssEscape(elementId) + '"]');
       if (next) next.setAttribute("data-selected", "true");
       const found = findElement(elementId);
       if (found) selectSection(found.section.id);
+      // Action elements get an auto-pinned link popover so the Owner can
+      // navigate to the linked page (or open the external URL) without
+      // hunting for the inspector's href field. The wrapper's inner anchor
+      // is the popover anchor.
+      if (found && found.element && found.element.type === 'action' && next) {
+        var actionAnchor = next.querySelector('a.rev01-action');
+        if (actionAnchor) showLinkPopover(actionAnchor, { pinned: true });
+      }
     }
     renderInspector();
     renderSidebarSelection();
@@ -6044,9 +6203,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return out;
   }
 
-  // -- Link hover popover --------------------------------------------------
+  // -- Link hover/selection popover ---------------------------------------
+  //
+  // Singleton popover shown for inline link marks (<a class="rev01-inline-link">)
+  // inside the text element currently in edit mode. Two trigger modes:
+  //   - hover: 150ms show delay, auto-hides on mouseleave.
+  //   - pinned: shown when the caret enters a link (selectionchange) and
+  //     persists until the caret leaves the link or text edit ends.
+  // The pinned mode makes the popover act like a per-link toolbar without
+  // needing a second UI surface.
   var linkPopover = null;
   var linkPopoverAnchor = null;
+  var linkPopoverPinned = false;
   var linkPopoverShowTimer = null;
   var linkPopoverHideTimer = null;
 
@@ -6058,6 +6226,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     linkPopover = null;
     linkPopoverAnchor = null;
+    linkPopoverPinned = false;
   }
 
   function positionLinkPopover(anchorEl) {
@@ -6075,24 +6244,81 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     linkPopover.style.left = Math.max(0, rect.left) + 'px';
   }
 
-  function showLinkPopover(anchorEl) {
+  // Classify a link anchor in the canvas. The popover's button set + preview
+  // class adapt to this kind so each link primitive gets the right toolbar
+  // without three separate popover implementations.
+  function linkPopoverKindOf(anchorEl) {
+    if (!anchorEl || !anchorEl.classList) return 'inline';
+    if (anchorEl.classList.contains('rev01-action')) return 'action';
+    if (anchorEl.classList.contains('rev01-nav-link')) return 'nav';
+    return 'inline';
+  }
+
+  // Walk up from a clicked sub-anchor (nav link, inline mark) to the canvas
+  // element wrapper that owns it. Used by the nav-link "Edit nav" button to
+  // surface the inspector for the parent NavElement.
+  function parentElementIdOf(node) {
+    var n = node;
+    while (n && n !== document.body) {
+      if (n.nodeType === 1 && n.getAttribute && n.getAttribute('data-rev01-element')) {
+        return n.getAttribute('data-rev01-element');
+      }
+      n = n.parentNode;
+    }
+    return null;
+  }
+
+  function showLinkPopover(anchorEl, opts) {
     removeLinkPopover();
+    var pinned = !!(opts && opts.pinned);
     var href = anchorEl.getAttribute('href') || '';
+    var kind = linkPopoverKindOf(anchorEl);
     var bar = document.createElement('div');
     bar.className = 'rev01-link-popover';
+    bar.setAttribute('data-rev01-link-popover-kind', kind);
+    if (pinned) bar.setAttribute('data-rev01-link-popover-pinned', 'true');
+
+    // Top row: URL + buttons. Bottom row: visitor-view preview chip when the
+    // kind has a meaningful styling mismatch (inline marks, nav links). Two
+    // rows live in one column so the popover stays a single floating
+    // surface anchored to the link.
+    var topRow = document.createElement('div');
+    topRow.className = 'rev01-link-popover-row';
+    bar.appendChild(topRow);
 
     var urlSpan = document.createElement('span');
     urlSpan.className = 'rev01-link-popover-url';
     urlSpan.textContent = href.length > 40 ? href.slice(0, 37) + '...' : href;
     urlSpan.title = href;
-    bar.appendChild(urlSpan);
+    topRow.appendChild(urlSpan);
 
-    var openBtn = document.createElement('button');
-    openBtn.type = 'button';
-    openBtn.textContent = 'Open';
-    openBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-    openBtn.addEventListener('click', function (ev) {
+    // Smart "Go" button — internal hrefs swap the active page so the Owner
+    // can keep editing the destination; anchors and external hrefs fall
+    // through to the existing open-in-new-tab path. Label adapts so the
+    // Owner knows what will happen before they click.
+    var goBtn = document.createElement('button');
+    goBtn.type = 'button';
+    var matchedPage = findPageByHref(href);
+    if (matchedPage) {
+      goBtn.textContent = 'Go to ' + (matchedPage.title || matchedPage.slug || 'page');
+      goBtn.title = 'Switch the canvas to ' + (matchedPage.title || matchedPage.slug);
+    } else if (href.charAt(0) === '#') {
+      goBtn.textContent = 'Jump';
+      goBtn.title = 'In-page anchor — no destination in the editor';
+      goBtn.disabled = true;
+    } else {
+      goBtn.textContent = 'Open';
+      goBtn.title = 'Open in new tab';
+    }
+    goBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+    goBtn.addEventListener('click', function (ev) {
       ev.preventDefault();
+      if (goBtn.disabled) return;
+      if (matchedPage) {
+        removeLinkPopover();
+        setActivePage(matchedPage.id);
+        return;
+      }
       if (!isAllowedHref(href)) {
         setStatus('Link rejected: ' + href + ' is not http/https/mailto/tel/anchor/relative', 'error');
         removeLinkPopover();
@@ -6101,64 +6327,131 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       window.open(href, '_blank', 'noopener,noreferrer');
       removeLinkPopover();
     });
-    bar.appendChild(openBtn);
+    topRow.appendChild(goBtn);
 
-    var editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.textContent = 'Edit';
-    editBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-    editBtn.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      var currentHref = anchorEl.getAttribute('href') || '';
-      var currentTarget = anchorEl.getAttribute('target') || '';
-      var linkText = anchorEl.textContent || '';
-      removeLinkPopover();
-      openLinkModal({
-        linkText: linkText,
-        href: currentHref,
-        blank: currentTarget === '_blank',
-        focusAfterClose: closestEditableRoot(anchorEl),
-      }).then(function (result) {
-        if (result === null) return;
-        anchorEl.setAttribute('href', result.href);
-        if (result.target === '_blank') {
-          anchorEl.setAttribute('target', '_blank');
-          anchorEl.setAttribute('rel', 'noopener noreferrer');
-        } else {
-          anchorEl.removeAttribute('target');
-          anchorEl.removeAttribute('rel');
-        }
-      }).catch(function (err) {
-        setStatus('Link edit failed: ' + (err && err.message ? err.message : String(err)), 'error');
+    if (kind === 'inline') {
+      // Inline link marks: full edit (modal) + unlink. These manipulate the
+      // contenteditable DOM directly because the text element is in edit mode.
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.textContent = 'Edit';
+      editBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      editBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var currentHref = anchorEl.getAttribute('href') || '';
+        var currentTarget = anchorEl.getAttribute('target') || '';
+        var linkText = anchorEl.textContent || '';
+        removeLinkPopover();
+        openLinkModal({
+          linkText: linkText,
+          href: currentHref,
+          blank: currentTarget === '_blank',
+          focusAfterClose: closestEditableRoot(anchorEl),
+        }).then(function (result) {
+          if (result === null) return;
+          anchorEl.setAttribute('href', result.href);
+          if (result.target === '_blank') {
+            anchorEl.setAttribute('target', '_blank');
+            anchorEl.setAttribute('rel', 'noopener noreferrer');
+          } else {
+            anchorEl.removeAttribute('target');
+            anchorEl.removeAttribute('rel');
+          }
+        }).catch(function (err) {
+          setStatus('Link edit failed: ' + (err && err.message ? err.message : String(err)), 'error');
+        });
       });
-    });
-    bar.appendChild(editBtn);
+      topRow.appendChild(editBtn);
 
-    var unlinkBtn = document.createElement('button');
-    unlinkBtn.type = 'button';
-    unlinkBtn.textContent = 'Unlink';
-    unlinkBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-    unlinkBtn.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      var parent = anchorEl.parentNode;
-      if (!parent) return;
-      while (anchorEl.firstChild) {
-        parent.insertBefore(anchorEl.firstChild, anchorEl);
-      }
-      parent.removeChild(anchorEl);
-      removeLinkPopover();
-    });
-    bar.appendChild(unlinkBtn);
+      var unlinkBtn = document.createElement('button');
+      unlinkBtn.type = 'button';
+      unlinkBtn.textContent = 'Unlink';
+      unlinkBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      unlinkBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var parent = anchorEl.parentNode;
+        if (!parent) return;
+        while (anchorEl.firstChild) {
+          parent.insertBefore(anchorEl.firstChild, anchorEl);
+        }
+        parent.removeChild(anchorEl);
+        removeLinkPopover();
+      });
+      topRow.appendChild(unlinkBtn);
+    } else if (kind === 'nav') {
+      // Nav links are structured (label/href/kind), not free text — editing
+      // happens through the parent NavElement's inspector. The button
+      // selects the owning element so the inspector opens for it.
+      var navEditBtn = document.createElement('button');
+      navEditBtn.type = 'button';
+      navEditBtn.textContent = 'Edit nav';
+      navEditBtn.title = 'Open the nav element inspector';
+      navEditBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      navEditBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var ownerId = parentElementIdOf(anchorEl);
+        removeLinkPopover();
+        if (ownerId) selectElement(ownerId);
+      });
+      topRow.appendChild(navEditBtn);
+    } else if (kind === 'action') {
+      // Action elements expose every field (label/href/variant) in the
+      // inspector. The Inspector button just guarantees the inspector is
+      // pointed at this element (helpful when the popover was triggered by
+      // hover rather than selection).
+      var inspBtn = document.createElement('button');
+      inspBtn.type = 'button';
+      inspBtn.textContent = 'Inspector';
+      inspBtn.title = 'Select this action so the inspector opens its fields';
+      inspBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+      inspBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var ownerId = parentElementIdOf(anchorEl);
+        removeLinkPopover();
+        if (ownerId) selectElement(ownerId);
+      });
+      topRow.appendChild(inspBtn);
+    }
+
+    // Preview row — renders the link text inside a sandbox that disables the
+    // editor-only contenteditable underline-cursor override so the Owner sees
+    // exactly what a visitor sees on the published page. Action elements
+    // skip the preview because they already render full-fidelity on the
+    // canvas (no contenteditable override sits on them).
+    if (kind === 'inline' || kind === 'nav') {
+      var previewRow = document.createElement('div');
+      previewRow.className = 'rev01-link-popover-preview';
+      var previewLabel = document.createElement('span');
+      previewLabel.className = 'rev01-link-popover-preview-label';
+      previewLabel.textContent = 'Visitors see';
+      previewRow.appendChild(previewLabel);
+      var previewLink = document.createElement('a');
+      // Use the matching published class so the kit accent / hover colour
+      // flow through unchanged. Adding the popover-specific class disables
+      // pointer events so accidental clicks don't navigate.
+      var previewClass = kind === 'nav' ? 'rev01-nav-link' : 'rev01-inline-link';
+      previewLink.className = previewClass + ' rev01-link-popover-preview-link';
+      previewLink.setAttribute('href', href || '#');
+      previewLink.setAttribute('tabindex', '-1');
+      previewLink.textContent = (anchorEl.textContent || '').trim() || 'link text';
+      previewLink.addEventListener('click', function (ev) { ev.preventDefault(); });
+      previewRow.appendChild(previewLink);
+      bar.appendChild(previewRow);
+    }
 
     bar.addEventListener('mouseenter', function () {
       if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); linkPopoverHideTimer = null; }
     });
     bar.addEventListener('mouseleave', function () {
-      removeLinkPopover();
+      // Pinned popovers stay until something else dismisses them (caret
+      // leaves the link, element is deselected, text edit ends). Hover-
+      // triggered popovers auto-hide as before.
+      if (!linkPopoverPinned) removeLinkPopover();
     });
 
     linkPopover = bar;
     linkPopoverAnchor = anchorEl;
+    linkPopoverPinned = pinned;
     document.body.appendChild(bar);
     positionLinkPopover(anchorEl);
   }
@@ -6167,6 +6460,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!editingElementId) return;
     var target = ev.target;
     if (!target || target.tagName !== 'A') return;
+    // Don't disturb a pinned popover already showing for the same link.
+    if (linkPopoverPinned && linkPopoverAnchor === target) return;
     if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
     if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); linkPopoverHideTimer = null; }
     linkPopoverShowTimer = setTimeout(function () {
@@ -6179,10 +6474,95 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var target = ev.target;
     if (!target || target.tagName !== 'A') return;
     if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
+    if (linkPopoverPinned) return;
     linkPopoverHideTimer = setTimeout(function () {
       linkPopoverHideTimer = null;
       removeLinkPopover();
     }, 200);
+  }
+
+  // Walk up from a DOM node to the nearest inline link mark anchor inside the
+  // text element currently in edit mode. Returns null when the node is not
+  // inside a link or not inside an edited text element.
+  function closestInlineLinkInEditMode(node) {
+    if (!editingElementId || !node) return null;
+    var n = node;
+    if (n.nodeType !== 1) n = n.parentNode;
+    while (n && n !== document.body) {
+      if (n.nodeType === 1 && n.tagName === 'A' && n.classList && n.classList.contains('rev01-inline-link')) {
+        return n;
+      }
+      n = n.parentNode;
+    }
+    return null;
+  }
+
+  // Whether the popover may trigger for this anchor given the current editor
+  // state. Inline marks fire only inside a text element being edited; nav
+  // links and action elements fire only when no text edit is in progress
+  // (otherwise they'd race the mark toolbar for the same screen real estate).
+  function canHoverPopover(anchorEl) {
+    if (!anchorEl || anchorEl.tagName !== 'A') return false;
+    var kind = linkPopoverKindOf(anchorEl);
+    if (kind === 'inline') return !!editingElementId;
+    return !editingElementId;
+  }
+
+  // Canvas-wide link hover handlers. Attached on root in attachPointerHandlers
+  // so nav links and action elements get the same popover treatment as inline
+  // marks, without each renderer wiring its own listeners.
+  function onCanvasLinkHover(ev) {
+    var target = ev.target;
+    if (!(target instanceof Element)) return;
+    if (target.tagName !== 'A') {
+      target = target.closest && target.closest('a');
+      if (!target) return;
+    }
+    if (!canHoverPopover(target)) return;
+    if (linkPopoverPinned && linkPopoverAnchor === target) return;
+    if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
+    if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); linkPopoverHideTimer = null; }
+    var captured = target;
+    linkPopoverShowTimer = setTimeout(function () {
+      linkPopoverShowTimer = null;
+      showLinkPopover(captured);
+    }, 150);
+  }
+
+  function onCanvasLinkHoverLeave(ev) {
+    var target = ev.target;
+    if (!(target instanceof Element)) return;
+    if (target.tagName !== 'A') {
+      target = target.closest && target.closest('a');
+      if (!target) return;
+    }
+    if (linkPopoverShowTimer) { clearTimeout(linkPopoverShowTimer); linkPopoverShowTimer = null; }
+    if (linkPopoverPinned) return;
+    linkPopoverHideTimer = setTimeout(function () {
+      linkPopoverHideTimer = null;
+      removeLinkPopover();
+    }, 200);
+  }
+
+  // selectionchange driver — pin the popover to whichever link contains the
+  // caret while text is in edit mode. When the caret leaves the link, the
+  // pinned popover dismisses (hover may re-show it without pinning).
+  function onSelectionChangeForLinkPopover() {
+    if (!editingElementId) return;
+    var sel = document.getSelection();
+    if (!sel || sel.rangeCount === 0) {
+      if (linkPopoverPinned) removeLinkPopover();
+      return;
+    }
+    var anchorNode = sel.anchorNode;
+    var linkEl = closestInlineLinkInEditMode(anchorNode);
+    if (!linkEl) {
+      if (linkPopoverPinned) removeLinkPopover();
+      return;
+    }
+    // Already pinned to this link → nothing to do.
+    if (linkPopoverPinned && linkPopoverAnchor === linkEl) return;
+    showLinkPopover(linkEl, { pinned: true });
   }
 
   // -- Inline mark toolbar ------------------------------------------------
@@ -6580,6 +6960,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     });
 
+    // selectionchange is a document-level event; register it for the
+    // duration of text edit and remove it in finish(). The handler
+    // short-circuits when editingElementId is cleared, but removing keeps
+    // the global listener set small.
+    document.addEventListener('selectionchange', onSelectionChangeForLinkPopover);
+
     function restoreFromSnapshot() {
       found.element.content = JSON.parse(JSON.stringify(editingSnapshot));
       rebuildElement(elementId);
@@ -6589,6 +6975,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       inner.removeAttribute("contenteditable");
       inner.removeEventListener("blur", onBlur);
       inner.removeEventListener("keydown", onKey);
+      document.removeEventListener('selectionchange', onSelectionChangeForLinkPopover);
       removeMarkToolbar();
       removeLinkPopover();
       const snapshot = editingSnapshot;
@@ -6825,8 +7212,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           if (body && Array.isArray(body.errors) && body.errors.length > 0) detail = body.errors[0];
           else if (body && body.error) detail = body.error;
         } catch (_) { /* ignore */ }
-        setStatus("AI preview failed: " + detail, "error");
+        setStatus("AI preview failed", "error");
         setAiBusy(false);
+        // Modal surface — the status-line flash is too easy to miss and the
+        // server's error message often tells the Owner exactly what to do.
+        try {
+          await openAlertModal({ title: "AI preview failed", message: detail });
+        } catch (_) { /* another modal was open; status line still has the error */ }
         return;
       }
       const body = await response.json();
@@ -6891,6 +7283,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // -- Drag & resize ------------------------------------------------------
 
   function attachPointerHandlers() {
+    // Canvas-wide link hover → popover. Inline marks inside a contenteditable
+    // text element are handled by beginTextEdit's per-inner listeners; this
+    // wiring covers nav links and action elements which live outside any
+    // contenteditable subtree.
+    root.addEventListener("mouseover", onCanvasLinkHover);
+    root.addEventListener("mouseout", onCanvasLinkHoverLeave);
     root.addEventListener("mousedown", (ev) => {
       if (interactionMode === "pan") return;
       if (ev.target instanceof Element && (ev.target.closest("[data-element-menu-trigger]") || ev.target.closest("[data-element-menu]"))) return;
@@ -8056,14 +8454,56 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         } else if (body && body.error) {
           detail = body.error;
         }
-        setStatus("Publish failed: " + detail, "error");
+        setStatus("Publish failed", "error");
+        // Modal surface — same reasoning as the AI-preview path: the
+        // status-line flash is too quiet for a failure the Owner needs to act
+        // on (fix the issue, then re-publish).
+        try {
+          await openAlertModal({ title: "Publish failed", message: detail });
+        } catch (_) { /* another modal was open; status line still has it */ }
         return;
       }
-      const version =
+      const versionSuffix =
         body && typeof body.version === "number" && Number.isFinite(body.version)
           ? " v" + body.version
           : "";
-      setStatus("Published" + version, "ok");
+      setStatus("Published" + versionSuffix, "ok");
+
+      // Refresh Versions sidebar panel so the new snapshot is visible without
+      // a page reload. Invalidate the cache flag always; repaint only if the
+      // panel is currently visible (otherwise the next tab-click triggers a
+      // fresh fetch via activateSidebarTab).
+      versionsLoaded = false;
+      var versionsPanel = sidebar ? sidebar.querySelector('[data-sidebar-panel="versions"]') : null;
+      if (versionsPanel && !versionsPanel.hidden) {
+        renderVersionsPanel();
+      }
+
+      // Publish-success modal — gives the Owner an explicit "View live site"
+      // exit (opens published URL in new tab + leaves editor) and an
+      // unambiguous "Continue editing" path that just dismisses. Replaces the
+      // 4-second status-line flash that was easy to miss.
+      var addrEl = document.querySelector(".rev01-editor-topbar .address");
+      var publishedHost = addrEl && addrEl.textContent ? addrEl.textContent.trim() : "";
+      var modalTitle = "Published" + versionSuffix;
+      var modalMessage = publishedHost
+        ? publishedHost + " is live.\\nVisitors with the page open see your changes without refreshing."
+        : "Your site is live. Visitors with the page open see your changes without refreshing.";
+      try {
+        var openLive = await openConfirmModal({
+          title: modalTitle,
+          message: modalMessage,
+          confirmLabel: "View live site",
+          cancelLabel: "Continue editing",
+        });
+        if (openLive && publishedHost) {
+          window.open("https://" + publishedHost, "_blank");
+          window.location.href = "/dashboard";
+        }
+      } catch (_) {
+        // Another modal was already open; the status line still announced
+        // success so the Owner is not left without feedback.
+      }
     } catch (err) {
       setStatus("Publish failed: " + (err && err.message ? err.message : String(err)), "error");
     } finally {
@@ -8154,16 +8594,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (selectedElementId) {
           ev.preventDefault();
           var found = findElement(selectedElementId);
-          if (found) {
-            var idx = found.section.elements.indexOf(found.element);
-            if (idx >= 0) found.section.elements.splice(idx, 1);
-            closeElementMenu();
-            selectedElementId = null;
-            captureForUndo();
-            renderAll();
-            renderInspector();
-            scheduleSave();
-          }
+          if (found) deleteElement(found.section, found.element);
           return;
         }
         if (selectedSectionId) {

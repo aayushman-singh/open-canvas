@@ -1470,13 +1470,15 @@ body[data-placement-active="true"] .rev01-section-slot {
   pointer-events: none;
 }
 
-/* Link hover popover — singleton floating bar shown when the mouse enters
-   an <a> inside a contenteditable text element. Positioned below (or above)
-   the link via position: fixed. Z-index above the mark toolbar (180). */
+/* Link popover — singleton floating bar shown when the mouse enters or the
+   caret enters an <a> inside the text element currently in edit mode. Two
+   trigger modes are visually indicated by data-rev01-link-popover-pinned.
+   Positioned below (or above) the link via position: fixed. Z-index above
+   the mark toolbar (180). */
 .rev01-link-popover {
   position: fixed;
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   z-index: 190;
   padding: 6px 10px;
@@ -1489,6 +1491,14 @@ body[data-placement-active="true"] .rev01-section-slot {
   color: var(--rev01-fg);
   max-width: 420px;
   pointer-events: auto;
+}
+.rev01-link-popover[data-rev01-link-popover-pinned="true"] {
+  border-color: var(--rev01-accent, var(--rev01-hairline-strong));
+}
+.rev01-link-popover .rev01-link-popover-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .rev01-link-popover .rev01-link-popover-url {
   flex: 1 1 auto;
@@ -1513,6 +1523,45 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-link-popover button:hover {
   border-color: var(--rev01-accent);
   color: var(--rev01-fg);
+}
+.rev01-link-popover button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Visitor-view preview row inside the link popover. The label is small +
+   muted; the chip renders the actual published link styling so the Owner
+   sees the same underline/colour visitors will see. The preview link sits
+   outside any contenteditable subtree so the .rev01-inline-link rule
+   applies cleanly without the contenteditable-only cursor override. */
+.rev01-link-popover .rev01-link-popover-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: var(--rev01-bg-panel);
+  border: 1px dashed var(--rev01-hairline);
+  font-family: var(--rev01-font-body, inherit);
+  font-size: 12px;
+  color: var(--rev01-fg);
+  max-width: 100%;
+}
+.rev01-link-popover .rev01-link-popover-preview-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rev01-fg-mute);
+  user-select: none;
+  flex: 0 0 auto;
+}
+.rev01-link-popover .rev01-link-popover-preview-link {
+  cursor: default;
+  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
 }
 
 /* Link modal inline validation error */
