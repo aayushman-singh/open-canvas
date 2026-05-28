@@ -8,8 +8,9 @@
 // affect NEW sites. Sites already created from those templates still carry
 // the dead URL in editableState (and publishedSnapshot, where present).
 //
-// Walks every site row, rewrites both editableState and publishedSnapshot
-// in-place, and writes back via drizzle. Idempotent — re-running on a clean
+// Walks every site row, skips rows that already define a real /contact page,
+// rewrites both editableState and publishedSnapshot in-place, and writes back
+// via drizzle. Idempotent — re-running on a clean
 // DB is a no-op.
 //
 // Usage:
@@ -53,9 +54,18 @@ function rewritePage(page: CanvasPage): number {
   return touched;
 }
 
-function rewriteState(
+export function stateHasContactPage(
+  state: CanvasSiteState | PublishedSnapshot,
+): boolean {
+  return state.pages.some(
+    (page) => page.slug.trim().toLowerCase().replace(/^\/+|\/+$/g, '') === 'contact',
+  );
+}
+
+export function rewriteDeadContactUrlsInState(
   state: CanvasSiteState | PublishedSnapshot,
 ): number {
+  if (stateHasContactPage(state)) return 0;
   let touched = 0;
   for (const page of state.pages) {
     touched += rewritePage(page);
@@ -92,9 +102,14 @@ async function main(): Promise<void> {
   let totalUrlsRewritten = 0;
 
   for (const row of rows) {
-    const editableTouched = rewriteState(row.editableState);
+    const hasContactPage =
+      stateHasContactPage(row.editableState) ||
+      (row.publishedSnapshot ? stateHasContactPage(row.publishedSnapshot) : false);
+    if (hasContactPage) continue;
+
+    const editableTouched = rewriteDeadContactUrlsInState(row.editableState);
     const publishedTouched = row.publishedSnapshot
-      ? rewriteState(row.publishedSnapshot)
+      ? rewriteDeadContactUrlsInState(row.publishedSnapshot)
       : 0;
     const touched = editableTouched + publishedTouched;
     if (touched === 0) continue;
@@ -123,4 +138,6 @@ async function main(): Promise<void> {
   );
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}

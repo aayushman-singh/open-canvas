@@ -36,7 +36,7 @@ export async function signEditToken(
   secret: string,
   ttl: number = TTL_SECONDS,
 ): Promise<string> {
-  return signJWT(payload as unknown as Record<string, unknown>, secret, ttl);
+  return signJWT(payload, secret, ttl);
 }
 
 export async function verifyEditToken(

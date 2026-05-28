@@ -182,7 +182,6 @@ export function prepareSeedAssetsForCustomer(
 ): PreparedSeedAssets {
   const editableState = structuredClone(state);
   const mappedIds = new Map<string, string>();
-  const materializedIdByContentHash = new Map<string, string>();
   const seedRows: SeedOwnerAssetRow[] = [];
   const unknownSeedIds = new Set<string>();
   const assetKindErrors: Array<{

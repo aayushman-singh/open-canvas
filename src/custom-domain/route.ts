@@ -161,6 +161,14 @@ router.get('/', async (c) => {
   // `pollOneById` / `pollOne`; we tolerate stale rows over breaking the
   // list endpoint.
   if (domains.length > 0) {
+    const missing = missingCfConfig(c.env);
+    if (missing) {
+      console.error('[custom-domain] list blocked — env missing', { missing, siteId });
+      return c.json(
+        { error: `custom domains are not configured on this deployment (missing ${missing})` },
+        503,
+      );
+    }
     const pollDeps = await buildPollDepsFromEnv(c.env);
     for (const row of domains) {
       if (row.status === 'failed') continue;

@@ -92,7 +92,20 @@ function stableStringify(value: unknown): string {
 }
 
 function fail(label: string, err?: unknown): never {
-  const detail = err instanceof Error ? `${err.name}: ${err.message}` : err === undefined ? '' : String(err);
+  const detail =
+    err instanceof Error
+      ? `${err.name}: ${err.message}`
+      : err === undefined
+        ? ''
+        : typeof err === 'object' && err !== null
+          ? stableStringify(err)
+          : err === null
+            ? 'null'
+            : typeof err === 'string'
+              ? err
+              : typeof err === 'number' || typeof err === 'boolean' || typeof err === 'bigint'
+                ? String(err)
+                : 'unknown thrown value';
   process.stderr.write(`[applylocalstate-repro] FAIL ${label}${detail ? '\n  ' + detail : ''}\n`);
   process.exit(1);
 }
@@ -305,8 +318,10 @@ const factories: Array<{ name: string; build: (id: string) => CanvasElement }> =
 // Replay loop: 12 element types × 2 passes = 24 "Add component" cycles.
 // ----------------------------------------------------------------------------
 
-let liveState: CanvasSiteState = JSON.parse(JSON.stringify(initial)) as CanvasSiteState;
-if (!liveState.pages[0] || !liveState.pages[0].sections[0]) {
+const liveState: CanvasSiteState = JSON.parse(JSON.stringify(initial)) as CanvasSiteState;
+const firstPage = liveState.pages[0];
+const firstSection = firstPage?.sections[0];
+if (!firstPage || !firstSection) {
   fail('fixture has no page[0].section[0] to append into');
 }
 
@@ -315,7 +330,7 @@ for (let pass = 0; pass < 2; pass += 1) {
   for (const factory of factories) {
     iter += 1;
     const id = `repro-${factory.name}-p${String(pass)}-${String(iter)}`;
-    liveState.pages[0]!.sections[0]!.elements.push(factory.build(id));
+    firstSection.elements.push(factory.build(id));
 
     try {
       applyLocalState(client, liveState);

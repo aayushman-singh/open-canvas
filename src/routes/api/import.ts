@@ -25,7 +25,7 @@ import { MOTION_PRESETS } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { isSiteLimitViolation, validateSubdomain } from './sites';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site, siteFont, type BillingPlan } from '../../db/schema';
+import { customer, ownerAsset, site, siteFont } from '../../db/schema';
 import { fontContentHashToR2Key } from '../../fonts/upload';
 
 type Bindings = {
@@ -803,4 +803,3 @@ function isUniqueViolation(err: unknown): boolean {
   if (e.cause) return isUniqueViolation(e.cause);
   return false;
 }
-

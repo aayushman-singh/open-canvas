@@ -496,6 +496,35 @@ function esc(value: string): string {
 function clientScript(siteId: string): string {
   const sid = JSON.stringify(siteId);
   return String.raw`
+const rev01SiteSettingsConfig = (() => {
+  const SITE_ID = ${sid};
+  let configPatchChain = Promise.resolve();
+  function queueConfigPatch(body, onSaved, onFailed) {
+    const run = configPatchChain.then(async () => {
+      try {
+        const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) {
+          const bodyText = (await response.text()).trim();
+          onFailed('Could not save: ' + (bodyText || response.statusText));
+          return;
+        }
+        onSaved(response);
+      } catch (e) {
+        onFailed('Network error: ' + (e && e.message ? e.message : String(e)));
+      }
+    });
+    configPatchChain = run.catch((error) => {
+      console.error('[site-settings] config patch queue failed', { error });
+    });
+    return run;
+  }
+  return { SITE_ID, queueConfigPatch };
+})();
+
 (() => {
   const SITE_ID = ${sid};
   const form = document.querySelector('form.pw');
@@ -661,7 +690,8 @@ function clientScript(siteId: string): string {
 // Same pattern as the per-page OG picker in dashboard/page-settings.tsx; kept
 // inline here so site-settings remains a single-file route.
 (() => {
-  const SITE_ID = ${sid};
+  const SITE_ID = rev01SiteSettingsConfig.SITE_ID;
+  const queueConfigPatch = rev01SiteSettingsConfig.queueConfigPatch;
   function assetUrl(id) {
     return '/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/assets/' + encodeURIComponent(id);
   }
@@ -710,18 +740,7 @@ function clientScript(siteId: string): string {
   }
   async function commit(assetIdOrNull) {
     showOk('Saving…');
-    try {
-      const r = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify({ faviconAssetId: assetIdOrNull }),
-      });
-      if (!r.ok) {
-        let detail = r.statusText;
-        try { const b = await r.json(); if (b && b.error) detail = b.error; } catch (_) {}
-        showErr('Could not save: ' + detail);
-        return;
-      }
+    await queueConfigPatch({ faviconAssetId: assetIdOrNull }, () => {
       const thumb = picker.querySelector('[data-picker-thumb]');
       const meta = picker.querySelector('[data-picker-meta]');
       const clearBtn = picker.querySelector('[data-picker-clear]');
@@ -747,9 +766,7 @@ function clientScript(siteId: string): string {
       if (chooseBtn) chooseBtn.textContent = assetIdOrNull ? 'Change' : 'Choose image';
       showOk('Saved.');
       if (modal) modal.removeAttribute('data-open');
-    } catch (e) {
-      showErr('Network error: ' + (e && e.message ? e.message : String(e)));
-    }
+    }, showErr);
   }
   const chooseBtn = picker.querySelector('[data-picker-choose]');
   const clearBtn = picker.querySelector('[data-picker-clear]');
@@ -802,9 +819,8 @@ function clientScript(siteId: string): string {
 // the same prior state, each apply their own diff, and the second write
 // silently overwrites the first. Queueing here keeps each toggle's effect.
 (() => {
-  const SITE_ID = ${sid};
+  const queueConfigPatch = rev01SiteSettingsConfig.queueConfigPatch;
   const toggles = document.querySelectorAll('input[data-config-key]');
-  let patchChain = Promise.resolve();
   toggles.forEach((cb) => {
     cb.addEventListener('change', () => {
       const key = cb.getAttribute('data-config-key');
@@ -814,27 +830,14 @@ function clientScript(siteId: string): string {
       const stateOn = cb.getAttribute('data-on-label') ?? 'On';
       const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
       cb.disabled = true;
-      patchChain = patchChain.then(async () => {
-        try {
-          const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
-            method: 'PATCH',
-            headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-            body: JSON.stringify({ [key]: apiValue }),
-          });
-          if (!response.ok) {
-            const bodyText = (await response.text()).trim();
-            cb.checked = !cb.checked;
-            alert('Could not save: ' + (bodyText || response.statusText));
-            return;
-          }
+      queueConfigPatch({ [key]: apiValue }, () => {
           if (stateEl) stateEl.textContent = cb.checked ? stateOn : stateOff;
-        } catch (e) {
+        }, (message) => {
           cb.checked = !cb.checked;
-          alert('Network error: ' + (e && e.message ? e.message : String(e)));
-        } finally {
+          alert(message);
+        }).finally(() => {
           cb.disabled = false;
-        }
-      });
+        });
     });
   });
 })();

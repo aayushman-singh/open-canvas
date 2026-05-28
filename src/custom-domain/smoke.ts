@@ -355,6 +355,21 @@ function runValidation(): void {
   assert(ok.ok && ok.hostname === 'www.acme.com', 'expected hostname to be normalised lowercased');
 }
 
+async function runRouteRegressionChecks(): Promise<void> {
+  const routeResponse = await fetch(new URL('./route.ts', import.meta.url));
+  const routeSource = await routeResponse.text();
+  const getStart = routeSource.indexOf("router.get('/', async (c) => {");
+  const deleteStart = routeSource.indexOf("router.delete('/:hostname'", getStart);
+  assert(getStart !== -1 && deleteStart !== -1, 'expected custom-domain route source to include GET and DELETE handlers');
+  const getHandler = routeSource.slice(getStart, deleteStart);
+  const guardIndex = getHandler.indexOf('missingCfConfig(c.env)');
+  const pollDepsIndex = getHandler.indexOf('buildPollDepsFromEnv(c.env)');
+  assert(
+    guardIndex !== -1 && pollDepsIndex !== -1 && guardIndex < pollDepsIndex,
+    'expected GET /domains to validate CF config before building poll deps',
+  );
+}
+
 async function runRegisterAndActivate(): Promise<{
   shim: ReturnType<typeof makeShim>;
   state: ShimState;
@@ -583,6 +598,7 @@ async function runStuckPendingFlip(): Promise<void> {
 
 async function main(): Promise<void> {
   runValidation();
+  await runRouteRegressionChecks();
   const {
     shim,
     state,

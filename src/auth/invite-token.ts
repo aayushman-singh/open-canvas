@@ -37,7 +37,7 @@ export async function signInviteToken(
   payload: Omit<InviteTokenPayload, 'iat' | 'exp'>,
   secret: string,
 ): Promise<string> {
-  return signJWT(payload as unknown as Record<string, unknown>, secret, INVITE_TTL_SECONDS);
+  return signJWT(payload, secret, INVITE_TTL_SECONDS);
 }
 
 export async function verifyInviteToken(

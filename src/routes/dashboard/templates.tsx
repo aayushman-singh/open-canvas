@@ -490,8 +490,8 @@ templatesRoute.get('/:templateId/assets/:assetId', (c) => {
 
 templatesRoute.get('/', async (c) => {
   const auth = c.get('auth');
-  let communityCustomTemplates: CustomTemplateCard[] = [];
-  let personalCustomTemplates: CustomTemplateCard[] = [];
+  const communityCustomTemplates: CustomTemplateCard[] = [];
+  const personalCustomTemplates: CustomTemplateCard[] = [];
   let siteLimitErrorMessage: string | null = null;
   if (auth.userId) {
     const database = db(c.env);
