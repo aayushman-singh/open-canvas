@@ -4,7 +4,7 @@
 // signs a short-lived token after Clerk auth; the token is set as a cookie
 // scoped to .rev01.aayushman.dev so published-site subdomains can read it.
 // The token carries the Owner's identity (clerkUserId, customerId) and the
-// site it was issued for, letting the /__api/* proxy and /__edit handler
+// site it was issued for, letting the /__api/* proxy and the /?edit handler
 // verify ownership without a Clerk session cookie on the subdomain.
 
 import { signJWT, verifyJWT } from './jwt';
