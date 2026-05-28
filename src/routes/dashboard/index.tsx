@@ -4,8 +4,8 @@ import { desc, eq, sql, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customer, site, ownerAsset } from '../../db/schema';
-import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/middleware';
-import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
+import { clerkAuth, resolveClerkKeys } from '../../auth/middleware';
+import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge, Pill } from '../../ui';
@@ -1143,9 +1143,6 @@ dashboard.get('/', async (c) => {
     storageBytes = Number(sb[0]?.total ?? 0);
   }
 
-  const { publishableKey } = resolveClerkKeys(c.env);
-  const signOutUrl = buildSignOutUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url, '/'));
-
   const siteLimit = siteLimitForPlan(customerPlan);
   const atSiteLimit = siteLimit !== null && cards.length >= siteLimit;
   const planName = billingPlanLabel(customerPlan);
@@ -1265,7 +1262,7 @@ dashboard.get('/', async (c) => {
       </div>
       <p class="dash-sub">
         Signed in as {primaryEmail}.{' '}
-        <a class="dash-sign-out" href={signOutUrl}>
+        <a class="dash-sign-out" href="/sign-out">
           Sign out
         </a>
       </p>

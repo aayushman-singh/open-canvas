@@ -55,6 +55,7 @@ import {
 } from './routes/api/custom-templates';
 import { editTokenAuth } from './auth/middleware';
 import editTokenRefreshRoute from './auth/refresh-route';
+import signOutRoute from './auth/sign-out-route';
 import { verifyEditToken } from './auth/edit-token';
 import { db } from './db/client';
 import onSiteEditRoute from './routes/api/on-site-edit';
@@ -129,6 +130,8 @@ app.get('/__live', async (c) => {
 });
 
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
+
+app.route('/sign-out', signOutRoute);
 
 app.get('/favicon.ico', (c) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0d1117"/><text x="4" y="24" font-family="monospace" font-size="22" font-weight="700" fill="#22d3ee">r1</text></svg>`;

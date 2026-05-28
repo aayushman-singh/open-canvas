@@ -49,11 +49,13 @@ export function buildSignInUrl(publishableKey: string, redirectUrl: string): str
   return url.toString();
 }
 
-export function buildSignOutUrl(publishableKey: string, redirectUrl: string): string {
-  const url = new URL('/sign-out', accountPortalOrigin(publishableKey));
-  url.searchParams.set('redirect_url', redirectUrl);
-  return url.toString();
-}
+// NOTE: sign-out used to construct a `<portal>/sign-out` URL, but Clerk's
+// hosted Account Portal does not expose that path (the portal serves only
+// /sign-in, /sign-up, /user, /organization, /create-organization,
+// /unauthorized-sign-in). Linking to the non-existent `/sign-out` page
+// resolved to 404 and left the session intact. Sign-out is now handled by
+// the worker-local route in `src/auth/sign-out-route.ts`, which revokes
+// the session via the Clerk Backend API and clears the cookies.
 
 export function requireAuth() {
   return createMiddleware<{

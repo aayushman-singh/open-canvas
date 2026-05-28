@@ -27,7 +27,7 @@ import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
 import { signEditToken } from './auth/edit-token';
-import { buildSignInUrl, buildSignOutUrl } from './auth/require-auth';
+import { buildSignInUrl } from './auth/require-auth';
 import {
   prepareSeedAssetsForCustomer,
   RESERVED_SUBDOMAINS,
@@ -658,11 +658,14 @@ assert(
 );
 assert(
   dashboardSource.includes('resolveClerkKeys(c.env)'),
-  'expected dashboard sign-out to use the same resolved Clerk key pair as clerkAuth',
+  'expected dashboard to use the shared Clerk key resolver (clerk-script injection)',
 );
+// Sign-out is now handled by the worker-local /sign-out endpoint
+// (src/auth/sign-out-route.ts) — dashboard pages link to it directly
+// instead of constructing a (non-existent) Account Portal /sign-out URL.
 assert(
-  dashboardSource.includes("resolveAuthRedirectUrl(c.env, c.req.url, '/')"),
-  'expected dashboard sign-out redirect_url to resolve to local origin in dev',
+  dashboardSource.includes('href="/sign-out"'),
+  'expected dashboard Sign out anchor to point at the worker-local /sign-out route',
 );
 
 const livePublishableKey = `pk_live_${btoa('clerk.rev01.aayushman.dev$')}`;
@@ -697,25 +700,18 @@ assert(
   devSignInUrl.searchParams.get('redirect_url') === devSignInRedirect,
   'expected dev sign-in redirect_url query param to match the resolved local URL',
 );
-const devSignOutRedirect = resolveAuthRedirectUrl(
+// Sign-out is no longer a Clerk Account Portal URL — see
+// src/auth/sign-out-route.ts. The `overridePath='/'` form of
+// resolveAuthRedirectUrl is still validated below since other callers
+// (e.g. landing page handoff back to /) rely on it.
+const devRootRedirect = resolveAuthRedirectUrl(
   devClerkEnv,
   'https://rev01.aayushman.dev/dashboard',
   '/',
 );
 assert(
-  devSignOutRedirect === 'http://localhost:8787/',
-  `expected dev sign-out redirect_url to stay local, got ${devSignOutRedirect}`,
-);
-const devSignOutUrl = new URL(
-  buildSignOutUrl(resolveClerkKeys(devClerkEnv).publishableKey, devSignOutRedirect),
-);
-assert(
-  devSignOutUrl.origin === 'https://local-dev.accounts.dev',
-  `expected dev sign-out to use the test Clerk portal, got ${devSignOutUrl.origin}`,
-);
-assert(
-  devSignOutUrl.searchParams.get('redirect_url') === devSignOutRedirect,
-  'expected dev sign-out redirect_url query param to match the resolved local URL',
+  devRootRedirect === 'http://localhost:8787/',
+  `expected dev root redirect to stay local, got ${devRootRedirect}`,
 );
 const liveRedirect = resolveAuthRedirectUrl(
   liveClerkEnv,
@@ -725,14 +721,14 @@ assert(
   liveRedirect === 'https://rev01.aayushman.dev/dashboard?next=sites',
   `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
 );
-const liveSignOutRedirect = resolveAuthRedirectUrl(
+const liveRootRedirect = resolveAuthRedirectUrl(
   liveClerkEnv,
   'https://rev01.aayushman.dev/dashboard',
   '/',
 );
 assert(
-  liveSignOutRedirect === 'https://rev01.aayushman.dev/',
-  `expected live sign-out redirect_url to use the live origin, got ${liveSignOutRedirect}`,
+  liveRootRedirect === 'https://rev01.aayushman.dev/',
+  `expected live root redirect to use the live origin, got ${liveRootRedirect}`,
 );
 try {
   resolveAuthRedirectUrl(
@@ -815,6 +811,13 @@ assert(
   !siteSettingsSource.includes("fd.append('siteId', SITE_ID);") &&
     !pageSettingsSource.includes("fd.append('siteId', SITE_ID);"),
   'expected favicon and SEO picker uploads not to send partial slot-history metadata',
+);
+assert(
+  siteSettingsSource.includes('let configPatchChain = Promise.resolve();') &&
+    siteSettingsSource.includes('function queueConfigPatch') &&
+    siteSettingsSource.includes('queueConfigPatch({ faviconAssetId: assetIdOrNull }') &&
+    siteSettingsSource.includes('queueConfigPatch({ [key]: apiValue }'),
+  'expected all site config PATCH writes on settings page to use the serialized queue',
 );
 assert(
   canvasApiSource.includes('assetIsImageForCustomer') &&

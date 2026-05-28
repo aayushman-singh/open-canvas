@@ -3,8 +3,8 @@ import { raw } from 'hono/html';
 import { eq, sql, count } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
-import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/middleware';
-import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
+import { clerkAuth } from '../../auth/middleware';
+import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button } from '../../ui';
@@ -330,12 +330,6 @@ profileRoute.get('/profile', async (c) => {
     .where(eq(site.customerId, profile.id));
   const siteCount = siteCountRows[0]?.count ?? 0;
 
-  const { publishableKey } = resolveClerkKeys(c.env);
-  const signOutUrl = buildSignOutUrl(
-    publishableKey,
-    resolveAuthRedirectUrl(c.env, c.req.url, '/'),
-  );
-
   const avatarUrl = user.imageUrl;
   const displayName = profile.displayName ?? user.firstName ?? '';
   const initial = (displayName || primaryEmail || '?').charAt(0).toUpperCase();
@@ -420,7 +414,7 @@ profileRoute.get('/profile', async (c) => {
 
           <div class="sign-out-row">
             <p>Sign out of your account on this device.</p>
-            <a href={signOutUrl} class="btn-signout">Sign out</a>
+            <a href="/sign-out" class="btn-signout">Sign out</a>
           </div>
         </div>
       </div>
