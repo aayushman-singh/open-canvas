@@ -103,7 +103,7 @@ function makeSiteState(
     sections: [makeSection([collection])],
     ...pageMetadata,
   };
-  return { styleKit: 'charcoal', pages: [page], symbols: [] };
+  return { styleKit: 'charcoal', pages: [page] };
 }
 
 // ---------------------------------------------------------------------------

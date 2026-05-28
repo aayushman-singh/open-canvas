@@ -49,7 +49,6 @@ function buildFixtureState(): CanvasSiteState {
   const features = createSectionFromRecipe('feature-grid', recipeInput);
   return {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [
       {
         id: 'page-smoke',
@@ -88,7 +87,7 @@ function buildLargeState(): CanvasSiteState {
       sections,
     };
   });
-  return { styleKit: 'charcoal', symbols: [], header, pages };
+  return { styleKit: 'charcoal', header, pages };
 }
 
 // ---------------------------------------------------------------------------

@@ -61,7 +61,6 @@ function singlePageStateAround(...recipeIds: SectionRecipeId[]): CanvasSiteState
   const sections = recipeIds.map((id) => createSectionFromRecipe(id, input));
   return {
     styleKit: 'charcoal',
-    symbols: [],
     pages: [
       {
         id: 'page-smoke',

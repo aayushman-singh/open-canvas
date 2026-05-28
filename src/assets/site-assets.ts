@@ -16,7 +16,6 @@ import type {
   CanvasSiteState,
   MediaKind,
   PublishedSnapshot,
-  SymbolMaster,
 } from '../canvas/schema.js';
 
 export interface ReferencedAsset {
@@ -56,7 +55,6 @@ export interface AssetReferenceRoot {
   faviconAssetId?: string;
   header?: CanvasSection;
   footer?: CanvasSection;
-  symbols?: SymbolMaster[];
 }
 
 export type AssetReferenceSource =
@@ -83,7 +81,6 @@ function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
     pages: source.pages,
     ...(source.header !== undefined ? { header: source.header } : {}),
     ...(source.footer !== undefined ? { footer: source.footer } : {}),
-    ...(source.symbols !== undefined ? { symbols: source.symbols } : {}),
     ...(favicon !== undefined ? { faviconAssetId: favicon } : {}),
   };
 }
@@ -208,9 +205,6 @@ export function collectReferencedAssets(source: AssetReferenceSource): Reference
   }
   if (root.header !== undefined) collectSectionReferences(root.header, 'header', out);
   if (root.footer !== undefined) collectSectionReferences(root.footer, 'footer', out);
-  root.symbols?.forEach((symbol, idx) => {
-    collectSectionReferences(symbol.section, `symbols[${String(idx)}].section`, out);
-  });
   return out;
 }
 
@@ -262,9 +256,6 @@ export function collectUnfilledAssetReferences(
   }
   if (root.header !== undefined) collectUnfilledSectionReferences(root.header, 'header', out);
   if (root.footer !== undefined) collectUnfilledSectionReferences(root.footer, 'footer', out);
-  root.symbols?.forEach((symbol, idx) => {
-    collectUnfilledSectionReferences(symbol.section, `symbols[${String(idx)}].section`, out);
-  });
   return out;
 }
 

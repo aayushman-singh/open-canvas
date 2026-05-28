@@ -128,7 +128,6 @@ export interface QuerySiteSummary {
   styleKit: string;
   defaultLocale: string;
   customStyleKitPresent: boolean;
-  symbolsCount: number;
   pageCount: number;
   header?: QuerySiteSectionSummary | undefined;
   footer?: QuerySiteSectionSummary | undefined;
@@ -199,7 +198,6 @@ export function buildQuerySiteSummary(input: QuerySiteInput): QuerySiteSummary {
     styleKit: state.styleKit,
     defaultLocale: state.defaultLocale ?? 'en',
     customStyleKitPresent: state.customStyleKit !== undefined,
-    symbolsCount: state.symbols.length,
     pageCount: state.pages.length,
     header,
     footer,
