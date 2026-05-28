@@ -29,7 +29,8 @@ export interface ReferencedAsset {
     | 'favicon'
     | 'background-video'
     | 'nav-logo'
-    | 'carousel-slide';
+    | 'carousel-slide'
+    | 'element-bg-image';
   path: string;
   mediaElementId?: string;
 }
@@ -64,16 +65,27 @@ export type AssetReferenceSource =
   | CanvasSiteState
   | PublishedSnapshot;
 
+// Sentinel for media slots an Owner has dropped onto the canvas but not yet
+// filled with a real asset. Treated as "unfilled" by the reference walker
+// (save validator skips it; publish guard counts it as an unfilled slot).
+const PLACEHOLDER_ASSET_ID = '__placeholder__';
+
+function siteFaviconAssetId(
+  source: Exclude<AssetReferenceSource, CanvasPage[]>,
+): string | undefined {
+  return 'faviconAssetId' in source ? source.faviconAssetId : undefined;
+}
+
 function referenceRootFrom(source: AssetReferenceSource): AssetReferenceRoot {
-  return Array.isArray(source)
-    ? { pages: source }
-    : {
-        pages: source.pages,
-        ...(source.faviconAssetId !== undefined ? { faviconAssetId: source.faviconAssetId } : {}),
-        ...(source.header !== undefined ? { header: source.header } : {}),
-        ...(source.footer !== undefined ? { footer: source.footer } : {}),
-        ...(source.symbols !== undefined ? { symbols: source.symbols } : {}),
-      };
+  if (Array.isArray(source)) return { pages: source };
+  const favicon = siteFaviconAssetId(source);
+  return {
+    pages: source.pages,
+    ...(source.header !== undefined ? { header: source.header } : {}),
+    ...(source.footer !== undefined ? { footer: source.footer } : {}),
+    ...(source.symbols !== undefined ? { symbols: source.symbols } : {}),
+    ...(favicon !== undefined ? { faviconAssetId: favicon } : {}),
+  };
 }
 
 function pushReference(
@@ -85,6 +97,7 @@ function pushReference(
   mediaElementId?: string,
 ): void {
   if (typeof assetId !== 'string' || assetId.length === 0) return;
+  if (assetId === PLACEHOLDER_ASSET_ID) return;
   out.push({
     assetId,
     expectedKind,
@@ -99,6 +112,14 @@ function collectElementReferences(
   elementPath: string,
   out: ReferencedAsset[],
 ): void {
+  pushReference(
+    out,
+    element.elementStyle?.backgroundImageAssetId,
+    'image',
+    'element-bg-image',
+    `${elementPath}.elementStyle.backgroundImageAssetId`,
+    element.id,
+  );
   if (element.type === 'media') {
     pushReference(
       out,
@@ -197,6 +218,10 @@ export function collectReferencedAssetIds(source: AssetReferenceSource): Set<str
   return new Set(collectReferencedAssets(source).map((ref) => ref.assetId));
 }
 
+function isUnfilledAssetId(assetId: unknown): boolean {
+  return assetId === '' || assetId === PLACEHOLDER_ASSET_ID;
+}
+
 function collectUnfilledSectionReferences(
   section: CanvasSection,
   sectionPath: string,
@@ -204,14 +229,14 @@ function collectUnfilledSectionReferences(
 ): void {
   for (const [elementIdx, element] of section.elements.entries()) {
     if (element.type !== 'media') continue;
-    if (element.assetId === '') {
+    if (isUnfilledAssetId(element.assetId)) {
       out.push({
         role: 'asset',
         path: `${sectionPath}.elements[${String(elementIdx)}].assetId`,
         mediaElementId: element.id,
       });
     }
-    if (element.posterAssetId === '') {
+    if (isUnfilledAssetId(element.posterAssetId)) {
       out.push({
         role: 'poster',
         path: `${sectionPath}.elements[${String(elementIdx)}].posterAssetId`,
