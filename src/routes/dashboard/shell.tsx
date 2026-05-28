@@ -288,7 +288,7 @@ type Props = {
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Sites' },
   { href: '/dashboard/templates', label: 'Templates' },
-  { href: '/dashboard/shop', label: 'Shop' },
+  { href: '/dashboard/addons', label: 'Addons' },
   { href: '/dashboard/settings', label: 'Settings' },
 ];
 

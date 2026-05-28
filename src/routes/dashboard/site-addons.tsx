@@ -257,7 +257,7 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
             {!hasEntitlement ? (
               <p class="not-purchased">
                 You haven't acquired this addon yet.{' '}
-                <a href="/dashboard/shop">Visit the Shop</a> to get it.
+                <a href="/dashboard/addons">Visit Addons</a> to get it.
               </p>
             ) : (
               <>
