@@ -2008,6 +2008,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       rh.setAttribute("data-resize-dir", dirs[di]);
       wrapper.appendChild(rh);
     }
+    var dragHandle = document.createElement("button");
+    dragHandle.type = "button";
+    dragHandle.className = "element-drag-handle";
+    dragHandle.setAttribute("data-element-drag-handle", element.id);
+    dragHandle.setAttribute("aria-label", "Drag to move");
+    dragHandle.title = "Drag to move";
+    dragHandle.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+      '<circle cx="5.5" cy="4" r="1.2" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="4" r="1.2" fill="currentColor"/>' +
+      '<circle cx="5.5" cy="8" r="1.2" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="8" r="1.2" fill="currentColor"/>' +
+      '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="12" r="1.2" fill="currentColor"/>' +
+      '</svg>';
+    wrapper.appendChild(dragHandle);
     var trigger = document.createElement("button");
     trigger.type = "button";
     trigger.className = "element-menu-trigger";
@@ -6476,6 +6491,30 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     bar.className = "rev01-mark-toolbar";
     bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", "Inline formatting");
+    const dragBtn = document.createElement("button");
+    dragBtn.type = "button";
+    dragBtn.className = "rev01-mark-drag";
+    dragBtn.setAttribute("data-mark-drag", "true");
+    dragBtn.setAttribute("aria-label", "Drag to move");
+    dragBtn.title = "Drag to move";
+    dragBtn.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+      '<circle cx="5.5" cy="4" r="1.2" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="4" r="1.2" fill="currentColor"/>' +
+      '<circle cx="5.5" cy="8" r="1.2" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="8" r="1.2" fill="currentColor"/>' +
+      '<circle cx="5.5" cy="12" r="1.2" fill="currentColor"/>' +
+      '<circle cx="10.5" cy="12" r="1.2" fill="currentColor"/>' +
+      '</svg>';
+    // mousedown.preventDefault() keeps the contenteditable selection alive
+    // while we initiate the drag on the parent text element wrapper.
+    dragBtn.addEventListener("mousedown", function(ev) {
+      ev.preventDefault();
+      if (!editingElementId) return;
+      var wrapper = root.querySelector('[data-rev01-element="' + cssEscape(editingElementId) + '"]');
+      if (!wrapper) return;
+      beginDrag(ev, wrapper);
+    });
+    bar.appendChild(dragBtn);
     const labels = {
       bold: "B",
       italic: "I",
@@ -6864,6 +6903,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function attachPointerHandlers() {
     root.addEventListener("mousedown", (ev) => {
       if (interactionMode === "pan") return;
+      if (ev.target instanceof Element) {
+        // Drag handle on element wrapper — works for any element type,
+        // including text (which the default click flow blocks below).
+        const dh = ev.target.closest("[data-element-drag-handle]");
+        if (dh) {
+          const wrapper = dh.closest('.rev01-element');
+          const elementId = wrapper && wrapper.getAttribute('data-rev01-element');
+          if (wrapper && elementId) {
+            if (selectedElementId !== elementId) selectElement(elementId);
+            beginDrag(ev, wrapper);
+            ev.preventDefault();
+          }
+          return;
+        }
+      }
       if (ev.target instanceof Element && (ev.target.closest("[data-element-menu-trigger]") || ev.target.closest("[data-element-menu]"))) return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
