@@ -8,7 +8,8 @@ import {
   storageLimitForPlan,
 } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, site, ownerAsset } from '../../db/schema';
+import { customer, site, ownerAsset, type BillingPlan } from '../../db/schema';
+import { entitlementsFor, isUnlimited, PLAN_DISPLAY_NAMES } from '../../billing/plans';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
@@ -86,6 +87,15 @@ const settingsStyles = `
     color: var(--faint);
     margin: 0 0 20px;
   }
+
+  .plan-status {
+    min-height: 18px;
+    margin: -6px 0 14px;
+    font-size: 13px;
+    color: var(--faint);
+  }
+  .plan-status[data-tone="success"] { color: var(--accent); }
+  .plan-status[data-tone="error"] { color: #ff6b6b; }
 
   .plan-grid {
     display: grid;
@@ -303,10 +313,52 @@ const tabScript = raw(`<script>
       if (target) target.setAttribute('data-active', 'true');
     });
   });
+
+  var planButtons = document.querySelectorAll('[data-plan-id]');
+  var planStatus = document.getElementById('plan-status');
+  function setStatus(text, tone) {
+    if (!planStatus) return;
+    planStatus.textContent = text || '';
+    planStatus.setAttribute('data-tone', tone || '');
+  }
+  planButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var planId = btn.getAttribute('data-plan-id');
+      if (!planId || btn.disabled) return;
+      var originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+      setStatus('', '');
+      fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ plan: planId }),
+      }).then(function(res) {
+        return res.json().then(function(body) { return { ok: res.ok, body: body }; });
+      }).then(function(result) {
+        if (!result.ok) {
+          throw new Error(result.body && result.body.error ? result.body.error : 'Plan update failed');
+        }
+        setStatus('Plan updated. Reloading...', 'success');
+        window.location.reload();
+      }).catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = originalText;
+        setStatus(err && err.message ? err.message : 'Plan update failed', 'error');
+      });
+    });
+  });
 })();
 </script>`);
 
-const PLANS = [
+const PLANS: Array<{
+  id: BillingPlan;
+  name: string;
+  price: string;
+  period: string;
+  features: string[];
+}> = [
   {
     id: 'free',
     name: 'Free',
@@ -326,13 +378,7 @@ const PLANS = [
     name: 'Team',
     price: '$49',
     period: '/mo',
-    features: [
-      'Everything in Pro',
-      '5 team seats',
-      'Shared asset library',
-      'Priority support',
-      '50 GB storage',
-    ],
+    features: ['Everything in Pro', '5 team seats', 'Shared asset library', 'Priority support', '50 GB storage'],
   },
 ];
 
@@ -390,7 +436,8 @@ settingsRoute.get('/settings', async (c) => {
     .where(eq(customer.clerkUserId, user.id))
     .limit(1);
   const customerId = customerRow[0]?.id;
-  const customerPlan = customerRow[0]?.plan ?? 'free';
+  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
+  const currentPlan = PLANS.find((p) => p.id === currentPlanId) ?? PLANS[0]!;
 
   let siteCount = 0;
   let storageBytes = 0;
@@ -408,10 +455,12 @@ settingsRoute.get('/settings', async (c) => {
     storageBytes = Number(sb[0]?.total ?? 0);
   }
 
-  const currentPlanLabel = billingPlanLabel(customerPlan);
-  const currentInvoiceAmount = billingPlanInvoiceAmount(customerPlan);
-  const siteLimit = siteLimitForPlan(customerPlan);
-  const storageLimit = storageLimitForPlan(customerPlan);
+  const entitlements = entitlementsFor(currentPlanId);
+  const siteLimitLabel = isUnlimited(entitlements.siteLimit) ? 'Unlimited' : String(entitlements.siteLimit);
+  const storageLimitLabel = isUnlimited(entitlements.storageBytes) ? 'Unlimited' : formatBytes(entitlements.storageBytes);
+  const planName = PLAN_DISPLAY_NAMES[currentPlanId];
+  const sitesFillPct = isUnlimited(entitlements.siteLimit) ? 0 : Math.min(100, (siteCount / entitlements.siteLimit) * 100);
+  const storageFillPct = isUnlimited(entitlements.storageBytes) ? 0 : Math.min(100, (storageBytes / entitlements.storageBytes) * 100);
 
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
@@ -441,31 +490,32 @@ settingsRoute.get('/settings', async (c) => {
       <div class="settings-panel" id="tab-billing" data-active="true">
         <div class="settings-section">
           <h3>Plan</h3>
-          <p class="desc">
-            {customerPlan === 'free'
-              ? "You're on the Free plan. Upgrade to unlock more sites and custom domains."
-              : `You're on the ${currentPlanLabel} plan.`}
-          </p>
+          <p class="desc">You're on the {currentPlan.name} plan. {currentPlanId === 'team' ? 'You have access to every rev01 feature.' : 'Upgrade to unlock more sites and custom domains.'}</p>
+          <div id="plan-status" class="plan-status" role="status" aria-live="polite" />
           <div class="plan-grid">
-            {PLANS.map((plan) => (
-              <div class={`plan-card${plan.id === customerPlan ? ' plan-card--current' : ''}`}>
-                <p class="plan-name">{plan.name}</p>
-                <p class="plan-price">
-                  {plan.price}
-                  <span class="period">{plan.period}</span>
-                </p>
-                <ul class="plan-features">
-                  {plan.features.map((f) => (
-                    <li>{f}</li>
-                  ))}
-                </ul>
-                {plan.id !== customerPlan && (
-                  <Button variant="secondary" style="margin-top:16px;width:100%">
-                    Upgrade to {plan.name}
-                  </Button>
-                )}
-              </div>
-            ))}
+            {PLANS.map((plan) => {
+              const isCurrent = plan.id === currentPlanId;
+              return (
+                <div class={`plan-card${isCurrent ? ' plan-card--current' : ''}`} data-plan-card={plan.id}>
+                  <p class="plan-name">{plan.name}</p>
+                  <p class="plan-price">{plan.price}<span class="period">{plan.period}</span></p>
+                  <ul class="plan-features">
+                    {plan.features.map((f) => <li>{f}</li>)}
+                  </ul>
+                  {isCurrent ? (
+                    <Button variant="secondary" style="margin-top:16px;width:100%" disabled>
+                      Current plan
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" style="margin-top:16px;width:100%" data-plan-id={plan.id}>
+                      {PLANS.findIndex((p) => p.id === plan.id) < PLANS.findIndex((p) => p.id === currentPlanId)
+                        ? `Downgrade to ${plan.name}`
+                        : `Upgrade to ${plan.name}`}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -476,29 +526,17 @@ settingsRoute.get('/settings', async (c) => {
             <div class="usage-card">
               <div class="label">Sites</div>
               <div class="value">{String(siteCount)}</div>
-              <div class="of">
-                {siteLimit === null
-                  ? `Unlimited on ${currentPlanLabel}`
-                  : `of ${String(siteLimit)} on ${currentPlanLabel}`}
-              </div>
+              <div class="of">of {siteLimitLabel} on {planName}</div>
               <div class="usage-bar">
-                <div
-                  class="usage-bar-fill"
-                  style={`width:${siteLimit === null ? 100 : Math.min(100, (siteCount / siteLimit) * 100)}%`}
-                />
+                <div class="usage-bar-fill" style={`width:${sitesFillPct}%`} />
               </div>
             </div>
             <div class="usage-card">
               <div class="label">Storage</div>
               <div class="value">{formatBytes(storageBytes)}</div>
-              <div class="of">
-                of {formatBytes(storageLimit)} on {currentPlanLabel}
-              </div>
+              <div class="of">of {storageLimitLabel} on {planName}</div>
               <div class="usage-bar">
-                <div
-                  class="usage-bar-fill"
-                  style={`width:${Math.min(100, (storageBytes / storageLimit) * 100)}%`}
-                />
+                <div class="usage-bar-fill" style={`width:${storageFillPct}%`} />
               </div>
             </div>
           </div>

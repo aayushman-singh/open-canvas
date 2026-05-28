@@ -11,7 +11,8 @@ import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, customTemplate, site } from '../../db/schema';
+import { customer, customTemplate, site, type BillingPlan } from '../../db/schema';
+import { entitlementsFor, isUnlimited } from '../../billing/plans';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
@@ -413,8 +414,8 @@ templatesRoute.get('/', async (c) => {
       .from(customer)
       .where(eq(customer.clerkUserId, auth.userId))
       .limit(1);
-    const customerRecord = customerRow[0];
-    const customerId = customerRecord?.id;
+    const customerId = customerRow[0]?.id;
+    const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
 
     const whereClause = customerId
       ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
@@ -434,14 +435,13 @@ templatesRoute.get('/', async (c) => {
     customTemplates = rows;
 
     if (customerId) {
-      const customerPlan = customerRecord.plan;
-      const countRows = await database
-        .select({ count: sql<number>`count(*)::int` })
-        .from(site)
-        .where(eq(site.customerId, customerId));
-      const siteLimit = siteLimitForPlan(customerPlan);
-      if (siteLimit !== null && (countRows[0]?.count ?? 0) >= siteLimit) {
-        siteLimitErrorMessage = siteLimitError(customerPlan);
+      const { siteLimit } = entitlementsFor(currentPlanId);
+      if (!isUnlimited(siteLimit)) {
+        const countRows = await database
+          .select({ count: sql<number>`count(*)::int` })
+          .from(site)
+          .where(eq(site.customerId, customerId));
+        atSiteLimit = (countRows[0]?.count ?? 0) >= siteLimit;
       }
     }
   }

@@ -25,7 +25,8 @@ import { MOTION_PRESETS } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { isSiteLimitViolation, validateSubdomain } from './sites';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site, siteFont } from '../../db/schema';
+import { customer, ownerAsset, site, siteFont, type BillingPlan } from '../../db/schema';
+import { entitlementsFor, isUnlimited, siteLimitExceededMessage } from '../../billing/plans';
 import { fontContentHashToR2Key } from '../../fonts/upload';
 
 type Bindings = {
@@ -148,8 +149,8 @@ importRouter.post('/', async (c) => {
   if (!customerRecord) {
     return c.json({ error: 'no customer row for current user - visit /dashboard first' }, 409);
   }
-  const customerId = customerRecord.id;
-  const customerPlan = customerRecord.plan;
+  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
+  const { siteLimit } = entitlementsFor(currentPlanId);
 
   const existingSite = await database
     .select({ id: site.id })
@@ -160,14 +161,15 @@ importRouter.post('/', async (c) => {
     return c.json({ error: 'subdomain is already taken' }, 409);
   }
 
-  const siteCountRows = await database
-    .select({ value: count() })
-    .from(site)
-    .where(eq(site.customerId, customerId));
-  const siteCount = siteCountRows[0]?.value ?? 0;
-  const siteLimit = siteLimitForPlan(customerPlan);
-  if (siteLimit !== null && siteCount >= siteLimit) {
-    return c.json({ error: siteLimitError(customerPlan) }, 403);
+  if (!isUnlimited(siteLimit)) {
+    const siteCountRows = await database
+      .select({ value: count() })
+      .from(site)
+      .where(eq(site.customerId, customerId));
+    const siteCount = siteCountRows[0]?.value ?? 0;
+    if (siteCount >= siteLimit) {
+      return c.json({ error: siteLimitExceededMessage(currentPlanId) }, 403);
+    }
   }
 
   const scraperUrl = c.env.SCRAPER_URL;
@@ -273,7 +275,7 @@ importRouter.post('/', async (c) => {
       return c.json({ error: 'subdomain is already taken' }, 409);
     }
     if (isSiteLimitViolation(err)) {
-      return c.json({ error: siteLimitError(customerPlan) }, 403);
+      return c.json({ error: siteLimitExceededMessage(currentPlanId) }, 403);
     }
     throw err;
   }
@@ -796,5 +798,19 @@ function isUniqueViolation(err: unknown): boolean {
   if (e.code === '23505') return true;
   if (typeof e.message === 'string' && e.message.includes('duplicate key value')) return true;
   if (e.cause) return isUniqueViolation(e.cause);
+  return false;
+}
+
+function isSiteLimitViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: unknown; message?: unknown; cause?: unknown };
+  if (
+    e.code === '23514' &&
+    typeof e.message === 'string' &&
+    e.message.includes('site limit exceeded')
+  ) {
+    return true;
+  }
+  if (e.cause) return isSiteLimitViolation(e.cause);
   return false;
 }

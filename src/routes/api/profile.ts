@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { customer } from '../../db/schema';
+import { customer, BILLING_PLANS, type BillingPlan } from '../../db/schema';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 
@@ -30,6 +30,7 @@ profileApi.get('/', async (c) => {
       displayName: customer.displayName,
       bio: customer.bio,
       timezone: customer.timezone,
+      plan: customer.plan,
       createdAt: customer.createdAt,
     })
     .from(customer)
@@ -55,6 +56,7 @@ profileApi.patch('/', async (c) => {
     displayName?: string;
     bio?: string;
     timezone?: string;
+    plan?: string;
   }>();
 
   const updates: Record<string, unknown> = { updatedAt: sql`now()` };
@@ -78,6 +80,13 @@ profileApi.patch('/', async (c) => {
       return c.json({ error: 'timezone must be a string under 80 characters' }, 400);
     }
     updates.timezone = body.timezone || 'UTC';
+  }
+
+  if (body.plan !== undefined) {
+    if (!BILLING_PLANS.includes(body.plan as BillingPlan)) {
+      return c.json({ error: `plan must be one of: ${BILLING_PLANS.join(', ')}` }, 400);
+    }
+    updates.plan = body.plan;
   }
 
   const database = db(c.env);

@@ -9,7 +9,9 @@ import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSection, CanvasSiteState, MediaKind } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, customTemplate, ownerAsset, site } from '../../db/schema';
+import { customer, customTemplate, ownerAsset, site, type BillingPlan } from '../../db/schema';
+import { entitlementsFor, isUnlimited, siteLimitExceededMessage } from '../../billing/plans';
+import { canReadScopedLibraryRow } from './library-access';
 import { getTemplateSeed } from '../../templates/registry';
 import { canReadScopedLibraryRow } from './library-access';
 
@@ -131,7 +133,7 @@ export function isSiteLimitViolation(err: unknown): boolean {
   if (
     e.code === '23514' &&
     typeof e.message === 'string' &&
-    (e.message.includes('site limit exceeded') || e.message.includes('free site limit exceeded'))
+    e.message.includes('site limit exceeded')
   ) {
     return true;
   }
@@ -139,8 +141,8 @@ export function isSiteLimitViolation(err: unknown): boolean {
   return false;
 }
 
-function siteLimitResponse(c: Context<Env>, plan: string) {
-  const error = siteLimitError(plan);
+function siteLimitResponse(c: Context<Env>, plan: BillingPlan) {
+  const error = siteLimitExceededMessage(plan);
   if (wantsJson(c)) {
     return c.json({ error }, 403);
   }
@@ -343,17 +345,18 @@ sites.post('/', async (c) => {
       409,
     );
   }
-  const customerId = customerRecord.id;
-  const customerPlan = customerRecord.plan;
+  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
+  const { siteLimit } = entitlementsFor(currentPlanId);
 
-  const siteCountRows = await database
-    .select({ value: count() })
-    .from(site)
-    .where(eq(site.customerId, customerId));
-  const siteCount = siteCountRows[0]?.value ?? 0;
-  const siteLimit = siteLimitForPlan(customerPlan);
-  if (siteLimit !== null && siteCount >= siteLimit) {
-    return siteLimitResponse(c, customerPlan);
+  if (!isUnlimited(siteLimit)) {
+    const siteCountRows = await database
+      .select({ value: count() })
+      .from(site)
+      .where(eq(site.customerId, customerId));
+    const siteCount = siteCountRows[0]?.value ?? 0;
+    if (siteCount >= siteLimit) {
+      return siteLimitResponse(c, currentPlanId);
+    }
   }
 
   let editableState: CanvasSiteState;
@@ -475,7 +478,7 @@ sites.post('/', async (c) => {
     }
   } catch (err) {
     if (isSiteLimitViolation(err)) {
-      return siteLimitResponse(c, customerPlan);
+      return siteLimitResponse(c, currentPlanId);
     }
     if (isUniqueViolation(err)) {
       return c.json({ error: 'subdomain is already taken' }, 409);
