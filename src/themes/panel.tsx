@@ -694,7 +694,7 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
 // custom theme.
 // --------------------------------------------------------------------------
 
-const DARK_COLOR_TOKENS: ReadonlyArray<{ name: keyof StyleKitPreset; label: string }> = [
+const DARK_COLOR_TOKENS: ReadonlyArray<{ name: keyof Omit<StyleKitPreset, 'dark'>; label: string }> = [
   { name: 'bg', label: 'Background' },
   { name: 'panel', label: 'Panel' },
   { name: 'text', label: 'Text' },
