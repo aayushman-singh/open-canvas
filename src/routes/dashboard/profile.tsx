@@ -5,6 +5,7 @@ import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button } from '../../ui';
@@ -295,19 +296,8 @@ profileRoute.get('/profile', async (c) => {
     throw new Error('profile page reached without a resolved user');
   }
 
-  const primaryEmail = user.emailAddresses.find(
-    (addr) => addr.id === user.primaryEmailAddressId,
-  )?.emailAddress ?? '';
-
   const database = db(c.env);
-
-  await database
-    .insert(customer)
-    .values({ clerkUserId: user.id, email: primaryEmail })
-    .onConflictDoUpdate({
-      target: customer.clerkUserId,
-      set: { email: primaryEmail, updatedAt: sql`now()` },
-    });
+  const { email: primaryEmail } = await upsertCustomerFromClerk(database, user);
 
   const rows = await database
     .select({

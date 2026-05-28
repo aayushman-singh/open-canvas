@@ -11,6 +11,7 @@ import { db } from '../../db/client';
 import { customer, site, ownerAsset, type BillingPlan } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge } from '../../ui';
@@ -348,18 +349,8 @@ settingsRoute.get('/settings', async (c) => {
     throw new Error('settings page reached without a resolved user');
   }
 
-  const primaryEmail =
-    user.emailAddresses.find((addr) => addr.id === user.primaryEmailAddressId)?.emailAddress ?? '';
-
   const database = db(c.env);
-
-  await database
-    .insert(customer)
-    .values({ clerkUserId: user.id, email: primaryEmail })
-    .onConflictDoUpdate({
-      target: customer.clerkUserId,
-      set: { email: primaryEmail, updatedAt: sql`now()` },
-    });
+  const { email: primaryEmail } = await upsertCustomerFromClerk(database, user);
 
   const customerRow = await database
     .select({ id: customer.id, displayName: customer.displayName, plan: customer.plan })

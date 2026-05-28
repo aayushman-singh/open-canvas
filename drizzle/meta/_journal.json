@@ -64,6 +64,13 @@
       "when": 1780099260000,
       "tag": "0008_plan_aware_site_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780099320000,
+      "tag": "0009_lowercase_customer_emails",
+      "breakpoints": true
     }
   ]
 }

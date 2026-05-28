@@ -77,7 +77,10 @@ async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
     { siteId: ctx.siteId, collaboratorId: ctx.collaboratorId, invitedEmail: ctx.invitedEmail },
     ctx.signingSecret,
   );
-  const acceptUrl = `https://${ctx.siteSubdomain}.rev01.aayushman.dev/__accept-invite?token=${encodeURIComponent(inviteToken)}`;
+  // Main-domain landing instead of the published subdomain so a later
+  // subdomain rename doesn't break this link. The redirector resolves
+  // siteId -> current subdomain at click time.
+  const acceptUrl = `https://rev01.aayushman.dev/__invite?token=${encodeURIComponent(inviteToken)}`;
   await sendEmail(ctx.resendApiKey, {
     to: ctx.invitedEmail,
     subject: inviteEmailSubject(ctx.siteName),
@@ -96,6 +99,36 @@ function resolveInviterName(c: Context<Env>, fallbackEmail: string): string {
   if (!ownerUser) return 'A rev01 user';
   const named = `${ownerUser.firstName ?? ''} ${ownerUser.lastName ?? ''}`.trim();
   return named || fallbackEmail;
+}
+
+// Local lookup first (cheap), then Clerk Backend API fallback (covers
+// secondary emails that Clerk knows about but we haven't denormalized).
+// Returns null only when neither source can resolve a customer row — the
+// invitee really doesn't have a rev01 account.
+async function findCustomerByEmail(
+  c: Context<Env>,
+  email: string,
+): Promise<string | null> {
+  const database = db(c.env);
+  const local = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.email, email))
+    .limit(1);
+  if (local[0]) return local[0].id;
+
+  const clerk = c.get('clerk');
+  if (!clerk) return null;
+  const clerkResult = await clerk.users.getUserList({ emailAddress: [email] });
+  const clerkUser = clerkResult.data?.[0];
+  if (!clerkUser) return null;
+
+  const byClerkId = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.clerkUserId, clerkUser.id))
+    .limit(1);
+  return byClerkId[0]?.id ?? null;
 }
 
 collaboratorsApi.get('/sites/:siteId/collaborators', async (c) => {
@@ -140,13 +173,8 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
 
   const database = db(c.env);
 
-  const targetRows = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.email, rawEmail))
-    .limit(1);
-
-  if (!targetRows[0]) {
+  const targetCustomerId = await findCustomerByEmail(c, rawEmail);
+  if (!targetCustomerId) {
     return c.json(
       {
         error: 'no rev01 account found for this email — they need to sign up first',
@@ -154,7 +182,6 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
       404,
     );
   }
-  const targetCustomerId = targetRows[0].id;
 
   if (targetCustomerId === owner.customerId) {
     return c.json({ error: 'you cannot invite yourself' }, 400);

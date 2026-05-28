@@ -60,6 +60,7 @@ import { verifyEditToken } from './auth/edit-token';
 import { db } from './db/client';
 import onSiteEditRoute from './routes/api/on-site-edit';
 import collaboratorsApi from './routes/api/collaborators';
+import inviteRedirectRoute from './auth/invite-redirect-route';
 import { hasLiveEditorSocketAccess } from './live/editor-auth';
 
 const app = new Hono<PublicEnv>();
@@ -132,6 +133,12 @@ app.get('/__live', async (c) => {
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
 
 app.route('/sign-out', signOutRoute);
+
+// Stable invite landing page (#7): collaborator emails point at the main
+// domain instead of a specific subdomain, so renames don't break links.
+// Looks up the current subdomain at click time and 302s to the published
+// subdomain's /__accept-invite handler with the same token.
+app.route('/__invite', inviteRedirectRoute);
 
 app.get('/favicon.ico', (c) => {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0d1117"/><text x="4" y="24" font-family="monospace" font-size="22" font-weight="700" fill="#22d3ee">r1</text></svg>`;

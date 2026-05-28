@@ -29,6 +29,7 @@ import {
   EDIT_TOKEN_MAX_AGE,
 } from '../auth/edit-token';
 import { verifyInviteToken } from '../auth/invite-token';
+import { buildInviteErrorResponse } from '../auth/invite-error-page';
 import { editorPageJsx, type EditorPageOptions } from '../editor/canvas-index';
 import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
@@ -469,43 +470,6 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   return c.html(editorPageJsx(opts));
 }
 
-type InviteErrorKind = 'expired' | 'invalid' | 'cancelled';
-
-function renderInviteErrorPage<P extends string, I extends Input>(
-  c: Context<PublicEnv, P, I>,
-  kind: InviteErrorKind,
-): Response {
-  const copy: Record<InviteErrorKind, { title: string; body: string; status: 400 | 404 | 410 }> = {
-    expired: {
-      title: 'Invitation expired',
-      body: 'This invitation link has expired. Ask the site owner to send a new one.',
-      status: 410,
-    },
-    invalid: {
-      title: 'Invalid invitation link',
-      body: 'This invitation link could not be verified. Check the URL or ask the site owner to resend.',
-      status: 400,
-    },
-    cancelled: {
-      title: 'Invitation no longer available',
-      body: 'The site owner has cancelled or removed this invitation.',
-      status: 410,
-    },
-  };
-  const { title, body, status } = copy[kind];
-  return c.html(
-    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-    <title>rev01 — ${title}</title>
-    <style>body{margin:0;display:flex;align-items:center;justify-content:center;
-    min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
-    .wrap{text-align:center;max-width:400px;padding:32px;}
-    h1{font-size:20px;margin:0 0 12px;}
-    p{font-size:14px;opacity:0.7;line-height:1.5;margin:0;}</style></head>
-    <body><div class="wrap"><h1>${title}</h1><p>${body}</p></div></body></html>`,
-    status,
-  );
-}
-
 async function handleAcceptInvite<P extends string, I extends Input>(
   c: Context<PublicEnv, P, I>,
   siteRow: PublicSiteRow,
@@ -515,10 +479,10 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   const result = await verifyInviteToken(token, c.env.UNLOCK_SIGNING_SECRET);
 
   if (!result.ok) {
-    return renderInviteErrorPage(c, result.reason);
+    return buildInviteErrorResponse(result.reason);
   }
   if (result.payload.siteId !== siteRow.id) {
-    return renderInviteErrorPage(c, 'invalid');
+    return buildInviteErrorResponse('invalid');
   }
 
   const database = db(c.env);
@@ -541,7 +505,7 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     });
 
   if (!updated[0]) {
-    return renderInviteErrorPage(c, 'cancelled');
+    return buildInviteErrorResponse('cancelled');
   }
 
   const collabCustomer = await database

@@ -6,6 +6,7 @@ import { db } from '../../db/client';
 import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth, resolveClerkKeys } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge, Pill } from '../../ui';
@@ -1106,29 +1107,8 @@ dashboard.get('/', async (c) => {
     throw new Error('dashboard reached without a resolved user');
   }
 
-  const primaryEmail = user.emailAddresses.find(
-    (addr) => addr.id === user.primaryEmailAddressId,
-  )?.emailAddress;
-
-  if (!primaryEmail) {
-    throw new Error(`clerk user ${user.id} has no primary email address`);
-  }
-
   const database = db(c.env);
-
-  await database
-    .insert(customer)
-    .values({
-      clerkUserId: user.id,
-      email: primaryEmail,
-    })
-    .onConflictDoUpdate({
-      target: customer.clerkUserId,
-      set: {
-        email: primaryEmail,
-        updatedAt: sql`now()`,
-      },
-    });
+  const { email: primaryEmail } = await upsertCustomerFromClerk(database, user);
 
   const customerRow = await database
     .select({ id: customer.id, displayName: customer.displayName, plan: customer.plan })
