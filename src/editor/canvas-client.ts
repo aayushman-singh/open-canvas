@@ -6272,7 +6272,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     sel.removeAllRanges();
     var next = document.createRange();
-    next.selectNode(el);
+    // selectNodeContents (not selectNode) so the range lives INSIDE the wrapper:
+    // a follow-up click on the same toolbar button can detect the wrapper via
+    // findAncestor(commonAncestorContainer) and unwrap it. selectNode places the
+    // range around the element, making its parent the commonAncestor and the
+    // toggle-off path unreachable until the user reselects.
+    next.selectNodeContents(el);
     sel.addRange(next);
   }
 
