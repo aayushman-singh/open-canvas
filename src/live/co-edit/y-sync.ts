@@ -65,7 +65,7 @@ export function handleSyncStep1(doc: Y.Doc, remoteStateVector: Uint8Array): Uint
  * No return value — the caller proceeds to await further `y-update` frames.
  */
 export function handleSyncStep2(doc: Y.Doc, updateBytes: Uint8Array): void {
-  Y.applyUpdate(doc, updateBytes, Y_SYNC_REMOTE_ORIGIN);
+  applyWithDiagnostics(doc, updateBytes, 'y-sync-step2');
 }
 
 /**
@@ -74,7 +74,60 @@ export function handleSyncStep2(doc: Y.Doc, updateBytes: Uint8Array): void {
  * this update back to the socket it came from.
  */
 export function handleYUpdate(doc: Y.Doc, updateBytes: Uint8Array): void {
-  Y.applyUpdate(doc, updateBytes, Y_SYNC_REMOTE_ORIGIN);
+  applyWithDiagnostics(doc, updateBytes, 'y-update');
+}
+
+/**
+ * Apply an inbound Yjs update with diagnostic logging on failure. The error
+ * (e.g. "Unexpected content type in Yjs _integrate", reported as N2 in the
+ * Run-2 DFS controls inventory) still propagates so the caller's catch
+ * pathway is unchanged — but the log capture lets us replay the failing
+ * bytes against a fresh doc offline to locate the bug.
+ *
+ * Captured fields:
+ *  - kind: which envelope path failed (y-sync-step2 vs y-update)
+ *  - bytesLength + bytesBase64: the exact payload that triggered the throw
+ *  - docStateVectorBase64: receiver's SV at fail time, so the encoder side
+ *    can be replayed with the same delta
+ *  - clientID + clock: receiver's local clientID/clock, useful when LWW
+ *    asymmetry is the suspected cause
+ */
+function applyWithDiagnostics(doc: Y.Doc, updateBytes: Uint8Array, kind: string): void {
+  try {
+    Y.applyUpdate(doc, updateBytes, Y_SYNC_REMOTE_ORIGIN);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    let stateVectorBase64 = '';
+    try {
+      stateVectorBase64 = bytesToBase64(Y.encodeStateVector(doc));
+    } catch {
+      stateVectorBase64 = '<encodeStateVector also threw>';
+    }
+    console.error('[y-sync] applyUpdate failed — capturing payload for offline replay', {
+      kind,
+      message,
+      bytesLength: updateBytes.length,
+      bytesBase64: bytesToBase64(updateBytes),
+      docStateVectorBase64: stateVectorBase64,
+      clientID: doc.clientID,
+    });
+    throw err;
+  }
+}
+
+/**
+ * Inline base64 encoder for diagnostic logging. Mirrors site-room-protocol's
+ * encodeBytesField but kept local so y-sync stays free of cross-module
+ * imports — the only consumer is the catch path above.
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }
 
 /**

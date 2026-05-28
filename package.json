@@ -30,6 +30,7 @@
     "canvas:smoke": "bun run src/canvas/smoke.ts",
     "canvas-agent:smoke": "bun run src/agent/canvas-agent-smoke.ts",
     "yjs-projection:smoke": "bun run src/canvas/yjs-projection.smoke.ts",
+    "applylocalstate-repro:smoke": "bun run src/canvas/applylocalstate-repro.smoke.ts",
     "section-import:smoke": "bun run src/canvas/section-import-smoke.ts",
     "import:smoke": "bun run src/routes/api/import-smoke.ts",
     "assets:smoke": "bun run src/assets/smoke.ts",
