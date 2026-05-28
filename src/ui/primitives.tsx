@@ -82,11 +82,13 @@ export function Card({
   id,
   class: userClass,
   style,
+  id,
   children,
 }: {
   id?: string;
   class?: string;
   style?: string;
+  id?: string;
   children?: Child;
 }) {
   return (
@@ -94,6 +96,7 @@ export function Card({
       {...(id ? { id } : {})}
       class={classes('rev01-ui-card', userClass)}
       {...(style ? { style } : {})}
+      {...(id ? { id } : {})}
     >
       {children}
     </section>

@@ -4120,6 +4120,29 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
     group7.appendChild(maxWInput);
     inspector.appendChild(group7);
+
+    // -- Divider ----------------------------------------------------------
+    var divider3 = document.createElement("div");
+    divider3.className = "rev01-page-inspector-divider";
+    inspector.appendChild(divider3);
+
+    // -- SEO & metadata link ---------------------------------------------
+    // Opens the dashboard SEO panel for this page in a new tab so the user
+    // doesn't lose their editor scroll position.
+    var seoGroup = document.createElement("div");
+    seoGroup.className = "rev01-page-inspector-group";
+    var seoLabel = document.createElement("h4");
+    seoLabel.textContent = "SEO & metadata";
+    seoGroup.appendChild(seoLabel);
+    var seoLink = document.createElement("a");
+    seoLink.href = "/dashboard/sites/" + encodeURIComponent(SITE_ID) + "/pages/" + encodeURIComponent(page.id) + "/seo";
+    seoLink.target = "_blank";
+    seoLink.rel = "noopener";
+    seoLink.className = "rev01-page-inspector-link";
+    seoLink.textContent = "Open SEO panel →";
+    seoLink.title = "Edit title, description, share-card image and search settings";
+    seoGroup.appendChild(seoLink);
+    inspector.appendChild(seoGroup);
   }
 
   // Live-apply page-level visual properties on the artboard.

@@ -375,6 +375,9 @@ publishApi.post('/sites/:siteId', async (c) => {
     ...(row.editableState.darkModeEnabled !== undefined
       ? { darkModeEnabled: row.editableState.darkModeEnabled }
       : {}),
+    ...(row.editableState.faviconAssetId !== undefined
+      ? { faviconAssetId: row.editableState.faviconAssetId }
+      : {}),
   };
 
   const snapshotValidation = validatePublishedSnapshot(snapshot);

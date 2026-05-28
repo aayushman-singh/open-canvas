@@ -282,6 +282,147 @@ const pageStyles = `
     color: #fda4a4;
     border-color: rgba(248, 113, 113, 0.55);
   }
+
+  /* --- Favicon picker --------------------------------------------------- */
+  .favicon-picker {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+  }
+  .favicon-picker .fv-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px dashed rgba(255,255,255,0.12);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--faint);
+    font-size: 11px;
+  }
+  .favicon-picker .fv-thumb[data-has-image="true"] {
+    border-style: solid;
+    border-color: rgba(255,255,255,0.18);
+    background-color: #fff;
+  }
+  .favicon-picker .fv-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .favicon-picker .fv-label { font-size: 14px; color: var(--text); font-weight: 500; }
+  .favicon-picker .fv-state { font-size: 12.5px; color: var(--muted); }
+  .favicon-picker .fv-actions { display: flex; gap: 8px; }
+  .favicon-picker button {
+    background: rgba(125, 211, 252, 0.10);
+    border: 1px solid rgba(125, 211, 252, 0.30);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .favicon-picker button.clear {
+    background: transparent;
+    border-color: rgba(252,165,165,0.30);
+    color: #fca5a5;
+  }
+  .favicon-picker button:disabled { opacity: 0.55; cursor: wait; }
+
+  /* --- Picker modal (shared structure with page-settings) --------------- */
+  .picker-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 8, 16, 0.78);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+  }
+  .picker-modal[data-open="true"] { display: flex; }
+  .picker-sheet {
+    width: min(900px, 100%);
+    max-height: 86vh;
+    background: #0c1220;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+  }
+  .picker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--line);
+  }
+  .picker-head h3 { margin: 0; font-size: 16px; color: var(--text); }
+  .picker-actions { display: flex; gap: 8px; align-items: center; }
+  .picker-actions button, .picker-actions label {
+    background: rgba(125,211,252,0.10);
+    border: 1px solid rgba(125,211,252,0.30);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .picker-actions .close {
+    background: transparent;
+    border-color: var(--line);
+    color: var(--muted);
+  }
+  .picker-body { padding: 16px 20px; overflow: auto; flex: 1; }
+  .picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  .picker-tile {
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background-size: cover;
+    background-position: center;
+    background-color: rgba(255,255,255,0.04);
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .picker-tile:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .picker-tile .alt {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 6px 8px;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.7));
+    color: #fff;
+    font-size: 11px;
+    border-radius: 0 0 7px 7px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .picker-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .picker-status {
+    padding: 8px 20px;
+    color: var(--muted);
+    font-size: 12.5px;
+    border-top: 1px solid var(--line);
+    min-height: 16px;
+  }
+  .picker-status.error { color: #fca5a5; }
 `;
 
 interface OwnedSite {
@@ -294,6 +435,7 @@ interface OwnedSite {
   publishedVersion: number;
   siteNoIndex: boolean;
   darkModeEnabled: boolean;
+  faviconAssetId: string | null;
 }
 
 async function lookupOwnedSite(
@@ -336,6 +478,7 @@ async function lookupOwnedSite(
     publishedVersion: row.publishedVersion,
     siteNoIndex: row.editableState.siteNoIndex ?? false,
     darkModeEnabled: row.editableState.darkModeEnabled ?? false,
+    faviconAssetId: row.editableState.faviconAssetId ?? null,
   };
 }
 
@@ -500,6 +643,140 @@ function clientScript(siteId: string): string {
       } catch (e) {
         if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
         btn.disabled = false;
+      }
+    });
+  }
+})();
+
+// Favicon picker — loads owner-scoped assets into a modal, lets the user pick
+// or upload one, and persists the choice via PATCH /config { faviconAssetId }.
+// Same pattern as the per-page OG picker in dashboard/page-settings.tsx; kept
+// inline here so site-settings remains a single-file route.
+(() => {
+  const SITE_ID = ${sid};
+  const picker = document.querySelector('[data-asset-picker="favicon"]');
+  if (!picker) return;
+  const modal = document.querySelector('[data-picker-modal]');
+  const modalGrid = document.querySelector('[data-picker-grid]');
+  const modalEmpty = document.querySelector('[data-picker-empty]');
+  const modalStatus = document.querySelector('[data-picker-status]');
+  const modalClose = document.querySelector('[data-picker-close]');
+  const modalUpload = document.querySelector('[data-picker-upload]');
+  const okMsg = document.querySelector('[data-favicon-status]');
+  const errMsg = document.querySelector('[data-favicon-err]');
+  function setStatus(msg, isError) {
+    if (!modalStatus) return;
+    modalStatus.textContent = msg || '';
+    modalStatus.classList.toggle('error', !!isError);
+  }
+  function showOk(msg) { if (okMsg) okMsg.textContent = msg; if (errMsg) errMsg.textContent = ''; }
+  function showErr(msg) { if (errMsg) errMsg.textContent = msg; if (okMsg) okMsg.textContent = ''; }
+  async function loadAssets() {
+    setStatus('Loading…', false);
+    try {
+      const r = await fetch('/api/owner/assets', { headers: { accept: 'application/json' } });
+      if (!r.ok) { setStatus('Could not load assets (' + r.status + ')', true); return; }
+      const body = await r.json();
+      const assets = Array.isArray(body.assets) ? body.assets : [];
+      const images = assets.filter((a) => (a.kind === 'image') || (typeof a.mediaType === 'string' && a.mediaType.startsWith('image/')));
+      if (!modalGrid || !modalEmpty) return;
+      modalGrid.innerHTML = '';
+      if (images.length === 0) { modalEmpty.hidden = false; setStatus('', false); return; }
+      modalEmpty.hidden = true;
+      for (const a of images) {
+        const tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'picker-tile';
+        tile.style.backgroundImage = 'url(/assets/' + encodeURIComponent(a.id) + ')';
+        tile.title = a.alt || a.id;
+        tile.addEventListener('click', () => commit(a.id));
+        modalGrid.appendChild(tile);
+      }
+      setStatus(images.length + ' image' + (images.length === 1 ? '' : 's') + ' available', false);
+    } catch (e) {
+      setStatus('Network error: ' + (e && e.message ? e.message : String(e)), true);
+    }
+  }
+  async function commit(assetIdOrNull) {
+    showOk('Saving…');
+    try {
+      const r = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/config', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify({ faviconAssetId: assetIdOrNull }),
+      });
+      if (!r.ok) {
+        let detail = r.statusText;
+        try { const b = await r.json(); if (b && b.error) detail = b.error; } catch (_) {}
+        showErr('Could not save: ' + detail);
+        return;
+      }
+      const thumb = picker.querySelector('[data-picker-thumb]');
+      const meta = picker.querySelector('[data-picker-meta]');
+      const clearBtn = picker.querySelector('[data-picker-clear]');
+      const chooseBtn = picker.querySelector('[data-picker-choose]');
+      picker.setAttribute('data-asset-id', assetIdOrNull || '');
+      if (thumb) {
+        if (assetIdOrNull) {
+          thumb.style.backgroundImage = 'url(/assets/' + encodeURIComponent(assetIdOrNull) + ')';
+          thumb.setAttribute('data-has-image', 'true');
+          thumb.textContent = '';
+        } else {
+          thumb.style.backgroundImage = '';
+          thumb.setAttribute('data-has-image', 'false');
+          thumb.textContent = 'none';
+        }
+      }
+      if (meta) {
+        meta.textContent = assetIdOrNull
+          ? 'Set — emitted as <link rel="icon"> on every page.'
+          : 'Not set — browsers will show the default tab icon.';
+      }
+      if (clearBtn) clearBtn.hidden = !assetIdOrNull;
+      if (chooseBtn) chooseBtn.textContent = assetIdOrNull ? 'Change' : 'Choose image';
+      showOk('Saved.');
+      if (modal) modal.removeAttribute('data-open');
+    } catch (e) {
+      showErr('Network error: ' + (e && e.message ? e.message : String(e)));
+    }
+  }
+  const chooseBtn = picker.querySelector('[data-picker-choose]');
+  const clearBtn = picker.querySelector('[data-picker-clear]');
+  if (chooseBtn) chooseBtn.addEventListener('click', () => {
+    if (modal) modal.setAttribute('data-open', 'true');
+    loadAssets();
+  });
+  if (clearBtn) clearBtn.addEventListener('click', () => commit(null));
+  if (modalClose) modalClose.addEventListener('click', () => modal && modal.removeAttribute('data-open'));
+  if (modal) modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.removeAttribute('data-open'); });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && modal && modal.getAttribute('data-open') === 'true') {
+      modal.removeAttribute('data-open');
+    }
+  });
+  if (modalUpload) {
+    modalUpload.addEventListener('change', async () => {
+      const file = modalUpload.files && modalUpload.files[0];
+      if (!file) return;
+      setStatus('Uploading ' + file.name + '…', false);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('siteId', SITE_ID);
+      try {
+        const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
+        if (!r.ok) {
+          let detail = r.statusText;
+          try { const b = await r.json(); if (b && b.error) detail = b.error; } catch (_) {}
+          setStatus('Upload failed: ' + detail, true);
+          modalUpload.value = '';
+          return;
+        }
+        const body = await r.json();
+        modalUpload.value = '';
+        if (body && body.id) await commit(body.id);
+      } catch (e) {
+        setStatus('Network error: ' + (e && e.message ? e.message : String(e)), true);
+        modalUpload.value = '';
       }
     });
   }
@@ -696,6 +973,55 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         <p class="hint">Takes effect at the next publish — emits <code>&lt;meta name="robots"&gt;</code> across every page.</p>
       </Card>
 
+      <Card id="favicon">
+        <h2>Favicon</h2>
+        <p class="sub">
+          The small icon shown in browser tabs, bookmarks, and Google search results. PNG or SVG
+          works well — square images render best (32×32 or 192×192 are the common sizes browsers
+          ask for).
+        </p>
+        <div
+          class="favicon-picker"
+          data-asset-picker="favicon"
+          data-asset-id={owned.faviconAssetId ?? ''}
+        >
+          <div
+            class="fv-thumb"
+            data-picker-thumb
+            data-has-image={owned.faviconAssetId ? 'true' : 'false'}
+            style={owned.faviconAssetId ? `background-image:url(/assets/${encodeURIComponent(owned.faviconAssetId)})` : ''}
+          >
+            {owned.faviconAssetId ? '' : 'none'}
+          </div>
+          <div class="fv-meta">
+            <span class="fv-label">Site favicon</span>
+            <span class="fv-state" data-picker-meta>
+              {owned.faviconAssetId
+                ? 'Set — emitted as <link rel="icon"> on every page.'
+                : 'Not set — browsers will show the default tab icon.'}
+            </span>
+          </div>
+          <div class="fv-actions">
+            <button type="button" data-picker-choose>
+              {owned.faviconAssetId ? 'Change' : 'Choose image'}
+            </button>
+            <button
+              type="button"
+              class="clear"
+              data-picker-clear
+              hidden={!owned.faviconAssetId}
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+        <p class="hint">
+          Takes effect at the next publish.{' '}
+          <span class="ok" data-favicon-status role="status" aria-live="polite"></span>
+          <span class="err" data-favicon-err role="alert" aria-live="polite"></span>
+        </p>
+      </Card>
+
       <Card id="dark-mode">
         <h2>Visitor dark mode</h2>
         <p class="sub">
@@ -763,6 +1089,34 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           ))}
         </ul>
       </Card>
+
+      {/* Shared asset picker modal (favicon + any future picker on this page). */}
+      <div class="picker-modal" data-picker-modal>
+        <div class="picker-sheet" role="dialog" aria-label="Choose image">
+          <div class="picker-head">
+            <h3>Choose an image</h3>
+            <div class="picker-actions">
+              <label>
+                Upload new
+                <input
+                  type="file"
+                  data-picker-upload
+                  accept="image/*"
+                  style="display:none"
+                />
+              </label>
+              <button type="button" class="close" data-picker-close>Close</button>
+            </div>
+          </div>
+          <div class="picker-body">
+            <div class="picker-grid" data-picker-grid></div>
+            <div class="picker-empty" data-picker-empty hidden>
+              No images yet. Click "Upload new" to add one.
+            </div>
+          </div>
+          <p class="picker-status" data-picker-status></p>
+        </div>
+      </div>
 
       <script type="module">{raw(clientScript(siteId))}</script>
     </DashboardShell>,

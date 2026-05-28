@@ -437,6 +437,12 @@ export interface CanvasSiteState {
    * blocks plus the inline mode-setter script. Owner-controlled per site.
    */
   darkModeEnabled?: boolean;
+  /**
+   * Owner-selected favicon asset (ownerAsset.id). Emitted as `<link rel="icon">`
+   * across every page. The same `/assets/<id>` URL the publish route uses for
+   * any other asset reference — no special handling.
+   */
+  faviconAssetId?: string;
 }
 
 export interface PublishedSnapshot {
@@ -458,6 +464,8 @@ export interface PublishedSnapshot {
   siteNoIndex?: boolean;
   /** Mirror of `CanvasSiteState.darkModeEnabled`; used by visitor-mode CSS emission. */
   darkModeEnabled?: boolean;
+  /** Mirror of `CanvasSiteState.faviconAssetId`; emitted as `<link rel="icon">`. */
+  faviconAssetId?: string;
 }
 
 // -- Style Kit token contract (Task 8) -------------------------------------

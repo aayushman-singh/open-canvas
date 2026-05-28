@@ -179,6 +179,16 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
     lines.push(`<meta name="robots" content="noindex,nofollow">`);
   }
 
+  // -- Favicon (site-level) ------------------------------------------------
+  // The asset route accepts either the ownerAsset.id or the content hash; we
+  // use the id so the Owner can swap the underlying file without re-publishing.
+  const faviconAssetId = ctx.snapshot.faviconAssetId;
+  if (typeof faviconAssetId === 'string' && faviconAssetId.length > 0) {
+    lines.push(
+      `<link rel="icon" href="/assets/${escapeAttr(encodeURIComponent(faviconAssetId))}">`,
+    );
+  }
+
   // -- OG image (shared between og:image and twitter:image) ----------------
   const ogCtx: OgResolveContext = {
     siteId: ctx.siteId,

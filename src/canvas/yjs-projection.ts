@@ -25,6 +25,7 @@
 //   'defaultLocale'?   -> string
 //   'siteNoIndex'?     -> boolean
 //   'darkModeEnabled'? -> boolean
+//   'faviconAssetId'?  -> string
 //   'symbols'          -> Y.Array<Y.Map<unknown>>    (SymbolMaster[])
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
 //
@@ -785,6 +786,7 @@ export function encodeYDoc(state: CanvasSiteState): Y.Doc {
     setIfDefined(root, 'defaultLocale', state.defaultLocale);
     setIfDefined(root, 'siteNoIndex', state.siteNoIndex);
     setIfDefined(root, 'darkModeEnabled', state.darkModeEnabled);
+    setIfDefined(root, 'faviconAssetId', state.faviconAssetId);
 
     const symbols = new Y.Array<Y.Map<unknown>>();
     for (const symbol of state.symbols) symbols.push([encodeSymbolMaster(symbol)]);
@@ -1344,6 +1346,9 @@ export function decodeYDoc(doc: Y.Doc): CanvasSiteState {
   if (root.has('siteNoIndex')) state.siteNoIndex = root.get('siteNoIndex') as boolean;
   if (root.has('darkModeEnabled')) {
     state.darkModeEnabled = root.get('darkModeEnabled') as boolean;
+  }
+  if (root.has('faviconAssetId')) {
+    state.faviconAssetId = root.get('faviconAssetId') as string;
   }
   if (root.has('header')) {
     state.header = decodeSection(root.get('header') as Y.Map<unknown>);

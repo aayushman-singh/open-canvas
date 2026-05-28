@@ -1761,6 +1761,23 @@ body[data-placement-active="true"] .rev01-section-slot {
   background: var(--rev01-hairline);
   margin: 4px 14px;
 }
+.rev01-page-inspector-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--rev01-fg);
+  font-size: 12px;
+  text-decoration: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.rev01-page-inspector-link:hover {
+  border-color: var(--rev01-accent);
+  background: var(--rev01-bg-hover);
+}
 
 /* Modal overlay — replaces window.prompt() for the link/AI dialogs. Single
    modal stack only; the JS throws if two are opened at once. Visual

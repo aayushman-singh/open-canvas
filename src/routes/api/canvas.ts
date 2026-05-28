@@ -285,6 +285,21 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
     }
     next.darkModeEnabled = body.darkModeEnabled;
   }
+  if ('faviconAssetId' in body) {
+    const raw = body.faviconAssetId;
+    if (raw === null || (typeof raw === 'string' && raw.trim().length === 0)) {
+      delete next.faviconAssetId;
+    } else if (typeof raw === 'string') {
+      const assetId = raw.trim();
+      const exists = await assetExistsForCustomer(c.env, assetId, result.ownerCustomerId);
+      if (!exists) {
+        return c.json({ error: 'faviconAssetId does not match an asset you own' }, 400);
+      }
+      next.faviconAssetId = assetId;
+    } else {
+      return c.json({ error: 'faviconAssetId must be a string or null' }, 400);
+    }
+  }
 
   const database = db(c.env);
   await database
@@ -299,8 +314,23 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
     ok: true,
     siteNoIndex: next.siteNoIndex ?? false,
     darkModeEnabled: next.darkModeEnabled ?? false,
+    faviconAssetId: next.faviconAssetId ?? null,
   });
 });
+
+async function assetExistsForCustomer(
+  env: Bindings,
+  assetId: string,
+  customerId: string,
+): Promise<boolean> {
+  const database = db(env);
+  const rows = await database
+    .select({ id: ownerAsset.id })
+    .from(ownerAsset)
+    .where(and(eq(ownerAsset.id, assetId), eq(ownerAsset.customerId, customerId)))
+    .limit(1);
+  return rows.length > 0;
+}
 
 canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const siteId = c.req.param('siteId');
@@ -323,6 +353,16 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
   if ('error' in description) return c.json({ error: description.error }, 400);
   const ogImageAssetId = optionalStringPatch(body, 'ogImageAssetId');
   if ('error' in ogImageAssetId) return c.json({ error: ogImageAssetId.error }, 400);
+  if (ogImageAssetId.present && ogImageAssetId.value !== undefined) {
+    const exists = await assetExistsForCustomer(
+      c.env,
+      ogImageAssetId.value,
+      result.ownerCustomerId,
+    );
+    if (!exists) {
+      return c.json({ error: 'ogImageAssetId does not match an asset you own' }, 400);
+    }
+  }
   const canonical = optionalStringPatch(body, 'canonical');
   if ('error' in canonical) return c.json({ error: canonical.error }, 400);
   const locale = optionalStringPatch(body, 'locale');
