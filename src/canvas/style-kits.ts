@@ -22,11 +22,19 @@ import type {
   ActionVariant,
   ActionVariantTokens,
   BuiltInStyleKit,
+  MotionPreset,
+  MotionPresetTokens,
   StyleKitPreset,
   SurfaceVariant,
   SurfaceVariantTokens,
 } from './schema.js';
-import { ACTION_VARIANTS, BUILT_IN_STYLE_KITS, STYLE_KITS, SURFACE_VARIANTS } from './schema.js';
+import {
+  ACTION_VARIANTS,
+  BUILT_IN_STYLE_KITS,
+  MOTION_PRESETS,
+  STYLE_KITS,
+  SURFACE_VARIANTS,
+} from './schema.js';
 
 // --------------------------------------------------------------------------
 // The four kits.
@@ -434,10 +442,9 @@ const GREEN_ORGANIC: StyleKitPreset = {
 };
 
 // `satisfies` enforces that the literal is a valid `Record<BuiltInStyleKit, ...>`
-// AND lets the four field shapes stay precise. `'custom'` (Phase 0 scaffold
-// for Wave 2 #10) is NOT a key here — it resolves at render time from
-// `EditableSite.customStyleKit` instead.
-export const STYLE_KIT_PRESETS: Record<BuiltInStyleKit, StyleKitPreset> = {
+// AND lets the four field shapes stay precise. `'custom'` is NOT a key here —
+// it resolves at render time from `EditableSite.customStyleKit` instead.
+export const STYLE_KIT_PRESETS = {
   charcoal: CHARCOAL,
   'orange-editorial': ORANGE_EDITORIAL,
   'blue-saas': BLUE_SAAS,
@@ -451,33 +458,28 @@ export const STYLE_KIT_PRESETS: Record<BuiltInStyleKit, StyleKitPreset> = {
 // --------------------------------------------------------------------------
 
 export function getStyleKitPreset(kit: string): StyleKitPreset {
-  // Note: 'custom' (Phase 0 scaffold for Wave 2 #10) does not have a row in
-  // STYLE_KIT_PRESETS. Callers that may pass 'custom' must check the selector
-  // and route through `customStyleKit` before calling this. Calling
-  // getStyleKitPreset('custom') is treated as a programming error and throws.
+  // `'custom'` is not a key in STYLE_KIT_PRESETS — callers that may see it
+  // route through `resolveStyleKitWithCustom(state)` instead. Calling
+  // `getStyleKitPreset('custom')` is treated as a programming error and throws.
   if (!Object.prototype.hasOwnProperty.call(STYLE_KIT_PRESETS, kit)) {
     throw new Error(
       `getStyleKitPreset: unknown style kit ${JSON.stringify(kit)} — expected one of ${STYLE_KITS.join(', ')}`,
     );
   }
-  const preset = STYLE_KIT_PRESETS[kit as BuiltInStyleKit];
-  if (preset === undefined) {
-    throw new Error(`getStyleKitPreset: preset table missing entry for ${JSON.stringify(kit)}`);
-  }
-  return preset;
+  return STYLE_KIT_PRESETS[kit as BuiltInStyleKit];
 }
 
 // --------------------------------------------------------------------------
-// Wave 2 #10 — `'custom'` dispatch slot.
+// `'custom'` dispatch slot.
 //
-// Phase 0 reserved this resolver for the Wave 2 owner (custom theme editor).
-// The implementation lives in `src/themes/custom-resolve.ts` so the runtime
-// validator + the editor panel can share one source of truth. We re-export
-// it here so the canvas render boundary (and any future caller that already
-// imports from `src/canvas/style-kits.ts`) routes `'custom'` through the
-// same dispatch as built-ins without taking a dependency on `src/themes/`.
-// The `getStyleKitPreset(kit: string)` entry-point keeps its
-// 'custom-is-a-programming-error' contract — callers that may see `'custom'`
+// The custom-kit resolver lives in `src/themes/custom-resolve.ts` so the
+// runtime validator + the editor panel can share one source of truth. We
+// re-export it here so callers that already import from this module can
+// route `'custom'` through the same dispatch as built-ins. The re-export
+// IS a dependency on `src/themes/` — callers that need to avoid pulling
+// `custom-resolve` transitively must import it from its source module
+// instead. `getStyleKitPreset(kit: string)` keeps its
+// 'custom-is-a-programming-error' contract; callers that may see `'custom'`
 // switch to `resolveStyleKitWithCustom(state)` instead.
 // --------------------------------------------------------------------------
 
@@ -509,9 +511,8 @@ export { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 // --------------------------------------------------------------------------
 
 function quoteCssString(value: string): string {
-  // Selectors quote attribute values with double quotes; values inside CSS
-  // declarations are emitted as-is. Both callers go through this only when
-  // they need an attribute-selector literal.
+  // Safe only because every kit + preset name we pass is kebab-case ASCII;
+  // JSON.stringify is not a full CSS string-token escaper.
   return JSON.stringify(value);
 }
 
@@ -603,58 +604,132 @@ function buildShapeBlock(kitName: string, preset: StyleKitPreset): string {
 }`;
 }
 
-function buildMotionKeyframes(): string {
-  return `@keyframes rev01-fade-up { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes rev01-fade-down { from { transform: translateY(-12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes rev01-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes rev01-fade-right { from { transform: translateX(-12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes rev01-slide-left { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes rev01-slide-up { from { transform: translateY(20px); } to { transform: translateY(0); } }
-@keyframes rev01-slide-right { from { transform: translateX(-20px); } to { transform: translateX(0); } }
-@keyframes rev01-scale-in { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes rev01-zoom-out { from { transform: scale(1.08); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@keyframes rev01-blur-in { from { filter: blur(8px); opacity: 0; } to { filter: blur(0); opacity: 1; } }
-@keyframes rev01-rotate-in { from { transform: rotate(-6deg) scale(0.95); opacity: 0; } to { transform: rotate(0) scale(1); opacity: 1; } }
-@keyframes rev01-flip-in { from { transform: perspective(600px) rotateY(90deg); opacity: 0; } to { transform: perspective(600px) rotateY(0); opacity: 1; } }
-@keyframes rev01-bounce-in { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 80% { transform: scale(0.95); } 100% { transform: scale(1); } }
-@keyframes rev01-slow-drift { 0% { transform: translateY(0); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0); } }
-@keyframes rev01-parallax-soft { from { transform: translateY(6px); } to { transform: translateY(0); } }`;
+// Motion presets that share the simple "from kit tokens → identity resting
+// state" shape. Everything else (`none`, the multi-stop `bounce-in`, the
+// continuous-loop `slow-drift`, the entrance-with-amplitude `parallax-soft`,
+// the reuses-fade-up `stagger-children`) is special-cased below.
+const MOTION_ENTRANCE_RESTING_STATE: Record<string, string> = {
+  'fade-up': 'transform: translateY(0); opacity: 1;',
+  'fade-down': 'transform: translateY(0); opacity: 1;',
+  'fade-in': 'opacity: 1;',
+  'fade-right': 'transform: translateX(0); opacity: 1;',
+  'slide-left': 'transform: translateX(0); opacity: 1;',
+  'slide-up': 'transform: translateY(0);',
+  'slide-right': 'transform: translateX(0);',
+  'scale-in': 'transform: scale(1); opacity: 1;',
+  'zoom-out': 'transform: scale(1); opacity: 1;',
+  // `blur-in`'s filter dimension isn't expressible in `MotionPresetTokens`;
+  // the blur(8px) initial AND blur(0) resting are hardcoded here.
+  'blur-in': 'filter: blur(0); opacity: 1;',
+  'rotate-in': 'transform: rotate(0) scale(1); opacity: 1;',
+  'flip-in': 'transform: perspective(600px) rotateY(0); opacity: 1;',
+};
+
+function buildEntranceKeyframe(ns: string, preset: MotionPreset, tokens: MotionPresetTokens): string {
+  const fromParts: string[] = [];
+  if (tokens.transform !== undefined) fromParts.push(`transform: ${tokens.transform};`);
+  if (tokens.opacity !== undefined) fromParts.push(`opacity: ${String(tokens.opacity)};`);
+  // `blur-in` always starts blurred regardless of kit — the schema's
+  // `MotionPresetTokens` has no filter field, so the blur amount lives here.
+  if (preset === 'blur-in') fromParts.push('filter: blur(8px);');
+  const resting = MOTION_ENTRANCE_RESTING_STATE[preset];
+  if (resting === undefined) {
+    throw new Error(`buildEntranceKeyframe: no resting state for ${preset}`);
+  }
+  return `@keyframes ${ns}-${preset} { from { ${fromParts.join(' ')} } to { ${resting} } }`;
+}
+
+function buildMotionKeyframes(kitName: string, preset: StyleKitPreset): string {
+  // Per-kit keyframes named `rev01-<kit>-<preset>`. Each kit's
+  // `motionPresets[p]` seeds the initial state so each kit's declared
+  // amplitude (charcoal translateY(12px) vs orange translateY(16px) vs
+  // green translateY(18px) …) actually takes effect.
+  const ns = `rev01-${kitName}`;
+  const blocks: string[] = [];
+  for (const p of MOTION_PRESETS) {
+    if (p === 'none') continue;
+    if (p === 'stagger-children') continue; // Reuses the kit's fade-up keyframe.
+    if (p === 'bounce-in') continue;
+    if (p === 'slow-drift') continue;
+    if (p === 'parallax-soft') continue;
+    blocks.push(buildEntranceKeyframe(ns, p, preset.motionPresets[p]));
+  }
+  // `bounce-in`: 4-stop overshoot. Initial scale comes from the kit;
+  // 60%/80% overshoot stops are intrinsic to the preset's character.
+  const bounceFrom = preset.motionPresets['bounce-in'].transform ?? 'scale(0.6)';
+  blocks.push(
+    `@keyframes ${ns}-bounce-in { 0% { transform: ${bounceFrom}; opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 80% { transform: scale(0.95); } 100% { transform: scale(1); } }`,
+  );
+  // `slow-drift`: continuous loop. The data seeds `translateY(0px)` across
+  // all four built-in kits (the resting centre of the drift); the loop
+  // amplitude (-6px peak) is fixed because the effect is by definition
+  // subtle and uniform.
+  blocks.push(
+    `@keyframes ${ns}-slow-drift { 0% { transform: translateY(0); } 50% { transform: translateY(-6px); } 100% { transform: translateY(0); } }`,
+  );
+  // `parallax-soft`: gentle entrance offset. Initial Y derived from the
+  // kit so each kit's parallax amplitude actually differs in the output.
+  const parallaxFrom = preset.motionPresets['parallax-soft'].transform ?? 'translateY(6px)';
+  blocks.push(
+    `@keyframes ${ns}-parallax-soft { from { transform: ${parallaxFrom}; } to { transform: translateY(0); } }`,
+  );
+  return blocks.join('\n');
 }
 
 function buildMotionBlock(kitName: string): string {
-  // Each preset maps to a CSS animation by name. The kit's duration/easing
-  // come from the kit-level token block (already on the wrapper); we only
-  // attach the animation name here so a single rule per preset works for
-  // every kit. The `--rev01-kit-motion-*` tokens are already set on the
-  // wrapper by `buildKitTokenBlock` — no need to redeclare here.
+  // Each preset attaches its kit-namespaced keyframe. Duration + easing come
+  // from `--rev01-kit-motion-*` tokens already set on the wrapper by
+  // `buildKitTokenBlock`. Three presets deviate from the kit-default cadence:
+  //   - `bounce-in` overrides easing with an overshoot curve (the
+  //     definition of "bounce").
+  //   - `slow-drift` is a continuous loop, not an entrance: it runs longer
+  //     (calc(dur * 4)) on a symmetric ease.
+  //   - `stagger-children` reuses the kit's fade-up keyframe; the
+  //     between-child delay is wired at the call site, not in the keyframe.
   const sk = quoteCssString(kitName);
+  const ns = `rev01-${kitName}`;
   const dur = 'var(--rev01-kit-motion-duration)';
   const eas = 'var(--rev01-kit-motion-easing)';
-  const anim = (preset: string, kf: string, extra = '') =>
-    `[data-style-kit=${sk}] [data-motion-preset="${preset}"] {\n  animation: rev01-${kf} ${dur} ${eas} both;${extra ? '\n  ' + extra : ''}\n}`;
-  const presetRules: string[] = [
-    anim('fade-up', 'fade-up'),
-    anim('fade-down', 'fade-down'),
-    anim('fade-in', 'fade-in'),
-    anim('fade-right', 'fade-right'),
-    anim('slide-left', 'slide-left'),
-    anim('slide-up', 'slide-up'),
-    anim('slide-right', 'slide-right'),
-    anim('scale-in', 'scale-in'),
-    anim('zoom-out', 'zoom-out'),
-    anim('blur-in', 'blur-in'),
-    anim('rotate-in', 'rotate-in'),
-    anim('flip-in', 'flip-in'),
-    anim('bounce-in', 'bounce-in', 'animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);'),
-    `[data-style-kit=${sk}] [data-motion-preset="parallax-soft"] {\n  animation: rev01-parallax-soft ${dur} ${eas} both;\n}`,
-    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: rev01-slow-drift calc(${dur} * 4) ease-in-out infinite;\n}`,
-    `[data-style-kit=${sk}] [data-motion-preset="stagger-children"] {\n  animation: rev01-fade-up ${dur} ${eas} both;\n}`,
-  ];
-  return presetRules.join('\n');
+  const entranceRule = (p: MotionPreset): string =>
+    `[data-style-kit=${sk}] [data-motion-preset="${p}"] {\n  animation: ${ns}-${p} ${dur} ${eas} both;\n}`;
+  const rules: string[] = [];
+  for (const p of MOTION_PRESETS) {
+    if (p === 'none') continue;
+    if (p === 'stagger-children') continue;
+    if (p === 'bounce-in') continue;
+    if (p === 'slow-drift') continue;
+    rules.push(entranceRule(p));
+  }
+  rules.push(
+    `[data-style-kit=${sk}] [data-motion-preset="bounce-in"] {\n  animation: ${ns}-bounce-in ${dur} ${eas} both;\n  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);\n}`,
+  );
+  rules.push(
+    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: ${ns}-slow-drift calc(${dur} * 4) ease-in-out infinite;\n}`,
+  );
+  rules.push(
+    `[data-style-kit=${sk}] [data-motion-preset="stagger-children"] {\n  animation: ${ns}-fade-up ${dur} ${eas} both;\n}`,
+  );
+  return rules.join('\n');
+}
+
+function buildTextRules(kitName: string): string {
+  // Per-role font + line-height. Labels reuse the body font but get loosened
+  // tracking — eyebrow / overline labels are typically rendered at small
+  // sizes and the extra letter-spacing keeps them legible at that scale.
+  const sk = quoteCssString(kitName);
+  return [
+    `[data-style-kit=${sk}] [data-element-type="text"][data-role="heading"] .rev01-text {\n  font-family: var(--rev01-kit-font-display);\n}`,
+    `[data-style-kit=${sk}] [data-element-type="text"][data-role="body"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  line-height: var(--rev01-kit-line-height);\n}`,
+    `[data-style-kit=${sk}] [data-element-type="text"][data-role="label"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  letter-spacing: 0.04em;\n}`,
+  ].join('\n');
 }
 
 function buildKitBlock(kitName: string, preset: StyleKitPreset): string {
-  const parts: string[] = [buildKitTokenBlock(kitName, preset), buildShapeBlock(kitName, preset)];
+  const parts: string[] = [
+    buildKitTokenBlock(kitName, preset),
+    buildTextRules(kitName),
+    buildShapeBlock(kitName, preset),
+  ];
   for (const variant of ACTION_VARIANTS) {
     const block = buildActionVariantBlock(kitName, variant, preset.actionVariants[variant]);
     if (block) parts.push(block);
@@ -667,42 +742,35 @@ function buildKitBlock(kitName: string, preset: StyleKitPreset): string {
   return parts.join('\n');
 }
 
-function buildTextRules(kitName: string): string {
-  return [
-    `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="text"][data-role="heading"] .rev01-text {\n  font-family: var(--rev01-kit-font-display);\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="text"][data-role="body"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  line-height: var(--rev01-kit-line-height);\n}`,
-    `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="text"][data-role="label"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  letter-spacing: 0.04em;\n}`,
-  ].join('\n');
-}
-
 /**
- * Emit CSS for one concrete kit name and preset. Built-in kit CSS is emitted
- * through `buildAllStyleKitsCss`; public visitor responses use this helper to
- * append the per-site custom kit block when `styleKit === 'custom'`.
+ * Emit CSS for one concrete kit name and preset, including its own motion
+ * keyframes. Built-in kit CSS is emitted through `buildAllStyleKitsCss`;
+ * public visitor responses use this helper to append the per-site custom
+ * kit block when `styleKit === 'custom'`.
  */
 export function buildStyleKitCss(kitName: string, preset: StyleKitPreset): string {
+  // Empty kit name would produce `[data-style-kit=""]` selectors — those
+  // match nothing the renderer stamps, so the page would silently render
+  // without kit styling. Fail loudly instead.
   if (kitName.length === 0) {
     throw new Error('buildStyleKitCss: kitName must be non-empty');
   }
-  return [buildTextRules(kitName), buildKitBlock(kitName, preset)].join('\n');
+  return [buildMotionKeyframes(kitName, preset), buildKitBlock(kitName, preset)].join('\n');
 }
 
 /**
- * Emit the full CSS for every kit, including motion keyframes. Consumed by
- * the editor preview stylesheet and the public renderer's inline <style>
- * block. Output is stable across calls (preset map is frozen at module load).
+ * Emit the full CSS for every built-in kit, including per-kit motion
+ * keyframes. Consumed by the editor preview stylesheet and the public
+ * renderer's inline <style> block. Output is stable across calls (preset
+ * map is frozen at module load).
  */
 export function buildAllStyleKitsCss(): string {
-  const keyframes = buildMotionKeyframes();
   // Iterate built-in kits only. `'custom'` resolves at render time from
   // `EditableSite.customStyleKit`; emitting a kit-wide CSS block for a
   // value that lives in per-site state would mix layers.
+  const keyframes = BUILT_IN_STYLE_KITS.map((kit) =>
+    buildMotionKeyframes(kit, STYLE_KIT_PRESETS[kit]),
+  );
   const kitBlocks = BUILT_IN_STYLE_KITS.map((kit) => buildKitBlock(kit, STYLE_KIT_PRESETS[kit]));
-  // Per-element typography uses the kit's font tokens. The display family
-  // applies to headings; body to body; label to labels. These rules live at
-  // the kit level so role-specific size scales also work (the renderer
-  // already emits the absolute fontSize; the scale here is a multiplier so
-  // owner-set sizes still respect the kit's modular scale).
-  const baseTextRules = BUILT_IN_STYLE_KITS.map((kit) => buildTextRules(kit));
-  return [keyframes, baseTextRules.join('\n'), kitBlocks.join('\n')].join('\n');
+  return [...keyframes, ...kitBlocks].join('\n');
 }
