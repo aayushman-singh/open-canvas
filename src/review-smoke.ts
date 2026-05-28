@@ -526,7 +526,9 @@ assert(
 assert(
   publishRouteSource.includes('buildPublishBroadcastPayload') &&
     publishRouteSource.includes('htmlBySlug') &&
-    /renderCanvasSnapshot\(\s*pageSnapshot,\s*'\/assets',\s*siteId\s*\)/.test(publishRouteSource),
+    /renderCanvasSnapshot\(\s*fullPagesSnapshot,\s*'\/assets',\s*siteId,\s*\{\s*renderPages:\s*\[targetPage\]\s*\}/.test(
+      publishRouteSource,
+    ),
   'expected publish broadcast render to emit page-scoped html and pass site id through so live-updated forms keep a valid action',
 );
 assert(
@@ -1356,13 +1358,17 @@ assert(
   'expected T7 insertSection to add exactly one section',
 );
 
-// Every recipe in the registry is exercised by canvas-agent-smoke.ts; here we
-// smoke that the model-facing tool set exposes semantic section design rather
-// than the fixed recipe picker.
+// Every mutating tool is enumerated in canvas-agent-smoke.ts; here we smoke
+// that section creation stays semantic instead of exposing the fixed recipe
+// picker directly to the model.
 const t7ToolNames = CANVAS_AGENT_TOOLS.map((t) => t.name).sort();
 assert(
-  JSON.stringify(t7ToolNames) === JSON.stringify(['designSection', 'replaceMedia', 'rewriteText']),
-  `expected CANVAS_AGENT_TOOLS to expose three tools (got [${t7ToolNames.join(', ')}])`,
+  t7ToolNames.includes('designSection'),
+  `expected CANVAS_AGENT_TOOLS to expose designSection (got [${t7ToolNames.join(', ')}])`,
+);
+assert(
+  !t7ToolNames.includes('createSection') && !t7ToolNames.includes('insertSection'),
+  `expected CANVAS_AGENT_TOOLS to hide recipe picker tools (got [${t7ToolNames.join(', ')}])`,
 );
 for (const recipeId of SECTION_RECIPE_IDS as readonly SectionRecipeId[]) {
   const section = createSectionFromRecipe(recipeId, {

@@ -277,9 +277,9 @@ export async function handleFormSubmit(
     throw new Error('[forms/submit] insert returned no row — DB driver contract violation');
   }
 
-  // 8. Webhook (optional). Fire-and-forget from the Visitor's view: we await
-  // here so the smoke can assert delivery, but the route layer wraps this in
-  // `c.executionCtx.waitUntil(...)` so the HTTP response races ahead.
+  // 8. Webhook (optional). We await delivery so the submit outcome carries
+  // the explicit webhook result; failures are returned in the outcome and
+  // logged by deliverWebhook with URL, status, duration, and transport detail.
   let webhookDelivery: WebhookDeliveryResult | undefined;
   if (typeof form.webhookUrl === 'string' && form.webhookUrl.length > 0) {
     webhookDelivery = await deliverWebhook(

@@ -71,6 +71,6 @@ export async function listOwnerAssets(
     height: row.height,
     byteSize: row.byteSize,
     createdAt: row.createdAt.toISOString(),
-    lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+    lastUsedAt: row.lastUsedAt ?? null,
   }));
 }

@@ -177,6 +177,7 @@ async function fetchPublicUrl(
       Referer: sourceUrl,
     },
   });
+  await assertPublicHttpUrl(response.url || url);
 
   if (response.status >= 300 && response.status < 400) {
     const location = response.headers.get('location');

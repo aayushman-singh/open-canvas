@@ -18,11 +18,6 @@ import type { BaseElement } from '../schema.js';
 import type { StyleKitPreset } from '../schema.js';
 import { getStyleKitPreset } from '../style-kits.js';
 
-let _customPreset: StyleKitPreset | null = null;
-
-export function configureCodeRender(opts: { customPreset: StyleKitPreset | null }): void {
-  _customPreset = opts.customPreset;
-}
 import {
   highlightCode,
   isSupportedLanguage,
@@ -54,6 +49,7 @@ export interface CodeElement extends BaseElement {
 
 export interface CodeRenderCtx {
   styleKit: string;
+  customPreset?: StyleKitPreset | null;
 }
 
 /**
@@ -84,14 +80,14 @@ export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
   let fontMono: string;
   let radius: string;
   if (ctx.styleKit === 'custom') {
-    if (!_customPreset) {
+    if (!ctx.customPreset) {
       throw new Error(
-        'renderCode: styleKit is "custom" but configureCodeRender was not called with the resolved preset.',
+        'renderCode: styleKit is "custom" but no resolved custom preset was provided.',
       );
     }
-    panel = _customPreset.panel;
-    fontMono = _customPreset.fontFamilyMono;
-    radius = _customPreset.radius;
+    panel = ctx.customPreset.panel;
+    fontMono = ctx.customPreset.fontFamilyMono;
+    radius = ctx.customPreset.radius;
   } else {
     const preset = getStyleKitPreset(ctx.styleKit);
     panel = preset.panel;

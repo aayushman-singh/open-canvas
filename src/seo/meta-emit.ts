@@ -234,7 +234,7 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
   if (ogImageUrl !== null) {
     jsonLd.image = ogImageUrl;
   }
-  // Escape all `<` as `<` to prevent `</script>` injection in the JSON body.
+  // Escape all `<` as `\u003c` to prevent `</script>` injection in the JSON body.
   const jsonLdStr = JSON.stringify(jsonLd).replace(/</g, '\\u003c');
   lines.push(`<script type="application/ld+json">${jsonLdStr}</script>`);
 
@@ -274,16 +274,7 @@ export interface RenderHeadContext {
 export function renderCanvasHead(snapshot: PublishedSnapshot, ctx: RenderHeadContext): string {
   const page = snapshot.pages.find((p) => p.slug === ctx.pageSlug);
   if (!page) {
-    console.warn('[seo/meta-emit] page not found in snapshot, falling back to first page', { pageSlug: ctx.pageSlug });
-    const first = snapshot.pages[0];
-    if (!first) return '';
-    return emitPageMeta(first, {
-      siteId: ctx.siteId,
-      host: ctx.host,
-      ...(ctx.protocol ? { protocol: ctx.protocol } : {}),
-      snapshot,
-      ...(ctx.assetLookup ? { assetLookup: ctx.assetLookup } : {}),
-    });
+    return '';
   }
   return emitPageMeta(page, {
     siteId: ctx.siteId,

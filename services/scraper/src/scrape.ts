@@ -34,6 +34,12 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     );
     await page.setViewport({ width: VIEWPORT_WIDTH, height: VIEWPORT_HEIGHT });
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      void assertPublicHttpUrl(request.url())
+        .then(() => request.continue())
+        .catch(() => request.abort('blockedbyclient'));
+    });
 
     await page.goto(safeUrl.href, {
       waitUntil: 'networkidle0',

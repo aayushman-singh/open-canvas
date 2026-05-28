@@ -143,6 +143,34 @@ const publishedSnapshot: PublishedSnapshot = {
   pages: editableState.pages,
 };
 
+// Webhook URL safety must reject local/private destinations before fetch.
+{
+  let fetchCalls = 0;
+  const rejected = await deliverWebhook(
+    'http://127.0.0.1:8080/hook',
+    'secret',
+    {
+      siteId: SITE_ID,
+      formElementId: FORM_ID,
+      pageSlug: PAGE_SLUG,
+      payload: {},
+      submittedAt: '2026-05-28T00:00:00.000Z',
+    },
+    {
+      fetchImpl: () => {
+        fetchCalls += 1;
+        return Promise.resolve(new Response('{}', { status: 200 }));
+      },
+    },
+  );
+  assert(
+    rejected.ok === false && rejected.error === 'invalid-url',
+    'webhook rejects loopback URL',
+    JSON.stringify(rejected),
+  );
+  assert(fetchCalls === 0, 'webhook loopback rejection happens before fetch');
+}
+
 // ---------------------------------------------------------------------------
 // In-memory DB shim. Supports the exact call patterns submit.ts + inbox.ts use:
 //

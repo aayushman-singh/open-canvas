@@ -1,6 +1,7 @@
 import {
   boolean,
   customType,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -100,7 +101,9 @@ export const site = pgTable('site', {
   passwordSetAt: timestamp('password_set_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  customerIdx: index('site_customer_id_idx').on(t.customerId),
+}));
 
 export type Site = typeof site.$inferSelect;
 export type NewSite = typeof site.$inferInsert;
@@ -186,7 +189,12 @@ export const ownerAsset = pgTable('owner_asset', {
   height: integer('height'),
   byteSize: integer('byte_size').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  customerContentHashUnique: uniqueIndex('owner_asset_customer_content_hash_unique').on(
+    t.customerId,
+    t.contentHash,
+  ),
+}));
 
 export type OwnerAsset = typeof ownerAsset.$inferSelect;
 export type NewOwnerAsset = typeof ownerAsset.$inferInsert;
@@ -250,7 +258,9 @@ export const customDomain = pgTable('custom_domain', {
   verificationRecord: jsonb('verification_record').notNull().$type<Record<string, unknown>>(),
   certIssuedAt: timestamp('cert_issued_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  siteIdx: index('custom_domain_site_id_idx').on(t.siteId),
+}));
 
 export type CustomDomain = typeof customDomain.$inferSelect;
 export type NewCustomDomain = typeof customDomain.$inferInsert;
@@ -274,7 +284,13 @@ export const formSubmission = pgTable('form_submission', {
   ipHash: text('ip_hash').notNull(),
   userAgent: text('user_agent').notNull().default(''),
   submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  siteFormSubmittedIdx: index('form_submission_site_form_submitted_idx').on(
+    t.siteId,
+    t.formElementId,
+    t.submittedAt.desc(),
+  ),
+}));
 
 export type FormSubmission = typeof formSubmission.$inferSelect;
 export type NewFormSubmission = typeof formSubmission.$inferInsert;
@@ -300,7 +316,9 @@ export const siteSnapshot = pgTable('site_snapshot', {
   reason: text('reason').notNull().$type<SiteSnapshotReason>(),
   label: text('label'),
   publishedVersion: integer('published_version'),
-});
+}, (t) => ({
+  siteCapturedIdx: index('site_snapshot_site_captured_idx').on(t.siteId, t.capturedAt.desc()),
+}));
 
 export type SiteSnapshot = typeof siteSnapshot.$inferSelect;
 export type NewSiteSnapshot = typeof siteSnapshot.$inferInsert;
@@ -327,7 +345,9 @@ export const siteFont = pgTable('site_font', {
   contentHash: text('content_hash').notNull(),
   byteSize: integer('byte_size').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  siteIdx: index('site_font_site_id_idx').on(t.siteId),
+}));
 
 export type SiteFont = typeof siteFont.$inferSelect;
 export type NewSiteFont = typeof siteFont.$inferInsert;
@@ -357,7 +377,9 @@ export const siteSearchEntry = pgTable('site_search_entry', {
   elementId: text('element_id').notNull(),
   text: text('text').notNull(),
   publishedVersion: integer('published_version').notNull(),
-});
+}, (t) => ({
+  siteIdx: index('site_search_entry_site_id_idx').on(t.siteId),
+}));
 
 export type SiteSearchEntry = typeof siteSearchEntry.$inferSelect;
 export type NewSiteSearchEntry = typeof siteSearchEntry.$inferInsert;
@@ -381,7 +403,13 @@ export const chatSession = pgTable('chat_session', {
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
   endedAt: timestamp('ended_at', { withTimezone: true }),
   messages: jsonb('messages').notNull().$type<Array<Record<string, unknown>>>(),
-});
+}, (t) => ({
+  siteCustomerStartedIdx: index('chat_session_site_customer_started_idx').on(
+    t.siteId,
+    t.customerId,
+    t.startedAt.desc(),
+  ),
+}));
 
 export type ChatSession = typeof chatSession.$inferSelect;
 export type NewChatSession = typeof chatSession.$inferInsert;

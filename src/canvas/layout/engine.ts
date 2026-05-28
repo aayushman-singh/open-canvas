@@ -299,9 +299,6 @@ function createCanvasElement(
         variant: container.variant,
       };
     }
-    default: {
-      throw new Error(`unsupported designSection element type: ${String(el.type)}`);
-    }
   }
 }
 
@@ -544,8 +541,6 @@ function parseSplitRatio(ratio: SplitRatio): [number, number] {
       return [1, 2];
     case '2:1':
       return [2, 1];
-    default:
-      throw new Error('parseSplitRatio: unknown ratio ' + ratio);
   }
 }
 

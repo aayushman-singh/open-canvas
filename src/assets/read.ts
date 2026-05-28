@@ -71,6 +71,7 @@ export interface ReadAssetRequest {
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
 const CACHE_CONTROL_IMMUTABLE = 'public, max-age=31536000, immutable';
+const INTEGER_RE = /^\d+$/;
 
 /**
  * Resolve the asset row and stream its bytes. The caller (route handler)
@@ -158,14 +159,20 @@ function parseTransformParams(url: URL): CfImageOptions | null {
   }
   const opts: CfImageOptions = {};
   if (wRaw !== null) {
-    const w = parseInt(wRaw, 10);
+    if (!INTEGER_RE.test(wRaw)) {
+      throw new Error(`readOwnerAsset: invalid w=${wRaw} (must be a positive integer)`);
+    }
+    const w = Number.parseInt(wRaw, 10);
     if (!Number.isFinite(w) || w <= 0 || w > 10000) {
       throw new Error(`readOwnerAsset: invalid w=${wRaw} (must be a positive integer)`);
     }
     opts.width = w;
   }
   if (hRaw !== null) {
-    const h = parseInt(hRaw, 10);
+    if (!INTEGER_RE.test(hRaw)) {
+      throw new Error(`readOwnerAsset: invalid h=${hRaw} (must be a positive integer)`);
+    }
+    const h = Number.parseInt(hRaw, 10);
     if (!Number.isFinite(h) || h <= 0 || h > 10000) {
       throw new Error(`readOwnerAsset: invalid h=${hRaw} (must be a positive integer)`);
     }
@@ -182,7 +189,10 @@ function parseTransformParams(url: URL): CfImageOptions | null {
     opts.fit = 'cover';
   }
   if (qRaw !== null) {
-    const q = parseInt(qRaw, 10);
+    if (!INTEGER_RE.test(qRaw)) {
+      throw new Error(`readOwnerAsset: invalid q=${qRaw} (must be 1..100)`);
+    }
+    const q = Number.parseInt(qRaw, 10);
     if (!Number.isFinite(q) || q < 1 || q > 100) {
       throw new Error(`readOwnerAsset: invalid q=${qRaw} (must be 1..100)`);
     }

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { sha256Hex, contentHashToR2Key, extFromMediaType } from '../../assets/hash';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
@@ -21,6 +21,7 @@ import type {
   MediaKind,
 } from '../../canvas/schema';
 import { MOTION_PRESETS } from '../../canvas/schema';
+import { validateCanvasSiteState } from '../../canvas/validate';
 import { validateSubdomain } from './sites';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site, siteFont } from '../../db/schema';
@@ -94,6 +95,7 @@ export interface PreparedImportedAssets {
 }
 
 const MOTION_PRESET_SET = new Set<string>(MOTION_PRESETS);
+const FREE_SITE_LIMIT = 3;
 
 function isValidMotionPreset(p: string): p is MotionPreset {
   return MOTION_PRESET_SET.has(p);
@@ -151,6 +153,18 @@ importRouter.post('/', async (c) => {
     return c.json({ error: 'subdomain is already taken' }, 409);
   }
 
+  const siteCountRows = await database
+    .select({ value: count() })
+    .from(site)
+    .where(eq(site.customerId, customerId));
+  const siteCount = siteCountRows[0]?.value ?? 0;
+  if (siteCount >= FREE_SITE_LIMIT) {
+    return c.json(
+      { error: `Free plan allows up to ${String(FREE_SITE_LIMIT)} sites. Upgrade to create more.` },
+      403,
+    );
+  }
+
   const scraperUrl = c.env.SCRAPER_URL;
   const scraperSecret = c.env.SCRAPER_API_SECRET;
   if (!scraperUrl || !scraperSecret) {
@@ -203,11 +217,24 @@ importRouter.post('/', async (c) => {
     ),
   );
 
-  const editableState = buildCanvasSiteState(
-    scraperData,
-    preparedAssets.mediaAssetIdMap,
-    preparedAssets.fontFamilyTokenMap,
-  );
+  let editableState: CanvasSiteState;
+  try {
+    editableState = buildCanvasSiteState(
+      scraperData,
+      preparedAssets.mediaAssetIdMap,
+      preparedAssets.fontFamilyTokenMap,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Import failed: ${message}` }, 502);
+  }
+  const validation = validateCanvasSiteState(editableState);
+  if (!validation.valid) {
+    return c.json(
+      { error: 'Import produced invalid editable state', errors: validation.errors },
+      502,
+    );
+  }
 
   try {
     const siteInsert = database.insert(site).values({
@@ -240,6 +267,14 @@ importRouter.post('/', async (c) => {
     if (isUniqueViolation(err)) {
       return c.json({ error: 'subdomain is already taken' }, 409);
     }
+    if (isSiteLimitViolation(err)) {
+      return c.json(
+        {
+          error: `Free plan allows up to ${String(FREE_SITE_LIMIT)} sites. Upgrade to create more.`,
+        },
+        403,
+      );
+    }
     throw err;
   }
 
@@ -267,7 +302,33 @@ function parseImportSourceUrl(
   if (parsed.username || parsed.password) {
     return { ok: false, error: 'URL must not include credentials' };
   }
+  const blockedHost = blockedImportHost(parsed.hostname);
+  if (blockedHost !== null) {
+    return {
+      ok: false,
+      error: `URL resolves to blocked private/reserved address: ${blockedHost}`,
+    };
+  }
   return { ok: true, url: parsed.href };
+}
+
+function blockedImportHost(hostname: string): string | null {
+  const host = hostname.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return host;
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return null;
+  const octets = host.split('.').map((part) => Number.parseInt(part, 10));
+  if (octets.some((part) => part < 0 || part > 255)) return host;
+  const [a, b, c] = octets as [number, number, number, number];
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return host;
+  if (a === 169 && b === 254) return host;
+  if (a === 172 && b >= 16 && b <= 31) return host;
+  if (a === 192 && b === 168) return host;
+  if (a === 100 && b >= 64 && b <= 127) return host;
+  if (a === 192 && b === 0) return host;
+  if (a === 198 && (b === 18 || b === 19)) return host;
+  if (a === 198 && b === 51 && c === 100) return host;
+  if (a === 203 && b === 0 && c === 113) return host;
+  return null;
 }
 
 export async function prepareImportedAssets(input: {
@@ -385,9 +446,7 @@ export function buildCanvasSiteState(
       name,
       height: Math.max(Math.round(s.height), 100),
       ...(role ? { role } : {}),
-      elements: s.elements
-        .map((el) => convertElement(el, assetIdMap))
-        .filter((el): el is CanvasElement => el !== null),
+      elements: s.elements.map((el) => convertElement(el, assetIdMap)),
     };
   });
 
@@ -538,7 +597,7 @@ function primaryFontFamily(value: string): string | null {
   return first.replace(/^['"]|['"]$/g, '');
 }
 
-function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): CanvasElement | null {
+function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): CanvasElement {
   const baseId = crypto.randomUUID();
   const box = {
     x: Math.max(0, Math.round(el.box.x)),
@@ -587,7 +646,9 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
             }
           : {}),
       }));
-      if (content.length === 0) return null;
+      if (content.length === 0) {
+        throw new Error(`scraped text element has no text content at x=${String(box.x)} y=${String(box.y)}`);
+      }
       const result: TextElement = {
         id: baseId,
         type: 'text',
@@ -607,7 +668,9 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
       const d = data as { src?: string; originalUrl?: string; alt?: string; mediaType?: string };
       const source = d.src || d.originalUrl || '';
       const assetId = assetIdMap.get(source);
-      if (!assetId) return null;
+      if (!assetId) {
+        throw new Error(`missing imported media asset for ${source || '<empty media source>'}`);
+      }
       const kind: MediaKind = d.mediaType === 'video' ? 'video' : 'image';
       const result: MediaElement = {
         id: baseId,
@@ -666,7 +729,7 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
     }
 
     default:
-      return null;
+      throw new Error(`unsupported scraped element type: ${el.type}`);
   }
 }
 
@@ -714,5 +777,19 @@ function isUniqueViolation(err: unknown): boolean {
   if (e.code === '23505') return true;
   if (typeof e.message === 'string' && e.message.includes('duplicate key value')) return true;
   if (e.cause) return isUniqueViolation(e.cause);
+  return false;
+}
+
+function isSiteLimitViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { code?: unknown; message?: unknown; cause?: unknown };
+  if (
+    e.code === '23514' &&
+    typeof e.message === 'string' &&
+    e.message.includes('free site limit exceeded')
+  ) {
+    return true;
+  }
+  if (e.cause) return isSiteLimitViolation(e.cause);
   return false;
 }

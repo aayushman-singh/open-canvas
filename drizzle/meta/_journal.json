@@ -43,6 +43,13 @@
       "when": 1779928200000,
       "tag": "0005_site_limit_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779930000000,
+      "tag": "0006_hot_path_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -43,6 +43,27 @@ const addonsApi = new Hono<Env>();
 addonsApi.use('*', clerkAuth());
 addonsApi.use('*', requireAuth());
 
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.values(value).every((entry) => typeof entry === 'string');
+}
+
+function parseSiteAddonBody(
+  value: unknown,
+): { ok: true; enabled: boolean; config: Record<string, string> } | { ok: false; error: string } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'request body must be a JSON object' };
+  }
+  const record = value as Record<string, unknown>;
+  if (typeof record.enabled !== 'boolean') {
+    return { ok: false, error: 'enabled must be a boolean' };
+  }
+  if (!isStringRecord(record.config)) {
+    return { ok: false, error: 'config must be an object with string values' };
+  }
+  return { ok: true, enabled: record.enabled, config: record.config };
+}
+
 // POST /:addonId/acquire — Grant addon entitlement to the authenticated customer.
 // If already owned, returns { ok: true, alreadyOwned: true }.
 addonsApi.post('/:addonId/acquire', async (c) => {
@@ -166,7 +187,12 @@ addonsApi.put('/sites/:siteId/:addonId', async (c) => {
     return c.json({ error: 'addon not owned' }, 403);
   }
 
-  const body = await c.req.json<{ enabled: boolean; config: Record<string, string> }>();
+  const rawBody: unknown = await c.req.json();
+  const parsedBody = parseSiteAddonBody(rawBody);
+  if (!parsedBody.ok) {
+    return c.json({ error: parsedBody.error }, 400);
+  }
+  const body = parsedBody;
 
   // Validate config against addon's configFields patterns.
   if (body.enabled) {

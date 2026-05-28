@@ -57,7 +57,11 @@ slotHistoryApi.get('/sites/:siteId/elements/:elementId/history', async (c) => {
     .from(slotHistory)
     .innerJoin(ownerAsset, eq(ownerAsset.id, slotHistory.ownerAssetId))
     .where(
-      and(eq(slotHistory.siteId, ctx.site.id), eq(slotHistory.elementId, c.req.param('elementId'))),
+      and(
+        eq(slotHistory.siteId, ctx.site.id),
+        eq(slotHistory.elementId, c.req.param('elementId')),
+        eq(ownerAsset.customerId, ctx.customer.id),
+      ),
     )
     .orderBy(desc(slotHistory.usedAt))
     .limit(limit);

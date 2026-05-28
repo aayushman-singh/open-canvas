@@ -39,6 +39,7 @@ export interface ChartElement extends BaseElement {
 
 export interface ChartRenderCtx {
   styleKit: string;
+  customAccent?: string | null;
 }
 
 /**
@@ -55,7 +56,7 @@ export function renderChart(el: ChartElement, ctx: ChartRenderCtx): string {
   // is resized at any breakpoint.
   const width = Math.max(0, el.box.w);
   const height = Math.max(0, el.box.h);
-  const palette = buildChartPalette(ctx.styleKit);
+  const palette = buildChartPalette(ctx.styleKit, { customAccent: ctx.customAccent ?? null });
   let body: string;
   switch (el.kind) {
     case 'bar':

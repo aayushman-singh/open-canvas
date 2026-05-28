@@ -14,8 +14,6 @@
 // renderer never has to know how Owner Assets are addressed.
 
 import { RENDER_DISPATCH, type ElementRenderCtx } from './elements/index.js';
-import { configureCodeRender } from './elements/code.js';
-import { configureChartPalette } from '../charts/colors.js';
 import {
   escapeAttr,
   escapeCssValue,
@@ -24,7 +22,7 @@ import {
 } from './elements/render-utils.js';
 import { renderResponsiveCss } from './responsive/index.js';
 import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
-import type { CanvasElement, CanvasPage, CanvasSection, ElementStyle, PublishedSnapshot } from './schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, ElementStyle, PublishedSnapshot, StyleKitPreset } from './schema.js';
 
 function applyElementStyle(
   entries: Array<[string, string]>,
@@ -326,18 +324,15 @@ export function renderCanvasSnapshot(
   // Custom kits are site-owned data carried on the snapshot. Validate them
   // here even though the public route also emits CSS from them, so every
   // render entry point has the same fail-loud boundary.
-  if (snapshot.styleKit === 'custom') {
-    const resolved = resolveStyleKitWithCustom(snapshot);
-    configureCodeRender({ customPreset: resolved });
-    configureChartPalette({ customAccent: resolved.accent });
-  } else {
+  const customPreset: StyleKitPreset | null =
+    snapshot.styleKit === 'custom' ? resolveStyleKitWithCustom(snapshot) : null;
+  if (snapshot.styleKit !== 'custom') {
     getStyleKitPreset(snapshot.styleKit);
-    configureCodeRender({ customPreset: null });
-    configureChartPalette({ customAccent: null });
   }
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
     assetBasePath,
     styleKit: snapshot.styleKit,
+    customPreset,
     siteId,
     pages: snapshot.pages,
   };

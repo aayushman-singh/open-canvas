@@ -61,7 +61,12 @@ router.post('/:siteId/:formElementId', async (c) => {
     return c.json({ error: 'siteId and formElementId required' }, 400);
   }
 
-  const rawFields = await collectFormFields(c.req.raw);
+  let rawFields: Record<string, string | string[]>;
+  try {
+    rawFields = await collectFormFields(c.req.raw);
+  } catch {
+    return c.json({ error: 'unsupported content type; use multipart/form-data or application/x-www-form-urlencoded' }, 415);
+  }
   const turnstileToken = pickStringField(rawFields, 'cf-turnstile-response', '');
   const ip = c.req.header('cf-connecting-ip') ?? null;
   const userAgent = c.req.header('user-agent') ?? '';

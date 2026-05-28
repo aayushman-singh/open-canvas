@@ -127,6 +127,25 @@ export async function deliverWebhook(
       message: `webhookUrl uses unsupported scheme ${parsed.protocol}`,
     };
   }
+  if (parsed.username || parsed.password) {
+    return {
+      ok: false,
+      status: 0,
+      durationMs: 0,
+      error: 'invalid-url',
+      message: 'webhookUrl must not include credentials',
+    };
+  }
+  const blockedHost = blockedWebhookHost(parsed.hostname);
+  if (blockedHost !== null) {
+    return {
+      ok: false,
+      status: 0,
+      durationMs: 0,
+      error: 'invalid-url',
+      message: `webhookUrl resolves to blocked private/reserved address: ${blockedHost}`,
+    };
+  }
 
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -201,6 +220,48 @@ export async function deliverWebhook(
 
 function describeUrl(value: string): string {
   return JSON.stringify(value.length > 80 ? `${value.slice(0, 77)}...` : value);
+}
+
+function blockedWebhookHost(hostname: string): string | null {
+  const host = hostname.trim().toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return host;
+  if (isBlockedIpv4Host(host)) return host;
+  if (isBlockedIpv6Host(host)) return host;
+  return null;
+}
+
+function isBlockedIpv4Host(host: string): boolean {
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return false;
+  const octets = host.split('.').map((part) => Number.parseInt(part, 10));
+  if (octets.some((part) => part < 0 || part > 255)) return true;
+  const [a, b, c] = octets as [number, number, number, number];
+  if (a === 0) return true;
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a === 192 && b === 0) return true;
+  if (a === 198 && (b === 18 || b === 19)) return true;
+  if (a === 198 && b === 51 && c === 100) return true;
+  if (a === 203 && b === 0 && c === 113) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+function isBlockedIpv6Host(host: string): boolean {
+  if (!host.includes(':')) return false;
+  if (host === '::' || host === '::1') return true;
+  const ipv4Mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(host);
+  if (ipv4Mapped?.[1]) return isBlockedIpv4Host(ipv4Mapped[1]);
+  const first = Number.parseInt(host.split(':')[0] || '0', 16);
+  if (!Number.isFinite(first)) return true;
+  if ((first & 0xfe00) === 0xfc00) return true;
+  if ((first & 0xffc0) === 0xfe80) return true;
+  if ((first & 0xff00) === 0xff00) return true;
+  if (host.startsWith('2001:db8:') || host === '2001:db8::') return true;
+  return false;
 }
 
 /** Exported constant for tests + receivers building their own verifier. */

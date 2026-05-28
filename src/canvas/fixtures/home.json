@@ -20,7 +20,7 @@
               "type": "text",
               "box": { "x": 80, "y": 16, "w": 200, "h": 40, "z": 2 },
               "content": [{ "text": "rev01", "marks": [{ "type": "bold" }] }],
-              "role": "heading",
+              "role": "label",
               "fontSize": 22,
               "fontWeight": 700,
               "align": "left"

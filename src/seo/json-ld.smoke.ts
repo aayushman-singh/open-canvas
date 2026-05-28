@@ -148,7 +148,10 @@ const meta6 = emitPageMeta(page6, {
 });
 const ld6 = extractJsonLd(meta6);
 assert(ld6 !== null, '6: JSON-LD must be parseable');
-assert(ld6!['image'] === `/assets/${KNOWN_HASH}`, '6: JSON-LD image must resolve from asset lookup');
+assert(
+  ld6!['image'] === `https://${HOST}/assets/${KNOWN_HASH}`,
+  '6: JSON-LD image must resolve from asset lookup as an absolute URL',
+);
 
 // ---------------------------------------------------------------------------
 // 7. Special characters — no raw `</script>` possible.

@@ -2,23 +2,17 @@
 //
 // Tool surface for the chat orchestrator.
 //
-// The chat agent consumes the existing canvas tools (rewriteText,
-// replaceMedia, designSection) verbatim from `src/agent/canvas-tools.ts` and
-// adds two new tools owned here:
+// The chat agent consumes the mutating canvas tools from
+// `src/agent/canvas-tools.ts` and adds two read-only inspection tools:
 //
 //   - `query_site` — read-only. Returns a token-bounded summary of the
-//     current CanvasSiteState so the model can reference page / section /
-//     element ids when it picks a follow-up tool call.
-//   - `propose_op` — wraps a canvas op as a preview event. The orchestrator
-//     does NOT apply ops to the editable state; it emits an `op-preview`
-//     SSE event and the editor client renders accept/reject UI. The actual
-//     apply happens through the existing `POST /api/canvas-agent/sites/:id/apply`
-//     route — owned by the canvas-agent module — once the Owner accepts.
+//     model can reference page, section, and element ids.
+//   - `query_assets` â€” returns uploaded asset ids and metadata so the model
+//     can reference concrete assets in media operations.
 //
-// The existing canvas tools (rewriteText, replaceMedia, designSection) are
-// re-exported as part of CHAT_AGENT_TOOLS so the orchestrator dispatches
-// them as `propose_op`-equivalent previews. The model sees a single
-// extended tool catalogue.
+// Mutating canvas tools are re-exported as part of CHAT_AGENT_TOOLS. The
+// orchestrator dispatches those calls as preview events; accepted previews are
+// applied by the canvas-agent route.
 
 import { CANVAS_AGENT_TOOLS } from '../canvas-tools.js';
 import type { JsonSchema, LlmTool } from '../llm.js';
@@ -28,7 +22,6 @@ import type {
   CanvasSiteState,
   ElementType,
 } from '../../canvas/schema.js';
-import { ELEMENT_TYPES } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
 import { QUERY_SITE_TOKEN_CAP, estimateTokens } from './session.js';
 

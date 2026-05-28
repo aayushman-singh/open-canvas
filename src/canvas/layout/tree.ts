@@ -10,7 +10,6 @@ import type {
   ActionVariant,
   ActionHref,
   BackgroundEffect,
-  ElementType,
   MotionPreset,
   ShapeVariant,
   SurfaceVariant,
@@ -39,6 +38,9 @@ export type SplitRatio = (typeof SPLIT_RATIOS)[number];
 
 export const ELEMENT_SIZES = ['fill', 'hug'] as const;
 export type ElementSize = (typeof ELEMENT_SIZES)[number];
+
+export const DESIGN_ELEMENT_TYPES = ['text', 'media', 'action', 'shape', 'container'] as const;
+export type DesignElementType = (typeof DESIGN_ELEMENT_TYPES)[number];
 
 export interface TextProps {
   content: string;
@@ -70,7 +72,7 @@ export interface ContainerProps {
 
 export interface ElementNode {
   element: {
-    type: ElementType;
+    type: DesignElementType;
     text?: TextProps;
     media?: MediaProps;
     action?: ActionProps;

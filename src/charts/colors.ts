@@ -41,6 +41,9 @@ export function parseHexColor(hex: string): { r: number; g: number; b: number } 
     throw new Error(`parseHexColor: expected non-empty string, got ${String(hex)}`);
   }
   const cleaned = hex.trim().replace(/^#/, '');
+  if (!/^(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(cleaned)) {
+    throw new Error(`parseHexColor: expected 3 or 6 hex chars, got "${hex}"`);
+  }
   let r: number;
   let g: number;
   let b: number;
@@ -178,25 +181,21 @@ export function buildPaletteFromAccent(accentHex: string): string[] {
 
 /**
  * Resolve the active accent for a chart by Style Kit name and produce the
- * palette. The 'custom' kit (Wave 2 #10) is intentionally not handled here:
- * the custom-theme owner wires `customStyleKit` into the renderer separately
- * and may pass an accent through different plumbing — chart palette resolves
- * only against built-in kits today.
+ * palette. Custom kits pass the resolved accent through the render context;
+ * this function keeps that request-scoped so concurrent renders cannot leak
+ * style data through module globals.
  */
-let _customAccent: string | null = null;
-
-export function configureChartPalette(opts: { customAccent: string | null }): void {
-  _customAccent = opts.customAccent;
-}
-
-export function buildChartPalette(styleKitName: string): string[] {
+export function buildChartPalette(
+  styleKitName: string,
+  opts: { customAccent?: string | null } = {},
+): string[] {
   if (styleKitName === 'custom') {
-    if (!_customAccent) {
+    if (!opts.customAccent) {
       throw new Error(
-        'buildChartPalette: styleKit is "custom" but configureChartPalette was not called with the resolved accent.',
+        'buildChartPalette: styleKit is "custom" but no resolved custom accent was provided.',
       );
     }
-    return buildPaletteFromAccent(_customAccent);
+    return buildPaletteFromAccent(opts.customAccent);
   }
   const preset = getStyleKitPreset(styleKitName);
   return buildPaletteFromAccent(preset.accent);

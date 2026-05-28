@@ -33,6 +33,7 @@
     "section-import:smoke": "bun run src/canvas/section-import-smoke.ts",
     "import:smoke": "bun run src/routes/api/import-smoke.ts",
     "assets:smoke": "bun run src/assets/smoke.ts",
+    "auth-access:smoke": "bun run src/auth/access.smoke.ts",
     "seed:assets": "bun run src/assets/seed-script.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",

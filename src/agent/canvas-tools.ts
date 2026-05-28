@@ -1,13 +1,14 @@
 // src/agent/canvas-tools.ts
 //
-// LLM tool definitions for the canvas AI flow (T7). The agent gets exactly
-// three tools:
+// LLM tool definitions for the canvas AI flow (T7). The agent gets mutating
+// tools for:
 //
 //   - `rewriteText` — replace the inline runs of a text element.
 //   - `replaceMedia` — swap a media element's asset id (LLM picks an
 //     EXISTING uploaded asset; the tool does not generate bytes).
 //   - `designSection` — create a section from a semantic layout tree; the
 //     LLM describes structure while the layout engine computes geometry.
+//   - Element, section, page, Style Kit, and site-config edits.
 //
 // Each schema is tight: marks and design tokens are enumerated, link hrefs
 // carry the same allowlist hint the validator enforces, and descriptions

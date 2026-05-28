@@ -23,7 +23,7 @@
 // `ElementRenderCtx` declared below — a single shape every render fn reads
 // from, regardless of whether it cares about every field.
 
-import type { CanvasElement, CanvasPage } from '../schema.js';
+import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
 import { renderAccordion } from './accordion.js';
 import { renderAction } from './action.js';
@@ -90,6 +90,8 @@ export interface ElementRenderCtx {
   assetBasePath: string;
   /** Active style kit name on the current snapshot. Used by chart palette, code theme, etc. */
   styleKit: string;
+  /** Resolved custom style kit tokens when styleKit === 'custom'. */
+  customPreset?: StyleKitPreset | null;
   /** Current site id, needed by form render to wire form action URL. */
   siteId: string;
   /** Slug of the page currently being rendered. */
@@ -133,7 +135,11 @@ export const RENDER_DISPATCH: RenderDispatch = {
       styleKit: ctx.styleKit,
     }),
   embed: (el, ctx) => renderEmbed(el, { styleKit: ctx.styleKit }),
-  chart: (el, ctx) => renderChart(el, { styleKit: ctx.styleKit }),
+  chart: (el, ctx) =>
+    renderChart(el, {
+      styleKit: ctx.styleKit,
+      customAccent: ctx.customPreset?.accent ?? null,
+    }),
   accordion: (el, ctx) => renderAccordion(el, { styleKit: ctx.styleKit }),
   carousel: (el, ctx) =>
     renderCarousel(el, {
@@ -141,7 +147,11 @@ export const RENDER_DISPATCH: RenderDispatch = {
       assetBasePath: ctx.assetBasePath,
     }),
   table: (el, ctx) => renderTable(el, { styleKit: ctx.styleKit }),
-  code: (el, ctx) => renderCode(el, { styleKit: ctx.styleKit }),
+  code: (el, ctx) =>
+    renderCode(el, {
+      styleKit: ctx.styleKit,
+      ...(ctx.customPreset !== undefined ? { customPreset: ctx.customPreset } : {}),
+    }),
   nav: (el, ctx) =>
     renderNav(el, {
       styleKit: ctx.styleKit,

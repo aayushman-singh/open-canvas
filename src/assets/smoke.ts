@@ -27,6 +27,7 @@ import { deleteOwnerAsset } from './delete.js';
 import { sha256Hex } from './hash.js';
 import { readOwnerAsset, type CfImageFetcher, type CfImageOptions } from './read.js';
 import { createR2Client, type R2BucketLike, type R2PutOptions } from './r2-client.js';
+import { uploadOwnerAsset, UploadAssetError } from './upload.js';
 import {
   collectReferencedAssets,
   collectReferencedAssetIds,
@@ -34,6 +35,7 @@ import {
 } from './site-assets.js';
 import type { CanvasPage } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
+import { ownerAsset, site, slotHistory } from '../db/schema.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[assets:smoke] ${message}`);
@@ -437,6 +439,21 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
     `expected immutable cache-control on transformed response, got ${transformedCacheControl}`,
   );
 
+  let invalidWidthThrew = false;
+  try {
+    await readOwnerAsset(
+      { db: shimDb, r2: r2Client, cfImageFetch, publicOrigin: 'https://rev01.test' },
+      {
+        addr: expectedHash,
+        url: new URL(`https://rev01.test/assets/${expectedHash}?w=12abc`),
+      },
+    );
+  } catch (err) {
+    invalidWidthThrew =
+      err instanceof Error && err.message.includes('invalid w=12abc');
+  }
+  assert(invalidWidthThrew, 'transform width must reject partial numeric garbage');
+
   // Missing addr resolves to null (route layer maps to 404).
   const missDb = {
     select: () => ({
@@ -451,6 +468,102 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
     },
   );
   assert(missResponse === null, 'expected missing-addr lookup to return null');
+}
+
+// ---------------------------------------------------------------------------
+// Slot-history scope: upload-side book-keeping must never write a site slot
+// for a site outside the uploading Owner's account.
+// ---------------------------------------------------------------------------
+
+class UploadScopeDb {
+  ownerAssets: Array<Record<string, unknown>> = [];
+  slotRows: Array<Record<string, unknown>> = [];
+
+  constructor(private readonly ownsSite: boolean) {}
+
+  select(): { from: (table: unknown) => { where: () => { limit: () => Promise<unknown[]> } } } {
+    return {
+      from: (table: unknown) => ({
+        where: () => ({
+          limit: () => {
+            if (table === ownerAsset) return Promise.resolve([]);
+            if (table === site) {
+              return Promise.resolve(this.ownsSite ? [{ id: 'site-owned' }] : []);
+            }
+            throw new Error('[assets:smoke] unexpected select table');
+          },
+        }),
+      }),
+    };
+  }
+
+  insert(table: unknown): { values: (row: Record<string, unknown>) => Promise<void> | { onConflictDoUpdate: () => Promise<void> } } {
+    if (table === ownerAsset) {
+      return {
+        values: (row) => {
+          this.ownerAssets.push(row);
+          return Promise.resolve();
+        },
+      };
+    }
+    if (table === slotHistory) {
+      return {
+        values: (row) => ({
+          onConflictDoUpdate: () => {
+            this.slotRows.push(row);
+            return Promise.resolve();
+          },
+        }),
+      };
+    }
+    throw new Error('[assets:smoke] unexpected insert table');
+  }
+}
+
+async function runSlotHistoryScopeTests(png32: Uint8Array): Promise<void> {
+  const unownedDb = new UploadScopeDb(false);
+  let unownedThrew = false;
+  try {
+    await uploadOwnerAsset(
+      { db: unownedDb as unknown as Db, r2: createR2Client(new MockR2()) },
+      {
+        customerId: 'cust-A',
+        bytes: png32,
+        mediaType: 'image/png',
+        alt: 'scoped',
+        siteId: 'site-not-owned',
+        elementId: 'hero-media',
+      },
+    );
+  } catch (err) {
+    unownedThrew =
+      err instanceof UploadAssetError &&
+      err.status === 403 &&
+      err.message.includes('site not owned');
+  }
+  assert(unownedThrew, 'uploadOwnerAsset must reject slot history for unowned site');
+  assert(unownedDb.slotRows.length === 0, 'unowned slot history must not be inserted');
+
+  const partialDb = new UploadScopeDb(true);
+  let partialThrew = false;
+  try {
+    await uploadOwnerAsset(
+      { db: partialDb as unknown as Db, r2: createR2Client(new MockR2()) },
+      {
+        customerId: 'cust-A',
+        bytes: png32,
+        mediaType: 'image/png',
+        alt: 'partial',
+        siteId: 'site-owned',
+      },
+    );
+  } catch (err) {
+    partialThrew =
+      err instanceof UploadAssetError &&
+      err.message.includes('siteId and elementId must be provided together');
+  }
+  assert(partialThrew, 'slot history metadata must be all-or-nothing');
+  assert(partialDb.slotRows.length === 0, 'partial slot history must not be inserted');
 }
 
 // ---------------------------------------------------------------------------
@@ -634,6 +747,7 @@ const expectedHash = await sha256Hex(png32);
 runReferenceWalkTests();
 await runUploadTests(png32, expectedHash);
 await runReadTests(png32, expectedHash);
+await runSlotHistoryScopeTests(png32);
 await runDeleteTests(png32, expectedHash);
 
 console.log('[assets:smoke] OK');

@@ -10,6 +10,7 @@ import {
 import { isAllowedHref } from '../canvas/validate.js';
 import {
   COLOR_TOKENS,
+  DESIGN_ELEMENT_TYPES,
   ELEMENT_SIZES,
   FONT_TOKENS,
   GAP_TOKENS,
@@ -22,8 +23,7 @@ import {
   type LayoutNode,
 } from '../canvas/layout/tree.js';
 
-const DESIGN_ELEMENT_TYPES = ['text', 'media', 'action', 'shape', 'container'] as const;
-const ELEMENT_PROP_KEYS = ['text', 'media', 'action', 'shape', 'container'] as const;
+const ELEMENT_PROP_KEYS = DESIGN_ELEMENT_TYPES;
 const DESIGN_ELEMENT_MAX = 30;
 const HEIGHT_MIN = 240;
 const HEIGHT_MAX = 1200;

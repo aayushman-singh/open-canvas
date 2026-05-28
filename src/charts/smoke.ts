@@ -17,6 +17,7 @@ import {
   buildChartPalette,
   buildPaletteFromAccent,
   CHART_PALETTE_LENGTH,
+  parseHexColor,
 } from './colors.js';
 import { computePieSlices } from './pie.js';
 
@@ -46,6 +47,16 @@ function makeBaseElement(): Omit<ChartElement, 'kind' | 'series' | 'categories' 
     type: 'chart',
     box: { x: 0, y: 0, w: 800, h: 400, z: 1 },
   };
+}
+
+{
+  let threw = false;
+  try {
+    parseHexColor('#0g0000');
+  } catch (err) {
+    threw = err instanceof Error && err.message.includes('hex');
+  }
+  assert(threw, 'parseHexColor must reject partial hex garbage');
 }
 
 // --- Assertion 1: 3 categories x 2 series -> 6 <rect> ----------------------

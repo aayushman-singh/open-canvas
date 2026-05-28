@@ -22,7 +22,7 @@ import { contentHashToR2Key, extFromMediaType, sha256Hex } from './hash.js';
 import { probeImageDimensions } from './image-probe.js';
 import type { R2Client } from './r2-client.js';
 import type { Db } from '../db/client.js';
-import { ownerAsset, slotHistory } from '../db/schema.js';
+import { ownerAsset, site, slotHistory } from '../db/schema.js';
 
 export interface UploadAssetInput {
   customerId: string;
@@ -91,6 +91,11 @@ export async function uploadOwnerAsset(
   deps: UploadAssetDeps,
   input: UploadAssetInput,
 ): Promise<UploadAssetResult> {
+  const hasSiteId = input.siteId !== undefined;
+  const hasElementId = input.elementId !== undefined;
+  if (hasSiteId !== hasElementId) {
+    throw new UploadAssetError('siteId and elementId must be provided together');
+  }
   if (!ALLOWED_MEDIA_PREFIXES.some((prefix) => input.mediaType.startsWith(prefix))) {
     throw new UploadAssetError(
       `unsupported media type: ${input.mediaType} (must start with image/ or video/)`,
@@ -117,7 +122,13 @@ export async function uploadOwnerAsset(
   const found = existing[0];
   if (found) {
     if (input.siteId !== undefined && input.elementId !== undefined) {
-      await recordSlotUse(deps.db, input.siteId, input.elementId, found.id);
+      await recordOwnedSiteSlotUse(
+        deps.db,
+        input.customerId,
+        input.siteId,
+        input.elementId,
+        found.id,
+      );
     }
     return {
       id: found.id,
@@ -164,7 +175,7 @@ export async function uploadOwnerAsset(
   });
 
   if (input.siteId !== undefined && input.elementId !== undefined) {
-    await recordSlotUse(deps.db, input.siteId, input.elementId, id);
+    await recordOwnedSiteSlotUse(deps.db, input.customerId, input.siteId, input.elementId, id);
   }
 
   return {
@@ -182,12 +193,22 @@ export async function uploadOwnerAsset(
   };
 }
 
-async function recordSlotUse(
+async function recordOwnedSiteSlotUse(
   db: Db,
+  customerId: string,
   siteId: string,
   elementId: string,
   ownerAssetId: string,
 ): Promise<void> {
+  const siteRows = await db
+    .select({ id: site.id })
+    .from(site)
+    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .limit(1);
+  if (!siteRows[0]) {
+    throw new UploadAssetError(`site not owned for slot history: ${siteId}`, 403);
+  }
+
   // Composite primary key keeps duplicates a no-op via ON CONFLICT DO
   // NOTHING. We always update `used_at` so the gallery's MRU ordering moves
   // the asset to the top on every reuse.

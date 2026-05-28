@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { createR2Client } from '../../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../../assets/read';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
+import { loadAccessibleSite, type SiteAccessRequirement } from '../../auth/accessible-site';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import {
@@ -14,7 +15,7 @@ import {
 } from '../../canvas/schema';
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site, siteCollaborator } from '../../db/schema';
+import { ownerAsset, site } from '../../db/schema';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -83,7 +84,7 @@ function patchEditablePage(
 async function persistEditableState(
   c: Context<Env>,
   siteId: string,
-  customerId: string,
+  ownerCustomerId: string,
   nextState: CanvasSiteState,
 ): Promise<Response | null> {
   const validation = validateCanvasSiteState(nextState);
@@ -97,17 +98,18 @@ async function persistEditableState(
       editableState: nextState,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
+    .where(and(eq(site.id, siteId), eq(site.customerId, ownerCustomerId)));
   return null;
 }
 
-async function loadOwnedSite(
+async function loadCanvasSiteAccess(
   c: Context<Env>,
   siteId: string,
+  requiredRole: SiteAccessRequirement,
 ): Promise<
   | {
       found: true;
-      customerId: string;
+      ownerCustomerId: string;
       site: {
         id: string;
         name: string;
@@ -125,60 +127,28 @@ async function loadOwnedSite(
   }
 
   const database = db(c.env);
-
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) {
+  const accessibleSite = await loadAccessibleSite(database, auth.userId, siteId, requiredRole);
+  if (!accessibleSite) {
     return { found: false };
   }
 
-  const siteRow = await database
-    .select({
-      id: site.id,
-      name: site.name,
-      subdomain: site.subdomain,
-      styleKit: site.styleKit,
-      editableState: site.editableState,
-      publishedVersion: site.publishedVersion,
-      ownerId: site.customerId,
-    })
-    .from(site)
-    .where(eq(site.id, siteId))
-    .limit(1);
-  const row = siteRow[0];
-  if (!row) {
-    return { found: false };
-  }
-
-  if (row.ownerId === customerId) {
-    return { found: true, customerId, site: row };
-  }
-
-  const collabRow = await database
-    .select({ id: siteCollaborator.id })
-    .from(siteCollaborator)
-    .where(
-      and(
-        eq(siteCollaborator.siteId, siteId),
-        eq(siteCollaborator.customerId, customerId),
-        isNotNull(siteCollaborator.acceptedAt),
-      ),
-    )
-    .limit(1);
-  if (!collabRow[0]) {
-    return { found: false };
-  }
-
-  return { found: true, customerId: row.ownerId, site: row };
+  return {
+    found: true,
+    ownerCustomerId: accessibleSite.customerId,
+    site: {
+      id: accessibleSite.id,
+      name: accessibleSite.name,
+      subdomain: accessibleSite.subdomain,
+      styleKit: accessibleSite.styleKit,
+      editableState: accessibleSite.editableState,
+      publishedVersion: accessibleSite.publishedVersion,
+    },
+  };
 }
 
 canvasApi.get('/sites/:siteId', async (c) => {
   const siteId = c.req.param('siteId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'viewer');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -194,7 +164,7 @@ canvasApi.get('/sites/:siteId', async (c) => {
 
 canvasApi.put('/sites/:siteId', async (c) => {
   const siteId = c.req.param('siteId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -229,7 +199,10 @@ canvasApi.put('/sites/:siteId', async (c) => {
       .select({ id: ownerAsset.id, kind: ownerAsset.kind })
       .from(ownerAsset)
       .where(
-        and(eq(ownerAsset.customerId, result.customerId), inArray(ownerAsset.id, referencedList)),
+        and(
+          eq(ownerAsset.customerId, result.ownerCustomerId),
+          inArray(ownerAsset.id, referencedList),
+        ),
       );
     const referenceErrors = findAssetReferenceErrors(nextState, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
@@ -265,7 +238,7 @@ canvasApi.put('/sites/:siteId', async (c) => {
       editableState: nextState,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(site.id, siteId), eq(site.customerId, result.customerId)));
+    .where(and(eq(site.id, siteId), eq(site.customerId, result.ownerCustomerId)));
 
   return c.json({ ok: true });
 });
@@ -273,7 +246,7 @@ canvasApi.put('/sites/:siteId', async (c) => {
 canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const siteId = c.req.param('siteId');
   const pageId = c.req.param('pageId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -315,7 +288,7 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
     return c.json({ error: 'page not found' }, 404);
   }
 
-  const failure = await persistEditableState(c, siteId, result.customerId, nextState);
+  const failure = await persistEditableState(c, siteId, result.ownerCustomerId, nextState);
   if (failure) return failure;
   return c.json({ ok: true });
 });
@@ -323,7 +296,7 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
 canvasApi.put('/sites/:siteId/pages/:pageId/metadata', async (c) => {
   const siteId = c.req.param('siteId');
   const pageId = c.req.param('pageId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -380,7 +353,7 @@ canvasApi.put('/sites/:siteId/pages/:pageId/metadata', async (c) => {
     return c.json({ error: 'page not found' }, 404);
   }
 
-  const failure = await persistEditableState(c, siteId, result.customerId, nextState);
+  const failure = await persistEditableState(c, siteId, result.ownerCustomerId, nextState);
   if (failure) return failure;
   return c.json({ ok: true });
 });
@@ -442,7 +415,7 @@ function decodeDataUrl(input: string): DecodedDataUrl {
 // will be removed in a follow-up commit once the rollout window closes.
 canvasApi.post('/sites/:siteId/assets', async (c) => {
   const siteId = c.req.param('siteId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -468,7 +441,7 @@ canvasApi.post('/sites/:siteId/assets', async (c) => {
     const uploaded = await uploadOwnerAsset(
       { db: database, r2 },
       {
-        customerId: result.customerId,
+        customerId: result.ownerCustomerId,
         bytes: decoded.bytes,
         mediaType: decoded.mediaType,
         alt: parsed.alt,
@@ -625,7 +598,7 @@ async function generateImageViaReplicate(
 // otherwise be required.
 canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
   const siteId = c.req.param('siteId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -673,7 +646,7 @@ canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
 canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   const siteId = c.req.param('siteId');
   const assetId = c.req.param('assetId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'viewer');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -693,7 +666,7 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
     .from(ownerAsset)
     .where(
       and(
-        eq(ownerAsset.customerId, result.customerId),
+        eq(ownerAsset.customerId, result.ownerCustomerId),
         or(eq(ownerAsset.id, assetId), eq(ownerAsset.contentHash, assetId)),
       ),
     )
@@ -737,7 +710,7 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
 
 canvasApi.post('/sites/:siteId/style-kit', async (c) => {
   const siteId = c.req.param('siteId');
-  const result = await loadOwnedSite(c, siteId);
+  const result = await loadCanvasSiteAccess(c, siteId, 'editor');
   if (!result.found) {
     return c.json({ error: 'site not found' }, 404);
   }
@@ -764,7 +737,7 @@ canvasApi.post('/sites/:siteId/style-kit', async (c) => {
       editableState: nextState,
       updatedAt: sql`now()`,
     })
-    .where(and(eq(site.id, siteId), eq(site.customerId, result.customerId)));
+    .where(and(eq(site.id, siteId), eq(site.customerId, result.ownerCustomerId)));
 
   return c.json({ ok: true, styleKit: incoming });
 });

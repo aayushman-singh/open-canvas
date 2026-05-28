@@ -1,7 +1,7 @@
 // src/auth/accessible-site.ts
 //
 // Permission helper that resolves a site for the current user if they are
-// the owner OR an accepted collaborator with the required role. Replaces
+// the owner OR an accepted collaborator with a sufficient role. Replaces
 // the owner-only `loadOwnedSite` pattern for endpoints that collaborators
 // should also reach (canvas load/save, asset upload, etc.).
 
@@ -21,12 +21,35 @@ export interface AccessibleSite {
   accessRole: 'owner' | CollaboratorRole;
 }
 
+export type SiteAccessRole = AccessibleSite['accessRole'];
+export type SiteAccessRequirement = 'viewer' | 'editor' | 'owner';
+
+const ACCESS_RANK: Record<SiteAccessRole, number> = {
+  viewer: 1,
+  editor: 2,
+  owner: 3,
+};
+
+const REQUIRED_ACCESS_RANK: Record<SiteAccessRequirement, number> = {
+  viewer: 1,
+  editor: 2,
+  owner: 3,
+};
+
+export function accessRoleMeetsRequirement(
+  role: SiteAccessRole,
+  required: SiteAccessRequirement,
+): boolean {
+  return ACCESS_RANK[role] >= REQUIRED_ACCESS_RANK[required];
+}
+
 type Db = ReturnType<typeof import('../db/client').db>;
 
 export async function loadAccessibleSite(
   database: Db,
   clerkUserId: string,
   siteId: string,
+  requiredRole: SiteAccessRequirement = 'viewer',
 ): Promise<AccessibleSite | null> {
   const customerRow = await database
     .select({ id: customer.id })
@@ -52,7 +75,8 @@ export async function loadAccessibleSite(
     .limit(1);
 
   if (ownedRow[0]) {
-    return { ...ownedRow[0], accessRole: 'owner' };
+    const ownedSite = { ...ownedRow[0], accessRole: 'owner' as const };
+    return accessRoleMeetsRequirement(ownedSite.accessRole, requiredRole) ? ownedSite : null;
   }
 
   // Check accepted collaborator
@@ -79,7 +103,7 @@ export async function loadAccessibleSite(
     .limit(1);
 
   if (collabRow[0]) {
-    return {
+    const accessibleSite: AccessibleSite = {
       id: collabRow[0].siteId,
       customerId: collabRow[0].customerId,
       name: collabRow[0].name,
@@ -89,6 +113,9 @@ export async function loadAccessibleSite(
       publishedVersion: collabRow[0].publishedVersion,
       accessRole: collabRow[0].role,
     };
+    return accessRoleMeetsRequirement(accessibleSite.accessRole, requiredRole)
+      ? accessibleSite
+      : null;
   }
 
   return null;

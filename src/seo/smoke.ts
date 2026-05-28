@@ -329,6 +329,16 @@ assert(
   headMeta.includes('<title>Launch</title>'),
   'renderCanvasHead: selects the page by slug and emits its title',
 );
+const missingHeadMeta = renderCanvasHead(snapshot3, {
+  siteId: SITE_ID,
+  host: HOST,
+  pageSlug: 'missing-page',
+  assetLookup: stubAssetLookup,
+});
+assert(
+  missingHeadMeta === '',
+  'renderCanvasHead: missing page returns empty head meta without falling back',
+);
 
 // renderCanvasSnapshot — additive emitHeadMeta hook is invoked per page.
 const collected: string[] = [];

@@ -40,8 +40,7 @@ export async function emitAddonHeadScripts(
   for (const row of rows) {
     const addon = getAddon(row.addonId);
     if (!addon) {
-      console.error(`[addons/emit] siteAddon references unknown addon id: ${row.addonId}`);
-      continue;
+      throw new Error(`[addons/emit] siteAddon references unknown addon id: ${row.addonId}`);
     }
     const html = addon.emitHeadScripts(row.config);
     if (html) parts.push(html);
@@ -59,7 +58,9 @@ export async function emitAddonBodyScripts(
   const parts: string[] = [];
   for (const row of rows) {
     const addon = getAddon(row.addonId);
-    if (!addon) continue;
+    if (!addon) {
+      throw new Error(`[addons/emit] siteAddon references unknown addon id: ${row.addonId}`);
+    }
     if (!addon.emitBodyScripts) continue;
     const html = addon.emitBodyScripts(row.config);
     if (html) parts.push(html);

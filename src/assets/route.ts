@@ -7,6 +7,7 @@
 
 import { eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { deleteOwnerAsset, type AssetReference } from './delete.js';
 import { listOwnerAssets } from './list.js';
 import { createR2Client } from './r2-client.js';
@@ -112,7 +113,7 @@ ownerAssetsApi.post('/', async (c) => {
     return c.json(result);
   } catch (err) {
     if (err instanceof UploadAssetError) {
-      return c.json({ error: err.message }, err.status);
+      return c.json({ error: err.message }, err.status as ContentfulStatusCode);
     }
     throw err;
   }

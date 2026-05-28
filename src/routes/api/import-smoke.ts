@@ -1,4 +1,5 @@
 import { sha256Hex } from '../../assets/hash.js';
+import { validateCanvasSiteState } from '../../canvas/validate.js';
 import { buildCanvasSiteState, prepareImportedAssets, type ScraperResponse } from './import.js';
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -90,6 +91,8 @@ assert(
 );
 
 const state = buildCanvasSiteState(data, prepared.mediaAssetIdMap, prepared.fontFamilyTokenMap);
+const validation = validateCanvasSiteState(state);
+assert(validation.valid, validation.valid ? '' : validation.errors.join('; '));
 const elements = state.pages[0]?.sections[0]?.elements ?? [];
 assert(elements.length === 2, `expected two media elements, got ${String(elements.length)}`);
 assert(elements[0]?.type === 'media', 'first element must be media');
@@ -105,5 +108,41 @@ assert(
   state.customStyleKit?.fontFamilyDisplay.startsWith('font:'),
   'custom style kit display font must reference imported site font',
 );
+
+let missingAssetThrew = false;
+try {
+  buildCanvasSiteState(data, new Map(), prepared.fontFamilyTokenMap);
+} catch (err) {
+  missingAssetThrew =
+    err instanceof Error && err.message.includes('missing imported media asset');
+}
+assert(missingAssetThrew, 'missing imported media asset must fail loudly');
+
+let unknownElementThrew = false;
+try {
+  buildCanvasSiteState(
+    {
+      ...data,
+      sections: [
+        {
+          ...data.sections[0]!,
+          elements: [
+            {
+              type: 'marquee',
+              box: { x: 0, y: 0, w: 100, h: 80, z: 1 },
+              data: {},
+            },
+          ],
+        },
+      ],
+    },
+    prepared.mediaAssetIdMap,
+    prepared.fontFamilyTokenMap,
+  );
+} catch (err) {
+  unknownElementThrew =
+    err instanceof Error && err.message.includes('unsupported scraped element type');
+}
+assert(unknownElementThrew, 'unknown scraped element type must fail loudly');
 
 console.log('[import:smoke] OK');

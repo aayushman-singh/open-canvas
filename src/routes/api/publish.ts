@@ -266,12 +266,7 @@ publishApi.post('/sites/:siteId', async (c) => {
     return c.json({ error: 'render failed', detail: msg }, 500);
   }
 
-  try {
-    await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
-  } catch (ogErr) {
-    const msg = ogErr instanceof Error ? ogErr.message : String(ogErr);
-    console.error('[publish] OG generation failed (non-blocking):', msg);
-  }
+  await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
 
   await database
     .update(site)
@@ -282,19 +277,9 @@ publishApi.post('/sites/:siteId', async (c) => {
     })
     .where(and(eq(site.id, row.id), eq(site.customerId, customerId)));
 
-  try {
-    await captureOnPublish(row.id, snapshot.version, database, c.env);
-  } catch (captureErr) {
-    const msg = captureErr instanceof Error ? captureErr.message : String(captureErr);
-    console.error('[publish] snapshot capture failed (non-blocking):', msg);
-  }
+  await captureOnPublish(row.id, snapshot.version, database, c.env);
 
-  try {
-    await rebuildSearchIndex(row.id, snapshot, database);
-  } catch (indexErr) {
-    const msg = indexErr instanceof Error ? indexErr.message : String(indexErr);
-    console.error('[publish] search index rebuild failed (non-blocking):', msg);
-  }
+  await rebuildSearchIndex(row.id, snapshot, database);
 
   const id = c.env.SITE_ROOM.idFromName(row.id);
   const stub = c.env.SITE_ROOM.get(id);

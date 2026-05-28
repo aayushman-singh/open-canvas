@@ -881,7 +881,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
     }
-    return "id-" + Math.random().toString(36).slice(2) + "-" + Date.now().toString(36);
+    throw new Error("crypto.randomUUID is required for editor id generation");
   }
 
   function newElementId() { return "el-" + uuid(); }
@@ -1479,6 +1479,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function parseHexAccent(raw) {
     if (typeof raw !== "string") return null;
     const cleaned = raw.trim().replace(/^#/, "");
+    if (!/^(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(cleaned)) return null;
     let r, g, b;
     if (cleaned.length === 3) {
       r = parseInt(cleaned[0] + cleaned[0], 16);
@@ -1666,6 +1667,190 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  function buildFormBody(element) {
+    const node = document.createElement("form");
+    node.className = "rev01-form-preview";
+    node.style.display = "flex";
+    node.style.flexDirection = "column";
+    node.style.gap = "8px";
+    node.style.width = "100%";
+    node.style.height = "100%";
+    node.addEventListener("submit", function(ev) { ev.preventDefault(); });
+    const fields = Array.isArray(element.fields) ? element.fields : [];
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i] || {};
+      const label = document.createElement("label");
+      label.style.display = "flex";
+      label.style.flexDirection = "column";
+      label.style.gap = "4px";
+      label.style.fontSize = "12px";
+      label.textContent = field.label || field.id || "Field";
+      const input = document.createElement(field.kind === "textarea" ? "textarea" : "input");
+      if (field.kind && field.kind !== "textarea") input.setAttribute("type", field.kind === "email" ? "email" : field.kind === "checkbox" ? "checkbox" : "text");
+      input.disabled = true;
+      input.placeholder = field.placeholder || "";
+      input.style.boxSizing = "border-box";
+      input.style.width = "100%";
+      label.appendChild(input);
+      node.appendChild(label);
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = element.submitLabel || "Submit";
+    node.appendChild(button);
+    return node;
+  }
+
+  function buildEmbedBody(element) {
+    const node = document.createElement("div");
+    node.className = "rev01-embed-preview";
+    node.style.display = "flex";
+    node.style.alignItems = "center";
+    node.style.justifyContent = "center";
+    node.style.width = "100%";
+    node.style.height = "100%";
+    node.style.padding = "12px";
+    node.style.boxSizing = "border-box";
+    node.style.textAlign = "center";
+    node.textContent = element.title || element.url || "Embed";
+    return node;
+  }
+
+  function buildCodeBody(element) {
+    const pre = document.createElement("pre");
+    pre.className = "rev01-code-preview";
+    pre.style.margin = "0";
+    pre.style.width = "100%";
+    pre.style.height = "100%";
+    pre.style.overflow = "auto";
+    pre.style.boxSizing = "border-box";
+    pre.style.padding = "12px";
+    pre.textContent = element.source || "";
+    return pre;
+  }
+
+  function buildAccordionBody(element) {
+    const node = document.createElement("div");
+    node.className = "rev01-accordion-preview";
+    const items = Array.isArray(element.items) ? element.items : [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i] || {};
+      const details = document.createElement("details");
+      if (i === 0) details.open = true;
+      const summary = document.createElement("summary");
+      summary.textContent = item.title || "Item";
+      details.appendChild(summary);
+      const body = document.createElement("div");
+      const runs = Array.isArray(item.body) ? item.body : [];
+      body.textContent = runs.map(function(run) { return run && typeof run.text === "string" ? run.text : ""; }).join("");
+      details.appendChild(body);
+      node.appendChild(details);
+    }
+    return node;
+  }
+
+  function buildCarouselBody(element) {
+    const node = document.createElement("div");
+    node.className = "rev01-carousel-preview";
+    node.style.display = "flex";
+    node.style.gap = "8px";
+    node.style.width = "100%";
+    node.style.height = "100%";
+    node.style.overflow = "hidden";
+    const slides = Array.isArray(element.slides) ? element.slides : [];
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i] || {};
+      const cell = document.createElement("div");
+      cell.style.flex = "0 0 70%";
+      cell.style.display = "flex";
+      cell.style.alignItems = "center";
+      cell.style.justifyContent = "center";
+      cell.style.background = "rgba(0,0,0,0.08)";
+      cell.textContent = slide.caption || slide.assetId || "Slide";
+      node.appendChild(cell);
+    }
+    return node;
+  }
+
+  function buildTableBody(element) {
+    const table = document.createElement("table");
+    table.className = "rev01-table-preview";
+    table.style.width = "100%";
+    table.style.height = "100%";
+    table.style.borderCollapse = "collapse";
+    const columns = Array.isArray(element.columns) ? element.columns : [];
+    const rows = Array.isArray(element.rows) ? element.rows : [];
+    if (columns.length > 0) {
+      const thead = document.createElement("thead");
+      const tr = document.createElement("tr");
+      for (let i = 0; i < columns.length; i++) {
+        const th = document.createElement("th");
+        th.textContent = columns[i].header || columns[i].id || "";
+        tr.appendChild(th);
+      }
+      thead.appendChild(tr);
+      table.appendChild(thead);
+    }
+    const tbody = document.createElement("tbody");
+    for (let r = 0; r < rows.length; r++) {
+      const tr = document.createElement("tr");
+      for (let c = 0; c < columns.length; c++) {
+        const td = document.createElement("td");
+        const key = columns[c].id;
+        const cells = rows[r] && rows[r].cells ? rows[r].cells : {};
+        td.textContent = key ? String(cells[key] || "") : "";
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildNavBody(element) {
+    const nav = document.createElement("nav");
+    nav.className = "rev01-nav-preview";
+    nav.style.display = "flex";
+    nav.style.alignItems = "center";
+    nav.style.gap = "12px";
+    nav.style.width = "100%";
+    nav.style.height = "100%";
+    const links = Array.isArray(element.links) ? element.links : [];
+    for (let i = 0; i < links.length; i++) {
+      const a = document.createElement("a");
+      a.href = "#";
+      a.textContent = links[i].label || "Link";
+      a.addEventListener("click", function(ev) { ev.preventDefault(); });
+      nav.appendChild(a);
+    }
+    return nav;
+  }
+
+  function buildCollectionBody(element) {
+    const node = document.createElement("div");
+    node.className = "rev01-collection-preview";
+    node.style.display = "grid";
+    node.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
+    node.style.gap = "8px";
+    const entries = Array.isArray(element.entries) ? element.entries : [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = Array.isArray(entries[i]) ? entries[i] : [];
+      const card = document.createElement("div");
+      card.style.position = "relative";
+      card.style.minHeight = "80px";
+      for (let j = 0; j < entry.length; j++) {
+        const child = document.createElement("div");
+        child.style.position = "absolute";
+        setBoxStyle(child, entry[j].box || { x: 0, y: 0, w: 120, h: 40, z: 1 });
+        child.appendChild(buildElementBody(entry[j]));
+        card.appendChild(child);
+      }
+      node.appendChild(card);
+    }
+    if (entries.length === 0) node.textContent = "Collection";
+    return node;
+  }
+
   function buildElementBody(element) {
     switch (element.type) {
       case "text": return buildTextBody(element);
@@ -1674,6 +1859,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       case "shape": return buildShapeBody(element);
       case "container": return buildContainerBody(element);
       case "chart": return buildChartBody(element);
+      case "form": return buildFormBody(element);
+      case "embed": return buildEmbedBody(element);
+      case "code": return buildCodeBody(element);
+      case "accordion": return buildAccordionBody(element);
+      case "carousel": return buildCarouselBody(element);
+      case "table": return buildTableBody(element);
+      case "nav": return buildNavBody(element);
+      case "collection": return buildCollectionBody(element);
       // Wave 3 #14 — symbol-instance editor placeholder. Renders a card that
       // identifies the referenced master by name + lists override count. The
       // public renderer does the real merge + render at publish/preview time;
@@ -1681,8 +1874,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // be primarily edited via the Symbol panel (master edits propagate).
       case "symbol-instance": return buildSymbolInstanceBody(element);
     }
-    const fallback = document.createElement("div");
-    return fallback;
+    throw new Error("unsupported editor element type: " + String(element.type));
   }
 
   // -- Element context menu (3-dot, top-left on hover) --------------------
@@ -2942,7 +3134,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           if (m.type === "strike") inner = "<s>" + inner + "</s>";
           if (m.type === "code") inner = "<code>" + inner + "</code>";
           if (m.type === "highlight") inner = "<mark>" + inner + "</mark>";
-          if (m.type === "link") { var safeHref = /^(https?:|mailto:|tel:|\/|#)/i.test(m.href) ? m.href : "#"; inner = "<a href=\"" + safeHref.replace(/"/g, "&quot;") + "\">" + inner + "</a>"; }
+          if (m.type === "link") { var safeHref = /^(https?:|mailto:|tel:|\\/|#)/i.test(m.href) ? m.href : "#"; inner = '<a href="' + safeHref.replace(/"/g, "&quot;") + '">' + inner + "</a>"; }
         }
         out += inner;
       }
@@ -8239,7 +8431,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // actions, and the "Add symbol instance" sidebar command.
 
   function ensureSymbolsTabMounted() {
-    return null;
     if (!sidebar) return null;
     const tabsRow = sidebar.querySelector(".rev01-sidebar-tabs");
     if (!tabsRow) return null;
