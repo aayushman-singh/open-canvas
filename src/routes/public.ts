@@ -12,7 +12,7 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { html, raw } from 'hono/html';
@@ -469,47 +469,73 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   return c.html(editorPageJsx(opts));
 }
 
+type InviteErrorKind = 'expired' | 'invalid' | 'cancelled';
+
+function renderInviteErrorPage<P extends string, I extends Input>(
+  c: Context<PublicEnv, P, I>,
+  kind: InviteErrorKind,
+): Response {
+  const copy: Record<InviteErrorKind, { title: string; body: string; status: 400 | 404 | 410 }> = {
+    expired: {
+      title: 'Invitation expired',
+      body: 'This invitation link has expired. Ask the site owner to send a new one.',
+      status: 410,
+    },
+    invalid: {
+      title: 'Invalid invitation link',
+      body: 'This invitation link could not be verified. Check the URL or ask the site owner to resend.',
+      status: 400,
+    },
+    cancelled: {
+      title: 'Invitation no longer available',
+      body: 'The site owner has cancelled or removed this invitation.',
+      status: 410,
+    },
+  };
+  const { title, body, status } = copy[kind];
+  return c.html(
+    `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+    <title>rev01 — ${title}</title>
+    <style>body{margin:0;display:flex;align-items:center;justify-content:center;
+    min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
+    .wrap{text-align:center;max-width:400px;padding:32px;}
+    h1{font-size:20px;margin:0 0 12px;}
+    p{font-size:14px;opacity:0.7;line-height:1.5;margin:0;}</style></head>
+    <body><div class="wrap"><h1>${title}</h1><p>${body}</p></div></body></html>`,
+    status,
+  );
+}
+
 async function handleAcceptInvite<P extends string, I extends Input>(
   c: Context<PublicEnv, P, I>,
   siteRow: PublicSiteRow,
 ): Promise<Response> {
   const requestUrl = new URL(c.req.url);
   const token = requestUrl.searchParams.get('token');
-  const payload = await verifyInviteToken(token, c.env.UNLOCK_SIGNING_SECRET);
+  const result = await verifyInviteToken(token, c.env.UNLOCK_SIGNING_SECRET);
 
-  if (!payload || payload.siteId !== siteRow.id) {
-    return c.html(
-      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-      <title>rev01 — invalid invitation</title>
-      <style>body{margin:0;display:flex;align-items:center;justify-content:center;
-      min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
-      .wrap{text-align:center;max-width:400px;}h1{font-size:20px;margin:0 0 12px;}
-      p{font-size:14px;opacity:0.7;line-height:1.5;}</style></head>
-      <body><div class="wrap"><h1>Invitation expired or invalid</h1>
-      <p>Ask the site owner to send a new invitation.</p></div></body></html>`,
-      400,
-    );
+  if (!result.ok) {
+    return renderInviteErrorPage(c, result.reason);
+  }
+  if (result.payload.siteId !== siteRow.id) {
+    return renderInviteErrorPage(c, 'invalid');
   }
 
   const database = db(c.env);
+  // COALESCE keeps the original acceptedAt timestamp if the invitee re-clicks
+  // an old link after already accepting — preserves audit data and lets the
+  // same handler serve both first-accept and re-visit flows.
   const updated = await database
     .update(siteCollaborator)
-    .set({ acceptedAt: new Date() })
-    .where(eq(siteCollaborator.id, payload.collaboratorId))
+    .set({ acceptedAt: sql`COALESCE(${siteCollaborator.acceptedAt}, NOW())` })
+    .where(eq(siteCollaborator.id, result.payload.collaboratorId))
     .returning({
       id: siteCollaborator.id,
       customerId: siteCollaborator.customerId,
     });
 
   if (!updated[0]) {
-    return c.html(
-      `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-      <title>rev01 — invitation not found</title>
-      <style>body{margin:0;display:flex;align-items:center;justify-content:center;
-      min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
-      </style></head><body><p>This invitation no longer exists.</p></body></html>`,
-      404,
-    );
+    return renderInviteErrorPage(c, 'cancelled');
   }
 
   const collabCustomer = await database

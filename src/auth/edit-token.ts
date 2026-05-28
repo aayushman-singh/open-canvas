@@ -7,6 +7,8 @@
 // site it was issued for, letting the /__api/* proxy and /__edit handler
 // verify ownership without a Clerk session cookie on the subdomain.
 
+import { signJWT, verifyJWT } from './jwt';
+
 export interface EditTokenPayload {
   siteId: string;
   customerId: string;
@@ -15,47 +17,18 @@ export interface EditTokenPayload {
   exp: number;
 }
 
-const ALGORITHM = { name: 'HMAC', hash: 'SHA-256' } as const;
 const TTL_SECONDS = 14400; // 4 hours
 
-function isEditTokenPayload(value: unknown): value is EditTokenPayload {
-  if (value === null || typeof value !== 'object') return false;
-  const payload = value as Record<string, unknown>;
+function hasEditTokenShape(value: Record<string, unknown>): boolean {
   return (
-    typeof payload.siteId === 'string' &&
-    typeof payload.customerId === 'string' &&
-    typeof payload.clerkUserId === 'string' &&
-    typeof payload.iat === 'number' &&
-    typeof payload.exp === 'number' &&
-    Number.isFinite(payload.iat) &&
-    Number.isFinite(payload.exp)
+    typeof value.siteId === 'string' &&
+    typeof value.customerId === 'string' &&
+    typeof value.clerkUserId === 'string' &&
+    typeof value.iat === 'number' &&
+    typeof value.exp === 'number' &&
+    Number.isFinite(value.iat) &&
+    Number.isFinite(value.exp)
   );
-}
-
-function base64UrlEncode(data: ArrayBuffer | Uint8Array): string {
-  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]!);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function base64UrlDecode(str: string): Uint8Array {
-  const padded = str.replace(/-/g, '+').replace(/_/g, '/');
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-async function importKey(secret: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), ALGORITHM, false, [
-    'sign',
-    'verify',
-  ]);
 }
 
 export async function signEditToken(
@@ -63,50 +36,17 @@ export async function signEditToken(
   secret: string,
   ttl: number = TTL_SECONDS,
 ): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const full: EditTokenPayload = { ...payload, iat: now, exp: now + ttl };
-  const header = base64UrlEncode(
-    new TextEncoder().encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })),
-  );
-  const body = base64UrlEncode(new TextEncoder().encode(JSON.stringify(full)));
-  const data = `${header}.${body}`;
-  const key = await importKey(secret);
-  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
-  return `${data}.${base64UrlEncode(sig)}`;
+  return signJWT(payload as unknown as Record<string, unknown>, secret, ttl);
 }
 
 export async function verifyEditToken(
   token: string | undefined | null,
   secret: string,
 ): Promise<EditTokenPayload | null> {
-  if (typeof token !== 'string' || token.length === 0) return null;
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-
-  const data = `${parts[0]}.${parts[1]}`;
-  let sigBytes: Uint8Array;
-  try {
-    sigBytes = base64UrlDecode(parts[2]!);
-  } catch {
-    return null;
-  }
-
-  const key = await importKey(secret);
-  const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(data));
-  if (!valid) return null;
-
-  let payload: unknown;
-  try {
-    payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(parts[1]!)));
-  } catch {
-    return null;
-  }
-
-  if (!isEditTokenPayload(payload)) return null;
-  const now = Math.floor(Date.now() / 1000);
-  if (payload.exp <= now) return null;
-
-  return payload;
+  const result = await verifyJWT(token, secret);
+  if (!result.ok) return null;
+  if (!hasEditTokenShape(result.payload)) return null;
+  return result.payload as unknown as EditTokenPayload;
 }
 
 export const EDIT_TOKEN_COOKIE = '__rev01_edit';

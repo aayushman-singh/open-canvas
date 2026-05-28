@@ -5,7 +5,7 @@
 // clicks the accept link. 7-day TTL. The payload carries the collaborator
 // row ID so acceptance is a single UPDATE … SET acceptedAt = now().
 
-import { signEditToken, verifyEditToken } from './edit-token';
+import { signJWT, verifyJWT } from './jwt';
 
 export interface InviteTokenPayload {
   siteId: string;
@@ -15,32 +15,43 @@ export interface InviteTokenPayload {
   exp: number;
 }
 
+export type InviteVerifyResult =
+  | { ok: true; payload: InviteTokenPayload }
+  | { ok: false; reason: 'expired' | 'invalid' };
+
 const INVITE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
+function hasInviteTokenShape(value: Record<string, unknown>): boolean {
+  return (
+    typeof value.siteId === 'string' &&
+    typeof value.collaboratorId === 'string' &&
+    typeof value.invitedEmail === 'string' &&
+    typeof value.iat === 'number' &&
+    typeof value.exp === 'number' &&
+    Number.isFinite(value.iat) &&
+    Number.isFinite(value.exp)
+  );
+}
 
 export async function signInviteToken(
   payload: Omit<InviteTokenPayload, 'iat' | 'exp'>,
   secret: string,
 ): Promise<string> {
-  // Reuse the same HMAC-SHA256 signing from edit-token but with invite-specific
-  // payload fields and a longer TTL. The token format is identical (header.payload.sig)
-  // so verifyEditToken can decode it — we just cast the payload type.
-  return signEditToken(payload as unknown as Omit<import('./edit-token').EditTokenPayload, 'iat' | 'exp'>, secret, INVITE_TTL_SECONDS);
+  return signJWT(payload as unknown as Record<string, unknown>, secret, INVITE_TTL_SECONDS);
 }
 
 export async function verifyInviteToken(
   token: string | undefined | null,
   secret: string,
-): Promise<InviteTokenPayload | null> {
-  const raw = await verifyEditToken(token, secret);
-  if (!raw) return null;
-  // Verify invite-specific fields are present
-  const payload = raw as unknown as Record<string, unknown>;
-  if (
-    typeof payload.collaboratorId !== 'string' ||
-    typeof payload.invitedEmail !== 'string' ||
-    typeof payload.siteId !== 'string'
-  ) {
-    return null;
+): Promise<InviteVerifyResult> {
+  const result = await verifyJWT(token, secret);
+  if (!result.ok) {
+    return result.reason === 'expired'
+      ? { ok: false, reason: 'expired' }
+      : { ok: false, reason: 'invalid' };
   }
-  return payload as unknown as InviteTokenPayload;
+  if (!hasInviteTokenShape(result.payload)) {
+    return { ok: false, reason: 'invalid' };
+  }
+  return { ok: true, payload: result.payload as unknown as InviteTokenPayload };
 }
