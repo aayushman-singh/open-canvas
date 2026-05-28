@@ -571,10 +571,10 @@ function clientScript(siteId: string): string {
 
 (() => {
   const SITE_ID = ${sid};
-  const collabForm = document.querySelector('[data-collab-form]');
-  const collabErr = document.querySelector('[data-collab-err]');
-  const collabOk = document.querySelector('[data-collab-ok]');
-  const collabList = document.querySelector('[data-collab-list]');
+  const collabForm = document.querySelector('form.collab-form');
+  const collabErr = document.querySelector('p.collab-err');
+  const collabOk = document.querySelector('p.collab-ok');
+  const collabList = document.querySelector('ul.collab-list');
 
   function clearCollabStatus() {
     if (collabErr) collabErr.textContent = '';
@@ -620,9 +620,18 @@ function clientScript(siteId: string): string {
 
   if (collabList) {
     collabList.addEventListener('click', async (event) => {
-      const btn = event.target instanceof Element ? event.target.closest('[data-remove-collab]') : null;
-      if (!btn) return;
-      const collabId = btn.getAttribute('data-remove-collab');
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      // Anchor on the visible button class so the handler still fires when the
+      // click target is a child node of the button (e.g. an inner span added
+      // later) — closest on a [data-remove-collab] attribute alone would miss
+      // any wrapper that doesn't carry the attribute.
+      const btn = target.closest('button.remove-btn');
+      if (!(btn instanceof HTMLButtonElement)) return;
+      const item = btn.closest('.collab-item');
+      const collabId =
+        btn.getAttribute('data-remove-collab') ||
+        (item ? item.getAttribute('data-collab-id') : null);
       if (!collabId) return;
       if (!await __rev01Modal.confirm('Remove this collaborator?', { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true })) return;
       btn.disabled = true;
@@ -638,7 +647,6 @@ function clientScript(siteId: string): string {
           btn.disabled = false;
           return;
         }
-        const item = btn.closest('.collab-item');
         if (item) item.remove();
       } catch (e) {
         if (collabErr) collabErr.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
@@ -1065,7 +1073,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           Add people by email to let them edit this site. They must have a rev01 account. An
           invitation email will be sent when you add them.
         </p>
-        <form class="collab-form" data-collab-form autocomplete="off">
+        <form class="collab-form" autocomplete="off">
           <label>
             <span>Email address</span>
             <input type="email" name="email" placeholder="collaborator@example.com" required />
@@ -1081,9 +1089,9 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             Invite
           </Button>
         </form>
-        <p class="err" data-collab-err role="alert" aria-live="polite"></p>
-        <p class="ok" data-collab-ok role="status" aria-live="polite"></p>
-        <ul class="collab-list" data-collab-list>
+        <p class="err collab-err" role="alert" aria-live="polite"></p>
+        <p class="ok collab-ok" role="status" aria-live="polite"></p>
+        <ul class="collab-list">
           {collaborators.map((collab) => (
             <li class="collab-item" data-collab-id={collab.id}>
               <span class="email">{collab.email}</span>
