@@ -10,6 +10,7 @@ import { Hero } from './components/Hero';
 import { StatLine } from './components/StatLine';
 import { StatusBar } from './components/StatusBar';
 import { Tagline } from './components/Tagline';
+import { LANDING_DEMO_SRC } from './demo-script';
 import { styles } from './styles';
 import { uiStyles } from '../ui';
 
@@ -45,6 +46,7 @@ function Page() {
           <StatLine />
           <Footer />
         </main>
+        <script>{raw(LANDING_DEMO_SRC)}</script>
       </body>
     </html>
   );

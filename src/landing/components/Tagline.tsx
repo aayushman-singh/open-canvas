@@ -2,7 +2,7 @@ import { Button } from '../../ui';
 
 export function Tagline() {
   return (
-    <section class="tagline" aria-label="product tagline">
+    <section class="tagline scroll-reveal" aria-label="product tagline">
       <span class="eyebrow">// rev01</span>
       <h1>
         multiplayer site builder with an <span class="accent">agent</span> at the cursor.

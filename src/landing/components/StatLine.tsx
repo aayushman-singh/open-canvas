@@ -7,17 +7,17 @@ export function StatLine() {
       </span>
       <span class="stat">
         <span class="k">LOC</span>
-        <span class="v" data-stat="loc">
+        <span class="v" data-stat="loc" data-count-to="1247">
           1247
         </span>
       </span>
       <span class="stat">
         <span class="k">demo edit ops</span>
-        <span class="v tick">42</span>
+        <span class="v tick" data-count-to="42">42</span>
       </span>
       <span class="stat">
         <span class="k">demo agent ops</span>
-        <span class="v">12</span>
+        <span class="v" data-count-to="12">12</span>
       </span>
       <span class="stat">
         <span class="k">published sites</span>

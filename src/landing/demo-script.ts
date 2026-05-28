@@ -216,14 +216,6 @@ export const LANDING_DEMO_SRC = String.raw`(function() {
     run();
     initScrollReveal();
     initCountUp();
-
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden) {
-        clearTimers();
-      } else {
-        run();
-      }
-    });
   }
 
   if (document.readyState === 'loading') {

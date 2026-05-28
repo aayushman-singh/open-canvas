@@ -18,7 +18,7 @@ const features = [
 
 export function FeatureGrid() {
   return (
-    <section class="features" aria-label="differentiators">
+    <section class="features scroll-reveal" aria-label="differentiators">
       {features.map((f) => (
         <article class="feature">
           <span class="num">{f.num}</span>

@@ -5,7 +5,7 @@ const BUILD_STAMP = '2026-05-21';
 export function Footer() {
   return (
     <footer aria-label="footer">
-      <div class="footer-cta">
+      <div class="footer-cta scroll-reveal">
         <h2 class="footer-heading">Ready to build?</h2>
         <p class="footer-sub">
           One canvas. One agent. Ship your site in minutes.
