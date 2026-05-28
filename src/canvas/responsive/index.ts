@@ -65,12 +65,23 @@ export function renderResponsiveCss(snapshot: PublishedSnapshot): string {
 }
 
 function snapshotHasResponsiveOverride(snapshot: PublishedSnapshot): boolean {
+  // Site-wide header/footer are merged into every page's layout by
+  // `resolveSnapshotLayout`, so a header- or footer-only override must also
+  // trip the "needs CSS body" gate — otherwise phone-width pages whose only
+  // overrides live in the shared chrome would skip emission entirely.
+  if (snapshot.header !== undefined && sectionHasResponsiveOverride(snapshot.header)) return true;
+  if (snapshot.footer !== undefined && sectionHasResponsiveOverride(snapshot.footer)) return true;
   for (const page of snapshot.pages) {
     for (const section of page.sections) {
-      for (const element of section.elements) {
-        if (elementHasResponsiveOverride(element)) return true;
-      }
+      if (sectionHasResponsiveOverride(section)) return true;
     }
+  }
+  return false;
+}
+
+function sectionHasResponsiveOverride(section: { elements: CanvasElement[] }): boolean {
+  for (const element of section.elements) {
+    if (elementHasResponsiveOverride(element)) return true;
   }
   return false;
 }

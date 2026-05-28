@@ -202,4 +202,109 @@ assert(
   'expected a <style data-rev01-responsive> block when an override is present, even on a tiny page',
 );
 
+// --- Assertion 8: header-only override on a tiny page still emits a block --
+// Regression for the bug where `snapshotHasResponsiveOverride` only scanned
+// `page.sections` and ignored the site-wide header / footer. A header-only
+// override on a phone-fitting page must still trip the gate; otherwise the
+// emitted CSS body would be empty even though the resolver merges header +
+// footer into every page's layout.
+const headerOnlyOverride: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-05-23T00:00:00.000Z',
+  styleKit: 'charcoal',
+  header: {
+    id: 'site-header',
+    recipeId: 'hero-split',
+    name: 'Header',
+    height: 80,
+    role: 'header',
+    elements: [
+      {
+        id: 'header-logo',
+        type: 'shape',
+        box: { x: 10, y: 10, w: 100, h: 40, z: 1 },
+        variant: 'rect',
+        responsive: { phone: { hidden: true } },
+      },
+    ],
+  },
+  pages: [
+    {
+      id: 'page-tiny',
+      slug: 'tiny',
+      title: 'Tiny',
+      width: 320,
+      sections: [
+        {
+          id: 'section-tiny',
+          recipeId: 'hero-split',
+          name: 'Tiny',
+          height: 200,
+          elements: [],
+        },
+      ],
+    },
+  ],
+};
+const headerOnlyResult = renderResponsiveCss(headerOnlyOverride);
+assert(
+  headerOnlyResult.startsWith('<style data-rev01-responsive>') &&
+    headerOnlyResult.endsWith('</style>'),
+  'expected a <style data-rev01-responsive> block when only the site-wide header carries a responsive override',
+);
+assert(
+  headerOnlyResult.includes('[data-rev01-element="header-logo"] { display: none !important; }'),
+  'expected header-logo display:none rule to appear in the emitted CSS when override lives in snapshot.header',
+);
+
+// --- Assertion 9: footer-only override on a tiny page still emits a block --
+const footerOnlyOverride: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-05-23T00:00:00.000Z',
+  styleKit: 'charcoal',
+  footer: {
+    id: 'site-footer',
+    recipeId: 'hero-split',
+    name: 'Footer',
+    height: 80,
+    role: 'footer',
+    elements: [
+      {
+        id: 'footer-credit',
+        type: 'shape',
+        box: { x: 10, y: 10, w: 100, h: 40, z: 1 },
+        variant: 'rect',
+        responsive: { phone: { hidden: true } },
+      },
+    ],
+  },
+  pages: [
+    {
+      id: 'page-tiny',
+      slug: 'tiny',
+      title: 'Tiny',
+      width: 320,
+      sections: [
+        {
+          id: 'section-tiny',
+          recipeId: 'hero-split',
+          name: 'Tiny',
+          height: 200,
+          elements: [],
+        },
+      ],
+    },
+  ],
+};
+const footerOnlyResult = renderResponsiveCss(footerOnlyOverride);
+assert(
+  footerOnlyResult.startsWith('<style data-rev01-responsive>') &&
+    footerOnlyResult.endsWith('</style>'),
+  'expected a <style data-rev01-responsive> block when only the site-wide footer carries a responsive override',
+);
+assert(
+  footerOnlyResult.includes('[data-rev01-element="footer-credit"] { display: none !important; }'),
+  'expected footer-credit display:none rule to appear in the emitted CSS when override lives in snapshot.footer',
+);
+
 console.log('[responsive:smoke] OK');
