@@ -1156,7 +1156,7 @@
               "id": "wf-embed-player",
               "type": "embed",
               "box": { "x": 120, "y": 180, "w": 1200, "h": 480, "z": 2 },
-              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+              "url": "",
               "title": "Apogee product walkthrough",
               "aspectRatio": 1.7778,
               "motion": { "preset": "scale-in", "delayMs": 100 }
@@ -2873,7 +2873,7 @@
               "id": "wf-ent-demo-video",
               "type": "embed",
               "box": { "x": 160, "y": 140, "w": 1120, "h": 420, "z": 2 },
-              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+              "url": "",
               "title": "Apogee Enterprise walkthrough",
               "aspectRatio": 1.7778,
               "motion": { "preset": "scale-in", "delayMs": 60 }
