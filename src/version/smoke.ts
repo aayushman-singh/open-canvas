@@ -34,7 +34,13 @@ import * as Y from 'yjs';
 import { encodeYDoc } from '../canvas/yjs-projection.js';
 import type { CanvasSiteState, PublishedSnapshot } from '../canvas/schema.js';
 import type { Db } from '../db/client.js';
-import { site, siteSnapshot, type NewSiteSnapshot, type SiteSnapshot } from '../db/schema.js';
+import {
+  decodeByteaDriverValue,
+  site,
+  siteSnapshot,
+  type NewSiteSnapshot,
+  type SiteSnapshot,
+} from '../db/schema.js';
 
 import { captureManual, captureOnPublish, type CaptureEnv } from './capture.js';
 import { listSnapshots } from './list.js';
@@ -803,6 +809,33 @@ async function runYjsRoundTrip(): Promise<void> {
   process.stdout.write('[version:smoke] OK 5 — Y.Doc encode→decode round-trip stable\n');
 }
 
+function runByteaDriverDecode(): void {
+  const decoded = decodeByteaDriverValue('\\x000fff');
+  assert(decoded.length === 3, `expected 3 decoded bytes, got ${String(decoded.length)}`);
+  assert(
+    decoded[0] === 0 && decoded[1] === 15 && decoded[2] === 255,
+    `expected \\x000fff to decode to [0,15,255], got [${[...decoded].join(',')}]`,
+  );
+
+  for (const input of ['\\x0', '\\xzz']) {
+    let threw = false;
+    try {
+      decodeByteaDriverValue(input);
+    } catch (err) {
+      threw = true;
+      assert(
+        err instanceof Error && err.message.includes('bytea fromDriver'),
+        `expected bytea decode error for ${input}, got ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    assert(threw, `expected invalid bytea input ${input} to throw`);
+  }
+
+  process.stdout.write('[version:smoke] OK 6 — bytea driver hex decode fails loudly\n');
+}
+
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
@@ -817,6 +850,7 @@ await runManualSnapshotShowsLabel();
 await runRestoreSwapsAndCapturesSafety();
 await runPruneKeepsLast50AndRecentPublishes();
 await runYjsRoundTrip();
+runByteaDriverDecode();
 
 // Silence unused-PublishedSnapshot warning — referenced for type completeness
 // to ensure preview-render's PublishedSnapshot shape stays aligned.

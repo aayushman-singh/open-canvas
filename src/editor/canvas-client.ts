@@ -4282,7 +4282,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       bgImgClear.type = "button";
       bgImgClear.textContent = "x";
       bgImgClear.className = "style-btn-clear";
-      bgImgClear.title = "Remove background image";
+      bgImgClear.title = "Clear only the background image override";
       bgImgClear.disabled = !es.backgroundImageAssetId;
       // File input lives in the DOM so the picker actually opens. Chromium
       // silently no-ops .click() on a detached input[type=file] as a

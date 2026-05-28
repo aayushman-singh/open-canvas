@@ -12,7 +12,7 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { html, raw } from 'hono/html';
@@ -528,7 +528,13 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   const updated = await database
     .update(siteCollaborator)
     .set({ acceptedAt: sql`COALESCE(${siteCollaborator.acceptedAt}, NOW())` })
-    .where(eq(siteCollaborator.id, result.payload.collaboratorId))
+    .where(
+      and(
+        eq(siteCollaborator.id, result.payload.collaboratorId),
+        eq(siteCollaborator.siteId, siteRow.id),
+        eq(siteCollaborator.invitedEmail, result.payload.invitedEmail),
+      ),
+    )
     .returning({
       id: siteCollaborator.id,
       customerId: siteCollaborator.customerId,
@@ -900,7 +906,9 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <script type="module">
             ${raw(visitorScript)};
           </script>
-          <script>${raw(ENTRANCE_OBSERVER_SCRIPT)}</script>
+          <script>
+            ${raw(ENTRANCE_OBSERVER_SCRIPT)};
+          </script>
           ${addonBodyScripts ? raw(addonBodyScripts) : ''}
         </body>
       </html>`,

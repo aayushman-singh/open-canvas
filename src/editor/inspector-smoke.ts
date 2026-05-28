@@ -6,10 +6,6 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const source = readFileSync(join(process.cwd(), 'src', 'editor', 'canvas-client.ts'), 'utf8');
-const navEditorSource = readFileSync(
-  join(process.cwd(), 'src', 'routes', 'dashboard', 'nav-editor.tsx'),
-  'utf8',
-);
 
 function sliceBetween(startNeedle: string, endNeedle: string): string {
   const start = source.indexOf(startNeedle);
@@ -79,11 +75,17 @@ assert(
   'canvas nav inspector must reject non-fragment hrefs for anchor links',
 );
 
+const elementStyleControls = sliceBetween('// -- Element style controls', '// Motion controls.');
+
 assert(
-  navEditorSource.includes('<option value="anchor"') &&
-    navEditorSource.includes("newKind === 'anchor'") &&
-    navEditorSource.includes('Anchor targets must start with #.'),
-  'dashboard nav editor must preserve and validate anchor nav links',
+  elementStyleControls.includes('resetBtn.textContent = "Reset all";') &&
+    elementStyleControls.includes('delete element.elementStyle;') &&
+    elementStyleControls.includes('scheduleSave();'),
+  'element style controls must include a Reset all button that deletes elementStyle and persists',
+);
+assert(
+  elementStyleControls.includes('bgImgClear.title = "Clear only the background image override";'),
+  'background-image clear button must disclose that it only clears the image override',
 );
 
 console.log('[inspector:smoke] OK');

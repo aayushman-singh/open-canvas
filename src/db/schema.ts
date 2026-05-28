@@ -20,28 +20,39 @@ import type { CanvasSection, CanvasSiteState, PublishedSnapshot, StyleKit } from
 // `Uint8Array`; the SQL side is `bytea`. The Neon HTTP driver normally
 // returns bytea as a Buffer (Uint8Array subclass) via its built-in
 // parseBytea type parser, but the response shape can vary across Neon
-// runtime versions / pooled vs direct connections — we defensively
-// coerce strings of the form `\x...` and any non-Uint8Array ArrayLike
-// to a Uint8Array so downstream consumers (Y.applyUpdate) never see a
-// hex string.
-const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+// runtime versions / pooled vs direct connections. Decode Postgres'
+// textual `\x...` representation explicitly and reject malformed bytes
+// instead of handing Y.applyUpdate a corrupt update.
+const BYTEA_HEX_RE = /^[0-9a-fA-F]*$/;
+
+export function decodeByteaDriverValue(value: unknown): Uint8Array {
+  if (value instanceof Uint8Array) return value;
+  if (typeof value === 'string') {
+    if (!value.startsWith('\\x')) {
+      throw new Error('bytea fromDriver: unrecognised string format (expected \\x hex)');
+    }
+    const hex = value.slice(2);
+    if (hex.length % 2 !== 0) {
+      throw new Error(`bytea fromDriver: hex payload must have even length, got ${hex.length}`);
+    }
+    if (!BYTEA_HEX_RE.test(hex)) {
+      throw new Error('bytea fromDriver: hex payload contains non-hex characters');
+    }
+    const out = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < out.length; i += 1) {
+      out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+  }
+  throw new Error(`bytea fromDriver: unsupported driver type ${typeof value}`);
+}
+
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array | string }>({
   dataType() {
     return 'bytea';
   },
   fromDriver(value: unknown): Uint8Array {
-    if (value instanceof Uint8Array) return value;
-    if (typeof value === 'string') {
-      if (value.startsWith('\\x')) {
-        const hex = value.slice(2);
-        const out = new Uint8Array(hex.length / 2);
-        for (let i = 0; i < out.length; i += 1) {
-          out[i] = Number.parseInt(hex.substr(i * 2, 2), 16);
-        }
-        return out;
-      }
-      throw new Error(`bytea fromDriver: unrecognised string format (expected \\x… hex)`);
-    }
-    throw new Error(`bytea fromDriver: unsupported driver type ${typeof value}`);
+    return decodeByteaDriverValue(value);
   },
 });
 
@@ -101,31 +112,35 @@ export const template = pgTable('template', {
 export type Template = typeof template.$inferSelect;
 export type NewTemplate = typeof template.$inferInsert;
 
-export const site = pgTable('site', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  customerId: text('customer_id')
-    .notNull()
-    .references(() => customer.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  subdomain: text('subdomain').notNull().unique(),
-  styleKit: text('style_kit').notNull().$type<StyleKit>(),
-  editableState: jsonb('editable_state').notNull().$type<CanvasSiteState>(),
-  publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
-  publishedVersion: integer('published_version').notNull().default(0),
-  // Wave 2 #9 — password-protected publish. `passwordEnabled` is the visitor-
-  // gate switch; `passwordHash` is the PBKDF2 hash + salt blob set by the
-  // owner; `passwordSetAt` lets the unlock cookie's iat be compared so
-  // password changes invalidate previously-issued cookies.
-  passwordEnabled: boolean('password_enabled').notNull().default(false),
-  passwordHash: text('password_hash'),
-  passwordSetAt: timestamp('password_set_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({
-  customerIdx: index('site_customer_id_idx').on(t.customerId),
-}));
+export const site = pgTable(
+  'site',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    subdomain: text('subdomain').notNull().unique(),
+    styleKit: text('style_kit').notNull().$type<StyleKit>(),
+    editableState: jsonb('editable_state').notNull().$type<CanvasSiteState>(),
+    publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
+    publishedVersion: integer('published_version').notNull().default(0),
+    // Wave 2 #9 — password-protected publish. `passwordEnabled` is the visitor-
+    // gate switch; `passwordHash` is the PBKDF2 hash + salt blob set by the
+    // owner; `passwordSetAt` lets the unlock cookie's iat be compared so
+    // password changes invalidate previously-issued cookies.
+    passwordEnabled: boolean('password_enabled').notNull().default(false),
+    passwordHash: text('password_hash'),
+    passwordSetAt: timestamp('password_set_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerIdx: index('site_customer_id_idx').on(t.customerId),
+  }),
+);
 
 export type Site = typeof site.$inferSelect;
 export type NewSite = typeof site.$inferInsert;
@@ -195,28 +210,32 @@ export type NewPage = typeof page.$inferInsert;
 // (customerId, contentHash) pair: the existing row is returned and no new R2
 // object is written. Two Owners uploading the same bytes share the R2 object
 // (one set of bytes on disk) but each get their own ownerAsset row.
-export const ownerAsset = pgTable('owner_asset', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  customerId: text('customer_id')
-    .notNull()
-    .references(() => customer.id, { onDelete: 'cascade' }),
-  contentHash: text('content_hash').notNull(),
-  r2Key: text('r2_key').notNull(),
-  mediaType: text('media_type').notNull(),
-  kind: text('kind').notNull().$type<'image' | 'video'>(),
-  alt: text('alt').notNull().default(''),
-  width: integer('width'),
-  height: integer('height'),
-  byteSize: integer('byte_size').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({
-  customerContentHashUnique: uniqueIndex('owner_asset_customer_content_hash_unique').on(
-    t.customerId,
-    t.contentHash,
-  ),
-}));
+export const ownerAsset = pgTable(
+  'owner_asset',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    contentHash: text('content_hash').notNull(),
+    r2Key: text('r2_key').notNull(),
+    mediaType: text('media_type').notNull(),
+    kind: text('kind').notNull().$type<'image' | 'video'>(),
+    alt: text('alt').notNull().default(''),
+    width: integer('width'),
+    height: integer('height'),
+    byteSize: integer('byte_size').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    customerContentHashUnique: uniqueIndex('owner_asset_customer_content_hash_unique').on(
+      t.customerId,
+      t.contentHash,
+    ),
+  }),
+);
 
 export type OwnerAsset = typeof ownerAsset.$inferSelect;
 export type NewOwnerAsset = typeof ownerAsset.$inferInsert;
@@ -267,22 +286,26 @@ export type NewSlotHistory = typeof slotHistory.$inferInsert;
 export const CUSTOM_DOMAIN_STATUSES = ['pending', 'verifying', 'active', 'failed'] as const;
 export type CustomDomainStatus = (typeof CUSTOM_DOMAIN_STATUSES)[number];
 
-export const customDomain = pgTable('custom_domain', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  hostname: text('hostname').notNull().unique(),
-  cfHostnameId: text('cf_hostname_id').notNull(),
-  status: text('status').notNull().$type<CustomDomainStatus>(),
-  verificationRecord: jsonb('verification_record').notNull().$type<Record<string, unknown>>(),
-  certIssuedAt: timestamp('cert_issued_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({
-  siteIdx: index('custom_domain_site_id_idx').on(t.siteId),
-}));
+export const customDomain = pgTable(
+  'custom_domain',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    hostname: text('hostname').notNull().unique(),
+    cfHostnameId: text('cf_hostname_id').notNull(),
+    status: text('status').notNull().$type<CustomDomainStatus>(),
+    verificationRecord: jsonb('verification_record').notNull().$type<Record<string, unknown>>(),
+    certIssuedAt: timestamp('cert_issued_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    siteIdx: index('custom_domain_site_id_idx').on(t.siteId),
+  }),
+);
 
 export type CustomDomain = typeof customDomain.$inferSelect;
 export type NewCustomDomain = typeof customDomain.$inferInsert;
@@ -293,26 +316,30 @@ export type NewCustomDomain = typeof customDomain.$inferInsert;
 // FormElement id (lives inside `site.editableState`); `payload` is the raw
 // field-value map. `ipHash` is a hashed IP for rate-limit accounting — never
 // the raw IP. `userAgent` is verbatim for debugging.
-export const formSubmission = pgTable('form_submission', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  formElementId: text('form_element_id').notNull(),
-  pageSlug: text('page_slug').notNull(),
-  payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
-  ipHash: text('ip_hash').notNull(),
-  userAgent: text('user_agent').notNull().default(''),
-  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({
-  siteFormSubmittedIdx: index('form_submission_site_form_submitted_idx').on(
-    t.siteId,
-    t.formElementId,
-    t.submittedAt.desc(),
-  ),
-}));
+export const formSubmission = pgTable(
+  'form_submission',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    formElementId: text('form_element_id').notNull(),
+    pageSlug: text('page_slug').notNull(),
+    payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
+    ipHash: text('ip_hash').notNull(),
+    userAgent: text('user_agent').notNull().default(''),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    siteFormSubmittedIdx: index('form_submission_site_form_submitted_idx').on(
+      t.siteId,
+      t.formElementId,
+      t.submittedAt.desc(),
+    ),
+  }),
+);
 
 export type FormSubmission = typeof formSubmission.$inferSelect;
 export type NewFormSubmission = typeof formSubmission.$inferInsert;
@@ -326,21 +353,25 @@ export type NewFormSubmission = typeof formSubmission.$inferInsert;
 export const SITE_SNAPSHOT_REASONS = ['publish', 'manual'] as const;
 export type SiteSnapshotReason = (typeof SITE_SNAPSHOT_REASONS)[number];
 
-export const siteSnapshot = pgTable('site_snapshot', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  yjsSnapshotBytes: bytea('yjs_snapshot_bytes').notNull(),
-  capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
-  reason: text('reason').notNull().$type<SiteSnapshotReason>(),
-  label: text('label'),
-  publishedVersion: integer('published_version'),
-}, (t) => ({
-  siteCapturedIdx: index('site_snapshot_site_captured_idx').on(t.siteId, t.capturedAt.desc()),
-}));
+export const siteSnapshot = pgTable(
+  'site_snapshot',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    yjsSnapshotBytes: bytea('yjs_snapshot_bytes').notNull(),
+    capturedAt: timestamp('captured_at', { withTimezone: true }).notNull().defaultNow(),
+    reason: text('reason').notNull().$type<SiteSnapshotReason>(),
+    label: text('label'),
+    publishedVersion: integer('published_version'),
+  },
+  (t) => ({
+    siteCapturedIdx: index('site_snapshot_site_captured_idx').on(t.siteId, t.capturedAt.desc()),
+  }),
+);
 
 export type SiteSnapshot = typeof siteSnapshot.$inferSelect;
 export type NewSiteSnapshot = typeof siteSnapshot.$inferInsert;
@@ -353,23 +384,27 @@ export type NewSiteSnapshot = typeof siteSnapshot.$inferInsert;
 export const SITE_FONT_STYLES = ['normal', 'italic'] as const;
 export type SiteFontStyle = (typeof SITE_FONT_STYLES)[number];
 
-export const siteFont = pgTable('site_font', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  family: text('family').notNull(),
-  weight: integer('weight').notNull().default(400),
-  style: text('style').notNull().$type<SiteFontStyle>().default('normal'),
-  contentHash: text('content_hash').notNull(),
-  byteSize: integer('byte_size').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({
-  siteIdx: index('site_font_site_id_idx').on(t.siteId),
-}));
+export const siteFont = pgTable(
+  'site_font',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    family: text('family').notNull(),
+    weight: integer('weight').notNull().default(400),
+    style: text('style').notNull().$type<SiteFontStyle>().default('normal'),
+    contentHash: text('content_hash').notNull(),
+    byteSize: integer('byte_size').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    siteIdx: index('site_font_site_id_idx').on(t.siteId),
+  }),
+);
 
 export type SiteFont = typeof siteFont.$inferSelect;
 export type NewSiteFont = typeof siteFont.$inferInsert;
@@ -388,20 +423,24 @@ export type NewSiteFont = typeof siteFont.$inferInsert;
 //
 // Queries reference `tsv` directly via `sql\`tsv @@ ...\``; the type
 // surface here intentionally omits it so application code never reads it.
-export const siteSearchEntry = pgTable('site_search_entry', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  pageSlug: text('page_slug').notNull(),
-  elementId: text('element_id').notNull(),
-  text: text('text').notNull(),
-  publishedVersion: integer('published_version').notNull(),
-}, (t) => ({
-  siteIdx: index('site_search_entry_site_id_idx').on(t.siteId),
-}));
+export const siteSearchEntry = pgTable(
+  'site_search_entry',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    pageSlug: text('page_slug').notNull(),
+    elementId: text('element_id').notNull(),
+    text: text('text').notNull(),
+    publishedVersion: integer('published_version').notNull(),
+  },
+  (t) => ({
+    siteIdx: index('site_search_entry_site_id_idx').on(t.siteId),
+  }),
+);
 
 export type SiteSearchEntry = typeof siteSearchEntry.$inferSelect;
 export type NewSiteSearchEntry = typeof siteSearchEntry.$inferInsert;
@@ -412,26 +451,30 @@ export type NewSiteSearchEntry = typeof siteSearchEntry.$inferInsert;
 // turn-by-turn payload (`role`, `content`, optional `toolCalls`). Sessions
 // are pinned per (site, customer); the orchestrator keeps the active session
 // in DO storage and persists to this table on session end.
-export const chatSession = pgTable('chat_session', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  siteId: text('site_id')
-    .notNull()
-    .references(() => site.id, { onDelete: 'cascade' }),
-  customerId: text('customer_id')
-    .notNull()
-    .references(() => customer.id, { onDelete: 'cascade' }),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
-  endedAt: timestamp('ended_at', { withTimezone: true }),
-  messages: jsonb('messages').notNull().$type<Array<Record<string, unknown>>>(),
-}, (t) => ({
-  siteCustomerStartedIdx: index('chat_session_site_customer_started_idx').on(
-    t.siteId,
-    t.customerId,
-    t.startedAt.desc(),
-  ),
-}));
+export const chatSession = pgTable(
+  'chat_session',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp('ended_at', { withTimezone: true }),
+    messages: jsonb('messages').notNull().$type<Array<Record<string, unknown>>>(),
+  },
+  (t) => ({
+    siteCustomerStartedIdx: index('chat_session_site_customer_started_idx').on(
+      t.siteId,
+      t.customerId,
+      t.startedAt.desc(),
+    ),
+  }),
+);
 
 export type ChatSession = typeof chatSession.$inferSelect;
 export type NewChatSession = typeof chatSession.$inferInsert;

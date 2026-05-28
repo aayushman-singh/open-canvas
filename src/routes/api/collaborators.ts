@@ -147,9 +147,12 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
     .limit(1);
 
   if (!targetRows[0]) {
-    return c.json({
-      error: 'no rev01 account found for this email — they need to sign up first',
-    }, 404);
+    return c.json(
+      {
+        error: 'no rev01 account found for this email — they need to sign up first',
+      },
+      404,
+    );
   }
   const targetCustomerId = targetRows[0].id;
 
@@ -165,22 +168,23 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
     })
     .from(siteCollaborator)
     .where(
-      and(
-        eq(siteCollaborator.siteId, siteId),
-        eq(siteCollaborator.customerId, targetCustomerId),
-      ),
+      and(eq(siteCollaborator.siteId, siteId), eq(siteCollaborator.customerId, targetCustomerId)),
     )
     .limit(1);
 
   if (existing[0]) {
     const status = existing[0].acceptedAt ? 'active' : 'pending';
-    return c.json({
-      error: status === 'active'
-        ? 'this person is already a collaborator on this site'
-        : 'this person already has a pending invitation — use Resend to send a fresh email',
-      status,
-      collaboratorId: existing[0].id,
-    }, 409);
+    return c.json(
+      {
+        error:
+          status === 'active'
+            ? 'this person is already a collaborator on this site'
+            : 'this person already has a pending invitation — use Resend to send a fresh email',
+        status,
+        collaboratorId: existing[0].id,
+      },
+      409,
+    );
   }
 
   const inserted = await database
@@ -215,18 +219,19 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
       resendApiKey: c.env.RESEND_API_KEY,
     });
   } catch (err) {
-    await database
-      .delete(siteCollaborator)
-      .where(eq(siteCollaborator.id, collaboratorId));
+    await database.delete(siteCollaborator).where(eq(siteCollaborator.id, collaboratorId));
     const message = err instanceof Error ? err.message : String(err);
     return c.json({ error: `invitation email failed to send: ${message}` }, 502);
   }
 
-  return c.json({
-    ok: true,
-    collaborator: { id: collaboratorId, role, email: rawEmail, acceptedAt: null },
-    status: 'invited',
-  }, 201);
+  return c.json(
+    {
+      ok: true,
+      collaborator: { id: collaboratorId, role, email: rawEmail, acceptedAt: null },
+      status: 'invited',
+    },
+    201,
+  );
 });
 
 // Update role only. Does not touch acceptedAt or send email. Works on both
@@ -249,12 +254,7 @@ collaboratorsApi.patch('/sites/:siteId/collaborators/:collabId', async (c) => {
   const updated = await database
     .update(siteCollaborator)
     .set({ role })
-    .where(
-      and(
-        eq(siteCollaborator.id, collabId),
-        eq(siteCollaborator.siteId, siteId),
-      ),
-    )
+    .where(and(eq(siteCollaborator.id, collabId), eq(siteCollaborator.siteId, siteId)))
     .returning({ id: siteCollaborator.id, role: siteCollaborator.role });
 
   if (!updated[0]) {
@@ -281,21 +281,19 @@ collaboratorsApi.post('/sites/:siteId/collaborators/:collabId/resend', async (c)
       invitedEmail: siteCollaborator.invitedEmail,
     })
     .from(siteCollaborator)
-    .where(
-      and(
-        eq(siteCollaborator.id, collabId),
-        eq(siteCollaborator.siteId, siteId),
-      ),
-    )
+    .where(and(eq(siteCollaborator.id, collabId), eq(siteCollaborator.siteId, siteId)))
     .limit(1);
 
   const row = rows[0];
   if (!row) return c.json({ error: 'collaborator not found' }, 404);
   if (row.acceptedAt) {
-    return c.json({
-      error: 'this person has already accepted — no need to resend',
-      status: 'active',
-    }, 409);
+    return c.json(
+      {
+        error: 'this person has already accepted — no need to resend',
+        status: 'active',
+      },
+      409,
+    );
   }
 
   try {
@@ -305,7 +303,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators/:collabId/resend', async (c)
       siteSubdomain: owner.siteSubdomain,
       collaboratorId: row.id,
       invitedEmail: row.invitedEmail,
-      role: (row.role as CollaboratorRole) ?? 'editor',
+      role: row.role,
       inviterName: resolveInviterName(c, row.invitedEmail),
       signingSecret: c.env.UNLOCK_SIGNING_SECRET,
       resendApiKey: c.env.RESEND_API_KEY,
@@ -327,12 +325,7 @@ collaboratorsApi.delete('/sites/:siteId/collaborators/:collabId', async (c) => {
   const database = db(c.env);
   const deleted = await database
     .delete(siteCollaborator)
-    .where(
-      and(
-        eq(siteCollaborator.id, collabId),
-        eq(siteCollaborator.siteId, siteId),
-      ),
-    )
+    .where(and(eq(siteCollaborator.id, collabId), eq(siteCollaborator.siteId, siteId)))
     .returning({ id: siteCollaborator.id });
 
   if (deleted.length === 0) {

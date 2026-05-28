@@ -21,5 +21,15 @@ assert(
   source.includes('queueConfigPatch({ [key]: apiValue }'),
   'expected config toggles to use the shared config PATCH queue',
 );
+assert(
+  source.includes("document.querySelector('ul.collab-list')") &&
+    source.includes("target.closest('button.remove-btn')") &&
+    source.includes("item.getAttribute('data-collab-id')"),
+  'expected collaborator removal to be wired through stable class selectors and row data id',
+);
+assert(
+  !source.includes("querySelector('[data-collab-list]')"),
+  'collaborator removal must not depend on boolean data-* list selector wiring',
+);
 
 console.log('[site-settings:smoke] OK');
