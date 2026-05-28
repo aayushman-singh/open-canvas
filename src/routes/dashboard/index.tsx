@@ -3,8 +3,7 @@ import { raw } from 'hono/html';
 import { desc, eq, sql, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, site, ownerAsset, type BillingPlan } from '../../db/schema';
-import { entitlementsFor, isUnlimited, PLAN_DISPLAY_NAMES } from '../../billing/plans';
+import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth, resolveAuthRedirectUrl, resolveClerkKeys } from '../../auth/middleware';
 import { buildSignOutUrl, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
@@ -1109,8 +1108,9 @@ dashboard.get('/', async (c) => {
     .from(customer)
     .where(eq(customer.clerkUserId, user.id))
     .limit(1);
-  const customerId = customerRow[0]?.id;
-  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
+  const customerRecord = customerRow[0];
+  const customerId = customerRecord?.id;
+  const customerPlan = customerRecord?.plan ?? 'free';
 
   const origin = new URL(c.req.url).origin;
 
@@ -1146,11 +1146,11 @@ dashboard.get('/', async (c) => {
   const { publishableKey } = resolveClerkKeys(c.env);
   const signOutUrl = buildSignOutUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url, '/'));
 
-  const entitlements = entitlementsFor(currentPlanId);
-  const atSiteLimit = !isUnlimited(entitlements.siteLimit) && cards.length >= entitlements.siteLimit;
-  const planName = PLAN_DISPLAY_NAMES[currentPlanId];
-  const siteLimitLabel = isUnlimited(entitlements.siteLimit) ? 'Unlimited' : String(entitlements.siteLimit);
-  const storageLimitLabel = isUnlimited(entitlements.storageBytes) ? 'Unlimited' : formatBytes(entitlements.storageBytes);
+  const siteLimit = siteLimitForPlan(customerPlan);
+  const atSiteLimit = siteLimit !== null && cards.length >= siteLimit;
+  const planName = billingPlanLabel(customerPlan);
+  const siteLimitLabel = siteLimit === null ? 'Unlimited' : String(siteLimit);
+  const storageLimitLabel = formatBytes(storageLimitForPlan(customerPlan));
 
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
@@ -1188,7 +1188,7 @@ dashboard.get('/', async (c) => {
         <div class="dash-stat-card">
           <div class="stat-label">Plan</div>
           <div class="stat-value">{planName}</div>
-          <div class="stat-sub"><a href="/dashboard/settings" style="font-size:12px">{currentPlanId === 'team' ? 'Manage' : 'Upgrade'}</a></div>
+          <div class="stat-sub"><a href="/dashboard/settings" style="font-size:12px">{customerPlan === 'team' ? 'Manage' : 'Upgrade'}</a></div>
         </div>
       </div>
 

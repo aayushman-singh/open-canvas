@@ -9,7 +9,6 @@ import {
 } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customer, site, ownerAsset, type BillingPlan } from '../../db/schema';
-import { entitlementsFor, isUnlimited, PLAN_DISPLAY_NAMES } from '../../billing/plans';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
@@ -367,9 +366,10 @@ settingsRoute.get('/settings', async (c) => {
     .from(customer)
     .where(eq(customer.clerkUserId, user.id))
     .limit(1);
-  const customerId = customerRow[0]?.id;
-  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
-  const currentPlan = PLANS.find((p) => p.id === currentPlanId) ?? PLANS[0]!;
+  const customerRecord = customerRow[0];
+  const customerId = customerRecord?.id;
+  const customerPlan = customerRecord?.plan ?? 'free';
+  const currentPlan = PLANS.find((p) => p.id === customerPlan) ?? PLANS[0]!;
 
   let siteCount = 0;
   let storageBytes = 0;
@@ -387,12 +387,15 @@ settingsRoute.get('/settings', async (c) => {
     storageBytes = Number(sb[0]?.total ?? 0);
   }
 
-  const entitlements = entitlementsFor(currentPlanId);
-  const siteLimitLabel = isUnlimited(entitlements.siteLimit) ? 'Unlimited' : String(entitlements.siteLimit);
-  const storageLimitLabel = isUnlimited(entitlements.storageBytes) ? 'Unlimited' : formatBytes(entitlements.storageBytes);
-  const planName = PLAN_DISPLAY_NAMES[currentPlanId];
-  const sitesFillPct = isUnlimited(entitlements.siteLimit) ? 0 : Math.min(100, (siteCount / entitlements.siteLimit) * 100);
-  const storageFillPct = isUnlimited(entitlements.storageBytes) ? 0 : Math.min(100, (storageBytes / entitlements.storageBytes) * 100);
+  const siteLimit = siteLimitForPlan(customerPlan);
+  const storageBytesLimit = storageLimitForPlan(customerPlan);
+  const siteLimitLabel = siteLimit === null ? 'Unlimited' : String(siteLimit);
+  const storageLimitLabel = formatBytes(storageBytesLimit);
+  const planName = billingPlanLabel(customerPlan);
+  const currentPlanLabel = billingPlanLabel(customerPlan);
+  const currentInvoiceAmount = billingPlanInvoiceAmount(customerPlan);
+  const sitesFillPct = siteLimit === null ? 0 : Math.min(100, (siteCount / siteLimit) * 100);
+  const storageFillPct = Math.min(100, (storageBytes / storageBytesLimit) * 100);
 
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
@@ -422,10 +425,10 @@ settingsRoute.get('/settings', async (c) => {
       <div class="settings-panel" id="tab-billing" data-active="true">
         <div class="settings-section">
           <h3>Plan</h3>
-          <p class="desc">You're on the {currentPlan.name} plan. {currentPlanId === 'team' ? 'You have access to every rev01 feature.' : 'Plan changes are coming soon — contact support to switch plans.'}</p>
+          <p class="desc">You're on the {currentPlan.name} plan. {customerPlan === 'team' ? 'You have access to every rev01 feature.' : 'Plan changes are coming soon — contact support to switch plans.'}</p>
           <div class="plan-grid">
             {PLANS.map((plan) => {
-              const isCurrent = plan.id === currentPlanId;
+              const isCurrent = plan.id === customerPlan;
               return (
                 <div class={`plan-card${isCurrent ? ' plan-card--current' : ''}`} data-plan-card={plan.id}>
                   <p class="plan-name">{plan.name}</p>

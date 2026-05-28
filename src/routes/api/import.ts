@@ -26,7 +26,6 @@ import { validateCanvasSiteState } from '../../canvas/validate';
 import { isSiteLimitViolation, validateSubdomain } from './sites';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site, siteFont, type BillingPlan } from '../../db/schema';
-import { entitlementsFor, isUnlimited, siteLimitExceededMessage } from '../../billing/plans';
 import { fontContentHashToR2Key } from '../../fonts/upload';
 
 type Bindings = {
@@ -149,8 +148,9 @@ importRouter.post('/', async (c) => {
   if (!customerRecord) {
     return c.json({ error: 'no customer row for current user - visit /dashboard first' }, 409);
   }
-  const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
-  const { siteLimit } = entitlementsFor(currentPlanId);
+  const customerId = customerRecord.id;
+  const customerPlan = customerRecord.plan ?? 'free';
+  const siteLimit = siteLimitForPlan(customerPlan);
 
   const existingSite = await database
     .select({ id: site.id })
@@ -161,14 +161,14 @@ importRouter.post('/', async (c) => {
     return c.json({ error: 'subdomain is already taken' }, 409);
   }
 
-  if (!isUnlimited(siteLimit)) {
+  if (siteLimit !== null) {
     const siteCountRows = await database
       .select({ value: count() })
       .from(site)
       .where(eq(site.customerId, customerId));
     const siteCount = siteCountRows[0]?.value ?? 0;
     if (siteCount >= siteLimit) {
-      return c.json({ error: siteLimitExceededMessage(currentPlanId) }, 403);
+      return c.json({ error: siteLimitError(customerPlan) }, 403);
     }
   }
 
@@ -275,12 +275,11 @@ importRouter.post('/', async (c) => {
       return c.json({ error: 'subdomain is already taken' }, 409);
     }
     if (isSiteLimitViolation(err)) {
-      const { siteLimit } = entitlementsFor(currentPlanId);
-      if (isUnlimited(siteLimit)) {
-        console.error('site_limit_drift', { plan: currentPlanId, err });
+      if (siteLimitForPlan(customerPlan) === null) {
+        console.error('site_limit_drift', { plan: customerPlan, err });
         throw err;
       }
-      return c.json({ error: siteLimitExceededMessage(currentPlanId) }, 403);
+      return c.json({ error: siteLimitError(customerPlan) }, 403);
     }
     throw err;
   }
@@ -805,16 +804,3 @@ function isUniqueViolation(err: unknown): boolean {
   return false;
 }
 
-function isSiteLimitViolation(err: unknown): boolean {
-  if (!err || typeof err !== 'object') return false;
-  const e = err as { code?: unknown; message?: unknown; cause?: unknown };
-  if (
-    e.code === '23514' &&
-    typeof e.message === 'string' &&
-    e.message.includes('site limit exceeded')
-  ) {
-    return true;
-  }
-  if (e.cause) return isSiteLimitViolation(e.cause);
-  return false;
-}

@@ -10,7 +10,6 @@ import type { CanvasSection, CanvasSiteState, MediaKind } from '../../canvas/sch
 import { validateCanvasSiteState } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, customTemplate, ownerAsset, site, type BillingPlan } from '../../db/schema';
-import { entitlementsFor, isUnlimited, siteLimitExceededMessage } from '../../billing/plans';
 import { canReadScopedLibraryRow } from './library-access';
 import { getTemplateSeed } from '../../templates/registry';
 
@@ -141,11 +140,10 @@ export function isSiteLimitViolation(err: unknown): boolean {
 }
 
 function siteLimitResponse(c: Context<Env>, plan: BillingPlan) {
-  const { siteLimit } = entitlementsFor(plan);
-  if (isUnlimited(siteLimit)) {
+  if (siteLimitForPlan(plan) === null) {
     return null;
   }
-  const error = siteLimitExceededMessage(plan);
+  const error = siteLimitError(plan);
   if (wantsJson(c)) {
     return c.json({ error }, 403);
   }
@@ -385,17 +383,17 @@ sites.post('/', async (c) => {
     );
   }
   const customerId = customerRecord.id;
-  const currentPlanId: BillingPlan = customerRecord.plan ?? 'free';
-  const { siteLimit } = entitlementsFor(currentPlanId);
+  const customerPlan = customerRecord.plan ?? 'free';
+  const siteLimit = siteLimitForPlan(customerPlan);
 
-  if (!isUnlimited(siteLimit)) {
+  if (siteLimit !== null) {
     const siteCountRows = await database
       .select({ value: count() })
       .from(site)
       .where(eq(site.customerId, customerId));
     const siteCount = siteCountRows[0]?.value ?? 0;
     if (siteCount >= siteLimit) {
-      const response = siteLimitResponse(c, currentPlanId);
+      const response = siteLimitResponse(c, customerPlan);
       if (response) return response;
     }
   }
@@ -528,9 +526,9 @@ sites.post('/', async (c) => {
     }
   } catch (err) {
     if (isSiteLimitViolation(err)) {
-      const response = siteLimitResponse(c, currentPlanId);
+      const response = siteLimitResponse(c, customerPlan);
       if (response) return response;
-      console.error('site_limit_drift', { customerId, plan: currentPlanId, err });
+      console.error('site_limit_drift', { customerId, plan: customerPlan, err });
       throw err;
     }
     if (isUniqueViolation(err)) {

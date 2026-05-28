@@ -10,8 +10,7 @@ import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, customTemplate, site, type BillingPlan } from '../../db/schema';
-import { entitlementsFor, isUnlimited } from '../../billing/plans';
+import { customer, customTemplate, site } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
@@ -332,11 +331,11 @@ function CustomTemplateTile({ dt }: { dt: CustomTemplateCard }) {
 function Page({
   communityCustomTemplates,
   personalCustomTemplates,
-  atSiteLimit,
+  siteLimitErrorMessage,
 }: {
   communityCustomTemplates: CustomTemplateCard[];
   personalCustomTemplates: CustomTemplateCard[];
-  atSiteLimit: boolean;
+  siteLimitErrorMessage: string | null;
 }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   const communityCount = allTemplateSeeds.length + communityCustomTemplates.length;
@@ -493,7 +492,7 @@ templatesRoute.get('/', async (c) => {
   const auth = c.get('auth');
   let communityCustomTemplates: CustomTemplateCard[] = [];
   let personalCustomTemplates: CustomTemplateCard[] = [];
-  let atSiteLimit = false;
+  let siteLimitErrorMessage: string | null = null;
   if (auth.userId) {
     const database = db(c.env);
     const customerRow = await database
@@ -501,8 +500,9 @@ templatesRoute.get('/', async (c) => {
       .from(customer)
       .where(eq(customer.clerkUserId, auth.userId))
       .limit(1);
-    const customerId = customerRow[0]?.id;
-    const currentPlanId: BillingPlan = customerRow[0]?.plan ?? 'free';
+    const customerRecord = customerRow[0];
+    const customerId = customerRecord?.id;
+    const customerPlan = customerRecord?.plan ?? 'free';
 
     const whereClause = customerId
       ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
@@ -528,13 +528,15 @@ templatesRoute.get('/', async (c) => {
     }
 
     if (customerId) {
-      const { siteLimit } = entitlementsFor(currentPlanId);
-      if (!isUnlimited(siteLimit)) {
+      const siteLimit = siteLimitForPlan(customerPlan);
+      if (siteLimit !== null) {
         const countRows = await database
           .select({ count: sql<number>`count(*)::int` })
           .from(site)
           .where(eq(site.customerId, customerId));
-        atSiteLimit = (countRows[0]?.count ?? 0) >= siteLimit;
+        if ((countRows[0]?.count ?? 0) >= siteLimit) {
+          siteLimitErrorMessage = siteLimitError(customerPlan);
+        }
       }
     }
   }
@@ -543,7 +545,7 @@ templatesRoute.get('/', async (c) => {
     <Page
       communityCustomTemplates={communityCustomTemplates}
       personalCustomTemplates={personalCustomTemplates}
-      atSiteLimit={atSiteLimit}
+      siteLimitErrorMessage={siteLimitErrorMessage}
     />,
   );
 });
