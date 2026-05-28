@@ -1,8 +1,8 @@
 // src/canvas/yjs-projection.ts
 //
-// Phase 0 — Yjs projection module. Frozen contract consumed by:
-//   * Wave 1 #3 — version history (snapshot capture + restore broadcasts).
-//   * Wave 1 #4 — co-edit (Y.Doc held in SiteRoom DO, autosaved to Postgres).
+// Yjs projection module. Frozen contract consumed by version history
+// (snapshot capture + restore broadcasts) and co-edit (Y.Doc held in
+// SiteRoom DO, autosaved to Postgres).
 //
 // The canonical operation model per ADR 0007 is a `Y.Doc`. Every other
 // subsystem (agent ops, validators, renderer, publish) still consumes the
@@ -1020,9 +1020,7 @@ function decodeElement(map: Y.Map<unknown>): CanvasElement {
       if (map.has('sort')) {
         const sortMap = map.get('sort') as Y.Map<unknown>;
         el.sort = {
-          field: sortMap.get('field') as CollectionElement['sort'] extends undefined
-            ? never
-            : NonNullable<CollectionElement['sort']>['field'],
+          field: sortMap.get('field') as NonNullable<CollectionElement['sort']>['field'],
           order: sortMap.get('order') as 'asc' | 'desc',
         };
       }
@@ -1282,24 +1280,20 @@ export function attachAutosave(
     // Promises are intentionally not awaited here. The caller may return a
     // promise to express async persistence; floating it is the right shape
     // for an autosave because we never want one slow persist to block the
-    // next debounce window. Any rejection is the caller's responsibility to
-    // surface (consistent with the project's "fail loudly" posture).
+    // next debounce window. Any rejection is re-thrown asynchronously so the
+    // host runtime surfaces it as an unhandled error rather than silently
+    // discarding it (consistent with the project's "fail loudly" posture).
     const result = onPersist(projected);
     if (result && typeof result.then === 'function') {
-      // Attach a noop catch so an unawaited rejection doesn't trip
-      // `unhandledRejection` handlers in the host runtime. The caller's
-      // `.then` chain elsewhere remains the source of truth for errors.
       result.catch((err: unknown) => {
-        console.error('[yjs-projection] autosave onPersist rejected', err);
+        setTimeout(() => {
+          throw err;
+        }, 0);
       });
     }
   };
 
-  const observer = (_update: Uint8Array, _origin: unknown, _doc: Y.Doc, _tr: Y.Transaction) => {
-    void _update;
-    void _origin;
-    void _doc;
-    void _tr;
+  const observer = (): void => {
     if (timer !== null) clearTimeout(timer);
     timer = setTimeout(flush, debounceMs);
   };
