@@ -146,6 +146,13 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <button id="canvas-chat-toggle" type="button" title="Chat with AI to edit your site">
               AI Chat
             </button>
+            <a
+              id="canvas-settings-link"
+              href={`/dashboard/sites/${siteId}/settings`}
+              title="Open site settings"
+            >
+              Settings
+            </a>
             <button id="canvas-save" type="button">
               Save
             </button>

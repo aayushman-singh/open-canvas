@@ -114,7 +114,9 @@ body.rev01-modal-open {
 }
 
 .rev01-editor-topbar #canvas-save,
-.rev01-editor-topbar #canvas-publish {
+.rev01-editor-topbar #canvas-publish,
+.rev01-editor-topbar #canvas-save-template,
+.rev01-editor-topbar #canvas-settings-link {
   appearance: none;
   border: 1px solid var(--rev01-hairline-strong);
   background: var(--rev01-bg-panel-strong);
@@ -123,8 +125,12 @@ body.rev01-modal-open {
   padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
+  text-decoration: none;
+  line-height: 1.4;
 }
-.rev01-editor-topbar #canvas-save:hover {
+.rev01-editor-topbar #canvas-save:hover,
+.rev01-editor-topbar #canvas-save-template:hover,
+.rev01-editor-topbar #canvas-settings-link:hover {
   border-color: var(--rev01-accent);
 }
 .rev01-editor-topbar #canvas-publish[disabled] {

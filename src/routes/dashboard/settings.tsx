@@ -305,14 +305,14 @@ const PLANS = [
     name: 'Free',
     price: '$0',
     period: '/mo',
-    features: ['1 site', 'Community templates', 'rev01 subdomain', '100 MB storage', 'Standard AI'],
+    features: ['1 site', 'Community templates', 'rev01 subdomain', '100 MB storage'],
     current: true,
   },
   {
     name: 'Pro',
     price: '$19',
     period: '/mo',
-    features: ['Unlimited sites', 'Custom domains', 'Priority AI', 'Remove branding', '10 GB storage'],
+    features: ['Unlimited sites', 'Custom domains', 'Remove branding', '10 GB storage'],
     current: false,
   },
   {
@@ -403,7 +403,7 @@ settingsRoute.get('/settings', async (c) => {
       <div class="settings-panel" id="tab-billing" data-active="true">
         <div class="settings-section">
           <h3>Plan</h3>
-          <p class="desc">You're on the Free plan. Upgrade to unlock more sites, custom domains, and priority AI.</p>
+          <p class="desc">You're on the Free plan. Upgrade to unlock more sites and custom domains.</p>
           <div class="plan-grid">
             {PLANS.map((plan) => (
               <div class={`plan-card${plan.current ? ' plan-card--current' : ''}`}>
@@ -440,14 +440,6 @@ settingsRoute.get('/settings', async (c) => {
               <div class="of">of {formatBytes(FREE_STORAGE_LIMIT)} on Free</div>
               <div class="usage-bar">
                 <div class="usage-bar-fill" style={`width:${Math.min(100, (storageBytes / FREE_STORAGE_LIMIT) * 100)}%`} />
-              </div>
-            </div>
-            <div class="usage-card">
-              <div class="label">AI generations</div>
-              <div class="value">12</div>
-              <div class="of">of 50 on Free</div>
-              <div class="usage-bar">
-                <div class="usage-bar-fill" style="width:24%" />
               </div>
             </div>
           </div>
