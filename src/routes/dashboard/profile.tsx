@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { eq, sql, count } from 'drizzle-orm';
+import { eq, count } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';

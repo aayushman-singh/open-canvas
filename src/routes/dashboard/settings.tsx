@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { eq, sql, count, sum } from 'drizzle-orm';
+import { eq, count, sum } from 'drizzle-orm';
 import {
   billingPlanInvoiceAmount,
   billingPlanLabel,
