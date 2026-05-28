@@ -1,13 +1,19 @@
 // src/editor/canvas-styles.ts
 //
-// Stylesheet for the desktop Canvas Editor (T4). Inlined into the editor route
+// Stylesheet for the desktop Canvas Editor. Inlined into the editor route
 // via raw(canvasEditorStyles). Dark theme tuned for dense desktop editing.
 //
 // The visitor renderer (src/canvas/public-styles.ts) and this editor preview
 // share a single source of truth for kit tokens, variants, and motion:
 // `buildAllStyleKitsCss` in src/canvas/style-kits.ts. The hard-coded
-// per-kit `--kit-*` table that used to live here was removed in T8 — the
+// per-kit `--kit-*` table that used to live here was removed earlier — the
 // editor and the visitor cannot drift because they read the same map.
+//
+// Color space: chrome tokens use OKLCH (perceptual uniformity for the dark
+// editor surfaces). Browser floor: Chrome 111 / Safari 15.4 / Firefox 113.
+// Acceptable for the owner-facing editor; visitor-side kit colors in
+// style-kits.ts intentionally stay in hex for older-browser reach since the
+// published site must render on a wider range than the editor.
 
 import { buildAllStyleKitsCss } from '../canvas/style-kits.js';
 
@@ -1727,7 +1733,9 @@ body[data-placement-active="true"] .rev01-section-slot {
   border-color: var(--rev01-accent);
 }
 
-/* Animation replay */
+/* Animation replay — owner-only control surfaced over an element while
+   selected so they can re-trigger entrance/scroll animations without
+   reloading the preview. */
 .rev01-replay-btn {
   appearance: none;
   display: inline-flex;
