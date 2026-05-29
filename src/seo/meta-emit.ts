@@ -20,7 +20,7 @@
 // OG image dimensions: the generated card is always 1200×630 (matches
 // `OG_WIDTH` / `OG_HEIGHT` in `src/og-image/render.tsx`). Owner-uploaded
 // images can be any aspect ratio, so dimensions + image type are emitted
-// only when the URL came from the generator path.
+// only when the URL came from the generator path (i.e. starts with `/og/`).
 //
 // The `<html lang="…">` attribute is owned by the document envelope in
 // `src/routes/public.ts` (main thread integration). This module exposes the

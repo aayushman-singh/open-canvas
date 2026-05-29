@@ -360,15 +360,15 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-// Audit follow-ups — wave: 2026-05-29 SEO setup pass.
+// Audit follow-ups — 2026-05-29 SEO setup pass.
 //
 // The original meta-emit module shipped without:
 //   - og:locale, og:image:alt, og:image:type, og:image:width, og:image:height
 //   - twitter:image:alt
 //
-// These fields are tightening the crawler/unfurl contract. Generated cards
-// (the `/og/<siteId>/<slug>.png` fallback) have known 1200×630 PNG output
-// from the satori renderer, so dimensions + image type are emitted. Owner-
+// These fields tighten the crawler/unfurl contract. Generated cards (the
+// `/og/<siteId>/<slug>.png` fallback) come from the satori renderer at a
+// known 1200×630 PNG, so dimensions + image type are emitted. Owner-
 // uploaded images route through `/assets/...` and have unknown aspect
 // ratios; dimensions + type are omitted in that branch (assertions below).
 // ---------------------------------------------------------------------------

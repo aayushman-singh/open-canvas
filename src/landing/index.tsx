@@ -47,16 +47,13 @@ type LandingEnv = { Bindings: HostConfigEnv };
 
 const landing = new Hono<LandingEnv>();
 
-// The marketing page's social-share title + description. The headline is
-// duplicated between the visible `<h1>` (in `./components/Hero.tsx`) and
-// the social-share `<title>` because crawlers + unfurl bots read the latter
-// and human visitors read the former; keeping both in sync is an authoring
-// concern, not a runtime one. The OG headline / description live in
-// `src/seo/apex.ts` so the OG card text and the marketing meta agree.
+// The marketing page's social-share title + description. The OG headline /
+// description live in `src/seo/apex.ts` so the OG card text and the
+// marketing meta agree byte-for-byte.
 const PAGE_TITLE = `${APEX_OG_SITE_NAME} — ${APEX_OG_HEADLINE.toLowerCase()}`;
 const PAGE_DESCRIPTION = APEX_OG_DESCRIPTION;
 
-// The OG image is 1200x630 — matches `OG_WIDTH` / `OG_HEIGHT` in
+// OG image is 1200x630 — matches `OG_WIDTH` / `OG_HEIGHT` in
 // `src/og-image/render.tsx`. Crawlers want explicit dimensions so they don't
 // have to fetch + decode the PNG before deciding whether to render the card.
 const OG_IMAGE_PATH = '/og-card.png';
@@ -72,8 +69,7 @@ interface PageProps {
 function buildJsonLd(origin: string): string {
   // Two schema.org types in one @graph so a single <script> covers both the
   // product (SoftwareApplication) and the site identity (WebSite).
-  // - WebSite supplies the search-action hook + the site name Google uses in
-  //   the sitelinks search box.
+  // - WebSite supplies the site name Google uses in the sitelinks search box.
   // - SoftwareApplication tells Google this is a tool (not an article / blog)
   //   so the rich result eligibility flags are set correctly.
   const graph = [
@@ -104,8 +100,8 @@ function buildJsonLd(origin: string): string {
     '@context': 'https://schema.org',
     '@graph': graph,
   };
-  // Escape `<` as `<` so a `</script>` substring inside any future field
-  // value cannot break out of the JSON body.
+  // Escape `<` as `<` so any `</script>` substring inside a future
+  // field value cannot break out of the JSON body.
   return JSON.stringify(payload).replace(/</g, '\\u003c');
 }
 

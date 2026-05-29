@@ -74,6 +74,7 @@
     "seo:smoke": "bun run src/seo/smoke.ts",
     "jsonld:smoke": "bun run src/seo/json-ld.smoke.ts",
     "sitemap:smoke": "bun run src/seo/sitemap/smoke.ts",
+    "apex-seo:smoke": "bun run src/seo/apex.smoke.ts",
     "collection:smoke": "bun run src/canvas/elements/collection-smoke.ts",
     "table:smoke": "bun run src/canvas/elements/table-smoke.ts",
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",

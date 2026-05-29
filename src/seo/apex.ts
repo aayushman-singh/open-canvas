@@ -20,9 +20,8 @@
 // — the same satori/resvg pipeline the published-site OG route uses —
 // fed a constant (siteName, headline, description, preset) tuple. The bytes
 // are cached in R2 at a static key (`og/apex/landing.v1.png`); bump the
-// version suffix when any input changes. Cache-Control is 1 hour, matching
-// the published-site OG route, so Cloudflare's edge cache absorbs the
-// post-deploy traffic.
+// version suffix when any input changes. Cache-Control is 1 day, matching
+// the apex's static publish cadence.
 
 import { Hono } from 'hono';
 import { createR2Client, type R2Client } from '../assets/r2-client.js';
