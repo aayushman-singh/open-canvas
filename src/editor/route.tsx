@@ -160,6 +160,20 @@ export function editorPageJsx(opts: EditorPageOptions) {
         </a>
         <span class="sep">/</span>
         <span class="here">{siteName}</span>
+        <span class="sep">/</span>
+        <button
+          type="button"
+          id="canvas-page-crumb"
+          class="crumb-page-switcher"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-label="Switch page"
+        >
+          <span data-page-crumb-label>…</span>
+          <span class="crumb-caret" aria-hidden="true">
+            &#9662;
+          </span>
+        </button>
       </span>
     );
 
@@ -213,14 +227,11 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 WebSocket used by the visitor live-update path. The client
                 script unhides this element when count > 1 and removes it
                 when count drops back to 1. */}
-            <span
-              data-rev01-presence
-              hidden
-              role="status"
-              aria-live="polite"
-              aria-label="People editing"
-            >
-              <span data-rev01-presence-count>0</span> editing
+            {/* Presence pill — pre-seeded with solo (1 editing) so the
+                visible state is correct from first paint. The WS callback
+                overwrites this once it attaches with the real peer count. */}
+            <span data-rev01-presence role="status" aria-live="polite" aria-label="People editing">
+              <span data-rev01-presence-count>1</span> editing
             </span>
           </header>
           <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
@@ -450,7 +461,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
           <aside id="canvas-inspector" hidden />
           <aside id="canvas-chat-panel" class="rev01-chat-panel" hidden>
             <div class="rev01-chat-header">
-              <span>Chat</span>
+              <span>AI Chat</span>
               <button type="button" id="canvas-chat-close" title="Close chat">
                 &times;
               </button>
@@ -467,7 +478,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
             </form>
           </aside>
           <footer class="rev01-editor-status">
-            <span id="canvas-status">Ready</span>
+            <span id="canvas-status">Saved</span>
           </footer>
         </main>
         {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
