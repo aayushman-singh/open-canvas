@@ -30,6 +30,7 @@ jobs:
       - run: bun run host-config:smoke
       - run: bun run host-literal-guard:smoke
       - run: bun run canvas:smoke
+      - run: bun run inspector-dispatch:smoke
       - run: bun run canvas-agent:smoke
       - run: bun run build
 
