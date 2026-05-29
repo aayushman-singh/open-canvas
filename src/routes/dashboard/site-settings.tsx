@@ -104,6 +104,31 @@ const pageStyles = `
   }
   .set-body { padding: 0 22px 20px; }
 
+  /* Section TOC — chip row at the top of the page that jump-scrolls to each
+     settings card via #id anchors. Pure CSS; the .set { scroll-margin-top }
+     above keeps the target's heading clear of the sticky shell chrome. */
+  .set-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 22px;
+  }
+  .set-toc a {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 12px;
+    text-decoration: none;
+    transition: color 120ms, background 120ms, border-color 120ms;
+  }
+  .set-toc a:hover {
+    color: var(--ink);
+    background: var(--surface);
+    border-color: var(--ink-3);
+  }
+
   .row-line {
     display: flex;
     align-items: center;
@@ -1133,6 +1158,16 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
       <p class="sub">
         Manage how <b>{owned.name}</b> is hosted, secured, and shared.
       </p>
+
+      <nav class="set-toc" aria-label="Settings sections">
+        <a href="#hosting">Hosting</a>
+        <a href="#password">Password</a>
+        <a href="#seo">Search engines</a>
+        <a href="#favicon">Favicon</a>
+        <a href="#dark-mode">Dark mode</a>
+        <a href="#collaborators">Collaborators</a>
+        <a href="#danger">Delete site</a>
+      </nav>
 
       {/* Hosting card — read-only summary of plan/CDN/style-kit/status + the
           public address. Mirrors settings.html § Hosting. */}

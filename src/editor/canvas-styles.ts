@@ -100,6 +100,81 @@ body.rev01-modal-open {
   color: var(--ink);
   font-weight: 650;
 }
+/* Page chip — switches the active page via a popover. Same weight as .here
+   so the breadcrumb reads as one continuous trail. */
+.rev01-editor-header .crumb-page-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 220px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.rev01-editor-header .crumb-page-switcher:hover {
+  background: var(--surface);
+}
+.rev01-editor-header .crumb-page-switcher .crumb-caret {
+  color: var(--ink-3);
+  font-size: 10px;
+}
+/* Page-switcher popover — rendered to document.body so it escapes the
+   header's overflow clip. Position is set inline via the client. */
+.rev01-crumb-menu {
+  z-index: 200;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-family: var(--sans);
+  font-size: 13px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.rev01-crumb-menu-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rev01-crumb-menu-item:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.rev01-crumb-menu-item.active {
+  background: var(--surface-2);
+  color: var(--ink);
+  font-weight: 600;
+}
+.rev01-crumb-menu-title {
+  flex: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.rev01-crumb-menu-slug {
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 11px;
+}
 
 /* Address chip — pill, mono so the URL reads as data. */
 .rev01-editor-header .address {
@@ -172,6 +247,122 @@ body.rev01-modal-open {
 .rev01-editor-header #canvas-publish[disabled]:hover {
   background: var(--red);
   transform: none;
+}
+
+/* Version badge — small persistent indicator of the live version, clickable
+   to open the social-preview pill. Greyer than Publish so it reads as a
+   passive status surface rather than a primary action. */
+.rev01-editor-header #canvas-version {
+  appearance: none;
+  border: 1.5px solid var(--line-2);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font: inherit;
+  font-family: var(--mono);
+  font-weight: 650;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  line-height: 1;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+.rev01-editor-header #canvas-version:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+.rev01-editor-header #canvas-version[data-version="0"] {
+  color: var(--ink-3);
+}
+
+/* Social-preview pill — anchored below the version badge, mirrors what
+   src/seo/meta-emit.ts will emit for og:title / og:description / og:image. */
+.rev01-version-pill {
+  width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 14px;
+  z-index: 250;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+.rev01-version-pill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.rev01-version-pill-title {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.rev01-version-pill-chip {
+  font-size: 11px;
+  font-family: var(--mono);
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 650;
+}
+.rev01-version-pill-chip.live {
+  background: rgba(74, 222, 128, 0.14);
+  color: #1f7a3f;
+}
+.rev01-version-pill-chip.draft {
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.rev01-version-pill-image {
+  width: 100%;
+  height: 156px;
+  object-fit: cover;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+  display: block;
+  background: var(--surface-2);
+}
+.rev01-version-pill-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 10px 12px;
+  background: var(--surface-2);
+}
+.rev01-version-pill-card-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.rev01-version-pill-card-desc {
+  font-size: 12px;
+  color: var(--ink-2);
+  line-height: 1.4;
+  margin-top: 4px;
+}
+.rev01-version-pill-card-url {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+.rev01-version-pill-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+.rev01-version-pill-view {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--red-ink);
+  text-decoration: none;
+}
+.rev01-version-pill-view:hover {
+  text-decoration: underline;
 }
 
 /* AI Chat toggle — soft red surface + red ink, hints AI affordance. */
@@ -1703,6 +1894,68 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-mark-toolbar .rev01-mark-drag svg {
   display: block;
   pointer-events: none;
+}
+/* Vertical divider between mark groups (marks | align | color/AI). */
+.rev01-mark-toolbar .rev01-mark-sep {
+  display: inline-block;
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--line);
+}
+/* Alignment buttons — pressed state mirrors the active alignment. */
+.rev01-mark-toolbar .rev01-mark-align svg {
+  display: block;
+  pointer-events: none;
+}
+.rev01-mark-toolbar .rev01-mark-align.active,
+.rev01-mark-toolbar button[aria-pressed="true"].rev01-mark-align {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+/* Text color swatch — glyph "A" with a tiny color bar beneath, native
+   <input type="color"> hidden behind the button so the swatch click opens
+   the OS color picker. */
+.rev01-mark-toolbar .rev01-mark-color {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 8px 4px;
+  line-height: 1;
+}
+.rev01-mark-toolbar .rev01-mark-color-glyph {
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 14px;
+}
+.rev01-mark-toolbar .rev01-mark-color-swatch {
+  display: block;
+  width: 14px;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.rev01-mark-toolbar .rev01-mark-color-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+}
+/* AI rewrite button — accent emphasis, mirrors inspector aiBtn styling. */
+.rev01-mark-toolbar .rev01-mark-ai {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+}
+.rev01-mark-toolbar .rev01-mark-ai:hover {
+  color: var(--ink);
+  background: var(--accent-soft, var(--surface-2));
 }
 
 /* Link popover — singleton floating bar shown when the mouse enters or the

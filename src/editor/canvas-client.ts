@@ -230,6 +230,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const sidebarSelection = document.getElementById("canvas-sidebar-selection");
   const saveButton = document.getElementById("canvas-save");
   const publishButton = document.getElementById("canvas-publish");
+  const versionBadge = document.getElementById("canvas-version");
   const saveTemplateButton = document.getElementById("canvas-save-template");
 
   // -- Chat panel toggle (wired early — no site data dependency) ----------
@@ -577,7 +578,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (statusTimer) clearTimeout(statusTimer);
     statusTimer = setTimeout(() => {
       if (statusEl.textContent === text) {
-        statusEl.textContent = "Ready";
+        // Idle default is "Saved" — every mutation goes through scheduleSave,
+        // so once the toast fades we're back in the synced/saved baseline.
+        // The presence pill in the header carries viewer count separately.
+        statusEl.textContent = "Saved";
         statusEl.className = "";
       }
     }, 4000);
@@ -962,6 +966,103 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         artboards[i].setAttribute("data-active", isActive ? "true" : "false");
       }
     }
+    refreshPageCrumb();
+  }
+
+  // -- Breadcrumb page chip + page switcher dropdown ----------------------
+  // The header crumb renders 'Open Canvas / dashboard / {siteName} / {page}'.
+  // The page chip is a button — clicking it opens a popover listing every
+  // page in the site; picking one calls setActivePage. The label text is
+  // refreshed inside setActivePage so it always reflects activePageId.
+  var pageCrumbMenu = null;
+
+  function refreshPageCrumb() {
+    var label = document.querySelector("[data-page-crumb-label]");
+    if (!label) return;
+    var page = currentPage();
+    if (page) {
+      label.textContent = page.title || page.slug || "page";
+    } else {
+      label.textContent = "page";
+    }
+  }
+
+  function closePageCrumbMenu() {
+    if (!pageCrumbMenu) return;
+    if (pageCrumbMenu.parentNode) pageCrumbMenu.parentNode.removeChild(pageCrumbMenu);
+    pageCrumbMenu = null;
+    var btn = document.getElementById("canvas-page-crumb");
+    if (btn) btn.setAttribute("aria-expanded", "false");
+    document.removeEventListener("mousedown", onPageCrumbOutside, true);
+    document.removeEventListener("keydown", onPageCrumbKey, true);
+  }
+
+  function onPageCrumbOutside(ev) {
+    var target = ev.target instanceof Element ? ev.target : null;
+    if (!target) return;
+    if (pageCrumbMenu && pageCrumbMenu.contains(target)) return;
+    if (target.closest("#canvas-page-crumb")) return;
+    closePageCrumbMenu();
+  }
+
+  function onPageCrumbKey(ev) {
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closePageCrumbMenu();
+    }
+  }
+
+  function openPageCrumbMenu() {
+    if (pageCrumbMenu) { closePageCrumbMenu(); return; }
+    if (!state || !Array.isArray(state.pages) || state.pages.length === 0) return;
+    var btn = document.getElementById("canvas-page-crumb");
+    if (!btn) return;
+    var menu = document.createElement("div");
+    menu.className = "rev01-crumb-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "Pages");
+    for (var i = 0; i < state.pages.length; i++) {
+      (function (p) {
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "rev01-crumb-menu-item";
+        item.setAttribute("role", "menuitem");
+        if (p.id === activePageId) item.classList.add("active");
+        var title = document.createElement("span");
+        title.className = "rev01-crumb-menu-title";
+        title.textContent = p.title || p.slug || "page";
+        var slug = document.createElement("span");
+        slug.className = "rev01-crumb-menu-slug";
+        slug.textContent = "/" + (p.slug || "");
+        item.appendChild(title);
+        item.appendChild(slug);
+        item.addEventListener("click", function () {
+          closePageCrumbMenu();
+          setActivePage(p.id);
+        });
+        menu.appendChild(item);
+      })(state.pages[i]);
+    }
+    document.body.appendChild(menu);
+    var rect = btn.getBoundingClientRect();
+    menu.style.position = "fixed";
+    menu.style.top = (rect.bottom + 4) + "px";
+    menu.style.left = Math.max(8, rect.left) + "px";
+    menu.style.minWidth = Math.max(200, rect.width) + "px";
+    pageCrumbMenu = menu;
+    btn.setAttribute("aria-expanded", "true");
+    document.addEventListener("mousedown", onPageCrumbOutside, true);
+    document.addEventListener("keydown", onPageCrumbKey, true);
+  }
+
+  function attachPageCrumb() {
+    var btn = document.getElementById("canvas-page-crumb");
+    if (!btn) return;
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      openPageCrumbMenu();
+    });
+    refreshPageCrumb();
   }
 
   // Resolve a string href (e.g. "/about", "/about#hero", "about") to a Canvas
@@ -1091,9 +1192,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var newTitle = await openTextModal({ title: "Rename page", label: "Page title", defaultValue: page.title });
     if (!newTitle || newTitle.trim().length === 0) return;
     newTitle = newTitle.trim();
-    page.title = newTitle;
     var newSlug = newTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     if (newSlug.length === 0) newSlug = "page";
+    // _404 is reserved for the optional custom 404 page (src/canvas/page-routing.ts).
+    // 404 is what the normaliser produces when someone types '_404' as a title; block
+    // both so the dedicated custom-404 flow stays the only way in.
+    if (newSlug === "_404" || newSlug === "404") {
+      setStatus("Slug '" + newSlug + "' is reserved for the custom 404 page", "error");
+      return;
+    }
+    page.title = newTitle;
     var slugBase = newSlug;
     var counter = 2;
     while (state.pages.some(function(p) { return p.id !== pageId && p.slug === newSlug; })) {
@@ -7036,6 +7144,65 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // Apply an element-level field change while a text element is in edit mode.
+  // We mutate the data model AND mirror the new value into the live .rev01-text
+  // inline style so the change is visible immediately without a rebuild — a
+  // rebuild would tear down the contenteditable and drop the caret.
+  function applyAlignToEditing(direction) {
+    if (!editingElementId) return;
+    var found = findElement(editingElementId);
+    if (!found || found.element.type !== "text") return;
+    found.element.align = direction;
+    var wrapper = root.querySelector('[data-rev01-element="' + cssEscape(editingElementId) + '"]');
+    var inner = wrapper ? wrapper.querySelector(".rev01-text") : null;
+    if (inner) inner.style.textAlign = direction;
+    refreshMarkToolbarAlignState();
+    scheduleSave();
+  }
+
+  // Element-level text color, applied via elementStyle.color — same field
+  // the inspector "Style" block writes (see render.ts applyElementStyle).
+  // Color inherits, so we set it on the wrapper to mirror the renderer.
+  function applyTextColorToEditing(color) {
+    if (!editingElementId) return;
+    var found = findElement(editingElementId);
+    if (!found || found.element.type !== "text") return;
+    var es = found.element.elementStyle || {};
+    if (color) {
+      es.color = color;
+    } else {
+      delete es.color;
+    }
+    var anyKey = false;
+    for (var k in es) { if (es[k] !== undefined) { anyKey = true; break; } }
+    if (anyKey) {
+      found.element.elementStyle = es;
+    } else {
+      delete found.element.elementStyle;
+    }
+    var wrapper = root.querySelector('[data-rev01-element="' + cssEscape(editingElementId) + '"]');
+    if (wrapper) wrapper.style.color = color || "";
+    scheduleSave();
+  }
+
+  function refreshMarkToolbarAlignState() {
+    if (!markToolbar || !editingElementId) return;
+    var found = findElement(editingElementId);
+    if (!found || found.element.type !== "text") return;
+    var current = found.element.align;
+    var btns = markToolbar.querySelectorAll('[data-mark-align]');
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      if (b.getAttribute('data-mark-align') === current) {
+        b.setAttribute('aria-pressed', 'true');
+        b.classList.add('active');
+      } else {
+        b.setAttribute('aria-pressed', 'false');
+        b.classList.remove('active');
+      }
+    }
+  }
+
   function buildMarkToolbar(anchor) {
     removeMarkToolbar();
     const bar = document.createElement("div");
@@ -7089,6 +7256,126 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       bar.appendChild(btn);
     }
+
+    // -- Alignment block --------------------------------------------------
+    // Element-level alignment buttons mirror the inspector's align select
+    // (left/center/right). Pressed state is refreshed after each apply via
+    // refreshMarkToolbarAlignState — and once below after the toolbar is
+    // attached, so the initial state matches element.align.
+    var sep1 = document.createElement("span");
+    sep1.className = "rev01-mark-sep";
+    sep1.setAttribute("aria-hidden", "true");
+    bar.appendChild(sep1);
+
+    var alignDirs = ["left", "center", "right"];
+    var alignTitles = { left: "Align left", center: "Align center", right: "Align right" };
+    var alignSvg = {
+      left:
+        '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+        '<rect x="2" y="3" width="12" height="1.6" fill="currentColor"/>' +
+        '<rect x="2" y="6.2" width="8" height="1.6" fill="currentColor"/>' +
+        '<rect x="2" y="9.4" width="12" height="1.6" fill="currentColor"/>' +
+        '<rect x="2" y="12.6" width="8" height="1.6" fill="currentColor"/></svg>',
+      center:
+        '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+        '<rect x="2" y="3" width="12" height="1.6" fill="currentColor"/>' +
+        '<rect x="4" y="6.2" width="8" height="1.6" fill="currentColor"/>' +
+        '<rect x="2" y="9.4" width="12" height="1.6" fill="currentColor"/>' +
+        '<rect x="4" y="12.6" width="8" height="1.6" fill="currentColor"/></svg>',
+      right:
+        '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+        '<rect x="2" y="3" width="12" height="1.6" fill="currentColor"/>' +
+        '<rect x="6" y="6.2" width="8" height="1.6" fill="currentColor"/>' +
+        '<rect x="2" y="9.4" width="12" height="1.6" fill="currentColor"/>' +
+        '<rect x="6" y="12.6" width="8" height="1.6" fill="currentColor"/></svg>',
+    };
+    for (var ai = 0; ai < alignDirs.length; ai++) {
+      (function (dir) {
+        var ab = document.createElement("button");
+        ab.type = "button";
+        ab.className = "rev01-mark-align";
+        ab.setAttribute("data-mark-align", dir);
+        ab.setAttribute("aria-label", alignTitles[dir]);
+        ab.title = alignTitles[dir];
+        ab.innerHTML = alignSvg[dir];
+        ab.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+        ab.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          applyAlignToEditing(dir);
+        });
+        bar.appendChild(ab);
+      })(alignDirs[ai]);
+    }
+
+    // -- Text color block -------------------------------------------------
+    // Element-level color via elementStyle.color. The native <input type="color">
+    // is hidden behind the swatch button — clicking the swatch triggers the
+    // browser's color picker. The swatch fill mirrors the current color so
+    // the user can see the active value without opening the picker.
+    var sep2 = document.createElement("span");
+    sep2.className = "rev01-mark-sep";
+    sep2.setAttribute("aria-hidden", "true");
+    bar.appendChild(sep2);
+
+    var initColor = "#222222";
+    var foundInit = editingElementId ? findElement(editingElementId) : null;
+    if (foundInit && foundInit.element && foundInit.element.elementStyle && foundInit.element.elementStyle.color) {
+      initColor = foundInit.element.elementStyle.color;
+    }
+    var colorBtn = document.createElement("button");
+    colorBtn.type = "button";
+    colorBtn.className = "rev01-mark-color";
+    colorBtn.setAttribute("aria-label", "Text color");
+    colorBtn.title = "Text color";
+    var colorGlyph = document.createElement("span");
+    colorGlyph.className = "rev01-mark-color-glyph";
+    colorGlyph.textContent = "A";
+    var colorSwatch = document.createElement("span");
+    colorSwatch.className = "rev01-mark-color-swatch";
+    colorSwatch.style.background = initColor;
+    colorBtn.appendChild(colorGlyph);
+    colorBtn.appendChild(colorSwatch);
+    var colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = initColor;
+    colorInput.className = "rev01-mark-color-input";
+    colorInput.setAttribute("aria-hidden", "true");
+    colorInput.tabIndex = -1;
+    colorBtn.appendChild(colorInput);
+    colorBtn.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+    colorBtn.addEventListener("click", function (ev) {
+      // The hidden input is inside the button — pressing the button bubbles a
+      // click here. Only forward to the native picker when the event target was
+      // the button itself, not the input.
+      if (ev.target === colorInput) return;
+      ev.preventDefault();
+      colorInput.click();
+    });
+    colorInput.addEventListener("input", function () {
+      var v = colorInput.value;
+      colorSwatch.style.background = v;
+      applyTextColorToEditing(v);
+    });
+    bar.appendChild(colorBtn);
+
+    // -- AI rewrite button ------------------------------------------------
+    // Same handler the inspector's "AI rewrite" button uses (aiRewriteText).
+    // Surfaced in the toolbar so the author can rewrite without leaving the
+    // selection — Notion/Gamma-style inline AI affordance.
+    var aiBtn = document.createElement("button");
+    aiBtn.type = "button";
+    aiBtn.className = "rev01-mark-ai";
+    aiBtn.setAttribute("aria-label", "Rewrite with AI");
+    aiBtn.title = "Rewrite with AI";
+    aiBtn.textContent = "AI";
+    aiBtn.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+    aiBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      if (!editingElementId) return;
+      aiRewriteText(editingElementId);
+    });
+    bar.appendChild(aiBtn);
+
     markToolbar = bar;
     markToolbarAnchor = anchor;
     // Append to document.body (NOT viewport or #canvas-root) so the
@@ -7096,6 +7383,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // position: fixed while the body scrolls.
     document.body.appendChild(bar);
     positionMarkToolbar(anchor);
+    refreshMarkToolbarAlignState();
   }
 
   function beginTextEdit(elementId) {
@@ -7630,9 +7918,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     section.elements.push(element);
     renderAll();
     selectElement(element.id);
+    // Pan the camera so the freshly-inserted element is centred in the
+    // viewport — without this, an element added far from the current scroll
+    // (e.g. footer when user is at the hero) appears off-screen.
+    panToElement(element.id);
     scheduleSave();
   }
 
+  // Pick the section the user is currently looking at, so newly-added
+  // elements land where the cursor is — not in the page footer.
+  // Priority:
+  //   1. Explicitly-selected section.
+  //   2. The section under the viewport centre (what the user is editing).
+  //   3. The first body section (skip pinned header/footer roles).
+  //   4. The first section of any kind.
   function targetSectionForSidebar() {
     const page = currentPage();
     if (!page || !Array.isArray(page.sections) || page.sections.length === 0) return null;
@@ -7640,7 +7939,52 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const selected = findSection(selectedSectionId);
       if (selected) return selected;
     }
-    return page.sections[page.sections.length - 1] || null;
+    if (viewport) {
+      var vRect = viewport.getBoundingClientRect();
+      var cx = vRect.left + vRect.width / 2;
+      var cy = vRect.top + vRect.height / 2;
+      var hit = document.elementFromPoint(cx, cy);
+      if (hit && hit instanceof Element) {
+        var secNode = hit.closest('.rev01-section');
+        if (secNode) {
+          var sid = secNode.getAttribute('data-rev01-section');
+          if (sid) {
+            var hitSection = findSection(sid);
+            if (hitSection) return hitSection;
+          }
+        }
+      }
+    }
+    for (var i = 0; i < page.sections.length; i++) {
+      var role = page.sections[i].role || 'body';
+      if (role === 'body') return page.sections[i];
+    }
+    return page.sections[0];
+  }
+
+  // Centre the camera on an element's world position. No-op if anything in
+  // the lookup chain is missing (page/section/element/viewport).
+  function panToElement(elementId) {
+    if (!viewport) return;
+    var found = findElement(elementId);
+    if (!found) return;
+    var page = currentPage();
+    if (!page) return;
+    var pos = getPagePosition(page.id);
+    if (!pos) return;
+    var sectionY = pos.y;
+    if (state && state.header) sectionY += state.header.height || 0;
+    for (var i = 0; i < page.sections.length; i++) {
+      if (page.sections[i].id === found.section.id) break;
+      sectionY += page.sections[i].height || 0;
+    }
+    var box = found.element.box;
+    var worldX = pos.x + box.x + box.w / 2;
+    var worldY = sectionY + box.y + box.h / 2;
+    var rect = viewport.getBoundingClientRect();
+    camera.x = rect.width / 2 - worldX * camera.zoom;
+    camera.y = rect.height / 2 - worldY * camera.zoom;
+    applyCameraTransform();
   }
 
   function addBlankSectionFromSidebar() {
@@ -7942,6 +8286,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var name = await openTextModal({ title: "Save to library", label: "Section name", defaultValue: section.name || "" });
     if (name === null) return;
     if (name.trim().length === 0) name = section.name || "Untitled";
+    var description = await openTextModal({ title: "Save to library", label: "Description (optional)", defaultValue: "" });
+    if (description === null) return;
+    var visibility = await openSelectModal({
+      title: "Save to library",
+      label: "Where can this section be reused?",
+      options: [
+        { value: "private", label: "Private — only my sites" },
+        { value: "global", label: "Community — shared with everyone" },
+      ],
+      defaultValue: "private",
+    });
+    if (visibility === null) return;
     try {
       var saved = await flushPendingSave();
       if (!saved) return;
@@ -7949,7 +8305,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var response = await authFetch(API_BASE + "/library/sections", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ siteId: SITE_ID, sectionId: section.id, name: name.trim() }),
+        body: JSON.stringify({
+          siteId: SITE_ID,
+          sectionId: section.id,
+          name: name.trim(),
+          description: description.trim(),
+          visibility: visibility,
+        }),
       });
       if (!response.ok) {
         var detail = response.statusText;
@@ -7976,8 +8338,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus("Template name is required", "error");
       return;
     }
-    var tagline = await openTextModal({ title: "Save as template", label: "One-line description", defaultValue: "" });
-    if (tagline === null) tagline = "";
+    var tagline = await openTextModal({ title: "Save as template", label: "Description", defaultValue: "" });
+    if (tagline === null) return;
+    var visibility = await openSelectModal({
+      title: "Save as template",
+      label: "Who can use this template?",
+      options: [
+        { value: "private", label: "Private — only me" },
+        { value: "global", label: "Community — anyone on Open Canvas" },
+      ],
+      defaultValue: "private",
+    });
+    if (visibility === null) return;
     try {
       var saved = await flushPendingSave();
       if (!saved) return;
@@ -7985,7 +8357,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var response = await authFetch(API_BASE + "/custom-templates", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ siteId: SITE_ID, name: name.trim(), tagline: tagline.trim() }),
+        body: JSON.stringify({
+          siteId: SITE_ID,
+          name: name.trim(),
+          tagline: tagline.trim(),
+          visibility: visibility,
+        }),
       });
       if (!response.ok) {
         var detail = response.statusText;
@@ -8649,13 +9026,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var pill = document.querySelector("[data-rev01-presence]");
       var counter = document.querySelector("[data-rev01-presence-count]");
       if (!pill || !counter) return;
+      // Always reveal the pill once the WS is attached and we know the
+      // count — solo edit reads "1 editing", co-edit reads "N editing".
+      // The hidden default in route.tsx covers the pre-connection moment
+      // only.
       var count = peers.size + 1;
-      if (count > 1) {
-        counter.textContent = String(count);
-        pill.hidden = false;
-      } else {
-        pill.hidden = true;
-      }
+      counter.textContent = String(count);
+      pill.hidden = false;
     });
 
     coEditConnection = conn;
@@ -8671,6 +9048,128 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // -- Publish ------------------------------------------------------------
+
+  // -- Header version badge + social-preview pill ------------------------
+  // Persistent surface that mirrors site.publishedVersion so the Owner can
+  // tell at a glance which version is live without waiting for the 4-second
+  // "Saved" / "Published" status flash. Clicking opens a popover that shows
+  // what social embeds will see (og:title / description / image) — the same
+  // signals src/seo/meta-emit.ts ships on the published HTML.
+
+  var versionPill = null;
+
+  function updateVersionBadge(version) {
+    if (!versionBadge) return;
+    var n = typeof version === "number" && Number.isFinite(version) ? version : 0;
+    versionBadge.setAttribute("data-version", String(n));
+    versionBadge.textContent = n > 0 ? "v" + n : "Draft";
+  }
+
+  function closeVersionPill() {
+    if (!versionPill) return;
+    if (versionPill.parentNode) versionPill.parentNode.removeChild(versionPill);
+    versionPill = null;
+    if (versionBadge) versionBadge.setAttribute("aria-expanded", "false");
+    document.removeEventListener("mousedown", onVersionPillOutside, true);
+    document.removeEventListener("keydown", onVersionPillKey, true);
+  }
+
+  function onVersionPillOutside(ev) {
+    var target = ev.target instanceof Element ? ev.target : null;
+    if (!target) return;
+    if (versionPill && versionPill.contains(target)) return;
+    if (target.closest("#canvas-version")) return;
+    closeVersionPill();
+  }
+
+  function onVersionPillKey(ev) {
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeVersionPill();
+    }
+  }
+
+  function openVersionPill() {
+    if (versionPill) { closeVersionPill(); return; }
+    if (!versionBadge) return;
+    var version = parseInt(versionBadge.getAttribute("data-version") || "0", 10);
+    if (!Number.isFinite(version)) version = 0;
+    var page = state && Array.isArray(state.pages) && state.pages.length > 0 ? state.pages[0] : null;
+    var addressEl = document.querySelector(".rev01-editor-header .address");
+    var addressText = addressEl && addressEl.textContent ? addressEl.textContent.trim() : "";
+
+    var pill = document.createElement("div");
+    pill.className = "rev01-version-pill";
+    pill.setAttribute("role", "dialog");
+    pill.setAttribute("aria-label", "Social preview");
+
+    var head = document.createElement("div");
+    head.className = "rev01-version-pill-head";
+    var title = document.createElement("span");
+    title.className = "rev01-version-pill-title";
+    title.textContent = "Social preview";
+    var chip = document.createElement("span");
+    chip.className = version > 0 ? "rev01-version-pill-chip live" : "rev01-version-pill-chip draft";
+    chip.textContent = version > 0 ? "v" + version + " live" : "Draft";
+    head.appendChild(title);
+    head.appendChild(chip);
+    pill.appendChild(head);
+
+    if (page && page.ogImageAssetId) {
+      var img = document.createElement("img");
+      img.className = "rev01-version-pill-image";
+      img.alt = "";
+      img.src = SITE_BASE + "/assets/" + encodeURIComponent(page.ogImageAssetId);
+      pill.appendChild(img);
+    }
+
+    var card = document.createElement("div");
+    card.className = "rev01-version-pill-card";
+    var cardTitle = document.createElement("div");
+    cardTitle.className = "rev01-version-pill-card-title";
+    cardTitle.textContent = (page && page.title) ? page.title : "Untitled site";
+    var cardDesc = document.createElement("div");
+    cardDesc.className = "rev01-version-pill-card-desc";
+    cardDesc.textContent = (page && page.description) ? page.description : "No meta description set.";
+    var cardUrl = document.createElement("div");
+    cardUrl.className = "rev01-version-pill-card-url";
+    cardUrl.textContent = addressText || "Not published yet";
+    card.appendChild(cardTitle);
+    card.appendChild(cardDesc);
+    card.appendChild(cardUrl);
+    pill.appendChild(card);
+
+    if (version > 0 && addressText) {
+      var actions = document.createElement("div");
+      actions.className = "rev01-version-pill-actions";
+      var view = document.createElement("a");
+      view.className = "rev01-version-pill-view";
+      view.href = "https://" + addressText;
+      view.target = "_blank";
+      view.rel = "noopener";
+      view.textContent = "View live site";
+      actions.appendChild(view);
+      pill.appendChild(actions);
+    }
+
+    document.body.appendChild(pill);
+    var rect = versionBadge.getBoundingClientRect();
+    pill.style.position = "fixed";
+    pill.style.top = (rect.bottom + 6) + "px";
+    var right = window.innerWidth - rect.right;
+    pill.style.right = Math.max(8, right) + "px";
+    versionPill = pill;
+    versionBadge.setAttribute("aria-expanded", "true");
+    document.addEventListener("mousedown", onVersionPillOutside, true);
+    document.addEventListener("keydown", onVersionPillKey, true);
+  }
+
+  function attachVersionBadge() {
+    if (!versionBadge) return;
+    versionBadge.addEventListener("click", function () {
+      openVersionPill();
+    });
+  }
 
   async function publishSite() {
     if (!publishButton) return;
@@ -8707,6 +9206,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           ? " v" + body.version
           : "";
       setStatus("Published" + versionSuffix, "ok");
+      if (body && typeof body.version === "number") {
+        updateVersionBadge(body.version);
+      }
 
       // Refresh Versions sidebar panel so the new snapshot is visible without
       // a page reload. Invalidate the cache flag always; repaint only if the
@@ -9114,6 +9616,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (state && state.pages && state.pages.length > 0) {
         activePageId = state.pages[0].id;
       }
+      updateVersionBadge(body.publishedVersion);
+      attachVersionBadge();
       initUndo();
       if (mainEl && state && state.styleKit) {
         mainEl.setAttribute("data-style-kit", state.styleKit);
@@ -9134,6 +9638,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         }
       });
       attachSidebarTabs();
+      attachPageCrumb();
       var sidebarToggle = document.getElementById("sidebar-toggle");
       if (sidebarToggle && sidebar) {
         sidebarToggle.addEventListener("click", function() {

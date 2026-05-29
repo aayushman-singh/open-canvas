@@ -219,6 +219,14 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <button id="canvas-publish" type="button">
               Publish
             </button>
+            {/* Persistent version badge — initial label is the draft sentinel.
+                The client script swaps it to `v{n}` once the site state loads
+                and again after each successful publish. Click opens an OG
+                preview pill anchored to the badge so the Owner can confirm
+                what social cards will render. */}
+            <button id="canvas-version" type="button" data-version="0" aria-haspopup="dialog">
+              v0
+            </button>
             <button id="canvas-save-template" type="button">
               Save as template
             </button>
