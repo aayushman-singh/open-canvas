@@ -26,8 +26,24 @@ type ClerkBindings = HostConfigEnv & {
 //              (drop the `.clerk.` segment).
 //   pk_live_ → `clerk.<root>` (Clerk's CNAME on your zone). Portal at
 //              `accounts.<root>` (swap the `clerk.` prefix for `accounts.`).
-function accountPortalOrigin(publishableKey: string, frontendApiUrl?: string): string {
-  let frontendApi: string;
+/**
+ * Resolves the Clerk frontend API host used to serve clerk-js and accept
+ * runtime API calls. `CLERK_FRONTEND_API_URL` wins when set; otherwise the
+ * host is decoded out of the publishable key (Clerk encodes it as base64
+ * after the `pk_test_` / `pk_live_` prefix).
+ *
+ * The env override exists because the publishable key encodes the host at
+ * issuance time — if a Clerk instance is later reconfigured to point at a
+ * new CNAME without re-issuing keys (Clerk only rotates the secret key on
+ * domain change), the decoded value goes stale and every consumer (script
+ * src, account portal URL, runtime API base) points at a dead host.
+ *
+ * The browser script-injection sites in `src/auth/sign-in-route.tsx`,
+ * `src/routes/dashboard/index.tsx`, and `src/editor/route.tsx` use this
+ * helper to emit a server-resolved host as a string literal so clerk-js
+ * loads from the live edge regardless of what the publishable key encodes.
+ */
+export function clerkFrontendApiHost(publishableKey: string, frontendApiUrl?: string): string {
   if (typeof frontendApiUrl === 'string' && frontendApiUrl.length > 0) {
     let parsed: URL;
     try {
@@ -37,24 +53,26 @@ function accountPortalOrigin(publishableKey: string, frontendApiUrl?: string): s
         cause: error,
       });
     }
-    frontendApi = parsed.host;
-  } else {
-    const marker = publishableKey.startsWith('pk_test_')
-      ? 'pk_test_'
-      : publishableKey.startsWith('pk_live_')
-        ? 'pk_live_'
-        : null;
-
-    if (!marker) {
-      throw new Error(
-        `unrecognised Clerk publishable key prefix: ${publishableKey.slice(0, 8)}`,
-      );
-    }
-
-    const encoded = publishableKey.slice(marker.length);
-    const decoded = atob(encoded);
-    frontendApi = decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
+    return parsed.host;
   }
+
+  const marker = publishableKey.startsWith('pk_test_')
+    ? 'pk_test_'
+    : publishableKey.startsWith('pk_live_')
+      ? 'pk_live_'
+      : null;
+
+  if (!marker) {
+    throw new Error(`unrecognised Clerk publishable key prefix: ${publishableKey.slice(0, 8)}`);
+  }
+
+  const encoded = publishableKey.slice(marker.length);
+  const decoded = atob(encoded);
+  return decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
+}
+
+function accountPortalOrigin(publishableKey: string, frontendApiUrl?: string): string {
+  const frontendApi = clerkFrontendApiHost(publishableKey, frontendApiUrl);
 
   let accountPortalHost: string;
   if (frontendApi.startsWith('clerk.')) {

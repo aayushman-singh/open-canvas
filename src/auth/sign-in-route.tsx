@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { resolveClerkKeys } from './middleware';
+import { clerkFrontendApiHost } from './require-auth';
 import { OcLogo } from '../ui/brand';
 import {
   themeCss,
@@ -27,6 +28,7 @@ import type { Theme } from '../ui';
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_FRONTEND_API_URL?: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
 };
@@ -350,20 +352,31 @@ const clerkAppearanceJson = JSON.stringify({
   },
 });
 
-function Page({ publishableKey, theme }: { publishableKey: string; theme?: Theme | undefined }) {
-  // Bootstraps clerk-js from the Clerk CDN derived from the publishable
-  // key (same pattern used in `src/routes/dashboard/index.tsx` and
-  // `src/editor/route.tsx`). Once loaded, mounts SignIn into the right
-  // pane. Tab toggle flips between mountSignIn and mountSignUp, calling
-  // unmount before re-mount so the widget DOM is rebuilt cleanly.
+function Page({
+  publishableKey,
+  frontendApiHost,
+  theme,
+}: {
+  publishableKey: string;
+  frontendApiHost: string;
+  theme?: Theme | undefined;
+}) {
+  // Bootstraps clerk-js from the Clerk CDN. The host is resolved server-side
+  // (see `clerkFrontendApiHost` in `src/auth/require-auth.ts`) — prefers
+  // `CLERK_FRONTEND_API_URL` when set, otherwise decodes the publishable key.
+  // Decoding at runtime in-page would re-introduce the stale-host bug we hit
+  // on 2026-05-29 (publishable key encoded the old `clerk.rev01.*` apex that
+  // no longer resolved). The same pattern lives in
+  // `src/routes/dashboard/index.tsx` and `src/editor/route.tsx`.
+  // Once loaded, mounts SignIn into the right pane. Tab toggle flips between
+  // mountSignIn and mountSignUp, calling unmount before re-mount so the
+  // widget DOM is rebuilt cleanly.
   const clerkBootstrapScript = raw(
     `<script>(function(){
   var pk=${JSON.stringify(publishableKey)};
   var appearance=${clerkAppearanceJson};
-  var raw=atob(pk.replace(/^pk_(test|live)_/,""));
-  if(raw.endsWith("$"))raw=raw.slice(0,-1);
   var s=document.createElement("script");
-  s.src="https://"+raw+"/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+  s.src="https://"+${JSON.stringify(frontendApiHost)}+"/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
   s.crossOrigin="anonymous";
   s.async=true;
   s.setAttribute("data-clerk-publishable-key",pk);
@@ -523,7 +536,14 @@ function Page({ publishableKey, theme }: { publishableKey: string; theme?: Theme
 
 signInRoute.get('/', (c) => {
   const { publishableKey } = resolveClerkKeys(c.env);
-  return c.html(<Page publishableKey={publishableKey} theme={readThemeCookie(c)} />);
+  const frontendApiHost = clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL);
+  return c.html(
+    <Page
+      publishableKey={publishableKey}
+      frontendApiHost={frontendApiHost}
+      theme={readThemeCookie(c)}
+    />,
+  );
 });
 
 export default signInRoute;

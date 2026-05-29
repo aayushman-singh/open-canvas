@@ -5,7 +5,7 @@ import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../b
 import { db } from '../../db/client';
 import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth, resolveClerkKeys } from '../../auth/middleware';
-import { requireAuth } from '../../auth/require-auth';
+import { clerkFrontendApiHost, requireAuth } from '../../auth/require-auth';
 import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
@@ -19,6 +19,7 @@ import { appDomain, type HostConfigEnv } from '../../host-config';
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_FRONTEND_API_URL?: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
@@ -36,13 +37,16 @@ dashboard.use('*', async (c, next) => {
   if (!ct.includes('text/html')) return;
   if (c.req.path.endsWith('/preview')) return;
   const { publishableKey } = resolveClerkKeys(c.env);
+  // Host resolved server-side (see `clerkFrontendApiHost`) so the clerk-js
+  // bundle URL doesn't depend on the publishable key's encoded host — which
+  // can go stale when a Clerk instance is reconfigured (rebrand domain
+  // change) without re-issuing keys.
+  const clerkHost = clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL);
   const clerkScript =
     `<script>(function(){` +
     `var pk="${publishableKey}";` +
-    `var r=atob(pk.replace(/^pk_(test|live)_/,""));` +
-    `if(r.endsWith("$"))r=r.slice(0,-1);` +
     `var s=document.createElement("script");` +
-    `s.src="https://"+r+"/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";` +
+    `s.src="https://${clerkHost}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";` +
     `s.crossOrigin="anonymous";s.async=true;` +
     `s.setAttribute("data-clerk-publishable-key",pk);` +
     `s.onload=function(){if(window.Clerk)window.Clerk.load();};` +

@@ -21,6 +21,7 @@ import { readOwnerAsset, type CfImageFetcher } from '../assets/read';
 import { collectReferencedAssetIds } from '../assets/site-assets';
 import { snapshotForPageSlug } from '../canvas/page-routing';
 import { resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
+import { clerkFrontendApiHost } from '../auth/require-auth';
 import {
   type EditTokenPayload,
   verifyEditToken,
@@ -81,6 +82,7 @@ import {
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_FRONTEND_API_URL?: string;
   DATABASE_URL: string;
   SITE_ROOM: DurableObjectNamespace;
   ASSETS_BUCKET: R2Bucket;
@@ -308,6 +310,7 @@ type OnSiteEditorEnv = Pick<
   Bindings,
   | 'CLERK_PUBLISHABLE_KEY'
   | 'CLERK_SECRET_KEY'
+  | 'CLERK_FRONTEND_API_URL'
   | 'UNLOCK_SIGNING_SECRET'
   | 'APP_DOMAIN'
   | 'AUTHORIZED_PARTIES'
@@ -331,6 +334,7 @@ export async function buildOnSiteEditorOptions(
     env.UNLOCK_SIGNING_SECRET,
   );
 
+  const { publishableKey } = resolveClerkKeys(env);
   return {
     siteId: siteRow.id,
     siteName: siteRow.name,
@@ -339,7 +343,8 @@ export async function buildOnSiteEditorOptions(
     apex: appDomain(env),
     apexOrigin: appOrigin(env),
     context: 'public',
-    clerkPublishableKey: resolveClerkKeys(env).publishableKey,
+    clerkPublishableKey: publishableKey,
+    clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, env.CLERK_FRONTEND_API_URL),
     wsToken,
   };
 }

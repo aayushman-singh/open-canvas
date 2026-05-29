@@ -13,7 +13,7 @@ import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
-import { requireAuth } from '../auth/require-auth';
+import { clerkFrontendApiHost, requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
@@ -28,6 +28,7 @@ import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_FRONTEND_API_URL?: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
@@ -62,6 +63,14 @@ export interface EditorPageOptions {
   apexOrigin: string;
   context?: 'dashboard' | 'public';
   clerkPublishableKey?: string;
+  /**
+   * Host that serves clerk-js (and against which the runtime API talks).
+   * Server-resolved via `clerkFrontendApiHost` so the bundle URL doesn't
+   * depend on the publishable key's encoded host — which can go stale
+   * when a Clerk instance is reconfigured (rebrand domain change) without
+   * re-issuing keys. Required when `clerkPublishableKey` is set.
+   */
+  clerkFrontendApiHost?: string;
   wsToken?: string;
   // SSR pre-paint theme stamp. Resolved from the `oc-theme` cookie by the
   // caller (see readThemeCookie). 'dark' becomes `data-theme="dark"` on
@@ -103,7 +112,7 @@ async function lookupOwnedSite(
 }
 
 export function editorPageJsx(opts: EditorPageOptions) {
-  const { siteId, siteName, subdomain, styleKit, apex, apexOrigin, context = 'dashboard', clerkPublishableKey, wsToken, theme } = opts;
+  const { siteId, siteName, subdomain, styleKit, apex, apexOrigin, context = 'dashboard', clerkPublishableKey, clerkFrontendApiHost: clerkHost, wsToken, theme } = opts;
   const apiBase = context === 'public' ? '/__api' : '/api';
   const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
   const publicAddress = `${subdomain}.${apex}`;
@@ -144,13 +153,11 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
         <style>{raw(canvasEditorStyles)}</style>
-        {clerkPublishableKey && raw(`<script>
+        {clerkPublishableKey && clerkHost && raw(`<script>
 (function(){
   var pk = ${JSON.stringify(clerkPublishableKey)};
-  var raw = atob(pk.replace(/^pk_(test|live)_/, ""));
-  if (raw.endsWith("$")) raw = raw.slice(0, -1);
   var s = document.createElement("script");
-  s.src = "https://" + raw + "/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
+  s.src = "https://${clerkHost}/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";
   s.crossOrigin = "anonymous";
   s.async = true;
   s.setAttribute("data-clerk-publishable-key", pk);
@@ -464,6 +471,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       apexOrigin: appOrigin(c.env),
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
+      clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL),
       wsToken,
       theme: readThemeCookie(c),
     }),
