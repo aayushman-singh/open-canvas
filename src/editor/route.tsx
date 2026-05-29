@@ -16,6 +16,7 @@ import { clerkAuth, resolveClerkKeys, type ClerkAuthVariables } from '../auth/mi
 import { clerkFrontendApiHost, requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { SIDEBAR_DISPATCH } from '../canvas/elements';
+import { SITE_ID_RE } from '../canvas/validate';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
 import {
@@ -42,8 +43,6 @@ type Bindings = HostConfigEnv & {
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
-
-const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
 
 export const canvasEditor = new Hono<Env>();
 

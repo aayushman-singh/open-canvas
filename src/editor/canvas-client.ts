@@ -22,14 +22,13 @@
 // imports the emitted client as JavaScript and catches broken escaping.
 
 import { INSPECTOR_DISPATCH, SIDEBAR_DISPATCH } from '../canvas/elements/index.js';
+import { SITE_ID_RE } from '../canvas/validate.js';
 
 export interface CanvasClientScriptParams {
   siteId: string;
   apiBase?: string;
   wsToken?: string;
 }
-
-const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
 
 export function canvasClientScript(params: CanvasClientScriptParams): string {
   const { siteId, apiBase = '/api', wsToken = '' } = params;

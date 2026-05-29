@@ -12,6 +12,7 @@ import { Hono } from 'hono';
 import { db } from '../db/client';
 import { verifyEditToken } from '../auth/edit-token';
 import { hasLiveEditorSocketAccess } from './editor-auth';
+import { isSiteId } from '../canvas/validate';
 
 interface Bindings {
   DATABASE_URL: string;
@@ -23,7 +24,7 @@ const socketRoute = new Hono<{ Bindings: Bindings }>();
 
 socketRoute.get('/', async (c) => {
   const siteId = c.req.query('siteId');
-  if (!siteId || !/^[A-Za-z0-9-]+$/.test(siteId)) {
+  if (!isSiteId(siteId)) {
     return c.text('site not found', 404);
   }
 

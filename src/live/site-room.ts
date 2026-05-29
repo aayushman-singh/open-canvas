@@ -20,6 +20,7 @@ import { eq } from 'drizzle-orm';
 import * as Y from 'yjs';
 
 import type { EditableSite } from '../canvas/schema.js';
+import { isSiteId } from '../canvas/validate.js';
 import { encodeYDoc } from '../canvas/yjs-projection.js';
 import { db } from '../db/client.js';
 import { site as siteTable } from '../db/schema.js';
@@ -271,7 +272,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       // canonical site id. The role param decides whether this socket may
       // speak Yjs or only receive publish/presence broadcasts.
       const siteIdParam = url.searchParams.get('siteId');
-      if (siteIdParam !== null && /^[A-Za-z0-9-]+$/.test(siteIdParam)) {
+      if (isSiteId(siteIdParam)) {
         this.siteId = siteIdParam;
       }
       const pair = new WebSocketPair();

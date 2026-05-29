@@ -23,6 +23,7 @@ import { signEditToken, buildEditTokenCookieHeader } from '../../auth/edit-token
 import { db, type Db } from '../../db/client';
 import { customer, customDomain, site } from '../../db/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
+import { SITE_ID_RE } from '../../canvas/validate';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -35,7 +36,6 @@ type Bindings = HostConfigEnv & {
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
 const STATE_RE = /^[A-Za-z0-9._~-]{16,256}$/;
 
 const onSiteEditRoute = new Hono<Env>();

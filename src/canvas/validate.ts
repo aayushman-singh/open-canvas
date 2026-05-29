@@ -252,6 +252,24 @@ function isAssetIdLike(value: unknown): value is string {
   return typeof value === 'string' && ASSET_ID_RE.test(value);
 }
 
+// Single source of truth for the canonical site-id regex (ADR 0012 dec 3).
+// Five call sites used to declare or inline this shape — `src/editor/canvas-client.ts`,
+// `src/editor/route.tsx`, `src/routes/api/on-site-edit.ts`, `src/live/socket-route.ts`,
+// `src/live/site-room.ts`. Changing the shape (e.g. allowing underscores) now
+// requires editing exactly one file. canvas-client.ts's outer wrapper imports
+// this directly; the IIFE template-literal body cannot import TS modules and
+// keeps the regex literal until the ADR-0014/0015 build-pipeline path lands.
+export const SITE_ID_RE = /^[A-Za-z0-9-]+$/;
+
+/**
+ * Predicate for the canonical site-id shape. Use at every site-id boundary
+ * (route handlers, WebSocket upgrades, DO entry points). Per ADR 0012 dec 3,
+ * the regex source lives next to the predicate; both live in this file.
+ */
+export function isSiteId(value: unknown): value is string {
+  return typeof value === 'string' && SITE_ID_RE.test(value);
+}
+
 // Deep-validate the StyleKitPreset shape supplied as `customStyleKit` when
 // `styleKit === 'custom'`. Required fields go into CSS or are read by
 // per-element renderers (code.ts reads panel/fontFamilyMono/radius;
@@ -975,7 +993,7 @@ function validateBackgroundVideo(value: unknown, basePath: string, errors: strin
     errors.push(`${basePath} must be a non-empty asset id when present`);
     return;
   }
-  if (!/^[A-Za-z0-9._-]+$/.test(value)) {
+  if (!isAssetIdLike(value)) {
     errors.push(`${basePath} must be an asset id, not a path or URL`);
   }
 }
