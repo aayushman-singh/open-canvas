@@ -30,6 +30,7 @@
     "host-config:smoke": "bun run src/host-config.smoke.ts",
     "host-literal-guard:smoke": "bun run src/host-literal-guard.smoke.ts",
     "canvas:smoke": "bun run src/canvas/smoke.ts",
+    "validate-parity:smoke": "bun run src/canvas/validate-parity.smoke.ts",
     "inspector-dispatch:smoke": "bun run src/canvas/elements/inspector-dispatch.smoke.ts",
     "agent-tool-dispatch:smoke": "bun run src/canvas/elements/agent-tool-dispatch.smoke.ts",
     "sidebar-dispatch:smoke": "bun run src/canvas/elements/sidebar-dispatch.smoke.ts",

@@ -1336,6 +1336,26 @@ export function validateEditableSite(state: unknown): ValidationResult {
   return { valid: false, errors };
 }
 
+/**
+ * Fields the published snapshot requires that the editable site does not.
+ * ADR 0012 dec 5 makes the diff between the two validators enumerated, not
+ * implicit. The parity smoke (`canvas/validate-parity.smoke.ts`) iterates
+ * this list and asserts that the only failures `validatePublishedSnapshot`
+ * surfaces beyond what `validateEditableSite` rejects come from one of
+ * these checks.
+ *
+ *  - `version`: the publish counter, integer >= 1.
+ *  - `publishedAt`: ISO date string parseable by `new Date(...)`.
+ *  - `media.assetId-non-empty`: every media element's `assetId` (and
+ *    `posterAssetId` when present) must be non-empty in the published
+ *    snapshot, even though the editor allows the placeholder `''`.
+ */
+export const PUBLISH_ONLY_REQUIRED_FIELDS = [
+  'version',
+  'publishedAt',
+  'media.assetId-non-empty',
+] as const;
+
 export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   const errors: string[] = [];
   if (!isRecord(snapshot)) {
