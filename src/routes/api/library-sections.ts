@@ -16,13 +16,15 @@ import { Hono } from 'hono';
 
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
-import { requireAdmin } from '../../auth/require-admin.js';
+import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
 import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
 import {
   customer,
   librarySection,
+  LIBRARY_SECTION_VISIBILITY,
+  type LibrarySectionVisibility,
   ownerAsset,
   site,
   type AssetManifestEntry,
@@ -228,6 +230,8 @@ interface SaveBody {
   siteId: string;
   sectionId: string;
   name: string | undefined;
+  description: string;
+  visibility: LibrarySectionVisibility;
 }
 
 function parseSaveBody(value: unknown): SaveBody | { error: string } {
@@ -240,7 +244,15 @@ function parseSaveBody(value: unknown): SaveBody | { error: string } {
     return { error: 'sectionId is required' };
   }
   const name = typeof v.name === 'string' && v.name.length > 0 ? v.name : undefined;
-  return { siteId: v.siteId, sectionId: v.sectionId, name };
+  const description = typeof v.description === 'string' ? v.description : '';
+  let visibility: LibrarySectionVisibility = 'private';
+  if (typeof v.visibility === 'string') {
+    if (!LIBRARY_SECTION_VISIBILITY.includes(v.visibility as LibrarySectionVisibility)) {
+      return { error: `visibility must be one of ${LIBRARY_SECTION_VISIBILITY.join(', ')}` };
+    }
+    visibility = v.visibility as LibrarySectionVisibility;
+  }
+  return { siteId: v.siteId, sectionId: v.sectionId, name, description, visibility };
 }
 
 librarySectionsOwner.post('/sections', async (c) => {
@@ -254,6 +266,10 @@ librarySectionsOwner.post('/sections', async (c) => {
   const raw: unknown = await c.req.json().catch(() => null);
   const parsed = parseSaveBody(raw);
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
+
+  if (parsed.visibility === 'global' && !isAdmin(auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
+    return c.json({ error: 'community (global) sections require admin access' }, 403);
+  }
 
   const loaded = await loadOwnedSection(database, customerId, parsed.siteId, parsed.sectionId);
   if (!loaded) return c.json({ error: 'section not found in owned site' }, 404);
@@ -269,9 +285,10 @@ librarySectionsOwner.post('/sections', async (c) => {
   const [row] = await database
     .insert(librarySection)
     .values({
-      customerId,
-      visibility: 'private',
+      customerId: parsed.visibility === 'global' ? null : customerId,
+      visibility: parsed.visibility,
       name: parsed.name ?? loaded.section.name,
+      description: parsed.description,
       recipeId: loaded.section.recipeId,
       sectionData: loaded.section,
       assetManifest: manifest,
@@ -343,6 +360,7 @@ librarySectionsAdmin.post('/sections', async (c) => {
       customerId: null,
       visibility: 'global',
       name: parsed.name ?? loaded.section.name,
+      description: parsed.description,
       recipeId: loaded.section.recipeId,
       sectionData: loaded.section,
       assetManifest: manifest,

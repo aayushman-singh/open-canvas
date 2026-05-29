@@ -20,7 +20,7 @@ import { Hono } from 'hono';
 
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
-import { requireAdmin } from '../../auth/require-admin.js';
+import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
@@ -30,6 +30,8 @@ import { db } from '../../db/client.js';
 import {
   customer,
   customTemplate,
+  CUSTOM_TEMPLATE_VISIBILITY,
+  type CustomTemplateVisibility,
   ownerAsset,
   site,
   type AssetManifestEntry,
@@ -127,7 +129,8 @@ async function buildAssetManifest(
 interface SaveBody {
   siteId: string;
   name: string;
-  tagline?: string;
+  tagline: string;
+  visibility: CustomTemplateVisibility;
 }
 
 function parseSaveBody(value: unknown): SaveBody | { error: string } {
@@ -140,7 +143,14 @@ function parseSaveBody(value: unknown): SaveBody | { error: string } {
     return { error: 'name is required' };
   }
   const tagline = typeof v.tagline === 'string' ? v.tagline : '';
-  return { siteId: v.siteId, name: v.name, tagline };
+  let visibility: CustomTemplateVisibility = 'private';
+  if (typeof v.visibility === 'string') {
+    if (!CUSTOM_TEMPLATE_VISIBILITY.includes(v.visibility as CustomTemplateVisibility)) {
+      return { error: `visibility must be one of ${CUSTOM_TEMPLATE_VISIBILITY.join(', ')}` };
+    }
+    visibility = v.visibility as CustomTemplateVisibility;
+  }
+  return { siteId: v.siteId, name: v.name, tagline, visibility };
 }
 
 // ---------------------------------------------------------------------------
@@ -210,6 +220,10 @@ customTemplatesOwner.post('/', async (c) => {
   const parsed = parseSaveBody(raw);
   if ('error' in parsed) return c.json({ error: parsed.error }, 400);
 
+  if (parsed.visibility === 'global' && !isAdmin(auth.userId, c.env.ADMIN_CLERK_USER_IDS)) {
+    return c.json({ error: 'community (global) templates require admin access' }, 403);
+  }
+
   const siteRow = await database
     .select({ editableState: site.editableState })
     .from(site)
@@ -228,10 +242,10 @@ customTemplatesOwner.post('/', async (c) => {
   const [row] = await database
     .insert(customTemplate)
     .values({
-      customerId,
-      visibility: 'private',
+      customerId: parsed.visibility === 'global' ? null : customerId,
+      visibility: parsed.visibility,
       name: parsed.name,
-      tagline: parsed.tagline ?? '',
+      tagline: parsed.tagline,
       styleKit: siteState.styleKit,
       siteState,
       assetManifest: manifest,
@@ -397,7 +411,7 @@ customTemplatesAdmin.post('/', async (c) => {
       customerId: null,
       visibility: 'global',
       name: parsed.name,
-      tagline: parsed.tagline ?? '',
+      tagline: parsed.tagline,
       styleKit: siteState.styleKit,
       siteState,
       assetManifest: manifest,

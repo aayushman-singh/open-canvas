@@ -78,6 +78,13 @@
       "when": 1780036315587,
       "tag": "0010_drop_legacy_template_page",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780122600000,
+      "tag": "0011_library_section_description",
+      "breakpoints": true
     }
   ]
 }

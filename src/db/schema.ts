@@ -455,6 +455,7 @@ export const librarySection = pgTable('library_section', {
   customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
   visibility: text('visibility').notNull().$type<LibrarySectionVisibility>(),
   name: text('name').notNull(),
+  description: text('description').notNull().default(''),
   recipeId: text('recipe_id').notNull(),
   sectionData: jsonb('section_data').notNull().$type<CanvasSection>(),
   assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
