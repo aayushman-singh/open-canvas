@@ -42,14 +42,17 @@ function isStyleKit(value: unknown): value is StyleKit {
 
 type OptionalStringPatch = { present: false } | { present: true; value: string | undefined };
 
-function optionalStringPatch(
-  body: Record<string, unknown>,
-  key: string,
-): OptionalStringPatch | { error: string } {
+function optionalStringPatch(body: Record<string, unknown>, key: string): OptionalStringPatch {
   if (!(key in body)) return { present: false };
   const value = body[key];
   if (value === null) return { present: true, value: undefined };
-  if (typeof value !== 'string') return { error: `${key} must be a string or null` };
+  if (typeof value !== 'string') {
+    // Per ADR 0012 dec 1, validate.ts is the only shape gate. The route
+    // surfaces the raw value into the patch; validate.ts rejects non-string
+    // values with a field-pathed error. The cast is honest about handing
+    // the bad shape downstream rather than swallowing it here.
+    return { present: true, value: value as unknown as string };
+  }
   const trimmed = value.trim();
   return { present: true, value: trimmed.length > 0 ? trimmed : undefined };
 }
@@ -269,22 +272,23 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
     return c.json({ error: 'body must be a JSON object' }, 400);
   }
 
+  // Per ADR 0012 dec 1, validate.ts is the only shape gate. The route
+  // copies present-in-body fields into the next state without type-checking
+  // them; persistEditableState calls validateEditableSite which rejects
+  // bad shapes with field-pathed errors. The two non-validation concerns
+  // that stay at this layer are PATCH semantics (faviconAssetId === null
+  // or empty-string means "delete") and authorization (the favicon must
+  // be an image asset the Owner owns).
   const next: EditableSite = {
     ...result.site.editableState,
     pages: result.site.editableState.pages,
   };
 
   if ('siteNoIndex' in body) {
-    if (typeof body.siteNoIndex !== 'boolean') {
-      return c.json({ error: 'siteNoIndex must be a boolean' }, 400);
-    }
-    next.siteNoIndex = body.siteNoIndex;
+    next.siteNoIndex = body.siteNoIndex as boolean;
   }
   if ('darkModeEnabled' in body) {
-    if (typeof body.darkModeEnabled !== 'boolean') {
-      return c.json({ error: 'darkModeEnabled must be a boolean' }, 400);
-    }
-    next.darkModeEnabled = body.darkModeEnabled;
+    next.darkModeEnabled = body.darkModeEnabled as boolean;
   }
   if ('faviconAssetId' in body) {
     const raw = body.faviconAssetId;
@@ -298,7 +302,8 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
       }
       next.faviconAssetId = assetId;
     } else {
-      return c.json({ error: 'faviconAssetId must be a string or null' }, 400);
+      // Non-string, non-null value — pass through; validate.ts rejects.
+      next.faviconAssetId = raw as string;
     }
   }
 
@@ -340,15 +345,14 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
   if (!isRecord(body)) {
     return c.json({ error: 'request body must be a JSON object' }, 400);
   }
-  if (typeof body.title !== 'string' || body.title.trim().length === 0) {
-    return c.json({ error: 'title is required' }, 400);
-  }
-  const title = body.title.trim();
+  // Per ADR 0012 dec 1, validate.ts is the only shape gate. The route
+  // trims when the value is a string but otherwise passes through; bad
+  // shapes (numbers, arrays, missing title) surface as 400s via
+  // persistEditableState's validateEditableSite call.
+  const title = typeof body.title === 'string' ? body.title.trim() : (body.title as string);
 
   const description = optionalStringPatch(body, 'description');
-  if ('error' in description) return c.json({ error: description.error }, 400);
   const ogImageAssetId = optionalStringPatch(body, 'ogImageAssetId');
-  if ('error' in ogImageAssetId) return c.json({ error: ogImageAssetId.error }, 400);
   if (ogImageAssetId.present && ogImageAssetId.value !== undefined) {
     const isImage = await assetIsImageForCustomer(
       c.env,
@@ -360,12 +364,7 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
     }
   }
   const canonical = optionalStringPatch(body, 'canonical');
-  if ('error' in canonical) return c.json({ error: canonical.error }, 400);
   const locale = optionalStringPatch(body, 'locale');
-  if ('error' in locale) return c.json({ error: locale.error }, 400);
-  if ('noIndex' in body && typeof body.noIndex !== 'boolean') {
-    return c.json({ error: 'noIndex must be a boolean when present' }, 400);
-  }
 
   const nextState = patchEditablePage(result.site.editableState, pageId, (page) => {
     const nextPage: CanvasPage = { ...page, title };
@@ -401,38 +400,35 @@ canvasApi.put('/sites/:siteId/pages/:pageId/metadata', async (c) => {
     return c.json({ error: 'request body must be a JSON object' }, 400);
   }
 
+  // Per ADR 0012 dec 1, validate.ts is the only shape gate; the route
+  // only computes PATCH presence + delegates shape checking downstream.
   const publishedDate = optionalStringPatch(body, 'publishedDate');
-  if ('error' in publishedDate) return c.json({ error: publishedDate.error }, 400);
   const author = optionalStringPatch(body, 'author');
-  if ('error' in author) return c.json({ error: author.error }, 400);
   const category = optionalStringPatch(body, 'category');
-  if ('error' in category) return c.json({ error: category.error }, 400);
 
-  let tags: { present: false } | { present: true; value: string[] | undefined } | { error: string };
+  let tags: { present: false } | { present: true; value: string[] | undefined };
   if (!('tags' in body) || body.tags === undefined) {
     tags = { present: false };
   } else if (body.tags === null) {
     tags = { present: true, value: undefined };
   } else if (Array.isArray(body.tags)) {
+    // Best-effort string normalisation; validate.ts catches per-element
+    // wrong types if the request had non-strings mixed in.
     const parsedTags: string[] = [];
-    let tagError: string | null = null;
-    for (const [idx, rawTag] of body.tags.entries()) {
-      if (typeof rawTag !== 'string') {
-        tagError = `tags[${String(idx)}] must be a string`;
-        break;
+    for (const rawTag of body.tags) {
+      if (typeof rawTag === 'string') {
+        const tag = rawTag.trim();
+        if (tag.length > 0) parsedTags.push(tag);
+      } else {
+        // Pass through; validate.ts rejects.
+        parsedTags.push(rawTag as string);
       }
-      const tag = rawTag.trim();
-      if (tag.length > 0) parsedTags.push(tag);
     }
-    tags =
-      tagError === null
-        ? { present: true, value: parsedTags.length > 0 ? parsedTags : undefined }
-        : { error: tagError };
+    tags = { present: true, value: parsedTags.length > 0 ? parsedTags : undefined };
   } else {
-    tags = { error: 'tags must be an array or null' };
+    // Non-array, non-null — pass through; validate.ts rejects.
+    tags = { present: true, value: body.tags as unknown as string[] };
   }
-  const tagsPatch = tags;
-  if ('error' in tagsPatch) return c.json({ error: tagsPatch.error }, 400);
 
   const nextState = patchEditablePage(result.site.editableState, pageId, (page) => {
     const nextPage: CanvasPage = { ...page };
@@ -441,7 +437,7 @@ canvasApi.put('/sites/:siteId/pages/:pageId/metadata', async (c) => {
     }
     if (author.present) setOptionalPageField(nextPage, 'author', author.value);
     if (category.present) setOptionalPageField(nextPage, 'category', category.value);
-    if (tagsPatch.present) setOptionalPageField(nextPage, 'tags', tagsPatch.value);
+    if (tags.present) setOptionalPageField(nextPage, 'tags', tags.value);
     return nextPage;
   });
   if (nextState === null) {
