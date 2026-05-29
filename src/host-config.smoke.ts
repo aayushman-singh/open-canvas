@@ -115,6 +115,13 @@ assert(
   }).length === 2,
   'authorizedParties trims whitespace',
 );
+assert(
+  authorizedParties({
+    ...baseEnv,
+    AUTHORIZED_PARTIES: 'https://slash.example/',
+  })[0] === 'https://slash.example',
+  'authorizedParties normalizes URL input to origin strings',
+);
 
 expectThrow(
   () => authorizedParties({ ...baseEnv, AUTHORIZED_PARTIES: '' }),
@@ -170,6 +177,11 @@ expectThrow(
   'valid public hostname',
   'emailFrom throws on bare-label domain',
 );
+expectThrow(
+  () => emailFrom({ ...baseEnv, EMAIL_FROM: 'Open Canvas <noreply@example.com' }),
+  'RFC 5322',
+  'emailFrom throws on missing display-name closing bracket',
+);
 
 // ---------------------------------------------------------------------------
 // cookieNamePrefix / cookieName
@@ -194,10 +206,14 @@ expectThrow(
   'COOKIE_NAME_PREFIX is required',
   'cookieNamePrefix throws on empty',
 );
+assert(
+  cookieNamePrefix({ ...baseEnv, COOKIE_NAME_PREFIX: 'brand-' }) === 'brand-',
+  'cookieNamePrefix accepts RFC 6265 token characters',
+);
 expectThrow(
-  () => cookieNamePrefix({ ...baseEnv, COOKIE_NAME_PREFIX: 'no-trailing-underscore' }),
-  'COOKIE_NAME_PREFIX must match',
-  'cookieNamePrefix rejects missing trailing underscore',
+  () => cookieNamePrefix({ ...baseEnv, COOKIE_NAME_PREFIX: 'bad;prefix' }),
+  'COOKIE_NAME_PREFIX must be a valid cookie-name token',
+  'cookieNamePrefix rejects RFC 6265 separator characters',
 );
 expectThrow(
   () => cookieName.unlock(baseEnv, ''),

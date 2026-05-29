@@ -122,6 +122,7 @@ export function authorizedParties(env: HostConfigEnv): string[] {
       'AUTHORIZED_PARTIES must contain at least one origin (got only empty entries)',
     );
   }
+  const origins: string[] = [];
   for (const party of parties) {
     let parsed: URL;
     try {
@@ -135,11 +136,9 @@ export function authorizedParties(env: HostConfigEnv): string[] {
     if (parsed.pathname !== '/' || parsed.search.length > 0 || parsed.hash.length > 0) {
       throw new Error(`AUTHORIZED_PARTIES entry must be an origin only (no path / query / hash): ${party}`);
     }
-    // Normalize trailing slash off the input before comparing: `new URL("https://x")` parses
-    // pathname as "/", and our origin-only check above accepts both `https://x` and
-    // `https://x/`.
+    origins.push(parsed.origin);
   }
-  return parties;
+  return origins;
 }
 
 /**
@@ -153,7 +152,11 @@ export function emailFrom(env: HostConfigEnv): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error('EMAIL_FROM is required and must be a sender address');
   }
-  const match = value.match(/^(?:[^<>]*<\s*)?([^\s@<>]+)@([a-z0-9.-]+)\s*>?$/i);
+  const trimmed = value.trim();
+  const match =
+    trimmed.includes('<') || trimmed.includes('>')
+      ? trimmed.match(/^[^<>\r\n]*<\s*([^\s@<>]+)@([a-z0-9.-]+)\s*>$/i)
+      : trimmed.match(/^([^\s@<>]+)@([a-z0-9.-]+)$/i);
   if (!match) {
     throw new Error(`EMAIL_FROM must be RFC 5322 syntactically valid (got ${JSON.stringify(value)})`);
   }
@@ -162,7 +165,7 @@ export function emailFrom(env: HostConfigEnv): string {
     throw new Error(`EMAIL_FROM is missing a domain part: ${value}`);
   }
   validateHostname(domain, 'EMAIL_FROM domain');
-  return value;
+  return trimmed;
 }
 
 /**
@@ -177,9 +180,9 @@ export function cookieNamePrefix(env: HostConfigEnv): string {
   if (typeof value !== 'string' || value.length === 0) {
     throw new Error('COOKIE_NAME_PREFIX is required (e.g. "__opencanvas_")');
   }
-  if (!/^__?[A-Za-z0-9]+_$/.test(value)) {
+  if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(value)) {
     throw new Error(
-      `COOKIE_NAME_PREFIX must match /^__?[A-Za-z0-9]+_$/ (got ${JSON.stringify(value)})`,
+      `COOKIE_NAME_PREFIX must be a valid cookie-name token (got ${JSON.stringify(value)})`,
     );
   }
   return value;

@@ -27,6 +27,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run lint
+      - run: bun run host-config:smoke
+      - run: bun run host-literal-guard:smoke
       - run: bun run canvas:smoke
       - run: bun run canvas-agent:smoke
       - run: bun run build
