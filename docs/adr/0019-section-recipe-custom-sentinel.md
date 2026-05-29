@@ -1,9 +1,10 @@
 # ADR 0019 — `SectionRecipeId 'custom'` is the sentinel for manually-designed sections
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** Codifies the existing `'custom'` recipe-id pattern so future review work does not re-litigate it. Surfaced as a follow-up in [ADR 0016](0016-fake-discriminated-unions-to-real.md) decision 5.
+**Accepted-context:** Accepted on 2026-05-29. The codification was the entire decision; the only mechanical follow-up was updating the `buildCustom` header comment in `src/canvas/recipes.ts` to cite this ADR, which landed in the same pass.
 
 ## Context
 

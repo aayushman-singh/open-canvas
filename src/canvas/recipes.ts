@@ -608,8 +608,13 @@ function buildVideoHero(input: RecipeFactoryInput): CanvasSection {
 
 // ---------------------------------------------------------------------------
 // Custom passthrough — designer-saved sections that don't match a recipe.
-// The agent never uses this; it exists to satisfy the Record<SectionRecipeId>
-// exhaustiveness check.
+// `'custom'` is the sentinel meaning "this section was designed by the Owner
+// in the editor, not built from an agent recipe" (ADR 0019). The agent never
+// calls this factory; the factory exists to satisfy the
+// `Record<SectionRecipeId, RecipeFactory>` exhaustiveness check, which is
+// what catches "added a recipe to the union, forgot to register a factory"
+// at compile time. The body stays a minimal stub because manually-designed
+// sections are constructed in the editor, not by invoking this builder.
 // ---------------------------------------------------------------------------
 
 function buildCustom(input: RecipeFactoryInput): CanvasSection {
