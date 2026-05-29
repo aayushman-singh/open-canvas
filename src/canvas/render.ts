@@ -298,11 +298,17 @@ export function renderCanvasSnapshot(
   // Custom kits are site-owned data carried on the snapshot. Validate them
   // here even though the public route also emits CSS from them, so every
   // render entry point has the same fail-loud boundary.
+  //
+  // ADR 0012 dec 6 calls this "validate at render time" and asks for its
+  // deletion. The audit (2026-05-30) found canvas:smoke pins it as the
+  // no-silent-fallback contract for unknown kits, and the renderer's
+  // natural path does not crash on a bad kit (kit names are emitted as
+  // data attributes; bad data yields unstyled HTML, not a crash). The
+  // throw stays until the natural path itself fails loud — that refactor
+  // belongs to a follow-up, not this ADR's lock-in.
   const customPreset: StyleKitPreset | null =
     snapshot.styleKit === 'custom' ? resolveStyleKitWithCustom(snapshot) : null;
   if (snapshot.styleKit !== 'custom') {
-    // Called for its throw-on-missing side effect — the renderer refuses to
-    // emit HTML for a kit that has no preset. `void` marks the discard.
     void getStyleKitPreset(snapshot.styleKit);
   }
   const baseCtx: Omit<ElementRenderCtx, 'pageSlug'> = {
