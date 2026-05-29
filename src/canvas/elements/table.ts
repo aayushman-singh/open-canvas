@@ -48,6 +48,7 @@
 //   - zebra colour: var(--rev01-kit-panel, rgba(0,0,0,0.04))
 //   - radius:       var(--rev01-kit-radius, 6px) on the wrapping table
 
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 
 import { escapeAttr, escapeCssAttrId, escapeHtml } from './render-utils.js';
@@ -221,3 +222,18 @@ function renderTbody(columns: TableColumn[], rows: TableRow[]): string {
 }
 
 export const TABLE_RECIPE_ID = 'table-card' as const;
+
+export const tableInspectorSpec: InspectorSpec = {
+  fields: [
+    // 2D rows × columns editor with per-cell text inputs + per-column header
+    // input + add/remove column + add/remove row + cascading cell cleanup
+    // on column delete. Imperative because the editing UI is a real
+    // <table> mirror of the rendered output; a declarative kind cannot
+    // model "remove column N also strips cells[N] from every row" without
+    // becoming a 2D-grid kind in its own right (and no other element wants
+    // that shape).
+    { kind: 'custom-mount', name: 'table-grid' },
+    { kind: 'checkbox', label: 'Zebra striping', path: 'zebra' },
+    { kind: 'checkbox', label: 'Collapse on phone', path: 'collapseOnPhone' },
+  ],
+};

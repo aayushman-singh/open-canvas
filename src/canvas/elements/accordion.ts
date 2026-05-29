@@ -20,6 +20,7 @@
 //   - Closed bodies are emitted with `hidden` (and the runtime mirrors that
 //     attribute on toggle) — assistive tech skips collapsed regions.
 
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement, InlineRun } from '../schema.js';
 import { escapeAttr, escapeHtml, renderInlineRun } from './render-utils.js';
 
@@ -94,3 +95,16 @@ export function renderAccordion(el: AccordionElement, ctx: AccordionRenderCtx): 
 }
 
 export const ACCORDION_RECIPE_ID = 'accordion-list' as const;
+
+export const accordionInspectorSpec: InspectorSpec = {
+  fields: [
+    // Per-item editor (title + rich-text body). Imperative because each item
+    // hosts a contentEditable body with its own toolbar + serializer round-
+    // trip back into InlineRun[]. When carousel/table/nav land via the same
+    // mount-handler pattern, the shared list-card shape will be a candidate
+    // for a declarative `list-editor` kind (ADR 0011 dec 3, generalize on
+    // three data points).
+    { kind: 'custom-mount', name: 'accordion-items' },
+    { kind: 'checkbox', label: 'Allow multiple open', path: 'allowMultipleOpen' },
+  ],
+};

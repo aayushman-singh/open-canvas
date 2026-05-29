@@ -1,7 +1,9 @@
 // src/canvas/elements/media.ts
 //
-// `MediaElement` discriminated union (image/video) + renderer.
+// `MediaElement` discriminated union (image/video) + renderer + inspector
+// spec (ADR 0011 Step 1).
 
+import type { InspectorSpec } from './inspector-spec.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 import type { BackgroundSize, BaseElement } from '../schema.js';
 
@@ -69,3 +71,24 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
       : '';
   return `<video class="rev01-media" data-rev01-media-kind="video" src="${escapeAttr(src)}" aria-label="${escapeAttr(element.alt)}"${posterAttr} style="${baseStyle}" ${attrs.join(' ')}></video>`;
 }
+
+export const mediaInspectorSpec: InspectorSpec = {
+  fields: [
+    {
+      kind: 'button-action',
+      label: 'AI media',
+      action: 'replace-media',
+      dataAttr: 'replace-media',
+      busyFlag: 'aiBusy',
+    },
+    // Asset picker (image | video selection + crop). Imperative because the
+    // picker manages its own internal modal + upload flow.
+    { kind: 'custom-mount', name: 'media-picker' },
+    { kind: 'select', label: 'Fit', path: 'fit', options: ['cover', 'contain'] },
+    // Video-only playback controls (autoplay, muted, loop, controls). The
+    // mount handler checks `element.mediaKind === 'video'` and skips
+    // rendering on images — a general visible-when machinery is overkill
+    // for a single conditional, see ADR 0011 dec 3 "generalize on demand".
+    { kind: 'custom-mount', name: 'video-playback' },
+  ],
+};

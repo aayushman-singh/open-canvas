@@ -8,20 +8,21 @@
 
 import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
-import { renderAccordion } from './accordion.js';
-import { renderAction } from './action.js';
-import { renderCarousel } from './carousel.js';
+import { accordionInspectorSpec, renderAccordion } from './accordion.js';
+import { actionInspectorSpec, renderAction } from './action.js';
+import { carouselInspectorSpec, renderCarousel } from './carousel.js';
 import { renderChart } from './chart.js';
-import { renderCode } from './code.js';
+import { codeInspectorSpec, renderCode } from './code.js';
 import { renderCollection } from './collection.js';
-import { renderContainer } from './container.js';
-import { renderEmbed } from './embed.js';
+import { containerInspectorSpec, renderContainer } from './container.js';
+import { embedInspectorSpec, renderEmbed } from './embed.js';
 import { renderForm } from './form.js';
-import { renderMedia } from './media.js';
+import type { InspectorSpec } from './inspector-spec.js';
+import { mediaInspectorSpec, renderMedia } from './media.js';
 import { renderNav } from './nav.js';
-import { renderShape } from './shape.js';
-import { renderTable } from './table.js';
-import { renderText } from './text.js';
+import { renderShape, shapeInspectorSpec } from './shape.js';
+import { renderTable, tableInspectorSpec } from './table.js';
+import { renderText, textInspectorSpec } from './text.js';
 
 // Re-export every element interface so downstream code has a single import
 // point. The five originals come from `schema.ts` (legacy location); the
@@ -176,4 +177,38 @@ export const RENDER_DISPATCH: RenderDispatch = {
       assetBasePath: ctx.assetBasePath,
       renderChild: (child) => ctx.renderElement(child, ctx),
     }),
+};
+
+// ---------------------------------------------------------------------------
+// Inspector dispatch (ADR 0011 Step 1)
+// ---------------------------------------------------------------------------
+//
+// Declarative spec per element type. The editor client at
+// `src/editor/canvas-client.ts` interpolates this table as JSON at
+// script-emit time and walks the spec with a single generic interpreter,
+// replacing the per-type `buildXInspector` functions that previously fanned
+// out inside the IIFE.
+//
+// Partial during migration per ADR 0011 dec 3: this PR migrates shape,
+// container, code, embed as the proof-of-pattern. Unmigrated element types
+// fall through to their existing `buildXInspector` function inside
+// canvas-client.ts. The cutover ADR flips this to a full
+// `Record<CanvasElement['type'], InspectorSpec>` once every element has a
+// spec — at which point the mapped-type enforcement matches RENDER_DISPATCH
+// above and "added a type, forgot the spec" becomes a compile error.
+//
+// `collection` is intentionally never in this dispatch: it has no inspector
+// fields of its own (the children's inspectors render when the visitor
+// selects a child element).
+export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], InspectorSpec>> = {
+  shape: shapeInspectorSpec,
+  container: containerInspectorSpec,
+  code: codeInspectorSpec,
+  embed: embedInspectorSpec,
+  text: textInspectorSpec,
+  action: actionInspectorSpec,
+  media: mediaInspectorSpec,
+  accordion: accordionInspectorSpec,
+  carousel: carouselInspectorSpec,
+  table: tableInspectorSpec,
 };

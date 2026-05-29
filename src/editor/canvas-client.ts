@@ -21,6 +21,8 @@
 // `bun run review:smoke` after editing string-heavy code here; that smoke
 // imports the emitted client as JavaScript and catches broken escaping.
 
+import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
+
 export interface CanvasClientScriptParams {
   siteId: string;
   apiBase?: string;
@@ -42,13 +44,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     );
   }
 
-  // Two safe interpolations: siteId and apiBase. Both are validated above.
+  // Safe interpolations: siteId, apiBase, INSPECTOR_DISPATCH. siteId + apiBase
+  // are validated above; INSPECTOR_DISPATCH is a static module export of pure
+  // data (ADR 0011 Step 1) so JSON.stringify produces a value-only payload
+  // with no embedded code.
   // Everything inside the IIFE is plain JavaScript, not TypeScript.
+  const inspectorDispatchJson = JSON.stringify(INSPECTOR_DISPATCH);
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
   const API_BASE = ${JSON.stringify(apiBase)};
   const WS_TOKEN = ${JSON.stringify(wsToken)};
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
+  const INSPECTOR_DISPATCH = ${inspectorDispatchJson};
 
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic"];
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
@@ -96,14 +103,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // — silent infinite reconnects mask a real outage and burn the user's
   // battery. Loud failure beats a fake "still connected" UI.
   const COEDIT_RECONNECT_MAX_ATTEMPTS = 10;
-  // Text element font bounds. Mirror src/canvas/validate.ts (server enforces
-  // the same range on PUT). If you change either side here, mirror it there
-  // or the server will reject what the inspector accepts.
-  const TEXT_FONT_SIZE_MIN = 12;
-  const TEXT_FONT_SIZE_MAX = 96;
-  // Allowed numeric font weights for text elements. Mirrors schema.ts's
-  // TextElement.fontWeight union.
-  const TEXT_FONT_WEIGHT_CHOICES = ["400", "500", "600", "700"];
+  // Text-element font bounds and weight options live on the textInspectorSpec
+  // in src/canvas/elements/text.ts now (ADR 0011 Step 1); the JSON-emitted
+  // INSPECTOR_DISPATCH above carries them into this script. Server-side
+  // src/canvas/validate.ts mirrors the same bounds — if you change them,
+  // change both places.
   // Subresource integrity for the Cropper.js v2.1.1 ESM bundle on jsDelivr.
   // Sourced at:
   //   curl -s https://cdn.jsdelivr.net/npm/cropperjs@2.1.1/dist/cropper.esm.js \
@@ -2872,80 +2876,175 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderGrid();
   }
 
-  // -- Extracted inspector builders -----------------------------------------
+  // -- Spec-driven inspector interpreter (ADR 0011 Step 1) ------------------
+  //
+  // Walks an InspectorSpec read from INSPECTOR_DISPATCH (interpolated as
+  // JSON at script-emit time) and renders DOM the same way the legacy
+  // buildXInspector functions below did. Migrated element types route here
+  // via the dispatch site further down; unmigrated types still fall through
+  // to their per-type buildXInspector. Cutover ADR removes the fallback
+  // once every type has a spec.
 
-  function buildTextInspector(element) {
-    const aiBtn = document.createElement("button");
-    aiBtn.type = "button";
-    aiBtn.textContent = "AI rewrite";
-    aiBtn.setAttribute("data-ai-button", "rewrite-text");
-    if (aiBusy) aiBtn.disabled = true;
-    aiBtn.addEventListener("click", () => { aiRewriteText(element.id); });
-    inspector.appendChild(aiBtn);
-
-    const role = selectInput(["heading", "body", "label"], element.role);
-    role.addEventListener("change", () => {
-      element.role = role.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Role", role));
-
-    const fontSize = document.createElement("input");
-    fontSize.type = "number";
-    fontSize.min = String(TEXT_FONT_SIZE_MIN); fontSize.max = String(TEXT_FONT_SIZE_MAX);
-    fontSize.value = String(element.fontSize);
-    fontSize.addEventListener("change", () => {
-      const n = Number(fontSize.value);
-      if (Number.isFinite(n) && n >= TEXT_FONT_SIZE_MIN && n <= TEXT_FONT_SIZE_MAX) {
-        element.fontSize = n;
-        rebuildElement(element.id);
-        scheduleSave();
-      }
-    });
-    inspector.appendChild(field("Font size", fontSize));
-
-    const weight = selectInput(TEXT_FONT_WEIGHT_CHOICES, String(element.fontWeight));
-    weight.addEventListener("change", () => {
-      element.fontWeight = Number(weight.value);
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Font weight", weight));
-
-    const align = selectInput(["left", "center", "right"], element.align);
-    align.addEventListener("change", () => {
-      element.align = align.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Align", align));
-  }
-
-  function buildActionInspector(element) {
-    const variant = selectInput(ACTION_VARIANTS, element.variant);
-    variant.addEventListener("change", () => {
-      element.variant = variant.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Variant", variant));
-
-    const label = document.createElement("input");
-    label.type = "text";
-    label.value = element.label;
-    label.addEventListener("change", () => {
-      if (label.value.length === 0) {
-        setStatus("Label can't be empty", "error");
-        label.value = element.label;
+  function renderInspectorSpec(spec, element) {
+    spec.fields.forEach(function(f) {
+      if (f.kind === "select") {
+        var cur = element[f.path];
+        if (typeof cur !== "string" || f.options.indexOf(cur) < 0) {
+          cur = f.defaultValue || f.options[0];
+        }
+        var sel = selectInput(f.options, cur);
+        sel.addEventListener("change", function() {
+          element[f.path] = sel.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, sel));
         return;
       }
-      element.label = label.value;
-      rebuildElement(element.id);
-      scheduleSave();
+      if (f.kind === "select-mapped") {
+        var tol = typeof f.tolerance === "number" ? f.tolerance : 0.01;
+        var raw = element[f.path];
+        var curLabel = null;
+        if (typeof raw === "number") {
+          for (var oi = 0; oi < f.options.length; oi++) {
+            if (Math.abs(f.options[oi].value - raw) < tol) {
+              curLabel = f.options[oi].label;
+              break;
+            }
+          }
+        }
+        if (curLabel === null) {
+          for (var di = 0; di < f.options.length; di++) {
+            if (Math.abs(f.options[di].value - f.defaultValue) < tol) {
+              curLabel = f.options[di].label;
+              break;
+            }
+          }
+        }
+        if (curLabel === null) curLabel = f.options[0].label;
+        var labels = [];
+        for (var li = 0; li < f.options.length; li++) labels.push(f.options[li].label);
+        var msel = selectInput(labels, curLabel);
+        msel.addEventListener("change", function() {
+          for (var oj = 0; oj < f.options.length; oj++) {
+            if (f.options[oj].label === msel.value) {
+              element[f.path] = f.options[oj].value;
+              break;
+            }
+          }
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, msel));
+        return;
+      }
+      if (f.kind === "text") {
+        var ti = document.createElement("input");
+        ti.type = "text";
+        ti.value = typeof element[f.path] === "string" ? element[f.path] : "";
+        if (f.placeholder) ti.placeholder = f.placeholder;
+        ti.addEventListener("change", function() {
+          if (f.required && ti.value.length === 0) {
+            setStatus(f.label + " cannot be empty", "error");
+            ti.value = element[f.path] || "";
+            return;
+          }
+          element[f.path] = ti.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, ti));
+        return;
+      }
+      if (f.kind === "textarea") {
+        var ta = document.createElement("textarea");
+        if (typeof f.rows === "number") ta.rows = f.rows;
+        if (typeof f.cssText === "string") ta.style.cssText = f.cssText;
+        ta.value = typeof element[f.path] === "string" ? element[f.path] : "";
+        if (f.placeholder) ta.placeholder = f.placeholder;
+        ta.addEventListener("change", function() {
+          element[f.path] = ta.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, ta));
+        return;
+      }
+      if (f.kind === "checkbox") {
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = !!element[f.path];
+        cb.addEventListener("change", function() {
+          element[f.path] = cb.checked;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, cb));
+        return;
+      }
+      if (f.kind === "number") {
+        var ni = document.createElement("input");
+        ni.type = "number";
+        if (typeof f.min === "number") ni.min = String(f.min);
+        if (typeof f.max === "number") ni.max = String(f.max);
+        var prev = typeof element[f.path] === "number" ? element[f.path] : 0;
+        ni.value = String(prev);
+        ni.addEventListener("change", function() {
+          var n = Number(ni.value);
+          var minOk = typeof f.min !== "number" || n >= f.min;
+          var maxOk = typeof f.max !== "number" || n <= f.max;
+          if (Number.isFinite(n) && minOk && maxOk) {
+            element[f.path] = n;
+            prev = n;
+            rebuildElement(element.id);
+            scheduleSave();
+          } else {
+            ni.value = String(prev);
+          }
+        });
+        inspector.appendChild(field(f.label, ni));
+        return;
+      }
+      if (f.kind === "button-action") {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = f.label;
+        if (f.dataAttr) btn.setAttribute("data-ai-button", f.dataAttr);
+        if (f.busyFlag) {
+          var busyReader = INSPECTOR_BUSY_FLAGS[f.busyFlag];
+          if (busyReader && busyReader()) btn.disabled = true;
+        }
+        var handler = INSPECTOR_ACTION_HANDLERS[f.action];
+        if (typeof handler !== "function") {
+          throw new Error("renderInspectorSpec: no action handler registered for " + JSON.stringify(f.action));
+        }
+        btn.addEventListener("click", function() { handler(element.id); });
+        inspector.appendChild(btn);
+        return;
+      }
+      if (f.kind === "action-href") {
+        renderActionHrefField(f, element);
+        return;
+      }
+      if (f.kind === "custom-mount") {
+        var mount = INSPECTOR_MOUNT_HANDLERS[f.name];
+        if (typeof mount !== "function") {
+          throw new Error("renderInspectorSpec: no mount handler registered for " + JSON.stringify(f.name));
+        }
+        mount(element, inspector);
+        return;
+      }
+      throw new Error("renderInspectorSpec: unknown field kind " + JSON.stringify(f.kind));
     });
-    inspector.appendChild(field("Label", label));
+  }
 
+  // Purpose-built editor for the ActionHref DU. The spec carries the labels +
+  // path; this function owns knowledge of the DU shape (external | page), the
+  // URL allowlist (isAllowedHref), and the page-source registry (state.pages).
+  // When the discriminator changes, the value field is rebuilt and the entire
+  // DU at element[f.path] is replaced with a fresh shape — same behaviour the
+  // legacy buildActionInspector had.
+  function renderActionHrefField(f, element) {
     var hrefTypeSelect = document.createElement("select");
     var optExternal = document.createElement("option");
     optExternal.value = "external";
@@ -2955,16 +3054,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     optPage.value = "page";
     optPage.textContent = "Page link";
     hrefTypeSelect.appendChild(optPage);
-    hrefTypeSelect.value = element.href && element.href.type ? element.href.type : "external";
+    var currentHref = element[f.path];
+    hrefTypeSelect.value = currentHref && currentHref.type ? currentHref.type : "external";
 
     var hrefValueContainer = document.createElement("div");
 
     function renderHrefValue() {
       hrefValueContainer.replaceChildren();
+      var href = element[f.path];
       if (hrefTypeSelect.value === "external") {
         var urlInput = document.createElement("input");
         urlInput.type = "text";
-        urlInput.value = element.href && element.href.type === "external" ? element.href.url : "";
+        urlInput.value = href && href.type === "external" ? href.url : "";
         urlInput.placeholder = "https://...";
         urlInput.addEventListener("change", function() {
           if (urlInput.value.length === 0) {
@@ -2975,143 +3076,145 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             setStatus("URL not allowed", "error");
             return;
           }
-          element.href = { type: "external", url: urlInput.value };
+          element[f.path] = { type: "external", url: urlInput.value };
           rebuildElement(element.id);
           scheduleSave();
         });
         hrefValueContainer.appendChild(urlInput);
-      } else {
-        var pageSelect = document.createElement("select");
-        for (var pi = 0; pi < state.pages.length; pi++) {
-          var p = state.pages[pi];
-          var opt = document.createElement("option");
-          opt.value = p.id;
-          opt.textContent = p.title + " (/" + p.slug + ")";
-          pageSelect.appendChild(opt);
-        }
-        if (element.href && element.href.type === "page") {
-          pageSelect.value = element.href.pageId;
-        }
-        pageSelect.addEventListener("change", function() {
-          element.href = { type: "page", pageId: pageSelect.value };
-          rebuildElement(element.id);
-          scheduleSave();
-        });
-        hrefValueContainer.appendChild(pageSelect);
+        return;
       }
+      // page branch
+      var pageSelect = document.createElement("select");
+      for (var pi = 0; pi < state.pages.length; pi++) {
+        var p = state.pages[pi];
+        var opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.title + " (/" + p.slug + ")";
+        pageSelect.appendChild(opt);
+      }
+      if (href && href.type === "page") {
+        pageSelect.value = href.pageId;
+      }
+      pageSelect.addEventListener("change", function() {
+        element[f.path] = { type: "page", pageId: pageSelect.value };
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      hrefValueContainer.appendChild(pageSelect);
     }
 
     hrefTypeSelect.addEventListener("change", function() {
       if (hrefTypeSelect.value === "external") {
-        element.href = { type: "external", url: "" };
+        element[f.path] = { type: "external", url: "" };
       } else {
-        element.href = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
+        element[f.path] = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
       }
       renderHrefValue();
       rebuildElement(element.id);
       scheduleSave();
     });
 
-    inspector.appendChild(field("Link Type", hrefTypeSelect));
+    inspector.appendChild(field(f.discriminatorLabel, hrefTypeSelect));
     renderHrefValue();
-    inspector.appendChild(field("Destination", hrefValueContainer));
+    inspector.appendChild(field(f.valueLabel, hrefValueContainer));
   }
 
-  function buildShapeInspector(element) {
-    const variant = selectInput(SHAPE_VARIANTS, element.variant);
-    variant.addEventListener("change", () => {
-      element.variant = variant.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Variant", variant));
-  }
+  // Action handler + busy-flag registries — spec carries the string name, the
+  // interpreter holds the imperative function. Adding a new button-action
+  // spec field requires registering the handler here too; the inspector
+  // throws synchronously at first mount if the name is missing, surfacing
+  // the gap immediately rather than as a silent no-op click.
+  var INSPECTOR_ACTION_HANDLERS = {
+    "rewrite-text": function(id) { aiRewriteText(id); },
+    "replace-media": function(id) { aiReplaceMedia(id); },
+  };
+  var INSPECTOR_BUSY_FLAGS = {
+    "aiBusy": function() { return aiBusy; },
+  };
+  // Mount handler registry for the "custom-mount" field kind. Each entry
+  // receives (element, host) and is free to append nothing, one node, or
+  // a full sub-tree. video-playback skips entirely on image elements
+  // because the playback controls are video-only — that conditional lives
+  // in the mount fn rather than the spec.
+  var INSPECTOR_MOUNT_HANDLERS = {
+    "media-picker": function(element, host) { mountMediaPicker(element, host); },
+    "video-playback": function(element, host) { mountVideoPlayback(element, host); },
+    "accordion-items": function(element, host) { mountAccordionItems(element, host); },
+    "carousel-slides": function(element, host) { mountCarouselSlides(element, host); },
+    "table-grid": function(element, host) { mountTableGrid(element, host); },
+  };
 
-  function buildContainerInspector(element) {
-    const variant = selectInput(SURFACE_VARIANTS, element.variant);
-    variant.addEventListener("change", () => {
-      element.variant = variant.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Variant", variant));
-  }
+  // Video-playback controls — autoplay, muted, loop, controls — with the
+  // autoplay-implies-muted enforcement that the legacy buildMediaInspector
+  // carried. No-op on images. Lazy-initialises element.playback on first
+  // render so older sites that pre-date the playback field still pick up
+  // the default shape on first inspector open.
+  function mountVideoPlayback(element, host) {
+    if (element.mediaKind !== "video") return;
+    var playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
+    var autoplay = document.createElement("input");
+    autoplay.type = "checkbox"; autoplay.checked = !!playback.autoplay;
+    var muted = document.createElement("input");
+    muted.type = "checkbox"; muted.checked = !!playback.muted;
+    var loop = document.createElement("input");
+    loop.type = "checkbox"; loop.checked = !!playback.loop;
+    var controls = document.createElement("input");
+    controls.type = "checkbox"; controls.checked = !!playback.controls;
 
-  function buildMediaInspector(element) {
-    const aiBtn = document.createElement("button");
-    aiBtn.type = "button";
-    aiBtn.textContent = "AI media";
-    aiBtn.setAttribute("data-ai-button", "replace-media");
-    if (aiBusy) aiBtn.disabled = true;
-    aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
-    inspector.appendChild(aiBtn);
-
-    mountMediaPicker(element, inspector);
-
-    const fit = selectInput(["cover", "contain"], element.fit);
-    fit.addEventListener("change", () => {
-      element.fit = fit.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Fit", fit));
-
-    if (element.mediaKind === "video") {
-      const playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
-      const autoplay = document.createElement("input");
-      autoplay.type = "checkbox"; autoplay.checked = !!playback.autoplay;
-      const muted = document.createElement("input");
-      muted.type = "checkbox"; muted.checked = !!playback.muted;
-      const loop = document.createElement("input");
-      loop.type = "checkbox"; loop.checked = !!playback.loop;
-      const controls = document.createElement("input");
-      controls.type = "checkbox"; controls.checked = !!playback.controls;
-
-      function enforceMuted() {
-        if (autoplay.checked) {
-          muted.checked = true;
-          muted.disabled = true;
-        } else {
-          muted.disabled = false;
-        }
+    function enforceMuted() {
+      if (autoplay.checked) {
+        muted.checked = true;
+        muted.disabled = true;
+      } else {
+        muted.disabled = false;
       }
-      enforceMuted();
-
-      autoplay.addEventListener("change", () => {
-        playback.autoplay = autoplay.checked;
-        enforceMuted();
-        playback.muted = muted.checked;
-        scheduleSave();
-      });
-      muted.addEventListener("change", () => {
-        if (autoplay.checked) { muted.checked = true; return; }
-        playback.muted = muted.checked;
-        scheduleSave();
-      });
-      loop.addEventListener("change", () => { playback.loop = loop.checked; scheduleSave(); });
-      controls.addEventListener("change", () => { playback.controls = controls.checked; scheduleSave(); });
-
-      const row = document.createElement("div"); row.className = "row";
-      row.appendChild(autoplay);
-      const al = document.createElement("label"); al.textContent = "autoplay"; row.appendChild(al);
-      inspector.appendChild(row);
-
-      const row2 = document.createElement("div"); row2.className = "row";
-      row2.appendChild(muted);
-      const ml = document.createElement("label"); ml.textContent = "muted"; row2.appendChild(ml);
-      inspector.appendChild(row2);
-
-      const row3 = document.createElement("div"); row3.className = "row";
-      row3.appendChild(loop);
-      const ll = document.createElement("label"); ll.textContent = "loop"; row3.appendChild(ll);
-      inspector.appendChild(row3);
-
-      const row4 = document.createElement("div"); row4.className = "row";
-      row4.appendChild(controls);
-      const cl = document.createElement("label"); cl.textContent = "controls"; row4.appendChild(cl);
-      inspector.appendChild(row4);
     }
+    enforceMuted();
+
+    autoplay.addEventListener("change", function() {
+      playback.autoplay = autoplay.checked;
+      enforceMuted();
+      playback.muted = muted.checked;
+      scheduleSave();
+    });
+    muted.addEventListener("change", function() {
+      if (autoplay.checked) { muted.checked = true; return; }
+      playback.muted = muted.checked;
+      scheduleSave();
+    });
+    loop.addEventListener("change", function() { playback.loop = loop.checked; scheduleSave(); });
+    controls.addEventListener("change", function() { playback.controls = controls.checked; scheduleSave(); });
+
+    function rowFor(node, labelText) {
+      var row = document.createElement("div"); row.className = "row";
+      row.appendChild(node);
+      var lbl = document.createElement("label"); lbl.textContent = labelText; row.appendChild(lbl);
+      return row;
+    }
+    host.appendChild(rowFor(autoplay, "autoplay"));
+    host.appendChild(rowFor(muted, "muted"));
+    host.appendChild(rowFor(loop, "loop"));
+    host.appendChild(rowFor(controls, "controls"));
   }
+
+  // -- Extracted inspector builders -----------------------------------------
+
+  // buildTextInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/text.ts (uses button-action, select, number,
+  // select-mapped field kinds).
+
+  // buildActionInspector + buildShapeInspector + buildContainerInspector
+  // migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1; see
+  // src/canvas/elements/{action,shape,container}.ts. The action-href DU
+  // editor lives in renderActionHrefField above (purpose-built; future
+  // DU-shaped fields can copy the pattern or generalize when a second
+  // element requires it).
+
+  // buildMediaInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/media.ts. The two imperative sub-trees
+  // (mountMediaPicker, mountVideoPlayback) are registered as custom-mount
+  // handlers in INSPECTOR_MOUNT_HANDLERS above; mountVideoPlayback owns the
+  // "skip on image" conditional and the autoplay-implies-muted enforcement.
 
   function buildFormInspector(element) {
     if (!Array.isArray(element.fields)) element.fields = [];
@@ -3291,81 +3394,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(field("Webhook URL", webhookInput));
   }
 
-  function buildEmbedInspector(element) {
-    var urlInput = document.createElement("input");
-    urlInput.type = "text";
-    urlInput.value = element.url || "";
-    urlInput.placeholder = "https://youtube.com/...";
-    urlInput.addEventListener("change", function() {
-      element.url = urlInput.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("URL", urlInput));
+  // buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH
+  // per ADR 0011 Step 1; see src/canvas/elements/{embed,code}.ts.
 
-    var titleInput = document.createElement("input");
-    titleInput.type = "text";
-    titleInput.value = element.title || "";
-    titleInput.placeholder = "Title (optional)";
-    titleInput.addEventListener("change", function() {
-      element.title = titleInput.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Title", titleInput));
-
-    var ratioMap = { "16:9": 16 / 9, "4:3": 4 / 3, "1:1": 1, "21:9": 21 / 9 };
-    var ratioLabels = ["16:9", "4:3", "1:1", "21:9"];
-    var currentLabel = "16:9";
-    var currentRatio = element.aspectRatio || (16 / 9);
-    for (var ri = 0; ri < ratioLabels.length; ri++) {
-      if (Math.abs(ratioMap[ratioLabels[ri]] - currentRatio) < 0.01) {
-        currentLabel = ratioLabels[ri];
-        break;
-      }
-    }
-    var ratioSel = selectInput(ratioLabels, currentLabel);
-    ratioSel.addEventListener("change", function() {
-      element.aspectRatio = ratioMap[ratioSel.value] || (16 / 9);
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Aspect ratio", ratioSel));
-  }
-
-  function buildCodeInspector(element) {
-    var langOptions = ["typescript", "javascript", "python", "rust", "go", "json", "bash", "sql", "html", "css", "markdown"];
-    var langSel = selectInput(langOptions, element.language || "typescript");
-    langSel.addEventListener("change", function() {
-      element.language = langSel.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Language", langSel));
-
-    var sourceArea = document.createElement("textarea");
-    sourceArea.rows = 8;
-    sourceArea.style.cssText = "width:100%;font-family:monospace;font-size:12px;resize:vertical;box-sizing:border-box;";
-    sourceArea.value = element.source || "";
-    sourceArea.addEventListener("change", function() {
-      element.source = sourceArea.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Source", sourceArea));
-
-    var lineNumCheck = document.createElement("input");
-    lineNumCheck.type = "checkbox";
-    lineNumCheck.checked = !!element.showLineNumbers;
-    lineNumCheck.addEventListener("change", function() {
-      element.showLineNumbers = lineNumCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Line numbers", lineNumCheck));
-  }
-
-  function buildAccordionInspector(element) {
+  // buildAccordionInspector migrated to INSPECTOR_DISPATCH per ADR 0011
+  // Step 1; see src/canvas/elements/accordion.ts. The per-item editor
+  // (title + rich-text body with contentEditable toolbar) lives in
+  // mountAccordionItems below; the allowMultipleOpen checkbox is now a
+  // declarative checkbox field in the spec.
+  function mountAccordionItems(element, host) {
     if (!Array.isArray(element.items)) element.items = [];
     var itemListHost = document.createElement("div");
 
@@ -3481,20 +3518,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       itemListHost.appendChild(addBtn);
     }
     renderItemList();
-    inspector.appendChild(field("Items", itemListHost));
-
-    var multiCheck = document.createElement("input");
-    multiCheck.type = "checkbox";
-    multiCheck.checked = !!element.allowMultipleOpen;
-    multiCheck.addEventListener("change", function() {
-      element.allowMultipleOpen = multiCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Allow multiple open", multiCheck));
+    host.appendChild(field("Items", itemListHost));
   }
 
-  function buildCarouselInspector(element) {
+  // buildCarouselInspector migrated to INSPECTOR_DISPATCH per ADR 0011
+  // Step 1; see src/canvas/elements/carousel.ts. Per-slide editor (thumbnail
+  // + upload + caption + link) lives in mountCarouselSlides; showArrows /
+  // showDots are now declarative checkbox fields.
+  function mountCarouselSlides(element, host) {
     if (!Array.isArray(element.slides)) element.slides = [];
     var slideListHost = document.createElement("div");
 
@@ -3589,30 +3620,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       slideListHost.appendChild(addBtn);
     }
     renderSlideList();
-    inspector.appendChild(field("Slides", slideListHost));
-
-    var arrowsCheck = document.createElement("input");
-    arrowsCheck.type = "checkbox";
-    arrowsCheck.checked = !!element.showArrows;
-    arrowsCheck.addEventListener("change", function() {
-      element.showArrows = arrowsCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Show arrows", arrowsCheck));
-
-    var dotsCheck = document.createElement("input");
-    dotsCheck.type = "checkbox";
-    dotsCheck.checked = !!element.showDots;
-    dotsCheck.addEventListener("change", function() {
-      element.showDots = dotsCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Show dots", dotsCheck));
+    host.appendChild(field("Slides", slideListHost));
   }
 
-  function buildTableInspector(element) {
+  // buildTableInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/table.ts. 2D rows × columns editor lives in
+  // mountTableGrid; zebra / collapseOnPhone are now declarative checkboxes.
+  function mountTableGrid(element, host) {
     if (!Array.isArray(element.columns)) element.columns = [];
     if (!Array.isArray(element.rows)) element.rows = [];
     var gridHost = document.createElement("div");
@@ -3769,27 +3783,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     }
     renderTableGrid();
-    inspector.appendChild(field("Data", gridHost));
-
-    var zebraCheck = document.createElement("input");
-    zebraCheck.type = "checkbox";
-    zebraCheck.checked = !!element.zebra;
-    zebraCheck.addEventListener("change", function() {
-      element.zebra = zebraCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Zebra striping", zebraCheck));
-
-    var collapseCheck = document.createElement("input");
-    collapseCheck.type = "checkbox";
-    collapseCheck.checked = !!element.collapseOnPhone;
-    collapseCheck.addEventListener("change", function() {
-      element.collapseOnPhone = collapseCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Collapse on phone", collapseCheck));
+    host.appendChild(field("Data", gridHost));
   }
 
   function buildNavInspector(element) {
@@ -4321,23 +4315,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildZOrderGroup(section, element));
     inspector.appendChild(buildElementActionsGroup(section, element));
 
-    const inspectorBuilders = {
-      text: buildTextInspector,
-      action: buildActionInspector,
-      shape: buildShapeInspector,
-      container: buildContainerInspector,
-      media: buildMediaInspector,
-      chart: buildChartInspector,
-      form: buildFormInspector,
-      embed: buildEmbedInspector,
-      code: buildCodeInspector,
-      accordion: buildAccordionInspector,
-      carousel: buildCarouselInspector,
-      table: buildTableInspector,
-      nav: buildNavInspector,
-    };
-    const inspectorBuilder = inspectorBuilders[element.type];
-    if (inspectorBuilder) inspectorBuilder(element);
+    // ADR 0011 Step 1: dispatch via spec when available, else fall back to
+    // the per-type buildXInspector. Migrated types (shape, container, code,
+    // embed, text, action, media, accordion, carousel, table) have specs;
+    // remaining types (chart, form, nav) still use their per-type builders
+    // until the next PR in the migration series.
+    const inspectorSpec = INSPECTOR_DISPATCH[element.type];
+    if (inspectorSpec) {
+      renderInspectorSpec(inspectorSpec, element);
+    } else {
+      const inspectorBuilders = {
+        chart: buildChartInspector,
+        form: buildFormInspector,
+        nav: buildNavInspector,
+      };
+      const inspectorBuilder = inspectorBuilders[element.type];
+      if (inspectorBuilder) inspectorBuilder(element);
+    }
 
     // -- Element style controls -----------------------------------------------
     (function buildStyleSection() {

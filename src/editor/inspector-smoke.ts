@@ -17,7 +17,7 @@ function sliceBetween(startNeedle: string, endNeedle: string): string {
 
 const formInspector = sliceBetween(
   'function buildFormInspector(element) {',
-  'function buildEmbedInspector(element) {',
+  '// buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH',
 );
 
 assert(
@@ -48,8 +48,8 @@ assert(
 );
 
 const accordionInspector = sliceBetween(
-  'function buildAccordionInspector(element) {',
-  'function buildCarouselInspector(element) {',
+  'function mountAccordionItems(element, host) {',
+  '// buildCarouselInspector migrated to INSPECTOR_DISPATCH',
 );
 
 assert(
@@ -58,6 +58,18 @@ assert(
     accordionInspector.includes('ev.preventDefault();') &&
     accordionInspector.includes('document.execCommand(command);'),
   'accordion rich-text toolbar must preserve the contenteditable selection before execCommand',
+);
+
+const tableInspector = sliceBetween(
+  'function mountTableGrid(element, host) {',
+  'function buildNavInspector(element) {',
+);
+
+assert(
+  tableInspector.includes('host.appendChild(field("Data", gridHost));') &&
+    !tableInspector.includes('inspector.appendChild(field("Zebra striping"') &&
+    !tableInspector.includes('inspector.appendChild(field("Collapse on phone"'),
+  'table inspector grid must mount through custom-mount while simple booleans live in INSPECTOR_DISPATCH',
 );
 
 const navInspector = sliceBetween(

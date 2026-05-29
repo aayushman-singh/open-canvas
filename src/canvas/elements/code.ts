@@ -20,6 +20,7 @@ import {
   isSupportedLanguage,
   renderPlainCodeSnippet,
 } from '../../code/highlight.js';
+import type { InspectorSpec } from './inspector-spec.js';
 import { escapeAttr, escapeCssValue } from './render-utils.js';
 
 export const CODE_LANGUAGES = [
@@ -128,3 +129,24 @@ export function renderCode(el: CodeElement, ctx: CodeRenderCtx): string {
 }
 
 export const CODE_RECIPE_ID = 'code-card' as const;
+
+export const codeInspectorSpec: InspectorSpec = {
+  fields: [
+    {
+      kind: 'select',
+      label: 'Language',
+      path: 'language',
+      options: CODE_LANGUAGES,
+      defaultValue: 'typescript',
+    },
+    {
+      kind: 'textarea',
+      label: 'Source',
+      path: 'source',
+      rows: 8,
+      cssText:
+        'width:100%;font-family:monospace;font-size:12px;resize:vertical;box-sizing:border-box;',
+    },
+    { kind: 'checkbox', label: 'Line numbers', path: 'showLineNumbers' },
+  ],
+};

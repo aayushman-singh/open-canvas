@@ -27,6 +27,7 @@
 //     a missing iframe in the DOM would be a silent skip.
 
 import { escapeAttr } from './render-utils.js';
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 import { resolveEmbed } from '../../embed/oembed-resolve.js';
 
@@ -105,3 +106,23 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
 }
 
 export const EMBED_RECIPE_ID = 'embed-card' as const;
+
+export const embedInspectorSpec: InspectorSpec = {
+  fields: [
+    { kind: 'text', label: 'URL', path: 'url', placeholder: 'https://youtube.com/...' },
+    { kind: 'text', label: 'Title', path: 'title', placeholder: 'Title (optional)' },
+    {
+      kind: 'select-mapped',
+      label: 'Aspect ratio',
+      path: 'aspectRatio',
+      options: [
+        { label: '16:9', value: 16 / 9 },
+        { label: '4:3', value: 4 / 3 },
+        { label: '1:1', value: 1 },
+        { label: '21:9', value: 21 / 9 },
+      ],
+      defaultValue: DEFAULT_EMBED_ASPECT_RATIO,
+      tolerance: 0.01,
+    },
+  ],
+};
