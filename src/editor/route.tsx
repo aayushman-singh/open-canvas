@@ -133,7 +133,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
       </span>
     ) : (
       <span class="crumbs">
-        <span>rev01</span>
+        <span>Open Canvas</span>
         <span class="sep">/</span>
         <a href="/dashboard" style="color: inherit; text-decoration: none;">
           dashboard
@@ -149,7 +149,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="dark" />
-        <title>rev01 — editing {siteName}</title>
+        <title>Open Canvas — editing {siteName}</title>
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
         <style>{raw(canvasEditorStyles)}</style>
