@@ -72,6 +72,11 @@ export interface SelectMappedField {
 /**
  * Single-line text input. When `required` is true, the interpreter rejects
  * an empty submission (reverts the input and surfaces a status error).
+ * When `emptyAsUndefined` is true, an empty input value writes `undefined`
+ * to the element instead of an empty string — used for optional fields
+ * whose absence is semantically distinct from a present-but-empty value
+ * (e.g. `nav.logoAssetId?: string`, where `undefined` means "no logo" and
+ * `""` would still serialize the key).
  */
 export interface TextField {
   kind: 'text';
@@ -79,6 +84,7 @@ export interface TextField {
   path: string;
   placeholder?: string;
   required?: boolean;
+  emptyAsUndefined?: boolean;
 }
 
 /**

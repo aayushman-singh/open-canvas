@@ -2949,7 +2949,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             ti.value = element[f.path] || "";
             return;
           }
-          element[f.path] = ti.value;
+          element[f.path] = f.emptyAsUndefined && ti.value.length === 0 ? undefined : ti.value;
           rebuildElement(element.id);
           scheduleSave();
         });
@@ -3142,6 +3142,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "accordion-items": function(element, host) { mountAccordionItems(element, host); },
     "carousel-slides": function(element, host) { mountCarouselSlides(element, host); },
     "table-grid": function(element, host) { mountTableGrid(element, host); },
+    "nav-links": function(element, host) { mountNavLinks(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -3786,7 +3787,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     host.appendChild(field("Data", gridHost));
   }
 
-  function buildNavInspector(element) {
+  // buildNavInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/nav.ts. Per-link editor (label + href + kind
+  // with per-kind href validation) lives in mountNavLinks; layout / sticky
+  // / logoAssetId are now declarative select / checkbox / text fields.
+  function mountNavLinks(element, host) {
     if (!Array.isArray(element.links)) element.links = [];
     var linkListHost = document.createElement("div");
 
@@ -3872,36 +3877,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       linkListHost.appendChild(addBtn);
     }
     renderLinkList();
-    inspector.appendChild(field("Links", linkListHost));
-
-    var layoutSel = selectInput(["left-right", "left-center-right"], element.layout || "left-right");
-    layoutSel.addEventListener("change", function() {
-      element.layout = layoutSel.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Layout", layoutSel));
-
-    var stickyCheck = document.createElement("input");
-    stickyCheck.type = "checkbox";
-    stickyCheck.checked = !!element.sticky;
-    stickyCheck.addEventListener("change", function() {
-      element.sticky = stickyCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Sticky", stickyCheck));
-
-    var logoInput = document.createElement("input");
-    logoInput.type = "text";
-    logoInput.value = element.logoAssetId || "";
-    logoInput.placeholder = "Logo asset ID (optional)";
-    logoInput.addEventListener("change", function() {
-      element.logoAssetId = logoInput.value || undefined;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Logo asset", logoInput));
+    host.appendChild(field("Links", linkListHost));
   }
 
   // Revoke any blob URLs held by AI-preview wraps before wiping the
@@ -4317,9 +4293,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media, accordion, carousel, table) have specs;
-    // remaining types (chart, form, nav) still use their per-type builders
-    // until the next PR in the migration series.
+    // embed, text, action, media, accordion, carousel, table, nav) have
+    // specs; remaining types (chart, form) still use their per-type
+    // builders until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
@@ -4327,7 +4303,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const inspectorBuilders = {
         chart: buildChartInspector,
         form: buildFormInspector,
-        nav: buildNavInspector,
       };
       const inspectorBuilder = inspectorBuilders[element.type];
       if (inspectorBuilder) inspectorBuilder(element);

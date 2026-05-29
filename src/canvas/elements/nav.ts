@@ -31,6 +31,7 @@
 //   the brand. A `logoAlt` field is not yet on the schema; empty alt is the
 //   honest default until then.
 
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml, styleFromEntries } from './render-utils.js';
 
@@ -122,3 +123,31 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
 }
 
 export const NAV_RECIPE_ID = 'site-nav' as const;
+
+export const navInspectorSpec: InspectorSpec = {
+  fields: [
+    // Per-link editor (label + href + kind with per-kind href validation).
+    // Imperative because the href input's placeholder and validation rule
+    // both depend on lnk.kind, and changing kind must re-validate the
+    // existing href against the new rule. A future declarative kind
+    // covering "discriminated sub-field that depends on a sibling
+    // discriminator" would generalize this with action-href; we wait
+    // until a second consumer asks for that shape.
+    { kind: 'custom-mount', name: 'nav-links' },
+    {
+      kind: 'select',
+      label: 'Layout',
+      path: 'layout',
+      options: ['left-right', 'left-center-right'],
+      defaultValue: 'left-right',
+    },
+    { kind: 'checkbox', label: 'Sticky', path: 'sticky' },
+    {
+      kind: 'text',
+      label: 'Logo asset',
+      path: 'logoAssetId',
+      placeholder: 'Logo asset ID (optional)',
+      emptyAsUndefined: true,
+    },
+  ],
+};

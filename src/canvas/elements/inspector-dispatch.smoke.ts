@@ -113,6 +113,17 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     zebra: true,
     collapseOnPhone: false,
   },
+  nav: {
+    id: 'fx-nav',
+    type: 'nav',
+    box: { x: 0, y: 0, w: 800, h: 60, z: 0 },
+    links: [{ label: 'Home', href: '/', kind: 'internal' }],
+    layout: 'left-right',
+    sticky: false,
+    // logoAssetId is intentionally absent — the spec uses `emptyAsUndefined`
+    // for this field so "absent" is its canonical empty state. The path
+    // check below exempts emptyAsUndefined text fields for this reason.
+  },
 };
 
 // Action handlers, busy flags, and mount handlers the interpreter binds
@@ -128,6 +139,7 @@ const REGISTERED_MOUNTS = [
   'accordion-items',
   'carousel-slides',
   'table-grid',
+  'nav-links',
 ] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {
@@ -151,12 +163,18 @@ function checkField(field: InspectorField, fixture: object, where: string): void
 
   // `button-action` + `custom-mount` are the path-free field kinds — they
   // dispatch via named handlers instead of binding to an element property.
+  // Text fields with `emptyAsUndefined` are exempt from the path-presence
+  // check because their canonical empty state is "key absent" — the fixture
+  // omitting the key is the correct shape, not a typo.
   if (field.kind !== 'button-action' && field.kind !== 'custom-mount') {
     assert(typeof field.path === 'string' && field.path.length > 0, `${where}: path required`);
-    assert(
-      Object.prototype.hasOwnProperty.call(fixture, field.path),
-      `${where}: path "${field.path}" is not present on the fixture (catches typos and stale paths)`,
-    );
+    const exempt = field.kind === 'text' && field.emptyAsUndefined === true;
+    if (!exempt) {
+      assert(
+        Object.prototype.hasOwnProperty.call(fixture, field.path),
+        `${where}: path "${field.path}" is not present on the fixture (catches typos and stale paths)`,
+      );
+    }
   }
 
   switch (field.kind) {

@@ -19,7 +19,7 @@ import { embedInspectorSpec, renderEmbed } from './embed.js';
 import { renderForm } from './form.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import { mediaInspectorSpec, renderMedia } from './media.js';
-import { renderNav } from './nav.js';
+import { navInspectorSpec, renderNav } from './nav.js';
 import { renderShape, shapeInspectorSpec } from './shape.js';
 import { renderTable, tableInspectorSpec } from './table.js';
 import { renderText, textInspectorSpec } from './text.js';
@@ -211,4 +211,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   accordion: accordionInspectorSpec,
   carousel: carouselInspectorSpec,
   table: tableInspectorSpec,
+  nav: navInspectorSpec,
 };
