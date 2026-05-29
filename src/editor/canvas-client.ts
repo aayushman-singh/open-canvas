@@ -82,6 +82,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // unsupported codec can leave loadeddata/seeked events un-fired; without this
   // the UI silently hangs on "Loading...". Loud failure on timeout.
   const POSTER_EXTRACTION_TIMEOUT_MS = 30000;
+  // Default page width in canvas px when a new page is created. Sized to match
+  // the 1440px desktop artboard the inspector is calibrated for; mirrored in
+  // server-side validate.ts page width bounds.
+  const DEFAULT_PAGE_WIDTH_PX = 1440;
+  // Co-edit reconnect curve. Mirrors src/live/co-edit/client.ts defaults so
+  // the editor host advertises the same backoff the underlying connector
+  // applies. Base * 2^attempt, capped, then multiplied by [0.5, 1.0) jitter.
+  const COEDIT_RECONNECT_BASE_DELAY_MS = 1000;
+  const COEDIT_RECONNECT_MAX_DELAY_MS = 30000;
+  // Give-up threshold for the co-edit reconnect loop. Past this many
+  // consecutive failed attempts we stop retrying and tell the user to reload
+  // — silent infinite reconnects mask a real outage and burn the user's
+  // battery. Loud failure beats a fake "still connected" UI.
+  const COEDIT_RECONNECT_MAX_ATTEMPTS = 10;
   // Text element font bounds. Mirror src/canvas/validate.ts (server enforces
   // the same range on PUT). If you change either side here, mirror it there
   // or the server will reject what the inspector accepts.
@@ -1043,7 +1057,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       id: newPageId(),
       slug: "page-" + idx,
       title: "Page " + idx,
-      width: 1440,
+      width: DEFAULT_PAGE_WIDTH_PX,
       sections: [
         {
           id: newSectionId(),
@@ -2078,9 +2092,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     dupBtn.className = "menu-item";
     dupBtn.textContent = "Duplicate";
     dupBtn.addEventListener("click", function() {
+      // Duplicate is only surfaced once a section is already rendered, which
+      // requires state.pages to be non-empty. A missing currentPage() here
+      // means state went sideways between render and the click — fail loudly
+      // instead of clamping against an invented width.
+      var page = currentPage();
+      if (!page) throw new Error("duplicate element: no current page; cannot clamp duplicate within artboard");
       var copy = JSON.parse(JSON.stringify(element));
       copy.id = newElementId();
-      copy.box.x = Math.min(copy.box.x + 20, (currentPage() ? currentPage().width : 1440) - copy.box.w);
+      copy.box.x = Math.min(copy.box.x + 20, page.width - copy.box.w);
       copy.box.y = Math.min(copy.box.y + 20, section.height - copy.box.h);
       copy.box.z = nextZ(section);
       section.elements.push(copy);
@@ -2281,7 +2301,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function pageRenderWidth(page) {
-    if (!page) return 1440;
+    // Every call site passes a page resolved from state.pages (renderAll's
+    // iteration, applyPageStyles' artboard lookup, applyPageStyleProperties'
+    // per-page render). A null page here means the caller passed a dangling
+    // reference — fail loudly instead of inventing a default width that
+    // misaligns the artboard against the real page model.
+    if (!page) throw new Error("pageRenderWidth: page is null; caller passed a dangling page reference");
     return page.maxWidth != null && page.maxWidth < page.width ? page.maxWidth : page.width;
   }
 
@@ -8528,23 +8553,55 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var scheme = location.protocol === "https:" ? "wss:" : "ws:";
     var wsUrl = scheme + "//" + location.host + "/__live?siteId=" + encodeURIComponent(SITE_ID) + (WS_TOKEN ? "&wsToken=" + encodeURIComponent(WS_TOKEN) : "");
 
+    // Consecutive failed reconnect attempts since the last successful open.
+    // The "open" handler resets this so a long-stable connection that later
+    // drops restarts retries at the base delay rather than the last cap.
+    // When this crosses COEDIT_RECONNECT_MAX_ATTEMPTS, we stop retrying and
+    // call destroy() on the connection so the underlying client.ts no longer
+    // schedules further reconnects; the user must reload to recover.
+    var reconnectAttempt = 0;
+    var givenUp = false;
+
     coEditSocketOpen = false;
     var conn = window.__rev01CoEdit.connectCoEdit(SITE_ID, state, {
       websocketUrl: wsUrl,
+      // Mirrors src/live/co-edit/client.ts defaults so the curve advertised
+      // here matches what the connector actually applies. Passed explicitly
+      // (instead of relying on defaults) so the editor host's reconnect
+      // behaviour is self-documenting at this call site.
+      reconnectDelayMs: COEDIT_RECONNECT_BASE_DELAY_MS,
+      reconnectMaxDelayMs: COEDIT_RECONNECT_MAX_DELAY_MS,
       websocketFactory: function(url) {
         var socket = new WebSocket(url);
         socket.addEventListener("open", function() {
+          // Successful re-handshake — reset the attempt counter so any future
+          // outage starts retries fresh instead of continuing the escalation.
+          reconnectAttempt = 0;
           coEditSocketOpen = true;
           coEditSync();
           setStatus("Synced", "ok");
         });
         socket.addEventListener("close", function() {
           coEditSocketOpen = false;
-          setStatus("Co-edit disconnected; changes not saved", "error");
+          if (givenUp) return;
+          reconnectAttempt += 1;
+          if (reconnectAttempt > COEDIT_RECONNECT_MAX_ATTEMPTS) {
+            givenUp = true;
+            // Stop the underlying client.ts reconnect loop so it doesn't keep
+            // scheduling timers behind a UI that has already given up.
+            if (coEditConnection) {
+              try { coEditConnection.destroy(); } catch (_) { /* noop */ }
+            }
+            console.error("[co-edit] reconnect gave up after " + COEDIT_RECONNECT_MAX_ATTEMPTS + " attempts; user must reload");
+            setStatus("Co-edit lost — refresh the page to reconnect", "error");
+            return;
+          }
+          setStatus("Co-edit disconnected; reconnecting (" + reconnectAttempt + "/" + COEDIT_RECONNECT_MAX_ATTEMPTS + ")", "error");
         });
         socket.addEventListener("error", function() {
           coEditSocketOpen = false;
-          setStatus("Co-edit failed; changes not saved", "error");
+          // Let the close handler drive the reconnect counter — error+close
+          // both fire on some browsers and we want one increment per failure.
         });
         return socket;
       },
@@ -8583,6 +8640,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     coEditConnection = conn;
 
     window.addEventListener("beforeunload", function() {
+      // Mark as given-up so any in-flight close event on the way out doesn't
+      // try to setStatus or schedule another retry while the page is tearing
+      // down. destroy() cancels the connector's pending reconnect timer too.
+      givenUp = true;
       coEditSocketOpen = false;
       conn.destroy();
     });
