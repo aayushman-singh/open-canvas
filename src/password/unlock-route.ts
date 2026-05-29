@@ -254,7 +254,7 @@ router.post('/', async (c) => {
   // Localhost dev runs over plain HTTP; Chrome silently drops `Secure`
   // cookies on http://. Detect that and drop the flag in dev.
   const secure = requestUrl.protocol === 'https:';
-  const cookieHeader = buildUnlockCookieHeader({
+  const cookieHeader = buildUnlockCookieHeader(c.env, {
     siteId: siteRow.id,
     value: token,
     secure,

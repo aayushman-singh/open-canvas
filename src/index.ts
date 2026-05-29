@@ -143,8 +143,9 @@ app.route('/api/on-site-edit', onSiteEditRoute);
 // On-site editor API proxy — same ownerApi handlers as /api/* but gated by
 // edit-token auth instead of the dashboard's Clerk session. The public host
 // router (public.ts) returns null for /__api/* paths so they fall through
-// here. editTokenAuth() validates the __rev01_edit cookie and populates the
-// same auth context variables that clerkAuth()+requireAuth() would, so each
+// here. editTokenAuth() validates the edit-token cookie (name derived from
+// `cookieName.edit(env)` per ADR 0017) and populates the same auth context
+// variables that clerkAuth()+requireAuth() would, so each
 // inner sub-app's built-in clerkAuth() short-circuits (auth already set).
 app.use('/__api/*', editTokenAuth());
 // /__api/edit-token must be mounted BEFORE the ownerApi catch-all because

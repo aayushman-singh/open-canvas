@@ -109,7 +109,7 @@ export async function requireUnlock(
   }
 
   const cookieHeader = c.req.header('cookie') ?? null;
-  const cookieValue = readUnlockCookieFromHeader(cookieHeader, site.id);
+  const cookieValue = readUnlockCookieFromHeader(env, cookieHeader, site.id);
   if (cookieValue.length > 0) {
     const payload = await verifyUnlockCookie(env.UNLOCK_SIGNING_SECRET, cookieValue, {
       siteId: site.id,

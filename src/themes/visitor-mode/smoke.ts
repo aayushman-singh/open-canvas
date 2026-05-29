@@ -26,12 +26,22 @@
 
 import type { StyleKitPreset } from '../../canvas/schema.js';
 import { getStyleKitPreset } from '../../canvas/style-kits.js';
+import { cookieName, type HostConfigEnv } from '../../host-config.js';
 
 import { resolveBuiltInDark } from './built-in-darks.js';
 import { emitDualModeCss } from './css-emit.js';
-import { getModeSetterScript, MODE_SETTER_SCRIPT } from './inline-script.js';
+import { getModeSetterScript } from './inline-script.js';
 import { resolveStyleKitForMode, withBuiltInDark } from './resolve.js';
-import { renderModeToggleHtml, MODE_TOGGLE_SCRIPT } from './toggle-element.js';
+import { renderModeToggleHtml, buildModeToggleScript } from './toggle-element.js';
+
+// Per ADR 0013 dec 7 + ADR 0017 dec 1, the smoke asserts the contract
+// against an injected env, never a brand literal.
+const SMOKE_ENV: HostConfigEnv = {
+  APP_DOMAIN: 'opencanvas.aayushman.dev',
+  AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
+};
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[visitor-mode:smoke] ${message}`);
@@ -73,22 +83,22 @@ assert(
 // Test 2 — early mode-setter script: size budget, contents, and parseability.
 // --------------------------------------------------------------------------
 
-const setterScript = getModeSetterScript();
+const setterScript = getModeSetterScript(SMOKE_ENV);
 assert(
-  setterScript === MODE_SETTER_SCRIPT,
-  'expected getModeSetterScript() and MODE_SETTER_SCRIPT constant to be the same string',
+  getModeSetterScript(SMOKE_ENV) === setterScript,
+  'expected getModeSetterScript(env) to be deterministic for the same env',
 );
 assert(
-  setterScript.length <= 200,
-  `expected mode-setter script ≤200 chars, got ${String(setterScript.length)}: ${setterScript}`,
+  setterScript.length <= 220,
+  `expected mode-setter script ≤220 chars, got ${String(setterScript.length)}: ${setterScript}`,
 );
 assert(
   setterScript.includes('data-mode'),
   `expected mode-setter script to mention data-mode, got: ${setterScript}`,
 );
 assert(
-  setterScript.includes('__rev01_cs'),
-  `expected mode-setter script to reference the cookie name __rev01_cs, got: ${setterScript}`,
+  setterScript.includes(cookieName.colorScheme(SMOKE_ENV)),
+  `expected mode-setter script to reference the env-derived cookie name ${cookieName.colorScheme(SMOKE_ENV)}, got: ${setterScript}`,
 );
 // Parse-only sandbox: wrap in a `new Function` so it is parsed at construction
 // time; this throws a SyntaxError if the script is malformed. We do NOT
@@ -115,7 +125,7 @@ assert(!scriptParseThrew, 'expected mode-setter script to parse cleanly');
 // Test 3 — renderModeToggleHtml emits a button with aria-pressed.
 // --------------------------------------------------------------------------
 
-const toggleHtml = renderModeToggleHtml();
+const toggleHtml = renderModeToggleHtml(SMOKE_ENV);
 assert(
   toggleHtml.includes('<button '),
   `expected toggle HTML to include a <button> element, got: ${toggleHtml.slice(0, 200)}`,
@@ -134,9 +144,14 @@ assert(
 );
 // The inline script must also be embedded for the standalone toggle to work
 // without a separate <script> tag.
+const expectedToggleScript = buildModeToggleScript(SMOKE_ENV);
 assert(
-  toggleHtml.includes(MODE_TOGGLE_SCRIPT.trim().slice(0, 40)),
-  'expected toggle HTML to embed the MODE_TOGGLE_SCRIPT body',
+  toggleHtml.includes(expectedToggleScript.trim().slice(0, 40)),
+  'expected toggle HTML to embed the env-derived toggle script body',
+);
+assert(
+  expectedToggleScript.includes(`COOKIE='${cookieName.colorScheme(SMOKE_ENV)}'`),
+  `expected toggle script to interpolate the env-derived cookie name, got: ${expectedToggleScript}`,
 );
 
 // --------------------------------------------------------------------------

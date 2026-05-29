@@ -1,9 +1,10 @@
 # ADR 0017 — Cookie name prefix is environment-driven
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** OSS-fork rebranding for cookie names. Follows the same shape as [ADR 0013](0013-host-config-from-environment.md); flagged as a follow-up in 0013's out-of-scope.
+**Accepted-context:** Accepted on 2026-05-29 alongside the rev01 → opencanvas rebrand. The cookie prefix had to move with the apex; deferring this ADR would have left `__rev01_` cookies on `opencanvas.aayushman.dev` and shipped the OSS fork story without the cookie-rename leg working.
 
 ## Context
 

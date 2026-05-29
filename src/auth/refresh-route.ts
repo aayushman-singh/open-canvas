@@ -15,10 +15,9 @@ import {
   verifyEditToken,
   signEditToken,
   buildEditTokenCookieHeader,
-  EDIT_TOKEN_COOKIE,
   EDIT_TOKEN_MAX_AGE,
 } from './edit-token';
-import type { HostConfigEnv } from '../host-config';
+import { cookieName, type HostConfigEnv } from '../host-config';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -31,7 +30,7 @@ type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 const refreshRoute = new Hono<Env>();
 
 refreshRoute.post('/refresh', async (c) => {
-  const token = getCookie(c, EDIT_TOKEN_COOKIE);
+  const token = getCookie(c, cookieName.edit(c.env));
   const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
   if (!payload) {
     return c.json({ error: 'unauthorized' }, 401);

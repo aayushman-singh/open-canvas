@@ -8,7 +8,7 @@
 // the /?edit handler verify ownership without a Clerk session cookie on the
 // subdomain.
 
-import { cookieDomain, publicHostSuffix, type HostConfigEnv } from '../host-config';
+import { cookieDomain, cookieName, publicHostSuffix, type HostConfigEnv } from '../host-config';
 import { signJWT, verifyJWT } from './jwt';
 
 export interface EditTokenPayload {
@@ -51,7 +51,6 @@ export async function verifyEditToken(
   return result.payload as unknown as EditTokenPayload;
 }
 
-export const EDIT_TOKEN_COOKIE = '__rev01_edit';
 export const EDIT_TOKEN_MAX_AGE = TTL_SECONDS;
 
 // The cookie scope depends on which host issues it. On any host under the
@@ -72,7 +71,7 @@ export function buildEditTokenCookieHeader(
   const host = requestHost.toLowerCase();
   const onApex = host === apex || host.endsWith(suffix);
   const parts = [
-    `${EDIT_TOKEN_COOKIE}=${token}`,
+    `${cookieName.edit(env)}=${token}`,
     ...(onApex ? [`Domain=${apex}`] : []),
     'Path=/',
     'HttpOnly',

@@ -12,27 +12,30 @@
 //
 // The toggle script (also returned by this module) is small (~15 lines): it
 // reads the current `data-mode` from `<html>`, flips it, writes the cookie,
-// and updates `aria-pressed`. It is identical across sites — there is no
-// per-request templating, so the result is module-level cached.
+// and updates `aria-pressed`. The cookie name is env-derived
+// (`cookieName.colorScheme(env)` per ADR 0017), so the script and the
+// wrapping HTML are templated per request rather than module-level cached.
 //
 // Why a string, not JSX: this module is consumed by the public renderer's
 // HTML emitter. The renderer stamps strings into the body HTML it returns;
 // everything has to be a self-contained chunk. JSX through hono/html would
 // work too, but a string keeps the path simple — the toggle has no dynamic
-// content.
+// content beyond the cookie name.
+
+import { cookieName, type HostConfigEnv } from '../../host-config.js';
 
 /**
  * The HTML for the mode-toggle button, including its inline script. Drop
  * this string into the body where the toggle should appear. The script is
  * inert until the visitor clicks; first-paint mode is already correct
- * thanks to `getModeSetterScript()` running earlier.
+ * thanks to `getModeSetterScript(env)` running earlier.
  *
  * The returned HTML uses a wrapper `<div data-rev01-mode-toggle-mount>` so
  * the toggle script can find the button even when multiple toggles exist on
  * one page (it queries all `[data-rev01-mode-toggle]` buttons and wires
  * each independently).
  */
-export function renderModeToggleHtml(): string {
+export function renderModeToggleHtml(env: HostConfigEnv): string {
   // The button starts with `aria-pressed="false"` (light = unpressed). The
   // toggle script flips it on mount to match the actual stamped `data-mode`
   // (because the visitor may have arrived in dark mode via cookie /
@@ -46,16 +49,20 @@ export function renderModeToggleHtml(): string {
     `<svg class="rev01-mode-toggle__sun" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>` +
     `<svg class="rev01-mode-toggle__moon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>` +
     `</button>`;
-  return `<div data-rev01-mode-toggle-mount>${button}<style>${MODE_TOGGLE_STYLES}</style><script>${MODE_TOGGLE_SCRIPT}</script></div>`;
+  return `<div data-rev01-mode-toggle-mount>${button}<style>${MODE_TOGGLE_STYLES}</style><script>${buildModeToggleScript(env)}</script></div>`;
 }
 
 /**
  * Standalone toggle SCRIPT — exported so a future caller (e.g. auto-injection
  * near nav) can wire it up to its own DOM without needing the wrapper HTML.
+ * The script reads and writes the env-configured color-scheme cookie name
+ * (`cookieName.colorScheme(env)`) and is otherwise identical across sites.
  */
-export const MODE_TOGGLE_SCRIPT: string = String.raw`
+export function buildModeToggleScript(env: HostConfigEnv): string {
+  const cookie = cookieName.colorScheme(env);
+  return String.raw`
 (function(){
-  var COOKIE='__rev01_cs';
+  var COOKIE='${cookie}';
   function read(){return document.documentElement.getAttribute('data-mode')==='dark'?'dark':'light';}
   function write(mode){
     document.documentElement.setAttribute('data-mode',mode);
@@ -73,6 +80,7 @@ export const MODE_TOGGLE_SCRIPT: string = String.raw`
   document.querySelectorAll('[data-rev01-mode-toggle]').forEach(wire);
 })();
 `;
+}
 
 /**
  * Tiny stylesheet for the toggle. Self-contained so the public stylesheet

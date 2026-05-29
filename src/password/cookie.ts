@@ -5,10 +5,12 @@
 // middleware reads it on every subsequent visitor request to short-circuit
 // the gate.
 //
-// Cookie name: `__rev01_unlock_<siteId>`. Per-site scoping means a Visitor
-// who unlocks site A does not get a free pass on site B even if both run on
-// the same host (the wildcard subdomain under the configured apex shares cookies across
-// subdomains by default — the cookie name prefix is what segregates them).
+// Cookie name: `${COOKIE_NAME_PREFIX}unlock_<siteId>` derived from env via
+// `cookieName.unlock(env, siteId)` per ADR 0017. Per-site scoping means a
+// Visitor who unlocks site A does not get a free pass on site B even if
+// both run on the same host (the wildcard subdomain under the configured
+// apex shares cookies across subdomains by default — the per-site suffix
+// is what segregates them).
 //
 // JWT payload shape:
 //   {
@@ -33,6 +35,8 @@
 // signature / shape error. The middleware treats null as "show the gate"
 // — no half-trusted fallback, no "skip verification on parse error". A
 // tampered cookie is functionally identical to no cookie at all.
+
+import { cookieName, type HostConfigEnv } from '../host-config.js';
 
 const ALGO_HEADER = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
   .replace(/=+$/, '')
@@ -195,25 +199,13 @@ export async function verifyUnlockCookie(
 /**
  * Build a complete `Set-Cookie` header value for the unlock JWT. The cookie
  * name embeds the siteId so per-site scoping survives the cookie-jar
- * collapse on the shared apex parent domain (see ADR 0013).
+ * collapse on the shared apex parent domain (see ADR 0013). The name itself
+ * derives from `cookieName.unlock(env, siteId)` per ADR 0017.
  *
  * `Secure` is forced ON in production; the caller may pass `secure: false`
  * for localhost dev where Workers serves over plain HTTP and Chrome will
  * silently drop `Secure` cookies.
  */
-export function unlockCookieName(siteId: string): string {
-  if (typeof siteId !== 'string' || siteId.length === 0) {
-    throw new Error('unlockCookieName: siteId must be a non-empty string');
-  }
-  // The cookie name must be a `token` per RFC 6265 — letters, digits, and a
-  // handful of separators. Our site ids are UUIDs (hex + hyphens), which are
-  // valid tokens; we sanity-check anyway so a future id-format change can't
-  // produce an invalid header.
-  if (!/^[A-Za-z0-9_-]+$/.test(siteId)) {
-    throw new Error(`unlockCookieName: siteId contains invalid characters: ${siteId}`);
-  }
-  return `__rev01_unlock_${siteId}`;
-}
 
 export interface BuildCookieHeaderInput {
   siteId: string;
@@ -224,8 +216,8 @@ export interface BuildCookieHeaderInput {
   secure?: boolean;
 }
 
-export function buildUnlockCookieHeader(input: BuildCookieHeaderInput): string {
-  const name = unlockCookieName(input.siteId);
+export function buildUnlockCookieHeader(env: HostConfigEnv, input: BuildCookieHeaderInput): string {
+  const name = cookieName.unlock(env, input.siteId);
   const maxAge = input.maxAgeSeconds ?? DEFAULT_TTL_SECONDS;
   const secure = input.secure !== false;
   const parts = [
@@ -245,8 +237,12 @@ export function buildUnlockCookieHeader(input: BuildCookieHeaderInput): string {
  * cookies do NOT auto-clear (Visitors keep their per-browser cookie until
  * expiry), but the Owner's preview tab can be cleared on disable.
  */
-export function buildUnlockCookieClearHeader(siteId: string, secure = true): string {
-  const name = unlockCookieName(siteId);
+export function buildUnlockCookieClearHeader(
+  env: HostConfigEnv,
+  siteId: string,
+  secure = true,
+): string {
+  const name = cookieName.unlock(env, siteId);
   const parts = [`${name}=`, 'Path=/', 'Max-Age=0', 'HttpOnly', 'SameSite=Lax'];
   if (secure) parts.push('Secure');
   return parts.join('; ');
@@ -257,9 +253,13 @@ export function buildUnlockCookieClearHeader(siteId: string, secure = true): str
  * empty string when the cookie is not present — the caller treats that as
  * "no cookie, show gate".
  */
-export function readUnlockCookieFromHeader(cookieHeader: string | null, siteId: string): string {
+export function readUnlockCookieFromHeader(
+  env: HostConfigEnv,
+  cookieHeader: string | null,
+  siteId: string,
+): string {
   if (!cookieHeader) return '';
-  const name = unlockCookieName(siteId);
+  const name = cookieName.unlock(env, siteId);
   // Cookie header is a `; `-separated list of `name=value` pairs. We split
   // by `;` (the canonical separator) and tolerate any whitespace either side
   // of the `=` so a non-standard producer can't poison the parse.

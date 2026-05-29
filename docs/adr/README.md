@@ -20,6 +20,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0008 | Site import architecture | Accepted | [`docs/adr/0008-site-import-architecture.md`](0008-site-import-architecture.md) |
 | 0009 | Addon entitlement model: account-scoped purchase, site-scoped configuration | Accepted | [`docs/adr/0009-addon-entitlement-model.md`](0009-addon-entitlement-model.md) |
 | 0013 | Apex host is environment-driven; production code reads it through one helper | Accepted | [`docs/adr/0013-host-config-from-environment.md`](0013-host-config-from-environment.md) |
+| 0017 | Cookie name prefix is environment-driven | Accepted | [`docs/adr/0017-cookie-name-prefix-from-env.md`](0017-cookie-name-prefix-from-env.md) |
 | 0018 | Email sender address is environment-driven | Accepted | [`docs/adr/0018-email-sender-from-env.md`](0018-email-sender-from-env.md) |
 | 0019 | `SectionRecipeId 'custom'` is the sentinel for manually-designed sections | Accepted | [`docs/adr/0019-section-recipe-custom-sentinel.md`](0019-section-recipe-custom-sentinel.md) |
 

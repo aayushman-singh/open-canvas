@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SIGN_OUT_COOKIE_NAMES, buildExpiredSignOutCookieHeaders } from './sign-out-route.js';
-import { EDIT_TOKEN_COOKIE } from './edit-token.js';
-import type { HostConfigEnv } from '../host-config.js';
+import { signOutCookieNames, buildExpiredSignOutCookieHeaders } from './sign-out-route.js';
+import { cookieName, type HostConfigEnv } from '../host-config.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[sign-out-route:smoke] ${message}`);
@@ -11,20 +10,22 @@ function assert(condition: unknown, message: string): asserts condition {
 
 const source = readFileSync(join(process.cwd(), 'src', 'auth', 'sign-out-route.ts'), 'utf8');
 
-assert(
-  SIGN_OUT_COOKIE_NAMES.includes(EDIT_TOKEN_COOKIE),
-  'sign-out must clear the on-site editor auth cookie as well as Clerk cookies',
-);
-
-// Test against an injected APP_DOMAIN (ADR 0013 decision 7) — the smoke
-// asserts the contract (cookie scoped to the configured apex when the host
-// is the apex / a sub-host), not a specific brand literal.
+// Test against an injected APP_DOMAIN + COOKIE_NAME_PREFIX (ADR 0013 dec 7,
+// ADR 0017 dec 1) — the smoke asserts the contract (cookie scoped to the
+// configured apex when the host is the apex / a sub-host, with a name
+// derived from the configured prefix), not a specific brand literal.
 const testEnv: HostConfigEnv = {
   APP_DOMAIN: 'opencanvas.aayushman.dev',
   AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
   COOKIE_NAME_PREFIX: '__opencanvas_',
   EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
 };
+
+assert(
+  signOutCookieNames(testEnv).includes(cookieName.edit(testEnv)),
+  'sign-out must clear the on-site editor auth cookie as well as Clerk cookies',
+);
+
 const prodHeaders = buildExpiredSignOutCookieHeaders(
   testEnv,
   new URL(`https://${testEnv.APP_DOMAIN}/sign-out`),
@@ -32,7 +33,7 @@ const prodHeaders = buildExpiredSignOutCookieHeaders(
 assert(
   prodHeaders.some(
     (header) =>
-      header.startsWith(`${EDIT_TOKEN_COOKIE}=`) &&
+      header.startsWith(`${cookieName.edit(testEnv)}=`) &&
       header.includes(`Domain=${testEnv.APP_DOMAIN}`) &&
       header.includes('Max-Age=0'),
   ),

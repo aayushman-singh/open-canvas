@@ -26,13 +26,22 @@ import {
   buildUnlockCookieHeader,
   readUnlockCookieFromHeader,
   signUnlockCookie,
-  unlockCookieName,
   verifyUnlockCookie,
 } from './cookie.js';
 import { renderGateHtml, sanitiseRedirect } from './gate.js';
 import { hashPassword, verifyPassword } from './hash.js';
 import { requireUnlock, type PasswordProtectedSite, type RequireUnlockEnv } from './middleware.js';
 import { InProcessRateLimiter } from './rate-limit.js';
+import { cookieName, type HostConfigEnv } from '../host-config.js';
+
+// Test env reused across suites. Per ADR 0013 dec 7 + ADR 0017 dec 1, the
+// smoke asserts the contract against an injected env, never a brand literal.
+const SMOKE_ENV: HostConfigEnv = {
+  APP_DOMAIN: 'opencanvas.aayushman.dev',
+  AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
+};
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[password:smoke] ${message}`);
@@ -175,9 +184,9 @@ async function runCookieSuite(): Promise<void> {
   assert(afterRotation === null, 'cookie predating current passwordSetAt should reject');
 
   // Cookie header round-trip.
-  const headerValue = buildUnlockCookieHeader({ siteId, value: token });
+  const headerValue = buildUnlockCookieHeader(SMOKE_ENV, { siteId, value: token });
   assert(
-    headerValue.includes(`${unlockCookieName(siteId)}=${token}`),
+    headerValue.includes(`${cookieName.unlock(SMOKE_ENV, siteId)}=${token}`),
     'cookie header missing value',
   );
   assert(headerValue.includes('HttpOnly'), 'cookie header missing HttpOnly');
@@ -185,10 +194,10 @@ async function runCookieSuite(): Promise<void> {
   assert(headerValue.includes('Secure'), 'cookie header missing Secure by default');
 
   // Read back from a Cookie header string.
-  const requestCookieHeader = `other=foo; ${unlockCookieName(siteId)}=${token}; tail=bar`;
-  const readBack = readUnlockCookieFromHeader(requestCookieHeader, siteId);
+  const requestCookieHeader = `other=foo; ${cookieName.unlock(SMOKE_ENV, siteId)}=${token}; tail=bar`;
+  const readBack = readUnlockCookieFromHeader(SMOKE_ENV, requestCookieHeader, siteId);
   assert(readBack === token, 'readUnlockCookieFromHeader should extract the token');
-  const missing = readUnlockCookieFromHeader('foo=bar', siteId);
+  const missing = readUnlockCookieFromHeader(SMOKE_ENV, 'foo=bar', siteId);
   assert(missing === '', 'absent cookie should read as empty string');
 }
 
@@ -222,11 +231,8 @@ function makeContext(url: string, cookieHeader: string | null): FakeContext {
 async function runMiddlewareSuite(): Promise<void> {
   const secret = 'middleware-test-secret';
   const env: RequireUnlockEnv = {
+    ...SMOKE_ENV,
     UNLOCK_SIGNING_SECRET: secret,
-    APP_DOMAIN: 'opencanvas.aayushman.dev',
-    AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
-    COOKIE_NAME_PREFIX: '__opencanvas_',
-    EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
   };
   const passwordSetAt = new Date('2026-05-23T12:00:00Z');
   const hash = await hashPassword('letmein');
@@ -265,7 +271,7 @@ async function runMiddlewareSuite(): Promise<void> {
     siteId: protectedSite.id,
     passwordSetAt,
   });
-  const cookieHeader = `${unlockCookieName(protectedSite.id)}=${token}`;
+  const cookieHeader = `${cookieName.unlock(SMOKE_ENV, protectedSite.id)}=${token}`;
   const cWithCookie = makeContext('https://x.opencanvas.aayushman.dev/about', cookieHeader);
   const r3 = await requireUnlock(cWithCookie as never, env, protectedSite);
   assert(r3 === null, 'valid cookie should pass through');
@@ -275,7 +281,7 @@ async function runMiddlewareSuite(): Promise<void> {
     siteId: protectedSite.id,
     passwordSetAt: new Date('2026-05-23T11:00:00Z'),
   });
-  const staleCookie = `${unlockCookieName(protectedSite.id)}=${staleToken}`;
+  const staleCookie = `${cookieName.unlock(SMOKE_ENV, protectedSite.id)}=${staleToken}`;
   const cStale = makeContext('https://x.opencanvas.aayushman.dev/about', staleCookie);
   const r4 = await requireUnlock(cStale as never, env, protectedSite);
   assert(r4 !== null, 'stale-hashEpoch cookie should be rejected');

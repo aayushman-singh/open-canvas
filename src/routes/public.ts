@@ -24,7 +24,6 @@ import { resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
 import {
   type EditTokenPayload,
   verifyEditToken,
-  EDIT_TOKEN_COOKIE,
   signEditToken,
   buildEditTokenCookieHeader,
 } from '../auth/edit-token';
@@ -74,6 +73,7 @@ import {
 import {
   appDomain,
   appOrigin,
+  cookieName,
   publicHostSuffix,
   type HostConfigEnv,
 } from '../host-config';
@@ -421,7 +421,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     }
   }
 
-  const token = getCookie(c, EDIT_TOKEN_COOKIE);
+  const token = getCookie(c, cookieName.edit(c.env));
   const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
 
   if (!payload || payload.siteId !== siteRow.id) {
@@ -999,7 +999,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   let modeSetterScript = '';
   if (darkModeEnabled) {
     dualModeCss = emitDualModeCss(resolvedKit, renderSnapshot.styleKit);
-    modeSetterScript = getModeSetterScript();
+    modeSetterScript = getModeSetterScript(c.env);
   }
 
   const addonScripts = await emitAddonHeadScripts(db(c.env), siteRow.id);

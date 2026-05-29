@@ -7,12 +7,13 @@ import { db } from '../db/client';
 import { site } from '../db/schema';
 import {
   authorizedParties,
+  cookieName,
   publicHostSuffix,
   resolveDevPublicOrigin,
   type HostConfigEnv,
 } from '../host-config';
 import { upsertCustomerFromClerk } from './customer-upsert';
-import { EDIT_TOKEN_COOKIE, verifyEditToken } from './edit-token';
+import { verifyEditToken } from './edit-token';
 
 export type AuthState = {
   userId: string | null;
@@ -278,8 +279,9 @@ export function clerkAuth() {
 }
 
 // Middleware for /__api/* routes on published-site subdomains. Validates the
-// __rev01_edit cookie (set by the /api/on-site-edit popup) and populates the
-// same auth / user / clerk context variables that clerkAuth() would, so
+// edit-token cookie (set by the /api/on-site-edit popup; name derived from
+// `cookieName.edit(env)` per ADR 0017) and populates the same
+// auth / user / clerk context variables that clerkAuth() would, so
 // downstream handlers (canvasApi, publishApi, etc.) work unchanged.
 type EditTokenBindings = ClerkBindings & { UNLOCK_SIGNING_SECRET: string };
 
@@ -325,7 +327,7 @@ export function editTokenAuth() {
     Bindings: EditTokenBindings & { DATABASE_URL: string };
     Variables: ClerkAuthVariables;
   }>(async (c, next) => {
-    const token = getCookie(c, EDIT_TOKEN_COOKIE);
+    const token = getCookie(c, cookieName.edit(c.env));
     const payload = await verifyEditToken(token, c.env.UNLOCK_SIGNING_SECRET);
     if (!payload) {
       return c.json({ error: 'unauthorized' }, 401);

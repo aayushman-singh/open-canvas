@@ -22,8 +22,7 @@
 
 import { Hono, type Context } from 'hono';
 
-import { cookieDomain, publicHostSuffix, type HostConfigEnv } from '../host-config.js';
-import { EDIT_TOKEN_COOKIE } from './edit-token.js';
+import { cookieDomain, cookieName, publicHostSuffix, type HostConfigEnv } from '../host-config.js';
 import { clerkAuth, type ClerkAuthVariables } from './middleware.js';
 
 type Bindings = HostConfigEnv & {
@@ -40,17 +39,20 @@ const signOutRoute = new Hono<SignOutEnv>();
 // Clerk cookie names - sourced from the official docs' production /
 // development instance cookies tables. Listed exhaustively so a future
 // Clerk SDK update that ships a new cookie still leaves us clearing the
-// known ones.
-
-export const SIGN_OUT_COOKIE_NAMES = [
+// known ones. The edit-token cookie name is env-derived (ADR 0017),
+// so the full list is built per-request from `signOutCookieNames(env)`.
+const CLERK_SIGN_OUT_COOKIE_NAMES = [
   '__session',
   '__client_uat',
   '__clerk_db_jwt',
   '__clerk_handshake',
   '__clerk_handshake_nonce',
   '__refresh',
-  EDIT_TOKEN_COOKIE,
 ] as const;
+
+export function signOutCookieNames(env: HostConfigEnv): readonly string[] {
+  return [...CLERK_SIGN_OUT_COOKIE_NAMES, cookieName.edit(env)];
+}
 
 function expiredCookieHeader(name: string, secure: boolean, domain?: string): string {
   const parts = [
@@ -80,7 +82,7 @@ export function buildExpiredSignOutCookieHeaders(
   }
 
   const headers: string[] = [];
-  for (const name of SIGN_OUT_COOKIE_NAMES) {
+  for (const name of signOutCookieNames(env)) {
     for (const domain of domains) {
       headers.push(expiredCookieHeader(name, secure, domain));
     }

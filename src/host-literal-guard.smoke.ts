@@ -1,18 +1,20 @@
 // src/host-literal-guard.smoke.ts
 //
-// ADR 0013 follow-up #5 — assert no literal `rev01.aayushman.dev` (or any
-// other canonical-apex literal) remains in production code outside the
-// designated exceptions. Catches regressions where a contributor adds
-// hardcoded apex strings to a new file without going through `host-config.ts`.
+// ADR 0013 follow-up #5 + ADR 0017 follow-up — assert no literal
+// `rev01.aayushman.dev` (apex) or `__rev01_` (cookie name prefix) remains
+// in production code outside the designated exceptions. Catches
+// regressions where a contributor adds hardcoded brand strings to a new
+// file without going through `host-config.ts`.
 //
 // Allowed exceptions:
-//   - `src/host-literal-guard.smoke.ts` (this file — the literal lives here
+//   - `src/host-literal-guard.smoke.ts` (this file — the literals live here
 //     as the search target).
 //   - `src/canvas/fixtures/**` (seed JSON data; ADR 0013 out-of-scope #6).
 //   - `src/templates/seeds/**` (seed template content; ADR 0013 out-of-scope #6).
 //
 // Files matching `*.smoke.ts` are NOT exempt — smokes must pin against an
-// injected test APP_DOMAIN per ADR 0013 decision 7.
+// injected test APP_DOMAIN / COOKIE_NAME_PREFIX per ADR 0013 decision 7
+// and ADR 0017 decision 1.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
@@ -23,7 +25,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)));
-const FORBIDDEN_LITERALS = ['rev01.aayushman.dev'] as const;
+const FORBIDDEN_LITERALS = ['rev01.aayushman.dev', '__rev01_'] as const;
 const SELF_PATH = fileURLToPath(import.meta.url);
 
 const EXEMPT_PREFIXES = [
