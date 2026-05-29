@@ -5,31 +5,56 @@ import type { HostConfigEnv } from '../host-config';
 type ClerkBindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
+  CLERK_FRONTEND_API_URL?: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
 };
 
-// Derives the Account Portal origin from the publishable key.
+// Derives the Account Portal origin.
 //
-// pk_test_: frontend host shape is `<slug>.clerk.accounts.dev` — portal is at
-// `<slug>.accounts.dev` (drop the `.clerk.` segment).
+// When `CLERK_FRONTEND_API_URL` is set, the frontend API host is read from
+// there. Otherwise we fall back to decoding it out of the publishable key.
 //
-// pk_live_: frontend host shape is `clerk.<root>` (Clerk's CNAME on your zone)
-// — portal is at `accounts.<root>` (swap the `clerk.` prefix for `accounts.`).
-function accountPortalOrigin(publishableKey: string): string {
-  const marker = publishableKey.startsWith('pk_test_')
-    ? 'pk_test_'
-    : publishableKey.startsWith('pk_live_')
-      ? 'pk_live_'
-      : null;
+// The env override exists because the publishable key encodes the frontend
+// host at issuance time — if a Clerk instance is later reconfigured to point
+// at a new CNAME without re-issuing keys (e.g. domain rebrand), the decoded
+// value goes stale and the redirect target points at a dead host. The env
+// var lets the operator override without rotating keys.
+//
+// Host shapes:
+//   pk_test_ → `<slug>.clerk.accounts.dev`. Portal at `<slug>.accounts.dev`
+//              (drop the `.clerk.` segment).
+//   pk_live_ → `clerk.<root>` (Clerk's CNAME on your zone). Portal at
+//              `accounts.<root>` (swap the `clerk.` prefix for `accounts.`).
+function accountPortalOrigin(publishableKey: string, frontendApiUrl?: string): string {
+  let frontendApi: string;
+  if (typeof frontendApiUrl === 'string' && frontendApiUrl.length > 0) {
+    let parsed: URL;
+    try {
+      parsed = new URL(frontendApiUrl);
+    } catch (error) {
+      throw new Error(`CLERK_FRONTEND_API_URL is not a valid URL: ${frontendApiUrl}`, {
+        cause: error,
+      });
+    }
+    frontendApi = parsed.host;
+  } else {
+    const marker = publishableKey.startsWith('pk_test_')
+      ? 'pk_test_'
+      : publishableKey.startsWith('pk_live_')
+        ? 'pk_live_'
+        : null;
 
-  if (!marker) {
-    throw new Error(`unrecognised Clerk publishable key prefix: ${publishableKey.slice(0, 8)}`);
+    if (!marker) {
+      throw new Error(
+        `unrecognised Clerk publishable key prefix: ${publishableKey.slice(0, 8)}`,
+      );
+    }
+
+    const encoded = publishableKey.slice(marker.length);
+    const decoded = atob(encoded);
+    frontendApi = decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
   }
-
-  const encoded = publishableKey.slice(marker.length);
-  const decoded = atob(encoded);
-  const frontendApi = decoded.endsWith('$') ? decoded.slice(0, -1) : decoded;
 
   let accountPortalHost: string;
   if (frontendApi.startsWith('clerk.')) {
@@ -43,8 +68,12 @@ function accountPortalOrigin(publishableKey: string): string {
   return `https://${accountPortalHost}`;
 }
 
-export function buildSignInUrl(publishableKey: string, redirectUrl: string): string {
-  const url = new URL('/sign-in', accountPortalOrigin(publishableKey));
+export function buildSignInUrl(
+  publishableKey: string,
+  redirectUrl: string,
+  frontendApiUrl?: string,
+): string {
+  const url = new URL('/sign-in', accountPortalOrigin(publishableKey, frontendApiUrl));
   url.searchParams.set('redirect_url', redirectUrl);
   return url.toString();
 }
@@ -83,7 +112,11 @@ export function requireAuth() {
     }
 
     const { publishableKey } = resolveClerkKeys(c.env);
-    const signInUrl = buildSignInUrl(publishableKey, resolveAuthRedirectUrl(c.env, c.req.url));
+    const signInUrl = buildSignInUrl(
+      publishableKey,
+      resolveAuthRedirectUrl(c.env, c.req.url),
+      c.env.CLERK_FRONTEND_API_URL,
+    );
     return c.redirect(signInUrl, 302);
   });
 }
