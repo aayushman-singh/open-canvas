@@ -447,3 +447,85 @@ After **four passes** against prod:
 **Across the script, roughly 25–30 beats are now flagged for script-rewrite.** None are blockers in the sense that recording is impossible — but if the script is read literally on camera, the action column will fail to fire on at least one beat in most sessions.
 
 Next reasonable step: a **dedicated script-fix sweep** to apply the rewrites listed above, then a final smoke pass to confirm each rewrite matches reality. After that the script can be recorded straight through.
+
+---
+
+# Pass 5 — sidebar UX fixes + S3-S7 surface drive (2026-05-29, late evening)
+
+Driven against prod after the 8 sidebar UX fixes (commit `25880ae`,
+deployed version `59494fc8`). Full Playwright trace and per-beat
+status in [drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md).
+
+## Verified live (no script change needed)
+
+- **All 8 sidebar UX fixes** — blank-canvas globally unselects + clears the inactive-page dim; inspector toggle button works (rapid-click can stall the 0.15s transition mid-flight, real-user pace is fine); left sidebar 360px; Versions tab underline clears on switch; brand-matching scrollbars on every editor scroll surface; landing demo sidebar mirrors the real editor; color hex inputs sync swatch↔hex (`#abc`→`#aabbcc`, invalid hex is a no-op); Replay all animations now stamps `data-motion-preset` on `on-scroll` entrance pages so the animation actually fires.
+- **S3.C.2** corner radius 6 + border 1 applied (`border-radius: 6px`, `border-width: 0.571429px` after kit scaling).
+- **S3.D** pinned color `#c75d3d` survives kit cycle to `charcoal` and back.
+- **S3.E.1** blog page-background `#f7ede3` applied (blog article `background: rgb(247,237,227)`, home unchanged).
+- **S4.A.1** six page rows render with Rename / SEO / Del controls.
+- **S4.D.1** SEO is an `<a target="_blank">` on every row, routes to `/dashboard/sites/{id}/pages/{pageId}/seo`.
+- **S4.F.1 — Gap-1 reserved-slug guard fires on prod.** Rename to `_404` is **blocked** with `setStatus("Slug '404' is reserved for the custom 404 page", "error")`. Blog row's title and slug stay untouched; the Ctrl+Z in the script is no longer needed.
+
+## New script deltas this pass (apply to `act-1-script.md`)
+
+| # | Beat | Delta | Fix |
+|---|---|---|---|
+| 1 | **S3.A.2** | "Four built-in kits" — there are now **six** live (charcoal, orange-editorial, blue-saas, green-organic, `ivory-press`, `midnight-violet`). Last two landed in commit `73920d1`. | Voiceover "six built-in kits" and cycle through all six in the on-screen action. |
+| 2 | **S3.A.3** | "Apogee shipped with a `custom` kit" — Briar's active kit is `blue-saas`, not `custom`. The custom-kit fixture beat is stale. | Either reseed Briar with a custom kit before recording, or drop the beat. |
+| 3 | **S3.E.1** | "Background color → pick warm cream" — the page-background field is a single text input (placeholder `e.g. #1a1a2e or transparent`), not a colour-swatch picker. | "Type a warm cream hex (e.g. `#f7ede3`) into Page background." |
+| 4 | **S4.E.1** | "the `is 404` toggle, already on" — there is **no toggle**. The custom-404 mechanism is slug-based (page IS the custom 404 iff slug === `_404`, see `src/canvas/page-routing.ts`). | "There's no toggle — the slug `_404` IS the mechanism. The page exists because its slug equals `_404`." |
+| 5 | **S4.F.1** | "blog row now reads `_404` / `/404`. Ctrl+Z to revert." — Pass-5 Gap-1 guard now blocks this rename. | "Maya types `_404` as a title. Editor flashes 'Slug 404 is reserved for the custom 404 page'. Rename does not apply — no Ctrl+Z needed." |
+| 6 | **S5.A.1 / S5.S.1** | The motion preset dropdown lists **17** values including `none`. S5.A.1 says "17 motion presets" (correct if `none` counts), S5.S.1 says "sixteen entrance presets" (correct if `none` excluded). | Pick a single number — recommend "sixteen entrance presets + `none`" — and apply it consistently across both beats. |
+| 7 | **S3.F / S3.I** | No Assets entry and no Theme panel exist in the canvas sidebar. The Add panel only has Sections + Components + Colors. | Move the Assets / Theme beats to whichever dashboard route actually owns them (asset library: element-image picker; fonts: dedicated route), OR drop them from S3 and cover during S5 element work. |
+| 8 | **S6 breakpoint switcher** | No `[data-breakpoint]` / `#canvas-breakpoint` / `.rev01-breakpoint-switcher` in the editor DOM. This is the medium-five **Gap 9** ("Editor breakpoint switcher desktop/tablet/phone preview") — not shipped. | Either ship Gap 9 before recording, or rewrite the responsive beats (S5.I.1 table phone collapse, S6 responsive sweep) to use a different demonstration path. |
+| 9 | **S7 a11y entry point** | The editor header has no a11y / accessibility link. The audit lives at `/dashboard/sites/{id}/a11y` (separate dashboard route). | Either ship an editor-header link to the audit, OR voiceover "Maya jumps back to the dashboard and opens the a11y audit". |
+
+## Not driven this pass (handoff to Pass 6)
+
+- **S3.F / S3.G / S3.H / S3.I** — asset upload, AI image gen, slot history, custom font WOFF2 upload. Each requires real file-system / Replicate / R2 interaction beyond what fits a quick verification batch.
+- **S5 per-variant cycles** — action variants (7), shape (6), container surfaces (7), form field kinds (5), embed providers (9), code languages (11), table per-column align + zebra + phone collapse, accordion multi-open, carousel arrows/dots, nav layouts + sticky + link kinds, collections manual ↔ page-bound, chart kinds (5), rotation + opacity. The Add-panel surface and motion preset dropdown are confirmed; each per-variant cycle still needs an interactive check.
+- **S5.B slot history pop-out** — UX exists in code; live trip not run.
+- **S7 publish flow end-to-end** — publish button confirmed enabled; the actual `runAudit → 422` gate behaviour was not exercised live this pass.
+- **S8–S13** — collaborators + invite token, addons + entitlement shop, forms inbox + CSV export, version restore + safety snapshot, Save as Community template. All untouched.
+
+A **Pass-6 manual walkthrough** is the recommended shape — drive each remaining beat by hand, log mismatches in this file. Pass-5's automated drive caught the easy structural deltas; Pass-6's value is in catching per-interaction behaviour the editor only reveals on user input.
+
+---
+
+# Pass 6 — finish the deep walk (2026-05-30, after the delta-resolution handoff)
+
+Continuation of Pass-5, driven against the same prod deploy `59494fc8`. Covers S6 → S13 (skipping beats blocked on external prereqs). Full per-beat table in [drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md) Pass-6 section.
+
+## Retractions (Pass-5 deltas that turned out to be non-issues)
+
+- **#8 S6 breakpoint switcher / Gap 9** — **NOT a recording blocker.** The script already says "No editor switcher in this build; she demos it on the published site" (S6.A.1) and uses DevTools resize on `briar.opencanvas.aayushman.dev` for the responsive tour. Gap 9 stays in the medium-five product backlog but does not gate Pass-7 recording.
+
+## New deltas Pass-6 surfaced
+
+| # | Beat | Delta | Fix |
+|---|---|---|---|
+| 10 | **S7.A.1 button label** | Live audit page shows **"Re-run check"** button, script says "Run audit". | Script-fix to "Re-run check", OR product-rename the button. |
+| 11 | **S7.A.1 numeric score** | Audit page renders a `50 / 100` score badge above the "Looking good!" headline. Script doesn't mention it. | Add a voiceover beat ("Audit shows 50 out of 100 — no blockers but room to improve") OR hide the score in the audit headline UI. |
+
+## Verified live this pass (no script change needed)
+
+- **S6.F.1 / S6.G.1** — Save section to library + Save as template now ship Pass-5's description + visibility flow (Gap-3).
+- **S7.A.1** — A11y route reachable + "Looking good!" / "Fix in editor" / score render.
+- **S8.A.1 / S8.B** — Top-level forms inbox totals; Export CSV at form-detail.
+- **S11.G** — TOC chip row at top of `/settings` (Pass-5 Gap-4 live).
+- **S11.B / S11.D / S11.M** — Pass-4 deltas confirmed (still need script rewrites per delta-resolution handoff).
+- **S13.E.1** — Three modal flow: Template name → Description → "Who can use this template?" select with `Private — only me` / `Community — anyone on Open Canvas`. Matches the recording beat verbatim.
+
+## Still not run live (external-prereq blockers, unchanged)
+
+- I1, S9, I6, I3 — needs second Clerk account or clean-cookie profile.
+- S10 addons — exists in source; not driven.
+- S12 restore — Briar only has v1 live; need at least one prior snapshot to exercise Restore + safety-snapshot flow.
+- S3.F (file upload) / S3.G (Replicate) / S3.I (WOFF2 upload) — external services / file system.
+
+## Net state going into recording
+
+- **All recordable surfaces verified end-to-end except the prereq-blocked ones above.**
+- **18 script-only rewrites** queued in [handoff-delta-resolution-2026-05-30.md](handoff-delta-resolution-2026-05-30.md) — half a day of writing.
+- **3 product fixes** still ship-or-rewrite-the-beat decisions: G6 section inspector, G7 + New Page modal, OG-PNG fixture leak. G9 breakpoint switcher demoted from this list.
+- **2 smaller product fixes**: canonical leak in apogee-showcase.json; a11y entry point in editor header.
