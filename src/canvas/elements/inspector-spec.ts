@@ -35,7 +35,8 @@ export type InspectorField =
   | TextareaField
   | CheckboxField
   | NumberField
-  | ButtonActionField;
+  | ButtonActionField
+  | ActionHrefField;
 
 /**
  * Static option list. The element's current value is one of the option
@@ -131,6 +132,30 @@ export interface ButtonActionField {
   action: string;
   dataAttr?: string;
   busyFlag?: string;
+}
+
+/**
+ * Purpose-built editor for an `ActionHref` discriminated union (the action
+ * element's `href` field — `{ type: 'external', url } | { type: 'page',
+ * pageId }`). Renders as two stacked fields: a discriminator select
+ * (`Link Type`) and a value field whose shape depends on the discriminator
+ * (text input for external, dynamic page-select for page). The interpreter
+ * holds the only knowledge of the DU shape, the URL allowlist
+ * (`isAllowedHref`), and the page-source registry (`state.pages`); the spec
+ * just names the labels and the path.
+ *
+ * Kept purpose-built rather than a general `conditional` + `select-dynamic`
+ * pair because only this one element currently needs the shape; if a second
+ * element (e.g. nav) ends up wanting the same DU later, generalize then.
+ */
+export interface ActionHrefField {
+  kind: 'action-href';
+  /** Label above the discriminator select (e.g. "Link Type"). */
+  discriminatorLabel: string;
+  /** Label above the value field (e.g. "Destination"). */
+  valueLabel: string;
+  /** Top-level path where the href DU lives (e.g. "href"). */
+  path: string;
 }
 
 /**

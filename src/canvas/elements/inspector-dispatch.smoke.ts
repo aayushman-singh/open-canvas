@@ -72,6 +72,14 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     fontWeight: 600,
     align: 'left',
   },
+  action: {
+    id: 'fx-action',
+    type: 'action',
+    box: { x: 0, y: 0, w: 120, h: 40, z: 0 },
+    label: 'Click me',
+    variant: 'solid',
+    href: { type: 'external', url: 'https://example.com' },
+  },
 };
 
 // Action handlers + busy flags the interpreter mounts inside canvas-client.ts.
@@ -83,7 +91,20 @@ const REGISTERED_ACTIONS = ['rewrite-text', 'replace-media'] as const;
 const REGISTERED_BUSY_FLAGS = ['aiBusy'] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {
-  assert(typeof field.label === 'string' && field.label.length > 0, `${where}: label required`);
+  // `action-href` carries its own two labels (discriminator + value) instead
+  // of a single `label` — both must be non-empty strings.
+  if (field.kind === 'action-href') {
+    assert(
+      typeof field.discriminatorLabel === 'string' && field.discriminatorLabel.length > 0,
+      `${where} action-href: discriminatorLabel required`,
+    );
+    assert(
+      typeof field.valueLabel === 'string' && field.valueLabel.length > 0,
+      `${where} action-href: valueLabel required`,
+    );
+  } else {
+    assert(typeof field.label === 'string' && field.label.length > 0, `${where}: label required`);
+  }
 
   // `button-action` is the only path-free field kind — it dispatches via a
   // named handler instead of binding to an element property.
@@ -145,6 +166,19 @@ function checkField(field: InspectorField, fixture: object, where: string): void
         );
       }
       return;
+    case 'action-href': {
+      const value = (fixture as Record<string, unknown>)[field.path];
+      assert(
+        value !== null && typeof value === 'object',
+        `${where} action-href: fixture[${field.path}] must be an object (the ActionHref DU)`,
+      );
+      const type = (value as { type?: unknown }).type;
+      assert(
+        type === 'external' || type === 'page',
+        `${where} action-href: fixture[${field.path}].type must be 'external' or 'page', got ${JSON.stringify(type)}`,
+      );
+      return;
+    }
     default: {
       const exhaustive: never = field;
       void exhaustive;

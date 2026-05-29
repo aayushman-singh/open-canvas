@@ -3022,8 +3022,93 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         inspector.appendChild(btn);
         return;
       }
+      if (f.kind === "action-href") {
+        renderActionHrefField(f, element);
+        return;
+      }
       throw new Error("renderInspectorSpec: unknown field kind " + JSON.stringify(f.kind));
     });
+  }
+
+  // Purpose-built editor for the ActionHref DU. The spec carries the labels +
+  // path; this function owns knowledge of the DU shape (external | page), the
+  // URL allowlist (isAllowedHref), and the page-source registry (state.pages).
+  // When the discriminator changes, the value field is rebuilt and the entire
+  // DU at element[f.path] is replaced with a fresh shape — same behaviour the
+  // legacy buildActionInspector had.
+  function renderActionHrefField(f, element) {
+    var hrefTypeSelect = document.createElement("select");
+    var optExternal = document.createElement("option");
+    optExternal.value = "external";
+    optExternal.textContent = "External URL";
+    hrefTypeSelect.appendChild(optExternal);
+    var optPage = document.createElement("option");
+    optPage.value = "page";
+    optPage.textContent = "Page link";
+    hrefTypeSelect.appendChild(optPage);
+    var currentHref = element[f.path];
+    hrefTypeSelect.value = currentHref && currentHref.type ? currentHref.type : "external";
+
+    var hrefValueContainer = document.createElement("div");
+
+    function renderHrefValue() {
+      hrefValueContainer.replaceChildren();
+      var href = element[f.path];
+      if (hrefTypeSelect.value === "external") {
+        var urlInput = document.createElement("input");
+        urlInput.type = "text";
+        urlInput.value = href && href.type === "external" ? href.url : "";
+        urlInput.placeholder = "https://...";
+        urlInput.addEventListener("change", function() {
+          if (urlInput.value.length === 0) {
+            setStatus("URL can not be empty", "error");
+            return;
+          }
+          if (!isAllowedHref(urlInput.value)) {
+            setStatus("URL not allowed", "error");
+            return;
+          }
+          element[f.path] = { type: "external", url: urlInput.value };
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        hrefValueContainer.appendChild(urlInput);
+        return;
+      }
+      // page branch
+      var pageSelect = document.createElement("select");
+      for (var pi = 0; pi < state.pages.length; pi++) {
+        var p = state.pages[pi];
+        var opt = document.createElement("option");
+        opt.value = p.id;
+        opt.textContent = p.title + " (/" + p.slug + ")";
+        pageSelect.appendChild(opt);
+      }
+      if (href && href.type === "page") {
+        pageSelect.value = href.pageId;
+      }
+      pageSelect.addEventListener("change", function() {
+        element[f.path] = { type: "page", pageId: pageSelect.value };
+        rebuildElement(element.id);
+        scheduleSave();
+      });
+      hrefValueContainer.appendChild(pageSelect);
+    }
+
+    hrefTypeSelect.addEventListener("change", function() {
+      if (hrefTypeSelect.value === "external") {
+        element[f.path] = { type: "external", url: "" };
+      } else {
+        element[f.path] = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
+      }
+      renderHrefValue();
+      rebuildElement(element.id);
+      scheduleSave();
+    });
+
+    inspector.appendChild(field(f.discriminatorLabel, hrefTypeSelect));
+    renderHrefValue();
+    inspector.appendChild(field(f.valueLabel, hrefValueContainer));
   }
 
   // Action handler + busy-flag registries — spec carries the string name, the
@@ -3045,103 +3130,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // see src/canvas/elements/text.ts (uses button-action, select, number,
   // select-mapped field kinds).
 
-  function buildActionInspector(element) {
-    const variant = selectInput(ACTION_VARIANTS, element.variant);
-    variant.addEventListener("change", () => {
-      element.variant = variant.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Variant", variant));
-
-    const label = document.createElement("input");
-    label.type = "text";
-    label.value = element.label;
-    label.addEventListener("change", () => {
-      if (label.value.length === 0) {
-        setStatus("Label can't be empty", "error");
-        label.value = element.label;
-        return;
-      }
-      element.label = label.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Label", label));
-
-    var hrefTypeSelect = document.createElement("select");
-    var optExternal = document.createElement("option");
-    optExternal.value = "external";
-    optExternal.textContent = "External URL";
-    hrefTypeSelect.appendChild(optExternal);
-    var optPage = document.createElement("option");
-    optPage.value = "page";
-    optPage.textContent = "Page link";
-    hrefTypeSelect.appendChild(optPage);
-    hrefTypeSelect.value = element.href && element.href.type ? element.href.type : "external";
-
-    var hrefValueContainer = document.createElement("div");
-
-    function renderHrefValue() {
-      hrefValueContainer.replaceChildren();
-      if (hrefTypeSelect.value === "external") {
-        var urlInput = document.createElement("input");
-        urlInput.type = "text";
-        urlInput.value = element.href && element.href.type === "external" ? element.href.url : "";
-        urlInput.placeholder = "https://...";
-        urlInput.addEventListener("change", function() {
-          if (urlInput.value.length === 0) {
-            setStatus("URL can not be empty", "error");
-            return;
-          }
-          if (!isAllowedHref(urlInput.value)) {
-            setStatus("URL not allowed", "error");
-            return;
-          }
-          element.href = { type: "external", url: urlInput.value };
-          rebuildElement(element.id);
-          scheduleSave();
-        });
-        hrefValueContainer.appendChild(urlInput);
-      } else {
-        var pageSelect = document.createElement("select");
-        for (var pi = 0; pi < state.pages.length; pi++) {
-          var p = state.pages[pi];
-          var opt = document.createElement("option");
-          opt.value = p.id;
-          opt.textContent = p.title + " (/" + p.slug + ")";
-          pageSelect.appendChild(opt);
-        }
-        if (element.href && element.href.type === "page") {
-          pageSelect.value = element.href.pageId;
-        }
-        pageSelect.addEventListener("change", function() {
-          element.href = { type: "page", pageId: pageSelect.value };
-          rebuildElement(element.id);
-          scheduleSave();
-        });
-        hrefValueContainer.appendChild(pageSelect);
-      }
-    }
-
-    hrefTypeSelect.addEventListener("change", function() {
-      if (hrefTypeSelect.value === "external") {
-        element.href = { type: "external", url: "" };
-      } else {
-        element.href = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
-      }
-      renderHrefValue();
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-
-    inspector.appendChild(field("Link Type", hrefTypeSelect));
-    renderHrefValue();
-    inspector.appendChild(field("Destination", hrefValueContainer));
-  }
-
-  // buildShapeInspector + buildContainerInspector migrated to INSPECTOR_DISPATCH
-  // per ADR 0011 Step 1; see src/canvas/elements/{shape,container}.ts.
+  // buildActionInspector + buildShapeInspector + buildContainerInspector
+  // migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1; see
+  // src/canvas/elements/{action,shape,container}.ts. The action-href DU
+  // editor lives in renderActionHrefField above (purpose-built; future
+  // DU-shaped fields can copy the pattern or generalize when a second
+  // element requires it).
 
   function buildMediaInspector(element) {
     const aiBtn = document.createElement("button");
@@ -4358,7 +4352,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text) have specs; remaining types (action, media, chart, form,
+    // embed, text, action) have specs; remaining types (media, chart, form,
     // accordion, carousel, table, nav) still use their per-type builders
     // until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
@@ -4366,7 +4360,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderInspectorSpec(inspectorSpec, element);
     } else {
       const inspectorBuilders = {
-        action: buildActionInspector,
         media: buildMediaInspector,
         chart: buildChartInspector,
         form: buildFormInspector,
