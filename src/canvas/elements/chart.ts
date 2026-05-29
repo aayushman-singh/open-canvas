@@ -8,6 +8,7 @@
 // The five chart-kind renderers live under `src/charts/`. All math is pure
 // (no DOM, no I/O).
 
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 import { renderAreaChartBody } from '../../charts/area.js';
 import { renderBarChartBody } from '../../charts/bar.js';
@@ -83,9 +84,35 @@ export function renderChart(el: ChartElement, ctx: ChartRenderCtx): string {
   // <rect>s. The legend toggle / per-slice <title> elements still provide
   // detail to anyone that wants it.
   const seriesSummary = el.series.length === 0 ? 'no data' : `${String(el.series.length)} series`;
-  const categorySummary = el.categories.length === 0 ? '' : `, ${String(el.categories.length)} categories`;
+  const categorySummary =
+    el.categories.length === 0 ? '' : `, ${String(el.categories.length)} categories`;
   const ariaLabel = `${el.kind} chart, ${seriesSummary}${categorySummary}`;
   return `<svg class="rev01-chart" data-chart-kind="${escapeAttr(el.kind)}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(width)} ${String(height)}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" role="img" aria-label="${escapeAttr(ariaLabel)}">${body}</svg>`;
 }
 
 export const CHART_RECIPE_ID = 'chart-card' as const;
+
+export const chartInspectorSpec: InspectorSpec = {
+  fields: [
+    { kind: 'select', label: 'Chart kind', path: 'kind', options: CHART_KINDS },
+    {
+      kind: 'text',
+      label: 'X-axis title',
+      path: 'xAxisTitle',
+      placeholder: 'X-axis title (optional)',
+      emptyOmits: true,
+    },
+    {
+      kind: 'text',
+      label: 'Y-axis title',
+      path: 'yAxisTitle',
+      placeholder: 'Y-axis title (optional)',
+      emptyOmits: true,
+    },
+    { kind: 'checkbox', label: 'Show legend', path: 'showLegend' },
+    // 2D series × categories grid editor with cascading values cleanup when
+    // a category is removed. Imperative because the data-grid shape is
+    // table-like (same reason as table-grid lives in mount form).
+    { kind: 'custom-mount', name: 'chart-data' },
+  ],
+};

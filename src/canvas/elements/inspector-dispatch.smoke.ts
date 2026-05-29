@@ -113,6 +113,36 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     zebra: true,
     collapseOnPhone: false,
   },
+  nav: {
+    id: 'fx-nav',
+    type: 'nav',
+    box: { x: 0, y: 0, w: 800, h: 60, z: 0 },
+    links: [{ label: 'Home', href: '/', kind: 'internal' }],
+    layout: 'left-right',
+    sticky: false,
+    // logoAssetId is intentionally absent — the spec uses `emptyOmits` for
+    // this field so "absent" is its canonical empty state. The path check
+    // below exempts emptyOmits text fields for this reason.
+  },
+  chart: {
+    id: 'fx-chart',
+    type: 'chart',
+    box: { x: 0, y: 0, w: 480, h: 320, z: 0 },
+    kind: 'bar',
+    series: [{ label: 'A', values: [1, 2, 3] }],
+    categories: ['Jan', 'Feb', 'Mar'],
+    showLegend: true,
+    // xAxisTitle + yAxisTitle intentionally absent (emptyOmits).
+  },
+  form: {
+    id: 'fx-form',
+    type: 'form',
+    box: { x: 0, y: 0, w: 360, h: 240, z: 0 },
+    fields: [{ id: 'fx-field-1', label: 'Name', kind: 'text', required: false }],
+    submitLabel: 'Submit',
+    successMessage: 'Thanks!',
+    webhookUrl: '',
+  },
 };
 
 // Action handlers, busy flags, and mount handlers the interpreter binds
@@ -128,6 +158,9 @@ const REGISTERED_MOUNTS = [
   'accordion-items',
   'carousel-slides',
   'table-grid',
+  'nav-links',
+  'chart-data',
+  'form-fields',
 ] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {
@@ -151,12 +184,18 @@ function checkField(field: InspectorField, fixture: object, where: string): void
 
   // `button-action` + `custom-mount` are the path-free field kinds — they
   // dispatch via named handlers instead of binding to an element property.
+  // Text fields with `emptyOmits` are exempt from the path-presence check
+  // because their canonical empty state is "key absent" — the fixture
+  // omitting the key is the correct shape, not a typo.
   if (field.kind !== 'button-action' && field.kind !== 'custom-mount') {
     assert(typeof field.path === 'string' && field.path.length > 0, `${where}: path required`);
-    assert(
-      Object.prototype.hasOwnProperty.call(fixture, field.path),
-      `${where}: path "${field.path}" is not present on the fixture (catches typos and stale paths)`,
-    );
+    const exempt = field.kind === 'text' && field.emptyOmits === true;
+    if (!exempt) {
+      assert(
+        Object.prototype.hasOwnProperty.call(fixture, field.path),
+        `${where}: path "${field.path}" is not present on the fixture (catches typos and stale paths)`,
+      );
+    }
   }
 
   switch (field.kind) {
@@ -169,8 +208,14 @@ function checkField(field: InspectorField, fixture: object, where: string): void
     case 'select-mapped':
       assert(field.options.length > 0, `${where} select-mapped: options must be non-empty`);
       for (const opt of field.options) {
-        assert(typeof opt.label === 'string' && opt.label.length > 0, `${where} select-mapped: option.label required`);
-        assert(typeof opt.value === 'number' && Number.isFinite(opt.value), `${where} select-mapped: option.value must be a finite number`);
+        assert(
+          typeof opt.label === 'string' && opt.label.length > 0,
+          `${where} select-mapped: option.label required`,
+        );
+        assert(
+          typeof opt.value === 'number' && Number.isFinite(opt.value),
+          `${where} select-mapped: option.value must be a finite number`,
+        );
       }
       assert(
         typeof field.defaultValue === 'number' && Number.isFinite(field.defaultValue),
@@ -231,7 +276,9 @@ function checkField(field: InspectorField, fixture: object, where: string): void
     default: {
       const exhaustive: never = field;
       void exhaustive;
-      throw new Error(`${where}: unknown field kind ${JSON.stringify((field as { kind: string }).kind)}`);
+      throw new Error(
+        `${where}: unknown field kind ${JSON.stringify((field as { kind: string }).kind)}`,
+      );
     }
   }
 }
@@ -242,7 +289,10 @@ assert(types.length > 0, 'INSPECTOR_DISPATCH must declare at least one entry');
 for (const type of types) {
   const spec = INSPECTOR_DISPATCH[type];
   assert(spec !== undefined, `${type}: dispatch entry must be defined`);
-  assert(spec.fields.length > 0, `${type}: spec.fields must be non-empty (a stub spec hides the editor field)`);
+  assert(
+    spec.fields.length > 0,
+    `${type}: spec.fields must be non-empty (a stub spec hides the editor field)`,
+  );
 
   const fixture = FIXTURES[type];
   assert(

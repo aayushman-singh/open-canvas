@@ -2757,70 +2757,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // Cell edits update element.series[].values in place and call
   // rebuildElement(id) + scheduleSave() — same shape every other inspector
   // input uses.
-  function buildChartInspector(element) {
-    const wrap = document.createElement("div");
-    wrap.className = "rev01-chart-inspector";
-    inspector.appendChild(wrap);
-
-    // Kind picker.
-    const kind = selectInput(CHART_KINDS, element.kind);
-    kind.addEventListener("change", () => {
-      element.kind = kind.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(field("Chart kind", kind));
-
-    // Axis titles (bar / line / area only — pie/donut ignore these on the
-    // server. We still let the Owner type them so switching kinds doesn't
-    // lose data.)
-    const xTitle = document.createElement("input");
-    xTitle.type = "text";
-    xTitle.value = typeof element.xAxisTitle === "string" ? element.xAxisTitle : "";
-    xTitle.placeholder = "X-axis title (optional)";
-    xTitle.addEventListener("change", () => {
-      if (xTitle.value.length === 0) { delete element.xAxisTitle; }
-      else { element.xAxisTitle = xTitle.value; }
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(field("X-axis title", xTitle));
-
-    const yTitle = document.createElement("input");
-    yTitle.type = "text";
-    yTitle.value = typeof element.yAxisTitle === "string" ? element.yAxisTitle : "";
-    yTitle.placeholder = "Y-axis title (optional)";
-    yTitle.addEventListener("change", () => {
-      if (yTitle.value.length === 0) { delete element.yAxisTitle; }
-      else { element.yAxisTitle = yTitle.value; }
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(field("Y-axis title", yTitle));
-
-    // Legend toggle.
-    const legendRow = document.createElement("div");
-    legendRow.className = "row";
-    const legendBox = document.createElement("input");
-    legendBox.type = "checkbox";
-    legendBox.checked = element.showLegend !== false;
-    legendBox.addEventListener("change", () => {
-      element.showLegend = legendBox.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    const legendLabel = document.createElement("label");
-    legendLabel.textContent = "show legend";
-    legendRow.appendChild(legendBox);
-    legendRow.appendChild(legendLabel);
-    wrap.appendChild(legendRow);
-
-    // Data grid host. Stored on 'wrap' so the controls below can target it
-    // when the grid needs a structural rebuild (add/remove series/cat).
+  // buildChartInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/chart.ts. Top-level fields (kind, x/y axis
+  // titles, showLegend) are declarative in the spec; the 2D series ×
+  // categories data grid stays imperative in mountChartData below.
+  function mountChartData(element, host) {
     const gridHost = document.createElement("div");
     gridHost.className = "rev01-chart-grid-host";
     gridHost.style.marginTop = "8px";
-    wrap.appendChild(gridHost);
+    host.appendChild(gridHost);
 
     function renderGrid() {
       gridHost.replaceChildren();
@@ -2988,10 +2933,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //
   // Walks an InspectorSpec read from INSPECTOR_DISPATCH (interpolated as
   // JSON at script-emit time) and renders DOM the same way the legacy
-  // buildXInspector functions below did. Migrated element types route here
-  // via the dispatch site further down; unmigrated types still fall through
-  // to their per-type buildXInspector. Cutover ADR removes the fallback
-  // once every type has a spec.
+  // buildXInspector functions did. Every inspectable element type routes
+  // through the dispatch site further down; collection intentionally has no
+  // spec because selecting its children opens their own inspectors.
 
   function renderInspectorSpec(spec, element) {
     spec.fields.forEach(function(f) {
@@ -3057,8 +3001,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             ti.value = element[f.path] || "";
             return;
           }
-          element[f.path] = ti.value;
-          rebuildElement(element.id);
+          if (f.emptyOmits && ti.value.length === 0) {
+            delete element[f.path];
+          } else {
+            element[f.path] = ti.value;
+          }
+          if (!f.noRebuild) rebuildElement(element.id);
           scheduleSave();
         });
         inspector.appendChild(field(f.label, ti));
@@ -3250,6 +3198,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "accordion-items": function(element, host) { mountAccordionItems(element, host); },
     "carousel-slides": function(element, host) { mountCarouselSlides(element, host); },
     "table-grid": function(element, host) { mountTableGrid(element, host); },
+    "nav-links": function(element, host) { mountNavLinks(element, host); },
+    "chart-data": function(element, host) { mountChartData(element, host); },
+    "form-fields": function(element, host) { mountFormFields(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -3324,7 +3275,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // handlers in INSPECTOR_MOUNT_HANDLERS above; mountVideoPlayback owns the
   // "skip on image" conditional and the autoplay-implies-muted enforcement.
 
-  function buildFormInspector(element) {
+  // buildFormInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/form.ts. Per-field editor (label + kind +
+  // required + conditional placeholder + conditional options-list) lives
+  // in mountFormFields; submitLabel / successMessage / webhookUrl are now
+  // declarative text fields (webhookUrl uses noRebuild because the value
+  // affects submission metadata, not the rendered output).
+  function mountFormFields(element, host) {
     if (!Array.isArray(element.fields)) element.fields = [];
     var fieldListHost = document.createElement("div");
 
@@ -3334,7 +3291,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     function assertFormOptionShape(option, fieldId, optionIndex) {
       if (!option || typeof option !== "object" || typeof option.value !== "string" || typeof option.label !== "string") {
-        throw new Error("buildFormInspector: field " + JSON.stringify(fieldId) + " option " + String(optionIndex) + " must be { value: string, label: string }");
+        throw new Error("mountFormFields: field " + JSON.stringify(fieldId) + " option " + String(optionIndex) + " must be { value: string, label: string }");
       }
     }
 
@@ -3469,37 +3426,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       fieldListHost.appendChild(addFieldBtn);
     }
     renderFieldList();
-    inspector.appendChild(field("Fields", fieldListHost));
-
-    var submitLabel = document.createElement("input");
-    submitLabel.type = "text";
-    submitLabel.value = element.submitLabel || "Submit";
-    submitLabel.addEventListener("change", function() {
-      element.submitLabel = submitLabel.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Submit label", submitLabel));
-
-    var successMsg = document.createElement("input");
-    successMsg.type = "text";
-    successMsg.value = element.successMessage || "";
-    successMsg.addEventListener("change", function() {
-      element.successMessage = successMsg.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Success message", successMsg));
-
-    var webhookInput = document.createElement("input");
-    webhookInput.type = "text";
-    webhookInput.value = element.webhookUrl || "";
-    webhookInput.placeholder = "https://...";
-    webhookInput.addEventListener("change", function() {
-      element.webhookUrl = webhookInput.value;
-      scheduleSave();
-    });
-    inspector.appendChild(field("Webhook URL", webhookInput));
+    host.appendChild(field("Fields", fieldListHost));
   }
 
   // buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH
@@ -3894,7 +3821,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     host.appendChild(field("Data", gridHost));
   }
 
-  function buildNavInspector(element) {
+  // buildNavInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/nav.ts. Per-link editor (label + href + kind
+  // with per-kind href validation) lives in mountNavLinks; layout / sticky
+  // / logoAssetId are now declarative select / checkbox / text fields.
+  function mountNavLinks(element, host) {
     if (!Array.isArray(element.links)) element.links = [];
     var linkListHost = document.createElement("div");
 
@@ -3980,36 +3911,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       linkListHost.appendChild(addBtn);
     }
     renderLinkList();
-    inspector.appendChild(field("Links", linkListHost));
-
-    var layoutSel = selectInput(["left-right", "left-center-right"], element.layout || "left-right");
-    layoutSel.addEventListener("change", function() {
-      element.layout = layoutSel.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Layout", layoutSel));
-
-    var stickyCheck = document.createElement("input");
-    stickyCheck.type = "checkbox";
-    stickyCheck.checked = !!element.sticky;
-    stickyCheck.addEventListener("change", function() {
-      element.sticky = stickyCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Sticky", stickyCheck));
-
-    var logoInput = document.createElement("input");
-    logoInput.type = "text";
-    logoInput.value = element.logoAssetId || "";
-    logoInput.placeholder = "Logo asset ID (optional)";
-    logoInput.addEventListener("change", function() {
-      element.logoAssetId = logoInput.value || undefined;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Logo asset", logoInput));
+    host.appendChild(field("Links", linkListHost));
   }
 
   // Revoke any blob URLs held by AI-preview wraps before wiping the
@@ -4423,22 +4325,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildZOrderGroup(section, element));
     inspector.appendChild(buildElementActionsGroup(section, element));
 
-    // ADR 0011 Step 1: dispatch via spec when available, else fall back to
-    // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media, accordion, carousel, table) have specs;
-    // remaining types (chart, form, nav) still use their per-type builders
-    // until the next PR in the migration series.
+    // ADR 0011 Step 1 cutover: INSPECTOR_DISPATCH is now
+    // Record<Exclude<ElementType, 'collection'>, InspectorSpec> — every
+    // element type except collection has a spec; missing a spec for a new
+    // element type fails TypeScript compile in src/canvas/elements/index.ts.
+    // collection still flows through here at runtime; the indexed lookup
+    // returns undefined for it and the inspector body stays empty (children
+    // render their own inspectors when selected).
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
-    } else {
-      const inspectorBuilders = {
-        chart: buildChartInspector,
-        form: buildFormInspector,
-        nav: buildNavInspector,
-      };
-      const inspectorBuilder = inspectorBuilders[element.type];
-      if (inspectorBuilder) inspectorBuilder(element);
     }
 
     // -- Element style controls -----------------------------------------------

@@ -14,12 +14,12 @@
 // behaviour: read `element[field.path]`, render the input, write back on
 // change, and call `rebuildElement(element.id); scheduleSave()`.
 //
-// During migration (ADR 0011 dec 3) the dispatch is `Partial<Record<
-// ElementType, InspectorSpec>>` so migrated and unmigrated element types
-// coexist. The completeness smoke (`inspector-dispatch.smoke.ts`) pins
-// every migrated entry to a fixture so dispatch / element drift is a
-// build-time failure. The cutover ADR flips the dispatch to a full
-// `Record<ElementType, InspectorSpec>` once every type has migrated.
+// The cutover dispatch is a typed `Record<Exclude<ElementType,
+// 'collection'>, InspectorSpec>`: every inspectable element type must
+// provide a spec, while collection is the explicit opt-out because its
+// children render their own inspectors. The completeness smoke
+// (`inspector-dispatch.smoke.ts`) pins every dispatch entry to a fixture so
+// dispatch / element drift is a build-time failure.
 
 /**
  * A single field rendered into the inspector. `path` is the top-level
@@ -72,6 +72,13 @@ export interface SelectMappedField {
 /**
  * Single-line text input. When `required` is true, the interpreter rejects
  * an empty submission (reverts the input and surfaces a status error).
+ * When `emptyOmits` is true, an empty input value DELETES the property on
+ * the element instead of writing an empty string — used for optional
+ * fields whose absence is semantically distinct from a present-but-empty
+ * value (e.g. `nav.logoAssetId?: string`, `chart.xAxisTitle?: string`).
+ * JSON serialization treats `delete` and `= undefined` identically (key
+ * dropped from output); we use `delete` so `Object.keys(element)` and
+ * `key in element` reflect the optional-field semantics directly.
  */
 export interface TextField {
   kind: 'text';
@@ -79,6 +86,14 @@ export interface TextField {
   path: string;
   placeholder?: string;
   required?: boolean;
+  emptyOmits?: boolean;
+  /**
+   * When true, the interpreter skips `rebuildElement(element.id)` on change
+   * and only calls `scheduleSave()`. Used for fields whose value affects
+   * element data but not its rendered output (e.g. `form.webhookUrl` —
+   * submission metadata, never read by the visitor-side renderer).
+   */
+  noRebuild?: boolean;
 }
 
 /**

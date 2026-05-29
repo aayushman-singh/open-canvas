@@ -16,7 +16,7 @@ function sliceBetween(startNeedle: string, endNeedle: string): string {
 }
 
 const formInspector = sliceBetween(
-  'function buildFormInspector(element) {',
+  'function mountFormFields(element, host) {',
   '// buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH',
 );
 
@@ -41,10 +41,25 @@ const renderInspector = sliceBetween(
 );
 
 assert(
-  renderInspector.includes('const inspectorBuilders = {') &&
-    renderInspector.includes('const inspectorBuilder = inspectorBuilders[element.type];') &&
-    renderInspector.includes('if (inspectorBuilder) inspectorBuilder(element);'),
-  'element inspector routing must use the named-helper dispatch table',
+  renderInspector.includes('const inspectorSpec = INSPECTOR_DISPATCH[element.type];') &&
+    renderInspector.includes('renderInspectorSpec(inspectorSpec, element);') &&
+    !renderInspector.includes('const inspectorBuilders = {'),
+  'element inspector routing must use INSPECTOR_DISPATCH directly, without the legacy named-helper branch',
+);
+
+const inspectorInterpreter = sliceBetween(
+  'function renderInspectorSpec(spec, element) {',
+  '// Purpose-built editor for the ActionHref DU',
+);
+
+assert(
+  inspectorInterpreter.includes('if (f.emptyOmits && ti.value.length === 0)') &&
+    inspectorInterpreter.includes('delete element[f.path];'),
+  'text inspector fields with emptyOmits must delete optional element keys',
+);
+assert(
+  inspectorInterpreter.includes('if (!f.noRebuild) rebuildElement(element.id);'),
+  'text inspector fields with noRebuild must skip rebuildElement while still saving',
 );
 
 const accordionInspector = sliceBetween(
@@ -62,7 +77,7 @@ assert(
 
 const tableInspector = sliceBetween(
   'function mountTableGrid(element, host) {',
-  'function buildNavInspector(element) {',
+  '// buildNavInspector migrated to INSPECTOR_DISPATCH',
 );
 
 assert(
@@ -73,7 +88,7 @@ assert(
 );
 
 const navInspector = sliceBetween(
-  'function buildNavInspector(element) {',
+  'function mountNavLinks(element, host) {',
   '// Revoke any blob URLs',
 );
 
