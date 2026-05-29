@@ -705,7 +705,7 @@ function encodeNestedTokenRecord(
 }
 
 /**
- * Encode a EditableSite into a fresh Y.Doc.
+ * Encode an EditableSite into a fresh Y.Doc.
  *
  * One transaction wraps the entire encode so a downstream `attachAutosave`
  * sees a single update event per encode call rather than one per nested set.

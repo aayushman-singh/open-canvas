@@ -650,7 +650,7 @@ assert(
 );
 
 // Sanity: the recipe section is structurally compatible with a real page —
-// we can drop it into a EditableSite without TS complaining.
+// we can drop it into an EditableSite without TS complaining.
 const recipeState: EditableSite = makeFixtureSiteState({
   ...page1,
   sections: [recipeSection, ...page1.sections],
