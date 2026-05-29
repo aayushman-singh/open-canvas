@@ -8,6 +8,7 @@
 // The five chart-kind renderers live under `src/charts/`. All math is pure
 // (no DOM, no I/O).
 
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 import { renderAreaChartBody } from '../../charts/area.js';
 import { renderBarChartBody } from '../../charts/bar.js';
@@ -89,3 +90,28 @@ export function renderChart(el: ChartElement, ctx: ChartRenderCtx): string {
 }
 
 export const CHART_RECIPE_ID = 'chart-card' as const;
+
+export const chartInspectorSpec: InspectorSpec = {
+  fields: [
+    { kind: 'select', label: 'Chart kind', path: 'kind', options: CHART_KINDS },
+    {
+      kind: 'text',
+      label: 'X-axis title',
+      path: 'xAxisTitle',
+      placeholder: 'X-axis title (optional)',
+      emptyOmits: true,
+    },
+    {
+      kind: 'text',
+      label: 'Y-axis title',
+      path: 'yAxisTitle',
+      placeholder: 'Y-axis title (optional)',
+      emptyOmits: true,
+    },
+    { kind: 'checkbox', label: 'Show legend', path: 'showLegend' },
+    // 2D series × categories grid editor with cascading values cleanup when
+    // a category is removed. Imperative because the data-grid shape is
+    // table-like (same reason as table-grid lives in mount form).
+    { kind: 'custom-mount', name: 'chart-data' },
+  ],
+};

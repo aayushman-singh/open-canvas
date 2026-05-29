@@ -2649,70 +2649,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // Cell edits update element.series[].values in place and call
   // rebuildElement(id) + scheduleSave() — same shape every other inspector
   // input uses.
-  function buildChartInspector(element) {
-    const wrap = document.createElement("div");
-    wrap.className = "rev01-chart-inspector";
-    inspector.appendChild(wrap);
-
-    // Kind picker.
-    const kind = selectInput(CHART_KINDS, element.kind);
-    kind.addEventListener("change", () => {
-      element.kind = kind.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(field("Chart kind", kind));
-
-    // Axis titles (bar / line / area only — pie/donut ignore these on the
-    // server. We still let the Owner type them so switching kinds doesn't
-    // lose data.)
-    const xTitle = document.createElement("input");
-    xTitle.type = "text";
-    xTitle.value = typeof element.xAxisTitle === "string" ? element.xAxisTitle : "";
-    xTitle.placeholder = "X-axis title (optional)";
-    xTitle.addEventListener("change", () => {
-      if (xTitle.value.length === 0) { delete element.xAxisTitle; }
-      else { element.xAxisTitle = xTitle.value; }
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(field("X-axis title", xTitle));
-
-    const yTitle = document.createElement("input");
-    yTitle.type = "text";
-    yTitle.value = typeof element.yAxisTitle === "string" ? element.yAxisTitle : "";
-    yTitle.placeholder = "Y-axis title (optional)";
-    yTitle.addEventListener("change", () => {
-      if (yTitle.value.length === 0) { delete element.yAxisTitle; }
-      else { element.yAxisTitle = yTitle.value; }
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(field("Y-axis title", yTitle));
-
-    // Legend toggle.
-    const legendRow = document.createElement("div");
-    legendRow.className = "row";
-    const legendBox = document.createElement("input");
-    legendBox.type = "checkbox";
-    legendBox.checked = element.showLegend !== false;
-    legendBox.addEventListener("change", () => {
-      element.showLegend = legendBox.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    const legendLabel = document.createElement("label");
-    legendLabel.textContent = "show legend";
-    legendRow.appendChild(legendBox);
-    legendRow.appendChild(legendLabel);
-    wrap.appendChild(legendRow);
-
-    // Data grid host. Stored on 'wrap' so the controls below can target it
-    // when the grid needs a structural rebuild (add/remove series/cat).
+  // buildChartInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/chart.ts. Top-level fields (kind, x/y axis
+  // titles, showLegend) are declarative in the spec; the 2D series ×
+  // categories data grid stays imperative in mountChartData below.
+  function mountChartData(element, host) {
     const gridHost = document.createElement("div");
     gridHost.className = "rev01-chart-grid-host";
     gridHost.style.marginTop = "8px";
-    wrap.appendChild(gridHost);
+    host.appendChild(gridHost);
 
     function renderGrid() {
       gridHost.replaceChildren();
@@ -2949,7 +2894,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             ti.value = element[f.path] || "";
             return;
           }
-          element[f.path] = f.emptyAsUndefined && ti.value.length === 0 ? undefined : ti.value;
+          if (f.emptyOmits && ti.value.length === 0) {
+            delete element[f.path];
+          } else {
+            element[f.path] = ti.value;
+          }
           rebuildElement(element.id);
           scheduleSave();
         });
@@ -3143,6 +3092,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "carousel-slides": function(element, host) { mountCarouselSlides(element, host); },
     "table-grid": function(element, host) { mountTableGrid(element, host); },
     "nav-links": function(element, host) { mountNavLinks(element, host); },
+    "chart-data": function(element, host) { mountChartData(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -4293,15 +4243,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media, accordion, carousel, table, nav) have
-    // specs; remaining types (chart, form) still use their per-type
-    // builders until the next PR in the migration series.
+    // embed, text, action, media, accordion, carousel, table, nav, chart)
+    // have specs; remaining type (form) still uses its per-type builder
+    // until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
     } else {
       const inspectorBuilders = {
-        chart: buildChartInspector,
         form: buildFormInspector,
       };
       const inspectorBuilder = inspectorBuilders[element.type];

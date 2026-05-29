@@ -11,7 +11,7 @@ import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 import { accordionInspectorSpec, renderAccordion } from './accordion.js';
 import { actionInspectorSpec, renderAction } from './action.js';
 import { carouselInspectorSpec, renderCarousel } from './carousel.js';
-import { renderChart } from './chart.js';
+import { chartInspectorSpec, renderChart } from './chart.js';
 import { codeInspectorSpec, renderCode } from './code.js';
 import { renderCollection } from './collection.js';
 import { containerInspectorSpec, renderContainer } from './container.js';
@@ -212,4 +212,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   carousel: carouselInspectorSpec,
   table: tableInspectorSpec,
   nav: navInspectorSpec,
+  chart: chartInspectorSpec,
 };

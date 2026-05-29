@@ -72,11 +72,13 @@ export interface SelectMappedField {
 /**
  * Single-line text input. When `required` is true, the interpreter rejects
  * an empty submission (reverts the input and surfaces a status error).
- * When `emptyAsUndefined` is true, an empty input value writes `undefined`
- * to the element instead of an empty string — used for optional fields
- * whose absence is semantically distinct from a present-but-empty value
- * (e.g. `nav.logoAssetId?: string`, where `undefined` means "no logo" and
- * `""` would still serialize the key).
+ * When `emptyOmits` is true, an empty input value DELETES the property on
+ * the element instead of writing an empty string — used for optional
+ * fields whose absence is semantically distinct from a present-but-empty
+ * value (e.g. `nav.logoAssetId?: string`, `chart.xAxisTitle?: string`).
+ * JSON serialization treats `delete` and `= undefined` identically (key
+ * dropped from output); we use `delete` so `Object.keys(element)` and
+ * `key in element` reflect the optional-field semantics directly.
  */
 export interface TextField {
   kind: 'text';
@@ -84,7 +86,7 @@ export interface TextField {
   path: string;
   placeholder?: string;
   required?: boolean;
-  emptyAsUndefined?: boolean;
+  emptyOmits?: boolean;
 }
 
 /**

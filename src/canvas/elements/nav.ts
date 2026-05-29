@@ -147,7 +147,7 @@ export const navInspectorSpec: InspectorSpec = {
       label: 'Logo asset',
       path: 'logoAssetId',
       placeholder: 'Logo asset ID (optional)',
-      emptyAsUndefined: true,
+      emptyOmits: true,
     },
   ],
 };
