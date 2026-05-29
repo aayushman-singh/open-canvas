@@ -1,5 +1,133 @@
 {
-  "styleKit": "charcoal",
+  "styleKit": "custom",
+  "customStyleKit": {
+    "bg": "#06070A",
+    "panel": "#0E1116",
+    "text": "#FAF8F2",
+    "muted": "#7A8290",
+    "accent": "#DEFF6E",
+    "accentText": "#06070A",
+    "fontFamilyDisplay": "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif",
+    "fontFamilyBody": "'Inter', system-ui, -apple-system, sans-serif",
+    "fontFamilyMono": "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+    "headingScale": 1.08,
+    "bodyScale": 0.98,
+    "labelScale": 0.78,
+    "lineHeight": 1.5,
+    "radius": "2px",
+    "borderWidth": "1px",
+    "shadow": "0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 16px 40px rgba(0, 0, 0, 0.5)",
+    "surfaceVariants": {
+      "flat": {
+        "background": "#0E1116",
+        "shadow": "none"
+      },
+      "raised": {
+        "background": "#11141A",
+        "border": "1px solid rgba(255, 255, 255, 0.06)",
+        "shadow": "0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 44px rgba(0, 0, 0, 0.55)",
+        "radius": "4px"
+      },
+      "glass": {
+        "background": "rgba(255, 255, 255, 0.04)",
+        "border": "1px solid rgba(255, 255, 255, 0.08)",
+        "shadow": "0 8px 24px rgba(0, 0, 0, 0.45)",
+        "radius": "4px"
+      },
+      "outlined": {
+        "background": "transparent",
+        "border": "1px solid rgba(255, 255, 255, 0.10)",
+        "radius": "2px"
+      },
+      "sticker": {
+        "background": "#11141A",
+        "border": "1px solid rgba(255, 255, 255, 0.10)",
+        "shadow": "4px 4px 0 #DEFF6E, 0 0 0 1px rgba(222, 255, 110, 0.20)",
+        "radius": "2px"
+      },
+      "editorial-frame": {
+        "background": "transparent",
+        "border": "2px solid #DEFF6E",
+        "radius": "0px"
+      },
+      "soft-panel": {
+        "background": "#0A0C10",
+        "shadow": "0 1px 0 rgba(255, 255, 255, 0.03) inset"
+      }
+    },
+    "shapeFill": "#DEFF6E",
+    "shapeStroke": "#7A8290",
+    "shapeStrokeWidth": "1px",
+    "actionRadius": "2px",
+    "actionPadding": "12px 22px",
+    "actionVariants": {
+      "solid": {
+        "background": "#DEFF6E",
+        "color": "#06070A",
+        "weight": 600,
+        "letterSpacing": "-0.01em"
+      },
+      "outline": {
+        "background": "transparent",
+        "color": "#FAF8F2",
+        "border": "1px solid rgba(250, 248, 242, 0.30)",
+        "weight": 500
+      },
+      "ghost": {
+        "background": "transparent",
+        "color": "#FAF8F2"
+      },
+      "pill": {
+        "background": "#DEFF6E",
+        "color": "#06070A",
+        "weight": 600,
+        "borderRadius": "999px"
+      },
+      "glass": {
+        "background": "rgba(255, 255, 255, 0.06)",
+        "color": "#FAF8F2",
+        "border": "1px solid rgba(255, 255, 255, 0.10)",
+        "backdropFilter": "blur(12px)",
+        "borderRadius": "2px"
+      },
+      "brutalist": {
+        "background": "#DEFF6E",
+        "color": "#06070A",
+        "border": "2px solid #06070A",
+        "weight": 800,
+        "borderRadius": "0px",
+        "boxShadow": "4px 4px 0 #06070A"
+      },
+      "underline": {
+        "background": "transparent",
+        "color": "#DEFF6E",
+        "textDecoration": "underline",
+        "borderRadius": "0px",
+        "padding": "0"
+      }
+    },
+    "motionDurationMs": 280,
+    "motionEasing": "cubic-bezier(0.2, 0, 0, 1.0)",
+    "motionPresets": {
+      "none": {},
+      "fade-up": { "transform": "translateY(12px)", "opacity": 0 },
+      "fade-down": { "transform": "translateY(-12px)", "opacity": 0 },
+      "fade-in": { "opacity": 0 },
+      "fade-right": { "transform": "translateX(-12px)", "opacity": 0 },
+      "slide-left": { "transform": "translateX(20px)", "opacity": 0 },
+      "slide-up": { "transform": "translateY(20px)" },
+      "slide-right": { "transform": "translateX(-20px)" },
+      "scale-in": { "transform": "scale(0.97)", "opacity": 0 },
+      "zoom-out": { "transform": "scale(1.06)", "opacity": 0 },
+      "blur-in": { "opacity": 0 },
+      "rotate-in": { "transform": "rotate(-4deg) scale(0.96)", "opacity": 0 },
+      "flip-in": { "transform": "perspective(600px) rotateY(90deg)", "opacity": 0 },
+      "bounce-in": { "transform": "scale(0.7)", "opacity": 0 },
+      "stagger-children": { "transform": "translateY(8px)", "opacity": 0, "delayMs": 60 },
+      "slow-drift": { "transform": "translateY(0px)" },
+      "parallax-soft": { "transform": "translateY(6px)" }
+    }
+  },
   "pages": [
     {
       "id": "page-enterprise-scale",
@@ -30,7 +158,7 @@
               "fontSize": 16,
               "fontWeight": 600,
               "align": "left",
-              "pinnedStyle": { "color": "#d8ff7a" }
+              "pinnedStyle": { "color": "#DEFF6E" }
             },
             {
               "id": "enterprise-hero-heading",
@@ -88,7 +216,7 @@
               "fontSize": 15,
               "fontWeight": 500,
               "align": "left",
-              "pinnedStyle": { "color": "#b8bdc8" }
+              "pinnedStyle": { "color": "#7A8290" }
             },
             {
               "id": "enterprise-hero-panel",
@@ -122,7 +250,7 @@
               "fontSize": 14,
               "fontWeight": 700,
               "align": "center",
-              "pinnedStyle": { "color": "#d8ff7a" }
+              "pinnedStyle": { "color": "#DEFF6E" }
             },
             {
               "id": "enterprise-hero-stat-one-card",
@@ -367,7 +495,7 @@
               "fontSize": 16,
               "fontWeight": 700,
               "align": "left",
-              "pinnedStyle": { "color": "#d8ff7a" }
+              "pinnedStyle": { "color": "#DEFF6E" }
             },
             {
               "id": "enterprise-outcomes-heading",
@@ -730,7 +858,7 @@
               "fontSize": 16,
               "fontWeight": 700,
               "align": "left",
-              "pinnedStyle": { "color": "#d8ff7a" }
+              "pinnedStyle": { "color": "#DEFF6E" }
             },
             {
               "id": "enterprise-scale-heading",
@@ -1071,7 +1199,7 @@
               "fontSize": 16,
               "fontWeight": 700,
               "align": "center",
-              "pinnedStyle": { "color": "#0c0c0d" }
+              "pinnedStyle": { "color": "#06070A" }
             },
             {
               "id": "enterprise-success-note",
