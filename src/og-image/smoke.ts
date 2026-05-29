@@ -247,9 +247,12 @@ async function runRenderAndCacheTests(): Promise<void> {
     `expected onPublishGenerateOg to render 2 pages, got ${String(result.rendered.length)}`,
   );
   assert(result.failed.length === 0, `expected zero failures, got ${result.failed.map((f) => f.slug).join(',')}`);
-  assertEq(freshMock.putCount, 2, 'puts after initial publish hook');
+  // Cold render writes two R2 objects per page: the version-key the OG route
+  // reads from, and the content-hash memo a future republish can hit.
+  assertEq(freshMock.putCount, 4, 'puts after initial publish hook (2 pages × {version-key, content-hash})');
 
-  // Re-fire the hook against the same R2; both pages skip via cache-hit.
+  // Re-fire the hook against the same R2 with the same SNAPSHOT — version-key
+  // HEAD hits and both pages skip without touching content-hash or render.
   const replay = await onPublishGenerateOg(
     SITE_ID,
     SNAPSHOT,
@@ -259,9 +262,11 @@ async function runRenderAndCacheTests(): Promise<void> {
   );
   assert(replay.rendered.length === 0, 'expected replay to skip every page');
   assert(replay.skipped.length === 2, 'expected replay to skip 2 pages');
-  assertEq(freshMock.putCount, 2, 'puts after replay hook (no new writes expected)');
+  assertEq(freshMock.putCount, 4, 'puts after replay hook (no new writes expected)');
 
-  // Bump the snapshot version → all pages re-render under fresh keys.
+  // Bump the snapshot version → version-key misses but content-hash memo
+  // still hits. Each page copies memo bytes to the new version-key (1 PUT)
+  // and skips Satori+resvg entirely.
   const bumped: PublishedSnapshot = { ...SNAPSHOT, version: 2 };
   const afterBump = await onPublishGenerateOg(
     SITE_ID,
@@ -270,8 +275,15 @@ async function runRenderAndCacheTests(): Promise<void> {
     {} as unknown as Db,
     SITE_NAME,
   );
-  assert(afterBump.rendered.length === 2, 'expected version bump to re-render all pages');
-  assertEq(freshMock.putCount, 4, 'puts after version-bumped publish hook');
+  assert(
+    afterBump.rendered.length === 2,
+    'expected version bump to write the new version-key for both pages',
+  );
+  assertEq(
+    freshMock.putCount,
+    6,
+    'puts after version-bumped publish hook (2 pages × 1 version-key write via memo hit)',
+  );
 }
 
 /**
@@ -362,8 +374,8 @@ async function runOverrideTest(): Promise<void> {
   assert(hookResult.rendered.includes('about'), 'expected non-override page to render');
   assert(hookResult.failed.length === 0, 'expected zero failures during override-mix publish');
   assert(
-    r2Mock.putCount === 1,
-    `expected exactly one R2 put (only the non-override page), got ${String(r2Mock.putCount)}`,
+    r2Mock.putCount === 2,
+    `expected exactly two R2 puts (the non-override page writes a version-key + a content-hash memo), got ${String(r2Mock.putCount)}`,
   );
 }
 

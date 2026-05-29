@@ -1,17 +1,23 @@
 // src/og-image/cache.ts
 //
-// R2 read-through cache for rendered OG PNGs. Keyed by the (siteId, pageSlug,
-// snapshotVersion) triple — bumping `publishedVersion` produces a fresh key,
-// so stale never serves. Old keys are NOT actively pruned: R2 lifecycle / a
-// future sweeper job handles them. Because each key embeds a monotonically
-// increasing version, name collisions are impossible.
+// R2 read-through cache for rendered OG PNGs. Two key shapes coexist:
 //
-// Contract:
-//   - `cacheKeyFor(siteId, slug, version)` is the only place that builds the
-//     R2 key string. Tests assert that path.
-//   - `readCached` returns the bytes + content type, or null if absent.
-//   - `writeCached` stores bytes as `image/png` with no conditional-put
-//     option — version-bumped keys never overlap so unconditional is fine.
+//   1. Version-keyed `og/{siteId}/{pageSlug}.v{version}.png` — the original
+//      shape the OG-serving route reads. Embedding the version means the
+//      route URL stays version-addressed and pre-existing cached PNGs from
+//      earlier publishes keep resolving.
+//
+//   2. Content-hash-keyed `og/c/{contentHash}.png` — a memo. The on-publish
+//      hook computes a deterministic hash of every input that affects the
+//      rendered SVG (siteName, page title/description, first section, style
+//      preset). When a republish produces an unchanged hash, the hook can
+//      copy bytes from the memo to the new version-key and skip the
+//      Satori+resvg pipeline entirely — the expensive part is CPU, and the
+//      Workers CPU budget is what 1102 trips on under concurrent load.
+//
+// Both key shapes resolve to `image/png` bytes. The memo is shared across
+// sites — content-hash is global — so if two sites happen to render an
+// identical OG card they share R2 storage.
 
 import type { R2Client } from '../assets/r2-client.js';
 
@@ -84,5 +90,57 @@ export async function writeCached(
   bytes: Uint8Array,
 ): Promise<void> {
   const key = cacheKeyFor(siteId, pageSlug, version);
+  await r2.put(key, bytes, OG_CONTENT_TYPE);
+}
+
+// ---------------------------------------------------------------------------
+// Content-hash memo cache. The on-publish hook uses this to skip Satori+resvg
+// when the per-page render inputs are unchanged from a prior render anywhere
+// in the bucket. The memo is read-once / write-once per content hash.
+// ---------------------------------------------------------------------------
+
+/**
+ * R2 key for a content-hash memo. The hash MUST be lowercase hex; the
+ * regex is enforced at the boundary so a bad hash never silently writes to
+ * a malformed key.
+ */
+export function contentCacheKeyFor(contentHash: string): string {
+  if (!/^[0-9a-f]{32,64}$/.test(contentHash)) {
+    throw new Error(
+      `contentCacheKeyFor: contentHash must be 32-64 lowercase hex chars, got ${contentHash}`,
+    );
+  }
+  return `og/c/${contentHash}.png`;
+}
+
+/**
+ * Fetch the memoed bytes for a content hash. Returns null on miss; the caller
+ * then renders fresh + `writeContentCached`s. The hot-path optimisation in
+ * `onPublishGenerateOg` is to skip rendering on hit.
+ */
+export async function readContentCached(
+  r2: R2Client,
+  contentHash: string,
+): Promise<CachedOg | null> {
+  const key = contentCacheKeyFor(contentHash);
+  const obj = await r2.get(key);
+  if (obj === null) return null;
+  const buf = await obj.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  const contentType = obj.httpMetadata?.contentType ?? OG_CONTENT_TYPE;
+  return { bytes, contentType };
+}
+
+/**
+ * Write bytes to a content-hash memo key. Unconditional — content-hash keys
+ * are by definition collision-free for the same inputs, so racing concurrent
+ * writes produce the same bytes.
+ */
+export async function writeContentCached(
+  r2: R2Client,
+  contentHash: string,
+  bytes: Uint8Array,
+): Promise<void> {
+  const key = contentCacheKeyFor(contentHash);
   await r2.put(key, bytes, OG_CONTENT_TYPE);
 }
