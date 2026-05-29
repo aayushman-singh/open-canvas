@@ -197,10 +197,7 @@ export const RENDER_DISPATCH: RenderDispatch = {
 // than a runtime no-op, matching the failure mode RENDER_DISPATCH catches.
 // A future element type that legitimately wants no inspector adds itself
 // to the Exclude<...> list as an explicit opt-out.
-export type InspectorDispatch = Record<
-  Exclude<CanvasElement['type'], 'collection'>,
-  InspectorSpec
->;
+export type InspectorDispatch = Record<Exclude<CanvasElement['type'], 'collection'>, InspectorSpec>;
 
 export const INSPECTOR_DISPATCH: InspectorDispatch = {
   shape: shapeInspectorSpec,

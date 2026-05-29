@@ -208,8 +208,14 @@ function checkField(field: InspectorField, fixture: object, where: string): void
     case 'select-mapped':
       assert(field.options.length > 0, `${where} select-mapped: options must be non-empty`);
       for (const opt of field.options) {
-        assert(typeof opt.label === 'string' && opt.label.length > 0, `${where} select-mapped: option.label required`);
-        assert(typeof opt.value === 'number' && Number.isFinite(opt.value), `${where} select-mapped: option.value must be a finite number`);
+        assert(
+          typeof opt.label === 'string' && opt.label.length > 0,
+          `${where} select-mapped: option.label required`,
+        );
+        assert(
+          typeof opt.value === 'number' && Number.isFinite(opt.value),
+          `${where} select-mapped: option.value must be a finite number`,
+        );
       }
       assert(
         typeof field.defaultValue === 'number' && Number.isFinite(field.defaultValue),
@@ -270,7 +276,9 @@ function checkField(field: InspectorField, fixture: object, where: string): void
     default: {
       const exhaustive: never = field;
       void exhaustive;
-      throw new Error(`${where}: unknown field kind ${JSON.stringify((field as { kind: string }).kind)}`);
+      throw new Error(
+        `${where}: unknown field kind ${JSON.stringify((field as { kind: string }).kind)}`,
+      );
     }
   }
 }
@@ -281,7 +289,10 @@ assert(types.length > 0, 'INSPECTOR_DISPATCH must declare at least one entry');
 for (const type of types) {
   const spec = INSPECTOR_DISPATCH[type];
   assert(spec !== undefined, `${type}: dispatch entry must be defined`);
-  assert(spec.fields.length > 0, `${type}: spec.fields must be non-empty (a stub spec hides the editor field)`);
+  assert(
+    spec.fields.length > 0,
+    `${type}: spec.fields must be non-empty (a stub spec hides the editor field)`,
+  );
 
   const fixture = FIXTURES[type];
   assert(
