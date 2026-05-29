@@ -236,23 +236,33 @@ const authPageStyles = `
     min-width: 0 !important;
     margin: 0 !important;
   }
-  /* "Secured by Clerk" badge: Clerk renders it 400x48 inside .cl-card,
-     which crowds the OAuth row and visually shifts everything right. Move
-     it under the card as a centred, muted footnote so the form aligns
-     cleanly with the tabs and the badge still appears. */
-  .cl-logoBox {
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-    width: auto !important;
-    height: auto !important;
+  /* "Secured by Clerk" badge: rendered by Clerk free-tier as a vertical
+     red sticker absolutely positioned to the left of the card. The class
+     name is randomised (cl-internal-*) so we can't hook it from CSS by
+     name; instead the bootstrap script below finds the anchor pointing
+     at clerk.com and rewrites the wrapping element's inline styles to a
+     small horizontal footnote centred under the card. The two rules
+     below are the *target* styles applied to that element once we add
+     the .oc-clerk-badge class — the script does that on every mount
+     and via MutationObserver so React re-renders don't undo us. */
+  .oc-clerk-badge {
+    position: static !important;
+    writing-mode: horizontal-tb !important;
+    transform: none !important;
     margin: 20px auto 0 !important;
-    padding: 0 !important;
-    opacity: 0.55;
-    transform: scale(0.9);
-    transform-origin: center top;
+    width: auto !important;
+    max-width: 100% !important;
+    height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    opacity: 0.45;
+    font-size: 11px !important;
   }
-  .cl-logoBox:hover { opacity: 0.85; }
+  .oc-clerk-badge:hover { opacity: 0.85; }
+  .oc-clerk-badge svg { width: auto !important; height: 12px !important; }
+  .oc-clerk-badge a { color: var(--ink-3) !important; }
   .oc-clerk-header,
   .oc-clerk-header-title,
   .oc-clerk-header-subtitle {
@@ -428,7 +438,31 @@ function Page({
         if(mode==="signup"){window.Clerk.mountSignUp(host,opts);}
         else{window.Clerk.mountSignIn(host,opts);}
       }
+      // Move Clerk's "Secured by Clerk" badge from its default vertical
+      // sticker position (absolutely placed to the left of the card) into
+      // a small horizontal footnote centred under the card. The badge's
+      // class is randomised (cl-internal-*) — identify it via the link's
+      // href and tag the wrapper with .oc-clerk-badge so the CSS above
+      // applies. Re-runs whenever Clerk's React tree mutates so a
+      // re-render doesn't undo us.
+      function relocateBadge(){
+        var anchor=host.querySelector('a[href*="clerk.com" i]');
+        if(!anchor)return;
+        var wrapper=anchor;
+        for(var i=0;i<6&&wrapper&&wrapper!==host;i++){
+          var pos=getComputedStyle(wrapper).position;
+          if(pos==="absolute"||pos==="fixed")break;
+          wrapper=wrapper.parentElement;
+        }
+        if(!wrapper||wrapper===host)wrapper=anchor.parentElement;
+        if(wrapper&&!wrapper.classList.contains("oc-clerk-badge")){
+          wrapper.classList.add("oc-clerk-badge");
+        }
+      }
+      var badgeObserver=new MutationObserver(function(){relocateBadge();});
+      badgeObserver.observe(host,{childList:true,subtree:true});
       mount();
+      relocateBadge();
       var tabSi=document.getElementById("tab-signin");
       var tabSu=document.getElementById("tab-signup");
       var title=document.getElementById("auth-title");
