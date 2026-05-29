@@ -1,0 +1,116 @@
+# .dev.vars.example — local development environment template.
+#
+# Copy this file to `.dev.vars` and fill in real values. `.dev.vars` is
+# git-ignored and read automatically by `wrangler dev`. Production values
+# are set via `wrangler secret put <NAME>` and never committed.
+#
+# Every variable listed here is referenced somewhere in `src/`. Grouped by
+# subsystem; placeholder values are the canonical rev01 dev values for
+# non-secrets, or `<your-…>` markers for secrets.
+
+# ---------------------------------------------------------------------------
+# Host config (ADR 0013)
+# ---------------------------------------------------------------------------
+# Apex host the deployment serves under. Every cookie scope, public-host
+# subdomain detector, and Clerk allowlist derives from this single value.
+APP_DOMAIN=rev01.aayushman.dev
+# Comma-separated origins Clerk should treat as "us." Forks add their own
+# dev origins here (e.g. http://localhost:5173) so the local handshake
+# does not silently reject.
+AUTHORIZED_PARTIES=http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788,https://rev01.aayushman.dev
+
+# ---------------------------------------------------------------------------
+# Cookies (ADR 0017)
+# ---------------------------------------------------------------------------
+# Prefix every Worker-issued cookie name carries (`${PREFIX}edit`,
+# `${PREFIX}unlock`, etc.). Forks rebrand by changing this one value.
+COOKIE_NAME_PREFIX=__rev01_
+
+# ---------------------------------------------------------------------------
+# Email (ADR 0018)
+# ---------------------------------------------------------------------------
+# Outbound `From:` address. Must be a verified sender at the provider
+# (Resend). Forks set this to their own verified address.
+EMAIL_FROM=hello@rev01.aayushman.dev
+# Resend.com API key for transactional email (invites, password resets).
+RESEND_API_KEY=<your-resend-api-key>
+
+# ---------------------------------------------------------------------------
+# Auth (Clerk)
+# ---------------------------------------------------------------------------
+# Live Clerk application keys. Production secrets in deploy, dev secrets
+# locally. Pair: a publishable key (browser-safe) and a secret key.
+CLERK_PUBLISHABLE_KEY=<your-clerk-publishable-key>
+CLERK_SECRET_KEY=<your-clerk-secret-key>
+# Optional Clerk Test app keypair. When BOTH are populated, the Worker
+# prefers them over the live pair so local `wrangler dev` runs against a
+# Clerk Test app (which accepts localhost; live apps reject it). Leave
+# blank in production secrets; never copy these into prod.
+CLERK_TEST_PUBLISHABLE_KEY=<your-clerk-test-publishable-key>
+CLERK_TEST_SECRET_KEY=<your-clerk-test-secret-key>
+# Dev-only override for the origin used to rebuild request URLs when
+# wrangler dev rewrites the Host header to the prod custom-domain pattern.
+# Defaults to http://127.0.0.1:8787 when unset.
+DEV_PUBLIC_HOST=http://127.0.0.1:8787
+# HMAC-SHA256 secret signing edit-token / unlock cookies and refresh
+# tokens. Must be a long random string; rotation invalidates all live
+# editor sessions.
+UNLOCK_SIGNING_SECRET=<your-unlock-signing-secret>
+# Comma-separated Clerk user ids granted admin access to /admin routes.
+ADMIN_CLERK_USER_IDS=<your-clerk-user-id>
+
+# ---------------------------------------------------------------------------
+# Database (Neon)
+# ---------------------------------------------------------------------------
+# Neon Serverless Postgres connection string. Owns the rev01 schema.
+DATABASE_URL=<your-neon-postgres-url>
+
+# ---------------------------------------------------------------------------
+# Cloudflare — TWO different concerns share this section. `CF_*` are the
+# worker's runtime env vars (read inside the Worker via `env.CF_*` in
+# src/custom-domain/route.ts and poll.ts). `CLOUDFLARE_*` are wrangler's
+# CLI auth env vars (used by `wrangler deploy` in CI to authenticate
+# against the Cloudflare account). Both are needed; they are distinct keys.
+# ---------------------------------------------------------------------------
+# --- Worker runtime (read via env.CF_*) ---
+# API token with Custom Hostnames permissions for the zone below.
+CF_API_TOKEN=<your-cloudflare-api-token>
+# Zone id under which Custom Hostnames are provisioned.
+CF_ZONE_ID=<your-cloudflare-zone-id>
+# --- Wrangler CLI auth (used by `wrangler deploy`, not by the Worker) ---
+CLOUDFLARE_API_TOKEN=<your-cloudflare-api-token>
+CLOUDFLARE_ACCOUNT_ID=<your-cloudflare-account-id>
+
+# ---------------------------------------------------------------------------
+# Forms (Turnstile + webhook signing)
+# ---------------------------------------------------------------------------
+# Cloudflare Turnstile server-side verify secret.
+TURNSTILE_SECRET=<your-turnstile-secret>
+# Cloudflare Turnstile public site key (browser-embedded).
+TURNSTILE_SITE_KEY=<your-turnstile-site-key>
+# HMAC-SHA256 secret signing outbound form webhook payloads so receivers
+# can verify authenticity.
+WEBHOOK_SIGNING_SECRET=<your-webhook-signing-secret>
+
+# ---------------------------------------------------------------------------
+# Site import (external scraper)
+# ---------------------------------------------------------------------------
+# Base URL of the Playwright scraper service used by /api/import.
+SCRAPER_URL=<your-scraper-base-url>
+# Shared secret for Worker → scraper authentication.
+SCRAPER_API_SECRET=<your-scraper-api-secret>
+
+# ---------------------------------------------------------------------------
+# AI providers
+# ---------------------------------------------------------------------------
+# Google Gemini API key used by the canvas agent and chat routes.
+GEMINI_API_KEY=<your-gemini-api-key>
+# Replicate API token used by image-generation tools in canvas routes.
+REPLICATE_API_TOKEN=<your-replicate-api-token>
+
+# ---------------------------------------------------------------------------
+# Smoke / test mode
+# ---------------------------------------------------------------------------
+# Set to "1" by smoke harnesses to bypass certain auth paths. Never set
+# in production.
+# SMOKE=1
