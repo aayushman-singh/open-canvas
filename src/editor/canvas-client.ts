@@ -9292,34 +9292,42 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                       } else if (kind === "tool-call") {
                         appendChatMessage("assistant", "[Calling " + (data.name || "tool") + "]");
                       } else if (kind === "op-preview") {
-                        var opDiv = document.createElement("div");
-                        opDiv.className = "rev01-chat-msg assistant";
-                        opDiv.textContent = "Proposed: " + (data.toolName || "edit") + " ";
-                        var acceptBtn = document.createElement("button");
-                        acceptBtn.textContent = "Accept";
-                        acceptBtn.style.cssText = "margin-left:8px;padding:4px 10px;border:1px solid var(--rev01-accent);background:var(--rev01-accent);color:var(--rev01-bg);border-radius:4px;cursor:pointer;font-size:12px;";
-                        acceptBtn.addEventListener("click", function() {
-                          acceptBtn.disabled = true;
-                          acceptBtn.textContent = "Applying...";
-                          authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
-                            method: "POST",
-                            headers: { "content-type": "application/json" },
-                            body: JSON.stringify({ ops: [data.op] }),
-                          }).then(function(r) { return r.json(); }).then(function(body) {
-                            if (body && body.editableState) {
-                              state = body.editableState;
-                              renderAll();
-                              scheduleSave();
-                              setStatus("Agent changes applied", "ok");
-                              acceptBtn.textContent = "Applied";
-                            } else {
-                              acceptBtn.textContent = "Failed";
-                            }
-                          }).catch(function() { acceptBtn.textContent = "Failed"; });
-                        });
-                        opDiv.appendChild(acceptBtn);
-                        chatMessages.appendChild(opDiv);
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                        // IIFE-scope the op + toolName snapshots so the Accept
+                        // handler captures THIS event's op, not whatever the
+                        // function-scoped data happens to hold at click time.
+                        // Without this, accepting any preview after another
+                        // SSE event arrived sent the wrong (or empty) op body
+                        // and the apply layer returned 400.
+                        (function(opSnapshot, toolNameSnapshot) {
+                          var opDiv = document.createElement("div");
+                          opDiv.className = "rev01-chat-msg assistant";
+                          opDiv.textContent = "Proposed: " + (toolNameSnapshot || "edit") + " ";
+                          var acceptBtn = document.createElement("button");
+                          acceptBtn.textContent = "Accept";
+                          acceptBtn.style.cssText = "margin-left:8px;padding:4px 10px;border:1px solid var(--rev01-accent);background:var(--rev01-accent);color:var(--rev01-bg);border-radius:4px;cursor:pointer;font-size:12px;";
+                          acceptBtn.addEventListener("click", function() {
+                            acceptBtn.disabled = true;
+                            acceptBtn.textContent = "Applying...";
+                            authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
+                              method: "POST",
+                              headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ ops: [opSnapshot] }),
+                            }).then(function(r) { return r.json(); }).then(function(body) {
+                              if (body && body.editableState) {
+                                state = body.editableState;
+                                renderAll();
+                                scheduleSave();
+                                setStatus("Agent changes applied", "ok");
+                                acceptBtn.textContent = "Applied";
+                              } else {
+                                acceptBtn.textContent = "Failed";
+                              }
+                            }).catch(function() { acceptBtn.textContent = "Failed"; });
+                          });
+                          opDiv.appendChild(acceptBtn);
+                          chatMessages.appendChild(opDiv);
+                          chatMessages.scrollTop = chatMessages.scrollHeight;
+                        })(data.op, data.toolName);
                       } else if (kind === "error") {
                         appendChatMessage("error", data.error || data.message || "Agent error");
                       } else if (kind === "done") {

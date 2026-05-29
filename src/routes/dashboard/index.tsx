@@ -14,13 +14,13 @@ import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
+import { appDomain, type HostConfigEnv } from '../../host-config';
 
-type Bindings = {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
-  DEV_PUBLIC_HOST?: string;
   DATABASE_URL: string;
   TURNSTILE_SITE_KEY?: string;
 };
@@ -1105,6 +1105,7 @@ dashboard.get('/', async (c) => {
   const customerPlan = customerRecord?.plan ?? 'free';
 
   const origin = new URL(c.req.url).origin;
+  const apex = appDomain(c.env);
 
   let cards: SiteCard[] = [];
   let publishedCount = 0;
@@ -1257,7 +1258,7 @@ dashboard.get('/', async (c) => {
               Subdomain <small>(optional)</small>
             </label>
             <input type="text" id="import-subdomain" placeholder="auto-generated from name" />
-            <p class="field-hint">.rev01.aayushman.dev</p>
+            <p class="field-hint">.{apex}</p>
           </div>
           <div class="import-error" id="import-error"></div>
           <div class="import-progress" id="import-progress">
@@ -1298,11 +1299,11 @@ dashboard.get('/', async (c) => {
                 <h3>{s.siteName}</h3>
                 <a
                   class="site-card-addr"
-                  href={`https://${s.subdomain}.rev01.aayushman.dev`}
+                  href={`https://${s.subdomain}.${apex}`}
                   target="_blank"
                   rel="noopener"
                 >
-                  {s.subdomain}.rev01.aayushman.dev
+                  {s.subdomain}.{apex}
                 </a>
                 <div class="site-card-meta">
                   <Badge variant="info">{s.styleKit}</Badge>

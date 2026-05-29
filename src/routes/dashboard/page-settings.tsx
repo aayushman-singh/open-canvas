@@ -36,12 +36,13 @@ import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Card, readThemeCookie } from '../../ui';
+import { appDomain, type HostConfigEnv } from '../../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -1055,7 +1056,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
   // The bare /assets/<id> path only resolves on the published-site host.
   const assetUrl = (id: string) =>
     `/api/canvas/sites/${encodeURIComponent(siteId)}/assets/${encodeURIComponent(id)}`;
-  const publishedHost = `${subdomain}.rev01.aayushman.dev`;
+  const publishedHost = `${subdomain}.${appDomain(c.env)}`;
   const publishedUrl = `https://${publishedHost}${page.slug.length > 0 ? `/${page.slug}` : '/'}`;
   // Initials for the SERP favicon fallback (when no custom favicon is set).
   const siteInitial = siteName.trim().slice(0, 1).toUpperCase() || 'R';

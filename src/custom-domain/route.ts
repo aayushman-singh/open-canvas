@@ -23,8 +23,9 @@ import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { db } from '../db/client.js';
 import { customDomain, customer, site } from '../db/schema.js';
+import type { HostConfigEnv } from '../host-config.js';
 
-type Bindings = {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
@@ -99,6 +100,7 @@ router.post('/', async (c) => {
   try {
     result = await registerCustomDomain(
       { db: db(c.env), cf: cfClientFor(c.env) },
+      c.env,
       { siteId, customerId, hostname },
     );
   } catch (err) {

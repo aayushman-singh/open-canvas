@@ -4,15 +4,15 @@ compatibility_date = "2026-05-25"
 compatibility_flags = ["nodejs_compat"]
 
 [[routes]]
-pattern = "rev01.aayushman.dev"
+pattern = "opencanvas.aayushman.dev"
 custom_domain = true
 
 # Wildcard for Published Addresses. Workers Custom Domains do not support
 # wildcards, so this is a Workers Route on the aayushman.dev zone (no
-# `custom_domain = true`). The wildcard CNAME for *.rev01.aayushman.dev is
-# already provisioned in Cloudflare DNS.
+# `custom_domain = true`). The wildcard CNAME for *.opencanvas.aayushman.dev
+# must be provisioned in Cloudflare DNS before this route activates.
 [[routes]]
-pattern = "*.rev01.aayushman.dev/*"
+pattern = "*.opencanvas.aayushman.dev/*"
 zone_name = "aayushman.dev"
 
 [[rules]]
@@ -97,19 +97,19 @@ bucket_name = "rev01-assets"
 # Settings → Variables), but plain `wrangler deploy` resets dashboard-set
 # values on every deploy — that caused a prod outage on 2026-05-29 when a
 # deploy stripped AUTHORIZED_PARTIES and every request 500'd at the Clerk
-# middleware boundary. ADR 0013 specifies these as env-driven; putting the
-# canonical rev01 values here means a fork rebrands by editing this block
-# AND the route patterns above in lockstep.
+# middleware boundary. ADR 0013 + ADR 0018 specify these as env-driven;
+# putting the canonical Open Canvas values here means a fork rebrands by
+# editing this block AND the route patterns above in lockstep.
 #
 # Update WHEN: the apex hostname in the [[routes]] blocks above changes.
 # These must move together; cookie scoping (`cookieDomain`) is `APP_DOMAIN`,
 # Clerk's `authenticateRequest` consults `AUTHORIZED_PARTIES`, and the
 # outbound sender uses the apex.
 [vars]
-APP_DOMAIN = "rev01.aayushman.dev"
-AUTHORIZED_PARTIES = "https://rev01.aayushman.dev,http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788"
-COOKIE_NAME_PREFIX = "__rev01_"
-EMAIL_FROM = "noreply@rev01.aayushman.dev"
+APP_DOMAIN = "opencanvas.aayushman.dev"
+AUTHORIZED_PARTIES = "https://opencanvas.aayushman.dev,http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788"
+COOKIE_NAME_PREFIX = "__opencanvas_"
+EMAIL_FROM = "noreply@opencanvas.aayushman.dev"
 
 # Wave 1 #5 (custom domains, plan 05). Cron tick every 5 minutes invokes
 # the `scheduled` handler exported from src/index.ts which delegates to

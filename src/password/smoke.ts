@@ -221,7 +221,13 @@ function makeContext(url: string, cookieHeader: string | null): FakeContext {
 
 async function runMiddlewareSuite(): Promise<void> {
   const secret = 'middleware-test-secret';
-  const env: RequireUnlockEnv = { UNLOCK_SIGNING_SECRET: secret };
+  const env: RequireUnlockEnv = {
+    UNLOCK_SIGNING_SECRET: secret,
+    APP_DOMAIN: 'opencanvas.aayushman.dev',
+    AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+    COOKIE_NAME_PREFIX: '__opencanvas_',
+    EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
+  };
   const passwordSetAt = new Date('2026-05-23T12:00:00Z');
   const hash = await hashPassword('letmein');
   const protectedSite: PasswordProtectedSite = {
@@ -240,12 +246,12 @@ async function runMiddlewareSuite(): Promise<void> {
   };
 
   // (a) Disabled gate → null.
-  const cOpen = makeContext('https://x.rev01.aayushman.dev/about', null);
+  const cOpen = makeContext('https://x.opencanvas.aayushman.dev/about', null);
   const r1 = await requireUnlock(cOpen as never, env, openSite);
   assert(r1 === null, 'disabled site should return null');
 
   // (b) Enabled, no cookie → 401 gate body.
-  const cNoCookie = makeContext('https://x.rev01.aayushman.dev/about', null);
+  const cNoCookie = makeContext('https://x.opencanvas.aayushman.dev/about', null);
   const r2 = await requireUnlock(cNoCookie as never, env, protectedSite);
   assert(r2 !== null, 'protected site without cookie should return a response');
   assert(r2.status === 401, `expected 401 gate response, got ${String(r2.status)}`);
@@ -260,7 +266,7 @@ async function runMiddlewareSuite(): Promise<void> {
     passwordSetAt,
   });
   const cookieHeader = `${unlockCookieName(protectedSite.id)}=${token}`;
-  const cWithCookie = makeContext('https://x.rev01.aayushman.dev/about', cookieHeader);
+  const cWithCookie = makeContext('https://x.opencanvas.aayushman.dev/about', cookieHeader);
   const r3 = await requireUnlock(cWithCookie as never, env, protectedSite);
   assert(r3 === null, 'valid cookie should pass through');
 
@@ -270,26 +276,26 @@ async function runMiddlewareSuite(): Promise<void> {
     passwordSetAt: new Date('2026-05-23T11:00:00Z'),
   });
   const staleCookie = `${unlockCookieName(protectedSite.id)}=${staleToken}`;
-  const cStale = makeContext('https://x.rev01.aayushman.dev/about', staleCookie);
+  const cStale = makeContext('https://x.opencanvas.aayushman.dev/about', staleCookie);
   const r4 = await requireUnlock(cStale as never, env, protectedSite);
   assert(r4 !== null, 'stale-hashEpoch cookie should be rejected');
   assert(r4.status === 401, 'stale cookie response should be 401');
 
   // (e) Unlock path bypasses the gate so the unlock POST can land.
-  const cReserved = makeContext('https://x.rev01.aayushman.dev/__rev01/unlock', null);
+  const cReserved = makeContext('https://x.opencanvas.aayushman.dev/__rev01/unlock', null);
   const r5 = await requireUnlock(cReserved as never, env, protectedSite);
   assert(r5 === null, 'unlock path must bypass the gate');
 
   // (f) Visitor subsystem paths are still visitor traffic and must stay
   // behind the password gate. Search results and form submissions would
   // otherwise leak protected-site state.
-  const cSearch = makeContext('https://x.rev01.aayushman.dev/__rev01/search?q=secret', null);
+  const cSearch = makeContext('https://x.opencanvas.aayushman.dev/__rev01/search?q=secret', null);
   const rSearch = await requireUnlock(cSearch as never, env, protectedSite);
   assert(rSearch !== null, 'protected visitor search must be gated without a cookie');
   assert(rSearch.status === 401, 'protected visitor search gate response should be 401');
 
   // (g) Retry + ratelimited markers surface in the rendered gate.
-  const cRetry = makeContext('https://x.rev01.aayushman.dev/about?retry=1', null);
+  const cRetry = makeContext('https://x.opencanvas.aayushman.dev/about?retry=1', null);
   const r6 = await requireUnlock(cRetry as never, env, protectedSite);
   assert(r6 !== null, 'retry path still renders gate');
   const retryBody = await r6.text();
@@ -300,7 +306,7 @@ async function runMiddlewareSuite(): Promise<void> {
     'retry gate should strip retry marker from redirect input',
   );
 
-  const cRl = makeContext('https://x.rev01.aayushman.dev/about?ratelimited=1', null);
+  const cRl = makeContext('https://x.opencanvas.aayushman.dev/about?ratelimited=1', null);
   const r7 = await requireUnlock(cRl as never, env, protectedSite);
   assert(r7 !== null, 'ratelimited path still renders gate');
   const rlBody = await r7.text();
@@ -367,7 +373,11 @@ function runGateSanitiseSuite(): void {
   assert(sanitiseRedirect('/x?q=1') === '/x?q=1', 'querystring is preserved');
   assert(sanitiseRedirect('/x\rinjected') === '/', 'CR-injection should be neutralised');
   // The renderer html-escapes the redirect for the hidden input.
-  const html = renderGateHtml({ redirect: '/safe', siteName: 'Acme & Co' });
+  const html = renderGateHtml({
+    redirect: '/safe',
+    siteName: 'Acme & Co',
+    appOrigin: 'https://opencanvas.aayushman.dev',
+  });
   assert(html.includes('Acme &amp; Co'), 'site name should be HTML-escaped');
   assert(html.includes('value="/safe"'), 'redirect should land in hidden input');
 }

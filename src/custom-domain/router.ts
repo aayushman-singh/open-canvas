@@ -2,7 +2,7 @@
 //
 // Public host resolver for custom hostnames. Called by `src/routes/public.ts`
 // as the second arm of the public host router (the first is the wildcard
-// subdomain arm under `*.rev01.aayushman.dev`).
+// subdomain arm under the configured apex).
 //
 // Contract:
 //   resolveCustomDomain(hostHeader, env, db) → { siteId } | null

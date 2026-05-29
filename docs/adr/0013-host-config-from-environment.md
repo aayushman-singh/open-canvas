@@ -1,9 +1,10 @@
 # ADR 0013 — The apex host is environment-driven; production code reads it through one helper
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** Theme D of the rev01 OSS code review (handoff-rev01-batch-27 §"Theme D"); promoted in urgency by the 2026-05-28 verification pass (`C:/Users/Aayushman/AppData/Local/Temp/claude/verification-pass-2026-05-28.md` §4) which found 36 files / 98 occurrences of the hardcoded apex, not the 10+ originally claimed.
+**Accepted-context:** Implemented in the same pass as the rev01 → opencanvas apex move (2026-05-29). Acceptance came alongside the move because the move would otherwise have required 36 file-edits per the failure mode this ADR names.
 
 ## Context
 

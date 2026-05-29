@@ -2,7 +2,7 @@
 //
 // Public host router for Published Sites.
 //
-// Inspects the request host. If it matches `<subdomain>.rev01.aayushman.dev`
+// Inspects the request host. If it matches `<subdomain>.<APP_DOMAIN>`
 // we own the request: load the site by subdomain, serve either the rendered
 // snapshot (any path) or upgrade /__live to a SiteRoom WebSocket. For any
 // other host we return null so the app's existing routes (landing, dashboard,
@@ -71,8 +71,14 @@ import {
   themeBootScript,
   readThemeCookie,
 } from '../ui/theme';
+import {
+  appDomain,
+  appOrigin,
+  publicHostSuffix,
+  type HostConfigEnv,
+} from '../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
@@ -99,13 +105,12 @@ interface Bindings {
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
-
-// Hosts that belong to the rev01 app itself (not a Published Site). We
-// short-circuit on these so app traffic doesn't pay the DB lookup cost and we
-// never accidentally treat the app host as a Published Address.
+// Hosts that belong to the app itself (not a Published Site). We short-circuit
+// on these so app traffic doesn't pay the DB lookup cost and we never
+// accidentally treat the app host as a Published Address. The configured apex
+// (`APP_DOMAIN`) is added per-request inside `handlePublicRequest` so a fork
+// gets its own apex routed correctly without source edits.
 const APP_HOSTS = new Set([
-  'rev01.aayushman.dev',
   'rev01.test',
   'localhost:8787',
   'localhost',
@@ -301,7 +306,13 @@ type OnSiteEditorSite = Pick<PublicSiteRow, 'id' | 'name' | 'subdomain' | 'style
 type OnSiteEditorTokenPayload = Pick<EditTokenPayload, 'siteId' | 'customerId' | 'clerkUserId'>;
 type OnSiteEditorEnv = Pick<
   Bindings,
-  'CLERK_PUBLISHABLE_KEY' | 'CLERK_SECRET_KEY' | 'UNLOCK_SIGNING_SECRET'
+  | 'CLERK_PUBLISHABLE_KEY'
+  | 'CLERK_SECRET_KEY'
+  | 'UNLOCK_SIGNING_SECRET'
+  | 'APP_DOMAIN'
+  | 'AUTHORIZED_PARTIES'
+  | 'COOKIE_NAME_PREFIX'
+  | 'EMAIL_FROM'
 >;
 
 export async function buildOnSiteEditorOptions(
@@ -325,6 +336,8 @@ export async function buildOnSiteEditorOptions(
     siteName: siteRow.name,
     subdomain: siteRow.subdomain,
     styleKit: siteRow.styleKit as EditorPageOptions['styleKit'],
+    apex: appDomain(env),
+    apexOrigin: appOrigin(env),
     context: 'public',
     clerkPublishableKey: resolveClerkKeys(env).publishableKey,
     wsToken,
@@ -372,9 +385,10 @@ async function loadPublicSiteById(env: Bindings, siteId: string): Promise<Public
   return rows[0] ?? null;
 }
 
-function extractSubdomain(host: string): string | null {
-  if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
-  const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
+function extractSubdomain(env: HostConfigEnv, host: string): string | null {
+  const suffix = publicHostSuffix(env);
+  if (!host.endsWith(suffix)) return null;
+  const prefix = host.slice(0, host.length - suffix.length);
   if (prefix.length === 0) return null;
   // Reject nested subdomains under the public namespace — only one label is
   // allowed (matches the SUBDOMAIN_RE shape enforced at site creation).
@@ -392,14 +406,14 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
 ): Promise<Response> {
   // Token transfer: the auth popup passes the signed token via postMessage,
   // and the bootstrap page redirects here with ?__transfer=<token>. The helper
-  // decides whether to domain-scope (rev01 subdomain) or host-scope (custom
+  // decides whether to domain-scope (apex subdomain) or host-scope (custom
   // domain) based on the request host.
   const requestUrl = new URL(c.req.url);
   const transfer = requestUrl.searchParams.get('__transfer');
   if (transfer) {
     const tp = await verifyEditToken(transfer, c.env.UNLOCK_SIGNING_SECRET);
     if (tp && tp.siteId === siteRow.id) {
-      const cookie = buildEditTokenCookieHeader(transfer, requestUrl.host);
+      const cookie = buildEditTokenCookieHeader(c.env, transfer, requestUrl.host);
       return new Response(null, {
         status: 302,
         headers: { Location: '/?edit', 'Set-Cookie': cookie },
@@ -412,6 +426,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
 
   if (!payload || payload.siteId !== siteRow.id) {
     const siteIdJson = JSON.stringify(siteRow.id);
+    const apexOriginJson = JSON.stringify(appOrigin(c.env));
     return c.html(
       `<!DOCTYPE html>
 <html lang="en">
@@ -419,7 +434,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="color-scheme" content="dark" />
-  <title>rev01 — sign in to edit</title>
+  <title>Open Canvas — sign in to edit</title>
   <style>
     body { margin: 0; display: flex; align-items: center; justify-content: center;
            min-height: 100vh; font-family: system-ui, sans-serif;
@@ -436,20 +451,21 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     if (!window.crypto || typeof window.crypto.randomUUID !== "function") {
       document.querySelector(".wrap p").textContent =
         "This browser cannot start secure sign-in.";
-      throw new Error("rev01 on-site edit requires crypto.randomUUID");
+      throw new Error("on-site edit requires crypto.randomUUID");
     }
+    var apexOrigin = ${apexOriginJson};
     var authState = window.crypto.randomUUID();
-    var authUrl = "https://rev01.aayushman.dev/api/on-site-edit?siteId=" +
+    var authUrl = apexOrigin + "/api/on-site-edit?siteId=" +
       encodeURIComponent(${siteIdJson}) +
       "&returnOrigin=" + encodeURIComponent(location.origin) +
       "&state=" + encodeURIComponent(authState);
     var popup = window.open(
       authUrl,
-      "rev01_auth",
+      "oc_auth",
       "width=420,height=320,menubar=no,toolbar=no"
     );
     window.addEventListener("message", function(e) {
-      if (e.origin !== "https://rev01.aayushman.dev") return;
+      if (e.origin !== apexOrigin) return;
       if (e.source !== popup) return;
       if (e.data && e.data.type === "rev01:edit-ready") {
         if (e.data.siteId !== ${siteIdJson}) return;
@@ -536,7 +552,7 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
-  const cookieValue = buildEditTokenCookieHeader(editToken, new URL(c.req.url).host);
+  const cookieValue = buildEditTokenCookieHeader(c.env, editToken, new URL(c.req.url).host);
 
   return new Response(null, {
     status: 302,
@@ -566,9 +582,9 @@ function ocLogoSvg(size: number): string {
 // Visitors land here unauthenticated; we link the wordmark out to the
 // product surface so the brand stays consumable but never injects the
 // authenticated chrome.
-function poweredByOpenCanvasHtml(): string {
+function poweredByOpenCanvasHtml(env: HostConfigEnv): string {
   return (
-    `<div class="powered"><a href="https://rev01.aayushman.dev" target="_blank" rel="noopener">` +
+    `<div class="powered"><a href="${appOrigin(env)}" target="_blank" rel="noopener">` +
     `<span class="oc-logo" style="color:var(--ink-3)">${ocLogoSvg(18)}</span>` +
     `Powered by Open Canvas</a></div>`
   );
@@ -642,7 +658,7 @@ function buildNotFoundPage<P extends string, I extends Input>(
         <a href="/" class="btn btn-primary btn-lg">Back to home</a>
       </div>
     </div>
-    ${poweredByOpenCanvasHtml()}
+    ${poweredByOpenCanvasHtml(c.env)}
   </div>
 </body>
 </html>`,
@@ -702,7 +718,7 @@ function buildComingSoonPage<P extends string, I extends Input>(
       </div>
     </div>
     <p class="owner">Are you the owner? <a href="/?edit">Sign in</a> to finish and publish your site.</p>
-    ${poweredByOpenCanvasHtml()}
+    ${poweredByOpenCanvasHtml(c.env)}
   </div>
 </body>
 </html>`,
@@ -718,22 +734,23 @@ function escapeHtmlForPage(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function buildPublishedFooterHtml(): string {
-  return `<footer data-rev01-footer style="
+function buildPublishedFooterHtml(env: HostConfigEnv): string {
+  const origin = appOrigin(env);
+  return `<footer data-oc-footer style="
   margin-top:40px;padding:20px 0;border-top:1px solid rgba(128,128,128,0.15);
   display:flex;align-items:center;justify-content:center;gap:24px;
   font-family:system-ui,sans-serif;font-size:12px;color:rgba(128,128,128,0.6);
-  "><a href="https://rev01.aayushman.dev" target="_blank" rel="noopener"
-  style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
+  "><a href="${origin}" target="_blank" rel="noopener"
+  style="display:inline-flex;align-items:center;gap:6px;color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
   onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
-  >made with rev01</a
+  ><span style="display:inline-flex;align-items:center">${ocLogoSvg(14)}</span>made with Open Canvas</a
   ><span style="opacity:0.3">&middot;</span
   ><a href="/?edit"
   style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
   onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
   >edit this site</a
   ><span style="opacity:0.3">&middot;</span
-  ><a href="https://rev01.aayushman.dev/dashboard/templates" target="_blank" rel="noopener"
+  ><a href="${origin}/dashboard/templates" target="_blank" rel="noopener"
   style="color:inherit;text-decoration:none;opacity:0.8;transition:opacity 0.2s"
   onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'"
   >browse templates</a
@@ -746,8 +763,10 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   const requestUrl = new URL(c.req.url);
   const host = requestUrl.host;
   const path = requestUrl.pathname;
+  const suffix = publicHostSuffix(c.env);
+  const apex = appDomain(c.env);
 
-  if (APP_HOSTS.has(host)) {
+  if (host === apex || APP_HOSTS.has(host)) {
     return null;
   }
   // Custom domain arm (Wave 1 #5): if the host isn't the app or a subdomain
@@ -756,16 +775,16 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // any host that doesn't match an active row, which falls through to the
   // null-return below — the request then lands on the app's regular routes
   // (which will 404 if no route matches the host).
-  const customDomainHit = host.endsWith(PUBLIC_HOST_SUFFIX)
+  const customDomainHit = host.endsWith(suffix)
     ? null
     : await resolveCustomDomainWithRuntimeCache(host, c.env);
-  if (!host.endsWith(PUBLIC_HOST_SUFFIX) && !customDomainHit) return null;
+  if (!host.endsWith(suffix) && !customDomainHit) return null;
 
   let siteRow: PublicSiteRow | null;
   if (customDomainHit) {
     siteRow = await loadPublicSiteById(c.env, customDomainHit.siteId);
   } else {
-    const subdomain = extractSubdomain(host);
+    const subdomain = extractSubdomain(c.env, host);
     if (subdomain === null) return null;
     siteRow = await loadPublicSite(c.env, subdomain);
   }
@@ -1003,7 +1022,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
         </head>
         <body>
           <div data-rev01-public-root>${raw(snapshotHtml)}</div>
-          ${raw(buildPublishedFooterHtml())}
+          ${raw(buildPublishedFooterHtml(c.env))}
           <script type="module">
             ${raw(visitorScript)};
           </script>

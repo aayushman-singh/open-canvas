@@ -23,7 +23,7 @@ type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
 export const SUBDOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 
-// Reserved subdomains under *.rev01.aayushman.dev:
+// Reserved subdomains under the configured apex:
 // - www/api/app/admin: standard reservations.
 // - dashboard/health: overlap with the app's own routes.
 export const RESERVED_SUBDOMAINS = new Set(['www', 'api', 'app', 'admin', 'dashboard', 'health']);
@@ -540,6 +540,61 @@ sites.post('/', async (c) => {
     return c.json({ siteId: newSiteId }, 201);
   }
   return c.redirect('/dashboard', 302);
+});
+
+// DELETE /api/sites/:siteId
+//
+// Owner-scoped, irreversible removal of a single site. Schema has
+// `onDelete: 'cascade'` on every site-rooted FK (page / site_snapshot /
+// site_collaborator / site_search_entry / site_font / form_submission /
+// custom_domain / site_addon / chat_session / slot_history), so a single
+// row delete drops the entire site graph. Owner Assets are owner-rooted
+// (ADR 0004) and survive — they may still be referenced by other sites.
+//
+// 404 (not 403) on a site the caller does not own, to avoid leaking the
+// existence of other owners' site ids.
+sites.delete('/:siteId', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('DELETE /api/sites/:siteId reached without an authenticated user');
+  }
+
+  const siteId = c.req.param('siteId');
+  if (typeof siteId !== 'string' || siteId.length === 0) {
+    return c.json({ error: 'siteId is required' }, 400);
+  }
+
+  const database = db(c.env);
+
+  const customerRow = await database
+    .select({ id: customer.id })
+    .from(customer)
+    .where(eq(customer.clerkUserId, auth.userId))
+    .limit(1);
+  const customerRecord = customerRow[0];
+  if (!customerRecord) {
+    return c.json({ error: 'no customer row for current user' }, 409);
+  }
+
+  const targetRow = await database
+    .select({ id: site.id, customerId: site.customerId })
+    .from(site)
+    .where(eq(site.id, siteId))
+    .limit(1);
+  const target = targetRow[0];
+  if (!target || target.customerId !== customerRecord.id) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  const deleted = await database.delete(site).where(eq(site.id, siteId)).returning({ id: site.id });
+  if (deleted.length === 0) {
+    return c.json({ error: 'site not found' }, 404);
+  }
+
+  if (wantsJson(c)) {
+    return c.json({ deleted: true, siteId }, 200);
+  }
+  return c.redirect('/dashboard', 303);
 });
 
 export default sites;

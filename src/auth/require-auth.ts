@@ -1,12 +1,12 @@
 import { createMiddleware } from 'hono/factory';
 import { resolveAuthRedirectUrl, resolveClerkKeys, type ClerkAuthVariables } from './middleware';
+import type { HostConfigEnv } from '../host-config';
 
-type ClerkBindings = {
+type ClerkBindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
-  DEV_PUBLIC_HOST?: string;
 };
 
 // Derives the Account Portal origin from the publishable key.

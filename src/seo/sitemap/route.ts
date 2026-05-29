@@ -5,7 +5,7 @@
 //
 // Lifecycle:
 //   1. Resolve the site row from the Host header. We accept either the
-//      `*.rev01.aayushman.dev` subdomain shape OR a custom domain (see
+//      `*.<APP_DOMAIN>` subdomain shape OR a custom domain (see
 //      `src/custom-domain/`). Resolution duplicates the helpers in
 //      `src/routes/public.ts` rather than importing from them — the public
 //      router does not export its host-resolution primitives, and the
@@ -13,11 +13,11 @@
 //      duplication is acceptable so long as it is documented.
 //
 //      Documented duplication:
-//        - `extractSubdomain(host)` mirrors the same-named helper in
+//        - `extractSubdomain(env, host)` mirrors the same-named helper in
 //          `src/routes/public.ts` and `src/search/route.ts`. Same shape,
-//          same nested-subdomain reject. Any change to the public host
-//          suffix MUST be mirrored across all three sites; the constant
-//          `PUBLIC_HOST_SUFFIX` is defined locally for the same reason.
+//          same nested-subdomain reject. The suffix derives from the
+//          shared `publicHostSuffix` helper (ADR 0013) so all three sites
+//          read the same source.
 //        - `loadPublicSnapshotBySubdomain` mirrors `loadPublicSite` from
 //          public.ts but projects only the columns we need:
 //          (`id`, `subdomain`, `publishedSnapshot`). We do NOT read the
@@ -45,16 +45,17 @@ import type { PublishedSnapshot } from '../../canvas/schema.js';
 import { db } from '../../db/client.js';
 import { site } from '../../db/schema.js';
 import { resolveCustomDomainWithRuntimeCache } from '../../custom-domain/router.js';
+import { publicHostSuffix, type HostConfigEnv } from '../../host-config.js';
 import { buildSitemapXml } from './build.js';
 import { buildRobotsTxt } from './robots.js';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   DATABASE_URL: string;
   // Custom-domain resolver reads the CF binding to look up the host row
   // when the host isn't a subdomain Published Address.
   CF_API_TOKEN?: string;
   CF_ZONE_ID?: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -66,13 +67,12 @@ const router = new Hono<Env>();
 // host shape must be propagated across all three sites.
 // ---------------------------------------------------------------------------
 
-const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
-
 const CACHE_CONTROL_PUBLIC_1H = 'public, max-age=3600';
 
-function extractSubdomain(host: string): string | null {
-  if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
-  const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
+function extractSubdomain(env: HostConfigEnv, host: string): string | null {
+  const suffix = publicHostSuffix(env);
+  if (!host.endsWith(suffix)) return null;
+  const prefix = host.slice(0, host.length - suffix.length);
   if (prefix.length === 0) return null;
   if (prefix.includes('.')) return null;
   return prefix;
@@ -119,8 +119,8 @@ async function loadPublicSnapshotById(
 }
 
 async function resolveSiteForHost(env: Bindings, host: string): Promise<ResolvedSite | null> {
-  if (host.endsWith(PUBLIC_HOST_SUFFIX)) {
-    const subdomain = extractSubdomain(host);
+  if (host.endsWith(publicHostSuffix(env))) {
+    const subdomain = extractSubdomain(env, host);
     if (subdomain === null) return null;
     return await loadPublicSnapshotBySubdomain(env, subdomain);
   }

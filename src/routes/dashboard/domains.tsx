@@ -24,12 +24,13 @@ import { db } from '../../db/client';
 import { customDomain, customer, site, type CustomDomain } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
+import { appDomain, type HostConfigEnv } from '../../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -201,13 +202,16 @@ interface VerificationInstruction {
  * etc.), we render the raw JSON so the Owner can still copy/paste it. We
  * never silently swallow — the visible JSON is the diagnostic.
  */
-function deriveInstructions(record: Record<string, unknown>): VerificationInstruction[] {
+function deriveInstructions(
+  record: Record<string, unknown>,
+  apex: string,
+): VerificationInstruction[] {
   const out: VerificationInstruction[] = [];
   out.push({
     kind: 'cname',
     recordType: 'CNAME',
     recordName: typeof record.hostname === 'string' ? record.hostname : 'your hostname',
-    recordValue: 'rev01.aayushman.dev',
+    recordValue: apex,
   });
 
   const ownership = record.ownership_verification;
@@ -288,8 +292,8 @@ function statusChip(status: CustomDomain['status']) {
   );
 }
 
-function DomainRow({ domain }: { domain: CustomDomain }) {
-  const instructions = deriveInstructions(domain.verificationRecord);
+function DomainRow({ domain, apex }: { domain: CustomDomain; apex: string }) {
+  const instructions = deriveInstructions(domain.verificationRecord, apex);
   const errorsRaw = (domain.verificationRecord as { verification_errors?: unknown })
     .verification_errors;
   const errors: string[] = Array.isArray(errorsRaw)
@@ -435,6 +439,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
     .select()
     .from(customDomain)
     .where(eq(customDomain.siteId, siteId));
+  const apex = appDomain(c.env);
 
   return c.html(
     <DashboardShell
@@ -454,7 +459,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
       <div class="dcard">
         <div class="drow">
           <div class="dn">
-            <b>{owned.subdomain}.rev01.aayushman.dev</b>
+            <b>{owned.subdomain}.{apex}</b>
             <small>Free address · included with every site</small>
           </div>
           <span class="chip chip-ok">
@@ -467,7 +472,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
             No custom domains yet. Connect one below to use your own web address.
           </div>
         ) : (
-          domains.map((row) => <DomainRow domain={row} />)
+          domains.map((row) => <DomainRow domain={row} apex={apex} />)
         )}
       </div>
 
@@ -502,7 +507,7 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
           <div class="dns-row">
             <span>CNAME</span>
             <span class="v">www</span>
-            <span class="v">rev01.aayushman.dev</span>
+            <span class="v">{apex}</span>
           </div>
           <div class="dns-row">
             <span>A</span>

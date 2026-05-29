@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { SIGN_OUT_COOKIE_NAMES, buildExpiredSignOutCookieHeaders } from './sign-out-route.js';
 import { EDIT_TOKEN_COOKIE } from './edit-token.js';
+import type { HostConfigEnv } from '../host-config.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[sign-out-route:smoke] ${message}`);
@@ -15,17 +16,27 @@ assert(
   'sign-out must clear the on-site editor auth cookie as well as Clerk cookies',
 );
 
+// Test against an injected APP_DOMAIN (ADR 0013 decision 7) — the smoke
+// asserts the contract (cookie scoped to the configured apex when the host
+// is the apex / a sub-host), not a specific brand literal.
+const testEnv: HostConfigEnv = {
+  APP_DOMAIN: 'opencanvas.aayushman.dev',
+  AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
+};
 const prodHeaders = buildExpiredSignOutCookieHeaders(
-  new URL('https://rev01.aayushman.dev/sign-out'),
+  testEnv,
+  new URL(`https://${testEnv.APP_DOMAIN}/sign-out`),
 );
 assert(
   prodHeaders.some(
     (header) =>
       header.startsWith(`${EDIT_TOKEN_COOKIE}=`) &&
-      header.includes('Domain=rev01.aayushman.dev') &&
+      header.includes(`Domain=${testEnv.APP_DOMAIN}`) &&
       header.includes('Max-Age=0'),
   ),
-  'sign-out must expire the edit token on the shared rev01 domain',
+  'sign-out must expire the edit token on the configured apex domain',
 );
 assert(
   prodHeaders.some(

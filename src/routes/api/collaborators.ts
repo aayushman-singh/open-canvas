@@ -7,8 +7,9 @@ import { db } from '../../db/client.js';
 import { customer, site, siteCollaborator, type CollaboratorRole } from '../../db/schema.js';
 import { sendEmail } from '../../email/send.js';
 import { inviteEmailHtml, inviteEmailSubject } from '../../email/templates/invite.js';
+import { appDomain, appOrigin, type HostConfigEnv } from '../../host-config.js';
 
-type Bindings = {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
@@ -61,6 +62,7 @@ async function requireSiteOwner(
 }
 
 interface InviteEmailContext {
+  env: Bindings;
   siteId: string;
   siteName: string;
   siteSubdomain: string;
@@ -68,25 +70,24 @@ interface InviteEmailContext {
   invitedEmail: string;
   role: CollaboratorRole;
   inviterName: string;
-  signingSecret: string;
-  resendApiKey: string;
 }
 
 async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
   const inviteToken = await signInviteToken(
     { siteId: ctx.siteId, collaboratorId: ctx.collaboratorId, invitedEmail: ctx.invitedEmail },
-    ctx.signingSecret,
+    ctx.env.UNLOCK_SIGNING_SECRET,
   );
   // Main-domain landing instead of the published subdomain so a later
   // subdomain rename doesn't break this link. The redirector resolves
   // siteId -> current subdomain at click time.
-  const acceptUrl = `https://rev01.aayushman.dev/__invite?token=${encodeURIComponent(inviteToken)}`;
-  await sendEmail(ctx.resendApiKey, {
+  const acceptUrl = `${appOrigin(ctx.env)}/__invite?token=${encodeURIComponent(inviteToken)}`;
+  await sendEmail(ctx.env, {
     to: ctx.invitedEmail,
     subject: inviteEmailSubject(ctx.siteName),
     html: inviteEmailHtml({
       siteName: ctx.siteName,
       siteSubdomain: ctx.siteSubdomain,
+      apex: appDomain(ctx.env),
       inviterName: ctx.inviterName,
       role: ctx.role,
       acceptUrl,
@@ -96,7 +97,7 @@ async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
 
 function resolveInviterName(c: Context<Env>, fallbackEmail: string): string {
   const ownerUser = c.get('user');
-  if (!ownerUser) return 'A rev01 user';
+  if (!ownerUser) return 'A user';
   const named = `${ownerUser.firstName ?? ''} ${ownerUser.lastName ?? ''}`.trim();
   return named || fallbackEmail;
 }
@@ -263,8 +264,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
       invitedEmail: rawEmail,
       role,
       inviterName: resolveInviterName(c, rawEmail),
-      signingSecret: c.env.UNLOCK_SIGNING_SECRET,
-      resendApiKey: c.env.RESEND_API_KEY,
+      env: c.env,
     });
   } catch (err) {
     await database.delete(siteCollaborator).where(eq(siteCollaborator.id, collaboratorId));
@@ -353,8 +353,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators/:collabId/resend', async (c)
       invitedEmail: row.invitedEmail,
       role: row.role,
       inviterName: resolveInviterName(c, row.invitedEmail),
-      signingSecret: c.env.UNLOCK_SIGNING_SECRET,
-      resendApiKey: c.env.RESEND_API_KEY,
+      env: c.env,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

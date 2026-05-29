@@ -27,6 +27,7 @@
 import { type Context } from 'hono';
 import { readUnlockCookieFromHeader, verifyUnlockCookie } from './cookie.js';
 import { renderGateHtml } from './gate.js';
+import { appOrigin, type HostConfigEnv } from '../host-config.js';
 
 export interface PasswordProtectedSite {
   /** Site row id (UUID). Used for the cookie name and JWT payload. */
@@ -41,10 +42,10 @@ export interface PasswordProtectedSite {
   passwordSetAt: Date | null;
 }
 
-export interface RequireUnlockEnv {
+export type RequireUnlockEnv = HostConfigEnv & {
   /** HS256 cookie signing secret. Worker secret per wrangler.toml. */
   UNLOCK_SIGNING_SECRET: string;
-}
+};
 
 const UNLOCK_PATH = '/__rev01/unlock';
 
@@ -141,6 +142,7 @@ export async function requireUnlock(
     showError,
     showRateLimit,
     siteName: site.name,
+    appOrigin: appOrigin(env),
     ...(gateTheme ? { theme: gateTheme } : {}),
   });
 

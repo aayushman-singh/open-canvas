@@ -41,8 +41,9 @@ import { onPublishGenerateOg } from '../../og-image/on-publish';
 import { runAudit } from '../../a11y/audit';
 import { rebuildSearchIndex } from '../../search/indexer';
 import { injectInteractiveRuntime } from '../../interactive/inject';
+import { appDomain, type HostConfigEnv } from '../../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
@@ -54,7 +55,7 @@ interface Bindings {
   // Cloudflare Turnstile public site key — required at the render boundary
   // when any page in the snapshot contains a form element.
   TURNSTILE_SITE_KEY?: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -500,7 +501,7 @@ publishApi.post('/sites/:siteId', async (c) => {
     c.json({
       ok: true,
       version: snapshot.version,
-      publicUrl: `https://${row.subdomain}.rev01.aayushman.dev/`,
+      publicUrl: `https://${row.subdomain}.${appDomain(c.env)}/`,
     }),
   );
 });

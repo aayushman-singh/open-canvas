@@ -90,8 +90,8 @@ export const starterTemplate = buildTemplate({
   heroBody: [
     { text: 'Position elements freely. Pick a style kit. ' },
     {
-      text: 'Publish to rev01.aayushman.dev',
-      marks: [{ type: 'link', href: 'https://rev01.aayushman.dev' }],
+      text: 'Publish to opencanvas.aayushman.dev',
+      marks: [{ type: 'link', href: 'https://opencanvas.aayushman.dev' }],
     },
     { text: '.' },
   ],

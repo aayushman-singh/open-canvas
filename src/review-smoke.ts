@@ -50,11 +50,21 @@ function assert(condition: boolean, message: string): asserts condition {
 // deterministic against the empty dev DB.
 const SMOKE_UNLOCK_SIGNING_SECRET = process.env.UNLOCK_SIGNING_SECRET ?? 'smoke-test-secret';
 
+// Test APP_DOMAIN (ADR 0013 decision 7) — smokes assert against the configured
+// apex via env, never the canonical brand literal. A future apex rename does
+// not require touching this file.
+const SMOKE_APP_DOMAIN = 'opencanvas.aayushman.dev';
+const SMOKE_APP_ORIGIN = `https://${SMOKE_APP_DOMAIN}`;
+
 const smokeEnv: Record<string, string> = {
   DATABASE_URL: process.env.DATABASE_URL ?? '',
   CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY ?? '',
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
   UNLOCK_SIGNING_SECRET: SMOKE_UNLOCK_SIGNING_SECRET,
+  APP_DOMAIN: SMOKE_APP_DOMAIN,
+  AUTHORIZED_PARTIES: `http://localhost:8787,http://127.0.0.1:8787,${SMOKE_APP_ORIGIN}`,
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: `noreply@${SMOKE_APP_DOMAIN}`,
   // Required at the render boundary now that Turnstile threads through ctx
   // (see ADR-touched batch 1 finding #3). Real production keys live in
   // wrangler secrets; smoke uses a stub the renderer treats as a valid key.
@@ -673,9 +683,16 @@ assert(
   'expected dashboard Sign out anchor to point at the worker-local /sign-out route',
 );
 
-const livePublishableKey = `pk_live_${btoa('clerk.rev01.aayushman.dev$')}`;
+const livePublishableKey = `pk_live_${btoa(`clerk.${SMOKE_APP_DOMAIN}$`)}`;
 const testPublishableKey = `pk_test_${btoa('local-dev.clerk.accounts.dev$')}`;
+const hostEnvForRedirects = {
+  APP_DOMAIN: SMOKE_APP_DOMAIN,
+  AUTHORIZED_PARTIES: SMOKE_APP_ORIGIN,
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: `noreply@${SMOKE_APP_DOMAIN}`,
+};
 const devClerkEnv = {
+  ...hostEnvForRedirects,
   CLERK_PUBLISHABLE_KEY: livePublishableKey,
   CLERK_SECRET_KEY: 'sk_live_review_smoke',
   CLERK_TEST_PUBLISHABLE_KEY: testPublishableKey,
@@ -683,12 +700,13 @@ const devClerkEnv = {
   DEV_PUBLIC_HOST: 'http://localhost:8787',
 };
 const liveClerkEnv = {
+  ...hostEnvForRedirects,
   CLERK_PUBLISHABLE_KEY: livePublishableKey,
   CLERK_SECRET_KEY: 'sk_live_review_smoke',
 };
 const devSignInRedirect = resolveAuthRedirectUrl(
   devClerkEnv,
-  'https://rev01.aayushman.dev/dashboard?next=sites',
+  `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
 );
 assert(
   devSignInRedirect === 'http://localhost:8787/dashboard?next=sites',
@@ -711,7 +729,7 @@ assert(
 // (e.g. landing page handoff back to /) rely on it.
 const devRootRedirect = resolveAuthRedirectUrl(
   devClerkEnv,
-  'https://rev01.aayushman.dev/dashboard',
+  `${SMOKE_APP_ORIGIN}/dashboard`,
   '/',
 );
 assert(
@@ -720,25 +738,25 @@ assert(
 );
 const liveRedirect = resolveAuthRedirectUrl(
   liveClerkEnv,
-  'https://rev01.aayushman.dev/dashboard?next=sites',
+  `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
 );
 assert(
-  liveRedirect === 'https://rev01.aayushman.dev/dashboard?next=sites',
+  liveRedirect === `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
   `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
 );
 const liveRootRedirect = resolveAuthRedirectUrl(
   liveClerkEnv,
-  'https://rev01.aayushman.dev/dashboard',
+  `${SMOKE_APP_ORIGIN}/dashboard`,
   '/',
 );
 assert(
-  liveRootRedirect === 'https://rev01.aayushman.dev/',
+  liveRootRedirect === `${SMOKE_APP_ORIGIN}/`,
   `expected live root redirect to use the live origin, got ${liveRootRedirect}`,
 );
 try {
   resolveAuthRedirectUrl(
     devClerkEnv,
-    'https://rev01.aayushman.dev/dashboard',
+    `${SMOKE_APP_ORIGIN}/dashboard`,
     'https://example.invalid/',
   );
   throw new Error('expected absolute auth redirect override paths to be rejected');
@@ -832,8 +850,9 @@ assert(
 );
 assert(
   canvasIndexSource.includes('const settingsHref =') &&
-    canvasIndexSource.includes('https://rev01.aayushman.dev/dashboard/sites/'),
-  'expected on-site editor Settings link to point at the app dashboard host',
+    canvasIndexSource.includes('appOrigin(') &&
+    canvasIndexSource.includes('/dashboard/sites/'),
+  'expected on-site editor Settings link to point at the env-driven app dashboard origin (ADR 0013)',
 );
 assert(
   !/const value = body\.config\[field\.key\];\s*if \(value === undefined\) continue;/.test(
@@ -1113,10 +1132,10 @@ assert(
 );
 
 // -- Task 5: public host router -------------------------------------------
-// An unknown subdomain under *.rev01.aayushman.dev should be handled by the
+// An unknown subdomain under the configured apex should be handled by the
 // public router (not the app's landing/health/etc.) and return 404 because
 // no site row matches.
-const unknownSubdomain = await responseFromHost('unknown-subdomain.rev01.aayushman.dev', '/');
+const unknownSubdomain = await responseFromHost(`unknown-subdomain.${SMOKE_APP_DOMAIN}`, '/');
 assert(
   unknownSubdomain.status === 404,
   `expected unknown Published Address to 404, got ${unknownSubdomain.status}`,
@@ -1131,16 +1150,16 @@ assert(
   `expected unknown-subdomain 404 body to mention "not found" or "not yet published" (got ${JSON.stringify(unknownSubdomain.body)})`,
 );
 
-// The app host (rev01.aayushman.dev) must still serve the landing page —
+// The app host (configured apex) must still serve the landing page —
 // the public router has to return null on this host, not intercept it.
-const appHostLanding = await responseFromHost('rev01.aayushman.dev', '/');
+const appHostLanding = await responseFromHost(SMOKE_APP_DOMAIN, '/');
 assert(
   appHostLanding.status === 200,
-  `expected rev01.aayushman.dev / to still serve the landing page, got ${appHostLanding.status}`,
+  `expected ${SMOKE_APP_DOMAIN} / to still serve the landing page, got ${appHostLanding.status}`,
 );
 assert(
   appHostLanding.body.includes('site builder for the rest of us'),
-  'expected rev01.aayushman.dev / to render the Open Canvas landing copy',
+  `expected ${SMOKE_APP_DOMAIN} / to render the Open Canvas landing copy`,
 );
 
 // -- Task 5.5: publish smoke + broadcast payload hardening ----------------
@@ -1159,7 +1178,7 @@ if (!smokeEnv.DATABASE_URL) {
 const smokeDb = db({ DATABASE_URL: smokeEnv.DATABASE_URL });
 const SMOKE_CLERK_USER = 'smoke-user-' + crypto.randomUUID().slice(0, 8);
 const SMOKE_SUB = 'smoke-' + crypto.randomUUID().slice(0, 8).toLowerCase();
-const SMOKE_HOST = `${SMOKE_SUB}.rev01.aayushman.dev`;
+const SMOKE_HOST = `${SMOKE_SUB}.${SMOKE_APP_DOMAIN}`;
 
 try {
   const insertedCustomer = await smokeDb
@@ -1240,7 +1259,7 @@ try {
   // 5. App host /__live → NOT a 426 (public router returns null, app routes
   // take over). The exact status doesn't matter as long as the public router
   // did not handle it as a Published Address.
-  const appLive = await responseFromHost('rev01.aayushman.dev', '/__live');
+  const appLive = await responseFromHost(SMOKE_APP_DOMAIN, '/__live');
   assert(
     appLive.status !== 426,
     `expected app host /__live not to be a 426 (public router should ignore the app host), got ${appLive.status}`,
@@ -1601,7 +1620,7 @@ for (const recipeId of SECTION_RECIPE_IDS as readonly SectionRecipeId[]) {
 
 // Route shell: hitting /api/canvas-agent/sites/:siteId/preview without auth
 // MUST redirect to the Clerk sign-in URL (clerkAuth + requireAuth gate). The
-// public host router only intercepts *.rev01.aayushman.dev; the app host
+// public host router only intercepts *.<APP_DOMAIN>; the app host
 // (rev01.test by default in review-smoke) falls through to the app routes.
 const t7PreviewProbe = await app.request(
   'http://rev01.test/api/canvas-agent/sites/probe/preview',

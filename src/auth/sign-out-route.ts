@@ -22,10 +22,11 @@
 
 import { Hono, type Context } from 'hono';
 
+import { cookieDomain, publicHostSuffix, type HostConfigEnv } from '../host-config.js';
 import { EDIT_TOKEN_COOKIE } from './edit-token.js';
 import { clerkAuth, type ClerkAuthVariables } from './middleware.js';
 
-type Bindings = {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
@@ -40,7 +41,6 @@ const signOutRoute = new Hono<SignOutEnv>();
 // development instance cookies tables. Listed exhaustively so a future
 // Clerk SDK update that ships a new cookie still leaves us clearing the
 // known ones.
-const SHARED_AUTH_COOKIE_DOMAIN = 'rev01.aayushman.dev';
 
 export const SIGN_OUT_COOKIE_NAMES = [
   '__session',
@@ -66,15 +66,17 @@ function expiredCookieHeader(name: string, secure: boolean, domain?: string): st
   return parts.join('; ');
 }
 
-export function buildExpiredSignOutCookieHeaders(requestUrl: URL): string[] {
+export function buildExpiredSignOutCookieHeaders(
+  env: HostConfigEnv,
+  requestUrl: URL,
+): string[] {
   const secure = requestUrl.protocol === 'https:';
   const hostname = requestUrl.hostname.toLowerCase();
+  const apex = cookieDomain(env);
+  const suffix = publicHostSuffix(env);
   const domains: Array<string | undefined> = [undefined];
-  if (
-    hostname === SHARED_AUTH_COOKIE_DOMAIN ||
-    hostname.endsWith(`.${SHARED_AUTH_COOKIE_DOMAIN}`)
-  ) {
-    domains.push(SHARED_AUTH_COOKIE_DOMAIN);
+  if (hostname === apex || hostname.endsWith(suffix)) {
+    domains.push(apex);
   }
 
   const headers: string[] = [];
@@ -124,7 +126,7 @@ async function handleSignOut(c: Context<SignOutEnv>) {
       return c.text(`sign-out failed: ${describeError(err)}`, 502);
     }
   }
-  for (const header of buildExpiredSignOutCookieHeaders(new URL(c.req.url))) {
+  for (const header of buildExpiredSignOutCookieHeaders(c.env, new URL(c.req.url))) {
     c.header('Set-Cookie', header, { append: true });
   }
   return c.redirect('/', 302);

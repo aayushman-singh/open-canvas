@@ -23,15 +23,16 @@ import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
 import { db } from '../db/client';
 import { customer, site } from '../db/schema';
+import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -55,6 +56,10 @@ export interface EditorPageOptions {
   siteName: string;
   subdomain: string;
   styleKit: StyleKit;
+  /** Apex host (ADR 0013) — drives published-address chip and Settings link. */
+  apex: string;
+  /** Canonical app origin (`https://<apex>`). */
+  apexOrigin: string;
   context?: 'dashboard' | 'public';
   clerkPublishableKey?: string;
   wsToken?: string;
@@ -98,14 +103,14 @@ async function lookupOwnedSite(
 }
 
 export function editorPageJsx(opts: EditorPageOptions) {
-  const { siteId, siteName, subdomain, styleKit, context = 'dashboard', clerkPublishableKey, wsToken, theme } = opts;
+  const { siteId, siteName, subdomain, styleKit, apex, apexOrigin, context = 'dashboard', clerkPublishableKey, wsToken, theme } = opts;
   const apiBase = context === 'public' ? '/__api' : '/api';
   const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
-  const publicAddress = `${subdomain}.rev01.aayushman.dev`;
+  const publicAddress = `${subdomain}.${apex}`;
   const settingsPath = `/dashboard/sites/${encodeURIComponent(siteId)}/settings`;
   const settingsHref =
     context === 'public'
-      ? `https://rev01.aayushman.dev/dashboard/sites/${encodeURIComponent(siteId)}/settings`
+      ? `${apexOrigin}/dashboard/sites/${encodeURIComponent(siteId)}/settings`
       : settingsPath;
 
   const breadcrumbs =
@@ -455,6 +460,8 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       siteName: owned.name,
       subdomain: owned.subdomain,
       styleKit: owned.styleKit,
+      apex: appDomain(c.env),
+      apexOrigin: appOrigin(c.env),
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
       wsToken,

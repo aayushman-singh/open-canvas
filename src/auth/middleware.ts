@@ -5,6 +5,12 @@ import { createMiddleware } from 'hono/factory';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { site } from '../db/schema';
+import {
+  authorizedParties,
+  publicHostSuffix,
+  resolveDevPublicOrigin,
+  type HostConfigEnv,
+} from '../host-config';
 import { upsertCustomerFromClerk } from './customer-upsert';
 import { EDIT_TOKEN_COOKIE, verifyEditToken } from './edit-token';
 
@@ -14,19 +20,21 @@ export type AuthState = {
   getToken: ((options?: { template?: string }) => Promise<string | null>) | null;
 };
 
-type ClerkBindings = {
+// Minimal env shape for picking a Clerk key pair. Leaf callers
+// (`resolveClerkKeys`, `usesTestClerkKeys`) read only the four `CLERK_*`
+// fields; widening the parameter to the full `ClerkBindings` (which spreads
+// `HostConfigEnv`) would force every route file that just wants a key pair
+// to inject APP_DOMAIN/AUTHORIZED_PARTIES/EMAIL_FROM into its local
+// `Bindings`. The narrower type keeps host config out of the call signature.
+export type ClerkKeyEnv = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
-  // Optional dev-only keys for a Clerk Test app. When the request host is
-  // localhost / 127.0.0.1, we prefer these so the Clerk handshake builds a
-  // working dev portal URL (test apps accept localhost; live apps don't).
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
-  // Optional override for the dev origin used to rebuild request URLs when
-  // wrangler dev's routes-based URL synthesis is in effect. When omitted,
-  // local development uses http://127.0.0.1:8787.
-  DEV_PUBLIC_HOST?: string;
 };
+
+type ClerkBindings = HostConfigEnv &
+  ClerkKeyEnv;
 
 export type ClerkAuthVariables = {
   auth: AuthState;
@@ -43,14 +51,10 @@ function isNonEmptyString(value: string | undefined): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
-const AUTHORIZED_PARTIES = [
-  'http://localhost:8787',
-  'http://localhost:8788',
-  'http://127.0.0.1:8787',
-  'http://127.0.0.1:8788',
-  'https://rev01.aayushman.dev',
-];
-const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
+// Accepted origins, public-host suffix, and the dev-public-origin override
+// all derive from env (`AUTHORIZED_PARTIES`, `APP_DOMAIN`, `DEV_PUBLIC_HOST`)
+// via `src/host-config.ts` per ADR 0013. Local constants used to mirror these
+// values; that scattered-hardcode pattern is what ADR 0013 names.
 
 // Picks the publishable/secret key pair to use. Live keys
 // (CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY) are the default; the test pair
@@ -58,12 +62,12 @@ const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
 //
 // Selection trigger is presence-of-test-keys, not request hostname, because
 // wrangler dev rewrites c.req.url to the worker's prod custom-domain pattern
-// (e.g. https://rev01.aayushman.dev/) regardless of the local listening
-// address, so a hostname check fires false for real localhost traffic. The
-// CLERK_TEST_* secrets are populated in the local .env only and are NEVER
-// added to the prod worker secret set, so their presence reliably signals
-// "this is a dev environment".
-export function resolveClerkKeys(env: ClerkBindings): ClerkKeyPair {
+// (e.g. the configured apex) regardless of the local listening address, so a
+// hostname check fires false for real localhost traffic. The CLERK_TEST_*
+// secrets are populated in the local .env only and are NEVER added to the
+// prod worker secret set, so their presence reliably signals "this is a dev
+// environment".
+export function resolveClerkKeys(env: ClerkKeyEnv): ClerkKeyPair {
   const testPub = env.CLERK_TEST_PUBLISHABLE_KEY;
   const testSec = env.CLERK_TEST_SECRET_KEY;
   const hasTestPub = isNonEmptyString(testPub);
@@ -92,31 +96,11 @@ export function resolveClerkKeys(env: ClerkBindings): ClerkKeyPair {
   return { publishableKey: env.CLERK_PUBLISHABLE_KEY, secretKey: env.CLERK_SECRET_KEY };
 }
 
-function usesTestClerkKeys(env: ClerkBindings, keys: ClerkKeyPair): boolean {
+function usesTestClerkKeys(env: ClerkKeyEnv, keys: ClerkKeyPair): boolean {
   return (
     keys.publishableKey === env.CLERK_TEST_PUBLISHABLE_KEY &&
     keys.secretKey === env.CLERK_TEST_SECRET_KEY
   );
-}
-
-function resolveDevPublicOrigin(env: ClerkBindings): string {
-  if (env.DEV_PUBLIC_HOST === '') {
-    throw new Error('DEV_PUBLIC_HOST must be a non-empty origin when set');
-  }
-
-  const origin = env.DEV_PUBLIC_HOST ?? 'http://127.0.0.1:8787';
-  let url: URL;
-  try {
-    url = new URL(origin);
-  } catch (error) {
-    throw new Error(`DEV_PUBLIC_HOST must be a valid origin: ${origin}`, { cause: error });
-  }
-
-  if (url.pathname !== '/' || url.search || url.hash) {
-    throw new Error(`DEV_PUBLIC_HOST must be an origin without path, query, or hash: ${origin}`);
-  }
-
-  return url.origin;
 }
 
 function resolveRedirectPath(source: URL, overridePath: string | undefined): string {
@@ -132,7 +116,7 @@ function resolveRedirectPath(source: URL, overridePath: string | undefined): str
 }
 
 export function resolveAuthRedirectUrl(
-  env: ClerkBindings,
+  env: ClerkKeyEnv & HostConfigEnv,
   requestUrl: string,
   overridePath?: string,
 ): string {
@@ -152,8 +136,8 @@ export function resolveAuthRedirectUrl(
 }
 
 // Wrangler dev rewrites both `c.req.url` AND the Host header to match the
-// worker's [[routes]] pattern (e.g. https://rev01.aayushman.dev/) even when
-// the browser hit localhost. That breaks Clerk's handshake: Clerk validates
+// worker's [[routes]] pattern (the configured apex origin) even when the
+// browser hit localhost. That breaks Clerk's handshake: Clerk validates
 // the handshake JWT against the request's origin, sees the prod host instead
 // of localhost, and rejects the session forever.
 //
@@ -234,7 +218,7 @@ export function clerkAuth() {
       : c.req.raw;
 
     const requestState = await clerk.authenticateRequest(requestForClerk, {
-      authorizedParties: AUTHORIZED_PARTIES,
+      authorizedParties: authorizedParties(c.env),
     });
 
     // Clerk's hosted account portal hands off the session via a handshake
@@ -299,9 +283,10 @@ export function clerkAuth() {
 // downstream handlers (canvasApi, publishApi, etc.) work unchanged.
 type EditTokenBindings = ClerkBindings & { UNLOCK_SIGNING_SECRET: string };
 
-function extractPublishedSubdomain(host: string): string | null {
-  if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
-  const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
+function extractPublishedSubdomain(env: HostConfigEnv, host: string): string | null {
+  const suffix = publicHostSuffix(env);
+  if (!host.endsWith(suffix)) return null;
+  const prefix = host.slice(0, host.length - suffix.length);
   if (prefix.length === 0 || prefix.includes('.')) return null;
   return prefix;
 }
@@ -321,7 +306,7 @@ export async function resolveEditHostSiteId(
   hostHeader: string,
 ): Promise<string | null> {
   const host = hostHeader.toLowerCase();
-  const subdomain = extractPublishedSubdomain(host);
+  const subdomain = extractPublishedSubdomain(env, host);
   if (subdomain !== null) {
     const rows = await db(env)
       .select({ id: site.id })

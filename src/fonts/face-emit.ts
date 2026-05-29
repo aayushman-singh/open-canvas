@@ -22,7 +22,7 @@
 // `swap` keeps the fallback visible during the block period and swaps in
 // the uploaded face the moment it lands. The path is relative so the
 // browser inherits the document's origin (works under both the
-// `<subdomain>.rev01.aayushman.dev` host and any Cloudflare-for-SaaS
+// `<subdomain>.<APP_DOMAIN>` host and any Cloudflare-for-SaaS
 // custom hostname owned by `src/custom-domain/`).
 
 import {

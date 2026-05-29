@@ -336,21 +336,30 @@ function makeShim(state: ShimState): {
 // Run
 // ---------------------------------------------------------------------------
 
-function runValidation(): void {
-  // Reserved hostnames are rejected.
-  const rejected = validateCustomHostname('foo.rev01.aayushman.dev');
-  assert(!rejected.ok, 'expected rev01 subdomain to be rejected');
+// Test APP_DOMAIN (ADR 0013 decision 7) — the smoke asserts behaviour against
+// the configured apex, not a brand literal.
+const SMOKE_HOST_ENV = {
+  APP_DOMAIN: 'opencanvas.aayushman.dev',
+  AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
+};
 
-  const invalid = validateCustomHostname('not a hostname');
+function runValidation(): void {
+  // Reserved hostnames: a subdomain under the configured apex is rejected.
+  const rejected = validateCustomHostname(SMOKE_HOST_ENV, `foo.${SMOKE_HOST_ENV.APP_DOMAIN}`);
+  assert(!rejected.ok, 'expected apex subdomain to be rejected');
+
+  const invalid = validateCustomHostname(SMOKE_HOST_ENV, 'not a hostname');
   assert(!invalid.ok, 'expected hostname with space to be rejected');
 
-  const empty = validateCustomHostname('');
+  const empty = validateCustomHostname(SMOKE_HOST_ENV, '');
   assert(!empty.ok, 'expected empty hostname to be rejected');
 
-  const apex = validateCustomHostname('singlelabel');
+  const apex = validateCustomHostname(SMOKE_HOST_ENV, 'singlelabel');
   assert(!apex.ok, 'expected single-label hostname to be rejected (no dot)');
 
-  const ok = validateCustomHostname('  WWW.Acme.COM  ');
+  const ok = validateCustomHostname(SMOKE_HOST_ENV, '  WWW.Acme.COM  ');
   assert(ok.ok, 'expected www.acme.com (mixed case) to be accepted');
   assert(ok.ok && ok.hostname === 'www.acme.com', 'expected hostname to be normalised lowercased');
 }
@@ -412,6 +421,7 @@ async function runRegisterAndActivate(): Promise<{
 
   const result = await registerCustomDomain(
     { db: shim.db, cf },
+    SMOKE_HOST_ENV,
     { siteId, customerId, hostname: 'www.acme.com' },
   );
   assert(result.status === 'created', `expected register status created, got ${result.status}`);
@@ -440,6 +450,7 @@ async function runRegisterAndActivate(): Promise<{
   shim.context.selectMode = 'one-by-hostname';
   const dupe = await registerCustomDomain(
     { db: shim.db, cf },
+    SMOKE_HOST_ENV,
     { siteId, customerId, hostname: 'www.acme.com' },
   );
   assert(
@@ -456,6 +467,7 @@ async function runRegisterAndActivate(): Promise<{
   shim.context.currentSiteId = 'site-not-here';
   const ghost = await registerCustomDomain(
     { db: shim.db, cf },
+    SMOKE_HOST_ENV,
     { siteId: 'site-not-here', customerId, hostname: 'wat.acme.com' },
   );
   assert(

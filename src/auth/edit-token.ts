@@ -2,11 +2,13 @@
 //
 // HMAC-SHA256 JWT for cross-subdomain on-site editor auth. The main domain
 // signs a short-lived token after Clerk auth; the token is set as a cookie
-// scoped to .rev01.aayushman.dev so published-site subdomains can read it.
-// The token carries the Owner's identity (clerkUserId, customerId) and the
-// site it was issued for, letting the /__api/* proxy and the /?edit handler
-// verify ownership without a Clerk session cookie on the subdomain.
+// scoped to the configured apex (`APP_DOMAIN`) so published-site subdomains
+// can read it. The token carries the Owner's identity (clerkUserId,
+// customerId) and the site it was issued for, letting the /__api/* proxy and
+// the /?edit handler verify ownership without a Clerk session cookie on the
+// subdomain.
 
+import { cookieDomain, publicHostSuffix, type HostConfigEnv } from '../host-config';
 import { signJWT, verifyJWT } from './jwt';
 
 export interface EditTokenPayload {
@@ -52,22 +54,26 @@ export async function verifyEditToken(
 export const EDIT_TOKEN_COOKIE = '__rev01_edit';
 export const EDIT_TOKEN_MAX_AGE = TTL_SECONDS;
 
-// The cookie scope depends on which host issues it. On any *.rev01.aayushman.dev
-// host (the popup runs on the apex, the editor runs on a subdomain) the cookie
-// must be domain-scoped so every sibling subdomain can read it. On a custom
-// domain there is no shared parent — the cookie must be host-scoped or the
-// browser rejects it. A previous refresh path issued host-scoped on every host
-// and silently broke cross-subdomain editing; this helper is the single source
-// of truth so that bug cannot regress per-site.
-const REV01_COOKIE_DOMAIN = 'rev01.aayushman.dev';
-const REV01_HOST_SUFFIX = `.${REV01_COOKIE_DOMAIN}`;
+// The cookie scope depends on which host issues it. On any host under the
+// configured apex (the popup runs on the apex, the editor runs on a
+// subdomain) the cookie must be domain-scoped so every sibling subdomain can
+// read it. On a custom domain there is no shared parent — the cookie must be
+// host-scoped or the browser rejects it. A previous refresh path issued
+// host-scoped on every host and silently broke cross-subdomain editing; this
+// helper is the single source of truth so that bug cannot regress per-site.
 
-export function buildEditTokenCookieHeader(token: string, requestHost: string): string {
+export function buildEditTokenCookieHeader(
+  env: HostConfigEnv,
+  token: string,
+  requestHost: string,
+): string {
+  const apex = cookieDomain(env);
+  const suffix = publicHostSuffix(env);
   const host = requestHost.toLowerCase();
-  const onRev01Domain = host === REV01_COOKIE_DOMAIN || host.endsWith(REV01_HOST_SUFFIX);
+  const onApex = host === apex || host.endsWith(suffix);
   const parts = [
     `${EDIT_TOKEN_COOKIE}=${token}`,
-    ...(onRev01Domain ? [`Domain=${REV01_COOKIE_DOMAIN}`] : []),
+    ...(onApex ? [`Domain=${apex}`] : []),
     'Path=/',
     'HttpOnly',
     'Secure',

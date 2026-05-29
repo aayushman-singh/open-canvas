@@ -7,7 +7,7 @@
 //
 // Cookie name: `__rev01_unlock_<siteId>`. Per-site scoping means a Visitor
 // who unlocks site A does not get a free pass on site B even if both run on
-// the same host (the wildcard `*.rev01.aayushman.dev` shares cookies across
+// the same host (the wildcard subdomain under the configured apex shares cookies across
 // subdomains by default — the cookie name prefix is what segregates them).
 //
 // JWT payload shape:
@@ -195,7 +195,7 @@ export async function verifyUnlockCookie(
 /**
  * Build a complete `Set-Cookie` header value for the unlock JWT. The cookie
  * name embeds the siteId so per-site scoping survives the cookie-jar
- * collapse on the shared `*.rev01.aayushman.dev` parent domain.
+ * collapse on the shared apex parent domain (see ADR 0013).
  *
  * `Secure` is forced ON in production; the caller may pass `secure: false`
  * for localhost dev where Workers serves over plain HTTP and Chrome will

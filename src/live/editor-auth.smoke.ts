@@ -30,6 +30,10 @@ const env = {
   CLERK_PUBLISHABLE_KEY: 'pk_test_live_auth_smoke',
   CLERK_SECRET_KEY: 'sk_test_live_auth_smoke',
   UNLOCK_SIGNING_SECRET: 'live-auth-smoke-secret',
+  APP_DOMAIN: 'opencanvas.aayushman.dev',
+  AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: 'noreply@opencanvas.aayushman.dev',
 };
 
 const opts = await buildOnSiteEditorOptions(

@@ -93,7 +93,13 @@ export function estimateMessagesTokens(messages: readonly ChatMessage[]): number
 
 export const CHAT_TOKEN_BUDGET = 16_000;
 export const SUMMARIZE_AFTER_TURNS = 10;
-export const QUERY_SITE_TOKEN_CAP = 2_000;
+// 2_000 was too small for the canonical Apogee Showcase site: full detail
+// (per-element id+type listings across 6 pages × ~7 sections × ~10–15
+// elements) overflows the cap and trips truncated=true on the first call,
+// at which point the agent loops re-calling query_site instead of
+// proposing edits. Bumped to 12_000 to fit Apogee comfortably while still
+// leaving room in the chat budget (CHAT_TOKEN_BUDGET = 16k).
+export const QUERY_SITE_TOKEN_CAP = 12_000;
 
 /**
  * Trim oldest non-system / non-summary messages from the front of the array

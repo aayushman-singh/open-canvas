@@ -1,9 +1,10 @@
 # ADR 0018 — Email sender address is environment-driven
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** OSS-fork rebranding for outbound email. Follows the same shape as [ADR 0013](0013-host-config-from-environment.md); flagged as a follow-up in 0013's out-of-scope.
+**Accepted-context:** Accepted alongside ADR 0013 in the rev01 → opencanvas apex move (2026-05-29). The sender domain has to move with the apex; deferring this ADR would have left the email-sender hardcode as the lone fork-blocker after the host migration.
 
 ## Context
 

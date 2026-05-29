@@ -18,12 +18,13 @@ import {
   EDIT_TOKEN_COOKIE,
   EDIT_TOKEN_MAX_AGE,
 } from './edit-token';
+import type { HostConfigEnv } from '../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   UNLOCK_SIGNING_SECRET: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -45,7 +46,7 @@ refreshRoute.post('/refresh', async (c) => {
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
-  const cookieValue = buildEditTokenCookieHeader(fresh, new URL(c.req.url).host);
+  const cookieValue = buildEditTokenCookieHeader(c.env, fresh, new URL(c.req.url).host);
 
   return c.json({ ok: true, ttl: EDIT_TOKEN_MAX_AGE }, 200, {
     'Set-Cookie': cookieValue,

@@ -13,25 +13,25 @@
 # ---------------------------------------------------------------------------
 # Apex host the deployment serves under. Every cookie scope, public-host
 # subdomain detector, and Clerk allowlist derives from this single value.
-APP_DOMAIN=rev01.aayushman.dev
+APP_DOMAIN=opencanvas.aayushman.dev
 # Comma-separated origins Clerk should treat as "us." Forks add their own
 # dev origins here (e.g. http://localhost:5173) so the local handshake
 # does not silently reject.
-AUTHORIZED_PARTIES=http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788,https://rev01.aayushman.dev
+AUTHORIZED_PARTIES=http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788,https://opencanvas.aayushman.dev
 
 # ---------------------------------------------------------------------------
 # Cookies (ADR 0017)
 # ---------------------------------------------------------------------------
 # Prefix every Worker-issued cookie name carries (`${PREFIX}edit`,
 # `${PREFIX}unlock`, etc.). Forks rebrand by changing this one value.
-COOKIE_NAME_PREFIX=__rev01_
+COOKIE_NAME_PREFIX=__opencanvas_
 
 # ---------------------------------------------------------------------------
 # Email (ADR 0018)
 # ---------------------------------------------------------------------------
 # Outbound `From:` address. Must be a verified sender at the provider
 # (Resend). Forks set this to their own verified address.
-EMAIL_FROM=hello@rev01.aayushman.dev
+EMAIL_FROM=hello@opencanvas.aayushman.dev
 # Resend.com API key for transactional email (invites, password resets).
 RESEND_API_KEY=<your-resend-api-key>
 

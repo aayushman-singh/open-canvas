@@ -17,6 +17,7 @@ import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import type { Theme } from '../../ui';
+import { publicHostSuffix, type HostConfigEnv } from '../../host-config';
 
 // Seed asset bytes inlined as base64 so the template preview works in
 // Workers (no filesystem access). Each key matches a SeedAsset.sourcePath.
@@ -40,7 +41,7 @@ function readSeedBytes(sourcePath: string): Uint8Array {
   return bytes;
 }
 
-type Bindings = {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
@@ -51,8 +52,6 @@ export const templatesRoute = new Hono<{ Bindings: Bindings; Variables: ClerkAut
 
 templatesRoute.use('*', clerkAuth());
 templatesRoute.use('*', requireAuth());
-
-const PUBLISHED_SUFFIX = '.rev01.aayushman.dev';
 
 // MIGRATION.md §5e — templates page wears the Open Canvas dashboard
 // chrome. The `.ttab-bar` Community/Personal toggle becomes a settings-
@@ -411,11 +410,13 @@ function Page({
   communityCustomTemplates,
   personalCustomTemplates,
   siteLimitErrorMessage,
+  publishedSuffix,
   theme,
 }: {
   communityCustomTemplates: CustomTemplateCard[];
   personalCustomTemplates: CustomTemplateCard[];
   siteLimitErrorMessage: string | null;
+  publishedSuffix: string;
   theme?: Theme | undefined;
 }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
@@ -529,7 +530,7 @@ function Page({
                 pattern={subdomainPattern}
                 placeholder="auto-generated"
               />
-              <span class="suffix">{PUBLISHED_SUFFIX}</span>
+              <span class="suffix">{publishedSuffix}</span>
             </span>
           </div>
         </div>
@@ -640,6 +641,7 @@ templatesRoute.get('/', async (c) => {
       communityCustomTemplates={communityCustomTemplates}
       personalCustomTemplates={personalCustomTemplates}
       siteLimitErrorMessage={siteLimitErrorMessage}
+      publishedSuffix={publicHostSuffix(c.env)}
       theme={readThemeCookie(c)}
     />,
   );

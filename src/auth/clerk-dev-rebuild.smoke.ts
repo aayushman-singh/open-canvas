@@ -13,16 +13,20 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[clerk-dev-rebuild:smoke] ${message}`);
 }
 
+// Test APP_DOMAIN (ADR 0013 decision 7) — the smoke targets the configured
+// apex by env, not a brand literal.
+const APEX = 'opencanvas.aayushman.dev';
+const APEX_ORIGIN = `https://${APEX}`;
 const LOCAL_ORIGIN = 'http://127.0.0.1:8787';
 
 const bodyPayload = { siteId: 'site-abc', name: 'updated name' };
-const original = new Request('https://rev01.aayushman.dev/api/sites/site-abc', {
+const original = new Request(`${APEX_ORIGIN}/api/sites/site-abc`, {
   method: 'PATCH',
   headers: {
     'content-type': 'application/json',
-    host: 'rev01.aayushman.dev',
-    origin: 'https://rev01.aayushman.dev',
-    referer: 'https://rev01.aayushman.dev/dashboard/sites/site-abc',
+    host: APEX,
+    origin: APEX_ORIGIN,
+    referer: `${APEX_ORIGIN}/dashboard/sites/site-abc`,
     cookie: '__session=fake; __client_uat=fake',
   },
   body: JSON.stringify(bodyPayload),
@@ -59,9 +63,9 @@ assert(
   "original request's body must remain readable after the rebuild",
 );
 
-const requestWithoutBody = new Request('https://rev01.aayushman.dev/api/sites', {
+const requestWithoutBody = new Request(`${APEX_ORIGIN}/api/sites`, {
   method: 'GET',
-  headers: { host: 'rev01.aayushman.dev', origin: 'https://rev01.aayushman.dev' },
+  headers: { host: APEX, origin: APEX_ORIGIN },
 });
 const rebuiltGet = rebuildRequestForLocalDevClerk(requestWithoutBody, LOCAL_ORIGIN);
 assert(rebuiltGet.method === 'GET', 'method preserved on bodyless request');
@@ -70,7 +74,7 @@ assert(
   'bodyless request URL also rewritten',
 );
 
-const requestWithBadReferer = new Request('https://rev01.aayushman.dev/api/sites', {
+const requestWithBadReferer = new Request(`${APEX_ORIGIN}/api/sites`, {
   method: 'GET',
   headers: { referer: 'not a url' },
 });

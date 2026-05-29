@@ -7,7 +7,7 @@
 //   2. Verify the site exists and belongs to this Owner; 404 otherwise.
 //   3. Validate the hostname:
 //      - lowercase, RFC-1123 label-and-dot shape,
-//      - not the public app host or any rev01-owned subdomain,
+//      - not the public app host or any subdomain under the configured apex,
 //      - not already present in the customDomain table (DB unique catches
 //        the race, but we surface a friendly error here).
 //   4. Call Cloudflare for SaaS `POST /custom_hostnames` to register it.
@@ -25,6 +25,7 @@ import type { CfCustomHostname, CfHostnamesClient } from './cf-api.js';
 import { CfApiError } from './cf-api.js';
 import type { Db } from '../db/client.js';
 import { customDomain, type CustomDomain } from '../db/schema.js';
+import { appDomain, type HostConfigEnv } from '../host-config.js';
 
 export interface RegisterDeps {
   db: Db;
@@ -52,17 +53,20 @@ export type RegisterResult =
 // canonical.
 const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
-// Hostnames the system owns; the Owner must not be able to claim them as a
-// custom domain because the wildcard subdomain arm already serves them.
-const FORBIDDEN_SUFFIXES = ['.rev01.aayushman.dev', '.aayushman.dev'];
-const FORBIDDEN_EXACT = new Set([
-  'rev01.aayushman.dev',
-  'aayushman.dev',
-  'localhost',
-  'localhost:8787',
-]);
+// Always-forbidden literals — local-dev hosts that are never legitimate as
+// Owner-claimed custom domains regardless of `APP_DOMAIN`. The apex itself
+// and its parent zone are added per-request from `appDomain(env)` below.
+const ALWAYS_FORBIDDEN_EXACT = new Set(['localhost', 'localhost:8787']);
+
+function parentZone(hostname: string): string | null {
+  const dot = hostname.indexOf('.');
+  if (dot < 0 || dot === hostname.length - 1) return null;
+  const parent = hostname.slice(dot + 1);
+  return parent.includes('.') ? parent : null;
+}
 
 export function validateCustomHostname(
+  env: HostConfigEnv,
   raw: string,
 ): { ok: true; hostname: string } | { ok: false; reason: string } {
   if (typeof raw !== 'string') {
@@ -82,10 +86,16 @@ export function validateCustomHostname(
         'hostname must be a valid DNS name (lowercase letters, digits, hyphens, at least one dot)',
     };
   }
-  if (FORBIDDEN_EXACT.has(hostname)) {
+  const apex = appDomain(env);
+  const forbiddenExact = new Set<string>([apex, ...ALWAYS_FORBIDDEN_EXACT]);
+  const apexParent = parentZone(apex);
+  if (apexParent) forbiddenExact.add(apexParent);
+  if (forbiddenExact.has(hostname)) {
     return { ok: false, reason: 'this hostname is reserved by the platform' };
   }
-  for (const suffix of FORBIDDEN_SUFFIXES) {
+  const forbiddenSuffixes = [`.${apex}`];
+  if (apexParent) forbiddenSuffixes.push(`.${apexParent}`);
+  for (const suffix of forbiddenSuffixes) {
     if (hostname.endsWith(suffix)) {
       return {
         ok: false,
@@ -98,9 +108,10 @@ export function validateCustomHostname(
 
 export async function registerCustomDomain(
   deps: RegisterDeps,
+  env: HostConfigEnv,
   input: RegisterInput,
 ): Promise<RegisterResult> {
-  const check = validateCustomHostname(input.hostname);
+  const check = validateCustomHostname(env, input.hostname);
   if (!check.ok) {
     return { status: 'invalid_hostname', reason: check.reason };
   }

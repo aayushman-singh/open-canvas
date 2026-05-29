@@ -49,9 +49,9 @@ import socketRoute from './live/socket-route';
 const app = new Hono<PublicEnv>();
 
 // Public host router runs FIRST. If the request host belongs to a Published
-// Site (*.rev01.aayushman.dev minus the app host), serve the snapshot here.
-// Otherwise return null and let the app-host mounts (landing, dashboard,
-// /api/*) handle the request as usual.
+// Site (a subdomain under the configured apex, minus the app host itself),
+// serve the snapshot here. Otherwise return null and let the app-host mounts
+// (landing, dashboard, /api/*) handle the request as usual.
 app.use('*', async (c, next) => {
   const handled = await handlePublicRequest(c);
   if (handled) return handled;
@@ -136,8 +136,8 @@ app.route('/dashboard', accountSettingsRoute);
 app.route('/dashboard', domainsRoute);
 app.route('/dashboard', versionTimelineRoute);
 app.route('/api/profile', profileApi);
-// On-site editor auth popup — main domain endpoint that sets the edit token
-// cookie scoped to .rev01.aayushman.dev so subdomain editors can read it.
+// On-site editor auth popup — app-host endpoint that sets the edit token
+// cookie scoped to the configured apex so subdomain editors can read it.
 app.route('/api/on-site-edit', onSiteEditRoute);
 
 // On-site editor API proxy — same ownerApi handlers as /api/* but gated by

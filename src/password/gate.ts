@@ -43,6 +43,13 @@ interface GateOptions {
    */
   redirect: string;
   /**
+   * Canonical app origin (`https://<APP_DOMAIN>`) used by the "Powered by
+   * Open Canvas" wordmark at the bottom of the gate. ADR 0013: drives the
+   * brand link target from env so a fork wears its own apex without source
+   * edits.
+   */
+  appOrigin: string;
+  /**
    * Render the "wrong password" error block. Set by the middleware when the
    * incoming request has `?retry=1` in the query string (the unlock handler
    * 303-redirects to that on a failed attempt).
@@ -263,7 +270,7 @@ export function renderGateHtml(options: GateOptions): string {
           <button class="btn" type="submit">Unlock site</button>
         </form>
       </main>
-      <div class="powered"><a href="https://rev01.aayushman.dev" target="_blank" rel="noopener"><span class="oc-logo" style="color:var(--ink-3)">${OC_LOGO_SVG}</span>Powered by Open Canvas</a></div>
+      <div class="powered"><a href="${options.appOrigin}" target="_blank" rel="noopener"><span class="oc-logo" style="color:var(--ink-3)">${OC_LOGO_SVG}</span>Powered by Open Canvas</a></div>
     </div>
   </body>
 </html>

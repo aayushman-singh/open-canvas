@@ -6,14 +6,16 @@
 export interface InviteEmailParams {
   siteName: string;
   siteSubdomain: string;
+  /** Apex host (ADR 0013) — combines with siteSubdomain into the public address. */
+  apex: string;
   inviterName: string;
   role: string;
   acceptUrl: string;
 }
 
 export function inviteEmailHtml(params: InviteEmailParams): string {
-  const { siteName, siteSubdomain, inviterName, role, acceptUrl } = params;
-  const publicAddress = `${siteSubdomain}.rev01.aayushman.dev`;
+  const { siteName, siteSubdomain, apex, inviterName, role, acceptUrl } = params;
+  const publicAddress = `${siteSubdomain}.${apex}`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -23,8 +25,7 @@ export function inviteEmailHtml(params: InviteEmailParams): string {
     <tr><td align="center">
       <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;">
         <tr><td style="background:#0d1117;padding:24px 32px;">
-          <span style="color:#22d3ee;font-family:monospace;font-size:20px;font-weight:700;">r1</span>
-          <span style="color:#e6edf3;font-size:14px;margin-left:8px;">rev01</span>
+          <span style="color:#e6edf3;font-size:16px;font-weight:600;">Open Canvas</span>
         </td></tr>
         <tr><td style="padding:32px;">
           <h1 style="margin:0 0 16px;font-size:20px;color:#18181b;">You've been invited to collaborate</h1>
@@ -51,7 +52,7 @@ export function inviteEmailHtml(params: InviteEmailParams): string {
 }
 
 export function inviteEmailSubject(siteName: string): string {
-  return `You've been invited to edit "${siteName.replace(/[\r\n]/g, '')}" on rev01`;
+  return `You've been invited to edit "${siteName.replace(/[\r\n]/g, '')}" on Open Canvas`;
 }
 
 function escapeHtml(str: string): string {

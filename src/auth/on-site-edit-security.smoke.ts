@@ -33,10 +33,16 @@ assert(
 assert(
   publicSource.includes('authState') &&
     publicSource.includes('returnOrigin=') &&
-    publicSource.includes('e.origin !== "https://rev01.aayushman.dev"') &&
+    // ADR 0013 decision 7: the popup-origin check derives from APP_DOMAIN at
+    // request time. We assert the structural contract — the inline script
+    // reads an `apexOrigin` and compares e.origin against it, not against a
+    // brand literal. Combined with the host-config:smoke guards, that pins
+    // both "origin check exists" and "value comes from env."
+    publicSource.includes('var apexOrigin =') &&
+    publicSource.includes('e.origin !== apexOrigin') &&
     publicSource.includes('e.source !== popup') &&
     publicSource.includes('e.data.state !== authState'),
-  'public edit bootstrap must verify popup origin, source window, and nonce state',
+  'public edit bootstrap must verify popup origin (from APP_DOMAIN), source window, and nonce state',
 );
 assert(
   authSource.includes('resolveEditHostSiteId') &&

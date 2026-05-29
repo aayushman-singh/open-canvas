@@ -4,15 +4,15 @@
 //
 // Popup auth endpoint for the on-site editor. Opened as a small popup window
 // from the published site when the Owner clicks "Edit." The popup runs on the
-// main domain (rev01.aayushman.dev) where Clerk session cookies are available.
+// configured app apex where Clerk session cookies are available.
 //
 // Flow:
 //   1. Clerk auth — if not signed in, requireAuth redirects to Clerk sign-in
 //      (which works fine inside a popup; Clerk redirects back after sign-in).
 //   2. Verify the authenticated user owns the requested site.
 //   3. Sign an edit token JWT (HMAC-SHA256, 4-hour TTL).
-//   4. Set the token as an httpOnly cookie scoped to .rev01.aayushman.dev
-//      so all subdomains can read it.
+//   4. Set the token as an httpOnly cookie scoped to the configured apex so
+//      all subdomains can read it.
 //   5. Return a small HTML page that postMessages to the opener and closes.
 
 import { and, eq } from 'drizzle-orm';
@@ -22,15 +22,16 @@ import { requireAuth } from '../../auth/require-auth';
 import { signEditToken, buildEditTokenCookieHeader } from '../../auth/edit-token';
 import { db, type Db } from '../../db/client';
 import { customer, customDomain, site } from '../../db/schema';
+import { appDomain, type HostConfigEnv } from '../../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   CLERK_TEST_PUBLISHABLE_KEY?: string;
   CLERK_TEST_SECRET_KEY?: string;
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -56,6 +57,7 @@ function parseReturnOrigin(returnOrigin: string | undefined): URL | null {
 }
 
 export async function isAuthorizedOnSiteEditReturnOrigin(
+  env: HostConfigEnv,
   database: Db,
   siteId: string,
   subdomain: string,
@@ -64,7 +66,7 @@ export async function isAuthorizedOnSiteEditReturnOrigin(
   const parsed = parseReturnOrigin(returnOrigin);
   if (!parsed) return false;
 
-  if (parsed.hostname === `${subdomain}.rev01.aayushman.dev`) {
+  if (parsed.hostname === `${subdomain}.${appDomain(env)}`) {
     return true;
   }
 
@@ -119,6 +121,7 @@ onSiteEditRoute.get('/', async (c) => {
   }
   if (
     !(await isAuthorizedOnSiteEditReturnOrigin(
+      c.env,
       database,
       siteId,
       siteRow[0].subdomain,
@@ -133,7 +136,7 @@ onSiteEditRoute.get('/', async (c) => {
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
-  const cookieValue = buildEditTokenCookieHeader(token, new URL(c.req.url).host);
+  const cookieValue = buildEditTokenCookieHeader(c.env, token, new URL(c.req.url).host);
 
   return c.html(
     renderPopupCloseDocument({ siteId, token, state, returnOrigin }),

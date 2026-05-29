@@ -24,13 +24,14 @@ import type { CanvasPage } from '../canvas/schema.js';
 import { db } from '../db/client.js';
 import { customer, site as siteTable } from '../db/schema.js';
 import { sendEmail } from '../email/send.js';
+import { appOrigin, type HostConfigEnv } from '../host-config.js';
 import type { FormRateLimiterMarker } from '../live/form-rate-limiter-client.js';
 
 import { exportFormSubmissionsCsv, listFormSubmissions } from './inbox.js';
 import { handleFormSubmit, type SubmitOutcome } from './submit.js';
 import { verifyTurnstile } from './turnstile.js';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
@@ -39,7 +40,7 @@ interface Bindings {
   WEBHOOK_SIGNING_SECRET: string;
   FORM_RATE_LIMITER: DurableObjectNamespace<FormRateLimiterMarker>;
   RESEND_API_KEY: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -107,9 +108,9 @@ router.post('/:siteId/:formElementId', async (c) => {
       );
     }
     const submittedAt = new Date().toISOString();
-    const inboxUrl = `https://rev01.aayushman.dev/dashboard/sites/${encodeURIComponent(siteId)}/forms/${encodeURIComponent(formElementId)}`;
+    const inboxUrl = `${appOrigin(c.env)}/dashboard/sites/${encodeURIComponent(siteId)}/forms/${encodeURIComponent(formElementId)}`;
     try {
-      await sendEmail(c.env.RESEND_API_KEY, {
+      await sendEmail(c.env, {
         to: ownerEmail,
         subject: `New form submission on your site`,
         html: [

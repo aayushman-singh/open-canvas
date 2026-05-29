@@ -166,7 +166,7 @@ assert(
 
 // Rich text: somewhere in the page a link mark must render as
 // <a class="rev01-inline-link" href="https://...">. The fixture wires this
-// onto the hero-body element pointing at rev01.aayushman.dev.
+// onto the hero-body element pointing at an external https url.
 assert(
   /<a class="rev01-inline-link" href="https:\/\/[^"]+"/.test(html),
   'expected at least one rev01-inline-link with an https href in rendered HTML',

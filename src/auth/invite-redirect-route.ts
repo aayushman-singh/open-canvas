@@ -8,7 +8,7 @@
 //   /__invite?token=<jwt>
 //     -> verify token (signature + exp + invite-shape)
 //     -> look up site by id (NOT by stale subdomain in the email)
-//     -> 302 to https://<currentSubdomain>.rev01.aayushman.dev/__accept-invite?token=<jwt>
+//     -> 302 to https://<currentSubdomain>.<apex>/__accept-invite?token=<jwt>
 //     -> the subdomain handler in src/routes/public.ts:handleAcceptInvite
 //        does the actual acceptedAt UPDATE and edit-cookie issue.
 
@@ -18,11 +18,12 @@ import { verifyInviteToken } from './invite-token';
 import { buildInviteErrorResponse } from './invite-error-page';
 import { db } from '../db/client';
 import { site } from '../db/schema';
+import { appDomain, type HostConfigEnv } from '../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
-}
+};
 
 const inviteRedirectRoute = new Hono<{ Bindings: Bindings }>();
 
@@ -47,7 +48,7 @@ inviteRedirectRoute.get('/', async (c) => {
 
   // Pass the same token through — the subdomain handler re-verifies it,
   // so there's no need (and no benefit) to re-sign.
-  const target = `https://${subdomain}.rev01.aayushman.dev/__accept-invite?token=${encodeURIComponent(
+  const target = `https://${subdomain}.${appDomain(c.env)}/__accept-invite?token=${encodeURIComponent(
     token ?? '',
   )}`;
   return c.redirect(target, 302);

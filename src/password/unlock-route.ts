@@ -36,8 +36,9 @@ import {
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router.js';
 import { db } from '../db/client.js';
 import { site } from '../db/schema.js';
+import { publicHostSuffix, type HostConfigEnv } from '../host-config.js';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
   CF_API_TOKEN?: string;
@@ -49,7 +50,7 @@ interface Bindings {
    * binding (declared in wrangler.toml).
    */
   FORM_RATE_LIMITER?: FormRateLimiterDoNamespace;
-}
+};
 
 type Env = { Bindings: Bindings };
 
@@ -59,11 +60,9 @@ const router = new Hono<Env>();
 // Site lookup
 // ---------------------------------------------------------------------------
 //
-// The unlock POST arrives on the Visitor's host (`*.rev01.aayushman.dev` or
-// a custom domain — see `src/custom-domain/`). We resolve the site row by
+// The unlock POST arrives on the Visitor's host (`*.<APP_DOMAIN>` or a
+// custom domain — see `src/custom-domain/`). We resolve the site row by
 // the same rules `src/routes/public.ts` uses for the snapshot path.
-
-const PUBLIC_HOST_SUFFIX = '.rev01.aayushman.dev';
 
 interface SiteRow {
   id: string;
@@ -108,16 +107,17 @@ async function loadSiteById(env: Bindings, siteId: string): Promise<SiteRow | nu
   return rows[0] ?? null;
 }
 
-function extractSubdomain(host: string): string | null {
-  if (!host.endsWith(PUBLIC_HOST_SUFFIX)) return null;
-  const prefix = host.slice(0, host.length - PUBLIC_HOST_SUFFIX.length);
+function extractSubdomain(env: HostConfigEnv, host: string): string | null {
+  const suffix = publicHostSuffix(env);
+  if (!host.endsWith(suffix)) return null;
+  const prefix = host.slice(0, host.length - suffix.length);
   if (prefix.length === 0) return null;
   if (prefix.includes('.')) return null;
   return prefix;
 }
 
 async function resolveSiteForHost(env: Bindings, host: string): Promise<SiteRow | null> {
-  const subdomain = extractSubdomain(host);
+  const subdomain = extractSubdomain(env, host);
   if (subdomain) {
     return loadSiteBySubdomain(env, subdomain);
   }

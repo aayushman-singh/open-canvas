@@ -305,8 +305,15 @@ async function dispatchReadOnlyTool(input: ReadOnlyDispatchInput): Promise<void>
   let output: unknown;
 
   if (call.name === 'query_site') {
+    // Default to 'full' so the agent always sees per-element ids in its
+    // first inspection. With 'summary' the model only sees per-section
+    // element-type counts and then hallucinates element ids when proposing
+    // mutating ops; every such op fails at the apply layer with
+    // 'element not found'. The token-cap inside buildQuerySiteSummary
+    // protects the budget on large sites by trimming element listings,
+    // then trailing sections, then trailing pages.
     const requested = args.detail;
-    const detail: QuerySiteDetail = requested === 'full' ? 'full' : 'summary';
+    const detail: QuerySiteDetail = requested === 'summary' ? 'summary' : 'full';
     output = buildQuerySiteSummary({
       state: ctx.state,
       detail,
@@ -472,7 +479,7 @@ export function buildSystemPrompt(state: EditableSite): string {
   lines.push('');
   lines.push('Read-only tools:');
   lines.push(
-    '  query_site — inspect site structure (pages, sections, elements with IDs). Call this BEFORE proposing changes when you need IDs.',
+    '  query_site — inspect site structure (pages, sections, elements with IDs). Defaults to detail="full" so every element id is visible. Call this BEFORE proposing any element-level change. NEVER invent element ids — every rewriteText / updateElement / deleteElement target id MUST appear verbatim in a prior query_site result.',
   );
   lines.push(
     "  query_assets — list the owner's uploaded media assets. Call this when you need asset IDs for replaceMedia or addElement.",

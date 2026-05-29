@@ -26,12 +26,13 @@ import { db } from '../../db/client';
 import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
+import { appDomain, type HostConfigEnv } from '../../host-config';
 
-interface Bindings {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
-}
+};
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
@@ -945,6 +946,70 @@ const rev01SiteSettingsConfig = (() => {
     });
   });
 })();
+
+// Delete-site confirmation — types-the-name gate, DELETE /api/sites/:id,
+// then redirects to /dashboard. Failures stay in the modal so the owner
+// can retry without losing the typed confirmation.
+(() => {
+  const SITE_ID = rev01SiteSettingsConfig.SITE_ID;
+  const trigger = document.querySelector('[data-delete-trigger]');
+  const modal = document.querySelector('[data-delete-confirm-modal]');
+  if (!trigger || !modal) return;
+  const siteName = modal.getAttribute('data-site-name') || '';
+  const input = modal.querySelector('[data-delete-confirm-input]');
+  const confirmBtn = modal.querySelector('[data-delete-confirm]');
+  const cancelBtn = modal.querySelector('[data-delete-cancel]');
+  const errEl = modal.querySelector('[data-delete-confirm-error]');
+  function reset() {
+    if (input) input.value = '';
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (errEl) errEl.textContent = '';
+  }
+  function close() {
+    modal.removeAttribute('data-open');
+    reset();
+  }
+  trigger.addEventListener('click', () => {
+    reset();
+    modal.setAttribute('data-open', 'true');
+    if (input) setTimeout(() => input.focus(), 60);
+  });
+  if (cancelBtn) cancelBtn.addEventListener('click', close);
+  modal.addEventListener('click', (ev) => { if (ev.target === modal) close(); });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && modal.getAttribute('data-open') === 'true') close();
+  });
+  if (input && confirmBtn) {
+    input.addEventListener('input', () => {
+      confirmBtn.disabled = input.value.trim() !== siteName;
+    });
+  }
+  if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+    if (input && input.value.trim() !== siteName) return;
+    confirmBtn.disabled = true;
+    if (errEl) errEl.textContent = '';
+    try {
+      const r = await fetch('/api/sites/' + encodeURIComponent(SITE_ID), {
+        method: 'DELETE',
+        headers: { accept: 'application/json' },
+      });
+      if (r.ok) {
+        window.location.href = '/dashboard';
+        return;
+      }
+      let msg = 'Delete failed (' + r.status + ').';
+      try {
+        const b = await r.json();
+        if (b && typeof b.error === 'string') msg = 'Delete failed: ' + b.error;
+      } catch (_) {}
+      if (errEl) errEl.textContent = msg;
+      confirmBtn.disabled = false;
+    } catch (e) {
+      if (errEl) errEl.textContent = 'Network error: ' + (e && e.message ? e.message : String(e));
+      confirmBtn.disabled = false;
+    }
+  });
+})();
 `;
 }
 
@@ -1035,6 +1100,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
     return c.text('site not found', 404);
   }
 
+  const apex = appDomain(c.env);
   const enabled = owned.passwordEnabled;
   const setAtLine = owned.passwordSetAt
     ? `Last changed ${owned.passwordSetAt.toISOString()}`
@@ -1100,7 +1166,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               <small>Anyone with this link can view your site</small>
             </div>
             <span class="chip chip-url">
-              {owned.subdomain}.rev01.aayushman.dev
+              {owned.subdomain}.{apex}
             </span>
           </div>
           <div class="row-line">
@@ -1406,9 +1472,9 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
       </div>
 
       {/* Danger zone — destructive actions live here so they're visually
-          quarantined from routine controls. Today: future "Delete site"
-          CTA will land here as a separate stage; for now it's a
-          placeholder card so the chrome matches settings.html. */}
+          quarantined from routine controls. The Delete site CTA opens the
+          typed-confirmation modal below; the actual DELETE call is wired
+          in the client script IIFE. */}
       <div class="set danger" id="danger">
         <div class="set-h">
           <span class="ic">
@@ -1425,9 +1491,66 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             size="sm"
             class="rev01-danger-cta"
             style="color:var(--red-ink); border-color:var(--red-line);"
+            data-delete-trigger
           >
             Delete site
           </Button>
+        </div>
+      </div>
+
+      {/* Delete-site confirmation modal — typed confirmation gate. Reuses
+          the `picker-modal` class so the existing fixed-overlay + data-open
+          CSS applies; the inner sheet content is destruction-specific. */}
+      <div class="picker-modal" data-delete-confirm-modal data-site-name={owned.name}>
+        <div
+          class="picker-sheet"
+          role="alertdialog"
+          aria-label="Delete this site"
+          style="max-width:480px;"
+        >
+          <div class="picker-head">
+            <h3>Delete this site?</h3>
+          </div>
+          <div class="picker-body" style="padding:20px 24px;">
+            <p style="margin:0 0 14px;">
+              This permanently removes <strong>{owned.name}</strong> and everything in
+              it &mdash; pages, snapshots, forms, collaborators, addons. It can&apos;t
+              be undone.
+            </p>
+            <p style="margin:0 0 6px;font-size:13px;color:var(--ink-2);">
+              Type <code>{owned.name}</code> to confirm.
+            </p>
+            <input
+              type="text"
+              data-delete-confirm-input
+              autocomplete="off"
+              spellcheck={false}
+              style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);color:var(--ink);box-sizing:border-box;"
+            />
+            <p
+              class="picker-status"
+              data-delete-confirm-error
+              role="alert"
+              aria-live="polite"
+              style="margin:8px 0 0;min-height:18px;color:var(--red-ink);"
+            ></p>
+          </div>
+          <div
+            class="picker-head"
+            style="border-top:1px solid var(--line);justify-content:flex-end;gap:8px;"
+          >
+            <button type="button" class="close" data-delete-cancel>
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-delete-confirm
+              disabled
+              style="padding:6px 14px;border:1px solid var(--red-line);background:var(--red-soft);color:var(--red-ink);border-radius:6px;cursor:pointer;font-weight:600;"
+            >
+              Delete site
+            </button>
+          </div>
         </div>
       </div>
 
