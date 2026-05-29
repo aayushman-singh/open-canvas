@@ -2825,10 +2825,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //
   // Walks an InspectorSpec read from INSPECTOR_DISPATCH (interpolated as
   // JSON at script-emit time) and renders DOM the same way the legacy
-  // buildXInspector functions below did. Migrated element types route here
-  // via the dispatch site further down; unmigrated types still fall through
-  // to their per-type buildXInspector. Cutover ADR removes the fallback
-  // once every type has a spec.
+  // buildXInspector functions did. Every inspectable element type routes
+  // through the dispatch site further down; collection intentionally has no
+  // spec because selecting its children opens their own inspectors.
 
   function renderInspectorSpec(spec, element) {
     spec.fields.forEach(function(f) {

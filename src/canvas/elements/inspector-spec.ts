@@ -14,12 +14,12 @@
 // behaviour: read `element[field.path]`, render the input, write back on
 // change, and call `rebuildElement(element.id); scheduleSave()`.
 //
-// During migration (ADR 0011 dec 3) the dispatch is `Partial<Record<
-// ElementType, InspectorSpec>>` so migrated and unmigrated element types
-// coexist. The completeness smoke (`inspector-dispatch.smoke.ts`) pins
-// every migrated entry to a fixture so dispatch / element drift is a
-// build-time failure. The cutover ADR flips the dispatch to a full
-// `Record<ElementType, InspectorSpec>` once every type has migrated.
+// The cutover dispatch is a typed `Record<Exclude<ElementType,
+// 'collection'>, InspectorSpec>`: every inspectable element type must
+// provide a spec, while collection is the explicit opt-out because its
+// children render their own inspectors. The completeness smoke
+// (`inspector-dispatch.smoke.ts`) pins every dispatch entry to a fixture so
+// dispatch / element drift is a build-time failure.
 
 /**
  * A single field rendered into the inspector. `path` is the top-level
