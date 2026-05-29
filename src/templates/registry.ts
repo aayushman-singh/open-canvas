@@ -178,12 +178,58 @@ export const apogeeShowcaseTemplate: TemplateSeed = {
   state: structuredClone(apogeeShowcaseSeed) as EditableSite,
 };
 
+export const pressTemplate = buildTemplate({
+  id: 'press-canvas',
+  name: 'Press Canvas',
+  tagline:
+    'A serif-led editorial canvas for writers, publications, and anyone who still believes a sentence can carry a brand.',
+  styleKit: 'ivory-press',
+  title: 'Press Canvas',
+  heroHeading: [
+    { text: 'A canvas with ' },
+    { text: 'something to say', marks: [{ type: 'bold' }] },
+    { text: '.' },
+  ],
+  heroBody: [
+    {
+      text: 'Set in Garamond, framed in hairlines, paced for reading. The page steps back so the writing steps forward.',
+    },
+  ],
+  featureHeading: [{ text: 'The page, in service of the words.' }],
+  ctaHeading: [{ text: 'Publish on paper, ship on the web.' }],
+  primaryAction: 'Start writing',
+});
+
+export const violetLaunchTemplate = buildTemplate({
+  id: 'violet-launch',
+  name: 'Violet Launch',
+  tagline:
+    'A bold midnight launch canvas with electric violet accents — the look indie products take when they want to be noticed.',
+  styleKit: 'midnight-violet',
+  title: 'Violet Launch',
+  heroHeading: [
+    { text: 'Ship something ' },
+    { text: 'loud', marks: [{ type: 'bold' }] },
+    { text: '.' },
+  ],
+  heroBody: [
+    {
+      text: 'Deep midnight, vivid violet, modern type. Built for launches that need to look the part on day one.',
+    },
+  ],
+  featureHeading: [{ text: 'Three reasons people stay past the headline.' }],
+  ctaHeading: [{ text: 'Make the launch list before launch day.' }],
+  primaryAction: 'Join the waitlist',
+});
+
 export const allTemplateSeeds = [
   starterTemplate,
   launchTemplate,
   enterpriseScaleTemplate,
   studioTemplate,
   localTemplate,
+  pressTemplate,
+  violetLaunchTemplate,
   apogeeShowcaseTemplate,
 ] as const satisfies readonly TemplateSeed[];
 

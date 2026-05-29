@@ -1,6 +1,6 @@
 // src/canvas/style-kits.ts
 //
-// The single source of truth for the four deterministic Style Kits.
+// The single source of truth for the deterministic built-in Style Kits.
 //
 // Both the editor preview (src/editor/canvas-styles.ts) and the public
 // renderer (src/canvas/public-styles.ts) consume the SAME preset map via
@@ -37,7 +37,7 @@ import {
 } from './schema.js';
 
 // --------------------------------------------------------------------------
-// The four kits.
+// The kits.
 // --------------------------------------------------------------------------
 
 const CHARCOAL: StyleKitPreset = {
@@ -441,15 +441,231 @@ const GREEN_ORGANIC: StyleKitPreset = {
   },
 };
 
-// `satisfies` enforces that the literal is a valid `Record<BuiltInStyleKit, ...>`
-// AND lets the four field shapes stay precise. `'custom'` is NOT a key here —
+const IVORY_PRESS: StyleKitPreset = {
+  bg: '#F5EFE3',
+  panel: '#FBF7EE',
+  text: '#1A1916',
+  muted: '#6E665A',
+  accent: '#9C3520',
+  accentText: '#FBF7EE',
+  fontFamilyDisplay: "'EB Garamond', 'Iowan Old Style', Georgia, 'Times New Roman', serif",
+  fontFamilyBody: "'Inter', system-ui, -apple-system, sans-serif",
+  fontFamilyMono: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+  headingScale: 1.18,
+  bodyScale: 1.02,
+  labelScale: 0.82,
+  lineHeight: 1.6,
+  radius: '4px',
+  borderWidth: '1px',
+  // Hairline warm shadow — paper, not pillow.
+  shadow: '0 1px 2px rgba(26, 25, 22, 0.05), 0 14px 36px rgba(26, 25, 22, 0.06)',
+  surfaceVariants: {
+    flat: { background: '#FBF7EE', shadow: 'none', radius: '4px' },
+    raised: {
+      background: '#FFFEFA',
+      border: '1px solid rgba(26, 25, 22, 0.06)',
+      shadow: '0 1px 2px rgba(26, 25, 22, 0.04), 0 18px 44px rgba(26, 25, 22, 0.07)',
+      radius: '6px',
+    },
+    glass: {
+      background: 'rgba(255, 254, 250, 0.62)',
+      border: '1px solid rgba(26, 25, 22, 0.08)',
+      shadow: '0 8px 24px rgba(26, 25, 22, 0.05)',
+      radius: '4px',
+    },
+    outlined: { background: 'transparent', border: '1px solid rgba(26, 25, 22, 0.14)', radius: '4px' },
+    sticker: {
+      background: '#FFFEFA',
+      border: '1px solid rgba(26, 25, 22, 0.10)',
+      // Soft stamp offset — print artifact, not drop shadow.
+      shadow: '4px 4px 0 rgba(26, 25, 22, 0.08), 0 1px 2px rgba(26, 25, 22, 0.04)',
+      radius: '6px',
+    },
+    'editorial-frame': {
+      background: 'transparent',
+      border: '2px solid #9C3520',
+      radius: '0px',
+    },
+    'soft-panel': { background: '#F0E9DA', shadow: '0 1px 0 rgba(26, 25, 22, 0.04) inset' },
+  },
+  shapeFill: '#9C3520',
+  shapeStroke: '#6E665A',
+  shapeStrokeWidth: '1px',
+  actionRadius: '4px',
+  actionPadding: '12px 22px',
+  actionVariants: {
+    solid: { background: '#1A1916', color: '#FBF7EE', weight: 600 },
+    outline: { background: 'transparent', color: '#1A1916', border: '1px solid #1A1916', weight: 500 },
+    ghost: { background: 'transparent', color: '#1A1916' },
+    pill: { background: '#9C3520', color: '#FBF7EE', weight: 600, borderRadius: '999px' },
+    glass: {
+      background: 'rgba(255, 254, 250, 0.7)',
+      color: '#1A1916',
+      border: '1px solid rgba(26, 25, 22, 0.10)',
+      borderRadius: '4px',
+      backdropFilter: 'blur(12px)',
+    },
+    brutalist: {
+      background: '#1A1916',
+      color: '#FBF7EE',
+      border: '2px solid #1A1916',
+      weight: 700,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #9C3520',
+    },
+    underline: {
+      background: 'transparent',
+      color: '#9C3520',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
+  },
+  // Medium-paced — editorial reads, doesn't sprint.
+  motionDurationMs: 380,
+  motionEasing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  motionPresets: {
+    none: {},
+    'fade-up': { transform: 'translateY(14px)', opacity: 0 },
+    'fade-down': { transform: 'translateY(-14px)', opacity: 0 },
+    'fade-in': { opacity: 0 },
+    'fade-right': { transform: 'translateX(-14px)', opacity: 0 },
+    'slide-left': { transform: 'translateX(22px)', opacity: 0 },
+    'slide-up': { transform: 'translateY(22px)' },
+    'slide-right': { transform: 'translateX(-22px)' },
+    'scale-in': { transform: 'scale(0.97)', opacity: 0 },
+    'zoom-out': { transform: 'scale(1.06)', opacity: 0 },
+    'blur-in': { opacity: 0 },
+    'rotate-in': { transform: 'rotate(-4deg) scale(0.97)', opacity: 0 },
+    'flip-in': { transform: 'perspective(600px) rotateY(90deg)', opacity: 0 },
+    'bounce-in': { transform: 'scale(0.7)', opacity: 0 },
+    'stagger-children': { transform: 'translateY(10px)', opacity: 0, delayMs: 80 },
+    'slow-drift': { transform: 'translateY(0px)' },
+    'parallax-soft': { transform: 'translateY(6px)' },
+  },
+};
+
+const MIDNIGHT_VIOLET: StyleKitPreset = {
+  bg: '#0A0815',
+  panel: '#140F25',
+  text: '#EFEAFF',
+  muted: '#8C82B5',
+  accent: '#C04CFF',
+  accentText: '#0A0815',
+  fontFamilyDisplay: "'Inter Tight', 'Inter', system-ui, -apple-system, sans-serif",
+  fontFamilyBody: "'Inter', system-ui, -apple-system, sans-serif",
+  fontFamilyMono: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
+  headingScale: 1.05,
+  bodyScale: 0.96,
+  labelScale: 0.82,
+  lineHeight: 1.5,
+  radius: '14px',
+  borderWidth: '1px',
+  // Violet glow + deep shadow — modern indie product.
+  shadow: '0 8px 28px rgba(192, 76, 255, 0.18), 0 18px 48px rgba(0, 0, 0, 0.55)',
+  surfaceVariants: {
+    flat: { background: '#140F25', shadow: 'none', radius: '14px' },
+    raised: {
+      background: '#1B1530',
+      border: '1px solid rgba(192, 76, 255, 0.10)',
+      shadow: '0 10px 32px rgba(192, 76, 255, 0.14), 0 22px 56px rgba(0, 0, 0, 0.6)',
+      radius: '18px',
+    },
+    glass: {
+      background: 'rgba(192, 76, 255, 0.08)',
+      border: '1px solid rgba(192, 76, 255, 0.22)',
+      shadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+      radius: '14px',
+    },
+    outlined: {
+      background: 'transparent',
+      border: '1px solid rgba(192, 76, 255, 0.24)',
+      radius: '14px',
+    },
+    sticker: {
+      background: '#1B1530',
+      border: '1px solid rgba(192, 76, 255, 0.30)',
+      shadow: '0 4px 0 rgba(192, 76, 255, 0.35), 0 14px 32px rgba(0, 0, 0, 0.5)',
+      radius: '14px',
+    },
+    'editorial-frame': {
+      background: 'transparent',
+      border: '2px solid #C04CFF',
+      radius: '4px',
+    },
+    'soft-panel': {
+      background: '#100B1F',
+      shadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    },
+  },
+  shapeFill: '#C04CFF',
+  shapeStroke: '#8C82B5',
+  shapeStrokeWidth: '1px',
+  actionRadius: '12px',
+  actionPadding: '12px 22px',
+  actionVariants: {
+    solid: { background: '#C04CFF', color: '#0A0815', weight: 600 },
+    outline: { background: 'transparent', color: '#EFEAFF', border: '1px solid #C04CFF', weight: 500 },
+    ghost: { background: 'transparent', color: '#EFEAFF' },
+    pill: { background: '#C04CFF', color: '#0A0815', weight: 600, borderRadius: '999px' },
+    glass: {
+      background: 'rgba(192, 76, 255, 0.14)',
+      color: '#EFEAFF',
+      border: '1px solid rgba(192, 76, 255, 0.30)',
+      borderRadius: '14px',
+      backdropFilter: 'blur(12px)',
+    },
+    brutalist: {
+      background: '#0A0815',
+      color: '#C04CFF',
+      border: '2px solid #C04CFF',
+      weight: 700,
+      borderRadius: '0px',
+      boxShadow: '4px 4px 0 #C04CFF',
+    },
+    underline: {
+      background: 'transparent',
+      color: '#C04CFF',
+      textDecoration: 'underline',
+      borderRadius: '0px',
+      padding: '0',
+    },
+  },
+  // Smooth modern — out-quart for product feel.
+  motionDurationMs: 400,
+  motionEasing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+  motionPresets: {
+    none: {},
+    'fade-up': { transform: 'translateY(14px)', opacity: 0 },
+    'fade-down': { transform: 'translateY(-14px)', opacity: 0 },
+    'fade-in': { opacity: 0 },
+    'fade-right': { transform: 'translateX(-14px)', opacity: 0 },
+    'slide-left': { transform: 'translateX(22px)', opacity: 0 },
+    'slide-up': { transform: 'translateY(22px)' },
+    'slide-right': { transform: 'translateX(-22px)' },
+    'scale-in': { transform: 'scale(0.96)', opacity: 0 },
+    'zoom-out': { transform: 'scale(1.08)', opacity: 0 },
+    'blur-in': { opacity: 0 },
+    'rotate-in': { transform: 'rotate(-5deg) scale(0.95)', opacity: 0 },
+    'flip-in': { transform: 'perspective(600px) rotateY(90deg)', opacity: 0 },
+    'bounce-in': { transform: 'scale(0.65)', opacity: 0 },
+    'stagger-children': { transform: 'translateY(10px)', opacity: 0, delayMs: 70 },
+    'slow-drift': { transform: 'translateY(0px)' },
+    'parallax-soft': { transform: 'translateY(8px)' },
+  },
+};
+
+// The exported registry is the public contract consumers index into.
+// `'custom'` is NOT a key here —
 // it resolves at render time from `EditableSite.customStyleKit` instead.
-export const STYLE_KIT_PRESETS = {
+export const STYLE_KIT_PRESETS: Record<BuiltInStyleKit, StyleKitPreset> = {
   charcoal: CHARCOAL,
   'orange-editorial': ORANGE_EDITORIAL,
   'blue-saas': BLUE_SAAS,
   'green-organic': GREEN_ORGANIC,
-} satisfies Record<BuiltInStyleKit, StyleKitPreset>;
+  'ivory-press': IVORY_PRESS,
+  'midnight-violet': MIDNIGHT_VIOLET,
+};
 
 // --------------------------------------------------------------------------
 // Lookup helper. Fails loudly so a corrupted kit name never silently

@@ -16,6 +16,8 @@ export const BUILT_IN_STYLE_KITS = [
   'orange-editorial',
   'blue-saas',
   'green-organic',
+  'ivory-press',
+  'midnight-violet',
 ] as const;
 export type BuiltInStyleKit = (typeof BUILT_IN_STYLE_KITS)[number];
 
