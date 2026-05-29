@@ -2899,7 +2899,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           } else {
             element[f.path] = ti.value;
           }
-          rebuildElement(element.id);
+          if (!f.noRebuild) rebuildElement(element.id);
           scheduleSave();
         });
         inspector.appendChild(field(f.label, ti));
@@ -3093,6 +3093,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "table-grid": function(element, host) { mountTableGrid(element, host); },
     "nav-links": function(element, host) { mountNavLinks(element, host); },
     "chart-data": function(element, host) { mountChartData(element, host); },
+    "form-fields": function(element, host) { mountFormFields(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -3167,7 +3168,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // handlers in INSPECTOR_MOUNT_HANDLERS above; mountVideoPlayback owns the
   // "skip on image" conditional and the autoplay-implies-muted enforcement.
 
-  function buildFormInspector(element) {
+  // buildFormInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/form.ts. Per-field editor (label + kind +
+  // required + conditional placeholder + conditional options-list) lives
+  // in mountFormFields; submitLabel / successMessage / webhookUrl are now
+  // declarative text fields (webhookUrl uses noRebuild because the value
+  // affects submission metadata, not the rendered output).
+  function mountFormFields(element, host) {
     if (!Array.isArray(element.fields)) element.fields = [];
     var fieldListHost = document.createElement("div");
 
@@ -3177,7 +3184,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     function assertFormOptionShape(option, fieldId, optionIndex) {
       if (!option || typeof option !== "object" || typeof option.value !== "string" || typeof option.label !== "string") {
-        throw new Error("buildFormInspector: field " + JSON.stringify(fieldId) + " option " + String(optionIndex) + " must be { value: string, label: string }");
+        throw new Error("mountFormFields: field " + JSON.stringify(fieldId) + " option " + String(optionIndex) + " must be { value: string, label: string }");
       }
     }
 
@@ -3312,37 +3319,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       fieldListHost.appendChild(addFieldBtn);
     }
     renderFieldList();
-    inspector.appendChild(field("Fields", fieldListHost));
-
-    var submitLabel = document.createElement("input");
-    submitLabel.type = "text";
-    submitLabel.value = element.submitLabel || "Submit";
-    submitLabel.addEventListener("change", function() {
-      element.submitLabel = submitLabel.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Submit label", submitLabel));
-
-    var successMsg = document.createElement("input");
-    successMsg.type = "text";
-    successMsg.value = element.successMessage || "";
-    successMsg.addEventListener("change", function() {
-      element.successMessage = successMsg.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Success message", successMsg));
-
-    var webhookInput = document.createElement("input");
-    webhookInput.type = "text";
-    webhookInput.value = element.webhookUrl || "";
-    webhookInput.placeholder = "https://...";
-    webhookInput.addEventListener("change", function() {
-      element.webhookUrl = webhookInput.value;
-      scheduleSave();
-    });
-    inspector.appendChild(field("Webhook URL", webhookInput));
+    host.appendChild(field("Fields", fieldListHost));
   }
 
   // buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH
@@ -4241,20 +4218,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildZOrderGroup(section, element));
     inspector.appendChild(buildElementActionsGroup(section, element));
 
-    // ADR 0011 Step 1: dispatch via spec when available, else fall back to
-    // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media, accordion, carousel, table, nav, chart)
-    // have specs; remaining type (form) still uses its per-type builder
-    // until the next PR in the migration series.
+    // ADR 0011 Step 1: every element type now has an INSPECTOR_DISPATCH
+    // spec. The dispatch is still declared as Partial<Record> in
+    // src/canvas/elements/index.ts during this PR; the cutover PR flips it
+    // to a full Record<ElementType, InspectorSpec> so the mapped-type check
+    // catches "added a type, forgot the spec" at compile time. Collection
+    // is intentionally absent from the dispatch — it has no inspector
+    // fields of its own (children render their inspectors instead).
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
-    } else {
-      const inspectorBuilders = {
-        form: buildFormInspector,
-      };
-      const inspectorBuilder = inspectorBuilders[element.type];
-      if (inspectorBuilder) inspectorBuilder(element);
     }
 
     // -- Element style controls -----------------------------------------------

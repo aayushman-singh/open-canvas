@@ -134,6 +134,15 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     showLegend: true,
     // xAxisTitle + yAxisTitle intentionally absent (emptyOmits).
   },
+  form: {
+    id: 'fx-form',
+    type: 'form',
+    box: { x: 0, y: 0, w: 360, h: 240, z: 0 },
+    fields: [{ id: 'fx-field-1', label: 'Name', kind: 'text', required: false }],
+    submitLabel: 'Submit',
+    successMessage: 'Thanks!',
+    webhookUrl: '',
+  },
 };
 
 // Action handlers, busy flags, and mount handlers the interpreter binds
@@ -151,6 +160,7 @@ const REGISTERED_MOUNTS = [
   'table-grid',
   'nav-links',
   'chart-data',
+  'form-fields',
 ] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {

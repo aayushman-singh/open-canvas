@@ -16,7 +16,7 @@ import { codeInspectorSpec, renderCode } from './code.js';
 import { renderCollection } from './collection.js';
 import { containerInspectorSpec, renderContainer } from './container.js';
 import { embedInspectorSpec, renderEmbed } from './embed.js';
-import { renderForm } from './form.js';
+import { formInspectorSpec, renderForm } from './form.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import { mediaInspectorSpec, renderMedia } from './media.js';
 import { navInspectorSpec, renderNav } from './nav.js';
@@ -213,4 +213,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   table: tableInspectorSpec,
   nav: navInspectorSpec,
   chart: chartInspectorSpec,
+  form: formInspectorSpec,
 };

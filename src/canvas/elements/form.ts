@@ -14,6 +14,7 @@
 // fails on a missing token, so a no-widget form would be unsubmittable dead
 // UX, never an acceptable degraded mode.
 
+import type { InspectorSpec } from './inspector-spec.js';
 import { escapeAttr, escapeHtml } from './render-utils.js';
 import type { BaseElement } from '../schema.js';
 
@@ -150,3 +151,24 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
 // feature dir; the registry slot is reserved here so the recipes module can
 // import the name without circular dependency on Wave 2 code.
 export const FORM_RECIPE_ID = 'contact-form' as const;
+
+export const formInspectorSpec: InspectorSpec = {
+  fields: [
+    // Per-field editor with per-kind discriminated sub-fields: every field
+    // has label + kind + required, but placeholder is hidden when kind is
+    // checkbox, and an options-list editor appears when kind is select.
+    // Imperative because re-rendering the card on kind-change is the only
+    // way to swap the conditional sub-fields without a declarative
+    // visible-when machinery (ADR 0011 dec 3 generalize on demand).
+    { kind: 'custom-mount', name: 'form-fields' },
+    { kind: 'text', label: 'Submit label', path: 'submitLabel' },
+    { kind: 'text', label: 'Success message', path: 'successMessage' },
+    {
+      kind: 'text',
+      label: 'Webhook URL',
+      path: 'webhookUrl',
+      placeholder: 'https://...',
+      noRebuild: true,
+    },
+  ],
+};

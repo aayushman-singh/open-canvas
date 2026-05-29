@@ -87,6 +87,13 @@ export interface TextField {
   placeholder?: string;
   required?: boolean;
   emptyOmits?: boolean;
+  /**
+   * When true, the interpreter skips `rebuildElement(element.id)` on change
+   * and only calls `scheduleSave()`. Used for fields whose value affects
+   * element data but not its rendered output (e.g. `form.webhookUrl` —
+   * submission metadata, never read by the visitor-side renderer).
+   */
+  noRebuild?: boolean;
 }
 
 /**
