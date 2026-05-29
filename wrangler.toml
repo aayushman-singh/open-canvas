@@ -109,7 +109,7 @@ bucket_name = "rev01-assets"
 APP_DOMAIN = "opencanvas.aayushman.dev"
 AUTHORIZED_PARTIES = "https://opencanvas.aayushman.dev,http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788"
 COOKIE_NAME_PREFIX = "__opencanvas_"
-EMAIL_FROM = "noreply@opencanvas.aayushman.dev"
+EMAIL_FROM = "Open Canvas <noreply@opencanvas.aayushman.dev>"
 
 # Wave 1 #5 (custom domains, plan 05). Cron tick every 5 minutes invokes
 # the `scheduled` handler exported from src/index.ts which delegates to

@@ -13,10 +13,6 @@
 import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import type { FormElement } from '../canvas/elements/form.js';
@@ -24,6 +20,10 @@ import type { CanvasPage } from '../canvas/schema.js';
 import { db } from '../db/client.js';
 import { customer, site as siteTable } from '../db/schema.js';
 import { sendEmail } from '../email/send.js';
+import {
+  formSubmissionEmailHtml,
+  formSubmissionEmailSubject,
+} from '../email/templates/form-submission.js';
 import { appOrigin, type HostConfigEnv } from '../host-config.js';
 import type { FormRateLimiterMarker } from '../live/form-rate-limiter-client.js';
 
@@ -112,13 +112,8 @@ router.post('/:siteId/:formElementId', async (c) => {
     try {
       await sendEmail(c.env, {
         to: ownerEmail,
-        subject: `New form submission on your site`,
-        html: [
-          `<p>A new form submission was received.</p>`,
-          `<p><strong>Form ID:</strong> ${escapeHtml(formElementId)}</p>`,
-          `<p><strong>Submitted at:</strong> ${submittedAt}</p>`,
-          `<p><a href="${inboxUrl}">View in Forms Inbox</a></p>`,
-        ].join('\n'),
+        subject: formSubmissionEmailSubject(),
+        html: formSubmissionEmailHtml({ formElementId, submittedAt, inboxUrl }),
       });
     } catch (err) {
       console.error('[forms/route] form-notify email failed', {

@@ -30,8 +30,11 @@ COOKIE_NAME_PREFIX=__opencanvas_
 # Email (ADR 0018)
 # ---------------------------------------------------------------------------
 # Outbound `From:` address. Must be a verified sender at the provider
-# (Resend). Forks set this to their own verified address.
-EMAIL_FROM=hello@opencanvas.aayushman.dev
+# (Resend). Forks set this to their own verified address. The display-name
+# form (`Brand <addr@domain>`) is accepted and recommended — inboxes show
+# the friendly name and derive a letter-avatar from it until BIMI is set up
+# (see docs/email-sender-icon.md).
+EMAIL_FROM=Open Canvas <hello@opencanvas.aayushman.dev>
 # Resend.com API key for transactional email (invites, password resets).
 RESEND_API_KEY=<your-resend-api-key>
 
