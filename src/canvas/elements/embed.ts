@@ -1,7 +1,6 @@
 // src/canvas/elements/embed.ts
 //
-// EmbedElement interface + render fn. Wave 2 (#8) owner file. See
-// docs/superpowers/plans/2026-05-23-08-embed.md.
+// EmbedElement interface + render fn. Wave 2 (#8) owner file.
 //
 // Visitor-facing contract: an Owner pastes a URL into an Embed element. The
 // published renderer drops a sandboxed iframe pointing at the resolved

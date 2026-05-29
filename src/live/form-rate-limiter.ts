@@ -3,8 +3,7 @@
 // Phase 0 stub. `FormRateLimiter` Durable Object class — bound in
 // `wrangler.toml` so the env binding exists before Wave 2 #7 (forms) lands.
 // Wave 2 owner replaces every method body with the real per-IP / per-form
-// rate-limit logic described in
-// docs/superpowers/plans/2026-05-23-07-forms.md.
+// rate-limit logic.
 //
 // Methods throw on call so accidental Phase 0 use fails loudly rather than
 // silently succeeding with a no-op (which the project's all-or-nothing
@@ -16,7 +15,9 @@ export class FormRateLimiter extends DurableObject<unknown> {
   override async fetch(request: Request): Promise<Response> {
     void request;
     return Promise.reject(
-      new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md'),
+      new Error(
+        'FormRateLimiter.fetch called on Phase 0 stub: rate-limit logic is unimplemented. Wave 2 (#7 forms) owns this binding.',
+      ),
     );
   }
 
@@ -29,7 +30,9 @@ export class FormRateLimiter extends DurableObject<unknown> {
     void ipHash;
     void formId;
     return Promise.reject(
-      new Error('TODO: implement in Wave 2 — see docs/superpowers/plans/2026-05-23-07-forms.md'),
+      new Error(
+        `FormRateLimiter.recordSubmission called on Phase 0 stub: rate-limit logic is unimplemented (ipHash=${ipHash}, formId=${formId}). Wave 2 (#7 forms) owns this binding.`,
+      ),
     );
   }
 }
