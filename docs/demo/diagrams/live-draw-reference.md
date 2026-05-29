@@ -1,35 +1,21 @@
-# Live-Draw Reference — Act 2 (28 blocks)
+# Live-Draw Reference — Act 2 (34 blocks)
 
-Single reference for the one-canvas live-draw recording. Each block has:
+Comments + Mermaid for each block. Freestyle the voiceover.
 
-- **From D<x>:** the bridge in — say this as you finish the previous block, so blocks feel continuous, not stitched.
-- **ADR / source:** where the truth lives. ADRs first (canonical per repo policy); source files where no ADR exists.
-- **Tech on screen:** every concrete tech the viewer should see drawn or hear named. If a name on this line isn't on the canvas or in your voiceover by the end of the block, you missed it.
-- **Mermaid reference:** the shape to mimic in Excalidraw. Same node count, same topology.
-- **Anchor:** the one sentence the viewer leaves with.
-- **Draw order:** numbered reveals + `◀ say:` cue phrases.
-- **Pitfalls:** dead features and common mis-statements to avoid.
-- **To D<x>:** the bridge out.
-
-The blocks are in the narrative order from [act-2-script.md](../act-2-script.md), not the numeric `D<n>` order. The `D<n>` labels are stable identifiers; ignore the numbers for flow purposes.
+- ⚠ flags landmines (dead features, common mis-statements).
+- Order matches the narrative flow; the 28 numeric `D<n>` IDs are from [act-2-script.md](../act-2-script.md). Six additional blocks (`D-canvas`, `D-elements`, `D-aigen`, `D-sections`, `D-template`, `D-snapshot`) cover product mechanics the original 28 didn't.
 
 ---
 
-## Ordering observations (push-back)
+## Ordering observations (decide before recording)
 
-Before recording, decide on these — current order is defensible but not the only choice:
-
-1. **D5 + D10 (auth tokens) come *after* D7 + D3 (collab).** This reads as "we showed editing; now the credential machinery." If you'd rather establish the gate before the room — "here's who's allowed in, here's what they do" — move D5 + D10 to slot between D4 and D11.
-2. **D26 (rate limiter) sits in the security cluster** but is mechanically the DO that throttles D15 (forms). Consider pairing it next to D15. Current placement loses the connection between the *thing being defended* (forms endpoint) and the *defense* (rate limiter DO).
-3. **D27 (CSP frame-src)** is per-page-rendered, tied to embeds in the page. Could live in the publish-time cluster (next to D18/D19) instead of the security cluster. Current placement frames it as a defense; alternate placement frames it as page-emission output. Both are accurate.
-
-Decide once, then commit — switching mid-recording reads as fumbling.
+1. **D5 + D10 (auth tokens) sit *after* D7 + D3 (collab).** Current reading: "show editing, then explain the gate." Alternative: move auth right after D4 so the gate precedes the room.
+2. **D26 (rate limiter) is grouped with security** but mechanically pairs with D15 (forms). Consider moving it next to D15.
+3. **D27 (CSP)** is per-page-rendered — could live with publish-time (D18/D19) instead of security cluster.
 
 ---
 
-## Canvas spatial layout (one big Excalidraw canvas)
-
-Lay rows top-to-bottom, blocks left-to-right within each row. Narrative arrows snake across rows so the viewer's eye follows naturally.
+## Canvas spatial layout (one canvas, 11 rows)
 
 ```mermaid
 flowchart TB
@@ -37,62 +23,65 @@ flowchart TB
     direction LR
     D1[D1 Architecture] --> D4[D4 Routing] --> D11[D11 Assets] --> D2[D2 Style Kit]
   end
-  subgraph R2["Row 2 — Editing"]
+  subgraph R2["Row 2 — Document model"]
+    direction LR
+    DC[D-canvas EditableSite] --> DE[D-elements 14 atoms]
+  end
+  subgraph R3["Row 3 — Editing"]
     direction LR
     D9[D9 Layout] --> D7[D7 Yjs CRDT] --> D3[D3 Fan-out]
   end
-  subgraph R3["Row 3 — Auth + AI"]
+  subgraph R4["Row 4 — Auth + AI"]
     direction LR
-    D5[D5 Edit token] --> D10[D10 Invite token] --> D6[D6 Agent gate]
+    D5[D5 Edit token] --> D10[D10 Invite token] --> D6[D6 Agent gate] --> DAI[D-aigen Image gen]
   end
-  subgraph R4["Row 4 — Versioning + Import"]
+  subgraph R5["Row 5 — Versioning + Content sources"]
     direction LR
-    D13[D13 Version] --> D12[D12 Library import] --> D14[D14 Site import]
+    D13[D13 Version] --> D12[D12 Library import] --> DS[D-sections Recipes] --> D14[D14 Site import]
   end
-  subgraph R5["Row 5 — Publish-time"]
+  subgraph R6["Row 6 — Templates + Publish state"]
+    direction LR
+    DT[D-template customTemplate] --> DSN[D-snapshot Editable vs Published]
+  end
+  subgraph R7["Row 7 — Publish-time"]
     direction LR
     D8[D8 A11y] --> D18[D18 SEO] --> D19[D19 OG image] --> D20[D20 Search]
   end
-  subgraph R6["Row 6 — Visitor I/O"]
+  subgraph R8["Row 8 — Visitor I/O"]
     direction LR
     D15[D15 Forms] --> D16[D16 Password]
   end
-  subgraph R7["Row 7 — Capability + Domain"]
+  subgraph R9["Row 9 — Capability + Domain"]
     direction LR
     D21[D21 Addons] --> D17[D17 Custom domain]
   end
-  subgraph R8["Row 8 — Security"]
+  subgraph R10["Row 10 — Security"]
     direction LR
     D27[D27 CSP] --> D26[D26 Rate limiter] --> D22[D22 Security poster]
   end
-  subgraph R9["Row 9 — Operational"]
+  subgraph R11["Row 11 — Operational"]
     direction LR
     D23[D23 Schema ER] --> D24[D24 API surface] --> D25[D25 Deploy] --> D28[D28 DevEx]
   end
-  R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7 --> R8 --> R9
+  R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7 --> R8 --> R9 --> R10 --> R11
 ```
 
-Rough physical canvas dims: assume each block is a ~600x400 cluster of Excalidraw nodes; with 9 rows of up to 4 blocks each, plan a ~2600x3800 canvas. Zoom out to fit at the end; zoom in per block during recording.
-
 ---
 
-## Conventions (lock before drawing)
+## D1 — System architecture overview
 
-- **Two colors only.** One for *data/state* (e.g. dark blue fills). One for *control/flow* (e.g. orange edges). Same scheme in every block.
-- **Red is reserved.** Only on things that stop everything (validator gates, publish blockers, unique-violation 409s). Never decorative.
-- **Dashed edges** = optional, disabled, or async. The scraper edge in D1, the cron tick in D25 — keep this consistent.
-- **Excalidraw library:** build one shared library file with: External service box, DO box (rounded corner), DB table cylinder, R2 bucket, Validator gate (red border), Y.Doc. Drop these into every block.
-- **Roughness 1.** Higher gets noisy on video zoom.
+Source: [docs/architecture/0001-architecture.md](../../architecture/0001-architecture.md), [wrangler.toml](../../../wrangler.toml)
 
----
+**One Worker is the hub. Everything else is storage it owns or external services it calls.**
 
-## Blocks in narrative order
-
-### D1 — System architecture overview
-
-**From:** (cold open — first block).
-**ADR / source:** [docs/architecture/0001-architecture.md](../../architecture/0001-architecture.md), [wrangler.toml](../../../wrangler.toml).
-**Tech on screen:** Cloudflare Workers, Hono, Neon Postgres, Drizzle ORM, R2 (`rev01-assets`), Durable Objects (`SiteRoom`, `FormRateLimiter`), Clerk, Resend, Gemini 2.5 Pro, Replicate (Flux Schnell), Cloudflare for SaaS, Turnstile, Playwright scraper, cron `*/5`.
+- Hono router on Cloudflare Workers edge runtime. Single binary via `wrangler deploy`.
+- Two audiences: visitor + owner, same Worker.
+- Storage: Neon (Drizzle), R2 (`rev01-assets`).
+- Two Durable Objects: SiteRoom (one per site, WS hub), FormRateLimiter (per-IP throttle).
+- External calls: Clerk, Resend, Gemini, Replicate, CF for SaaS, Turnstile, Playwright scraper (dashed, disabled in POC).
+- One cron, `*/5 * * * *` — polls custom-hostname status.
+- ⚠ Don't mention auto-translate (dead) or Symbols (dead).
+- ⚠ Scraper drawn dashed, never solid.
 
 ```mermaid
 flowchart TB
@@ -126,144 +115,174 @@ flowchart TB
   classDef ext stroke-dasharray: 3 3
 ```
 
-**Anchor:** _"One Worker is the hub. Everything else is storage it owns or external services it calls — no server in the middle."_
-
-**Draw order:**
-1. **Workers box, center, large** ◀ *"Hono router on Cloudflare's edge runtime. Single binary, deployed via wrangler."*
-2. **Visitor (top-left) + Owner (top-right)** ◀ *"Two audiences, same Worker."*
-3. **Storage row bottom: Neon + R2** ◀ *"Relational data via Drizzle, binaries in R2 keyed by content hash."*
-4. **DO column right-of-center: SiteRoom, FormRateLimiter** ◀ *"Stateful islands. SiteRoom is one DO per site for live updates — ADR 0007. FormRateLimiter throttles per-IP."*
-5. **External row top + right: Clerk, Resend, Gemini, Replicate, CF for SaaS, Turnstile, Scraper (dashed)** ◀ *"Everything else is an HTTP call out. Scraper is dashed — disabled in the public POC."*
-6. **Cron glyph on Worker (`*/5`)** ◀ *"One scheduled handler — polls custom-hostname status every five minutes."*
-
-**Pitfalls:**
-- Don't say "auto-translate via Gemini" — dead feature.
-- Don't say "Symbols" — dead feature.
-- Don't show the scraper as a solid edge.
-- Don't say "the import button works" — disabled in public POC.
-
-**To D4:** _"That's the hub. Now we zoom into the first thing the Worker does on every request — turn a URL into a site."_
-
 ---
 
-### D4 — Published address routing
+## D4 — Published address routing
 
-**From D1:** every request enters via that central Workers box. What does it do first? It routes.
-**ADR / source:** [docs/adr/0002-published-address.md](../../adr/0002-published-address.md).
-**Tech on screen:** apex host (`opencanvas.aayushman.dev`), wildcard subdomain (`*.opencanvas.aayushman.dev`), custom hostname (via CF for SaaS), `site.subdomain` column, `customDomain` table.
+Source: [ADR 0002](../../adr/0002-published-address.md)
+
+**Three host shapes, one render path.**
+
+- Apex (`opencanvas.aayushman.dev`) → app shell (dashboard / editor / landing).
+- Wildcard subdomain → `site.subdomain` lookup.
+- Anything else → must match a `customDomain` row.
+- Apex is a Workers Custom Domain; wildcard is a Workers *Route* — CF Custom Domains don't support wildcards.
+- ⚠ Apex migrated to `opencanvas.aayushman.dev` on 2026-05-29 — don't say `rev01.aayushman.dev`.
 
 ```mermaid
 stateDiagram-v2
   [*] --> ParseHost
   ParseHost --> Apex: host == APP_DOMAIN
-  ParseHost --> Sub: host ends with .APP_DOMAIN
+  ParseHost --> Sub: ends with .APP_DOMAIN
   ParseHost --> Custom: anything else
-  Apex --> AppShell: dashboard / editor / landing
-  Sub --> LookupSubdomain: site.subdomain match
-  Custom --> LookupCustomDomain: customDomain row match
+  Apex --> AppShell
+  Sub --> LookupSubdomain
+  Custom --> LookupCustomDomain
   LookupSubdomain --> RenderPublishedSite
   LookupCustomDomain --> RenderPublishedSite
-  LookupSubdomain --> NotFound: no match
-  LookupCustomDomain --> NotFound: no match
+  LookupSubdomain --> NotFound
+  LookupCustomDomain --> NotFound
 ```
-
-**Anchor:** _"Three host shapes, three lookup paths, one render. The host string is the routing key."_
-
-**Draw order:**
-1. **Incoming URL on the left** ◀ *"Visitor request arrives. We parse the host."*
-2. **Three branches: apex / subdomain / custom** ◀ *"Apex hits app shell — dashboard, editor, landing. Anything matching wildcard `.opencanvas.aayushman.dev` is a subdomain — we look up `site.subdomain`. Anything else must be a registered custom domain."*
-3. **Both wildcard and custom converge to RenderPublishedSite** ◀ *"Once we know the site row, render is identical."*
-4. **NotFound branch** ◀ *"No match — 404. Loud, not fallback."*
-
-**Pitfalls:**
-- Don't say `rev01.aayushman.dev` — apex migrated to `opencanvas.aayushman.dev` on 2026-05-29.
-- Don't claim Workers Custom Domains supports wildcards — it doesn't; the wildcard is a Workers *Route*, not a Custom Domain. ([wrangler.toml:6-16](../../../wrangler.toml#L6-L16))
-
-**To D11:** _"Routing landed the visitor on the right site. That site renders binaries — where do those binaries live?"_
 
 ---
 
-### D11 — Owner Asset content-addressed pipeline
+## D11 — Owner Asset content-addressed pipeline
 
-**From D4:** the site we routed to is mostly images and fonts. Here's where the bytes live.
-**ADR / source:** [docs/adr/0004-owner-asset.md](../../adr/0004-owner-asset.md), [docs/adr/0006-asset-storage-backend.md](../../adr/0006-asset-storage-backend.md).
-**Tech on screen:** SHA-256, R2 (`rev01-assets`), `ownerAsset` table (Neon + Drizzle), magic-byte dimension prober (PNG/JPEG/GIF/WebP), `customer_id` foreign key, `/assets/<contentHash>` public URL.
+Source: [ADR 0004](../../adr/0004-owner-asset.md), [ADR 0006](../../adr/0006-asset-storage-backend.md)
+
+**Same bytes → one R2 object → multiple `ownerAsset` rows.**
+
+- SHA-256 hash is the asset's identity.
+- R2 keyed by content hash; existing hash → skip upload.
+- `ownerAsset` row carries `customer_id` — R2 doesn't know ownership.
+- Magic-byte dimension probing (PNG / JPEG / GIF / WebP) — no full decode.
+- Public URL `/assets/<contentHash>`.
+- ⚠ Not MD5 — SHA-256.
+- ⚠ R2 doesn't enforce ownership; the DB does.
 
 ```mermaid
 flowchart LR
   up[Upload bytes] --> hash[SHA-256]
   up --> probe[Magic-byte<br/>dimension prober]
   hash --> ch([contentHash])
-  ch --> q{R2 has<br/>this hash?}
-  q -- no --> r2w[R2 PUT /contentHash]
+  ch --> q{R2 has hash?}
+  q -- no --> r2w[R2 PUT]
   q -- yes --> skip[skip]
-  ch --> row[(ownerAsset row<br/>customerId + hash<br/>+ width/height)]
+  ch --> row[(ownerAsset row<br/>customerId + hash)]
   probe --> row
   row --> url["/assets/&lt;contentHash&gt;"]
 ```
 
-**Anchor:** _"Same bytes → one R2 object → multiple `ownerAsset` rows. Identity comes from content, not from the upload event."_
-
-**Draw order:**
-1. **Upload bytes, left** ◀ *"Browser POSTs a file."*
-2. **SHA-256 + magic-byte prober (parallel)** ◀ *"We hash the bytes. We probe magic bytes for dimensions — no full decode."*
-3. **R2 conditional write** ◀ *"If the hash already lives in R2, we skip the upload. Bytes are deduplicated globally."*
-4. **`ownerAsset` row, scoped to `customer_id`** ◀ *"The DB row carries ownership. R2 doesn't know who owns what — the table does."*
-5. **Public URL `/assets/<contentHash>`** ◀ *"URL is content-addressable. Two owners uploading the same image get the same URL and two rows."*
-
-**Pitfalls:**
-- Not MD5 — SHA-256.
-- Don't say R2 enforces ownership.
-- Don't claim full image decode — only magic-byte probing.
-
-**To D2:** _"Bytes have homes. Now what controls how they appear styled — the Style Kit."_
-
 ---
 
-### D2 — Style Kit determinism + dark variants
+## D2 — Style Kit determinism + dark variants
 
-**From D11:** an image rendered against the wrong palette feels wrong. Style Kit makes "wrong" impossible by deriving every surface from one seed.
-**ADR / source:** [docs/adr/0022-twelve-token-oklch-theme-grammar.md](../../adr/0022-twelve-token-oklch-theme-grammar.md) (Proposed), [src/canvas/style-kits.ts](../../../src/canvas/style-kits.ts).
-**Tech on screen:** OKLCH color space, 12-token theme grammar, seed → derived tokens, light/dark variant projection.
+Source: [ADR 0022 (Proposed)](../../adr/0022-twelve-token-oklch-theme-grammar.md), [src/canvas/style-kits.ts](../../../src/canvas/style-kits.ts)
+
+**One seed produces twelve tokens deterministically. Editor and published site cannot drift.**
+
+- OKLCH color space — lightness and chroma shifts are predictable.
+- 12 named tokens (bg, panel, text, muted, accent, border, +6 more) computed from the seed.
+- Dark variant = another deterministic projection of the same seed.
+- Renderer reads tokens; editor uses the same lookup — pixel parity by construction.
+- ⚠ ADR 0022 is Proposed — phrase as "the grammar we're consolidating on."
+- ⚠ Not a "themes" library — one grammar, not a swap set.
 
 ```mermaid
 flowchart LR
-  seed([Seed color OKLCH]) --> algebra[12-token<br/>algebra]
-  algebra --> bg[bg]
-  algebra --> panel[panel]
-  algebra --> text[text]
-  algebra --> muted[muted]
-  algebra --> accent[accent]
-  algebra --> border[border]
-  algebra --> dots[... 6 more]
-  bg --> light[Light variant]
-  bg --> dark[Dark variant]
+  seed([Seed OKLCH]) --> algebra[12-token algebra]
+  algebra --> tokens["bg / panel / text / muted /<br/>accent / border / + 6 more"]
+  tokens --> light[Light variant]
+  tokens --> dark[Dark variant]
   light --> render[Canvas render]
   dark --> render
 ```
 
-**Anchor:** _"One seed produces twelve tokens deterministically. Editor and published site read the same tokens — they cannot drift."_
+---
 
-**Draw order:**
-1. **Seed swatch, left** ◀ *"Owner picks one color. That's the entire input."*
-2. **12-token algebra, center** ◀ *"OKLCH lets us shift lightness and chroma predictably. Twelve named roles — bg, panel, text, muted, accent, border, and six more."*
-3. **Token list radiating from algebra** ◀ *"Each token is computed, not chosen. No hand-tuning, no per-kit drift."*
-4. **Light + dark branches** ◀ *"Dark variant is another deterministic projection from the same seed."*
-5. **Canvas render** ◀ *"The renderer reads tokens. Editor uses the same lookup — pixel parity by construction."*
+## D-canvas — EditableSite tree (the document model)
 
-**Pitfalls:**
-- ADR 0022 is Proposed, not Accepted — phrase as "the grammar we're consolidating on."
-- Don't say "themes" plural — the kit is one grammar, not a swap library.
+Source: [src/canvas/schema.ts:393-427](../../../src/canvas/schema.ts) (EditableSite), [src/canvas/schema.ts:353-391](../../../src/canvas/schema.ts) (CanvasPage), [src/canvas/schema.ts:330-351](../../../src/canvas/schema.ts) (CanvasSection), [src/canvas/schema.ts:286-300](../../../src/canvas/schema.ts) (CanvasElement)
 
-**To D9:** _"Colors decide how things look. Layout decides where things sit. Now the responsive engine."_
+**Three levels of tree. Every editor mutation reduces to changing this.**
+
+- Root `EditableSite`: styleKit, pages[], header, footer, customStyleKit, defaultLocale, siteNoIndex, darkModeEnabled, faviconAssetId.
+- `CanvasPage`: id, slug, title, width, sections[], plus SEO + page-level motion.
+- `CanvasSection`: id, recipeId, name, height, role (header/footer/middle), backgroundEffect, entrance, trigger, backgroundVideoAssetId, elements[].
+- `CanvasElement`: discriminated union of 14 types (D-elements).
+- Header + footer are *site-wide* single sections, not per-page.
+- This is what the Y.Doc projects to (D7), what `validate.ts` gates (D6), what the renderer reads.
+- ⚠ It's a tree, not a graph. Asset refs are by UUID, not embedded bytes.
+- ⚠ Style kit, locale, dark-mode flag, favicon — all site-wide (root level), not per-page.
+
+```mermaid
+flowchart TB
+  site[EditableSite<br/>styleKit + locale + favicon] --> header[Site-wide header]
+  site --> footer[Site-wide footer]
+  site --> p1[Page 1<br/>slug + title + SEO]
+  site --> p2[Page 2]
+  p1 --> s1[Section<br/>recipeId + height + role]
+  p1 --> s2[Section]
+  s1 --> e1[Element of 14 types]
+  s1 --> e2[Element]
+  s2 --> e3[Element]
+```
 
 ---
 
-### D9 — Responsive layout engine + breakpoint cascade
+## D-elements — Element types + variant axes (14 atoms)
 
-**From D2:** style is the paint; layout is the frame. Sections position themselves through a semantic tree.
-**ADR / source:** [src/canvas/layout/engine.ts](../../../src/canvas/layout/engine.ts), [src/canvas/layout/tree.ts](../../../src/canvas/layout/tree.ts), [src/canvas/responsive/](../../../src/canvas/responsive/).
-**Tech on screen:** semantic tree (stack / grid / split), breakpoint cascade (desktop → tablet → mobile), positioned `CanvasSection`, override map.
+Source: [src/canvas/schema.ts:32-47](../../../src/canvas/schema.ts) (ELEMENT_TYPES), per-type definitions in [src/canvas/elements/](../../../src/canvas/elements/), [ADR 0011 (Proposed)](../../adr/0011-canvas-element-registry.md)
+
+**Fourteen atoms. Each is its own discriminated branch with its own variants and own validator.**
+
+- 14 types: `text`, `media`, `action`, `shape`, `container`, `form`, `embed`, `chart`, `accordion`, `carousel`, `table`, `code`, `nav`, `collection`.
+- Variant axes (sample):
+  - **text:** role (heading / body / label), fontSize 12-96, fontWeight, align.
+  - **action:** 7 variants — solid / outline / ghost / pill / glass / brutalist / underline.
+  - **shape:** 6 variants — rect / pill / circle / line / badge / blob.
+  - **container:** 7 surface variants — flat / raised / glass / outlined / sticker / editorial-frame / soft-panel.
+  - **media:** image | video, fit (cover / contain), video.playback flags (autoplay / muted / loop / controls).
+  - **chart:** 5 kinds — bar / line / pie / donut / area.
+  - **code:** 12 languages, line-numbers toggle.
+  - **embed:** provider resolved from URL — YouTube / Vimeo / Loom / Figma / Spotify / SoundCloud / CodePen / Twitter.
+- Discriminated union → compile-time exhaustiveness via D28's union-cover checks.
+- ADR 0011 (Proposed) consolidates per-element module ownership into a registry; inspector dispatch is mid-migration.
+- ⚠ Don't claim "infinite element types" — it's fourteen, bounded by design.
+- ⚠ `'custom'` recipe (D-sections) is different from element variants — recipes parametrise sections, variants parametrise elements.
+
+```mermaid
+flowchart LR
+  union[CanvasElement<br/>discriminated union] --> t[text]
+  union --> m[media]
+  union --> a[action]
+  union --> sh[shape]
+  union --> c[container]
+  union --> f[form]
+  union --> em[embed]
+  union --> ch[chart]
+  union --> ac[accordion]
+  union --> ca[carousel]
+  union --> ta[table]
+  union --> co[code]
+  union --> n[nav]
+  union --> cl[collection]
+```
+
+---
+
+## D9 — Responsive layout engine + breakpoint cascade
+
+Source: [src/canvas/layout/engine.ts](../../../src/canvas/layout/engine.ts), [src/canvas/responsive/](../../../src/canvas/responsive/)
+
+**Authors edit a semantic tree. Engine resolves to absolute positions per breakpoint, with cascading overrides.**
+
+- Semantic primitives: stack / grid / split.
+- Breakpoint cascade: desktop → tablet → mobile. Each inherits from the parent.
+- Per-breakpoint overrides are deltas, not full re-specs.
+- Engine is a pure function — same input, same positioned section.
+- ⚠ Not media queries — layouts computed ahead, not in CSS.
+- ⚠ Overflow is an author error caught by the validator, not handled gracefully.
 
 ```mermaid
 flowchart LR
@@ -271,31 +290,25 @@ flowchart LR
   bp[Breakpoint cascade<br/>desktop → tablet → mobile] --> resolve
   over[Per-bp overrides] --> resolve
   resolve --> sec[Positioned<br/>CanvasSection]
-  sec --> render[Render]
 ```
-
-**Anchor:** _"Authors edit a semantic tree. The engine resolves it to absolute positions per breakpoint, with cascading overrides."_
-
-**Draw order:**
-1. **Semantic tree, top-left** ◀ *"Author describes structure — stack, grid, split. No pixels yet."*
-2. **Breakpoint cascade column** ◀ *"Desktop is the base. Tablet inherits. Mobile inherits from tablet. Overrides flow down."*
-3. **Override map merging in** ◀ *"At each breakpoint, the author can override a child's position — but only delta from parent."*
-4. **Engine box, center, large** ◀ *"Single pure function. Same input, same positioned section."*
-5. **Positioned `CanvasSection`, right** ◀ *"Output is concrete pixels. Renderer doesn't think about layout — it draws."*
-
-**Pitfalls:**
-- Don't say "media queries" — we compute layouts ahead, not in CSS.
-- Don't claim the engine handles overflow — sections have fixed height; overflow is an author error caught by the validator.
-
-**To D7:** _"We've covered the static document. Now: how do two people edit it at once?"_
 
 ---
 
-### D7 — Yjs CRDT + element-style projection (animated)
+## D7 — Yjs CRDT + element-style projection ★ flagship
 
-**From D9:** two authors, same document. Without a server to pick a winner, how do they converge?
-**ADR / source:** [docs/adr/0007-yjs-revival.md](../../adr/0007-yjs-revival.md), [src/live/site-room.ts](../../../src/live/site-room.ts).
-**Tech on screen:** Yjs, `y-protocols`, `Y.Doc`, `Y.encodeStateAsUpdate`, SiteRoom DO, base64 snapshot in DB, EditableSite projection.
+Source: [ADR 0007](../../adr/0007-yjs-revival.md), [src/live/site-room.ts](../../../src/live/site-room.ts)
+
+**Two editors converge without a server picking a winner. Merge is conflict-free by construction.**
+
+- Each client owns its own Y.Doc. No server-held truth.
+- Edits emit binary diffs via `Y.encodeStateAsUpdate`.
+- SiteRoom DO broadcasts; clients converge.
+- Snapshot = whole Y.Doc encoded as bytes → stored in `siteVersion` (base64 in text column).
+- EditableSite is a *projection* — canvas reads through it so CRDT machinery doesn't leak into render.
+- Live-drawn animation: empty Docs → Maya edit → SiteRoom appears → Sam edit → fan-out back → snapshot + projection.
+- ⚠ CRDT, not Operational Transforms. Different math.
+- ⚠ Server doesn't resolve conflicts — the merge function does.
+- ⚠ Every client has its own Y.Doc — never draw a shared one.
 
 ```mermaid
 flowchart LR
@@ -308,29 +321,19 @@ flowchart LR
   sr --> snap[(Snapshot in DB<br/>base64 binary)]
 ```
 
-**Anchor:** _"Two editors converge to the same state without a server picking a winner. Merge is conflict-free by construction."_
-
-**Draw order (5 live reveals):**
-1. **Empty Y.Doc boxes — Maya left, Sam right** ◀ *"Each client owns a Y.Doc. No server-held truth yet."*
-2. **Maya edits → `encodeStateAsUpdate` arrow → SiteRoom DO appears** ◀ *"She emits a binary diff. SiteRoom is the broadcast hub — one DO per site."*
-3. **Sam's arrow appears simultaneously** ◀ *"He edits concurrently. Order doesn't matter. The merge is commutative."*
-4. **Arrows from SiteRoom back to both Y.Docs** ◀ *"Fan-out. Both clients converge."*
-5. **Snapshot below SiteRoom + projection edges from each Y.Doc** ◀ *"Autosave encodes the whole Doc — that's our version history. The canvas reads through a projection so CRDT machinery doesn't leak into render."*
-
-**Pitfalls:**
-- Not Operational Transforms. CRDT. Different math.
-- The server doesn't resolve conflicts — the merge function does.
-- Don't draw a single shared Y.Doc — every client has its own.
-
-**To D3:** _"Two editors agree via the Y.Doc. But how do visitors see the changes go live?"_
-
 ---
 
-### D3 — SiteRoom DO WebSocket fan-out (animated)
+## D3 — SiteRoom DO WebSocket fan-out
 
-**From D7:** Yjs handles editor↔editor convergence. SiteRoom handles editor↔visitor live preview.
-**ADR / source:** [docs/adr/0007-yjs-revival.md](../../adr/0007-yjs-revival.md), [src/live/site-room.ts](../../../src/live/site-room.ts).
-**Tech on screen:** WebSocket upgrade, SiteRoom DO, role-tagged connections (`editor`, `visitor`), broadcast loop, hibernation API.
+Source: [ADR 0007](../../adr/0007-yjs-revival.md), [src/live/site-room.ts](../../../src/live/site-room.ts)
+
+**One DO per site. Editors push diffs in, visitors get them broadcast out.**
+
+- WS upgrade tags role (`editor` / `visitor`) at connect time.
+- Editor diff → SiteRoom → fan-out to all visitors + ack to other editors.
+- DO hibernates between updates; uses Hibernation API.
+- ⚠ Not polling — single broadcast in DO state.
+- ⚠ D7 = *what* is sent (Yjs); D3 = *how* it's distributed (DO + WS).
 
 ```mermaid
 sequenceDiagram
@@ -342,33 +345,24 @@ sequenceDiagram
   Visitor1->>SR: WS upgrade (role=visitor)
   Visitor2->>SR: WS upgrade (role=visitor)
   Editor->>SR: Y.Doc update
-  SR->>Visitor1: broadcast update
-  SR->>Visitor2: broadcast update
+  SR->>Visitor1: broadcast
+  SR->>Visitor2: broadcast
   SR->>Editor: ack (other editors only)
 ```
 
-**Anchor:** _"One DO per site. Editors push diffs in, visitors get the same diff broadcast out. Same pipe, role-tagged."_
-
-**Draw order:**
-1. **SiteRoom box, center** ◀ *"One Durable Object per site. Hibernates between updates."*
-2. **Three WS upgrades from editor + two visitors** ◀ *"Each connection tags its role at upgrade time."*
-3. **Editor pushes a Y.Doc update arrow** ◀ *"A diff arrives — same shape as in D7."*
-4. **Fan-out arrows to both visitors** ◀ *"Broadcast. Visitors render the diff against their own projection."*
-5. **Ack edge back to other editors** ◀ *"Editors get the merged update so they converge — visitors don't ack."*
-
-**Pitfalls:**
-- Don't show fan-out as polling — it's a single broadcast in DO state.
-- Don't conflate this with D7 — Yjs is *what* is sent; SiteRoom is *how* it's distributed.
-
-**To D5:** _"Fan-out lets anyone connect. The gate that decides whether your connection is allowed is the edit token."_
-
 ---
 
-### D5 — Edit token issuance + origin binding
+## D5 — Edit token issuance + origin binding
 
-**From D3:** anyone could try to WS-upgrade. What stops them? An origin-bound HMAC token issued at session start.
-**ADR / source:** [docs/adr/0005-custom-domains.md](../../adr/0005-custom-domains.md), [src/auth/](../../../src/auth/).
-**Tech on screen:** HMAC-SHA256, edit-token cookie (`__opencanvas_edit_token`), origin binding, Clerk session, timing-safe compare.
+Source: [src/auth/](../../../src/auth/), [ADR 0005](../../adr/0005-custom-domains.md)
+
+**Bearer cookie bound to one origin. Replay on a different host dies.**
+
+- Clerk verifies session JWT → Worker mints `HMAC-SHA256(siteId + origin + nonce)`.
+- Cookie scoped to apex; prefix from `COOKIE_NAME_PREFIX` env var.
+- Every `/__api/*` call: timing-safe HMAC verify + Host header must match bound origin.
+- ⚠ HMAC, not signed JWT.
+- ⚠ `COOKIE_NAME_PREFIX` is env-driven (`__opencanvas_`); don't hardcode the literal.
 
 ```mermaid
 sequenceDiagram
@@ -380,34 +374,24 @@ sequenceDiagram
   Clerk-->>W: claims (customerId)
   W->>W: HMAC(siteId + origin + nonce)
   W-->>Owner: Set-Cookie edit-token
-  Note over Owner,W: subsequent requests
   Owner->>W: /__api/* with cookie
-  W->>W: timing-safe verify HMAC<br/>+ origin matches Host
-  W-->>Owner: 200 or 401
+  W->>W: timing-safe verify + origin check
+  W-->>Owner: 200 / 401
 ```
-
-**Anchor:** _"Edit token is a bearer credential bound to one origin. Replay it on a different host and it dies."_
-
-**Draw order:**
-1. **Owner → Worker → Clerk** ◀ *"Owner already has a Clerk session. We verify the JWT."*
-2. **HMAC mint box** ◀ *"Worker mints `HMAC-SHA256(siteId + origin + nonce)`."*
-3. **Set-Cookie back to Owner** ◀ *"Cookie scoped to apex `opencanvas.aayushman.dev`."*
-4. **Later request with cookie** ◀ *"Every `/__api/*` call carries the cookie."*
-5. **Timing-safe verify gate** ◀ *"XOR-compare, constant time. Origin must match the Host header — replay across origins fails."*
-
-**Pitfalls:**
-- Don't say "JWT" for the edit token — it's an HMAC, not signed JWT.
-- `COOKIE_NAME_PREFIX` is env-driven (`__opencanvas_`). Don't hardcode the literal in the script.
-
-**To D10:** _"Edit token lets the owner in. Invite token lets the owner bring collaborators in. Same bearer model, longer life."_
 
 ---
 
-### D10 — Invite token (HMAC JWT) sequence
+## D10 — Invite token (HMAC JWT)
 
-**From D5:** edit token = owner's per-session pass. Invite token = a transferable 7-day pass an owner hands to a collaborator.
-**ADR / source:** [docs/adr/0010-invite-link-bearer-auth.md](../../adr/0010-invite-link-bearer-auth.md), [src/auth/invite-token.ts](../../../src/auth/invite-token.ts).
-**Tech on screen:** HMAC-SHA256 JWT, 7-day expiry, single-use redemption row, Resend email delivery, `collaborator` table.
+Source: [src/auth/invite-token.ts](../../../src/auth/invite-token.ts), [ADR 0010](../../adr/0010-invite-link-bearer-auth.md)
+
+**The link is the credential. Single-use, 7-day expiry.**
+
+- HMAC-SHA256 JWT, sub = invitee email, includes siteId + exp.
+- Delivered via Resend email.
+- Redemption: timing-safe verify + check redemption table (single-use).
+- Post-redeem: insert `collaborator` row + issue edit token (D5 machinery).
+- ⚠ Verify 7-day TTL against [src/auth/invite-token.ts](../../../src/auth/invite-token.ts) before recording.
 
 ```mermaid
 sequenceDiagram
@@ -415,38 +399,32 @@ sequenceDiagram
   participant W as Worker
   participant Resend
   participant Invitee
-  Owner->>W: POST invite (email, siteId, role)
-  W->>W: mint HMAC-JWT (sub=email, siteId, exp=+7d)
-  W->>Resend: send email with link
-  Resend->>Invitee: email with token URL
+  Owner->>W: POST invite
+  W->>W: mint HMAC-JWT (email + siteId + 7d exp)
+  W->>Resend: send email link
+  Resend->>Invitee: email
   Invitee->>W: GET /invite?token=...
-  W->>W: timing-safe HMAC verify + redemption check
-  W->>W: insert collaborator row, mark token redeemed
-  W-->>Invitee: redirect to editor with edit-token
+  W->>W: verify + redemption check
+  W->>W: insert collaborator + mark redeemed
+  W-->>Invitee: redirect with edit-token
 ```
-
-**Anchor:** _"Invite link itself is the credential. Holder = redeemer. No login required, redeemed once."_
-
-**Draw order:**
-1. **Owner issues invite, top** ◀ *"Owner picks an email and role."*
-2. **HMAC-JWT mint, signed with `WEBHOOK_SIGNING_SECRET`-class secret** ◀ *"Bearer JWT, HMAC-SHA256, expires in seven days."*
-3. **Resend → Invitee email** ◀ *"Link in the email is the entire token."*
-4. **Invitee clicks → verify gate** ◀ *"Timing-safe verify, then check redemption table — single-use."*
-5. **Insert `collaborator` row + issue edit token** ◀ *"From this moment on, invitee acts via the same edit-token machinery from D5."*
-
-**Pitfalls:**
-- Don't say "the invitee needs a Clerk account" — they don't until after redemption (depends on implementation; verify per [src/auth/invite-token.ts](../../../src/auth/invite-token.ts) before recording).
-- 7 days is the spec'd lifetime — confirm against current code before stating literally.
-
-**To D6:** _"Owner brought Sam in. Now owner brings the AI in. How does the AI not break the site?"_
 
 ---
 
-### D6 — AI agent + chat preview/apply gate
+## D6 — AI agent + chat preview/apply gate ★ flagship
 
-**From D10:** human collaborators get edit tokens and respect each other's edits. The agent gets a *narrower* surface — every mutation goes through a preview gate first.
-**ADR / source:** [docs/adr/0012-validation-write-gate.md](../../adr/0012-validation-write-gate.md) (Proposed), [docs/adr/0014-template-literal-data-substitution.md](../../adr/0014-template-literal-data-substitution.md) (Proposed), [src/agent/](../../../src/agent/), [src/canvas/validate.ts](../../../src/canvas/validate.ts).
-**Tech on screen:** Gemini 2.5 Pro, tool surface (mutating + read-only), per-arg parsers, preview ops (SSE-streamed), Accept/Reject, Apply layer, validator (write gate), EditableSite.
+Source: [ADR 0012 (Proposed)](../../adr/0012-validation-write-gate.md), [ADR 0014 (Proposed)](../../adr/0014-template-literal-data-substitution.md), [src/agent/](../../../src/agent/), [src/canvas/validate.ts](../../../src/canvas/validate.ts)
+
+**The agent never mutates state directly. Every change becomes a preview the owner accepts.**
+
+- Owner prompt + current site state + tool schemas → Gemini 2.5 Pro.
+- Mutating tools go through per-arg parsers (inline marks, media kind, element types, style-kit tokens, page meta, motion fields, site config).
+- Read-only tools (`query_site`, `query_assets`) skip the preview path.
+- Valid ops → preview cards streamed via SSE.
+- Owner Accept → Apply layer → `validate.ts` (the only write gate per ADR 0012).
+- Invalid → 502, no partial apply.
+- ⚠ Agent edits the EditableSite projection, not Y.Doc directly.
+- ⚠ Don't show fallback paths — invalid is fatal.
 
 ```mermaid
 flowchart LR
@@ -462,66 +440,80 @@ flowchart LR
   gate -- invalid --> reject[502]
 ```
 
-**Anchor:** _"The agent never mutates state directly. Every change becomes a preview card the owner accepts; only then does it cross the validator."_
+---
 
-**Draw order:**
-1. **Prompt → Gemini, top-left** ◀ *"Owner prompt plus current site state plus the tool schemas."*
-2. **Tool surface fans out** ◀ *"Mutating tools and read-only tools — `query_site`, `query_assets` skip the preview path entirely."*
-3. **Per-arg parsers column** ◀ *"Every argument validated: inline marks, media kind, element type, style-kit tokens, page meta, motion fields, site config."*
-4. **Preview ops stack, SSE to Owner** ◀ *"Valid ops produce preview cards streamed live."*
-5. **Owner Accept → Apply → validator gate (red)** ◀ *"Validator is the *only* write gate per ADR 0012. Anything invalid fails loud — no partial apply."*
-6. **EditableSite mutates** ◀ *"State updates only after the gate passes."*
+## D-aigen — AI image generation (Replicate / Flux Schnell)
 
-**Pitfalls:**
-- Don't claim the agent edits Y.Doc directly — it edits the EditableSite projection, which then re-projects.
-- Don't show fallback for "invalid op" — there is none; it's a 502.
+Source: [src/routes/api/canvas.ts:632-733](../../../src/routes/api/canvas.ts), [ADR 0004 decision 2](../../adr/0004-owner-asset.md)
 
-**To D13:** _"Every change funnels through validate.ts. After the change lands, Y.Doc captures it forever. That's version history."_
+**Generated bytes live in the browser until the owner applies. Generation is a preview, not a side effect.**
+
+- Endpoint: `POST /sites/:siteId/assets/generate` with `{prompt, boxW, boxH}` ([canvas.ts:693-733](../../../src/routes/api/canvas.ts)).
+- `snapToFluxAspectRatio` rounds the requested box dims to one of Flux's supported ratios — generation isn't arbitrary-size.
+- `generateImageViaReplicate` POSTs to `black-forest-labs/flux-schnell/predictions` with Bearer `REPLICATE_API_TOKEN` and `Prefer: wait` header for synchronous response.
+- Worker returns the PNG bytes **raw to the browser** — no R2 write, no `ownerAsset` row, no DB touch.
+- Only on Apply does the browser do a separate multipart POST to `/api/owner/assets`, which runs the D11 content-address pipeline.
+- This is the **preview-before-persist** pattern from ADR 0004 decision 2 — generate cheap, commit only on owner intent.
+- ⚠ Generation alone does NOT create an asset. Senior viewers: lead with this — it's the non-obvious choice.
+- ⚠ Aspect ratios snapped to Flux's set, not arbitrary.
+
+```mermaid
+sequenceDiagram
+  participant Owner
+  participant W as Worker
+  participant Rep as Replicate Flux Schnell
+  Owner->>W: POST /sites/:siteId/assets/generate<br/>{prompt, boxW, boxH}
+  W->>W: snapToFluxAspectRatio
+  W->>Rep: POST predictions<br/>(Bearer + Prefer: wait)
+  Rep-->>W: PNG bytes
+  W-->>Owner: raw PNG (no R2, no DB)
+  Note over Owner: preview in canvas
+  Owner->>W: POST /api/owner/assets (multipart) on Apply
+  W->>W: D11 pipeline → R2 + ownerAsset row
+```
 
 ---
 
-### D13 — Version snapshot + Y.Doc deterministic encoding
+## D13 — Version snapshot + Y.Doc deterministic encoding
 
-**From D6:** state changed. How is the *previous* state remembered? Snapshots.
-**ADR / source:** [src/version/capture.ts](../../../src/version/capture.ts), [src/version/restore.ts](../../../src/version/restore.ts).
-**Tech on screen:** `Y.encodeStateAsUpdate` (deterministic binary), `siteVersion` table, base64 storage in Neon, restore path.
+Source: [src/version/capture.ts](../../../src/version/capture.ts), [src/version/restore.ts](../../../src/version/restore.ts)
+
+**A version is the whole Y.Doc encoded as bytes. Restore replays the encoding.**
+
+- Autosave on quiescence triggers `Y.encodeStateAsUpdate(doc)`.
+- Stored as base64 in a text column on `siteVersion` (D1 binaries didn't compress further).
+- Restore: fetch row → base64 decode → `Y.applyUpdate` into fresh Doc → project to EditableSite.
+- Encoding is deterministic — same Doc, same bytes.
+- ⚠ Whole-Doc snapshot, not diff between versions.
+- ⚠ Cross-version diff UI doesn't exist unless verified.
 
 ```mermaid
 sequenceDiagram
   participant Editor
   participant SR as SiteRoom
   participant DB as Neon
-  Editor->>SR: edit lands (Y.Doc update)
+  Editor->>SR: edit lands
   Note over SR: autosave tick
   SR->>SR: Y.encodeStateAsUpdate(doc)
-  SR->>DB: INSERT siteVersion (base64 binary)
-  Note over Editor,DB: later restore
+  SR->>DB: INSERT siteVersion (base64)
   Editor->>DB: GET version N
   DB-->>Editor: base64 binary
-  Editor->>Editor: Y.applyUpdate(doc, decoded)
+  Editor->>Editor: Y.applyUpdate(fresh doc, decoded)
 ```
-
-**Anchor:** _"A version is the whole Y.Doc encoded as bytes. Restore replays the encoding back into a fresh Doc — same projection, same render."_
-
-**Draw order:**
-1. **Editor → SiteRoom, autosave tick** ◀ *"Autosave fires on quiescence."*
-2. **`Y.encodeStateAsUpdate` box** ◀ *"Whole Doc serialised to binary. Deterministic — same Doc, same bytes."*
-3. **Insert into `siteVersion` (base64-encoded text column)** ◀ *"We store base64 in a text column — D1 binaries didn't compress further."*
-4. **Restore flow on the bottom** ◀ *"Fetch a version, base64-decode, `Y.applyUpdate` into a fresh Doc — that Doc projects to EditableSite the usual way."*
-
-**Pitfalls:**
-- Snapshot is the *whole* Doc, not a diff between versions. (Yjs diff-compression is a separate concern; spec the literal current behaviour.)
-- Don't claim cross-version diff UI exists unless verified — restore is whole-Doc replay.
-
-**To D12:** _"History stores the past. Where does *new* content come from? First — sections out of the library."_
 
 ---
 
-### D12 — Library section import + seed materialization
+## D12 — Library section import + seed materialization
 
-**From D13:** owner wants to add a new section. The library is the curated source of pre-designed sections.
-**ADR / source:** [src/canvas/library-section-import.ts](../../../src/canvas/library-section-import.ts).
-**Tech on screen:** library section catalogue, seed asset materialization (base64 → R2 + `ownerAsset` rows per ADR 0023), placeholder text substitution, `recipeId: 'custom'` sentinel per ADR 0019.
+Source: [src/canvas/library-section-import.ts](../../../src/canvas/library-section-import.ts), [ADR 0023 (Proposed)](../../adr/0023-seed-asset-bytes-as-base64-text.md), [ADR 0019](../../adr/0019-section-recipe-custom-sentinel.md)
+
+**A library section ships as JSON + seed bytes. Importing materialises into owner-assets and rewrites refs.**
+
+- Section seed = JSON + base64 byte files in-repo (ADR 0023).
+- Seed bytes pushed through the D11 asset pipeline — content-hash deduped against existing customer assets.
+- Section JSON refs the seed by URL; we rewrite refs to assetIds (same translation pattern as D14).
+- Section lands as `recipeId: 'custom'` per ADR 0019 — canvas treats it as hand-designed.
+- ⚠ Materialised, not cloned by reference — mutating the section doesn't touch library.
 
 ```mermaid
 sequenceDiagram
@@ -534,44 +526,66 @@ sequenceDiagram
   W->>Lib: fetch section seed (JSON + asset refs)
   W->>R2: upload seed bytes (if not present)
   W->>DB: insert ownerAsset rows
-  W->>W: rewrite section refs to new assetIds
+  W->>W: rewrite section refs → assetIds
   W->>DB: append section to site
-  W-->>Owner: section visible in editor
+  W-->>Owner: section visible
 ```
-
-**Anchor:** _"A library section ships as JSON + seed bytes. Importing materialises the bytes as owner-assets and rewrites refs — the section is now *yours*."_
-
-**Draw order:**
-1. **Library section, left** ◀ *"Section seed is JSON plus base64 byte files in-repo, per ADR 0023."*
-2. **Worker fetches seed, center** ◀ *"Read seed bytes once at import time."*
-3. **R2 + `ownerAsset` inserts** ◀ *"Seed bytes go through the D11 pipeline — content-hash deduped against this customer's existing assets."*
-4. **Rewrite refs box** ◀ *"Section JSON refs the seed by URL. We rewrite to assetIds — same translation pattern you'll see in D14."*
-5. **Append to site → render** ◀ *"Section lands as a `recipeId: 'custom'` row — ADR 0019 sentinel — so the canvas treats it as hand-designed, not template-bound."*
-
-**Pitfalls:**
-- Don't say "the section is cloned by reference" — it's materialised; mutating it doesn't mutate the library copy.
-- Section recipe `'custom'` is the explicit sentinel per ADR 0019. Don't introduce a different name.
-
-**To D14:** _"Library imports come from us. Site imports come from the user's old website. Same translation pattern, much bigger scope."_
 
 ---
 
-### D14 — Site Import architecture (3-frame teaching diagram)
+## D-sections — Recipes + `'custom'` sentinel (section "interchangeability")
 
-**From D12:** library = one section, our catalogue. Site import = a whole website, the user's URL. Watch the two-pass translation at scale.
-**ADR / source:** [docs/adr/0008-site-import-architecture.md](../../adr/0008-site-import-architecture.md), [src/routes/api/import.ts](../../../src/routes/api/import.ts).
-**Tech on screen:** Playwright scraper (external service, bearer-auth), SHA-256 hasher, `mediaAssetIdMap`, `fontFamilyTokenMap`, WOFF2 enforcement, `validateEditableSite`, Drizzle `database.batch`, OKLCH style-kit synthesis.
+Source: [src/canvas/schema.ts:102-113](../../../src/canvas/schema.ts) (AGENT_RECIPE_IDS + SECTION_RECIPE_IDS), [src/canvas/recipes.ts:46-72](../../../src/canvas/recipes.ts) (RecipeFactoryInput), [ADR 0019](../../adr/0019-section-recipe-custom-sentinel.md)
+
+**Recipes are factories, not templates. Swap = regenerate from a recipe with a new brief.**
+
+- Seven named recipes: `hero-split`, `feature-grid`, `gallery-strip`, `cta-band`, `logo-strip`, `testimonial-row`, `video-hero`.
+- Plus the `'custom'` sentinel per ADR 0019 — marks the section as *hand-designed*; not regeneratable from a factory.
+- Recipe factory signature: `(brief, styleKit, assetIds) → CanvasSection`. Each named recipe is one factory.
+- **There is no named-slot model.** Sections don't expose "headline slot, bgMedia slot" for rebinding. The factory just produces a fully-formed section.
+- **There is no in-place swap handler.** Pattern is *delete + add new*. To "change the hero," generate a new `hero-split` with a new brief and replace.
+- `'custom'` factory is a stub (`buildCustom`) — exists for discriminated-union exhaustiveness only.
+- ⚠ Do NOT pitch a slot system. It doesn't exist.
+- ⚠ Do NOT pitch in-place section swap. Pattern is delete + add.
+- ⚠ Senior takeaway: regenerative interchangeability beats slot-binding for AI-driven authoring — the model writes a new brief, not a slot-rebind script.
+
+```mermaid
+flowchart LR
+  brief[Brief: copy / intent] --> factory[Recipe factory]
+  kit[Style kit] --> factory
+  assets[Asset IDs] --> factory
+  factory --> sec[CanvasSection<br/>recipeId + elements]
+  named[7 named recipes<br/>hero-split / feature-grid /<br/>gallery-strip / cta-band /<br/>logo-strip / testimonial-row /<br/>video-hero] --> factory
+  factory -.-> custom["'custom' sentinel<br/>stub factory<br/>(ADR 0019)"]
+```
+
+---
+
+## D14 — Site Import architecture (3 frames) ★ flagship
+
+Source: [ADR 0008](../../adr/0008-site-import-architecture.md), [src/routes/api/import.ts](../../../src/routes/api/import.ts)
+
+**Scraper returns layout speaking foreign URLs + a flat bag of bytes. Two dictionaries + a rewrite pass + atomic commit.**
+
+- **Frame 1 — Shape mismatch:** scraper output (sections refer to `originalUrl`) vs canvas model (refs are UUIDs).
+- **Frame 2 — Dictionaries:** walk `scraperAssets`, hash each (SHA-256), build `mediaAssetIdMap` (originalUrl → UUID) and `fontFamilyTokenMap` (family → `font:hash`). Dedupe against existing customer `ownerAsset` by hash.
+- **Frame 3 — Atomic commit:** `validateEditableSite` gate → R2 batch put → Drizzle `database.batch([site, ownerAsset, siteFont])`.
+- WOFF2-only for fonts (no transcoding).
+- Invalid tree → 502, nothing persists. Subdomain collision → 409.
+- ⚠ Import button disabled in public POC — say "feature exists" if drawn at all.
+- ⚠ No partial-fail fallback. Either everything commits or 502.
+- ⚠ Not the same as `customTemplate` saving — separate endpoint, separate table.
 
 ```mermaid
 flowchart TB
-  subgraph F1["Frame 1 — Shape mismatch"]
-    scr[Scraper output<br/>sections refer to originalUrl<br/>+ flat assets bag base64] --- canvas[Canvas model<br/>EditableSite speaks UUIDs]
+  subgraph F1["Frame 1 — Mismatch"]
+    scr[Scraper output<br/>sections speak originalUrl<br/>+ flat assets bag base64] --- canvas[Canvas model<br/>EditableSite speaks UUIDs]
   end
   subgraph F2["Frame 2 — Dictionaries"]
     pass1[Walk scraperAssets] --> hash[SHA-256 each]
-    hash --> map1[mediaAssetIdMap<br/>originalUrl → assetUUID]
+    hash --> map1[mediaAssetIdMap<br/>originalUrl → UUID]
     hash --> map2[fontFamilyTokenMap<br/>family → font:hash]
-    map1 --> conv[convertElement<br/>walks layout, rewrites refs]
+    map1 --> conv[convertElement<br/>rewrites refs]
     map2 --> conv
     conv --> site[EditableSite]
   end
@@ -579,43 +593,91 @@ flowchart TB
     site2[EditableSite + staged rows] --> val{{validateEditableSite}}
     val -- valid --> r2put[R2 batch put]
     r2put --> dbb[Drizzle batch:<br/>site + ownerAsset + siteFont]
-    val -- invalid --> err502[502, nothing written]
+    val -- invalid --> err502[502]
   end
   F1 --> F2 --> F3
 ```
 
-**Anchor:** _"Scraper returns layout speaking foreign URLs + a flat bag of bytes. We build two dictionaries, rewrite the layout to speak our IDs, then commit everything in one batch."_
+---
 
-**Draw order — swap between three frames:**
+## D-template — Templates (customTemplate + clone-into-owner flow)
 
-**Frame 1 (the WHY):**
-1. **Scraper output box** containing `sections` (refer to `https://source.com/hero.jpg`) + `assets[]` (base64 bytes keyed by URL) ◀ *"Two halves. Layout knows source URLs. Bytes sit beside it."*
-2. **Canvas model box** containing `EditableSite` with `assetId: UUID` ◀ *"Our model only speaks UUIDs. We need a translator."*
+Source: [src/db/schema.ts:478-491](../../../src/db/schema.ts) (customTemplate), [src/routes/api/custom-templates.ts:6](../../../src/routes/api/custom-templates.ts) (save), [src/routes/api/sites.ts:428-446](../../../src/routes/api/sites.ts) (create-from-template), [src/routes/api/sites.ts:166-241](../../../src/routes/api/sites.ts) (asset re-rooting)
 
-**Frame 2 (the HOW):**
-1. **`mediaAssetIdMap: originalUrl → assetUUID`** as a key-value box ◀ *"Walk each asset, hash the bytes, mint a UUID — or reuse the existing UUID if this customer already owns the same hash."*
-2. **`fontFamilyTokenMap: "Inter" → "font:<hash>"`** ◀ *"Same for fonts. WOFF2-only — anything else fails loud, no transcoding."*
-3. **`convertElement` consuming layout + dictionaries → EditableSite** ◀ *"One pass. Every scraper element rewritten."*
+**A template is a frozen `EditableSite` + asset manifest. Create-from-template = clone state + re-root assets to the new owner.**
 
-**Frame 3 (the commit):**
-1. **In-memory staging area** ◀ *"Queued R2 uploads + queued DB rows + the new EditableSite. Nothing has touched R2 or DB yet."*
-2. **`validateEditableSite` gate (red)** ◀ *"Invalid tree → 502, nothing persists."*
-3. **R2 batch put → Drizzle `database.batch([site, ownerAsset, siteFont])`** ◀ *"R2 first (an orphan blob is harmless), then one DB round-trip. Half-imported sites are impossible."*
+- `customTemplate` row carries: id, visibility (`global` / `private`), name, tagline, styleKit, **`siteState` (EditableSite JSONB)**, **`assetManifest` (AssetManifestEntry[] JSONB)**.
+- **Save-as-template** (`POST /custom-templates`): clones current site's `editableState` into `siteState`, collects asset refs into the manifest.
+- **Create-from-template** (`POST /sites?templateId=...`): reads `customTemplate.siteState`, calls `prepareSeedAssetsForCustomer` to re-root assets into the new owner's `ownerAsset` rows, then `materializeAssetId` walks pages → sections → elements and rewrites every assetId.
+- Same two-pass translation pattern as D14 (site import) — collect refs, build ID map, rewrite the tree. Different source, same shape.
+- `visibility: 'global'` = catalog-wide template; `'private'` = creator-only.
+- ⚠ Template `siteState` is *frozen at save time*. Editing the source site later does not update the template.
+- ⚠ Templates are how the Apogee Showcase fixture becomes a startable site. The demo's "start from Apogee → rebrand to Briar" arc rides this flow.
 
-**Pitfalls:**
-- Import button is disabled in public POC — say "feature exists, recording uses fixture data" if you draw the button at all.
-- Don't show a fallback for "scrape partially fails" — the route 502s and rolls back.
-- Don't conflate this with `customTemplate` saving — separate endpoint, separate table.
-
-**To D8:** _"Imported content might be inaccessible. Before any site can publish — imported or hand-built — the a11y audit gates it."_
+```mermaid
+flowchart LR
+  subgraph save["Save-as-template"]
+    site1[(Source site<br/>editableState)] --> snap[Snapshot siteState]
+    site1 --> manif[Collect assetManifest]
+    snap --> tmpl[(customTemplate<br/>visibility + siteState +<br/>assetManifest + styleKit)]
+    manif --> tmpl
+  end
+  subgraph create["Create-from-template"]
+    tmpl2[(customTemplate)] --> clone[Clone siteState]
+    tmpl2 --> reroot[prepareSeedAssetsForCustomer<br/>re-root assets to new owner]
+    clone --> walk[materializeAssetId<br/>walk pages/sections/elements<br/>rewrite asset refs]
+    reroot --> walk
+    walk --> site2[(New site row<br/>editableState)]
+  end
+```
 
 ---
 
-### D8 — A11y audit pipeline (publish gate)
+## D-snapshot — editableState vs publishedSnapshot
 
-**From D14:** content arrived. Before it goes live, six checks run in parallel. Blocking issues stop publish at 422.
-**ADR / source:** [src/a11y/audit.ts](../../../src/a11y/audit.ts), [src/a11y/checks/](../../../src/a11y/checks/), [src/a11y/severity.ts](../../../src/a11y/severity.ts).
-**Tech on screen:** orchestrator, 6 parallel check workers (alt-text, action-labels, color-contrast, form-field-labels, heading-order, page-meta), crash isolation wrapper, severity classifier, publish gate.
+Source: [src/db/schema.ts:94-96](../../../src/db/schema.ts), [src/canvas/schema.ts:435-440](../../../src/canvas/schema.ts) (PublishedSnapshot), [src/routes/api/publish.ts:144-365](../../../src/routes/api/publish.ts)
+
+**Two snapshots per site. Edits mutate one; visitors read the other. Publish is the only transition.**
+
+- `site.editableState` — working state. What the editor mutates. Updated continuously via Y.Doc projection.
+- `site.publishedSnapshot` — `PublishedSnapshot` type = `EditableSite + version + publishedAt`. What visitors render.
+- `site.publishedVersion` — monotonic integer (1-based, not semver). Bumped on each successful publish.
+- Publish (`POST /api/publish/sites/:siteId`): validate → copy `editableState` → `publishedSnapshot` → bump `publishedVersion` → run side effects (search index rebuild D20, version capture D13, SiteRoom broadcast to live visitors).
+- Side-effect failure → `restorePreviousPublishState` rollback (publish.ts:144-200).
+- Visitor render path reads `publishedSnapshot` ONLY, never `editableState`.
+- ⚠ Editing never affects what visitors see — the column separation is the entire guarantee.
+- ⚠ Publish is *not* atomic at the row level — it's a sequence with rollback. Atomic boundary is the publish handler.
+- ⚠ This is the data-model precondition for D8: a11y gates the *transition*, not the editable state.
+
+```mermaid
+flowchart LR
+  editor[Editor mutations] --> es[(site.editableState)]
+  pub[Publish handler] --> val{{validate + a11y gate}}
+  val --> copy[Copy editableState<br/>→ publishedSnapshot]
+  copy --> bump[publishedVersion += 1]
+  bump --> sfx[Side effects:<br/>search rebuild,<br/>version capture,<br/>SiteRoom broadcast]
+  sfx --> done[Visitor reads<br/>publishedSnapshot]
+  sfx -. failure .-> restore[restorePreviousPublishState<br/>rollback]
+  es -. read .-> editor
+  done -. read .-> visitor[Visitor]
+```
+
+---
+
+## D8 — A11y audit pipeline ★ flagship
+
+Source: [src/a11y/audit.ts](../../../src/a11y/audit.ts), [src/a11y/checks/](../../../src/a11y/checks/), [src/a11y/severity.ts](../../../src/a11y/severity.ts)
+
+**Six parallel checks. Blocking issues stop publish at 422.**
+
+- Six checks: alt-text, action-labels, color-contrast, form-field-labels, heading-order, page-meta.
+- Each check wrapped in crash-isolation — crash becomes a blocking `audit-crash` issue (no silent skip).
+- Severity classifier tags each issue: blocking / warning / info.
+- Any blocking → publish returns 422 with the full report.
+- Contrast resolves against the *innermost surface by area, then z-index* — not just background.
+- Heading H-level derived from font size via per-kit `headingScale`.
+- ⚠ Audit *already* gates publish (live, not planned). Don't speak in the future tense.
+- ⚠ Pure-validator pattern: collect ALL errors, no fail-fast.
 
 ```mermaid
 flowchart LR
@@ -632,73 +694,49 @@ flowchart LR
   c4 --> sev
   c5 --> sev
   c6 --> sev
-  sev --> issues[Issue list<br/>blocking / warning / info]
+  sev --> issues[blocking / warning / info]
   issues --> gate{{Publish gate}}
   gate -- blocking==0 --> ok[Publish proceeds]
-  gate -- blocking>0 --> blocked[422 with report]
+  gate -- blocking>0 --> blocked[422 + report]
 ```
-
-**Anchor:** _"Six independent checks, one verdict. Blocking issues are fatal — publish returns 422 with the report."_
-
-**Draw order:**
-1. **Publish request → orchestrator** ◀ *"Owner clicks publish. Orchestrator fans out."*
-2. **Six check boxes in a column, each wrapped in a crash-isolation try/catch** ◀ *"Each check runs independently. If a check crashes, the wrapper converts the crash into a blocking `audit-crash` issue — no silent skips."*
-3. **Severity classifier** ◀ *"Each issue tagged blocking, warning, or info."*
-4. **Publish gate (red border) on the right** ◀ *"If any blocking issue exists, 422 with the report. Live behaviour — already in code, not planned."*
-
-**Pitfalls:**
-- The audit *already* gates publish — don't speak of it as future work.
-- Contrast resolves against the innermost surface by area, then z-index — call this out beside the contrast worker.
-- Heading H-level is derived from font size via per-kit `headingScale`, not from the element type alone.
-
-**To D18:** _"Publish is gated. Once a site passes, here's what gets emitted — SEO meta first."_
 
 ---
 
-### D18 — SEO meta emission pipeline
+## D18 — SEO meta emission
 
-**From D8:** publish proceeded. The first thing the published HTML carries is SEO metadata.
-**ADR / source:** [src/seo/](../../../src/seo/).
-**Tech on screen:** title / description, canonical URL, OG tags, Twitter card, JSON-LD, `lang` attribute, sitemap.
+Source: [src/seo/](../../../src/seo/)
+
+**One assembler emits every SEO surface. They can't drift.**
+
+- Single function reads page meta + site meta + URL.
+- Fans out: title / description / canonical / OG / Twitter / JSON-LD / `<html lang>`.
+- JSON-LD type derived from page kind, not free-form.
+- ⚠ Not separate per-tag pipelines — one assembler.
 
 ```mermaid
 flowchart LR
-  page[Page render] --> assembler[SEO assembler]
-  assembler --> title[title + description]
-  assembler --> canon[canonical URL]
-  assembler --> og[OG: image, title, type]
-  assembler --> tw[Twitter card]
-  assembler --> jsonld[JSON-LD structured data]
-  assembler --> lang[lang attribute]
-  title --> head[(<head>)]
-  canon --> head
-  og --> head
-  tw --> head
-  jsonld --> head
-  lang --> html[(<html lang>)]
+  page[Page render] --> asm[SEO assembler]
+  asm --> title[title + description]
+  asm --> canon[canonical URL]
+  asm --> og[OG tags]
+  asm --> tw[Twitter card]
+  asm --> jsonld[JSON-LD]
+  asm --> lang[html lang]
 ```
-
-**Anchor:** _"One assembler emits all SEO surfaces from one source — site meta + page meta — so they cannot contradict each other."_
-
-**Draw order:**
-1. **Page render box, left** ◀ *"Publish path renders the page."*
-2. **Assembler in the middle** ◀ *"Single function. Takes site meta + page meta + URL."*
-3. **Fan out to the tag families** ◀ *"Title, canonical, OG, Twitter, JSON-LD, lang. All from one assembler — they can't drift."*
-4. **All flow into `<head>` / `<html>`** ◀ *"Tags land in the rendered HTML. Visitors and crawlers both read the same source."*
-
-**Pitfalls:**
-- Don't show separate per-tag pipelines — there's one assembler.
-- JSON-LD type is derived from page kind, not free-form.
-
-**To D19:** _"Meta references an OG image. Where does that image come from?"_
 
 ---
 
-### D19 — OG image pipeline (Satori → resvg-wasm → R2 cache)
+## D19 — OG image pipeline (Satori → resvg-wasm → R2)
 
-**From D18:** OG meta needs an image URL. We generate it on demand, cache it by content hash.
-**ADR / source:** [src/og-image/rasterise.ts](../../../src/og-image/rasterise.ts), [src/og-image/cache.ts](../../../src/og-image/cache.ts), [src/og-image/on-publish.ts](../../../src/og-image/on-publish.ts).
-**Tech on screen:** Satori (HTML → SVG), `@resvg/resvg-wasm` (SVG → PNG), R2 content-hash cache, TTF fonts.
+Source: [src/og-image/rasterise.ts](../../../src/og-image/rasterise.ts), [src/og-image/cache.ts](../../../src/og-image/cache.ts)
+
+**Template + page data, hashed for cache. First crawler pays the render cost.**
+
+- Satori = JSX-like template → SVG.
+- `@resvg/resvg-wasm` = SVG → PNG, all in-Worker.
+- Cache key = hash of template version + page data → R2.
+- TTFs bundled as `Data` modules (wrangler.toml rule).
+- ⚠ No headless browser. Satori + resvg-wasm only.
 
 ```mermaid
 sequenceDiagram
@@ -708,44 +746,32 @@ sequenceDiagram
   participant Sat as Satori
   participant Rv as resvg-wasm
   Crawler->>W: GET /og/<siteId>/<pageSlug>.png
-  W->>W: compute cache key (hash of inputs)
+  W->>W: compute cache key
   W->>R2: HEAD cache key
   alt cached
     R2-->>W: hit
-    W-->>Crawler: PNG bytes
+    W-->>Crawler: PNG
   else miss
-    W->>Sat: render template (JSX-like) to SVG
+    W->>Sat: render template → SVG
     Sat-->>W: SVG
-    W->>Rv: rasterise SVG to PNG
-    Rv-->>W: PNG bytes
-    W->>R2: PUT cache key
-    W-->>Crawler: PNG bytes
+    W->>Rv: rasterise → PNG
+    Rv-->>W: PNG
+    W->>R2: PUT cache
+    W-->>Crawler: PNG
   end
 ```
 
-**Anchor:** _"OG image = template + page data, hashed for caching. First crawler pays the render cost; everyone after gets R2 bytes."_
-
-**Draw order:**
-1. **Crawler → Worker** ◀ *"Crawler requests `/og/<siteId>/<pageSlug>.png`."*
-2. **Cache key box** ◀ *"Hash of the template version + page data — deterministic."*
-3. **R2 HEAD check** ◀ *"Hit → return bytes immediately. Miss → render."*
-4. **Satori box** ◀ *"JSX-like template → SVG."*
-5. **resvg-wasm** ◀ *"SVG → PNG, all in-Worker, no headless browser."*
-6. **R2 PUT + response** ◀ *"Cache for the next crawler. TTF fonts ship inside the wasm bundle."*
-
-**Pitfalls:**
-- Not Puppeteer. Not headless browsers. Just `Satori` + `resvg-wasm` — both run inside the Worker.
-- TTFs are bundled as `Data` modules per [wrangler.toml:18-22](../../../wrangler.toml#L18-L22).
-
-**To D20:** _"OG is cached. Search index also rebuilt at publish — atomically, so visitors don't see partial states."_
-
 ---
 
-### D20 — Atomic search index rebuild (PG FTS)
+## D20 — Atomic search index rebuild (PG FTS)
 
-**From D19:** publish emits SEO + OG. It also rebuilds the search index — but visitors must never see it half-rebuilt.
-**ADR / source:** [src/search/](../../../src/search/).
-**Tech on screen:** Postgres full-text search (`tsvector`), per-site index rows, transactional rebuild (replace-in-transaction).
+Source: [src/search/](../../../src/search/)
+
+**Reindex inside one transaction. Visitors never see partial.**
+
+- Postgres FTS (`tsvector`), runs inside Neon — not Elasticsearch.
+- Single transaction wraps DELETE + INSERT.
+- Concurrent visitor queries see old, then new — never half (MVCC).
 
 ```mermaid
 sequenceDiagram
@@ -755,30 +781,23 @@ sequenceDiagram
   Pub->>DB: DELETE searchIndex WHERE siteId = X
   Pub->>DB: INSERT new tsvector rows
   Pub->>DB: COMMIT
-  Note over DB: visitors querying see old<br/>then new — never half
+  Note over DB: visitors see old then new
 ```
-
-**Anchor:** _"Search index rebuilds inside one transaction. Visitor queries see *the* index, not a transient half-state."_
-
-**Draw order:**
-1. **Publish path → DB BEGIN** ◀ *"Single transaction wraps the rebuild."*
-2. **DELETE old rows for this site** ◀ *"Site's old index gone, inside transaction."*
-3. **INSERT new `tsvector` rows** ◀ *"Page-by-page, all in the same transaction."*
-4. **COMMIT** ◀ *"Atomic. Concurrent visitor queries see the old index until commit, then the new — never a partial."*
-
-**Pitfalls:**
-- Not Elasticsearch. Postgres FTS — runs inside Neon.
-- Visitor reads don't block the rebuild; Postgres MVCC handles it.
-
-**To D15:** _"Publish is complete. Visitors arrive. The first thing they touch that mutates state — forms."_
 
 ---
 
-### D15 — Form pipeline (Turnstile → DO rate limit → DB → webhook + Resend)
+## D15 — Form pipeline (Turnstile → DO RL → DB → webhook + Resend)
 
-**From D20:** publish landed the site. Visitor submits a form. What happens?
-**ADR / source:** [src/forms/submit.ts](../../../src/forms/submit.ts), [src/forms/turnstile.ts](../../../src/forms/turnstile.ts), [src/forms/webhook.ts](../../../src/forms/webhook.ts).
-**Tech on screen:** Turnstile bot challenge, `FormRateLimiter` DO (per-IP 10/min), `formSubmission` table, outbound HMAC-signed webhook (`X-Rev01-Signature`), Resend notification to owner.
+Source: [src/forms/](../../../src/forms/)
+
+**Visitor input: bot check → throttle → DB → optional notify.**
+
+- Turnstile server-verified with `TURNSTILE_SECRET`.
+- FormRateLimiter DO: per-IP, 10 submissions/minute.
+- `formSubmission` insert is source of truth; webhook + Resend are fire-and-forget.
+- Webhook signed HMAC-SHA256 (`X-Rev01-Signature`).
+- ⚠ Specifically Turnstile, not generic CF bot manager.
+- ⚠ This is the prod (DO) limiter — dev uses the in-process variant (D26).
 
 ```mermaid
 sequenceDiagram
@@ -789,88 +808,63 @@ sequenceDiagram
   participant DB as Neon
   participant Hook as Owner webhook
   participant RS as Resend
-  V->>W: POST /__rev01/forms/<siteId>/<formId>
+  V->>W: POST /__rev01/forms/...
   W->>TS: verify token
-  TS-->>W: ok / fail
   W->>RL: increment(ip)
-  RL-->>W: under limit?
   W->>DB: INSERT formSubmission
   W->>Hook: POST with X-Rev01-Signature
-  W->>RS: send owner email notification
+  W->>RS: send notification
   W-->>V: 200
 ```
 
-**Anchor:** _"Visitor input goes through bot check, then per-IP throttle, then DB, then optional webhook + email — each step is independently failable."_
-
-**Draw order:**
-1. **Visitor POST, left** ◀ *"Form arrives at `/__rev01/forms/<siteId>/<formId>`."*
-2. **Turnstile verify** ◀ *"Bot challenge token verified server-side using `TURNSTILE_SECRET`."*
-3. **FormRateLimiter DO** ◀ *"Per-IP, 10 submissions per minute. DO is the source of truth for the counter."*
-4. **DB insert** ◀ *"Submission lands. Owner sees it in the inbox."*
-5. **Webhook + Resend (parallel)** ◀ *"Webhook is HMAC-signed with `X-Rev01-Signature`. Resend sends an owner notification — both are owner-configured, neither blocks 200."*
-
-**Pitfalls:**
-- Don't say "we use Cloudflare's bot manager" — it's Turnstile specifically.
-- Don't conflate FormRateLimiter with the dev in-process limiter — that's D26.
-
-**To D16:** _"Forms are public. Some published pages aren't — they're password-gated."_
-
 ---
 
-### D16 — Password gate (PBKDF2 + HS256 unlock cookie)
+## D16 — Password gate (PBKDF2 + HS256 cookie)
 
-**From D15:** forms accept public input. Some pages don't accept public eyes either — they're gated.
-**ADR / source:** [src/password/](../../../src/password/).
-**Tech on screen:** PBKDF2-SHA256 (100k iters, 32-byte salt), HS256 unlock cookie, per-IP rate limit (5/min), redirect path validation.
+Source: [src/password/](../../../src/password/)
+
+**Password proves you; cookie proves you proved it.**
+
+- PBKDF2-SHA256, 100k iterations, 32-byte salt.
+- Per-IP rate limit 5/min on the unlock endpoint.
+- Timing-safe compare on hash.
+- Redirect target validated same-origin (open-redirect blocked).
+- Set HS256-signed unlock cookie → visitor re-fetches gated page.
+- ⚠ Not bcrypt — PBKDF2-SHA256.
+- ⚠ Verify HS256 signing literal against [src/password/](../../../src/password/) before recording.
 
 ```mermaid
 sequenceDiagram
   participant V as Visitor
   participant W as Worker
-  participant RL as Rate limiter
   participant DB as Neon
-  V->>W: GET /gated-page
-  W-->>V: render unlock form
-  V->>W: POST /__rev01/unlock (password + redirect)
-  W->>RL: check 5/min by IP
+  V->>W: POST /__rev01/unlock
+  W->>W: rate-limit 5/min
   W->>DB: load passwordHash + salt
-  W->>W: PBKDF2-SHA256 verify (timing-safe compare)
-  W->>W: validate redirect path (same-origin only)
-  W-->>V: Set-Cookie HS256 unlock + redirect
-  V->>W: GET /gated-page with cookie
-  W-->>V: full page
+  W->>W: PBKDF2 verify (timing-safe)
+  W->>W: validate redirect path (same-origin)
+  W-->>V: Set-Cookie HS256 + redirect
 ```
-
-**Anchor:** _"Password proves you, the cookie proves you proved it. Cookie is HS256-signed so it can't be forged client-side."_
-
-**Draw order:**
-1. **Visitor lands on gated page, top-left** ◀ *"Server-side check: cookie absent → render unlock form."*
-2. **POST unlock + rate-limit (5/min)** ◀ *"Cheap, per-IP — defends against credential stuffing."*
-3. **PBKDF2-SHA256 verify** ◀ *"100k iterations, 32-byte salt. Timing-safe compare on the hash."*
-4. **Redirect-path validation** ◀ *"Redirect target must be same-origin — open-redirect blocked."*
-5. **Set HS256 cookie, redirect, visitor re-fetches** ◀ *"From now on, cookie unlocks the page until expiry."*
-
-**Pitfalls:**
-- Not bcrypt. PBKDF2-SHA256 specifically.
-- Cookie signed HS256, not HMAC-only — verify the literal in [src/password/](../../../src/password/) before stating.
-- Open-redirect validation is a separate guard — call it out, don't bury it.
-
-**To D21:** _"Visitors are visitors. Owners can layer addons onto sites. How is owner-bought capability separate from per-site config?"_
 
 ---
 
-### D21 — Addon entitlement vs site-addon split
+## D21 — Addon entitlement vs site-addon split
 
-**From D16:** visitor-facing surface ends. Owner-facing capability begins. Addons are bought by the customer, configured per site.
-**ADR / source:** [docs/adr/0009-addon-entitlement-model.md](../../adr/0009-addon-entitlement-model.md).
-**Tech on screen:** `addonEntitlement` (customer-scoped purchase), `siteAddon` (site-scoped config), lifecycle states (active, paused, revoked).
+Source: [ADR 0009](../../adr/0009-addon-entitlement-model.md)
+
+**Buying an addon doesn't activate it. Installing on a site does.**
+
+- `addonEntitlement` = customer-scoped purchase. One row per buy.
+- `siteAddon` = site-scoped config. One row per install.
+- Pause preserves config; revoke unwinds both.
+- ⚠ Don't conflate the two tables. Owns ≠ uses.
 
 ```mermaid
 stateDiagram-v2
   [*] --> Unpurchased
-  Unpurchased --> Entitled: customer buys addon
+  Unpurchased --> Entitled: buy
   Entitled --> Configured: install on site
-  Configured --> Active: site addon enabled
+  Configured --> Active
   Active --> Paused: owner pauses
   Paused --> Active
   Entitled --> Revoked: refund / cancel
@@ -878,93 +872,69 @@ stateDiagram-v2
   Active --> Revoked
 ```
 
-**Anchor:** _"Buying an addon doesn't activate it. Installing it on a site does. Revoke unwinds both."_
-
-**Draw order:**
-1. **Two stacked boxes: `addonEntitlement` (customer-scoped) + `siteAddon` (site-scoped)** ◀ *"One row per purchase. One row per install. Different tables."*
-2. **Lifecycle arrows: bought → installed → active** ◀ *"Each transition is a deliberate owner action."*
-3. **Paused state branching off Active** ◀ *"Reversible. Doesn't delete config."*
-4. **Revoke arrows from each state** ◀ *"Refund or cancellation unwinds everything — entitlement and every installed siteAddon."*
-
-**Pitfalls:**
-- Don't conflate the two tables — `addonEntitlement` says "customer owns it," `siteAddon` says "site uses it."
-- "Pause" preserves config; "revoke" doesn't.
-
-**To D17:** _"Custom domain is one such addon — but with extra machinery. How does briar.app become a route?"_
-
 ---
 
-### D17 — Custom domain state machine + CF for SaaS lifecycle
+## D17 — Custom domain state machine + CF for SaaS
 
-**From D21:** custom domain is purchased like any addon. Then DNS and certs have their own state machine.
-**ADR / source:** [docs/adr/0005-custom-domains.md](../../adr/0005-custom-domains.md), [src/custom-domain/](../../../src/custom-domain/), [wrangler.toml:119-120](../../../wrangler.toml#L119-L120) (cron).
-**Tech on screen:** Cloudflare for SaaS Custom Hostnames API, `customDomain` table (status, certIssuedAt), 5-minute cron poll, ownership token verification.
+Source: [ADR 0005](../../adr/0005-custom-domains.md), [src/custom-domain/](../../../src/custom-domain/)
+
+**Four states, one cron, bounded poll.**
+
+- CF for SaaS Custom Hostnames API on the backend.
+- Cron `*/5` polls Pending/Verifying rows, reconciles `status` + `certIssuedAt`.
+- 30-min stuck rows flip to Failed without further CF calls.
+- ⚠ Wildcard subdomain is *not* a custom hostname (it's a Workers Route).
+- ⚠ Reads `CF_API_TOKEN` + `CF_ZONE_ID` from secrets, not dashboard.
 
 ```mermaid
 stateDiagram-v2
   [*] --> Pending: owner adds briar.app
-  Pending --> Verifying: CF registered, awaiting CNAME
-  Verifying --> Active: CF reports cert issued
+  Pending --> Verifying: CF registered
+  Verifying --> Active: cert issued
   Verifying --> Failed: 30min stuck
   Pending --> Failed: 30min stuck
   Active --> [*]: owner removes
 ```
 
-**Anchor:** _"Custom hostname has four states. A 5-minute cron polls Cloudflare and reconciles them. 30-minute stuck rows flip to failed without further calls."_
-
-**Draw order:**
-1. **Owner adds `briar.app` → `customDomain` row in `Pending`** ◀ *"Worker registers the hostname with CF for SaaS."*
-2. **Owner adds CNAME → Verifying** ◀ *"Visitor DNS now points at our zone."*
-3. **Cron tick every 5 minutes** ◀ *"Scheduled handler polls CF for each Pending/Verifying row."*
-4. **Cert issued → Active** ◀ *"Worker route picks it up via D4 routing."*
-5. **30-minute stuck → Failed** ◀ *"Stop hitting CF. Owner sees the failure state. Loud, not silent."*
-
-**Pitfalls:**
-- Wildcard subdomain is *not* a custom hostname — it's a Workers Route. Don't conflate.
-- Worker reads `CF_API_TOKEN` + `CF_ZONE_ID` from secrets — not from dashboard.
-
-**To D27:** _"Custom domain delivers pages. Each page sets its own CSP based on the embed providers it uses."_
-
 ---
 
-### D27 — CSP dynamic frame-src
+## D27 — CSP dynamic frame-src
 
-**From D17:** the page is delivered. Its Content-Security-Policy header is computed per-page based on which embeds it actually uses.
-**ADR / source:** [src/embed/csp.ts](../../../src/embed/csp.ts).
-**Tech on screen:** per-page embed scan, `frame-src` directive, allowlist per provider (YouTube, Vimeo, Spotify, Google Maps, etc.), CSP header emission.
+Source: [src/embed/csp.ts](../../../src/embed/csp.ts)
+
+**CSP `frame-src` is the minimum set this page needs — derived from embeds actually used.**
+
+- Per-page scan of embed elements.
+- Provider allowlist baked in code (YouTube, Vimeo, Spotify, Google Maps, etc.).
+- Union of providers used → `frame-src` directive.
+- Pages with no embeds get a stricter CSP than pages with.
+- ⚠ Only `frame-src` is per-page. `script-src` nonce is ADR 0020 (Proposed), not shipped.
 
 ```mermaid
 sequenceDiagram
-  participant W as Worker (render path)
+  participant W as Worker
   participant Page as Page model
   participant CSP as CSP builder
   W->>Page: load page elements
-  W->>CSP: collect embed providers used
-  CSP->>CSP: union of provider frame-src allowlists
-  CSP-->>W: Content-Security-Policy: frame-src ...
-  W-->>Visitor: HTML + CSP header
+  W->>CSP: collect embed providers
+  CSP->>CSP: union frame-src allowlists
+  CSP-->>W: CSP header
+  W-->>Visitor: HTML + CSP
 ```
-
-**Anchor:** _"CSP `frame-src` is the minimum set that lets this page work — derived from embeds actually used. No catch-all `*`."_
-
-**Draw order:**
-1. **Page model with embed elements** ◀ *"YouTube on this page, no Spotify."*
-2. **CSP builder scans element list** ◀ *"Per-provider allowlist baked in code; union of what's used."*
-3. **Header emission** ◀ *"`frame-src` is exactly what the page needs. Pages without embeds have a stricter CSP than pages with."*
-
-**Pitfalls:**
-- Don't say "the CSP is the same for every page" — it's per-page.
-- Don't promise `script-src` is also dynamic — only `frame-src` is per-page per ADR 0020 (Proposed) discusses nonces for script.
-
-**To D26:** _"CSP defends pages. Rate limiter defends endpoints — same interface, two backends."_
 
 ---
 
-### D26 — Dual rate limiter (in-process dev vs DO prod)
+## D26 — Dual rate limiter (in-process dev vs DO prod)
 
-**From D27:** rate-limiting is the other reusable defense. Same interface, two implementations — chosen by environment.
-**ADR / source:** [src/live/form-rate-limiter.ts](../../../src/live/form-rate-limiter.ts).
-**Tech on screen:** `RateLimiter` interface, in-process `Map`-backed dev impl, `FormRateLimiter` DO prod impl.
+Source: [src/live/form-rate-limiter.ts](../../../src/live/form-rate-limiter.ts)
+
+**One interface, two backends — chosen by environment.**
+
+- `RateLimiter.check(key, limit, window)` contract.
+- Dev impl: `Map`-backed, in-process, ephemeral.
+- Prod impl: `FormRateLimiter` DO; counters persist across isolate cycling.
+- DO alarm prunes old buckets — no leak.
+- ⚠ Dev impl is *not* production-safe. The duality is the point.
 
 ```mermaid
 classDiagram
@@ -972,7 +942,7 @@ classDiagram
     +check(key, limit, window) bool
   }
   class InProcessLimiter {
-    -counts Map~string,Counter~
+    -counts Map
     +check(...)
   }
   class FormRateLimiterDO {
@@ -984,91 +954,66 @@ classDiagram
   RateLimiter <|-- FormRateLimiterDO
 ```
 
-**Anchor:** _"One interface, two backends. Dev runs in-process — fast, ephemeral. Prod runs in a Durable Object — survives isolate cycling."_
-
-**Draw order:**
-1. **Interface box at top: `RateLimiter.check()`** ◀ *"Single contract — same signature wherever you call it."*
-2. **Two implementations beneath** ◀ *"In-process `Map` for dev — no DO infra to start. DO for prod — counters persist across requests."*
-3. **DO alarm for pruning** ◀ *"Old buckets evicted on a DO alarm — no leak."*
-
-**Pitfalls:**
-- Don't say "we have one rate limiter" — there are two implementations, one interface. The duality is the point.
-- Dev impl is *not* production-safe — calling it out is the whole reason this block exists.
-
-**To D22:** _"Rate limit is one defense. Here's the full poster of every defense the codebase has."_
-
 ---
 
-### D22 — Security pass (one big poster)
+## D22 — Security pass (poster)
 
-**From D26:** we've shown specific defenses (HMAC tokens in D5/D10, validator gate in D6, Turnstile/rate-limit in D15, PBKDF2 in D16, CSP in D27). Here's everything at once.
-**ADR / source:** various — see groups below.
-**Tech on screen:** all the names below.
+Source: various — see each box
+
+**Defense by category. No single magic guard.**
+
+- **Auth tokens:** Clerk JWT, edit HMAC (origin-bound), invite HMAC JWT (7d), unlock HS256.
+- **Hashing:** PBKDF2-SHA256 100k + 32B salt (pw); timing-safe XOR everywhere; SHA-256 IP truncation.
+- **Input:** Drizzle parameterised queries; `escapeHtml` / `escapeAttr` / `escapeCssValue` / `sanitiseCssKey`; SMTP header guard; GA measurement ID regex.
+- **Output:** CSP dynamic `frame-src`; chart SVG attr escape; element selector escape; version-preview meta XSS; inline-link XSS guard.
+- **Network:** Turnstile; rate limits (5/min unlock, 10/min form); webhook `X-Rev01-Signature`; redirect path validation.
+- **Operations:** admin null-safety; loud failures (no silent retries); custom-domain ownership; asset unlink logging.
+- ⚠ It's a glossary, not a flow. Don't try to draw arrows between groups.
 
 ```mermaid
 flowchart TB
   subgraph T["Auth tokens"]
     A1[Clerk JWT]
-    A2[Edit token HMAC-SHA256<br/>origin-bound]
-    A3[Invite JWT HMAC<br/>7-day]
-    A4[Unlock cookie HS256]
+    A2[Edit HMAC origin-bound]
+    A3[Invite HMAC JWT 7d]
+    A4[Unlock HS256]
   end
   subgraph H["Hashing"]
-    H1[PBKDF2-SHA256<br/>100k + 32B salt]
-    H2[Timing-safe XOR<br/>every signature]
-    H3[SHA-256 IP truncation]
+    H1[PBKDF2-SHA256 100k]
+    H2[Timing-safe XOR]
+    H3[SHA-256 IP trunc]
   end
   subgraph I["Input"]
     I1[Drizzle parameterised]
-    I2[escapeHtml / escapeAttr<br/>escapeCssValue / sanitiseCssKey]
+    I2[escapeHtml / Attr / Css]
     I3[SMTP header guard]
-    I4[GA measurement ID regex]
   end
   subgraph O["Output"]
-    O1[CSP dynamic frame-src]
-    O2[Chart SVG attr escape]
-    O3[Element selector escape]
-    O4[Version-preview meta XSS]
-    O5[Inline-link XSS guard]
+    O1[CSP frame-src]
+    O2[SVG attr escape]
+    O3[Inline-link guard]
   end
   subgraph N["Network"]
     N1[Turnstile]
-    N2[Per-IP RL<br/>5/min unlock, 10/min form]
-    N3[Webhook X-Rev01-Signature]
-    N4[Redirect path validation]
-  end
-  subgraph Op["Operations"]
-    P1[Admin null-safety]
-    P2[Loud failures]
-    P3[Custom domain ownership]
-    P4[Asset unlink logging]
+    N2[Per-IP RL]
+    N3[Webhook HMAC sig]
+    N4[Redirect validation]
   end
 ```
 
-**Anchor:** _"Defense by category. No single magic guard — defenses stack by attack class."_
-
-**Draw order:** glossary — point at each group as you read it. Don't try to connect groups with arrows. Spend ~10s per group; the whole block is ~60-90s.
-
-1. **Auth tokens** ◀ *"Four credential kinds; each scoped, signed, time-bounded."*
-2. **Hashing** ◀ *"Strong KDF for passwords. Constant-time compare for everything signed."*
-3. **Input** ◀ *"Every untrusted byte goes through a labelled escaper. Drizzle handles SQL — no string concat."*
-4. **Output** ◀ *"CSP, SVG attrs, selectors, link hrefs — sanitised at emit time."*
-5. **Network** ◀ *"Turnstile, rate limits, webhook signatures, redirect validation."*
-6. **Operations** ◀ *"Loud failures (no silent retries), ownership checks at every shared-resource boundary, audit logging on destructive ops."*
-
-**Pitfalls:**
-- Don't try to draw this as a flow — it's a glossary.
-- If a defense isn't in the codebase, don't put it on the poster. Verify each line before recording.
-
-**To D23:** _"That's the runtime view. Now the data view — every table at once."_
-
 ---
 
-### D23 — Database schema ER (17 tables)
+## D23 — Database schema ER
 
-**From D22:** runtime defenses live in code; their state lives in tables. Here's the whole schema.
-**ADR / source:** [src/db/schema.ts](../../../src/db/schema.ts), [drizzle/](../../../drizzle/).
-**Tech on screen:** Neon Postgres, Drizzle ORM, ~17 tables (verify count vs current schema before recording), JSONB columns for `editableState` / `publishedSnapshot`.
+Source: [src/db/schema.ts](../../../src/db/schema.ts), [drizzle/](../../../drizzle/)
+
+**Two root tables: `customer` and `site`. Everything else hangs off one.**
+
+- Customer-scoped: `ownerAsset`, `addonEntitlement`.
+- Site-scoped: `collaborator`, `siteFont`, `siteVersion`, `customDomain`, `siteAddon`, `formSubmission`, `searchIndex`.
+- `customTemplate` saved *from* a site, used to create other sites.
+- `editableState` and `publishedSnapshot` are JSONB on `site` — asset refs are logical, not FK.
+- ⚠ Verify table count from `schema.ts` exports before recording (script says "~17").
 
 ```mermaid
 erDiagram
@@ -1083,169 +1028,117 @@ erDiagram
   site ||--o{ siteAddon : has
   site ||--o{ formSubmission : receives
   site ||--o{ searchIndex : indexes
-  ownerAsset }o..o{ site : "referenced in editableState"
   addonEntitlement ||--o{ siteAddon : enables
   invite }o--|| site : grants
-  user }o--|| customer : "Clerk-linked"
 ```
-
-**Anchor:** _"Customer owns assets and sites. Site owns everything site-scoped. Each table has one clear owner; no orphan rows."_
-
-**Draw order:**
-1. **Centre on `customer` and `site` cylinders** ◀ *"Two root tables. Everything else hangs off one of them."*
-2. **Customer-scoped fan-out: ownerAsset, addonEntitlement** ◀ *"Bought once, used many sites."*
-3. **Site-scoped fan-out: collaborator, font, version, customDomain, siteAddon, formSubmission, searchIndex** ◀ *"Per-site lifecycle. Delete the site, these go too."*
-4. **`customTemplate` and `invite`** ◀ *"`customTemplate` saved *from* a site, used to create other sites. `invite` grants access to a site."*
-
-**Pitfalls:**
-- Count is "~17" — verify against current `schema.ts` exports before stating literally.
-- Don't draw FK arrows for the JSONB ref from `editableState` to `ownerAsset` rows — it's a logical reference, not a DB constraint. Annotate as dashed.
-
-**To D24:** _"Tables describe state. Routes describe motion. Here's the API surface."_
 
 ---
 
-### D24 — API surface map (~90 endpoints, grouped by auth)
+## D24 — API surface (grouped by auth)
 
-**From D23:** state lives in tables; access lives in routes. Three columns, one per auth mechanism.
-**ADR / source:** [src/routes/](../../../src/routes/), [src/index.ts](../../../src/index.ts).
-**Tech on screen:** public routes (no auth), `/api/*` (Clerk-authed), `/__api/*` (edit-token cookie), DOs (SiteRoom WebSocket, FormRateLimiter), one cron.
+Source: [src/routes/](../../../src/routes/), [src/index.ts](../../../src/index.ts)
+
+**Three auth tiers. Surface groups by *who can call it*.**
+
+- **Public:** landing, `/health`, sitemap, robots, favicon, `/og/...`, `/assets/...`, `/fonts/...`, `/__rev01/forms`, `/__rev01/search`, `/__rev01/unlock`, `/__live` WS.
+- **`/api/*` (Clerk JWT):** sites, publishing, canvas-agent, chat, assets, fonts, collaborators, sections, library, custom-templates, version, domains, password, forms, search, a11y, addons, slot-history, profile, import, on-site-edit.
+- **`/__api/*` (edit cookie):** canvas, canvas-agent, publish, owner/assets, sections/import, library/sections, custom-templates, chat.
+- ⚠ Verify endpoint counts before recording. Don't list every route at 1080p.
 
 ```mermaid
 flowchart TB
-  subgraph Pub["Public (no auth)"]
+  subgraph Pub["Public"]
     P1["landing /"]
-    P2["/health"]
-    P3["/favicon.ico /sitemap.xml /robots.txt"]
-    P4["/og/:siteId/:pageSlug.png"]
-    P5["/fonts/:contentHash"]
-    P6["/assets/:contentHash"]
-    P7["/__rev01/forms/:siteId/:formId"]
-    P8["/__rev01/search"]
-    P9["/__rev01/unlock"]
-    P10["/__live (WS)"]
+    P2["/health /favicon /sitemap /robots"]
+    P3["/og /assets /fonts"]
+    P4["/__rev01/forms / search / unlock"]
+    P5["/__live (WS)"]
   end
   subgraph Clerk["/api/* (Clerk JWT)"]
-    C1["sites (6)"]
-    C2["publishing (2)"]
-    C3["canvas-agent / chat (4)"]
-    C4["assets / fonts (8)"]
-    C5["collaborators (3)"]
-    C6["sections / library / custom-templates (8)"]
-    C7["version (4)"]
-    C8["domains / password / forms / search (8)"]
-    C9["a11y / addons / slot-history / profile / import / on-site-edit (12)"]
+    C1[sites / publishing / assets / fonts]
+    C2[collaborators / sections / library]
+    C3[custom-templates / version / domains]
+    C4[forms / search / a11y / addons / import]
   end
-  subgraph Edit["/__api/* (edit-token cookie)"]
-    E1["canvas, canvas-agent, publish"]
-    E2["owner/assets, sections/import"]
-    E3["library/sections, custom-templates"]
-    E4["chat"]
+  subgraph Edit["/__api/* (edit cookie)"]
+    E1[canvas / canvas-agent / publish]
+    E2[owner-assets / sections-import / chat]
   end
 ```
 
-**Anchor:** _"Three auth tiers. The surface groups by *who can call it*, not by feature."*
-
-**Draw order:**
-1. **Three vertical columns; tall headers Public / `/api` / `/__api`** ◀ *"Each column is a different auth gate."*
-2. **Public column — list the 10 endpoints** ◀ *"No auth — anyone, including crawlers."*
-3. **Clerk column — list feature groups, not every endpoint** ◀ *"Owner authenticated via Clerk JWT. Roughly 50+ endpoints, grouped by feature."*
-4. **Edit-token column** ◀ *"Editor surface uses a cookie issued by D5 — narrower, performance-tuned for canvas paths."*
-
-**Pitfalls:**
-- Don't list every endpoint at 1080p — unreadable. Group counts only.
-- Verify endpoint counts before recording (use a quick grep of route registrations).
-
-**To D25:** _"Routes ship via deploy. Here's the operational view — from local to edge."_
-
 ---
 
-### D25 — Deploy + runtime
+## D25 — Deploy + runtime
 
-**From D24:** the API surface is the public face. How does code get from local to the edge?
-**ADR / source:** [wrangler.toml](../../../wrangler.toml), [package.json](../../../package.json), CI workflows.
-**Tech on screen:** Bun, TypeScript strict, Wrangler 4, GitHub Actions, Cloudflare Workers, Neon, R2, DO namespaces, 13 env secrets, cron.
+Source: [wrangler.toml](../../../wrangler.toml), [package.json](../../../package.json)
+
+**Local → CI → one binary on the edge. No staging cluster.**
+
+- Bun for scripts + smokes; `tsc --noEmit` in pre-commit.
+- GitHub Actions: typecheck + lint + smokes + `wrangler deploy`.
+- Routes: `opencanvas.aayushman.dev` apex + `*.opencanvas.aayushman.dev` wildcard.
+- Storage: Neon + R2 + two DO classes.
+- Non-secret config in `[vars]` block — *not* dashboard-set (caused outage 2026-05-29; ADRs 0013 / 0017 / 0018).
+- One cron `*/5`.
+- ⚠ CI runs smokes; e2e is local.
+- ⚠ Tell the dashboard-strip outage story when discussing `[vars]`.
 
 ```mermaid
 flowchart LR
-  dev[Local dev<br/>Bun + tsc + smokes] -- git push --> gh[GitHub]
-  gh --> ci[GitHub Actions CI<br/>typecheck + lint + smoke]
-  ci -- wrangler deploy --> wkr[[Cloudflare Workers]]
-  wkr <--> neon[(Neon Postgres)]
-  wkr <--> r2[(R2)]
-  wkr <--> dos[(SiteRoom + FormRateLimiter DOs)]
+  dev[Local dev<br/>Bun + tsc + smokes] --> gh[GitHub]
+  gh --> ci[Actions CI<br/>typecheck + lint + smoke]
+  ci --> deploy[wrangler deploy]
+  deploy --> wkr[[Cloudflare Workers]]
+  wkr --> neon[(Neon)]
+  wkr --> r2[(R2)]
+  wkr --> dos[(SiteRoom + FormRateLimiter)]
   ext[Clerk / Resend / Gemini /<br/>Replicate / Turnstile / CF for SaaS] -. HTTPS .-> wkr
   cron[cron */5] --> wkr
 ```
 
-**Anchor:** _"Local Bun + typecheck → GitHub → CI runs smokes → wrangler deploys one binary to the edge. No staging cluster — the edge *is* the runtime."_
-
-**Draw order:**
-1. **Local dev box, bottom-left** ◀ *"Bun 1.3.x for scripts and smokes. `tsc --noEmit` for typecheck. Pre-commit hook enforces typecheck."*
-2. **GitHub + CI in the middle** ◀ *"Push → typecheck, lint, smokes. CI is the source of truth for green."*
-3. **Cloudflare Workers, right** ◀ *"`wrangler deploy` ships the binary. Routes are `opencanvas.aayushman.dev` apex + `*.opencanvas.aayushman.dev` wildcard."*
-4. **Storage + DO row beneath the Worker** ◀ *"Neon for relational. R2 for binaries. DOs for state islands. All bindings declared in `wrangler.toml`."*
-5. **External services up top, dashed** ◀ *"Bearer secrets via `wrangler secret put`. Non-secret config (apex, AUTHORIZED_PARTIES, cookie prefix, email sender) lives in `[vars]` in wrangler.toml — committed, not dashboard."*
-6. **Cron tick into Worker** ◀ *"One cron — every 5 minutes, custom-hostname status poll."*
-
-**Pitfalls:**
-- Non-secret config is in `[vars]` block per ADRs 0013/0017/0018, *not* dashboard-set — dashboard-set values got stripped on deploy on 2026-05-29 and caused an outage. Tell that story.
-- Don't claim CI runs e2e — it runs smokes; e2e is local.
-
-**To D28:** _"Deploy lands code. DevEx is what keeps that code safe to change."_
-
 ---
 
-### D28 — DevEx (the safety net)
+## D28 — DevEx (the safety net)
 
-**From D25:** deploy gets code out. The harder problem is letting future-you change it without breaking it. That's smokes + pure validators + type invariants + the doc surface.
-**ADR / source:** [scripts/](../../../scripts/), [src/canvas/responsive/](../../../src/canvas/responsive/), [src/canvas/layout/](../../../src/canvas/layout/), pre-commit hook in [package.json:96-98](../../../package.json#L96-L98).
-**Tech on screen:** ~40 smoke scripts (hermetic, no network, no DB), pure validators (collect all errors), layout engine, design-section parser, compile-time union-cover checks, CLAUDE.md / CONTEXT.md / ADR index, subsystem READMEs.
+Source: [scripts/](../../../scripts/), [src/canvas/responsive/](../../../src/canvas/responsive/), [src/canvas/layout/](../../../src/canvas/layout/), pre-commit in [package.json](../../../package.json)
+
+**Smokes + pure validators + compile-time invariants + ADR-canonical docs.**
+
+- ~40 smoke scripts, hermetic, no network/DB. `bun run <name>:smoke`.
+- Pure validators: collect all errors, never throw (ADR 0012 for canvas, ADR 0025 (Proposed) for renderer-is-only-throw-site).
+- Compile-time union-cover checks: `_ELEMENT_TYPES_COVERS_UNION` + `_UNION_COVERS_ELEMENT_TYPES`.
+- Pre-commit hook: typecheck.
+- Doc surface: CLAUDE.md / CONTEXT.md / ADR index canonical; subsystem READMEs per major folder.
+- ⚠ ADRs are the *only* canonical docs. FEATURES.md / BUTTONS.md / handoff-* are working memos.
+- ⚠ Confirm ADR 0025 status before recording.
 
 ```mermaid
 flowchart TB
   subgraph BT["Build-time safety"]
-    BT1[~40 smoke scripts<br/>bun run *:smoke]
-    BT2[Compile-time union cover<br/>_ELEMENT_TYPES_COVERS_UNION]
-    BT3[Pre-commit: typecheck]
+    BT1[~40 smoke scripts]
+    BT2[Union-cover compile checks]
+    BT3[Pre-commit typecheck]
   end
   subgraph RT["Run-time safety"]
     RT1[Pure validators<br/>collect all errors]
-    RT2[Layout engine<br/>semantic → positioned]
-    RT3[Design-section parser<br/>LLM output → validated section]
+    RT2[Layout engine]
+    RT3[Design-section parser]
   end
   subgraph DS["Doc surface"]
     DS1[CLAUDE.md / CONTEXT.md]
     DS2[ADR index — canonical]
-    DS3[Subsystem READMEs<br/>src/*/SUBSYSTEM.md]
+    DS3[Subsystem READMEs]
   end
 ```
 
-**Anchor:** _"Smokes are the per-feature contract. Pure validators collect every error before failing. Compile-time invariants stop schema drift. ADRs are the only canonical docs."_
-
-**Draw order:**
-1. **Three group cards: Build-time / Run-time / Doc surface** ◀ *"Three layers of safety — none of them is enough alone."*
-2. **Smokes column** ◀ *"Forty-plus scripts, each hermetic. Run any one in milliseconds. CI runs them all."*
-3. **Pure validators** ◀ *"Never throw, never short-circuit. Collect every error and return them as a list — the caller decides the verdict. ADR 0012 — for canvas, ADR 0025 — for renderer-is-only-throw-site."*
-4. **Union-cover compile-time checks** ◀ *"`_ELEMENT_TYPES_COVERS_UNION` and `_UNION_COVERS_ELEMENT_TYPES` make schema drift a build error."*
-5. **Doc surface, right** ◀ *"ADRs are canonical. CLAUDE.md drives agent behaviour. Subsystem READMEs document folder-level invariants."*
-
-**Pitfalls:**
-- ADRs are the *only* canonical docs — FEATURES.md, BUTTONS.md, handoff-* and similar are working memos, not truth.
-- Don't say "ADR 0025 is accepted" if still Proposed — verify against the index before recording.
-
-**To viewer:** _"That's the system. One Worker, two state islands, every change funnelled through a validator, every defense category covered, every contract under a smoke test. The video ends here — the codebase keeps going."_
-
 ---
 
-## Pre-recording checklist (do once)
+## Pre-recording checklist
 
-- [ ] Verify schema.ts table count for D23 — replace "~17" with the actual count.
-- [ ] Verify endpoint group counts in D24 against `src/routes/`.
-- [ ] Confirm ADRs 0011, 0012, 0014, 0015, 0016, 0020, 0021, 0022, 0023, 0024, 0025, 0026 statuses (the script cites several as Proposed — re-check the ADR index right before recording).
-- [ ] Confirm invite-token TTL literal in [src/auth/invite-token.ts](../../../src/auth/invite-token.ts) (script says 7 days).
-- [ ] Confirm a11y check count is 6 in [src/a11y/checks/](../../../src/a11y/checks/).
-- [ ] Confirm FormRateLimiter window literals (script says 5/min unlock, 10/min form).
-- [ ] Confirm the editor / `__api` route list against [src/routes/](../../../src/routes/) — the column in D24 must match real routes.
-
-If any of these drift before recording, fix them in this file — don't re-narrate around them.
+- [ ] `schema.ts` table count for D23 — verify "~17".
+- [ ] Endpoint group counts in D24 against `src/routes/`.
+- [ ] ADR statuses for 0011, 0012, 0014, 0015, 0016, 0020, 0021, 0022, 0023, 0024, 0025, 0026.
+- [ ] Invite-token TTL in [src/auth/invite-token.ts](../../../src/auth/invite-token.ts) (script says 7d).
+- [ ] A11y check count = 6 in [src/a11y/checks/](../../../src/a11y/checks/).
+- [ ] FormRateLimiter window literals (5/min unlock, 10/min form).
+- [ ] `/__api` route list against [src/routes/](../../../src/routes/).
