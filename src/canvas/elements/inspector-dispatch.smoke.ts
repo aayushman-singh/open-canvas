@@ -62,15 +62,38 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     title: 'Test embed',
     aspectRatio: 16 / 9,
   },
+  text: {
+    id: 'fx-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 60, z: 0 },
+    content: [{ text: 'Heading', marks: [] }],
+    role: 'heading',
+    fontSize: 32,
+    fontWeight: 600,
+    align: 'left',
+  },
 };
+
+// Action handlers + busy flags the interpreter mounts inside canvas-client.ts.
+// Mirrored here so the smoke can verify that every `button-action` field in
+// a migrated spec names a registered handler — the interpreter throws at
+// first mount on a missing handler, so this check catches the gap at
+// build-time instead.
+const REGISTERED_ACTIONS = ['rewrite-text', 'replace-media'] as const;
+const REGISTERED_BUSY_FLAGS = ['aiBusy'] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {
   assert(typeof field.label === 'string' && field.label.length > 0, `${where}: label required`);
-  assert(typeof field.path === 'string' && field.path.length > 0, `${where}: path required`);
-  assert(
-    Object.prototype.hasOwnProperty.call(fixture, field.path),
-    `${where}: path "${field.path}" is not present on the fixture (catches typos and stale paths)`,
-  );
+
+  // `button-action` is the only path-free field kind — it dispatches via a
+  // named handler instead of binding to an element property.
+  if (field.kind !== 'button-action') {
+    assert(typeof field.path === 'string' && field.path.length > 0, `${where}: path required`);
+    assert(
+      Object.prototype.hasOwnProperty.call(fixture, field.path),
+      `${where}: path "${field.path}" is not present on the fixture (catches typos and stale paths)`,
+    );
+  }
 
   switch (field.kind) {
     case 'select':
@@ -101,6 +124,26 @@ function checkField(field: InspectorField, fixture: object, where: string): void
       }
       return;
     case 'checkbox':
+      return;
+    case 'number':
+      if (field.min !== undefined && field.max !== undefined) {
+        assert(
+          field.min <= field.max,
+          `${where} number: min (${String(field.min)}) must be <= max (${String(field.max)})`,
+        );
+      }
+      return;
+    case 'button-action':
+      assert(
+        REGISTERED_ACTIONS.includes(field.action as (typeof REGISTERED_ACTIONS)[number]),
+        `${where} button-action: action "${field.action}" is not in REGISTERED_ACTIONS (register the handler in canvas-client.ts before referencing it from a spec)`,
+      );
+      if (field.busyFlag !== undefined) {
+        assert(
+          REGISTERED_BUSY_FLAGS.includes(field.busyFlag as (typeof REGISTERED_BUSY_FLAGS)[number]),
+          `${where} button-action: busyFlag "${field.busyFlag}" is not in REGISTERED_BUSY_FLAGS`,
+        );
+      }
       return;
     default: {
       const exhaustive: never = field;

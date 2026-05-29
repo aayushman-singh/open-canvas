@@ -22,7 +22,7 @@ import { renderMedia } from './media.js';
 import { renderNav } from './nav.js';
 import { renderShape, shapeInspectorSpec } from './shape.js';
 import { renderTable } from './table.js';
-import { renderText } from './text.js';
+import { renderText, textInspectorSpec } from './text.js';
 
 // Re-export every element interface so downstream code has a single import
 // point. The five originals come from `schema.ts` (legacy location); the
@@ -205,4 +205,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   container: containerInspectorSpec,
   code: codeInspectorSpec,
   embed: embedInspectorSpec,
+  text: textInspectorSpec,
 };

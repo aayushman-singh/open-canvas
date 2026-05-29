@@ -103,14 +103,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // — silent infinite reconnects mask a real outage and burn the user's
   // battery. Loud failure beats a fake "still connected" UI.
   const COEDIT_RECONNECT_MAX_ATTEMPTS = 10;
-  // Text element font bounds. Mirror src/canvas/validate.ts (server enforces
-  // the same range on PUT). If you change either side here, mirror it there
-  // or the server will reject what the inspector accepts.
-  const TEXT_FONT_SIZE_MIN = 12;
-  const TEXT_FONT_SIZE_MAX = 96;
-  // Allowed numeric font weights for text elements. Mirrors schema.ts's
-  // TextElement.fontWeight union.
-  const TEXT_FONT_WEIGHT_CHOICES = ["400", "500", "600", "700"];
+  // Text-element font bounds and weight options live on the textInspectorSpec
+  // in src/canvas/elements/text.ts now (ADR 0011 Step 1); the JSON-emitted
+  // INSPECTOR_DISPATCH above carries them into this script. Server-side
+  // src/canvas/validate.ts mirrors the same bounds — if you change them,
+  // change both places.
   // Subresource integrity for the Cropper.js v2.1.1 ESM bundle on jsDelivr.
   // Sourced at:
   //   curl -s https://cdn.jsdelivr.net/npm/cropperjs@2.1.1/dist/cropper.esm.js \
@@ -2985,59 +2982,68 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         inspector.appendChild(field(f.label, cb));
         return;
       }
+      if (f.kind === "number") {
+        var ni = document.createElement("input");
+        ni.type = "number";
+        if (typeof f.min === "number") ni.min = String(f.min);
+        if (typeof f.max === "number") ni.max = String(f.max);
+        var prev = typeof element[f.path] === "number" ? element[f.path] : 0;
+        ni.value = String(prev);
+        ni.addEventListener("change", function() {
+          var n = Number(ni.value);
+          var minOk = typeof f.min !== "number" || n >= f.min;
+          var maxOk = typeof f.max !== "number" || n <= f.max;
+          if (Number.isFinite(n) && minOk && maxOk) {
+            element[f.path] = n;
+            prev = n;
+            rebuildElement(element.id);
+            scheduleSave();
+          } else {
+            ni.value = String(prev);
+          }
+        });
+        inspector.appendChild(field(f.label, ni));
+        return;
+      }
+      if (f.kind === "button-action") {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = f.label;
+        if (f.dataAttr) btn.setAttribute("data-ai-button", f.dataAttr);
+        if (f.busyFlag) {
+          var busyReader = INSPECTOR_BUSY_FLAGS[f.busyFlag];
+          if (busyReader && busyReader()) btn.disabled = true;
+        }
+        var handler = INSPECTOR_ACTION_HANDLERS[f.action];
+        if (typeof handler !== "function") {
+          throw new Error("renderInspectorSpec: no action handler registered for " + JSON.stringify(f.action));
+        }
+        btn.addEventListener("click", function() { handler(element.id); });
+        inspector.appendChild(btn);
+        return;
+      }
       throw new Error("renderInspectorSpec: unknown field kind " + JSON.stringify(f.kind));
     });
   }
 
+  // Action handler + busy-flag registries — spec carries the string name, the
+  // interpreter holds the imperative function. Adding a new button-action
+  // spec field requires registering the handler here too; the inspector
+  // throws synchronously at first mount if the name is missing, surfacing
+  // the gap immediately rather than as a silent no-op click.
+  var INSPECTOR_ACTION_HANDLERS = {
+    "rewrite-text": function(id) { aiRewriteText(id); },
+    "replace-media": function(id) { aiReplaceMedia(id); },
+  };
+  var INSPECTOR_BUSY_FLAGS = {
+    "aiBusy": function() { return aiBusy; },
+  };
+
   // -- Extracted inspector builders -----------------------------------------
 
-  function buildTextInspector(element) {
-    const aiBtn = document.createElement("button");
-    aiBtn.type = "button";
-    aiBtn.textContent = "AI rewrite";
-    aiBtn.setAttribute("data-ai-button", "rewrite-text");
-    if (aiBusy) aiBtn.disabled = true;
-    aiBtn.addEventListener("click", () => { aiRewriteText(element.id); });
-    inspector.appendChild(aiBtn);
-
-    const role = selectInput(["heading", "body", "label"], element.role);
-    role.addEventListener("change", () => {
-      element.role = role.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Role", role));
-
-    const fontSize = document.createElement("input");
-    fontSize.type = "number";
-    fontSize.min = String(TEXT_FONT_SIZE_MIN); fontSize.max = String(TEXT_FONT_SIZE_MAX);
-    fontSize.value = String(element.fontSize);
-    fontSize.addEventListener("change", () => {
-      const n = Number(fontSize.value);
-      if (Number.isFinite(n) && n >= TEXT_FONT_SIZE_MIN && n <= TEXT_FONT_SIZE_MAX) {
-        element.fontSize = n;
-        rebuildElement(element.id);
-        scheduleSave();
-      }
-    });
-    inspector.appendChild(field("Font size", fontSize));
-
-    const weight = selectInput(TEXT_FONT_WEIGHT_CHOICES, String(element.fontWeight));
-    weight.addEventListener("change", () => {
-      element.fontWeight = Number(weight.value);
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Font weight", weight));
-
-    const align = selectInput(["left", "center", "right"], element.align);
-    align.addEventListener("change", () => {
-      element.align = align.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Align", align));
-  }
+  // buildTextInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/text.ts (uses button-action, select, number,
+  // select-mapped field kinds).
 
   function buildActionInspector(element) {
     const variant = selectInput(ACTION_VARIANTS, element.variant);
@@ -4352,7 +4358,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed) have specs; remaining types (text, action, media, chart, form,
+    // embed, text) have specs; remaining types (action, media, chart, form,
     // accordion, carousel, table, nav) still use their per-type builders
     // until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
@@ -4360,7 +4366,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderInspectorSpec(inspectorSpec, element);
     } else {
       const inspectorBuilders = {
-        text: buildTextInspector,
         action: buildActionInspector,
         media: buildMediaInspector,
         chart: buildChartInspector,

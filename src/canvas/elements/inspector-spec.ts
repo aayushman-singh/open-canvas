@@ -33,7 +33,9 @@ export type InspectorField =
   | SelectMappedField
   | TextField
   | TextareaField
-  | CheckboxField;
+  | CheckboxField
+  | NumberField
+  | ButtonActionField;
 
 /**
  * Static option list. The element's current value is one of the option
@@ -99,6 +101,36 @@ export interface CheckboxField {
   kind: 'checkbox';
   label: string;
   path: string;
+}
+
+/**
+ * Numeric input with optional `min` / `max` bounds. The interpreter rejects a
+ * change whose parsed value is non-finite or out of bounds (reverts the input
+ * to the prior value). Used for free-form numbers like text font size; a
+ * fixed-option numeric pick belongs in `select-mapped`.
+ */
+export interface NumberField {
+  kind: 'number';
+  label: string;
+  path: string;
+  min?: number;
+  max?: number;
+}
+
+/**
+ * Action button (e.g. "AI rewrite", "AI media"). The `action` string names a
+ * handler the interpreter dispatches to via its imperative-handler registry;
+ * `busyFlag` names a boolean the interpreter consults to set `disabled` at
+ * mount time so a busy AI request cannot be re-fired from the inspector.
+ * `dataAttr` becomes a `data-ai-button` attribute on the button — the editor
+ * smoke / e2e selectors depend on it remaining present and stable.
+ */
+export interface ButtonActionField {
+  kind: 'button-action';
+  label: string;
+  action: string;
+  dataAttr?: string;
+  busyFlag?: string;
 }
 
 /**
