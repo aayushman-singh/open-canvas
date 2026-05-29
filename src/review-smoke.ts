@@ -774,14 +774,14 @@ const liveRedirect = resolveAuthRedirectUrl(
   liveClerkEnv,
   `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
 );
-assert(
-  liveRedirect === `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
-  `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
-);
 const liveLocalSignInUrl = new URL(buildLocalSignInUrl(liveClerkEnv, liveRedirect));
 assert(
   liveLocalSignInUrl.origin === SMOKE_APP_ORIGIN,
   `expected live local sign-in surface to stay on the app origin, got ${liveLocalSignInUrl.origin}`,
+);
+assert(
+  liveRedirect === `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
+  `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
 );
 const liveRootRedirect = resolveAuthRedirectUrl(liveClerkEnv, `${SMOKE_APP_ORIGIN}/dashboard`, '/');
 assert(
