@@ -89,7 +89,10 @@ export function buildSignInUrl(
  * bouncing to Clerk's hosted Account Portal at `accounts.<root>`.
  */
 export function buildLocalSignInUrl(env: HostConfigEnv, redirectUrl: string): string {
-  const url = new URL('/auth/', appOrigin(env));
+  // Path is `/auth` (no trailing slash) — the signInRoute is mounted with
+  // exact-prefix `/auth` and a `get('/', ...)` handler inside, which Hono
+  // matches as `/auth` (not `/auth/`). The trailing-slash form 404s.
+  const url = new URL('/auth', appOrigin(env));
   url.searchParams.set('redirect_url', redirectUrl);
   return url.toString();
 }
