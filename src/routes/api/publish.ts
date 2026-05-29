@@ -33,7 +33,7 @@ import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateEditableSite, validatePublishedSnapshot } from '../../canvas/validate';
 import { db, type Db } from '../../db/client';
-import { customer, ownerAsset, site, siteSearchEntry, siteSnapshot } from '../../db/schema';
+import { customer, ownerAsset, site } from '../../db/schema';
 // Post-publish side effects that are part of the published-site contract:
 // version timeline capture, OG-image pre-rendering, and search indexing.
 import { captureOnPublish } from '../../version/capture';
@@ -67,10 +67,6 @@ interface PublishBroadcastPayload {
   defaultSlug: string;
 }
 
-interface PreviousPublishState {
-  snapshot: PublishedSnapshot | null;
-  version: number;
-}
 
 // Short, response-safe failure description. Stack traces stay in the raw
 // `console.error(..., { error })` calls (which format the full stack in the
@@ -83,128 +79,157 @@ function describeError(error: unknown): string {
   return String(error);
 }
 
-async function restorePreviousPublishState(args: {
-  database: Db;
-  siteId: string;
-  customerId: string;
-  previous: PreviousPublishState;
-  failedVersion: number;
-}): Promise<void> {
-  const rollbackErrors: string[] = [];
-
-  try {
-    const restoredRows = await args.database
-      .update(site)
-      .set({
-        publishedSnapshot: args.previous.snapshot,
-        publishedVersion: args.previous.version,
-        updatedAt: sql`now()`,
-      })
-      .where(and(eq(site.id, args.siteId), eq(site.customerId, args.customerId)))
-      .returning({ id: site.id });
-    if (restoredRows.length === 0) {
-      throw new Error(`site ${args.siteId} disappeared before publish rollback`);
-    }
-  } catch (error) {
-    rollbackErrors.push(`site row: ${describeError(error)}`);
-  }
-
-  try {
-    if (args.previous.snapshot) {
-      await rebuildSearchIndex(args.siteId, args.previous.snapshot, args.database);
-    } else {
-      await args.database.delete(siteSearchEntry).where(eq(siteSearchEntry.siteId, args.siteId));
-    }
-  } catch (error) {
-    rollbackErrors.push(`search index: ${describeError(error)}`);
-  }
-
-  try {
-    await args.database
-      .delete(siteSnapshot)
-      .where(
-        and(
-          eq(siteSnapshot.siteId, args.siteId),
-          eq(siteSnapshot.reason, 'publish'),
-          eq(siteSnapshot.publishedVersion, args.failedVersion),
-        ),
+// Per-step wall-clock timing for the publish path. Cloudflare Workers cap
+// CPU per request and the publish flow on an Apogee-sized site (~292
+// elements × 6 pages) has been observed to exceed it. We instrument every
+// major step so a 1102 ("worker exceeded resource limits") response can be
+// localised to a specific cost centre from the wrangler tail.
+//
+// Each `mark` both records the duration since the previous mark AND emits a
+// `[publish-step]` log line *at the start* of the next step. The start-of-
+// step breadcrumb is intentional: if the worker is killed mid-step we still
+// know which step it died inside (the matching end-of-step duration line
+// will be missing).
+interface TimelineStep {
+  readonly step: string;
+  readonly durationMs: number;
+  readonly totalMs: number;
+}
+interface PublishTimeline {
+  begin(step: string): void;
+  end(step: string): void;
+  summary(): { totalMs: number; steps: readonly TimelineStep[] };
+}
+function createPublishTimeline(siteId: string): PublishTimeline {
+  const start = performance.now();
+  const steps: TimelineStep[] = [];
+  const open: { step: string; startedAt: number }[] = [];
+  return {
+    begin(step) {
+      const at = performance.now();
+      open.push({ step, startedAt: at });
+      console.log(
+        `[publish-step] begin ${step}`,
+        JSON.stringify({ siteId, atMs: Math.round((at - start) * 100) / 100 }),
       );
-  } catch (error) {
-    rollbackErrors.push(`version snapshot: ${describeError(error)}`);
-  }
-
-  if (rollbackErrors.length > 0) {
-    throw new Error(
-      `[publish] rollback failed for site ${args.siteId}: ${rollbackErrors.join('; ')}`,
-    );
-  }
+    },
+    end(step) {
+      const at = performance.now();
+      const top = open.pop();
+      if (top === undefined || top.step !== step) {
+        // Defensive — mismatched begin/end indicates an instrumentation bug
+        // (not a publish bug). Log loudly so it's caught in review.
+        console.error('[publish-step] mismatched end', { siteId, expected: top?.step, got: step });
+      }
+      const startedAt = top?.startedAt ?? start;
+      const durationMs = Math.round((at - startedAt) * 100) / 100;
+      const totalMs = Math.round((at - start) * 100) / 100;
+      steps.push({ step, durationMs, totalMs });
+      console.log(
+        `[publish-step] end ${step}`,
+        JSON.stringify({ siteId, durationMs, totalMs }),
+      );
+    },
+    summary() {
+      return {
+        totalMs: Math.round((performance.now() - start) * 100) / 100,
+        steps,
+      };
+    },
+  };
 }
 
-async function runPublishedSideEffects(args: {
+// Deferred side effects — run AFTER the publish HTTP response has returned.
+// The published row is the source of truth; broadcast, search index rebuild,
+// version capture, and OG warmup are denormalised state that can be repaired
+// on the next publish if any one of them fails. We surface each failure as a
+// loud `[publish-deferred] ... failed` log line but do NOT roll back the row
+// — the response has already gone out and the visitor-facing snapshot is the
+// committed one.
+//
+// The handler invokes this via `c.executionCtx.waitUntil(...)` so the Worker
+// keeps running until the chain finishes, but the request response is not
+// blocked on it. This is what lets concurrent publishes on the same isolate
+// avoid 1102: each request's heavy work overlaps with the next request's
+// response cycle rather than stacking on the request path.
+async function runDeferredPublishedSideEffects(args: {
   database: Db;
   env: Bindings;
   siteId: string;
-  customerId: string;
+  siteName: string;
   snapshot: PublishedSnapshot;
-  previous: PreviousPublishState;
   broadcastPayload: PublishBroadcastPayload;
 }): Promise<void> {
-  try {
-    await rebuildSearchIndex(args.siteId, args.snapshot, args.database);
-    await captureOnPublish(args.siteId, args.snapshot.version, args.database, args.env);
+  const { siteId } = args;
+  const version = args.snapshot.version;
+  const totalStart = performance.now();
 
-    const id = args.env.SITE_ROOM.idFromName(args.siteId);
-    const stub = args.env.SITE_ROOM.get(id);
-    const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
+  async function step(name: string, run: () => Promise<unknown>): Promise<void> {
+    const stepStart = performance.now();
+    console.log(`[publish-deferred] begin ${name}`, JSON.stringify({ siteId, version }));
+    try {
+      await run();
+      console.log(
+        `[publish-deferred] end ${name}`,
+        JSON.stringify({
+          siteId,
+          version,
+          durationMs: Math.round((performance.now() - stepStart) * 100) / 100,
+        }),
+      );
+    } catch (error) {
+      // Pass the raw error so console.error renders the full stack. The
+      // failure does NOT abort the chain — every remaining step still runs.
+      console.error(`[publish-deferred] ${name} failed`, {
+        siteId,
+        version,
+        durationMs: Math.round((performance.now() - stepStart) * 100) / 100,
+        detail: describeError(error),
+        error,
+      });
+    }
+  }
+
+  // Broadcast first so any open editor / visitor tab gets the new version
+  // ASAP. Even on a heavy site this stage is ~30-400ms.
+  await step('broadcast', async () => {
+    const doId = args.env.SITE_ROOM.idFromName(siteId);
+    const stub = args.env.SITE_ROOM.get(doId);
+    const response = await stub.fetch('https://do.invalid/broadcast', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(args.broadcastPayload),
     });
-    if (!broadcastResponse.ok) {
-      const body = await broadcastResponse.text();
-      throw new Error(`SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`);
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`SiteRoom broadcast failed: ${String(response.status)} ${body}`);
     }
-  } catch (error) {
-    const sideEffectFailure = describeError(error);
-    // Pass the raw error so console.error renders the full stack — describeError
-    // returns only the message, which is what we surface to the JSON response.
-    console.error('[publish] published side effects failed; restoring previous published state', {
-      siteId: args.siteId,
-      failedVersion: args.snapshot.version,
-      previousVersion: args.previous.version,
-      error,
-    });
-    try {
-      await restorePreviousPublishState({
-        database: args.database,
-        siteId: args.siteId,
-        customerId: args.customerId,
-        previous: args.previous,
-        failedVersion: args.snapshot.version,
-      });
-    } catch (rollbackError) {
-      const rollbackFailure = describeError(rollbackError);
-      console.error('[publish] rollback failed after published side effects failure', {
-        siteId: args.siteId,
-        failedVersion: args.snapshot.version,
-        previousVersion: args.previous.version,
-        sideEffectError: error,
-        rollbackError,
-      });
-      throw new Error(
-        `published side effects failed and rollback failed: sideEffect=${sideEffectFailure}; rollback=${rollbackFailure}`,
-      );
-    }
-    console.error('[publish] published side effects failed; restored previous published state', {
-      siteId: args.siteId,
-      failedVersion: args.snapshot.version,
-      previousVersion: args.previous.version,
-      error,
-    });
-    throw new Error(
-      `published side effects failed; restored previous published state: ${sideEffectFailure}`,
-    );
-  }
+  });
+
+  await step('rebuildSearchIndex', () =>
+    rebuildSearchIndex(siteId, args.snapshot, args.database),
+  );
+
+  await step('captureOnPublish', () =>
+    captureOnPublish(siteId, args.snapshot.version, args.database, args.env),
+  );
+
+  // OG warmup runs LAST because it is the heaviest step and the OG-serving
+  // route renders on demand if a visitor share-unfurls before the warmup
+  // completes — so deferring it does not cause user-visible 404s, only a
+  // slower first share-unfurl in the first few seconds after publish.
+  await step('onPublishGenerateOg', () =>
+    onPublishGenerateOg(siteId, args.snapshot, args.env, args.database, args.siteName),
+  );
+
+  console.log(
+    '[publish-deferred] all-done',
+    JSON.stringify({
+      siteId,
+      version,
+      totalMs: Math.round((performance.now() - totalStart) * 100) / 100,
+    }),
+  );
 }
 
 function renderPublishedPageHtml(
@@ -235,7 +260,19 @@ function buildPublishBroadcastPayload(
   const defaultSlug = resolvePrimaryPage(snapshot).slug;
   const htmlBySlug: Record<string, string> = {};
   for (const page of snapshot.pages) {
-    htmlBySlug[page.slug] = renderPublishedPageHtml(snapshot, page.slug, siteId, turnstileSiteKey);
+    const pageStart = performance.now();
+    const html = renderPublishedPageHtml(snapshot, page.slug, siteId, turnstileSiteKey);
+    htmlBySlug[page.slug] = html;
+    console.log(
+      '[publish-page-render]',
+      JSON.stringify({
+        siteId,
+        slug: page.slug,
+        sections: page.sections.length,
+        htmlBytes: html.length,
+        durationMs: Math.round((performance.now() - pageStart) * 100) / 100,
+      }),
+    );
   }
   const html = htmlBySlug[defaultSlug];
   if (html === undefined) {
@@ -260,18 +297,29 @@ publishApi.post('/sites/:siteId', async (c) => {
     return c.json({ error: 'site not found' }, 404);
   }
 
+  const timeline = createPublishTimeline(siteId);
+  const attachTimings = (response: Response): Response => {
+    const summary = timeline.summary();
+    response.headers.set('X-Publish-Timings', JSON.stringify(summary));
+    console.log('[publish-timing]', JSON.stringify({ siteId, ...summary }));
+    return response;
+  };
+
   const database = db(c.env);
 
+  timeline.begin('db.customerLookup');
   const customerRow = await database
     .select({ id: customer.id })
     .from(customer)
     .where(eq(customer.clerkUserId, auth.userId))
     .limit(1);
+  timeline.end('db.customerLookup');
   const customerId = customerRow[0]?.id;
   if (!customerId) {
-    return c.json({ error: 'site not found' }, 404);
+    return attachTimings(c.json({ error: 'site not found' }, 404));
   }
 
+  timeline.begin('db.siteSelect');
   const siteRow = await database
     .select({
       id: site.id,
@@ -284,43 +332,54 @@ publishApi.post('/sites/:siteId', async (c) => {
     .from(site)
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
+  timeline.end('db.siteSelect');
   const row = siteRow[0];
   if (!row) {
-    return c.json({ error: 'site not found' }, 404);
+    return attachTimings(c.json({ error: 'site not found' }, 404));
   }
 
+  timeline.begin('validateEditableSite');
   const validation = validateEditableSite(row.editableState);
+  timeline.end('validateEditableSite');
   if (!validation.valid) {
-    return c.json({ error: 'editable state invalid', errors: validation.errors }, 400);
+    return attachTimings(c.json({ error: 'editable state invalid', errors: validation.errors }, 400));
   }
 
   // Accessibility audit gate. Blocking issues (for example missing alt text,
   // contrast < 3.0, or empty page title) stop publish with a structured 422.
   // Warnings and info-level findings do not block.
+  timeline.begin('runAudit');
   const auditReport = runAudit(row.editableState);
+  timeline.end('runAudit');
   if (auditReport.blockerCount > 0) {
-    return c.json(
-      {
-        error: 'cannot publish: accessibility blockers',
-        blockers: auditReport.issues.filter((i) => i.severity === 'blocking'),
-        report: auditReport,
-      },
-      422,
+    return attachTimings(
+      c.json(
+        {
+          error: 'cannot publish: accessibility blockers',
+          blockers: auditReport.issues.filter((i) => i.severity === 'blocking'),
+          report: auditReport,
+        },
+        422,
+      ),
     );
   }
 
+  timeline.begin('collectUnfilledAssetReferences');
   const unfilledMediaSlots = collectUnfilledAssetReferences(row.editableState);
+  timeline.end('collectUnfilledAssetReferences');
   if (unfilledMediaSlots.length > 0) {
-    return c.json(
-      {
-        error: 'cannot publish: unfilled media slots',
-        unfilledMediaSlots: unfilledMediaSlots.map((reference) => ({
-          role: reference.role,
-          path: reference.path,
-          elementId: reference.mediaElementId,
-        })),
-      },
-      400,
+    return attachTimings(
+      c.json(
+        {
+          error: 'cannot publish: unfilled media slots',
+          unfilledMediaSlots: unfilledMediaSlots.map((reference) => ({
+            role: reference.role,
+            path: reference.path,
+            elementId: reference.mediaElementId,
+          })),
+        },
+        400,
+      ),
     );
   }
 
@@ -330,6 +389,7 @@ publishApi.post('/sites/:siteId', async (c) => {
   // the root is the Owner, not the site — an asset uploaded against one of
   // this Owner's other sites still resolves here. No auto-fix, no
   // placeholder substitution.
+  timeline.begin('assetReachabilityCheck');
   const referenced = collectReferencedAssetIds(row.editableState);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
@@ -340,30 +400,37 @@ publishApi.post('/sites/:siteId', async (c) => {
     const referenceErrors = findAssetReferenceErrors(row.editableState, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
-      return c.json(
-        {
-          error: 'cannot publish: missing assets',
-          missingAssetIds: missing.map((error) => error.assetId),
-        },
-        400,
+      timeline.end('assetReachabilityCheck');
+      return attachTimings(
+        c.json(
+          {
+            error: 'cannot publish: missing assets',
+            missingAssetIds: missing.map((error) => error.assetId),
+          },
+          400,
+        ),
       );
     }
     const mismatched = referenceErrors.filter((error) => error.reason === 'kind-mismatch');
     if (mismatched.length > 0) {
-      return c.json(
-        {
-          error: 'cannot publish: asset kind mismatch',
-          assetKindErrors: mismatched.map((error) => ({
-            assetId: error.assetId,
-            expectedKind: error.expectedKind,
-            actualKind: error.actualKind,
-            path: error.path,
-          })),
-        },
-        400,
+      timeline.end('assetReachabilityCheck');
+      return attachTimings(
+        c.json(
+          {
+            error: 'cannot publish: asset kind mismatch',
+            assetKindErrors: mismatched.map((error) => ({
+              assetId: error.assetId,
+              expectedKind: error.expectedKind,
+              actualKind: error.actualKind,
+              path: error.path,
+            })),
+          },
+          400,
+        ),
       );
     }
   }
+  timeline.end('assetReachabilityCheck');
 
   // PublishedSnapshot = EditableSite & { version, publishedAt }. Every
   // EditableSite field — required and optional — is part of the published
@@ -376,29 +443,38 @@ publishApi.post('/sites/:siteId', async (c) => {
     publishedAt: new Date().toISOString(),
   };
 
+  timeline.begin('validatePublishedSnapshot');
   const snapshotValidation = validatePublishedSnapshot(snapshot);
+  timeline.end('validatePublishedSnapshot');
   if (!snapshotValidation.valid) {
     // Defence in depth: editableState validated above so this should never
     // fire, but if it does the editable contract has diverged from the
     // published contract and we want to know loudly.
-    return c.json({ error: 'published snapshot invalid', errors: snapshotValidation.errors }, 500);
+    return attachTimings(
+      c.json({ error: 'published snapshot invalid', errors: snapshotValidation.errors }, 500),
+    );
   }
 
   let broadcastPayload: PublishBroadcastPayload;
+  timeline.begin('buildPublishBroadcastPayload');
   try {
     broadcastPayload = buildPublishBroadcastPayload(snapshot, row.id, requireTurnstileSiteKey(c.env));
   } catch (renderErr) {
+    timeline.end('buildPublishBroadcastPayload');
     const msg = renderErr instanceof Error ? renderErr.message : String(renderErr);
     console.error('[publish] render failed:', msg);
-    return c.json({ error: 'render failed', detail: msg }, 500);
+    return attachTimings(c.json({ error: 'render failed', detail: msg }, 500));
   }
+  timeline.end('buildPublishBroadcastPayload');
 
-  // Publish is all-or-nothing: generated OG images, snapshots, search index,
-  // and live broadcast are part of the external publish contract. Pre-update
-  // failures throw before the published row moves; post-update failures restore
-  // the prior published state before surfacing the error.
-  await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
-
+  // The site row UPDATE is the commit point: the publishedSnapshot column is
+  // the source of truth visitors read. Everything after this — broadcast,
+  // search index rebuild, version capture, OG warmup — is denormalised state
+  // that can be repaired on the next publish, so we defer it via
+  // c.executionCtx.waitUntil(). This keeps the response time and per-request
+  // memory footprint small so concurrent publishes on the same Worker isolate
+  // don't compound into a 1102 ("worker exceeded resource limits").
+  timeline.begin('db.siteRowUpdate');
   await database
     .update(site)
     .set({
@@ -407,25 +483,26 @@ publishApi.post('/sites/:siteId', async (c) => {
       updatedAt: sql`now()`,
     })
     .where(and(eq(site.id, row.id), eq(site.customerId, customerId)));
+  timeline.end('db.siteRowUpdate');
 
-  await runPublishedSideEffects({
-    database,
-    env: c.env,
-    siteId: row.id,
-    customerId,
-    snapshot,
-    previous: {
-      snapshot: row.publishedSnapshot ?? null,
-      version: row.publishedVersion,
-    },
-    broadcastPayload,
-  });
+  c.executionCtx.waitUntil(
+    runDeferredPublishedSideEffects({
+      database,
+      env: c.env,
+      siteId: row.id,
+      siteName: row.name,
+      snapshot,
+      broadcastPayload,
+    }),
+  );
 
-  return c.json({
-    ok: true,
-    version: snapshot.version,
-    publicUrl: `https://${row.subdomain}.rev01.aayushman.dev/`,
-  });
+  return attachTimings(
+    c.json({
+      ok: true,
+      version: snapshot.version,
+      publicUrl: `https://${row.subdomain}.rev01.aayushman.dev/`,
+    }),
+  );
 });
 
 publishApi.post('/sites/:siteId/unpublish', async (c) => {
