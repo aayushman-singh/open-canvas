@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Coming soon</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html, body { height: 100%; }
+  .scene { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 24px; position: relative; }
+  .chip-soon { margin-bottom: 22px; }
+  .scene h1 { font-size: clamp(30px, 5.2vw, 52px); letter-spacing: -.035em; line-height: 1.05; max-width: 16ch; }
+  .scene p { color: var(--ink-2); font-size: 17px; max-width: 46ch; margin: 18px auto 0; line-height: 1.55; }
+  /* a half-built canvas illustration from brand primitives */
+  .build { position: relative; width: min(360px, 80vw); margin: 38px auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+  .build .ph { height: 78px; background: linear-gradient(135deg,#E9837A,#E84D4A 60%,#C5332F); position: relative; }
+  .build .ph .scan { position: absolute; left: 0; right: 0; top: 0; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent); animation: sweep 2.4s ease-in-out infinite; }
+  .build .bd { padding: 16px 18px 20px; text-align: left; }
+  .build .ln { height: 9px; border-radius: 5px; background: var(--surface-3); margin-bottom: 9px; }
+  .build .dash { height: 34px; border-radius: 10px; border: 1.5px dashed var(--line-2); display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 11px; margin-top: 6px; }
+  @keyframes sweep { 0% { transform: translateX(-100%);} 60%,100% { transform: translateX(100%);} }
+  .owner { margin-top: 30px; font-size: 13.5px; color: var(--ink-3); }
+  .owner a { color: var(--red-ink); font-weight: 650; }
+  .powered { position: absolute; bottom: 24px; left: 0; right: 0; display: flex; justify-content: center; }
+  .powered a { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+  .theme-toggle.fixed { position: absolute; top: 22px; right: 22px; }
+</style>
+</head>
+<body>
+<div class="scene">
+  <button class="theme-toggle fixed" id="themeToggle" aria-label="Toggle theme">
+    <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg>
+    <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg>
+  </button>
+
+  <span class="chip chip-red chip-soon"><span class="dot"></span>Building in progress</span>
+  <h1>Something good is <span class="marker">on the way</span>.</h1>
+  <p>This site hasn't been published yet. The owner is still putting it together — check back soon!</p>
+
+  <div class="build">
+    <div class="ph"><div class="scan"></div></div>
+    <div class="bd">
+      <div class="ln" style="width:55%"></div>
+      <div class="ln" style="width:85%"></div>
+      <div class="ln" style="width:70%"></div>
+      <div class="dash">+ more coming soon</div>
+    </div>
+  </div>
+
+  <p class="owner">Are you the owner? <a href="auth.html">Sign in</a> to finish and publish your site.</p>
+
+  <div class="powered">
+    <a href="landing.html"><span class="oc-logo" style="color:var(--ink-3)"><svg width="18" height="18" viewBox="0 0 64 64" fill="none"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="3"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="8"/><rect x="40" y="19" width="21" height="4.5" rx="2" fill="var(--red)"/><rect x="6" y="43" width="21" height="4.5" rx="2" fill="var(--red)"/></svg></span>Powered by Open Canvas</a>
+  </div>
+</div>
+<script>
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', cur);
+    try { localStorage.setItem('oc-theme', cur); } catch (e) {}
+  });
+</script>
+</body>
+</html>

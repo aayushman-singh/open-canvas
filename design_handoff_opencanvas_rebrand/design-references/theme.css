@@ -1,0 +1,92 @@
+/* ============================================================
+   Open Canvas — theme.css
+   DROP-IN token layer for the rev01 codebase.
+
+   HOW TO USE
+   1. Load this file (or paste its contents) on EVERY route, AFTER
+      any existing <style> blocks so the alias mappings win.
+      - Dashboard:  add to src/ui.ts `uiStyles` or link in shell.tsx
+      - Landing:    prepend to src/landing/styles.ts export
+      - Editor:     prepend to src/editor/canvas-styles.ts `chromeCss`
+   2. Add the font <link> from MIGRATION.md to each page <head>.
+   3. Set <html data-theme="light"> (or "dark"). See MIGRATION.md §6.
+
+   The first block is the single source of truth. The alias blocks
+   below re-point your EXISTING variable names at these tokens, so
+   most of your current CSS reskins with zero renaming. Hard-coded
+   color literals (oklch(...)/#hex) in your templates are NOT caught
+   by aliases — grep and replace those with var(--...) over time.
+   ============================================================ */
+
+:root {
+  /* neutrals (warm, low-chroma) */
+  --paper:#FBFAF8; --surface:#FFFFFF; --surface-2:#F4F1EC; --surface-3:#ECE8E1;
+  --ink:#1A1917; --ink-2:#5B564E; --ink-3:#948D82;
+  --line:#ECE7DF; --line-2:#DCD6CB;
+
+  /* brand red */
+  --red:#E84D4A; --red-strong:#D33C39; --red-ink:#C5332F;
+  --red-soft:#FBEDEC; --red-tint:#FCF4F3; --red-line:#F4CFCD;
+
+  /* feedback */
+  --ok:#2E9E6B; --ok-soft:#E6F5EE; --warn:#D98A1F; --warn-soft:#FBF1DE;
+
+  /* shape */
+  --r-xs:8px; --r-sm:12px; --r:16px; --r-lg:22px; --r-xl:28px; --r-pill:999px;
+
+  /* shadows (warm-neutral) */
+  --shadow-sm:0 1px 2px rgba(40,34,26,.05),0 2px 6px rgba(40,34,26,.04);
+  --shadow:0 2px 6px rgba(40,34,26,.06),0 12px 28px -10px rgba(40,34,26,.14);
+  --shadow-lg:0 4px 12px rgba(40,34,26,.07),0 28px 60px -18px rgba(40,34,26,.22);
+  --shadow-red:0 8px 22px -8px rgba(232,77,74,.5);
+
+  /* type */
+  --display:"Bricolage Grotesque","Hanken Grotesk",system-ui,sans-serif;
+  --sans:"Hanken Grotesk",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Spline Sans Mono",ui-monospace,SFMono-Regular,monospace;
+  --ring:0 0 0 4px rgba(232,77,74,.22);
+}
+
+[data-theme="dark"] {
+  --paper:#16140F; --surface:#201D17; --surface-2:#2A261F; --surface-3:#353027;
+  --ink:#F6F2E9; --ink-2:#B7AFA1; --ink-3:#837B6D;
+  --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.17);
+  --red:#FF6257; --red-strong:#FF7468; --red-ink:#FF8378;
+  --red-soft:rgba(255,98,87,.15); --red-tint:rgba(255,98,87,.08); --red-line:rgba(255,98,87,.32);
+  --ok-soft:rgba(46,158,107,.18); --warn-soft:rgba(217,138,31,.18);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --shadow:0 2px 8px rgba(0,0,0,.4),0 16px 36px -14px rgba(0,0,0,.6);
+  --shadow-lg:0 4px 14px rgba(0,0,0,.45),0 32px 70px -20px rgba(0,0,0,.7);
+  --shadow-red:0 8px 24px -8px rgba(255,98,87,.5);
+  --ring:0 0 0 4px rgba(255,98,87,.28);
+}
+
+/* ---- ALIAS: dashboard shell.tsx + landing mapped names ---- */
+:root {
+  --bg:var(--paper); --panel:var(--surface); --panel-strong:var(--surface-2);
+  --text:var(--ink); --muted:var(--ink-2); --faint:var(--ink-3);
+  --accent:var(--red); --radius:var(--r);
+}
+
+/* ---- ALIAS: landing/styles.ts + templates.styles.ts ---- */
+:root {
+  --bg-deep:var(--paper); --bg-panel:var(--surface); --bg-panel-strong:var(--surface-2);
+  --bg-titlebar:var(--surface-2);
+  --fg:var(--ink); --fg-mute:var(--ink-2); --fg-faint:var(--ink-3);
+  --accent-soft:var(--red-soft); --accent-glow:var(--red-soft);
+  --hairline:var(--line); --hairline-strong:var(--line-2);
+  --grid:var(--line);
+  --font-sans:var(--sans); --font-mono:var(--mono);
+}
+
+/* ---- ALIAS: editor canvas-styles.ts (--rev01-*) ---- */
+:root {
+  --rev01-bg:var(--paper); --rev01-bg-panel:var(--surface);
+  --rev01-bg-panel-strong:var(--surface-2); --rev01-bg-titlebar:var(--surface-2);
+  --rev01-fg:var(--ink); --rev01-fg-mute:var(--ink-2); --rev01-fg-faint:var(--ink-3);
+  --rev01-accent:var(--red); --rev01-accent-soft:var(--red-soft);
+  --rev01-warn:var(--warn); --rev01-ok:var(--ok); --rev01-danger:var(--red);
+  --rev01-hairline:var(--line); --rev01-hairline-strong:var(--line-2);
+  --rev01-radius:var(--r);
+  --rev01-font-sans:var(--sans); --rev01-font-mono:var(--mono);
+}

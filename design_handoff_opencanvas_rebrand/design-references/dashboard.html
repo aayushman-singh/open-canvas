@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Canvas — Your sites</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  body { background: var(--paper); }
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  /* sidebar */
+  .side { border-right: 1px solid var(--line); padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; background: var(--surface); }
+  .side .brand { padding: 6px 8px 18px; }
+  .side .grp { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 14px 10px 6px; }
+  .side a { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 11px; font-size: 14.5px; font-weight: 550; color: var(--ink-2); transition: background .14s, color .14s; }
+  .side a svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .side a:hover { background: var(--surface-2); color: var(--ink); }
+  .side a.active { background: var(--red-soft); color: var(--red-ink); font-weight: 650; }
+  .side .spacer { flex: 1; }
+  .side .upsell { margin-top: 10px; padding: 14px; border-radius: var(--r); background: var(--surface-2); border: 1px solid var(--line); }
+  .side .upsell b { font-size: 13.5px; }
+  .side .upsell p { font-size: 12.5px; color: var(--ink-2); margin: 4px 0 10px; line-height: 1.4; }
+  .meter { height: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; margin-bottom: 10px; }
+  .meter i { display: block; height: 100%; background: var(--red); border-radius: 99px; }
+
+  /* main */
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  .topbar { height: 64px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 28px; background: color-mix(in srgb, var(--paper) 90%, transparent); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 30; }
+  .search { flex: 1; max-width: 380px; display: flex; align-items: center; gap: 9px; padding: 9px 14px; border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-3); font-size: 14px; }
+  .topbar .sp { flex: 1; }
+  .iconbtn { width: 40px; height: 40px; border-radius: var(--r-pill); border: 1.5px solid var(--line-2); background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--ink-2); cursor: pointer; }
+  .iconbtn:hover { border-color: var(--ink); color: var(--ink); }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg,#E9837A,#C5332F); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+
+  .content { padding: 32px 28px 60px; max-width: 1180px; width: 100%; }
+  .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 26px; flex-wrap: wrap; }
+  .page-head h1 { font-size: 34px; letter-spacing: -.03em; }
+  .page-head .hi { color: var(--ink-2); font-size: 15px; margin-top: 6px; }
+
+  /* stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 30px; }
+  .stat { padding: 18px 20px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); }
+  .stat .k { font-size: 13px; color: var(--ink-2); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .stat .k .ic { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--red-soft); color: var(--red-ink); }
+  .stat .v { font-family: var(--display); font-weight: 700; font-size: 32px; letter-spacing: -.02em; margin-top: 12px; }
+  .stat .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+
+  /* section head */
+  .sec-head { display: flex; align-items: center; justify-content: space-between; margin: 6px 0 16px; }
+  .sec-head h2 { font-size: 20px; }
+  .seg { display: flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: var(--r-pill); border: 1px solid var(--line); }
+  .seg button { font-family: var(--sans); font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: var(--r-pill); border: none; background: transparent; color: var(--ink-2); cursor: pointer; }
+  .seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+  /* site grid */
+  .sites { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .site-card { border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); overflow: hidden; transition: transform .16s, box-shadow .2s, border-color .2s; display: flex; flex-direction: column; }
+  .site-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--line-2); }
+  .thumb { height: 158px; position: relative; border-bottom: 1px solid var(--line); overflow: hidden; }
+  .thumb .badge { position: absolute; top: 12px; left: 12px; z-index: 2; }
+  .thumb .open { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; background: rgba(26,25,23,.28); transition: opacity .16s; }
+  .site-card:hover .thumb .open { opacity: 1; }
+  .site-meta { padding: 15px 17px 17px; }
+  .site-meta .name { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: -.01em; }
+  .site-meta .url { margin-top: 7px; }
+  .site-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  .site-foot .when { font-size: 12.5px; color: var(--ink-3); }
+  .quick { display: flex; gap: 6px; }
+  .quick a { width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; justify-content: center; color: var(--ink-2); transition: background .14s, color .14s, border-color .14s; }
+  .quick a:hover { background: var(--red-soft); color: var(--red-ink); border-color: var(--red-line); }
+
+  /* expanded card showing all per-site features */
+  .site-card.feature-card { grid-column: span 3; flex-direction: row; }
+  .feature-card .thumb { width: 320px; height: auto; border-bottom: none; border-right: 1px solid var(--line); flex-shrink: 0; }
+  .feature-card .fc-body { padding: 22px 24px; flex: 1; }
+  .feature-card .fc-body .name { font-size: 22px; }
+  .links-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 18px; }
+  .links-grid a { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 600; color: var(--ink); transition: background .14s, border-color .14s; }
+  .links-grid a:hover { background: var(--surface-2); border-color: var(--line-2); }
+  .links-grid a .ic { width: 30px; height: 30px; border-radius: 9px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--ink-2); }
+  .links-grid a:hover .ic { background: var(--red-soft); color: var(--red-ink); }
+  .links-grid a small { display: block; font-weight: 450; font-size: 11.5px; color: var(--ink-3); }
+
+  /* new site card */
+  .new-card { border: 2px dashed var(--line-2); border-radius: var(--r-lg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 280px; color: var(--ink-2); cursor: pointer; transition: border-color .16s, background .16s, color .16s; }
+  .new-card:hover { border-color: var(--red); background: var(--red-tint); color: var(--red-ink); }
+  .new-card .plus { width: 54px; height: 54px; border-radius: 16px; background: var(--red); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-red); }
+  .new-card b { font-size: 16px; font-family: var(--display); }
+  .new-card span { font-size: 13px; }
+
+  @media (max-width: 1180px) {
+    .sites { grid-template-columns: repeat(2,1fr); }
+    .site-card.feature-card { grid-column: span 2; flex-direction: column; }
+    .feature-card .thumb { width: 100%; height: 168px; border-right: none; border-bottom: 1px solid var(--line); }
+    .stats { grid-template-columns: repeat(2,1fr); }
+  }
+  @media (max-width: 760px) { .app { grid-template-columns: 1fr; } .side { display: none; } .sites { grid-template-columns: 1fr; } .feature-card { flex-direction: column !important; } .feature-card .thumb { width: 100% !important; height: 158px !important; border-right: none !important; border-bottom: 1px solid var(--line) !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- sidebar -->
+  <aside class="side">
+    <a href="index.html" class="oc-logo brand" style="color:var(--ink)">
+      <svg width="26" height="26" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/><rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/><rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/></svg>
+      <span class="oc-word" style="font-size:15px;">Open&nbsp;Canvas</span>
+    </a>
+    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Your sites</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Templates</a>
+    <a href="shop.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 19l-4.8 2.5.9-5.4L4.2 8.3l5.4-.8z"/></svg>Add-ons</a>
+    <div class="grp">Recent sites</div>
+    <a href="editor.html"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#E9837A,#C5332F);display:inline-block"></span>Bloom &amp; Co.</a>
+    <a href="#"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#5BB98C,#2E9E6B);display:inline-block"></span>Harbor Coffee</a>
+    <a href="#"><span style="width:18px;height:18px;border-radius:5px;background:linear-gradient(135deg,#7C6FE0,#574BC0);display:inline-block"></span>Northside Yoga</a>
+    <div class="spacer"></div>
+    <div class="upsell">
+      <b>Free plan</b>
+      <p>2 of 3 sites used</p>
+      <div class="meter"><i style="width:66%"></i></div>
+      <a href="account.html" class="btn btn-primary btn-sm" style="width:100%">Upgrade to Pro</a>
+    </div>
+    <a href="#" style="margin-top:6px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .7-1 1.7M12 17h.01" stroke-linecap="round"/></svg>Help &amp; guides</a>
+  </aside>
+
+  <!-- main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4" stroke-linecap="round"/></svg>Search your sites…</div>
+      <div class="sp"></div>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg>
+        <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg>
+      </button>
+      <button class="iconbtn" aria-label="Notifications"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <a href="#" class="btn btn-primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New site</a>
+      <a href="account.html" class="avatar" style="text-decoration:none">M</a>
+    </header>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <h1>Your sites</h1>
+          <p class="hi">Welcome back, Maya 👋 &nbsp;You have <b>2 live sites</b> and 1 in progress.</p>
+        </div>
+        <a href="#" class="btn btn-ink">Browse templates</a>
+      </div>
+
+      <!-- stats -->
+      <div class="stats">
+        <div class="stat"><div class="k"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>Total sites</div><div class="v">3</div><div class="sub">of 3 on Free plan</div></div>
+        <div class="stat"><div class="k"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Published</div><div class="v">2</div><div class="sub">live right now</div></div>
+        <div class="stat"><div class="k"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7" stroke-linejoin="round"/></svg></span>Storage</div><div class="v">240<span style="font-size:16px;font-family:var(--sans);color:var(--ink-3)"> MB</span></div><div class="sub">of 1 GB used</div></div>
+        <div class="stat"><div class="k"><span class="ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 8 4-16 3 8h4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Visitors</div><div class="v">1,284</div><div class="sub">this month · +18%</div></div>
+      </div>
+
+      <div class="sec-head">
+        <h2>All sites</h2>
+        <div class="seg"><button class="on">All</button><button>Published</button><button>Drafts</button></div>
+      </div>
+
+      <div class="sites">
+        <!-- featured / expanded card -->
+        <div class="site-card feature-card">
+          <div class="thumb" style="background:#fff">
+            <span class="chip chip-ok badge"><span class="dot"></span>Published</span>
+            <div style="height:62px;background:linear-gradient(135deg,#E9837A,#E84D4A 60%,#C5332F)"></div>
+            <div style="padding:16px 18px">
+              <div style="font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--red-ink);text-transform:uppercase">Fresh · local · daily</div>
+              <div style="font-family:var(--display);font-weight:700;font-size:20px;color:var(--ink);margin-top:6px">Bloom &amp; Co.</div>
+              <div style="height:8px;background:var(--surface-3);border-radius:4px;margin-top:10px;width:90%"></div>
+              <div style="height:8px;background:var(--surface-3);border-radius:4px;margin-top:6px;width:70%"></div>
+              <div style="display:inline-block;margin-top:14px;padding:8px 16px;border-radius:99px;background:var(--red);color:#fff;font-size:11px;font-weight:650">Order flowers</div>
+            </div>
+          </div>
+          <div class="fc-body">
+            <div class="row" style="justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="name">Bloom &amp; Co.</div>
+                <span class="chip chip-url" style="margin-top:8px;display:inline-flex">🔒 bloomandco.opencanvas.site</span>
+              </div>
+              <a href="editor.html" class="btn btn-primary">Open editor</a>
+            </div>
+            <p class="muted" style="font-size:14px;margin-top:14px;">Everything for this site, one click away —</p>
+            <div class="links-grid">
+              <a href="editor.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-1.5M2 22l1.5-5L14 6.5 17.5 10 7 20.5 2 22z" stroke-linejoin="round"/></svg></span>Editor<small>Design your pages</small></a>
+              <a href="settings.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.5H9.4l-.3 2.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.5h4.2l.3-2.5a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1z"/></svg></span>Settings<small>Hosting &amp; password</small></a>
+              <a href="#"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg></span>Navigation<small>Menu &amp; links</small></a>
+              <a href="forms.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h5" stroke-linecap="round"/></svg></span>Forms<small>12 new messages</small></a>
+              <a href="versions.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2" stroke-linecap="round"/><circle cx="12" cy="12" r="9"/></svg></span>Versions<small>Restore anytime</small></a>
+              <a href="domains.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></span>Domains<small>Use your own</small></a>
+              <a href="a11y.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5M12 16h.01" stroke-linecap="round"/></svg></span>Accessibility<small>All checks pass</small></a>
+              <a href="#"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>Assistant<small>Chat about this site</small></a>
+              <a href="shop.html"><span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 19l-4.8 2.5.9-5.4L4.2 8.3l5.4-.8z" stroke-linejoin="round"/></svg></span>Add-ons<small>Analytics &amp; more</small></a>
+            </div>
+          </div>
+        </div>
+
+        <!-- regular cards -->
+        <div class="site-card">
+          <div class="thumb">
+            <span class="chip chip-ok badge"><span class="dot"></span>Published</span>
+            <a href="editor.html" class="open"><span class="btn btn-primary btn-sm">Open editor</span></a>
+            <div style="height:100%;background:linear-gradient(160deg,#3A3027,#1A1917)"></div>
+          </div>
+          <div class="site-meta">
+            <div class="name">Harbor Coffee</div>
+            <span class="chip chip-url url">harborcoffee.opencanvas.site</span>
+            <div class="site-foot">
+              <span class="when">Edited 2 days ago</span>
+              <div class="quick">
+                <a href="editor.html" title="Edit"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l1.5-5L16 4.5 19.5 8 7 20.5 2 22z" stroke-linejoin="round"/></svg></a>
+                <a href="#" title="Settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V20a2 2 0 1 1-4 0v-.2A1.6 1.6 0 0 0 7 18.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 4.6 13H4.4a2 2 0 1 1 0-4h.2A1.6 1.6 0 0 0 6.2 6.3L6.1 6a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 11 4.6h.2a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7"/></svg></a>
+                <a href="#" title="Visit"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M9 7h8v8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="site-card">
+          <div class="thumb">
+            <span class="chip badge"><span class="dot" style="background:var(--ink-3)"></span>Draft</span>
+            <a href="editor.html" class="open"><span class="btn btn-primary btn-sm">Open editor</span></a>
+            <div style="height:100%;background:linear-gradient(160deg,#D8E5DC,#B7D2C2)"></div>
+          </div>
+          <div class="site-meta">
+            <div class="name">Northside Yoga</div>
+            <span class="chip chip-url url">not published yet</span>
+            <div class="site-foot">
+              <span class="when">Edited 5 hours ago</span>
+              <div class="quick">
+                <a href="editor.html" title="Edit"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22l1.5-5L16 4.5 19.5 8 7 20.5 2 22z" stroke-linejoin="round"/></svg></a>
+                <a href="#" title="Settings"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V20a2 2 0 1 1-4 0v-.2A1.6 1.6 0 0 0 7 18.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 4.6 13H4.4a2 2 0 1 1 0-4h.2A1.6 1.6 0 0 0 6.2 6.3L6.1 6a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 11 4.6h.2a2 2 0 1 1 4 0v.2a1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7"/></svg></a>
+                <a href="#" title="Delete"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- new site -->
+        <div class="new-card">
+          <span class="plus"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+          <b>Start a new site</b>
+          <span>From a template or a blank canvas</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', cur);
+    try { localStorage.setItem('oc-theme', cur); } catch (e) {}
+  });
+  document.querySelectorAll('.seg button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      this.parentNode.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+      this.classList.add('on');
+    });
+  });
+</script>
+</body>
+</html>

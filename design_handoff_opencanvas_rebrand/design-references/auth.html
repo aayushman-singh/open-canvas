@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Canvas — Sign in</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html, body { height: 100%; }
+  .auth { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
+
+  /* left brand panel */
+  .brandside { position: relative; background: var(--ink); color: var(--paper); padding: 40px 48px; display: flex; flex-direction: column; overflow: hidden; }
+  .brandside .bars { position: absolute; inset: 0; pointer-events: none; }
+  .brandside .bars i { position: absolute; height: 6px; background: var(--red); border-radius: 99px; }
+  .brandside .top { display: flex; align-items: center; gap: 11px; position: relative; z-index: 2; }
+  .brandside .oc-word { color: var(--paper); }
+  .brandside .mid { flex: 1; display: flex; flex-direction: column; justify-content: center; position: relative; z-index: 2; max-width: 420px; }
+  .brandside h1 { color: var(--paper); font-size: clamp(30px, 4vw, 46px); letter-spacing: -.03em; line-height: 1.05; }
+  .brandside .mk { color: var(--paper); position: relative; }
+  .brandside .mk::after { content:""; position:absolute; left:-4px; right:-4px; bottom:-.02em; height:.13em; background:var(--red); border-radius:99px; }
+  .brandside p { color: color-mix(in srgb, var(--paper) 72%, transparent); font-size: 17px; margin-top: 20px; line-height: 1.55; }
+  .mini-canvas { margin-top: 34px; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; width: 320px; }
+  .mini-canvas .ph { height: 70px; background: linear-gradient(135deg,#E9837A,#E84D4A 60%,#C5332F); }
+  .mini-canvas .bd { padding: 14px 16px 18px; }
+  .mini-canvas .h { font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ink); }
+  .mini-canvas .l { height: 7px; border-radius: 4px; background: var(--surface-3); margin-top: 8px; }
+  .mini-canvas .cta { display: inline-block; margin-top: 12px; padding: 7px 14px; border-radius: 99px; background: var(--red); color: #fff; font-size: 11px; font-weight: 650; }
+  .brandside .quote { position: relative; z-index: 2; font-size: 13.5px; color: color-mix(in srgb, var(--paper) 60%, transparent); }
+
+  /* right form */
+  .formside { display: flex; flex-direction: column; padding: 24px 28px; }
+  .formside .tn { display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+  .formwrap { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .formcard { width: 100%; max-width: 384px; }
+  .formcard h2 { font-size: 28px; letter-spacing: -.02em; }
+  .formcard .lead { color: var(--ink-2); margin: 8px 0 24px; font-size: 15px; }
+  .seg { display: flex; gap: 2px; padding: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-pill); margin-bottom: 24px; }
+  .seg button { flex: 1; font-family: var(--sans); font-size: 14px; font-weight: 650; padding: 9px 0; border: none; background: transparent; color: var(--ink-2); border-radius: var(--r-pill); cursor: pointer; transition: background .14s, color .14s; }
+  .seg button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+  .oauth { display: flex; flex-direction: column; gap: 10px; }
+  .oauth .btn { width: 100%; background: var(--surface); border: 1.5px solid var(--line-2); color: var(--ink); font-weight: 600; }
+  .oauth .btn:hover { border-color: var(--ink); }
+  .divider { display: flex; align-items: center; gap: 12px; margin: 20px 0; color: var(--ink-3); font-size: 12.5px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .fld { margin-bottom: 14px; }
+  .fld .rowlbl { display: flex; justify-content: space-between; align-items: baseline; }
+  .fld a.small { font-size: 12.5px; color: var(--red-ink); font-weight: 600; }
+  .name-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .name-row.hide { display: none; }
+  .submit { width: 100%; margin-top: 6px; }
+  .terms { font-size: 12px; color: var(--ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
+  .terms a { color: var(--ink-2); border-bottom: 1px solid var(--line-2); }
+
+  @media (max-width: 880px) { .auth { grid-template-columns: 1fr; } .brandside { display: none; } }
+</style>
+</head>
+<body>
+<div class="auth">
+  <!-- brand side -->
+  <div class="brandside">
+    <div class="bars"><i style="width:150px; top:90px; right:-40px;"></i><i style="width:120px; bottom:120px; left:-30px;"></i></div>
+    <div class="top">
+      <span class="oc-logo" style="color:var(--paper)">
+        <svg width="28" height="28" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/><rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="#FF6257"/><rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="#FF6257"/></svg>
+        <span class="oc-word">Open&nbsp;Canvas</span>
+      </span>
+    </div>
+    <div class="mid">
+      <h1>Make something you're <span class="mk">proud of</span>.</h1>
+      <p>Build your website by dragging things where you want them — with a friendly assistant ready to help.</p>
+      <div class="mini-canvas">
+        <div class="ph"></div>
+        <div class="bd">
+          <div class="h">Bloom &amp; Co.</div>
+          <div class="l" style="width:90%"></div>
+          <div class="l" style="width:70%"></div>
+          <span class="cta">Order flowers</span>
+        </div>
+      </div>
+    </div>
+    <div class="quote">“I had my shop online by lunchtime.” — Real small-business owner, probably</div>
+  </div>
+
+  <!-- form side -->
+  <div class="formside">
+    <div class="tn">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+        <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg>
+        <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg>
+      </button>
+    </div>
+    <div class="formwrap">
+      <div class="formcard">
+        <h2 id="title">Welcome back</h2>
+        <p class="lead" id="lead">Sign in to pick up where you left off.</p>
+
+        <div class="seg">
+          <button class="on" id="tabSignin">Sign in</button>
+          <button id="tabSignup">Create account</button>
+        </div>
+
+        <div class="oauth">
+          <button class="btn"><svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4.2-5.5 4.2-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.9 1.5l2.6-2.5C17.1 3.5 14.8 2.5 12 2.5 6.8 2.5 2.6 6.7 2.6 12s4.2 9.5 9.4 9.5c5.4 0 9-3.8 9-9.2 0-.6-.1-1.1-.2-1.6z"/></svg>Continue with Google</button>
+          <button class="btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 1.9c0 1.1-.4 2.1-1.2 2.9-.9.9-1.9 1.4-3 1.3-.1-1 .4-2.1 1.1-2.8.8-.8 2-1.4 3.1-1.4zM20.5 17c-.5 1.2-.8 1.7-1.5 2.8-1 1.5-2.3 3.3-4 3.3-1.5 0-1.9-1-4-1-2 0-2.5 1-4 1-1.6 0-2.9-1.7-3.9-3.1-2.7-4-3-8.6-1.3-11.1 1.2-1.7 3-2.7 4.8-2.7 1.8 0 2.9 1 4.4 1 1.4 0 2.3-1 4.4-1 1.6 0 3.2.8 4.4 2.3-3.9 2.1-3.2 7.6 1.2 9.2z"/></svg>Continue with Apple</button>
+        </div>
+
+        <div class="divider">or with email</div>
+
+        <form onsubmit="return false">
+          <div class="name-row hide" id="nameRow">
+            <div class="fld"><label class="lbl">First name</label><input class="field" placeholder="Maya" /></div>
+            <div class="fld"><label class="lbl">Last name</label><input class="field" placeholder="Torres" /></div>
+          </div>
+          <div class="fld"><label class="lbl">Email</label><input class="field" type="email" placeholder="you@business.com" /></div>
+          <div class="fld">
+            <div class="rowlbl"><label class="lbl">Password</label><a href="#" class="small" id="forgot">Forgot?</a></div>
+            <input class="field" type="password" placeholder="••••••••" />
+          </div>
+          <a href="dashboard.html" class="btn btn-primary btn-lg submit" id="submitBtn">Sign in</a>
+        </form>
+
+        <p class="terms" id="terms">By continuing you agree to our <a href="#">Terms</a> &amp; <a href="#">Privacy Policy</a>.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', cur);
+    try { localStorage.setItem('oc-theme', cur); } catch (e) {}
+  });
+  var si = document.getElementById('tabSignin'), su = document.getElementById('tabSignup');
+  function mode(signup) {
+    si.classList.toggle('on', !signup); su.classList.toggle('on', signup);
+    document.getElementById('nameRow').classList.toggle('hide', !signup);
+    document.getElementById('title').textContent = signup ? 'Create your account' : 'Welcome back';
+    document.getElementById('lead').textContent = signup ? "It's free to start — no credit card needed." : 'Sign in to pick up where you left off.';
+    document.getElementById('submitBtn').textContent = signup ? 'Create account' : 'Sign in';
+    document.getElementById('forgot').style.visibility = signup ? 'hidden' : 'visible';
+    document.getElementById('terms').style.display = signup ? 'block' : 'none';
+  }
+  si.addEventListener('click', function () { mode(false); });
+  su.addEventListener('click', function () { mode(true); });
+  mode(false);
+</script>
+</body>
+</html>

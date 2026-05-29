@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Canvas — Design System</title>
+<script>
+  (function () {
+    try { var t = localStorage.getItem('oc-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 18px;
+    padding: 14px 0;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar .wrap { display: flex; align-items: center; gap: 18px; }
+  .topnav { display: flex; gap: 4px; margin-left: 12px; }
+  .topnav a {
+    padding: 8px 14px; border-radius: var(--r-pill);
+    font-size: 14px; font-weight: 600; color: var(--ink-2);
+    transition: background .14s, color .14s;
+  }
+  .topnav a:hover { background: var(--surface-2); color: var(--ink); }
+  .topnav a.active { color: var(--ink); background: var(--surface-2); }
+  .spacer { flex: 1; }
+
+  .hero-sys { padding: 64px 0 44px; }
+  .hero-sys .wrap { max-width: 920px; }
+  .hero-sys h1 {
+    font-size: clamp(34px, 5.2vw, 58px);
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+    margin: 24px 0 0;
+  }
+  .hero-sys h1 .marker { white-space: nowrap; }
+  .hero-sys .lead {
+    font-size: clamp(17px, 2vw, 20px);
+    color: var(--ink-2); max-width: 60ch; margin-top: 28px; line-height: 1.6;
+  }
+
+  section.block { padding: 38px 0; }
+  .block-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 26px; flex-wrap: wrap; }
+  .block-head h2 { font-size: clamp(24px, 3vw, 32px); }
+  .block-head .note { color: var(--ink-3); font-size: 14px; }
+
+  .reasoning {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;
+  }
+  .reasoning .card { padding: 22px; }
+  .reasoning h3 { font-size: 17px; margin-bottom: 8px; }
+  .reasoning p { font-size: 14.5px; color: var(--ink-2); line-height: 1.5; }
+  .reasoning .k { font-family: var(--mono); font-size: 12px; color: var(--red-ink); display:block; margin-bottom: 10px; }
+
+  /* brand showcase */
+  .brand-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; }
+  .brand-card { padding: 0; overflow: hidden; }
+  .brand-stage {
+    display: flex; align-items: center; justify-content: center;
+    padding: 56px; min-height: 230px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand-stage.dark { background: #16140F; }
+  .brand-stage.dark .oc-word { color: #F6F2E9; }
+  .brand-meta { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+  .brand-meta span { font-size: 13px; color: var(--ink-3); }
+  .lockup-lg { transform: scale(1.4); }
+
+  .motif-card { padding: 28px; display: flex; flex-direction: column; gap: 22px; }
+  .motif-demo { font-family: var(--display); font-weight: 700; font-size: 30px; letter-spacing: -0.02em; }
+
+  /* color */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 12px; }
+  .sw { border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); background: var(--surface); }
+  .sw .chip-color { height: 76px; }
+  .sw .sw-meta { padding: 10px 12px; }
+  .sw .sw-name { font-size: 13px; font-weight: 650; }
+  .sw .sw-hex { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+
+  /* type */
+  .type-row { padding: 20px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 120px 1fr; gap: 20px; align-items: baseline; }
+  .type-row:first-child { border-top: none; }
+  .type-row .spec { font-family: var(--mono); font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+  .type-sample-display { font-family: var(--display); color: var(--ink); }
+  .type-sample-body { font-family: var(--sans); color: var(--ink); }
+
+  /* components */
+  .comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 16px; }
+  .comp-card { padding: 24px; }
+  .comp-card h3 { font-size: 15px; margin-bottom: 18px; color: var(--ink-2); font-family: var(--sans); font-weight:700; letter-spacing:0; }
+  .comp-card .demo-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+  /* screen links */
+  .screens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .screen-link {
+    display: block; border-radius: var(--r-lg); overflow: hidden;
+    border: 1px solid var(--line); background: var(--surface);
+    box-shadow: var(--shadow-sm); transition: transform .16s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .screen-link:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--line-2); }
+  .screen-thumb { height: 168px; position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+  .screen-meta { padding: 16px 18px 18px; }
+  .screen-meta h3 { font-size: 19px; }
+  .screen-meta p { font-size: 13.5px; color: var(--ink-2); margin-top: 5px; }
+  .screen-meta .go { margin-top: 12px; color: var(--red-ink); font-weight: 700; font-size: 13.5px; display:inline-flex; align-items:center; gap:6px; }
+
+  footer.sysfoot { padding: 50px 0; border-top: 1px solid var(--line); margin-top: 30px; color: var(--ink-3); font-size: 13px; }
+
+  @media (max-width: 860px) {
+    .brand-grid, .screens { grid-template-columns: 1fr; }
+    .topnav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <span class="oc-logo" style="color:var(--ink)">
+      <svg width="30" height="30" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+        <rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/>
+        <circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/>
+        <rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/>
+        <rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/>
+      </svg>
+      <span class="oc-word">Open&nbsp;Canvas</span>
+    </span>
+    <nav class="topnav">
+      <a href="index.html" class="active">System</a>
+      <a href="landing.html">Landing</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="editor.html">Editor</a>
+    </nav>
+    <span class="spacer"></span>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg>
+      <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero-sys">
+    <div class="wrap">
+      <span class="eyebrow">Brand &amp; Design System</span>
+      <h1>The new <span class="marker">Open Canvas</span><br/>looks like a tool you'd actually enjoy.</h1>
+      <p class="lead">A warmer, friendlier rebrand of the site builder — built for people who think in Word &amp; Docs, not code. Crisp black canvas frames, one confident coral red, and a heading face with a little character. Here's the system, then the three screens it dresses.</p>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>How I read the brief</h2><span class="note">assumptions &amp; direction — tell me where I'm off</span></div>
+      <div class="reasoning">
+        <div class="card">
+          <span class="k">audience</span>
+          <h3>Comfortable, not technical</h3>
+          <p>Small-business owners &amp; marketers who can drag-and-drop but don't care what's under the hood. Zero jargon, big tap targets, plain-language labels.</p>
+        </div>
+        <div class="card">
+          <span class="k">feeling</span>
+          <h3>Warm &amp; a little playful</h3>
+          <p>Rounded surfaces, soft warm shadows, friendly copy, gentle motion — in the Framer / Gamma family. Confident, never clinical or "terminal-y."</p>
+        </div>
+        <div class="card">
+          <span class="k">brand</span>
+          <h3>The frame that breaks open</h3>
+          <p>Your logo's red bars punch across the canvas frame. I made that the recurring device: overshooting underlines, active states, the live cursor.</p>
+        </div>
+        <div class="card">
+          <span class="k">scope</span>
+          <h3>One system, every surface</h3>
+          <p>Same tokens dress the landing page, the dashboard, and the editor. Light primary, full dark mode. Every existing feature keeps its place.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>Brand mark</h2><span class="note">recreated as clean SVG so it themes for light &amp; dark</span></div>
+      <div class="brand-grid">
+        <div class="card brand-card">
+          <div class="brand-stage">
+            <span class="oc-logo lockup-lg" style="color:var(--ink); flex-direction:column; gap:18px;">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                <rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/>
+                <circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/>
+                <rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/>
+                <rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/>
+              </svg>
+              <span class="oc-word" style="font-size:19px;">Open&nbsp;Canvas</span>
+            </span>
+          </div>
+          <div class="brand-meta"><span>Primary lockup · light</span><span class="mono" style="font-size:12px;">vertical · horizontal · mark-only</span></div>
+        </div>
+        <div class="card brand-card">
+          <div class="brand-stage dark">
+            <span class="oc-logo" style="color:#F6F2E9; flex-direction:column; gap:16px;">
+              <svg width="56" height="56" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                <rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/>
+                <circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/>
+                <rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="#FF6257"/>
+                <rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="#FF6257"/>
+              </svg>
+              <span class="oc-word" style="font-size:17px;">Open&nbsp;Canvas</span>
+            </span>
+          </div>
+          <div class="brand-meta"><span>On dark</span><span class="mono" style="font-size:12px;">red brightens for contrast</span></div>
+        </div>
+      </div>
+      <div class="card motif-card" style="margin-top:16px;">
+        <span class="eyebrow">The marker motif</span>
+        <div class="motif-demo">Headlines get a <span class="marker">red marker</span> that overshoots — just like the logo.</div>
+        <p class="muted" style="font-size:14px;">It reappears as the active-tab bar, the eyebrow tick, hover underlines, progress fills, and the multiplayer cursor in the live demo. One idea, used consistently.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>Color</h2><span class="note">warm neutrals · one brand red · low chroma, easy on the eyes</span></div>
+      <div class="swatches">
+        <div class="sw"><div class="chip-color" style="background:#E84D4A"></div><div class="sw-meta"><div class="sw-name">Brand Red</div><div class="sw-hex">#E84D4A</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#C5332F"></div><div class="sw-meta"><div class="sw-name">Red Ink</div><div class="sw-hex">#C5332F</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#FBEDEC"></div><div class="sw-meta"><div class="sw-name">Red Soft</div><div class="sw-hex">#FBEDEC</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#1A1917"></div><div class="sw-meta"><div class="sw-name">Ink</div><div class="sw-hex">#1A1917</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#5B564E"></div><div class="sw-meta"><div class="sw-name">Ink 2</div><div class="sw-hex">#5B564E</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#FBFAF8; border-bottom:1px solid #ECE7DF"></div><div class="sw-meta"><div class="sw-name">Paper</div><div class="sw-hex">#FBFAF8</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#F4F1EC"></div><div class="sw-meta"><div class="sw-name">Surface 2</div><div class="sw-hex">#F4F1EC</div></div></div>
+        <div class="sw"><div class="chip-color" style="background:#16140F"></div><div class="sw-meta"><div class="sw-name">Paper · dark</div><div class="sw-hex">#16140F</div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>Typography</h2><span class="note">Bricolage Grotesque + Hanken Grotesk</span></div>
+      <div class="card" style="padding: 8px 26px 26px;">
+        <div class="type-row"><div class="spec">Display<br/>Bricolage<br/>700 · -2%</div><div class="type-sample-display" style="font-size:52px; font-weight:700; letter-spacing:-0.03em;">Build it together.</div></div>
+        <div class="type-row"><div class="spec">H2<br/>Bricolage<br/>700</div><div class="type-sample-display" style="font-size:32px; font-weight:700; letter-spacing:-0.02em;">Your site, live in minutes</div></div>
+        <div class="type-row"><div class="spec">Body L<br/>Hanken<br/>450</div><div class="type-sample-body" style="font-size:19px; color:var(--ink-2); line-height:1.55;">Drag things where you want them. Ask the assistant for help. Hit publish — everyone watching sees it instantly.</div></div>
+        <div class="type-row"><div class="spec">Body<br/>Hanken<br/>450</div><div class="type-sample-body" style="font-size:16px; color:var(--ink-2); line-height:1.6;">Plain, friendly, readable at any age. No tiny text, no clever jargon — just clear words and comfortable spacing.</div></div>
+        <div class="type-row"><div class="spec">Label / mono<br/>Spline Mono</div><div class="mono" style="font-size:14px; color:var(--red-ink);">yoursite.opencanvas.site</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>Components</h2><span class="note">rounded, soft, big enough to tap</span></div>
+      <div class="comp-grid">
+        <div class="card comp-card">
+          <h3>Buttons</h3>
+          <div class="demo-row">
+            <button class="btn btn-primary">Publish</button>
+            <button class="btn btn-ink">New site</button>
+            <button class="btn btn-outline">Preview</button>
+            <button class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+        <div class="card comp-card">
+          <h3>Status &amp; chips</h3>
+          <div class="demo-row">
+            <span class="chip chip-ok"><span class="dot"></span>Published</span>
+            <span class="chip"><span class="dot" style="background:var(--ink-3)"></span>Draft</span>
+            <span class="chip chip-red">3 edits</span>
+            <span class="chip chip-url">acme.opencanvas.site</span>
+          </div>
+        </div>
+        <div class="card comp-card">
+          <h3>Inputs</h3>
+          <label class="lbl">Site name</label>
+          <input class="field" placeholder="Acme Coffee Roasters" />
+        </div>
+        <div class="card comp-card">
+          <h3>Selection &amp; tabs</h3>
+          <div class="demo-row" style="gap:0; border-bottom:1px solid var(--line); width:100%;">
+            <span style="padding:10px 4px; margin-right:18px; font-weight:700; font-size:14px; position:relative;">Add<span style="position:absolute; left:0; right:0; bottom:-1px; height:3px; background:var(--red); border-radius:99px;"></span></span>
+            <span style="padding:10px 4px; margin-right:18px; font-weight:600; font-size:14px; color:var(--ink-3);">Sections</span>
+            <span style="padding:10px 4px; font-weight:600; font-size:14px; color:var(--ink-3);">Pages</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>The three screens</h2><span class="note">click in — light/dark toggle carries across</span></div>
+      <div class="screens">
+        <a class="screen-link" href="landing.html">
+          <div class="screen-thumb" style="background:linear-gradient(160deg,#FBFAF8,#F4F1EC)">
+            <div style="position:absolute; inset:20px; border:1.5px solid var(--ink); opacity:.14;"></div>
+            <div style="position:absolute; left:28px; top:34px; font-family:var(--display); font-weight:700; font-size:26px; letter-spacing:-.03em; line-height:1.05; color:var(--ink)">Build it<br/><span class="marker">together.</span></div>
+            <div style="position:absolute; right:24px; bottom:24px; width:96px; height:64px; background:var(--surface); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow)"></div>
+          </div>
+          <div class="screen-meta"><h3>Landing</h3><p>Marketing page with the live multiplayer demo, kept and warmed up.</p><span class="go">View screen →</span></div>
+        </a>
+        <a class="screen-link" href="dashboard.html">
+          <div class="screen-thumb" style="background:var(--surface-2)">
+            <div style="position:absolute; left:18px; top:18px; right:18px; height:30px; background:var(--surface); border:1px solid var(--line); border-radius:8px;"></div>
+            <div style="position:absolute; left:18px; top:60px; width:46%; height:74px; background:var(--surface); border:1px solid var(--line); border-radius:10px;"></div>
+            <div style="position:absolute; right:18px; top:60px; width:46%; height:74px; background:var(--surface); border:1px solid var(--line); border-radius:10px;"></div>
+            <div style="position:absolute; left:18px; top:64px; width:24px; height:4px; background:var(--red); border-radius:99px;"></div>
+          </div>
+          <div class="screen-meta"><h3>Dashboard</h3><p>Your sites, at a glance. Stats, live previews, one big "new site."</p><span class="go">View screen →</span></div>
+        </a>
+        <a class="screen-link" href="editor.html">
+          <div class="screen-thumb" style="background:var(--surface-2)">
+            <div style="position:absolute; left:0; top:0; bottom:0; width:30%; background:var(--surface); border-right:1px solid var(--line);"></div>
+            <div style="position:absolute; right:0; top:0; bottom:0; width:24%; background:var(--surface); border-left:1px solid var(--line);"></div>
+            <div style="position:absolute; left:34%; top:30px; right:28%; height:40px; background:var(--surface); border:1px solid var(--line); border-radius:8px;"></div>
+            <div style="position:absolute; left:34%; top:82px; right:28%; height:44px; background:var(--red-soft); border:1px solid var(--red-line); border-radius:8px;"></div>
+          </div>
+          <div class="screen-meta"><h3>Editor</h3><p>The canvas, the inspector, and the assistant — friendlier than ever.</p><span class="go">View screen →</span></div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>System &amp; visitor pages</h2><span class="note">settings, sign-in, and what visitors see</span></div>
+      <div class="screens" style="grid-template-columns:repeat(5,1fr);">
+        <a class="screen-link" href="settings.html">
+          <div class="screen-thumb" style="background:var(--surface-2)">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:34%;background:var(--surface);border-right:1px solid var(--line)"></div>
+            <div style="position:absolute;left:40%;right:14px;top:18px;height:30px;background:var(--surface);border:1px solid var(--line);border-radius:8px"></div>
+            <div style="position:absolute;left:40%;right:14px;top:58px;height:30px;background:var(--surface);border:1px solid var(--line);border-radius:8px"></div>
+            <div style="position:absolute;right:24px;top:25px;width:28px;height:16px;background:var(--red);border-radius:99px"></div>
+          </div>
+          <div class="screen-meta"><h3>Settings</h3><p>Hosting, password, collaborators.</p><span class="go">View →</span></div>
+        </a>
+        <a class="screen-link" href="auth.html">
+          <div class="screen-thumb" style="background:var(--ink)">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:52%;background:var(--ink)"></div>
+            <div style="position:absolute;right:0;top:0;bottom:0;width:48%;background:var(--surface)"></div>
+            <div style="position:absolute;left:18px;top:24px;font-family:var(--display);font-weight:700;color:var(--paper);font-size:15px;line-height:1.1">Make<br/>something.</div>
+            <div style="position:absolute;right:14px;top:50px;left:56%;height:12px;background:var(--surface-2);border-radius:4px"></div>
+            <div style="position:absolute;right:14px;top:70px;left:56%;height:12px;background:var(--surface-2);border-radius:4px"></div>
+            <div style="position:absolute;right:14px;top:94px;left:56%;height:18px;background:var(--red);border-radius:6px"></div>
+          </div>
+          <div class="screen-meta"><h3>Sign in</h3><p>Sign in &amp; create account.</p><span class="go">View →</span></div>
+        </a>
+        <a class="screen-link" href="draft.html">
+          <div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center">
+            <div style="text-align:center"><div style="font-family:var(--display);font-weight:800;color:var(--ink);font-size:18px">Coming<br/>soon</div><div style="width:30px;height:4px;background:var(--red);border-radius:99px;margin:8px auto 0"></div></div>
+          </div>
+          <div class="screen-meta"><h3>Draft view</h3><p>Unpublished site visitors see.</p><span class="go">View →</span></div>
+        </a>
+        <a class="screen-link" href="locked.html">
+          <div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center">
+            <div style="width:46px;height:46px;border-radius:14px;background:var(--red-soft);display:flex;align-items:center;justify-content:center;color:var(--red-ink)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+          </div>
+          <div class="screen-meta"><h3>Password gate</h3><p>Private, protected sites.</p><span class="go">View →</span></div>
+        </a>
+        <a class="screen-link" href="404.html">
+          <div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center">
+            <div style="font-family:var(--display);font-weight:800;color:var(--ink);font-size:34px;letter-spacing:-.04em">4<span style="color:var(--red)">0</span>4</div>
+          </div>
+          <div class="screen-meta"><h3>Not found</h3><p>Friendly 404 error page.</p><span class="go">View →</span></div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>Dashboard &amp; management</h2><span class="note">the per-site tools &amp; account pages</span></div>
+      <div class="screens" style="grid-template-columns:repeat(6,1fr);">
+        <a class="screen-link" href="forms.html"><div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h5" stroke-linecap="round"/></svg></div><div class="screen-meta"><h3 style="font-size:16px">Forms</h3><span class="go">View →</span></div></a>
+        <a class="screen-link" href="versions.html"><div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/></svg></div><div class="screen-meta"><h3 style="font-size:16px">Versions</h3><span class="go">View →</span></div></a>
+        <a class="screen-link" href="domains.html"><div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/></svg></div><div class="screen-meta"><h3 style="font-size:16px">Domains</h3><span class="go">View →</span></div></a>
+        <a class="screen-link" href="a11y.html"><div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center"><div style="font-family:var(--display);font-weight:800;font-size:24px;color:var(--ink)">86</div></div><div class="screen-meta"><h3 style="font-size:16px">Accessibility</h3><span class="go">View →</span></div></a>
+        <a class="screen-link" href="account.html"><div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center"><div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#E9837A,#C5332F);color:#fff;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700">M</div></div><div class="screen-meta"><h3 style="font-size:16px">Account</h3><span class="go">View →</span></div></a>
+        <a class="screen-link" href="shop.html"><div class="screen-thumb center" style="background:var(--surface-2);display:flex;align-items:center;justify-content:center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="1.8"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 19l-4.8 2.5.9-5.4L4.2 8.3l5.4-.8z" stroke-linejoin="round"/></svg></div><div class="screen-meta"><h3 style="font-size:16px">Add-ons</h3><span class="go">View →</span></div></a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="sysfoot">
+    <div class="wrap row" style="justify-content:space-between; flex-wrap:wrap; gap:12px;">
+      <span class="oc-logo" style="color:var(--ink)">
+        <svg width="22" height="22" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/><rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/><rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/></svg>
+        <span class="oc-word" style="font-size:14px;">Open&nbsp;Canvas</span>
+      </span>
+      <span>Design system · May 2026 · concept rebrand, subject to your call</span>
+    </div>
+  </footer>
+</main>
+
+<script>
+  var tt = document.getElementById('themeToggle');
+  tt.addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', cur);
+    try { localStorage.setItem('oc-theme', cur); } catch (e) {}
+  });
+</script>
+</body>
+</html>

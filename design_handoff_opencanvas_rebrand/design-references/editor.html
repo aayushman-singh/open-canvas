@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Canvas — Editor</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .editor { height: 100vh; display: flex; flex-direction: column; }
+
+  /* ---- top bar ---- */
+  .ebar { height: 58px; flex-shrink: 0; border-bottom: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; gap: 12px; padding: 0 14px; }
+  .ebar .divider { width: 1px; height: 26px; background: var(--line); }
+  .crumb { display: flex; align-items: center; gap: 8px; font-size: 14px; white-space: nowrap; }
+  .crumb a { color: var(--ink-2); }
+  .crumb .here { font-weight: 650; }
+  .crumb .pg { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--r-pill); background: var(--surface-2); font-size: 13px; font-weight: 600; }
+  .ebar .sp { flex: 1; }
+  .hist { display: flex; gap: 2px; }
+  .hist button, .toolbtn { width: 38px; height: 38px; border-radius: 10px; border: none; background: transparent; color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .hist button:hover, .toolbtn:hover { background: var(--surface-2); color: var(--ink); }
+  .save-state { font-size: 12.5px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+  .save-state .d { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .presence { display: flex; }
+  .presence .av { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); margin-left: -8px; font-size: 11px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; }
+  .btn-ai { background: var(--surface); border: 1.5px solid var(--red-line); color: var(--red-ink); }
+  .btn-ai:hover { background: var(--red-soft); }
+
+  /* ---- body ---- */
+  .ebody { flex: 1; display: grid; grid-template-columns: 284px 1fr 304px; min-height: 0; }
+
+  /* left panel */
+  .lpanel { border-right: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+  .tabs { display: flex; padding: 10px 12px 0; gap: 2px; }
+  .tabs button { flex: 1; font-family: var(--sans); font-size: 13.5px; font-weight: 650; padding: 9px 0; border: none; background: transparent; color: var(--ink-3); cursor: pointer; position: relative; }
+  .tabs button.on { color: var(--ink); }
+  .tabs button.on::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 3px; background: var(--red); border-radius: 99px; }
+  .tab-body { flex: 1; overflow-y: auto; padding: 16px; }
+  .tab-body[hidden] { display: none; }
+  .lgroup { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin: 4px 0 11px; }
+  .elements { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .el { aspect-ratio: 1; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; cursor: grab; color: var(--ink-2); transition: border-color .14s, background .14s, color .14s, transform .1s; }
+  .el:hover { border-color: var(--red-line); background: var(--red-tint); color: var(--red-ink); transform: translateY(-2px); }
+  .el span { font-size: 11px; font-weight: 600; }
+  .kits { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .kit { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .14s, background .14s; }
+  .kit:hover { background: var(--surface-2); }
+  .kit.on { border-color: var(--red); background: var(--red-tint); }
+  .kit .sw { width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0; display: flex; overflow: hidden; }
+  .kit .sw i { flex: 1; }
+  .kit b { font-size: 13.5px; font-weight: 650; }
+  .kit small { display: block; font-size: 11.5px; color: var(--ink-3); font-weight: 450; }
+
+  /* canvas */
+  .cstage { position: relative; overflow: hidden; background:
+      radial-gradient(circle at 1px 1px, var(--line-2) 1px, transparent 0) 0 0 / 24px 24px, var(--surface-2); }
+  .artboard { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); width: 520px; background: var(--surface); border-radius: 16px; box-shadow: var(--shadow-lg); overflow: visible; border: 1px solid var(--line); }
+  .ab-inner { border-radius: 16px; overflow: hidden; }
+  .ab-photo { height: 148px; background: linear-gradient(135deg, #E9837A, #E84D4A 60%, #C5332F); position: relative; }
+  .ab-photo .tag { position: absolute; left: 14px; bottom: 12px; font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,.85); }
+  .ab-pad { padding: 22px 28px 26px; }
+  .ab-eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--red-ink); }
+  .ab-h { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: -.02em; margin: 10px 0 0; }
+  .ab-p { font-size: 15px; color: var(--ink-2); margin-top: 10px; line-height: 1.55; }
+  .ab-btn { margin-top: 20px; display: inline-flex; align-items: center; gap: 7px; padding: 13px 24px; border-radius: var(--r-pill); font-weight: 650; font-size: 15px; background: var(--red); color: #fff; box-shadow: var(--shadow-red); position: relative; cursor: pointer; white-space: nowrap; transition: background .4s, border-radius .3s; }
+
+  /* selection handles around the selected element */
+  .selbox { position: absolute; border: 2px solid var(--red); border-radius: 6px; pointer-events: none; }
+  .selbox .h { position: absolute; width: 9px; height: 9px; background: var(--surface); border: 2px solid var(--red); border-radius: 2px; }
+  .selbox .h.tl{left:-5px;top:-5px}.selbox .h.tr{right:-5px;top:-5px}.selbox .h.bl{left:-5px;bottom:-5px}.selbox .h.br{right:-5px;bottom:-5px}
+  .selbox .label { position: absolute; top: -25px; left: -2px; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 6px; white-space: nowrap; }
+
+  /* floating peer cursor */
+  .peer { position: absolute; z-index: 20; pointer-events: none; }
+  .peer svg { filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
+  .peer .lab { position: absolute; left: 16px; top: 15px; font-size: 11px; font-weight: 700; color: #fff; padding: 2px 8px; border-radius: 6px; white-space: nowrap; background: #3BA1A1; }
+
+  /* zoom controls */
+  .zoom { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 2px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-pill); box-shadow: var(--shadow); }
+  .zoom button { width: 30px; height: 30px; border: none; background: transparent; border-radius: 50%; color: var(--ink-2); cursor: pointer; font-size: 16px; }
+  .zoom button:hover { background: var(--surface-2); color: var(--ink); }
+  .zoom .pct { font-size: 12.5px; font-weight: 600; color: var(--ink-2); padding: 0 8px; min-width: 44px; text-align: center; }
+  .add-hint { position: absolute; right: 16px; bottom: 16px; font-size: 12px; color: var(--ink-3); background: var(--surface); border: 1px solid var(--line); padding: 7px 13px; border-radius: var(--r-pill); }
+
+  /* inspector */
+  .ipanel { border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+  .ihead { padding: 15px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .ihead .ic { width: 32px; height: 32px; border-radius: 9px; background: var(--red-soft); color: var(--red-ink); display: flex; align-items: center; justify-content: center; }
+  .ihead b { font-size: 15px; }
+  .ihead small { display: block; font-size: 11.5px; color: var(--ink-3); font-weight: 450; }
+  .ibody { flex: 1; overflow-y: auto; padding: 4px 16px 20px; }
+  .isec { padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .isec:last-child { border-bottom: none; }
+  .isec .lbl { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 11px; }
+  .variants { display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
+  .variants .v { padding: 9px; border: 1px solid var(--line); border-radius: 10px; text-align: center; cursor: pointer; font-size: 11px; color: var(--ink-2); transition: border-color .14s, background .14s; }
+  .variants .v:hover { border-color: var(--line-2); }
+  .variants .v.on { border-color: var(--red); background: var(--red-tint); color: var(--red-ink); }
+  .variants .v .pv { display: inline-block; font-size: 10px; font-weight: 700; padding: 4px 10px; border-radius: 99px; margin-bottom: 6px; }
+  .swrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swrow .c { width: 30px; height: 30px; border-radius: 9px; cursor: pointer; border: 2px solid transparent; box-shadow: inset 0 0 0 1px var(--line-2); }
+  .swrow .c.on { border-color: var(--ink); }
+  .seg2 { display: flex; padding: 3px; background: var(--surface-2); border-radius: 10px; border: 1px solid var(--line); }
+  .seg2 button { flex: 1; font-family: var(--sans); font-size: 12.5px; font-weight: 600; padding: 7px 0; border: none; background: transparent; color: var(--ink-2); border-radius: 7px; cursor: pointer; }
+  .seg2 button.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+  .slider { -webkit-appearance: none; width: 100%; height: 5px; border-radius: 99px; background: var(--surface-3); outline: none; }
+  .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--red); cursor: pointer; box-shadow: var(--shadow-sm); }
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+  /* status bar */
+  .status { height: 36px; flex-shrink: 0; border-top: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; gap: 16px; padding: 0 16px; font-size: 12px; color: var(--ink-3); }
+  .status .live { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+  .status .live .d { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+  /* AI chat slide-out */
+  .ai-panel { position: fixed; top: 58px; right: 0; bottom: 36px; width: 360px; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--shadow-lg); transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); z-index: 80; display: flex; flex-direction: column; }
+  .ai-panel.open { transform: none; }
+  .ai-head { padding: 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .ai-head .spark { width: 30px; height: 30px; border-radius: 9px; background: var(--red-soft); color: var(--red-ink); display: flex; align-items: center; justify-content: center; }
+  .ai-head b { font-size: 15px; }
+  .ai-head .x { margin-left: auto; width: 32px; height: 32px; border-radius: 9px; border: none; background: transparent; color: var(--ink-2); cursor: pointer; font-size: 18px; }
+  .ai-head .x:hover { background: var(--surface-2); }
+  .ai-feed { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .ai-msg { max-width: 88%; font-size: 13px; line-height: 1.5; padding: 11px 13px; border-radius: 14px; }
+  .ai-msg.user { align-self: flex-end; background: var(--ink); color: var(--paper); border-bottom-right-radius: 4px; }
+  .ai-msg.bot { align-self: flex-start; background: var(--surface-2); color: var(--ink); border-bottom-left-radius: 4px; }
+  .ai-op { align-self: flex-start; width: 92%; border: 1px solid var(--red-line); background: var(--red-tint); border-radius: 13px; padding: 13px; }
+  .ai-op .t { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--red-ink); }
+  .ai-op .d { font-size: 13px; margin-top: 5px; }
+  .ai-op .a { display: flex; gap: 8px; margin-top: 12px; }
+  .ai-op .a button { font-family: var(--sans); font-size: 12.5px; font-weight: 650; padding: 8px 14px; border-radius: 99px; border: none; cursor: pointer; }
+  .ai-op .a .acc { background: var(--red); color: #fff; }
+  .ai-op .a .dis { background: var(--surface); color: var(--ink-2); border: 1px solid var(--line-2); }
+  .ai-input { padding: 14px; border-top: 1px solid var(--line); }
+  .ai-input .box { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--line-2); border-radius: var(--r-pill); padding: 10px 8px 10px 16px; }
+  .ai-input .box input { flex: 1; border: none; background: transparent; outline: none; font-family: var(--sans); font-size: 13.5px; color: var(--ink); }
+  .ai-input .box .send { width: 34px; height: 34px; border-radius: 50%; border: none; background: var(--red); color: #fff; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+
+  .toast { position: fixed; left: 50%; bottom: 56px; transform: translate(-50%, 20px); z-index: 90; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: var(--r-pill); background: var(--ink); color: var(--paper); font-weight: 650; font-size: 14px; box-shadow: var(--shadow-lg); opacity: 0; transition: opacity .3s, transform .3s; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast .tick { width: 20px; height: 20px; border-radius: 50%; background: var(--ok); color: #fff; display: flex; align-items: center; justify-content: center; }
+
+  @media (max-width: 1180px) { .ebody { grid-template-columns: 240px 1fr 280px; } .ebar .chip-url { display: none; } .save-state { display: none; } }
+</style>
+</head>
+<body>
+<div class="editor">
+  <!-- top bar -->
+  <header class="ebar">
+    <a href="dashboard.html" class="oc-logo" style="color:var(--ink)" title="Back to dashboard">
+      <svg width="26" height="26" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/><rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/><rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/></svg>
+    </a>
+    <div class="divider"></div>
+    <div class="crumb">
+      <a href="dashboard.html">Bloom &amp; Co.</a>
+      <span style="color:var(--ink-3)">/</span>
+      <span class="pg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home ▾</span>
+    </div>
+    <div class="divider"></div>
+    <span class="chip chip-url">🔒 bloomandco.opencanvas.site</span>
+    <div class="sp"></div>
+    <div class="hist">
+      <button title="Undo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+      <button title="Redo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    </div>
+    <span class="save-state"><span class="d"></span>All changes saved</span>
+    <div class="divider"></div>
+    <div class="presence">
+      <span class="av" style="background:#E84D4A">Y</span>
+      <span class="av" style="background:#3BA1A1">S</span>
+    </div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" style="width:38px;height:38px;">
+      <svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg>
+      <svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg>
+    </button>
+    <button class="btn btn-ai" id="aiBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.5L19 9l-4.4 3.2L16 18l-4-3.4L8 18l1.4-5.8L5 9l5.2-1.5z"/></svg>Ask AI</button>
+    <button class="btn btn-primary" id="publishBtn">Publish</button>
+  </header>
+
+  <!-- body -->
+  <div class="ebody">
+    <!-- left panel -->
+    <aside class="lpanel">
+      <div class="tabs">
+        <button class="on" data-tab="add">Add</button>
+        <button data-tab="sections">Sections</button>
+        <button data-tab="pages">Pages</button>
+      </div>
+      <div class="tab-body" data-tabpane="add">
+        <div class="lgroup">Basics</div>
+        <div class="elements">
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M9 6v13M15 6v13"/></svg><span>Text</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h10M4 12h16M4 17h12" stroke-linecap="round"/></svg><span>Heading</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5L5 20" stroke-linecap="round"/></svg><span>Image</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="4"/></svg><span>Button</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="4"/><rect x="12" y="12" width="8" height="8" rx="1.5"/></svg><span>Shape</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/></svg><span>Box</span></div>
+        </div>
+        <div class="lgroup" style="margin-top:20px;">Content</div>
+        <div class="elements">
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h6" stroke-linecap="round"/></svg><span>Form</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h14v16l-7-4-7 4z" stroke-linejoin="round"/></svg><span>Gallery</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg><span>Video</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3 8 4-16 3 8h4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Chart</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11M15 9v11"/></svg><span>Table</span></div>
+          <div class="el"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-3 3 3 3M16 9l3 3-3 3"/></svg><span>Embed</span></div>
+        </div>
+        <div class="lgroup" style="margin-top:20px;">Style kits <span style="color:var(--ink-3);font-weight:500;text-transform:none;letter-spacing:0;">— restyle everything</span></div>
+        <div class="kits">
+          <div class="kit on"><span class="sw"><i style="background:#E84D4A"></i><i style="background:#1A1917"></i><i style="background:#FBFAF8"></i></span><span><b>Bloom</b><small>Warm · friendly · rounded</small></span></div>
+          <div class="kit"><span class="sw"><i style="background:#5b8def"></i><i style="background:#0f1b33"></i><i style="background:#eef3ff"></i></span><span><b>Crisp Blue</b><small>Clean · corporate</small></span></div>
+          <div class="kit"><span class="sw"><i style="background:#4a9d5b"></i><i style="background:#14241a"></i><i style="background:#eef6f0"></i></span><span><b>Garden</b><small>Natural · calm</small></span></div>
+          <div class="kit"><span class="sw"><i style="background:#d9dde4"></i><i style="background:#14171f"></i><i style="background:#1f242e"></i></span><span><b>Charcoal</b><small>Modern · technical · dark</small></span></div>
+        </div>
+      </div>
+      <div class="tab-body" data-tabpane="sections" hidden>
+        <div class="lgroup">Section catalog</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div class="kit" style="padding:0;overflow:hidden;border-radius:12px;"><div style="height:64px;width:100%;background:linear-gradient(135deg,#E9837A,#C5332F)"></div></div>
+          <div class="kit" style="padding:0;overflow:hidden;border-radius:12px;"><div style="height:64px;width:100%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px;">Features · 3 columns</div></div>
+          <div class="kit" style="padding:0;overflow:hidden;border-radius:12px;"><div style="height:64px;width:100%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px;">Testimonials</div></div>
+          <div class="kit" style="padding:0;overflow:hidden;border-radius:12px;"><div style="height:64px;width:100%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:12px;">Pricing</div></div>
+        </div>
+      </div>
+      <div class="tab-body" data-tabpane="pages" hidden>
+        <div class="lgroup">Pages</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div class="kit on" style="padding:10px 12px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><b style="font-size:13.5px">Home</b></div>
+          <div class="kit" style="padding:10px 12px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><b style="font-size:13.5px">About</b></div>
+          <div class="kit" style="padding:10px 12px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><b style="font-size:13.5px">Contact</b></div>
+          <button class="btn btn-outline btn-sm" style="margin-top:8px;justify-content:flex-start;">+ Add page</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- canvas -->
+    <div class="cstage" id="cstage">
+      <div class="artboard" id="artboard">
+        <div class="ab-inner">
+          <div class="ab-photo"><span class="tag">photo · storefront.jpg</span></div>
+          <div class="ab-pad">
+            <span class="ab-eyebrow">Fresh, local, daily</span>
+            <h2 class="ab-h">Bloom &amp; Co.</h2>
+            <p class="ab-p">Hand-tied bouquets and seasonal stems, delivered the same day.</p>
+            <span class="ab-btn" id="abBtn">Order flowers</span>
+          </div>
+        </div>
+        <div class="selbox" id="selbox"><span class="label">Button</span><span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span></div>
+      </div>
+      <div class="peer" id="peer" style="left:140px; top:120px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#3BA1A1"><path d="M5 2l14 8-6 1.5L10 19z"/></svg>
+        <span class="lab">Sam</span>
+      </div>
+      <div class="zoom">
+        <button id="zOut">−</button><span class="pct" id="zPct">90%</span><button id="zIn">+</button>
+        <button title="Fit" style="font-size:13px;">⊡</button>
+      </div>
+      <span class="add-hint">Drag any block onto the canvas</span>
+    </div>
+
+    <!-- inspector -->
+    <aside class="ipanel">
+      <div class="ihead">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="4"/></svg></span>
+        <span><b>Button</b><small>Call-to-action</small></span>
+      </div>
+      <div class="ibody">
+        <div class="isec">
+          <div class="lbl">Label</div>
+          <input class="field" id="labelInput" value="Order flowers" />
+        </div>
+        <div class="isec">
+          <div class="lbl">Style</div>
+          <div class="variants" id="variants">
+            <div class="v on" data-var="solid"><span class="pv" style="background:var(--red);color:#fff">Aa</span>Solid</div>
+            <div class="v" data-var="outline"><span class="pv" style="background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)">Aa</span>Outline</div>
+            <div class="v" data-var="ghost"><span class="pv" style="background:var(--surface-2);color:var(--ink)">Aa</span>Soft</div>
+            <div class="v" data-var="pill"><span class="pv" style="background:var(--ink);color:#fff">Aa</span>Dark</div>
+          </div>
+        </div>
+        <div class="isec">
+          <div class="lbl">Fill color</div>
+          <div class="swrow" id="fills">
+            <div class="c on" data-c="#E84D4A" style="background:#E84D4A"></div>
+            <div class="c" data-c="#1A1917" style="background:#1A1917"></div>
+            <div class="c" data-c="#2E9E6B" style="background:#2E9E6B"></div>
+            <div class="c" data-c="#5b8def" style="background:#5b8def"></div>
+            <div class="c" data-c="#D98A1F" style="background:#D98A1F"></div>
+            <div class="c" data-c="#7C6FE0" style="background:#7C6FE0"></div>
+          </div>
+        </div>
+        <div class="isec">
+          <div class="lbl"><span>Corner roundness</span><span class="mono" style="color:var(--ink-3);font-weight:500" id="radVal">Full</span></div>
+          <input type="range" class="slider" id="radius" min="0" max="100" value="100" />
+        </div>
+        <div class="isec">
+          <div class="lbl">Link to</div>
+          <div class="seg2"><button class="on">Page</button><button>Web address</button></div>
+          <input class="field" style="margin-top:9px;" value="/order" />
+        </div>
+        <div class="isec">
+          <div class="lbl">When it appears</div>
+          <div class="row-2">
+            <div class="seg2" style="grid-column:1 / -1;"><button class="on">Fade up</button><button>Slide</button><button>None</button></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- status bar -->
+  <footer class="status">
+    <span class="live"><span class="d"></span>You &amp; Sam are editing</span>
+    <span>·</span>
+    <span>Last published 2 days ago</span>
+    <div style="flex:1"></div>
+    <span>Home · 3 sections · 1 of 3 pages</span>
+  </footer>
+</div>
+
+<!-- AI panel -->
+<aside class="ai-panel" id="aiPanel">
+  <div class="ai-head">
+    <span class="spark"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.5L19 9l-4.4 3.2L16 18l-4-3.4L8 18l1.4-5.8L5 9l5.2-1.5z"/></svg></span>
+    <b>Assistant</b>
+    <button class="x" id="aiClose">×</button>
+  </div>
+  <div class="ai-feed" id="aiFeed">
+    <div class="ai-msg bot">Hi Maya! I can edit this page for you. Try “add a contact form” or “make it feel more cheerful”.</div>
+    <div class="ai-msg user">Make the headline a bit bigger and warmer</div>
+    <div class="ai-msg bot">Good call — here's what I'd change:</div>
+    <div class="ai-op">
+      <div class="t">Update heading</div>
+      <div class="d">Size 34 → 42 · warmer weight</div>
+      <div class="a"><button class="acc">✓ Accept</button><button class="dis">Discard</button></div>
+    </div>
+  </div>
+  <div class="ai-input">
+    <div class="box">
+      <input id="aiInput" placeholder="Ask for any change…" />
+      <button class="send"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+  </div>
+</aside>
+
+<div class="toast" id="toast"><span class="tick"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>Published — your visitors see it now</div>
+
+<script src="editor.js"></script>
+</body>
+</html>

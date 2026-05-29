@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Canvas — Add-ons</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .gnav { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); }
+  .gnav .wrap { display: flex; align-items: center; gap: 18px; height: 62px; }
+  .gnav .links { display: flex; gap: 2px; margin-left: 12px; }
+  .gnav .links a { padding: 8px 14px; border-radius: var(--r-pill); font-size: 14px; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  .gnav .links a:hover { background: var(--surface-2); color: var(--ink); }
+  .gnav .links a.on { background: var(--surface-2); color: var(--ink); }
+  .gnav .sp { flex: 1; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#E9837A,#C5332F); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+
+  .page { width: min(1080px, calc(100vw - 48px)); margin: 0 auto; padding: 40px 0 70px; }
+  .page > h1 { font-size: 34px; letter-spacing: -.03em; }
+  .page > .sub { color: var(--ink-2); font-size: 16px; margin: 8px 0 30px; max-width: 56ch; }
+  .grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .addon { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); padding: 22px; display: flex; flex-direction: column; transition: transform .16s, box-shadow .2s; }
+  .addon:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .addon .ic { width: 48px; height: 48px; border-radius: 13px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  .addon h3 { font-family: var(--display); font-size: 18px; }
+  .addon p { font-size: 13.5px; color: var(--ink-2); margin-top: 7px; line-height: 1.5; flex: 1; }
+  .addon .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .addon .price { font-size: 13px; font-weight: 600; color: var(--ink-3); }
+  .addon.soon { opacity: .75; }
+  .secttl { font-family: var(--display); font-size: 18px; margin: 32px 0 14px; }
+</style>
+</head>
+<body>
+<header class="gnav">
+  <div class="wrap">
+    <a href="index.html" class="oc-logo" style="color:var(--ink)"><svg width="26" height="26" viewBox="0 0 64 64" fill="none"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/><rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/><rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/></svg><span class="oc-word">Open&nbsp;Canvas</span></a>
+    <nav class="links"><a href="dashboard.html">Sites</a><a href="#">Templates</a><a href="#" class="on">Add-ons</a></nav>
+    <div class="sp"></div>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme"><svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg><svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg></button>
+    <div class="avatar">M</div>
+  </div>
+</header>
+
+<div class="page">
+  <h1>Add-ons</h1>
+  <p class="sub">Bolt on extra powers — analytics, tracking, and more. Turn them on per site, no code required.</p>
+
+  <div class="secttl">Installed</div>
+  <div class="grid">
+    <div class="addon">
+      <span class="ic" style="background:#fef0e6;color:#E8710A"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2" stroke-linecap="round"/></svg></span>
+      <h3>Google Analytics</h3>
+      <p>See how many people visit your site, where they come from, and what they look at.</p>
+      <div class="foot"><span class="chip chip-ok"><span class="dot"></span>Installed</span><button class="btn btn-outline btn-sm">Configure</button></div>
+    </div>
+    <div class="addon">
+      <span class="ic" style="background:var(--surface-2);color:var(--ink)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-3 3 3 3M16 9l3 3-3 3M13 5l-2 14"/></svg></span>
+      <h3>Custom Scripts</h3>
+      <p>Add tracking or chat tools like Intercom, Hotjar, or a Meta Pixel by pasting a snippet.</p>
+      <div class="foot"><span class="chip"><span class="dot" style="background:var(--ink-3)"></span>Not on this site</span><button class="btn btn-outline btn-sm">Enable</button></div>
+    </div>
+    <div class="addon">
+      <span class="ic" style="background:var(--red-soft);color:var(--red-ink)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v12H5.5L4 18z" stroke-linejoin="round"/></svg></span>
+      <h3>Live Chat</h3>
+      <p>Let visitors message you right from your site. Replies land in your inbox.</p>
+      <div class="foot"><span class="price">Free</span><button class="btn btn-primary btn-sm">Add</button></div>
+    </div>
+  </div>
+
+  <div class="secttl">Coming soon</div>
+  <div class="grid">
+    <div class="addon soon">
+      <span class="ic" style="background:var(--surface-2);color:var(--ink-2)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h6" stroke-linecap="round"/></svg></span>
+      <h3>Newsletter</h3>
+      <p>Collect emails and send updates without leaving Open Canvas.</p>
+      <div class="foot"><span class="price">Soon</span><button class="btn btn-ghost btn-sm" disabled>Notify me</button></div>
+    </div>
+    <div class="addon soon">
+      <span class="ic" style="background:var(--surface-2);color:var(--ink-2)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2h9l3 3v17H6z"/><path d="M9 12h6M9 16h6" stroke-linecap="round"/></svg></span>
+      <h3>Online Store</h3>
+      <p>Sell products and take payments with a simple checkout.</p>
+      <div class="foot"><span class="price">Soon</span><button class="btn btn-ghost btn-sm" disabled>Notify me</button></div>
+    </div>
+    <div class="addon soon">
+      <span class="ic" style="background:var(--surface-2);color:var(--ink-2)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke-linecap="round"/></svg></span>
+      <h3>Bookings</h3>
+      <p>Let customers schedule appointments straight from your site.</p>
+      <div class="foot"><span class="price">Soon</span><button class="btn btn-ghost btn-sm" disabled>Notify me</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', cur);
+    try { localStorage.setItem('oc-theme', cur); } catch (e) {}
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Canvas — Domains</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  .dcard { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-sm); padding: 22px; margin-bottom: 16px; }
+  .drow { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+  .drow:first-of-type { border-top: none; }
+  .drow .dn { flex: 1; }
+  .drow .dn b { font-size: 15px; font-family: var(--mono); }
+  .drow .dn small { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+  .add-row { display: flex; gap: 10px; margin-top: 4px; }
+  .add-row .field { flex: 1; }
+  .dns { margin-top: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); }
+  .dns .dns-row { display: grid; grid-template-columns: 60px 1fr 1fr; gap: 12px; padding: 5px 0; }
+  .dns .dns-row.h { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+  .chip-pending { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+</style>
+</head>
+<body data-active="domains" data-crumb="Domains">
+<div class="app">
+  <aside class="side" id="ocSide"></aside>
+  <div class="main">
+    <header class="topbar" id="ocTop"></header>
+    <div class="content">
+      <h1>Domains</h1>
+      <p class="sub">Use your own web address instead of the free one.</p>
+
+      <div class="dcard">
+        <div class="drow">
+          <div class="dn"><b>bloomandco.opencanvas.site</b><small>Free address · included with every site</small></div>
+          <span class="chip chip-ok"><span class="dot"></span>Active</span>
+        </div>
+        <div class="drow">
+          <div class="dn"><b>bloomandco.com</b><small>Connected · verifying DNS — this can take a few minutes</small></div>
+          <span class="chip chip-pending"><span class="dot"></span>Verifying</span>
+        </div>
+      </div>
+
+      <div class="dcard">
+        <h2 style="font-family:var(--display);font-size:18px;">Connect a new domain</h2>
+        <p class="muted" style="font-size:13.5px;margin:6px 0 14px;">Already own a domain? Enter it below, then add the records we give you at your domain provider.</p>
+        <div class="add-row">
+          <input class="field" placeholder="yourbusiness.com" />
+          <button class="btn btn-primary">Connect</button>
+        </div>
+        <div class="dns">
+          <div class="dns-row h"><span>Type</span><span>Name</span><span>Value</span></div>
+          <div class="dns-row"><span>CNAME</span><span>www</span><span>cname.opencanvas.site</span></div>
+          <div class="dns-row"><span>A</span><span>@</span><span>76.76.21.21</span></div>
+        </div>
+        <p class="faint" style="font-size:12px;margin-top:10px;">We'll check automatically and issue a secure (HTTPS) certificate once it's verified.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="site-shell.js"></script>
+</body>
+</html>

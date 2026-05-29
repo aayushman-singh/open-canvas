@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Page not found — Open Canvas</title>
+<script>(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Hanken+Grotesk:wght@400;450;500;600;700;800&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<style>
+  html, body { height: 100%; }
+  .scene { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 24px; position: relative; }
+  .scene .inner { max-width: 620px; text-align: center; }
+  .scene .mark { position: relative; margin-bottom: 30px; }
+  .scene .mark svg { display: block; }
+  .bigcode { font-family: var(--display); font-weight: 800; font-size: clamp(80px, 18vw, 160px); letter-spacing: -.04em; line-height: .9; color: var(--ink); }
+  .scene h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -.03em; line-height: 1.14; margin-top: 22px; }
+  .scene p { color: var(--ink-2); font-size: 17px; max-width: 44ch; margin: 20px auto 0; line-height: 1.55; }
+  .scene .acts { display: flex; gap: 12px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
+  .powered { position: absolute; bottom: 24px; left: 0; right: 0; display: flex; justify-content: center; }
+  .powered a { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+  .theme-toggle.fixed { position: absolute; top: 22px; right: 22px; }
+  /* the open-frame with a red bar slipping out — echoes the logo */
+</style>
+</head>
+<body>
+<div class="scene">
+  <button class="theme-toggle fixed" id="themeToggle" aria-label="Toggle theme">
+    <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12h2.5M19 12h2.5M5 5l1.8 1.8M17.2 17.2L19 19M19 5l-1.8 1.8M6.8 17.2L5 19"/></svg>
+    <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z"/></svg>
+  </button>
+
+  <div class="inner">
+  <div class="mark">
+    <svg width="78" height="78" viewBox="0 0 64 64" fill="none" aria-hidden="true" style="color:var(--ink)">
+      <rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/>
+      <circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/>
+      <rect x="40" y="19" width="28" height="3.6" rx="1.8" fill="var(--red)"/>
+      <rect x="-2" y="43" width="28" height="3.6" rx="1.8" fill="var(--red)"/>
+    </svg>
+  </div>
+
+  <div class="bigcode">4<span style="color:var(--red)">0</span>4</div>
+  <h1>This page took a wrong turn.</h1>
+  <p>The page you're looking for isn't here — it may have moved, or the link might have a typo.</p>
+  <div class="acts">
+    <a href="#" class="btn btn-primary btn-lg">Back to home</a>
+    <a href="#" class="btn btn-outline btn-lg">Search this site</a>
+  </div>
+  </div>
+
+  <div class="powered">
+    <a href="landing.html"><span class="oc-logo" style="color:var(--ink-3)"><svg width="18" height="18" viewBox="0 0 64 64" fill="none"><rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="3"/><circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="8"/><rect x="40" y="19" width="21" height="4.5" rx="2" fill="var(--red)"/><rect x="6" y="43" width="21" height="4.5" rx="2" fill="var(--red)"/></svg></span>Powered by Open Canvas</a>
+  </div>
+</div>
+<script>
+  document.getElementById('themeToggle').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', cur);
+    try { localStorage.setItem('oc-theme', cur); } catch (e) {}
+  });
+</script>
+</body>
+</html>
