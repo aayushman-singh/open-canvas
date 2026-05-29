@@ -92,6 +92,25 @@ bucket_name = "rev01-assets"
 # binding = "KV"
 # id = "to-be-created"
 
+# Non-secret env vars committed to source so `wrangler deploy` always carries
+# them. Previously these were set via the Cloudflare dashboard (Workers →
+# Settings → Variables), but plain `wrangler deploy` resets dashboard-set
+# values on every deploy — that caused a prod outage on 2026-05-29 when a
+# deploy stripped AUTHORIZED_PARTIES and every request 500'd at the Clerk
+# middleware boundary. ADR 0013 specifies these as env-driven; putting the
+# canonical rev01 values here means a fork rebrands by editing this block
+# AND the route patterns above in lockstep.
+#
+# Update WHEN: the apex hostname in the [[routes]] blocks above changes.
+# These must move together; cookie scoping (`cookieDomain`) is `APP_DOMAIN`,
+# Clerk's `authenticateRequest` consults `AUTHORIZED_PARTIES`, and the
+# outbound sender uses the apex.
+[vars]
+APP_DOMAIN = "rev01.aayushman.dev"
+AUTHORIZED_PARTIES = "https://rev01.aayushman.dev,http://localhost:8787,http://localhost:8788,http://127.0.0.1:8787,http://127.0.0.1:8788"
+COOKIE_NAME_PREFIX = "__rev01_"
+EMAIL_FROM = "noreply@rev01.aayushman.dev"
+
 # Wave 1 #5 (custom domains, plan 05). Cron tick every 5 minutes invokes
 # the `scheduled` handler exported from src/index.ts which delegates to
 # src/custom-domain/cron.ts. The handler polls Cloudflare for pending /
