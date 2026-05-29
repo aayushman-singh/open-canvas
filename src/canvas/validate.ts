@@ -133,7 +133,10 @@ function validateActionHref(
       errors.push(basePath + '.url must be a non-empty string');
     } else if (!isAllowedHref(h.url)) {
       errors.push(
-        basePath + '.url "' + h.url + '" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)',
+        basePath +
+          '.url "' +
+          h.url +
+          '" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)',
       );
     }
   } else if (h.type === 'page') {
@@ -350,7 +353,12 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
     errors.push(`${p}.backgroundImageAssetId must be an asset id, not a path or URL`);
   }
   if (value.backgroundSize !== undefined) {
-    assertOneOf<BackgroundSize>(value.backgroundSize, BACKGROUND_SIZES, `${p}.backgroundSize`, errors);
+    assertOneOf<BackgroundSize>(
+      value.backgroundSize,
+      BACKGROUND_SIZES,
+      `${p}.backgroundSize`,
+      errors,
+    );
   }
   if (value.borderRadius !== undefined) {
     if (!isFiniteNumber(value.borderRadius) || value.borderRadius < 0) {
@@ -381,12 +389,26 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   }
 }
 
-function validatePageMotionLayout(page: Record<string, unknown>, basePath: string, errors: string[]): void {
+function validatePageMotionLayout(
+  page: Record<string, unknown>,
+  basePath: string,
+  errors: string[],
+): void {
   if (page.entranceAnimation !== undefined) {
-    assertOneOf<MotionPreset>(page.entranceAnimation, MOTION_PRESETS, `${basePath}.entranceAnimation`, errors);
+    assertOneOf<MotionPreset>(
+      page.entranceAnimation,
+      MOTION_PRESETS,
+      `${basePath}.entranceAnimation`,
+      errors,
+    );
   }
   if (page.scrollTriggerMode !== undefined) {
-    assertOneOf<ScrollTriggerMode>(page.scrollTriggerMode, SCROLL_TRIGGER_MODES, `${basePath}.scrollTriggerMode`, errors);
+    assertOneOf<ScrollTriggerMode>(
+      page.scrollTriggerMode,
+      SCROLL_TRIGGER_MODES,
+      `${basePath}.scrollTriggerMode`,
+      errors,
+    );
   }
   if (page.pageBackground !== undefined) {
     if (typeof page.pageBackground !== 'string' || page.pageBackground.length === 0) {
@@ -405,7 +427,12 @@ function validatePageMotionLayout(page: Record<string, unknown>, basePath: strin
     }
   }
   if (page.defaultMotionPreset !== undefined) {
-    assertOneOf<MotionPreset>(page.defaultMotionPreset, MOTION_PRESETS, `${basePath}.defaultMotionPreset`, errors);
+    assertOneOf<MotionPreset>(
+      page.defaultMotionPreset,
+      MOTION_PRESETS,
+      `${basePath}.defaultMotionPreset`,
+      errors,
+    );
   }
   if (page.sectionGap !== undefined) {
     if (!isFiniteNumber(page.sectionGap) || page.sectionGap < 0 || page.sectionGap > 120) {
@@ -481,12 +508,14 @@ function validateTextContent(content: unknown, idLabel: string, errors: string[]
         );
         return;
       }
-      if (!assertOneOf<InlineMarkType>(
-        mark.type,
-        INLINE_MARK_TYPES,
-        `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type`,
-        errors,
-      )) {
+      if (
+        !assertOneOf<InlineMarkType>(
+          mark.type,
+          INLINE_MARK_TYPES,
+          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type`,
+          errors,
+        )
+      ) {
         return;
       }
       if (seenTypes.has(mark.type)) {
@@ -587,7 +616,12 @@ function validateElement(
   // Accumulate the type-discriminant error but keep validating box, motion,
   // and style — those checks are independent of the type-specific switch
   // below. Only skip the switch when the discriminant is unknown.
-  const knownType = assertOneOf<ElementType>(element.type, ELEMENT_TYPES, `${basePath}.type`, errors);
+  const knownType = assertOneOf<ElementType>(
+    element.type,
+    ELEMENT_TYPES,
+    `${basePath}.type`,
+    errors,
+  );
 
   validateBox(element.box, pageWidth, sectionHeight, basePath, errors);
   validateMotion(element.motion, basePath, errors);
@@ -621,25 +655,52 @@ function validateElement(
       break;
     }
     case 'media': {
-      assertOneOf<MediaKind>(element.mediaKind, MEDIA_KINDS, `${basePath}.mediaKind`, errors);
+      const knownMediaKind = assertOneOf<MediaKind>(
+        element.mediaKind,
+        MEDIA_KINDS,
+        `${basePath}.mediaKind`,
+        errors,
+      );
       if (typeof element.assetId !== 'string') {
         errors.push(
           `${basePath}.assetId must be a string (empty string allowed for unfilled slots)`,
-        );
-      }
-      if (element.posterAssetId !== undefined && typeof element.posterAssetId !== 'string') {
-        errors.push(
-          `${basePath}.posterAssetId must be a string when present (empty string allowed for unfilled slots)`,
         );
       }
       if (typeof element.alt !== 'string') {
         errors.push(`${basePath}.alt must be a string`);
       }
       assertOneOf<BackgroundSize>(element.fit, BACKGROUND_SIZES, `${basePath}.fit`, errors);
-      if (element.playback !== undefined && !isRecord(element.playback)) {
-        errors.push(`${basePath}.playback must be an object when present`);
+      if (!knownMediaKind) {
+        break;
       }
-      if (element.mediaKind === 'video' && isRecord(element.playback)) {
+      if (element.mediaKind === 'image') {
+        if (element.posterAssetId !== undefined) {
+          errors.push(`${basePath}.posterAssetId is only allowed when mediaKind is "video"`);
+        }
+        if (element.playback !== undefined) {
+          errors.push(`${basePath}.playback is only allowed when mediaKind is "video"`);
+        }
+        break;
+      }
+
+      if (element.posterAssetId !== undefined && typeof element.posterAssetId !== 'string') {
+        errors.push(
+          `${basePath}.posterAssetId must be a string when present (empty string allowed for unfilled slots)`,
+        );
+      }
+      if (element.playback !== undefined) {
+        if (!isRecord(element.playback)) {
+          errors.push(`${basePath}.playback must be an object when present`);
+          break;
+        }
+        for (const field of ['autoplay', 'muted', 'loop', 'controls'] as const) {
+          if (
+            element.playback[field] !== undefined &&
+            typeof element.playback[field] !== 'boolean'
+          ) {
+            errors.push(`${basePath}.playback.${field} must be a boolean when present`);
+          }
+        }
         const { autoplay, muted } = element.playback;
         if (autoplay === true && muted !== true) {
           errors.push(
@@ -816,7 +877,12 @@ function validateSection(
   } else {
     localIds.add(section.id);
   }
-  assertOneOf<SectionRecipeId>(section.recipeId, SECTION_RECIPE_IDS, `${basePath}.recipeId`, errors);
+  assertOneOf<SectionRecipeId>(
+    section.recipeId,
+    SECTION_RECIPE_IDS,
+    `${basePath}.recipeId`,
+    errors,
+  );
   if (!isNonEmptyString(section.name)) {
     errors.push(`${basePath}.name must be a non-empty string`);
   }
@@ -848,7 +914,11 @@ function validateSection(
     assertOneOf<MotionPreset>(section.entrance, MOTION_PRESETS, `${basePath}.entrance`, errors);
   }
   validateSectionTrigger(section.trigger, pathJoin(basePath, 'trigger'), errors);
-  validateBackgroundVideo(section.backgroundVideoAssetId, pathJoin(basePath, 'backgroundVideoAssetId'), errors);
+  validateBackgroundVideo(
+    section.backgroundVideoAssetId,
+    pathJoin(basePath, 'backgroundVideoAssetId'),
+    errors,
+  );
   if (!Array.isArray(section.elements)) {
     errors.push(`${basePath}.elements must be an array`);
     return;
@@ -860,7 +930,15 @@ function validateSection(
     const path = pathJoin(basePath, 'elements');
     const elementPath = pathJoin(path, idx);
     assertUniqueElementId(element, elementPath, localIds, errors);
-    validateElement(element, pageWidth, effectiveHeight, elementPath, errors, validPageIds, localIds);
+    validateElement(
+      element,
+      pageWidth,
+      effectiveHeight,
+      elementPath,
+      errors,
+      validPageIds,
+      localIds,
+    );
   });
 }
 
@@ -998,10 +1076,14 @@ function validatePage(
     }
   }
   if (page.noIndex !== undefined && typeof page.noIndex !== 'boolean') {
-    errors.push(`${basePath}.noIndex must be a boolean when present (got ${describe(page.noIndex)})`);
+    errors.push(
+      `${basePath}.noIndex must be a boolean when present (got ${describe(page.noIndex)})`,
+    );
   }
   if (page.locale !== undefined && !isNonEmptyString(page.locale)) {
-    errors.push(`${basePath}.locale must be a non-empty BCP-47 string when present (got ${describe(page.locale)})`);
+    errors.push(
+      `${basePath}.locale must be a non-empty BCP-47 string when present (got ${describe(page.locale)})`,
+    );
   }
   const widthValid =
     isFiniteNumber(page.width) && page.width >= PAGE_WIDTH_MIN && page.width <= PAGE_WIDTH_MAX;
@@ -1060,13 +1142,17 @@ function validateSiteShape(state: unknown, errors: string[]): void {
     validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
   }
   if (state.defaultLocale !== undefined && !isNonEmptyString(state.defaultLocale)) {
-    errors.push(`defaultLocale must be a non-empty BCP-47 string when present (got ${describe(state.defaultLocale)})`);
+    errors.push(
+      `defaultLocale must be a non-empty BCP-47 string when present (got ${describe(state.defaultLocale)})`,
+    );
   }
   if (state.siteNoIndex !== undefined && typeof state.siteNoIndex !== 'boolean') {
     errors.push(`siteNoIndex must be a boolean when present (got ${describe(state.siteNoIndex)})`);
   }
   if (state.darkModeEnabled !== undefined && typeof state.darkModeEnabled !== 'boolean') {
-    errors.push(`darkModeEnabled must be a boolean when present (got ${describe(state.darkModeEnabled)})`);
+    errors.push(
+      `darkModeEnabled must be a boolean when present (got ${describe(state.darkModeEnabled)})`,
+    );
   }
   if (state.faviconAssetId !== undefined && !isAssetIdLike(state.faviconAssetId)) {
     errors.push(
@@ -1215,9 +1301,7 @@ export function validateSeedFixture(state: EditableSite): ValidationResult {
       const assetId = element.assetId;
       const seedAsset = SEED_ASSET_REGISTRY[assetId];
       if (!seedAsset) {
-        errors.push(
-          `${elementPath}.assetId "${assetId}" is not registered in SEED_ASSET_REGISTRY`,
-        );
+        errors.push(`${elementPath}.assetId "${assetId}" is not registered in SEED_ASSET_REGISTRY`);
       } else if (seedAsset.kind !== element.mediaKind) {
         errors.push(
           `${elementPath}.assetId "${assetId}" is registered as ${seedAsset.kind}, but mediaKind is ${element.mediaKind}`,
@@ -1243,10 +1327,7 @@ export function validateSeedFixture(state: EditableSite): ValidationResult {
     if (!page) continue;
     const pagePath = `pages[${String(pageIdx)}]`;
     for (let sectionIdx = 0; sectionIdx < page.sections.length; sectionIdx++) {
-      validateSeedSection(
-        page.sections[sectionIdx],
-        `${pagePath}.sections[${String(sectionIdx)}]`,
-      );
+      validateSeedSection(page.sections[sectionIdx], `${pagePath}.sections[${String(sectionIdx)}]`);
     }
   }
   validateSeedSection(state.header, 'header');
@@ -1255,4 +1336,3 @@ export function validateSeedFixture(state: EditableSite): ValidationResult {
   if (errors.length === 0) return { valid: true };
   return { valid: false, errors };
 }
-

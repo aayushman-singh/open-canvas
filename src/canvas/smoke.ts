@@ -43,7 +43,9 @@ const snapshot: PublishedSnapshot = {
 const publishedResult = validatePublishedSnapshot(snapshot);
 assert(publishedResult.valid, publishedResult.valid ? '' : publishedResult.errors.join('; '));
 
-const html = renderCanvasSnapshot(snapshot, '/assets', 'smoke-site', { turnstileSiteKey: TURNSTILE_TEST_KEY });
+const html = renderCanvasSnapshot(snapshot, '/assets', 'smoke-site', {
+  turnstileSiteKey: TURNSTILE_TEST_KEY,
+});
 assert(html.includes('data-rev01-page="page-home"'), 'expected rendered home page marker');
 assert(html.includes('data-rev01-section="section-hero"'), 'expected rendered hero section marker');
 assert(html.includes('data-rev01-element="hero-heading"'), 'expected rendered heading marker');
@@ -138,7 +140,10 @@ const badPageMotionLayoutResult = validateEditableSite({
     },
   ],
 });
-assert(!badPageMotionLayoutResult.valid, 'expected invalid page motion/layout fields to be rejected');
+assert(
+  !badPageMotionLayoutResult.valid,
+  'expected invalid page motion/layout fields to be rejected',
+);
 assert(
   !badPageMotionLayoutResult.valid &&
     badPageMotionLayoutResult.errors.some((m) => m.includes('pageBackground')) &&
@@ -446,10 +451,7 @@ const duplicatePageState: EditableSite = structuredClone(twoPageState);
 duplicatePageState.pages[1]!.id = duplicatePageState.pages[0]!.id;
 duplicatePageState.pages[1]!.slug = duplicatePageState.pages[0]!.slug;
 const duplicatePageResult = validateEditableSite(duplicatePageState);
-assert(
-  !duplicatePageResult.valid,
-  'expected validator to reject duplicate page ids/slugs',
-);
+assert(!duplicatePageResult.valid, 'expected validator to reject duplicate page ids/slugs');
 assert(
   !duplicatePageResult.valid &&
     duplicatePageResult.errors.some((m) => m.includes('duplicated across pages')),
@@ -568,6 +570,50 @@ assert(
   !headerMediaResult.valid &&
     headerMediaResult.errors.some((m) => m.includes('header.elements[0].assetId')),
   'expected published header media with an empty assetId to be rejected',
+);
+
+const imageWithVideoOnlyFieldsState: EditableSite = {
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-image-video-fields',
+      slug: 'image-video-fields',
+      title: 'Image Video Fields',
+      width: 960,
+      sections: [
+        {
+          id: 'section-image-video-fields',
+          recipeId: 'custom',
+          name: 'Image Video Fields',
+          height: 240,
+          elements: [
+            {
+              id: 'image-with-video-fields',
+              type: 'media',
+              mediaKind: 'image',
+              assetId: 'image-asset',
+              posterAssetId: 'poster-asset',
+              alt: 'Image carrying video-only fields',
+              fit: 'cover',
+              playback: { autoplay: true, muted: true },
+              box: { x: 0, y: 0, w: 120, h: 80, z: 1 },
+            } as unknown as CanvasElement,
+          ],
+        },
+      ],
+    },
+  ],
+};
+const imageWithVideoOnlyFieldsResult = validateEditableSite(imageWithVideoOnlyFieldsState);
+assert(
+  !imageWithVideoOnlyFieldsResult.valid,
+  'expected image media to reject video-only posterAssetId/playback fields',
+);
+assert(
+  !imageWithVideoOnlyFieldsResult.valid &&
+    imageWithVideoOnlyFieldsResult.errors.some((m) => m.includes('posterAssetId')) &&
+    imageWithVideoOnlyFieldsResult.errors.some((m) => m.includes('playback')),
+  'expected image media validation errors to name posterAssetId and playback',
 );
 
 const headerFormPages: CanvasPage[] = [
@@ -710,7 +756,9 @@ const badSectionRoleResult = validateEditableSite(badSectionRoleState);
 assert(!badSectionRoleResult.valid, 'expected validator to reject an unknown section role');
 assert(
   !badSectionRoleResult.valid &&
-    badSectionRoleResult.errors.some((m) => m.includes('role must be one of [header, footer, body]')),
+    badSectionRoleResult.errors.some((m) =>
+      m.includes('role must be one of [header, footer, body]'),
+    ),
   'expected bad-section-role rejection to mention the allowed roles',
 );
 
@@ -915,9 +963,14 @@ assert(
 // boundary) would normally have stopped — defence in depth.
 let rendererThrew = false;
 try {
-  renderCanvasSnapshot({ ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit }, '/assets', 'smoke-site', {
-    turnstileSiteKey: TURNSTILE_TEST_KEY,
-  });
+  renderCanvasSnapshot(
+    { ...snapshot, styleKit: 'not-a-kit' as unknown as StyleKit },
+    '/assets',
+    'smoke-site',
+    {
+      turnstileSiteKey: TURNSTILE_TEST_KEY,
+    },
+  );
 } catch (err) {
   rendererThrew = true;
   assert(
@@ -934,7 +987,9 @@ function assertRenderDispatchFailure(
 ): void {
   let threw = false;
   try {
-    renderCanvasSnapshot(badSnapshot, '/assets', 'smoke-site', { turnstileSiteKey: TURNSTILE_TEST_KEY });
+    renderCanvasSnapshot(badSnapshot, '/assets', 'smoke-site', {
+      turnstileSiteKey: TURNSTILE_TEST_KEY,
+    });
   } catch (err) {
     threw = true;
     assert(

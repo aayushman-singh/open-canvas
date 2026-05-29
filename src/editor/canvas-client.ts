@@ -1549,20 +1549,27 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
-  // Client-side mirror of resolveActionHref in src/canvas/schema.ts. Returns
-  // the renderable href string ("#" for unknown shapes). String-typed hrefs
-  // are tolerated because migrateState may not have run yet on a session
-  // whose first render fires before the migrate pass completes.
+  // Client-side mirror of resolveActionHref in src/canvas/action-href.ts.
+  // String-typed hrefs are tolerated because migrateState may not have run yet
+  // on a session whose first render fires before the migrate pass completes.
   function resolveActionHref(href) {
-    if (href && href.type === "external") return href.url || "#";
+    if (href && href.type === "external") {
+      if (typeof href.url !== "string" || href.url.length === 0) {
+        throw new Error("resolveActionHref: external href missing url");
+      }
+      return href.url;
+    }
     if (href && href.type === "page") {
       for (var pi = 0; pi < state.pages.length; pi++) {
-        if (state.pages[pi].id === href.pageId) return "/" + state.pages[pi].slug;
+        if (state.pages[pi].id === href.pageId) {
+          var base = "/" + state.pages[pi].slug;
+          return href.anchor ? base + "#" + href.anchor : base;
+        }
       }
-      return "#";
+      throw new Error("resolveActionHref: missing page id " + JSON.stringify(href.pageId));
     }
     if (typeof href === "string") return href;
-    return "#";
+    throw new Error("resolveActionHref: unknown href shape");
   }
 
   function buildActionBody(element) {

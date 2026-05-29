@@ -1,7 +1,7 @@
 // src/og-image/on-publish.ts
 //
 // `onPublishGenerateOg(siteId, snapshot, env, db)` — the publish path calls
-// this after the site row update so every page's OG card is pre-rendered
+// this before the site row update so every page's OG card is pre-rendered
 // and cached in R2 before the first visitor share-link is unfurled.
 //
 // Two-tier cache:
@@ -13,12 +13,9 @@
 //     and skip Satori+resvg. On a content-hash miss we render + write both
 //     keys atomically (per-page parallel).
 //
-// Failure posture: a per-page render failure logs loudly and is reported in
-// the `failed[]` result, but does NOT throw. The publish row update has
-// already landed; the visitor OG endpoint will render on demand if the warm
-// cache miss races with their share. This is the explicit alternative
-// behaviour for the all-or-nothing posture and is intentional — the hook is
-// a warmup, not a publish gate.
+// Failure posture: rendering or writing failures throw through Promise.all.
+// The publish route treats this as a pre-commit failure, so the published row
+// does not move and the Owner sees an explicit publish error.
 
 import { sha256Hex } from '../assets/hash.js';
 import { createR2Client } from '../assets/r2-client.js';
@@ -119,9 +116,8 @@ function ogHashInputFor(page: Page, preset: StyleKitPreset, siteName: string): O
 
 /**
  * Pre-render every page's OG card and write to R2. Idempotent; safe to
- * call repeatedly. The main thread fires this after the publish row update
- * inside `src/routes/api/publish.ts` — see the integration note in the
- * brief for the exact insertion point.
+ * call repeatedly. The publish route calls this before updating the published
+ * row so failures stop the publish rather than silently deferring OG state.
  */
 export async function onPublishGenerateOg(
   siteId: string,

@@ -15,9 +15,9 @@
 // Failure posture (per the project's "fail loudly" rule):
 //   * A Postgres write rejection logs with the site id and the inferred
 //     pages-count so it's debuggable from logs alone — and re-throws on
-//     the inner promise. We do NOT swallow; the outer `attachAutosave`
-//     attaches a noop catch only to keep `unhandledRejection` quiet, but
-//     the error is still surfaced to `console.error`.
+//     the inner promise. We do NOT swallow; the outer `attachAutosave` logs
+//     the projected-state context and re-throws asynchronously so the host
+//     runtime surfaces the failed write.
 //   * No retry, no exponential backoff, no shadow-write — the next edit
 //     re-triggers the debounce, so a transient outage self-heals when
 //     connectivity returns. A persistent outage surfaces as escalating

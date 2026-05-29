@@ -33,7 +33,7 @@ import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateEditableSite, validatePublishedSnapshot } from '../../canvas/validate';
 import { db, type Db } from '../../db/client';
-import { customer, ownerAsset, site } from '../../db/schema';
+import { customer, ownerAsset, site, siteSearchEntry, siteSnapshot } from '../../db/schema';
 // Post-publish side effects that are part of the published-site contract:
 // version timeline capture, OG-image pre-rendering, and search indexing.
 import { captureOnPublish } from '../../version/capture';
@@ -68,6 +68,10 @@ interface PublishBroadcastPayload {
   defaultSlug: string;
 }
 
+interface PreviousPublishState {
+  snapshot: PublishedSnapshot | null;
+  version: number;
+}
 
 // Short, response-safe failure description. Stack traces stay in the raw
 // `console.error(..., { error })` calls (which format the full stack in the
@@ -126,10 +130,7 @@ function createPublishTimeline(siteId: string): PublishTimeline {
       const durationMs = Math.round((at - startedAt) * 100) / 100;
       const totalMs = Math.round((at - start) * 100) / 100;
       steps.push({ step, durationMs, totalMs });
-      console.log(
-        `[publish-step] end ${step}`,
-        JSON.stringify({ siteId, durationMs, totalMs }),
-      );
+      console.log(`[publish-step] end ${step}`, JSON.stringify({ siteId, durationMs, totalMs }));
     },
     summary() {
       return {
@@ -140,97 +141,128 @@ function createPublishTimeline(siteId: string): PublishTimeline {
   };
 }
 
-// Deferred side effects — run AFTER the publish HTTP response has returned.
-// The published row is the source of truth; broadcast, search index rebuild,
-// version capture, and OG warmup are denormalised state that can be repaired
-// on the next publish if any one of them fails. We surface each failure as a
-// loud `[publish-deferred] ... failed` log line but do NOT roll back the row
-// — the response has already gone out and the visitor-facing snapshot is the
-// committed one.
-//
-// The handler invokes this via `c.executionCtx.waitUntil(...)` so the Worker
-// keeps running until the chain finishes, but the request response is not
-// blocked on it. This is what lets concurrent publishes on the same isolate
-// avoid 1102: each request's heavy work overlaps with the next request's
-// response cycle rather than stacking on the request path.
-async function runDeferredPublishedSideEffects(args: {
+async function restorePreviousPublishState(args: {
+  database: Db;
+  siteId: string;
+  customerId: string;
+  previous: PreviousPublishState;
+  failedVersion: number;
+}): Promise<void> {
+  const rollbackErrors: string[] = [];
+
+  try {
+    const restoredRows = await args.database
+      .update(site)
+      .set({
+        publishedSnapshot: args.previous.snapshot,
+        publishedVersion: args.previous.version,
+        updatedAt: sql`now()`,
+      })
+      .where(and(eq(site.id, args.siteId), eq(site.customerId, args.customerId)))
+      .returning({ id: site.id });
+    if (restoredRows.length === 0) {
+      throw new Error(`site ${args.siteId} disappeared before publish rollback`);
+    }
+  } catch (error) {
+    rollbackErrors.push(`site row: ${describeError(error)}`);
+  }
+
+  try {
+    if (args.previous.snapshot) {
+      await rebuildSearchIndex(args.siteId, args.previous.snapshot, args.database);
+    } else {
+      await args.database.delete(siteSearchEntry).where(eq(siteSearchEntry.siteId, args.siteId));
+    }
+  } catch (error) {
+    rollbackErrors.push(`search index: ${describeError(error)}`);
+  }
+
+  try {
+    await args.database
+      .delete(siteSnapshot)
+      .where(
+        and(
+          eq(siteSnapshot.siteId, args.siteId),
+          eq(siteSnapshot.reason, 'publish'),
+          eq(siteSnapshot.publishedVersion, args.failedVersion),
+        ),
+      );
+  } catch (error) {
+    rollbackErrors.push(`version snapshot: ${describeError(error)}`);
+  }
+
+  if (rollbackErrors.length > 0) {
+    throw new Error(
+      `[publish] rollback failed for site ${args.siteId}: ${rollbackErrors.join('; ')}`,
+    );
+  }
+}
+
+async function runPublishedSideEffects(args: {
   database: Db;
   env: Bindings;
   siteId: string;
-  siteName: string;
+  customerId: string;
   snapshot: PublishedSnapshot;
+  previous: PreviousPublishState;
   broadcastPayload: PublishBroadcastPayload;
 }): Promise<void> {
-  const { siteId } = args;
-  const version = args.snapshot.version;
-  const totalStart = performance.now();
+  try {
+    await rebuildSearchIndex(args.siteId, args.snapshot, args.database);
+    await captureOnPublish(args.siteId, args.snapshot.version, args.database, args.env);
 
-  async function step(name: string, run: () => Promise<unknown>): Promise<void> {
-    const stepStart = performance.now();
-    console.log(`[publish-deferred] begin ${name}`, JSON.stringify({ siteId, version }));
-    try {
-      await run();
-      console.log(
-        `[publish-deferred] end ${name}`,
-        JSON.stringify({
-          siteId,
-          version,
-          durationMs: Math.round((performance.now() - stepStart) * 100) / 100,
-        }),
-      );
-    } catch (error) {
-      // Pass the raw error so console.error renders the full stack. The
-      // failure does NOT abort the chain — every remaining step still runs.
-      console.error(`[publish-deferred] ${name} failed`, {
-        siteId,
-        version,
-        durationMs: Math.round((performance.now() - stepStart) * 100) / 100,
-        detail: describeError(error),
-        error,
-      });
-    }
-  }
-
-  // Broadcast first so any open editor / visitor tab gets the new version
-  // ASAP. Even on a heavy site this stage is ~30-400ms.
-  await step('broadcast', async () => {
-    const doId = args.env.SITE_ROOM.idFromName(siteId);
-    const stub = args.env.SITE_ROOM.get(doId);
-    const response = await stub.fetch('https://do.invalid/broadcast', {
+    const id = args.env.SITE_ROOM.idFromName(args.siteId);
+    const stub = args.env.SITE_ROOM.get(id);
+    const broadcastResponse = await stub.fetch('https://do.invalid/broadcast', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(args.broadcastPayload),
     });
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`SiteRoom broadcast failed: ${String(response.status)} ${body}`);
+    if (!broadcastResponse.ok) {
+      const body = await broadcastResponse.text();
+      throw new Error(`SiteRoom broadcast failed: ${String(broadcastResponse.status)} ${body}`);
     }
-  });
-
-  await step('rebuildSearchIndex', () =>
-    rebuildSearchIndex(siteId, args.snapshot, args.database),
-  );
-
-  await step('captureOnPublish', () =>
-    captureOnPublish(siteId, args.snapshot.version, args.database, args.env),
-  );
-
-  // OG warmup runs LAST because it is the heaviest step and the OG-serving
-  // route renders on demand if a visitor share-unfurls before the warmup
-  // completes — so deferring it does not cause user-visible 404s, only a
-  // slower first share-unfurl in the first few seconds after publish.
-  await step('onPublishGenerateOg', () =>
-    onPublishGenerateOg(siteId, args.snapshot, args.env, args.database, args.siteName),
-  );
-
-  console.log(
-    '[publish-deferred] all-done',
-    JSON.stringify({
-      siteId,
-      version,
-      totalMs: Math.round((performance.now() - totalStart) * 100) / 100,
-    }),
-  );
+  } catch (error) {
+    const sideEffectFailure = describeError(error);
+    // Pass the raw error so console.error renders the full stack — describeError
+    // returns only the message, which is what we surface to the JSON response.
+    console.error('[publish] published side effects failed; restoring previous published state', {
+      siteId: args.siteId,
+      failedVersion: args.snapshot.version,
+      previousVersion: args.previous.version,
+      error,
+    });
+    try {
+      await restorePreviousPublishState({
+        database: args.database,
+        siteId: args.siteId,
+        customerId: args.customerId,
+        previous: args.previous,
+        failedVersion: args.snapshot.version,
+      });
+    } catch (rollbackError) {
+      const rollbackFailure = describeError(rollbackError);
+      console.error('[publish] rollback failed after published side effects failure', {
+        siteId: args.siteId,
+        failedVersion: args.snapshot.version,
+        previousVersion: args.previous.version,
+        sideEffectError: error,
+        rollbackError,
+      });
+      throw new Error(
+        `published side effects failed and rollback failed: sideEffect=${sideEffectFailure}; rollback=${rollbackFailure}`,
+      );
+    }
+    console.error('[publish] published side effects failed; restored previous published state', {
+      siteId: args.siteId,
+      failedVersion: args.snapshot.version,
+      previousVersion: args.previous.version,
+      error,
+    });
+    throw new Error(
+      `published side effects failed; restored previous published state: ${sideEffectFailure}`,
+    );
+  }
 }
 
 function renderPublishedPageHtml(
@@ -343,7 +375,9 @@ publishApi.post('/sites/:siteId', async (c) => {
   const validation = validateEditableSite(row.editableState);
   timeline.end('validateEditableSite');
   if (!validation.valid) {
-    return attachTimings(c.json({ error: 'editable state invalid', errors: validation.errors }, 400));
+    return attachTimings(
+      c.json({ error: 'editable state invalid', errors: validation.errors }, 400),
+    );
   }
 
   // Accessibility audit gate. Blocking issues (for example missing alt text,
@@ -459,7 +493,11 @@ publishApi.post('/sites/:siteId', async (c) => {
   let broadcastPayload: PublishBroadcastPayload;
   timeline.begin('buildPublishBroadcastPayload');
   try {
-    broadcastPayload = buildPublishBroadcastPayload(snapshot, row.id, requireTurnstileSiteKey(c.env));
+    broadcastPayload = buildPublishBroadcastPayload(
+      snapshot,
+      row.id,
+      requireTurnstileSiteKey(c.env),
+    );
   } catch (renderErr) {
     timeline.end('buildPublishBroadcastPayload');
     const msg = renderErr instanceof Error ? renderErr.message : String(renderErr);
@@ -468,13 +506,26 @@ publishApi.post('/sites/:siteId', async (c) => {
   }
   timeline.end('buildPublishBroadcastPayload');
 
-  // The site row UPDATE is the commit point: the publishedSnapshot column is
-  // the source of truth visitors read. Everything after this — broadcast,
-  // search index rebuild, version capture, OG warmup — is denormalised state
-  // that can be repaired on the next publish, so we defer it via
-  // c.executionCtx.waitUntil(). This keeps the response time and per-request
-  // memory footprint small so concurrent publishes on the same Worker isolate
-  // don't compound into a 1102 ("worker exceeded resource limits").
+  // Publish is all-or-nothing: generated OG images, snapshots, search index,
+  // and live broadcast are part of the external publish contract. Pre-update
+  // failures throw before the published row moves; post-update failures restore
+  // the prior published state before surfacing the error.
+  timeline.begin('onPublishGenerateOg');
+  try {
+    await onPublishGenerateOg(row.id, snapshot, c.env, database, row.name);
+  } catch (error) {
+    timeline.end('onPublishGenerateOg');
+    console.error('[publish] OG generation failed before publish row update', {
+      siteId: row.id,
+      version: snapshot.version,
+      error,
+    });
+    return attachTimings(
+      c.json({ error: 'publish OG generation failed', detail: describeError(error) }, 500),
+    );
+  }
+  timeline.end('onPublishGenerateOg');
+
   timeline.begin('db.siteRowUpdate');
   await database
     .update(site)
@@ -486,16 +537,27 @@ publishApi.post('/sites/:siteId', async (c) => {
     .where(and(eq(site.id, row.id), eq(site.customerId, customerId)));
   timeline.end('db.siteRowUpdate');
 
-  c.executionCtx.waitUntil(
-    runDeferredPublishedSideEffects({
+  timeline.begin('runPublishedSideEffects');
+  try {
+    await runPublishedSideEffects({
       database,
       env: c.env,
       siteId: row.id,
-      siteName: row.name,
+      customerId,
       snapshot,
       broadcastPayload,
-    }),
-  );
+      previous: {
+        snapshot: row.publishedSnapshot ?? null,
+        version: row.publishedVersion,
+      },
+    });
+  } catch (error) {
+    timeline.end('runPublishedSideEffects');
+    return attachTimings(
+      c.json({ error: 'publish side effects failed', detail: describeError(error) }, 500),
+    );
+  }
+  timeline.end('runPublishedSideEffects');
 
   return attachTimings(
     c.json({

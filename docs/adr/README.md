@@ -19,10 +19,23 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0007 | Yjs revival as canonical operation model for co-edit and version history | Accepted | [`docs/adr/0007-yjs-revival.md`](0007-yjs-revival.md) |
 | 0008 | Site import architecture | Accepted | [`docs/adr/0008-site-import-architecture.md`](0008-site-import-architecture.md) |
 | 0009 | Addon entitlement model: account-scoped purchase, site-scoped configuration | Accepted | [`docs/adr/0009-addon-entitlement-model.md`](0009-addon-entitlement-model.md) |
+| 0010 | Collaboration invite link is a bearer credential | Accepted | [`docs/adr/0010-invite-link-bearer-auth.md`](0010-invite-link-bearer-auth.md) |
+| 0011 | Canvas element registry as the single source of truth per element type | Proposed | [`docs/adr/0011-canvas-element-registry.md`](0011-canvas-element-registry.md) |
+| 0012 | `canvas/validate.ts` is the only write gate; consumers trust its output | Proposed | [`docs/adr/0012-validation-write-gate.md`](0012-validation-write-gate.md) |
 | 0013 | Apex host is environment-driven; production code reads it through one helper | Accepted | [`docs/adr/0013-host-config-from-environment.md`](0013-host-config-from-environment.md) |
+| 0014 | Compile-time data substitution for template-literal-bound client scripts | Proposed | [`docs/adr/0014-template-literal-data-substitution.md`](0014-template-literal-data-substitution.md) |
+| 0015 | Editor client ships as a built, cached, separately-fetched asset | Proposed | [`docs/adr/0015-editor-client-asset-pipeline.md`](0015-editor-client-asset-pipeline.md) |
+| 0016 | Fake discriminated-union patterns become real TS discriminated unions | Proposed | [`docs/adr/0016-fake-discriminated-unions-to-real.md`](0016-fake-discriminated-unions-to-real.md) |
 | 0017 | Cookie name prefix is environment-driven | Accepted | [`docs/adr/0017-cookie-name-prefix-from-env.md`](0017-cookie-name-prefix-from-env.md) |
 | 0018 | Email sender address is environment-driven | Accepted | [`docs/adr/0018-email-sender-from-env.md`](0018-email-sender-from-env.md) |
 | 0019 | `SectionRecipeId 'custom'` is the sentinel for manually-designed sections | Accepted | [`docs/adr/0019-section-recipe-custom-sentinel.md`](0019-section-recipe-custom-sentinel.md) |
+| 0020 | Per-request CSP nonce gates the editor's inline boot blob | Proposed | [`docs/adr/0020-csp-nonce-for-editor-boot-blob.md`](0020-csp-nonce-for-editor-boot-blob.md) |
+| 0021 | Dashboard ships as one shared, browser-cached asset bundle | Proposed | [`docs/adr/0021-dashboard-shared-asset-bundle.md`](0021-dashboard-shared-asset-bundle.md) |
+| 0022 | Twelve-token OKLCH theme grammar derived from a single seed | Proposed | [`docs/adr/0022-twelve-token-oklch-theme-grammar.md`](0022-twelve-token-oklch-theme-grammar.md) |
+| 0023 | Seed asset bytes are stored as base64 text files in-repo | Proposed | [`docs/adr/0023-seed-asset-bytes-as-base64-text.md`](0023-seed-asset-bytes-as-base64-text.md) |
+| 0024 | Landing page is one locked Post-Aero surface with a checked-in preview artifact | Proposed | [`docs/adr/0024-landing-locked-post-aero-with-preview.md`](0024-landing-locked-post-aero-with-preview.md) |
+| 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Proposed | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
+| 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Proposed | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

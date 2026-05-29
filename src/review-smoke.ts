@@ -727,11 +727,7 @@ assert(
 // src/auth/sign-out-route.ts. The `overridePath='/'` form of
 // resolveAuthRedirectUrl is still validated below since other callers
 // (e.g. landing page handoff back to /) rely on it.
-const devRootRedirect = resolveAuthRedirectUrl(
-  devClerkEnv,
-  `${SMOKE_APP_ORIGIN}/dashboard`,
-  '/',
-);
+const devRootRedirect = resolveAuthRedirectUrl(devClerkEnv, `${SMOKE_APP_ORIGIN}/dashboard`, '/');
 assert(
   devRootRedirect === 'http://localhost:8787/',
   `expected dev root redirect to stay local, got ${devRootRedirect}`,
@@ -744,21 +740,13 @@ assert(
   liveRedirect === `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
   `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
 );
-const liveRootRedirect = resolveAuthRedirectUrl(
-  liveClerkEnv,
-  `${SMOKE_APP_ORIGIN}/dashboard`,
-  '/',
-);
+const liveRootRedirect = resolveAuthRedirectUrl(liveClerkEnv, `${SMOKE_APP_ORIGIN}/dashboard`, '/');
 assert(
   liveRootRedirect === `${SMOKE_APP_ORIGIN}/`,
   `expected live root redirect to use the live origin, got ${liveRootRedirect}`,
 );
 try {
-  resolveAuthRedirectUrl(
-    devClerkEnv,
-    `${SMOKE_APP_ORIGIN}/dashboard`,
-    'https://example.invalid/',
-  );
+  resolveAuthRedirectUrl(devClerkEnv, `${SMOKE_APP_ORIGIN}/dashboard`, 'https://example.invalid/');
   throw new Error('expected absolute auth redirect override paths to be rejected');
 } catch (error) {
   assert(
@@ -782,6 +770,8 @@ const addonsApiSource = await readSource('./routes/api/addons.ts');
 const addonsRegistrySource = await readSource('./addons/registry.ts');
 const siteSettingsSource = await readSource('./routes/dashboard/site-settings.tsx');
 const pageSettingsSource = await readSource('./routes/dashboard/page-settings.tsx');
+const yjsProjectionSource = await readSource('./canvas/yjs-projection.ts');
+const coEditAutosaveSource = await readSource('./live/co-edit/autosave.ts');
 assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
@@ -809,8 +799,36 @@ assert(
   'expected publish to restore the prior snapshot/version if post-DB side effects fail',
 );
 assert(
+  !publishApiSource.includes('executionCtx.waitUntil'),
+  'expected publish to await contract side effects before returning ok, not defer them behind waitUntil',
+);
+assert(
   !/const\s+fullPagesSnapshot\s*=\s*\{\s*\.\.\.snapshot/.test(publishApiSource),
   'expected published page rendering to keep the original snapshot identity for responsive CSS memoization',
+);
+const resolveActionHrefStart = canvasClientSource.indexOf('function resolveActionHref(href)');
+assert(resolveActionHrefStart >= 0, 'expected editor client to define resolveActionHref');
+const buildActionBodyStart = canvasClientSource.indexOf(
+  'function buildActionBody',
+  resolveActionHrefStart,
+);
+assert(buildActionBodyStart >= 0, 'expected editor client to define buildActionBody');
+const resolveActionHrefSource = canvasClientSource.slice(
+  resolveActionHrefStart,
+  buildActionBodyStart,
+);
+assert(
+  resolveActionHrefSource.includes('throw new Error') &&
+    resolveActionHrefSource.includes('resolveActionHref: missing page id') &&
+    resolveActionHrefSource.includes('href.anchor ? base + "#" + href.anchor : base'),
+  'expected editor resolveActionHref mirror to throw on missing pages and preserve page anchors',
+);
+assert(
+  yjsProjectionSource.includes('[canvas:yjs-projection] autosave persist failed') &&
+    coEditAutosaveSource.includes('outer `attachAutosave` logs') &&
+    coEditAutosaveSource.includes('projected-state context') &&
+    !coEditAutosaveSource.includes('noop catch only'),
+  'expected autosave failure docs/source to log context and avoid stale noop-catch claims',
 );
 const importValidationIndex = importApiSource.indexOf(
   'const validation = validateEditableSite(editableState)',
@@ -1441,8 +1459,16 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
-const preparedForCustomerA = prepareSeedAssetsForCustomer('customer-a', starterTemplate.state, new Map());
-const preparedForCustomerB = prepareSeedAssetsForCustomer('customer-b', starterTemplate.state, new Map());
+const preparedForCustomerA = prepareSeedAssetsForCustomer(
+  'customer-a',
+  starterTemplate.state,
+  new Map(),
+);
+const preparedForCustomerB = prepareSeedAssetsForCustomer(
+  'customer-b',
+  starterTemplate.state,
+  new Map(),
+);
 assert(preparedForCustomerA.ok, 'expected seed asset preparation for customer-a to succeed');
 assert(preparedForCustomerB.ok, 'expected seed asset preparation for customer-b to succeed');
 const preparedAIds = new Set(
