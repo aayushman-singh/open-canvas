@@ -71,6 +71,13 @@
       "when": 1780099320000,
       "tag": "0009_lowercase_customer_emails",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780036315587,
+      "tag": "0010_drop_legacy_template_page",
+      "breakpoints": true
     }
   ]
 }
