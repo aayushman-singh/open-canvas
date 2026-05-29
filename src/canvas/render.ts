@@ -280,9 +280,17 @@ export interface RenderSnapshotOptions {
 export function renderCanvasSnapshot(
   snapshot: PublishedSnapshot,
   assetBasePath: string,
-  siteId: string = '',
+  siteId: string,
   opts: RenderSnapshotOptions,
 ): string {
+  // siteId feeds form action URLs (/__rev01/forms/<siteId>/<formId>). An empty
+  // string would silently produce a broken double-slash action that POSTs to
+  // a 404. Fail loudly at the boundary instead of emitting broken HTML.
+  if (!siteId) {
+    throw new Error(
+      'renderCanvasSnapshot: siteId is required and must be non-empty; got empty string',
+    );
+  }
   // Belt-and-braces: even though the validator rejects unknown kits at the API
   // boundary, the renderer refuses to emit HTML for a kit that has no preset
   // — there is no default. A missing token must never silently degrade.

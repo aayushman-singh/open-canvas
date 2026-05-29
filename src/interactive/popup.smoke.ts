@@ -64,7 +64,7 @@ const popupSnapshot: PublishedSnapshot = {
   ],
 };
 
-const popupHtml = renderCanvasSnapshot(popupSnapshot, '/assets', '', { turnstileSiteKey: 'turnstile-test-key' });
+const popupHtml = renderCanvasSnapshot(popupSnapshot, '/assets', 'smoke-site', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
   popupHtml.includes('data-rev01-popup="true"'),
@@ -118,7 +118,7 @@ const normalSnapshot: PublishedSnapshot = {
   ],
 };
 
-const normalHtml = renderCanvasSnapshot(normalSnapshot, '/assets', '', { turnstileSiteKey: 'turnstile-test-key' });
+const normalHtml = renderCanvasSnapshot(normalSnapshot, '/assets', 'smoke-site', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
   !normalHtml.includes('data-rev01-popup'),
@@ -200,7 +200,7 @@ const delaySnapshot: PublishedSnapshot = {
   ],
 };
 
-const delayHtml = renderCanvasSnapshot(delaySnapshot, '/assets', '', { turnstileSiteKey: 'turnstile-test-key' });
+const delayHtml = renderCanvasSnapshot(delaySnapshot, '/assets', 'smoke-site', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
   delayHtml.includes('data-rev01-trigger-type="delay"'),

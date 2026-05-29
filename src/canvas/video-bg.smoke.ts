@@ -59,7 +59,7 @@ const snapshot: PublishedSnapshot = {
   ],
 };
 
-const html = renderCanvasSnapshot(snapshot, '/assets', '', {
+const html = renderCanvasSnapshot(snapshot, '/assets', 'smoke-site', {
   turnstileSiteKey: 'turnstile-test-key',
 });
 

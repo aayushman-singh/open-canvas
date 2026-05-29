@@ -285,10 +285,15 @@ function PreviewPage({
     ...(template.state.footer ? { footer: template.state.footer } : {}),
     ...(template.state.customStyleKit ? { customStyleKit: template.state.customStyleKit } : {}),
   };
+  // Template previews have no backing site yet — forms inside a preview
+  // cannot submit to a real /__rev01/forms/<siteId>/<formId> endpoint. Pass
+  // an explicit synthetic id so the renderer's siteId check still passes and
+  // any accidental form POST hits a 404 against the forms router instead of
+  // a silent double-slash URL.
   const html = renderCanvasSnapshot(
     snapshot,
     `/dashboard/templates/${template.id}/assets`,
-    '',
+    '__template-preview__',
     { turnstileSiteKey },
   );
 

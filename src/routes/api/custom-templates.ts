@@ -302,10 +302,15 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
     ...(tmpl.siteState.footer ? { footer: tmpl.siteState.footer } : {}),
     ...(tmpl.siteState.customStyleKit ? { customStyleKit: tmpl.siteState.customStyleKit } : {}),
   };
+  // Template previews have no backing site yet — forms inside a preview
+  // cannot submit to a real /__rev01/forms/<siteId>/<formId> endpoint. Pass
+  // an explicit synthetic id so the renderer's siteId check still passes and
+  // any accidental form POST hits a 404 against the forms router instead of
+  // a silent double-slash URL.
   const html = renderCanvasSnapshot(
     snapshot,
     `/api/custom-templates/${c.req.param('id')}/assets`,
-    '',
+    '__template-preview__',
     { turnstileSiteKey: requireTurnstileSiteKey(c.env) },
   );
 
