@@ -3141,6 +3141,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "video-playback": function(element, host) { mountVideoPlayback(element, host); },
     "accordion-items": function(element, host) { mountAccordionItems(element, host); },
     "carousel-slides": function(element, host) { mountCarouselSlides(element, host); },
+    "table-grid": function(element, host) { mountTableGrid(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -3622,7 +3623,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     host.appendChild(field("Slides", slideListHost));
   }
 
-  function buildTableInspector(element) {
+  // buildTableInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/table.ts. 2D rows × columns editor lives in
+  // mountTableGrid; zebra / collapseOnPhone are now declarative checkboxes.
+  function mountTableGrid(element, host) {
     if (!Array.isArray(element.columns)) element.columns = [];
     if (!Array.isArray(element.rows)) element.rows = [];
     var gridHost = document.createElement("div");
@@ -3779,27 +3783,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     }
     renderTableGrid();
-    inspector.appendChild(field("Data", gridHost));
-
-    var zebraCheck = document.createElement("input");
-    zebraCheck.type = "checkbox";
-    zebraCheck.checked = !!element.zebra;
-    zebraCheck.addEventListener("change", function() {
-      element.zebra = zebraCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Zebra striping", zebraCheck));
-
-    var collapseCheck = document.createElement("input");
-    collapseCheck.type = "checkbox";
-    collapseCheck.checked = !!element.collapseOnPhone;
-    collapseCheck.addEventListener("change", function() {
-      element.collapseOnPhone = collapseCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Collapse on phone", collapseCheck));
+    host.appendChild(field("Data", gridHost));
   }
 
   function buildNavInspector(element) {
@@ -4333,9 +4317,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media, accordion, carousel) have specs;
-    // remaining types (chart, form, table, nav) still use their per-type
-    // builders until the next PR in the migration series.
+    // embed, text, action, media, accordion, carousel, table) have specs;
+    // remaining types (chart, form, nav) still use their per-type builders
+    // until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
@@ -4343,7 +4327,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const inspectorBuilders = {
         chart: buildChartInspector,
         form: buildFormInspector,
-        table: buildTableInspector,
         nav: buildNavInspector,
       };
       const inspectorBuilder = inspectorBuilders[element.type];

@@ -104,6 +104,15 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     showArrows: true,
     showDots: true,
   },
+  table: {
+    id: 'fx-table',
+    type: 'table',
+    box: { x: 0, y: 0, w: 480, h: 240, z: 0 },
+    columns: [{ id: 'fx-col-1', header: 'Name' }],
+    rows: [{ id: 'fx-row-1', cells: { 'fx-col-1': 'Alice' } }],
+    zebra: true,
+    collapseOnPhone: false,
+  },
 };
 
 // Action handlers, busy flags, and mount handlers the interpreter binds
@@ -118,6 +127,7 @@ const REGISTERED_MOUNTS = [
   'video-playback',
   'accordion-items',
   'carousel-slides',
+  'table-grid',
 ] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {

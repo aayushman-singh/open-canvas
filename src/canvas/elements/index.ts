@@ -21,7 +21,7 @@ import type { InspectorSpec } from './inspector-spec.js';
 import { mediaInspectorSpec, renderMedia } from './media.js';
 import { renderNav } from './nav.js';
 import { renderShape, shapeInspectorSpec } from './shape.js';
-import { renderTable } from './table.js';
+import { renderTable, tableInspectorSpec } from './table.js';
 import { renderText, textInspectorSpec } from './text.js';
 
 // Re-export every element interface so downstream code has a single import
@@ -210,4 +210,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   media: mediaInspectorSpec,
   accordion: accordionInspectorSpec,
   carousel: carouselInspectorSpec,
+  table: tableInspectorSpec,
 };
