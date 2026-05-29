@@ -22,6 +22,7 @@ import a11yRoute from './a11y/route';
 import a11yReportRoute from './routes/dashboard/a11y-report';
 import pageSettingsRoute from './routes/dashboard/page-settings';
 import sitemapRouter from './seo/sitemap/route';
+import apexSeoRouter from './seo/apex';
 import fontsRouter from './fonts/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
 import addonShopRoute from './routes/dashboard/addon-shop';
@@ -76,6 +77,14 @@ app.route('/auth', signInRoute);
 // Looks up the current subdomain at click time and 302s to the published
 // subdomain's /__accept-invite handler with the same token.
 app.route('/__invite', inviteRedirectRoute);
+
+// Apex SEO surface — /sitemap.xml, /robots.txt, /og-card.png for the
+// marketing landing page. Each handler checks `isApexHost(env, host)` and
+// calls `next()` for subdomain / custom-domain requests so the per-site
+// `sitemapRouter` below can serve them. Mounted BEFORE `sitemapRouter` so
+// apex requests land here first; mounted BEFORE `landing` to keep all SEO
+// surface in one place.
+app.route('/', apexSeoRouter);
 
 // The favicon route lives inside `landing` next to the rest of the brand
 // surface (see src/landing/index.tsx).
