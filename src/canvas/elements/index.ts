@@ -18,7 +18,7 @@ import { containerInspectorSpec, renderContainer } from './container.js';
 import { embedInspectorSpec, renderEmbed } from './embed.js';
 import { renderForm } from './form.js';
 import type { InspectorSpec } from './inspector-spec.js';
-import { renderMedia } from './media.js';
+import { mediaInspectorSpec, renderMedia } from './media.js';
 import { renderNav } from './nav.js';
 import { renderShape, shapeInspectorSpec } from './shape.js';
 import { renderTable } from './table.js';
@@ -207,4 +207,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   embed: embedInspectorSpec,
   text: textInspectorSpec,
   action: actionInspectorSpec,
+  media: mediaInspectorSpec,
 };

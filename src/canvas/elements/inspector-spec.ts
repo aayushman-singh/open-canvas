@@ -36,7 +36,8 @@ export type InspectorField =
   | CheckboxField
   | NumberField
   | ButtonActionField
-  | ActionHrefField;
+  | ActionHrefField
+  | CustomMountField;
 
 /**
  * Static option list. The element's current value is one of the option
@@ -156,6 +157,31 @@ export interface ActionHrefField {
   valueLabel: string;
   /** Top-level path where the href DU lives (e.g. "href"). */
   path: string;
+}
+
+/**
+ * Escape hatch for imperative inspector fragments that don't fit the
+ * declarative kinds — picker mounts, list-card editors with their own
+ * mutation logic, conditional sub-trees that need to read element state to
+ * decide whether to mount anything at all. The interpreter dispatches to a
+ * named handler in `INSPECTOR_MOUNT_HANDLERS` and passes `(element, host)`
+ * — the handler is free to skip rendering, mount a complex sub-tree, wire
+ * up arbitrary event handlers, anything the legacy buildXInspector did.
+ *
+ * Using `custom-mount` is an explicit signal that "this fragment is not yet
+ * generalizable" — when a SECOND element wants the same pattern, generalize
+ * it into a real declarative kind. Two custom-mount entries with related
+ * shapes is the trigger to design the proper kind.
+ */
+export interface CustomMountField {
+  kind: 'custom-mount';
+  /**
+   * Named mount handler the interpreter dispatches to. Mirrors how
+   * `button-action` names its handler — the spec ships strings only, the
+   * interpreter holds the imperative function. Adding a new spec entry
+   * requires registering the handler in canvas-client.ts first.
+   */
+  name: string;
 }
 
 /**

@@ -80,19 +80,32 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     variant: 'solid',
     href: { type: 'external', url: 'https://example.com' },
   },
+  media: {
+    id: 'fx-media',
+    type: 'media',
+    box: { x: 0, y: 0, w: 160, h: 120, z: 0 },
+    mediaKind: 'image',
+    assetId: 'fx-asset',
+    alt: 'fixture image',
+    fit: 'cover',
+  },
 };
 
-// Action handlers + busy flags the interpreter mounts inside canvas-client.ts.
-// Mirrored here so the smoke can verify that every `button-action` field in
-// a migrated spec names a registered handler — the interpreter throws at
-// first mount on a missing handler, so this check catches the gap at
-// build-time instead.
+// Action handlers, busy flags, and mount handlers the interpreter binds
+// inside canvas-client.ts. Mirrored here so the smoke can verify that every
+// `button-action` / `custom-mount` field in a migrated spec names a
+// registered handler — the interpreter throws at first mount on a missing
+// handler, so this check catches the gap at build-time instead.
 const REGISTERED_ACTIONS = ['rewrite-text', 'replace-media'] as const;
 const REGISTERED_BUSY_FLAGS = ['aiBusy'] as const;
+const REGISTERED_MOUNTS = ['media-picker', 'video-playback'] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {
   // `action-href` carries its own two labels (discriminator + value) instead
   // of a single `label` — both must be non-empty strings.
+  // `custom-mount` is label-free and path-free by design: its handler runs
+  // imperative DOM and may decide to render nothing (e.g. video-playback on
+  // image elements). Skip both checks for that kind.
   if (field.kind === 'action-href') {
     assert(
       typeof field.discriminatorLabel === 'string' && field.discriminatorLabel.length > 0,
@@ -102,13 +115,13 @@ function checkField(field: InspectorField, fixture: object, where: string): void
       typeof field.valueLabel === 'string' && field.valueLabel.length > 0,
       `${where} action-href: valueLabel required`,
     );
-  } else {
+  } else if (field.kind !== 'custom-mount') {
     assert(typeof field.label === 'string' && field.label.length > 0, `${where}: label required`);
   }
 
-  // `button-action` is the only path-free field kind — it dispatches via a
-  // named handler instead of binding to an element property.
-  if (field.kind !== 'button-action') {
+  // `button-action` + `custom-mount` are the path-free field kinds — they
+  // dispatch via named handlers instead of binding to an element property.
+  if (field.kind !== 'button-action' && field.kind !== 'custom-mount') {
     assert(typeof field.path === 'string' && field.path.length > 0, `${where}: path required`);
     assert(
       Object.prototype.hasOwnProperty.call(fixture, field.path),
@@ -179,6 +192,12 @@ function checkField(field: InspectorField, fixture: object, where: string): void
       );
       return;
     }
+    case 'custom-mount':
+      assert(
+        REGISTERED_MOUNTS.includes(field.name as (typeof REGISTERED_MOUNTS)[number]),
+        `${where} custom-mount: name "${field.name}" is not in REGISTERED_MOUNTS (register the mount handler in canvas-client.ts before referencing it from a spec)`,
+      );
+      return;
     default: {
       const exhaustive: never = field;
       void exhaustive;

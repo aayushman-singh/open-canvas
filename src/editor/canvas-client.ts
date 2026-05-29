@@ -3026,6 +3026,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         renderActionHrefField(f, element);
         return;
       }
+      if (f.kind === "custom-mount") {
+        var mount = INSPECTOR_MOUNT_HANDLERS[f.name];
+        if (typeof mount !== "function") {
+          throw new Error("renderInspectorSpec: no mount handler registered for " + JSON.stringify(f.name));
+        }
+        mount(element, inspector);
+        return;
+      }
       throw new Error("renderInspectorSpec: unknown field kind " + JSON.stringify(f.kind));
     });
   }
@@ -3123,6 +3131,68 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   var INSPECTOR_BUSY_FLAGS = {
     "aiBusy": function() { return aiBusy; },
   };
+  // Mount handler registry for the "custom-mount" field kind. Each entry
+  // receives (element, host) and is free to append nothing, one node, or
+  // a full sub-tree. video-playback skips entirely on image elements
+  // because the playback controls are video-only — that conditional lives
+  // in the mount fn rather than the spec.
+  var INSPECTOR_MOUNT_HANDLERS = {
+    "media-picker": function(element, host) { mountMediaPicker(element, host); },
+    "video-playback": function(element, host) { mountVideoPlayback(element, host); },
+  };
+
+  // Video-playback controls — autoplay, muted, loop, controls — with the
+  // autoplay-implies-muted enforcement that the legacy buildMediaInspector
+  // carried. No-op on images. Lazy-initialises element.playback on first
+  // render so older sites that pre-date the playback field still pick up
+  // the default shape on first inspector open.
+  function mountVideoPlayback(element, host) {
+    if (element.mediaKind !== "video") return;
+    var playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
+    var autoplay = document.createElement("input");
+    autoplay.type = "checkbox"; autoplay.checked = !!playback.autoplay;
+    var muted = document.createElement("input");
+    muted.type = "checkbox"; muted.checked = !!playback.muted;
+    var loop = document.createElement("input");
+    loop.type = "checkbox"; loop.checked = !!playback.loop;
+    var controls = document.createElement("input");
+    controls.type = "checkbox"; controls.checked = !!playback.controls;
+
+    function enforceMuted() {
+      if (autoplay.checked) {
+        muted.checked = true;
+        muted.disabled = true;
+      } else {
+        muted.disabled = false;
+      }
+    }
+    enforceMuted();
+
+    autoplay.addEventListener("change", function() {
+      playback.autoplay = autoplay.checked;
+      enforceMuted();
+      playback.muted = muted.checked;
+      scheduleSave();
+    });
+    muted.addEventListener("change", function() {
+      if (autoplay.checked) { muted.checked = true; return; }
+      playback.muted = muted.checked;
+      scheduleSave();
+    });
+    loop.addEventListener("change", function() { playback.loop = loop.checked; scheduleSave(); });
+    controls.addEventListener("change", function() { playback.controls = controls.checked; scheduleSave(); });
+
+    function rowFor(node, labelText) {
+      var row = document.createElement("div"); row.className = "row";
+      row.appendChild(node);
+      var lbl = document.createElement("label"); lbl.textContent = labelText; row.appendChild(lbl);
+      return row;
+    }
+    host.appendChild(rowFor(autoplay, "autoplay"));
+    host.appendChild(rowFor(muted, "muted"));
+    host.appendChild(rowFor(loop, "loop"));
+    host.appendChild(rowFor(controls, "controls"));
+  }
 
   // -- Extracted inspector builders -----------------------------------------
 
@@ -3137,81 +3207,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // DU-shaped fields can copy the pattern or generalize when a second
   // element requires it).
 
-  function buildMediaInspector(element) {
-    const aiBtn = document.createElement("button");
-    aiBtn.type = "button";
-    aiBtn.textContent = "AI media";
-    aiBtn.setAttribute("data-ai-button", "replace-media");
-    if (aiBusy) aiBtn.disabled = true;
-    aiBtn.addEventListener("click", () => { aiReplaceMedia(element.id); });
-    inspector.appendChild(aiBtn);
-
-    mountMediaPicker(element, inspector);
-
-    const fit = selectInput(["cover", "contain"], element.fit);
-    fit.addEventListener("change", () => {
-      element.fit = fit.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Fit", fit));
-
-    if (element.mediaKind === "video") {
-      const playback = element.playback || (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
-      const autoplay = document.createElement("input");
-      autoplay.type = "checkbox"; autoplay.checked = !!playback.autoplay;
-      const muted = document.createElement("input");
-      muted.type = "checkbox"; muted.checked = !!playback.muted;
-      const loop = document.createElement("input");
-      loop.type = "checkbox"; loop.checked = !!playback.loop;
-      const controls = document.createElement("input");
-      controls.type = "checkbox"; controls.checked = !!playback.controls;
-
-      function enforceMuted() {
-        if (autoplay.checked) {
-          muted.checked = true;
-          muted.disabled = true;
-        } else {
-          muted.disabled = false;
-        }
-      }
-      enforceMuted();
-
-      autoplay.addEventListener("change", () => {
-        playback.autoplay = autoplay.checked;
-        enforceMuted();
-        playback.muted = muted.checked;
-        scheduleSave();
-      });
-      muted.addEventListener("change", () => {
-        if (autoplay.checked) { muted.checked = true; return; }
-        playback.muted = muted.checked;
-        scheduleSave();
-      });
-      loop.addEventListener("change", () => { playback.loop = loop.checked; scheduleSave(); });
-      controls.addEventListener("change", () => { playback.controls = controls.checked; scheduleSave(); });
-
-      const row = document.createElement("div"); row.className = "row";
-      row.appendChild(autoplay);
-      const al = document.createElement("label"); al.textContent = "autoplay"; row.appendChild(al);
-      inspector.appendChild(row);
-
-      const row2 = document.createElement("div"); row2.className = "row";
-      row2.appendChild(muted);
-      const ml = document.createElement("label"); ml.textContent = "muted"; row2.appendChild(ml);
-      inspector.appendChild(row2);
-
-      const row3 = document.createElement("div"); row3.className = "row";
-      row3.appendChild(loop);
-      const ll = document.createElement("label"); ll.textContent = "loop"; row3.appendChild(ll);
-      inspector.appendChild(row3);
-
-      const row4 = document.createElement("div"); row4.className = "row";
-      row4.appendChild(controls);
-      const cl = document.createElement("label"); cl.textContent = "controls"; row4.appendChild(cl);
-      inspector.appendChild(row4);
-    }
-  }
+  // buildMediaInspector migrated to INSPECTOR_DISPATCH per ADR 0011 Step 1;
+  // see src/canvas/elements/media.ts. The two imperative sub-trees
+  // (mountMediaPicker, mountVideoPlayback) are registered as custom-mount
+  // handlers in INSPECTOR_MOUNT_HANDLERS above; mountVideoPlayback owns the
+  // "skip on image" conditional and the autoplay-implies-muted enforcement.
 
   function buildFormInspector(element) {
     if (!Array.isArray(element.fields)) element.fields = [];
@@ -4352,7 +4352,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action) have specs; remaining types (media, chart, form,
+    // embed, text, action, media) have specs; remaining types (chart, form,
     // accordion, carousel, table, nav) still use their per-type builders
     // until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
@@ -4360,7 +4360,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       renderInspectorSpec(inspectorSpec, element);
     } else {
       const inspectorBuilders = {
-        media: buildMediaInspector,
         chart: buildChartInspector,
         form: buildFormInspector,
         accordion: buildAccordionInspector,
