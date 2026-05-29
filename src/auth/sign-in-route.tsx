@@ -226,7 +226,33 @@ const authPageStyles = `
     border: none;
     box-shadow: none;
     padding: 0;
+    /* Clerk's internal .cl-card carries a default min-width / padding-inline
+       that pushes its left edge ~28px right of our 384px formcard and makes
+       it 16px wider than the formcard, breaking visual alignment between
+       the segmented Sign in/Create account tab pill above and the form
+       below. Force the card back to the formcard's bounds. */
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
   }
+  /* "Secured by Clerk" badge: Clerk renders it 400x48 inside .cl-card,
+     which crowds the OAuth row and visually shifts everything right. Move
+     it under the card as a centred, muted footnote so the form aligns
+     cleanly with the tabs and the badge still appears. */
+  .cl-logoBox {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 20px auto 0 !important;
+    padding: 0 !important;
+    opacity: 0.55;
+    transform: scale(0.9);
+    transform-origin: center top;
+  }
+  .cl-logoBox:hover { opacity: 0.85; }
   .oc-clerk-header,
   .oc-clerk-header-title,
   .oc-clerk-header-subtitle {
@@ -390,7 +416,14 @@ function Page({
       var mode="signin";
       var redirectUrl=new URLSearchParams(window.location.search).get("redirect_url")||"/dashboard";
       function mount(){
-        host.innerHTML="";
+        // Tear down the previous widget through Clerk's own unmount so its
+        // React reconciler clears its internal node references. Skipping
+        // unmount and just wiping innerHTML leaves stale references, and
+        // Clerk later throws NotFoundError: Failed to execute 'removeChild'
+        // when it tries to clean up its own listeners. Both unmount calls
+        // are safe to invoke even when the widget isn't mounted.
+        try{window.Clerk.unmountSignIn&&window.Clerk.unmountSignIn(host);}catch(_){ }
+        try{window.Clerk.unmountSignUp&&window.Clerk.unmountSignUp(host);}catch(_){ }
         var opts={appearance:appearance,redirectUrl:redirectUrl,afterSignInUrl:redirectUrl,afterSignUpUrl:redirectUrl};
         if(mode==="signup"){window.Clerk.mountSignUp(host,opts);}
         else{window.Clerk.mountSignIn(host,opts);}
