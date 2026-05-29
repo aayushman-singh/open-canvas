@@ -30,6 +30,8 @@ jobs:
       - run: bun run host-config:smoke
       - run: bun run host-literal-guard:smoke
       - run: bun run canvas:smoke
+      - run: bun run validate-parity:smoke
+      - run: bun run canvas-state-gate:smoke
       - run: bun run inspector-dispatch:smoke
       - run: bun run agent-tool-dispatch:smoke
       - run: bun run sidebar-dispatch:smoke

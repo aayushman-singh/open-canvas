@@ -353,7 +353,11 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
 
   const description = optionalStringPatch(body, 'description');
   const ogImageAssetId = optionalStringPatch(body, 'ogImageAssetId');
-  if (ogImageAssetId.present && ogImageAssetId.value !== undefined) {
+  if (
+    ogImageAssetId.present &&
+    ogImageAssetId.value !== undefined &&
+    typeof ogImageAssetId.value === 'string'
+  ) {
     const isImage = await assetIsImageForCustomer(
       c.env,
       ogImageAssetId.value,
@@ -374,7 +378,13 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
     if (canonical.present) setOptionalPageField(nextPage, 'canonical', canonical.value);
     if (locale.present) setOptionalPageField(nextPage, 'locale', locale.value);
     if ('noIndex' in body) {
-      setOptionalPageField(nextPage, 'noIndex', body.noIndex === true ? true : undefined);
+      if (body.noIndex === true) {
+        nextPage.noIndex = true;
+      } else if (body.noIndex === false || body.noIndex === null || body.noIndex === undefined) {
+        delete nextPage.noIndex;
+      } else {
+        (nextPage as unknown as Record<string, unknown>).noIndex = body.noIndex;
+      }
     }
     return nextPage;
   });
