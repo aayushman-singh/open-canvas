@@ -65,6 +65,5 @@ This ADR does not decide:
 
 ## Follow-ups
 
-- Plan: `docs/superpowers/plans/2026-05-23-05-custom-domains.md` — implementation specification, route shapes, smoke tests, and dashboard UI surface.
 - Future ADR if and when apex-domain support is required (DNS provider integration to enable CNAME flattening or ALIAS records).
 - Future ADR if quota or billing policies become real.

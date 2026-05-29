@@ -71,7 +71,6 @@ This ADR does not decide:
 
 ## Follow-ups
 
-- Plan: `docs/superpowers/plans/2026-05-23-02-asset-pipeline.md` — implementation specification, route shapes, smoke tests, and migration.
 - A future ADR for Cloudflare Stream when the video story moves beyond originals.
 - A future ADR if storage quota or asset-budget policies become real.
 - Cross-reference from ADR 0004 once this ADR is merged.

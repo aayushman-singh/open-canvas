@@ -84,7 +84,5 @@ This ADR does not decide:
 
 ## Follow-ups
 
-- Plan: `docs/superpowers/plans/2026-05-23-03-version-history.md` — snapshot persistence and restore.
-- Plan: `docs/superpowers/plans/2026-05-23-04-co-edit.md` — Yjs sync over `SiteRoom`.
 - A future ADR if the `TextElement.content` representation is upgraded to a Yjs `Y.Array<Y.Map>` for per-keystroke text CRDT.
 - A future ADR if the `Y.Doc` ↔ JSON projection becomes a performance bottleneck at scale and is replaced or restructured.
