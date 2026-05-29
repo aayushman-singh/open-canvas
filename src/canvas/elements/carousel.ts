@@ -19,6 +19,7 @@
 //
 // Out of scope: auto-play, multi-row carousels, touch inertia.
 
+import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml } from './render-utils.js';
 
@@ -142,3 +143,17 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
 }
 
 export const CAROUSEL_RECIPE_ID = 'carousel-strip' as const;
+
+export const carouselInspectorSpec: InspectorSpec = {
+  fields: [
+    // Per-slide editor (thumbnail + upload + caption + link + remove).
+    // Imperative because each slide needs a thumbnail preview, an upload
+    // button wired to postAssetUpload, and an asset-id round-trip after
+    // upload completes. Same custom-mount shape as accordion-items; the
+    // third such mount lands the trigger to design a declarative
+    // list-editor kind per ADR 0011 dec 3.
+    { kind: 'custom-mount', name: 'carousel-slides' },
+    { kind: 'checkbox', label: 'Show arrows', path: 'showArrows' },
+    { kind: 'checkbox', label: 'Show dots', path: 'showDots' },
+  ],
+};

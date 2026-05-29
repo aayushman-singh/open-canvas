@@ -10,7 +10,7 @@ import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
 import { accordionInspectorSpec, renderAccordion } from './accordion.js';
 import { actionInspectorSpec, renderAction } from './action.js';
-import { renderCarousel } from './carousel.js';
+import { carouselInspectorSpec, renderCarousel } from './carousel.js';
 import { renderChart } from './chart.js';
 import { codeInspectorSpec, renderCode } from './code.js';
 import { renderCollection } from './collection.js';
@@ -209,4 +209,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   action: actionInspectorSpec,
   media: mediaInspectorSpec,
   accordion: accordionInspectorSpec,
+  carousel: carouselInspectorSpec,
 };

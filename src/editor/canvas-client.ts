@@ -3140,6 +3140,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "media-picker": function(element, host) { mountMediaPicker(element, host); },
     "video-playback": function(element, host) { mountVideoPlayback(element, host); },
     "accordion-items": function(element, host) { mountAccordionItems(element, host); },
+    "carousel-slides": function(element, host) { mountCarouselSlides(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -3519,7 +3520,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     host.appendChild(field("Items", itemListHost));
   }
 
-  function buildCarouselInspector(element) {
+  // buildCarouselInspector migrated to INSPECTOR_DISPATCH per ADR 0011
+  // Step 1; see src/canvas/elements/carousel.ts. Per-slide editor (thumbnail
+  // + upload + caption + link) lives in mountCarouselSlides; showArrows /
+  // showDots are now declarative checkbox fields.
+  function mountCarouselSlides(element, host) {
     if (!Array.isArray(element.slides)) element.slides = [];
     var slideListHost = document.createElement("div");
 
@@ -3614,27 +3619,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       slideListHost.appendChild(addBtn);
     }
     renderSlideList();
-    inspector.appendChild(field("Slides", slideListHost));
-
-    var arrowsCheck = document.createElement("input");
-    arrowsCheck.type = "checkbox";
-    arrowsCheck.checked = !!element.showArrows;
-    arrowsCheck.addEventListener("change", function() {
-      element.showArrows = arrowsCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Show arrows", arrowsCheck));
-
-    var dotsCheck = document.createElement("input");
-    dotsCheck.type = "checkbox";
-    dotsCheck.checked = !!element.showDots;
-    dotsCheck.addEventListener("change", function() {
-      element.showDots = dotsCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Show dots", dotsCheck));
+    host.appendChild(field("Slides", slideListHost));
   }
 
   function buildTableInspector(element) {
@@ -4348,9 +4333,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media, accordion) have specs; remaining types
-    // (chart, form, carousel, table, nav) still use their per-type builders
-    // until the next PR in the migration series.
+    // embed, text, action, media, accordion, carousel) have specs;
+    // remaining types (chart, form, table, nav) still use their per-type
+    // builders until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
@@ -4358,7 +4343,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const inspectorBuilders = {
         chart: buildChartInspector,
         form: buildFormInspector,
-        carousel: buildCarouselInspector,
         table: buildTableInspector,
         nav: buildNavInspector,
       };
