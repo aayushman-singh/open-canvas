@@ -21,6 +21,8 @@
 // `bun run review:smoke` after editing string-heavy code here; that smoke
 // imports the emitted client as JavaScript and catches broken escaping.
 
+import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
+
 export interface CanvasClientScriptParams {
   siteId: string;
   apiBase?: string;
@@ -42,13 +44,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     );
   }
 
-  // Two safe interpolations: siteId and apiBase. Both are validated above.
+  // Safe interpolations: siteId, apiBase, INSPECTOR_DISPATCH. siteId + apiBase
+  // are validated above; INSPECTOR_DISPATCH is a static module export of pure
+  // data (ADR 0011 Step 1) so JSON.stringify produces a value-only payload
+  // with no embedded code.
   // Everything inside the IIFE is plain JavaScript, not TypeScript.
+  const inspectorDispatchJson = JSON.stringify(INSPECTOR_DISPATCH);
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
   const API_BASE = ${JSON.stringify(apiBase)};
   const WS_TOKEN = ${JSON.stringify(wsToken)};
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
+  const INSPECTOR_DISPATCH = ${inspectorDispatchJson};
 
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic"];
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
@@ -2872,6 +2879,116 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     renderGrid();
   }
 
+  // -- Spec-driven inspector interpreter (ADR 0011 Step 1) ------------------
+  //
+  // Walks an InspectorSpec read from INSPECTOR_DISPATCH (interpolated as
+  // JSON at script-emit time) and renders DOM the same way the legacy
+  // buildXInspector functions below did. Migrated element types route here
+  // via the dispatch site further down; unmigrated types still fall through
+  // to their per-type buildXInspector. Cutover ADR removes the fallback
+  // once every type has a spec.
+
+  function renderInspectorSpec(spec, element) {
+    spec.fields.forEach(function(f) {
+      if (f.kind === "select") {
+        var cur = element[f.path];
+        if (typeof cur !== "string" || f.options.indexOf(cur) < 0) {
+          cur = f.defaultValue || f.options[0];
+        }
+        var sel = selectInput(f.options, cur);
+        sel.addEventListener("change", function() {
+          element[f.path] = sel.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, sel));
+        return;
+      }
+      if (f.kind === "select-mapped") {
+        var tol = typeof f.tolerance === "number" ? f.tolerance : 0.01;
+        var raw = element[f.path];
+        var curLabel = null;
+        if (typeof raw === "number") {
+          for (var oi = 0; oi < f.options.length; oi++) {
+            if (Math.abs(f.options[oi].value - raw) < tol) {
+              curLabel = f.options[oi].label;
+              break;
+            }
+          }
+        }
+        if (curLabel === null) {
+          for (var di = 0; di < f.options.length; di++) {
+            if (Math.abs(f.options[di].value - f.defaultValue) < tol) {
+              curLabel = f.options[di].label;
+              break;
+            }
+          }
+        }
+        if (curLabel === null) curLabel = f.options[0].label;
+        var labels = [];
+        for (var li = 0; li < f.options.length; li++) labels.push(f.options[li].label);
+        var msel = selectInput(labels, curLabel);
+        msel.addEventListener("change", function() {
+          for (var oj = 0; oj < f.options.length; oj++) {
+            if (f.options[oj].label === msel.value) {
+              element[f.path] = f.options[oj].value;
+              break;
+            }
+          }
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, msel));
+        return;
+      }
+      if (f.kind === "text") {
+        var ti = document.createElement("input");
+        ti.type = "text";
+        ti.value = typeof element[f.path] === "string" ? element[f.path] : "";
+        if (f.placeholder) ti.placeholder = f.placeholder;
+        ti.addEventListener("change", function() {
+          if (f.required && ti.value.length === 0) {
+            setStatus(f.label + " cannot be empty", "error");
+            ti.value = element[f.path] || "";
+            return;
+          }
+          element[f.path] = ti.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, ti));
+        return;
+      }
+      if (f.kind === "textarea") {
+        var ta = document.createElement("textarea");
+        if (typeof f.rows === "number") ta.rows = f.rows;
+        if (typeof f.cssText === "string") ta.style.cssText = f.cssText;
+        ta.value = typeof element[f.path] === "string" ? element[f.path] : "";
+        if (f.placeholder) ta.placeholder = f.placeholder;
+        ta.addEventListener("change", function() {
+          element[f.path] = ta.value;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, ta));
+        return;
+      }
+      if (f.kind === "checkbox") {
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = !!element[f.path];
+        cb.addEventListener("change", function() {
+          element[f.path] = cb.checked;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+        inspector.appendChild(field(f.label, cb));
+        return;
+      }
+      throw new Error("renderInspectorSpec: unknown field kind " + JSON.stringify(f.kind));
+    });
+  }
+
   // -- Extracted inspector builders -----------------------------------------
 
   function buildTextInspector(element) {
@@ -3017,25 +3134,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(field("Destination", hrefValueContainer));
   }
 
-  function buildShapeInspector(element) {
-    const variant = selectInput(SHAPE_VARIANTS, element.variant);
-    variant.addEventListener("change", () => {
-      element.variant = variant.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Variant", variant));
-  }
-
-  function buildContainerInspector(element) {
-    const variant = selectInput(SURFACE_VARIANTS, element.variant);
-    variant.addEventListener("change", () => {
-      element.variant = variant.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Variant", variant));
-  }
+  // buildShapeInspector + buildContainerInspector migrated to INSPECTOR_DISPATCH
+  // per ADR 0011 Step 1; see src/canvas/elements/{shape,container}.ts.
 
   function buildMediaInspector(element) {
     const aiBtn = document.createElement("button");
@@ -3291,79 +3391,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(field("Webhook URL", webhookInput));
   }
 
-  function buildEmbedInspector(element) {
-    var urlInput = document.createElement("input");
-    urlInput.type = "text";
-    urlInput.value = element.url || "";
-    urlInput.placeholder = "https://youtube.com/...";
-    urlInput.addEventListener("change", function() {
-      element.url = urlInput.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("URL", urlInput));
-
-    var titleInput = document.createElement("input");
-    titleInput.type = "text";
-    titleInput.value = element.title || "";
-    titleInput.placeholder = "Title (optional)";
-    titleInput.addEventListener("change", function() {
-      element.title = titleInput.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Title", titleInput));
-
-    var ratioMap = { "16:9": 16 / 9, "4:3": 4 / 3, "1:1": 1, "21:9": 21 / 9 };
-    var ratioLabels = ["16:9", "4:3", "1:1", "21:9"];
-    var currentLabel = "16:9";
-    var currentRatio = element.aspectRatio || (16 / 9);
-    for (var ri = 0; ri < ratioLabels.length; ri++) {
-      if (Math.abs(ratioMap[ratioLabels[ri]] - currentRatio) < 0.01) {
-        currentLabel = ratioLabels[ri];
-        break;
-      }
-    }
-    var ratioSel = selectInput(ratioLabels, currentLabel);
-    ratioSel.addEventListener("change", function() {
-      element.aspectRatio = ratioMap[ratioSel.value] || (16 / 9);
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Aspect ratio", ratioSel));
-  }
-
-  function buildCodeInspector(element) {
-    var langOptions = ["typescript", "javascript", "python", "rust", "go", "json", "bash", "sql", "html", "css", "markdown"];
-    var langSel = selectInput(langOptions, element.language || "typescript");
-    langSel.addEventListener("change", function() {
-      element.language = langSel.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Language", langSel));
-
-    var sourceArea = document.createElement("textarea");
-    sourceArea.rows = 8;
-    sourceArea.style.cssText = "width:100%;font-family:monospace;font-size:12px;resize:vertical;box-sizing:border-box;";
-    sourceArea.value = element.source || "";
-    sourceArea.addEventListener("change", function() {
-      element.source = sourceArea.value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Source", sourceArea));
-
-    var lineNumCheck = document.createElement("input");
-    lineNumCheck.type = "checkbox";
-    lineNumCheck.checked = !!element.showLineNumbers;
-    lineNumCheck.addEventListener("change", function() {
-      element.showLineNumbers = lineNumCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Line numbers", lineNumCheck));
-  }
+  // buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH
+  // per ADR 0011 Step 1; see src/canvas/elements/{embed,code}.ts.
 
   function buildAccordionInspector(element) {
     if (!Array.isArray(element.items)) element.items = [];
@@ -4321,23 +4350,29 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildZOrderGroup(section, element));
     inspector.appendChild(buildElementActionsGroup(section, element));
 
-    const inspectorBuilders = {
-      text: buildTextInspector,
-      action: buildActionInspector,
-      shape: buildShapeInspector,
-      container: buildContainerInspector,
-      media: buildMediaInspector,
-      chart: buildChartInspector,
-      form: buildFormInspector,
-      embed: buildEmbedInspector,
-      code: buildCodeInspector,
-      accordion: buildAccordionInspector,
-      carousel: buildCarouselInspector,
-      table: buildTableInspector,
-      nav: buildNavInspector,
-    };
-    const inspectorBuilder = inspectorBuilders[element.type];
-    if (inspectorBuilder) inspectorBuilder(element);
+    // ADR 0011 Step 1: dispatch via spec when available, else fall back to
+    // the per-type buildXInspector. Migrated types (shape, container, code,
+    // embed) have specs; remaining types (text, action, media, chart, form,
+    // accordion, carousel, table, nav) still use their per-type builders
+    // until the next PR in the migration series.
+    const inspectorSpec = INSPECTOR_DISPATCH[element.type];
+    if (inspectorSpec) {
+      renderInspectorSpec(inspectorSpec, element);
+    } else {
+      const inspectorBuilders = {
+        text: buildTextInspector,
+        action: buildActionInspector,
+        media: buildMediaInspector,
+        chart: buildChartInspector,
+        form: buildFormInspector,
+        accordion: buildAccordionInspector,
+        carousel: buildCarouselInspector,
+        table: buildTableInspector,
+        nav: buildNavInspector,
+      };
+      const inspectorBuilder = inspectorBuilders[element.type];
+      if (inspectorBuilder) inspectorBuilder(element);
+    }
 
     // -- Element style controls -----------------------------------------------
     (function buildStyleSection() {
