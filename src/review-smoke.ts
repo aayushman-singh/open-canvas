@@ -12,6 +12,7 @@ import {
   findAssetReferenceErrors,
 } from './assets/site-assets';
 import { resolveAuthRedirectUrl, resolveClerkKeys } from './auth/middleware';
+import { SIDEBAR_DISPATCH } from './canvas/elements';
 import { canvasPublishedStyles } from './canvas/public-styles';
 import { createSectionFromRecipe } from './canvas/recipes';
 import type { EditableSite, SectionRecipeId } from './canvas/schema';
@@ -1019,11 +1020,24 @@ assert(
   canvasIndexSource.includes('data-sidebar-add-section="blank"'),
   'expected canvas sidebar to expose a blank-section add button',
 );
-for (const component of ['text', 'image', 'video', 'action', 'shape', 'container']) {
-  assert(
-    canvasIndexSource.includes(`data-sidebar-add-component="${component}"`),
-    `expected canvas sidebar to expose ${component} component add button`,
-  );
+// The sidebar grid is generated from SIDEBAR_DISPATCH per ADR 0011 Step 3
+// rather than 14 hardcoded buttons; check that the dispatch contains the
+// expected core component keys + the route renders them dynamically.
+assert(
+  canvasIndexSource.includes('data-sidebar-add-component={cmd.key}'),
+  'expected canvas sidebar to render component buttons from SIDEBAR_DISPATCH (ADR 0011 Step 3)',
+);
+{
+  const dispatchKeys = new Set<string>();
+  for (const spec of Object.values(SIDEBAR_DISPATCH)) {
+    for (const cmd of spec.commands) dispatchKeys.add(cmd.key);
+  }
+  for (const component of ['text', 'image', 'video', 'action', 'shape', 'container']) {
+    assert(
+      dispatchKeys.has(component),
+      `expected SIDEBAR_DISPATCH to declare ${component} sidebar command`,
+    );
+  }
 }
 assert(
   canvasIndexSource.includes('data-sidebar-style-kit={kit}'),

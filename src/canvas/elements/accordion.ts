@@ -20,7 +20,9 @@
 //   - Closed bodies are emitted with `hidden` (and the runtime mirrors that
 //     attribute on toggle) — assistive tech skips collapsed regions.
 
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement, InlineRun } from '../schema.js';
 import { escapeAttr, escapeHtml, renderInlineRun } from './render-utils.js';
 
@@ -107,4 +109,52 @@ export const accordionInspectorSpec: InspectorSpec = {
     { kind: 'custom-mount', name: 'accordion-items' },
     { kind: 'checkbox', label: 'Allow multiple open', path: 'allowMultipleOpen' },
   ],
+};
+
+export const accordionSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'accordion',
+      sidebarLabel: 'Accordion',
+      sidebarTip: 'Add a collapsible accordion (FAQ-style)',
+      factoryName: 'accordion',
+    },
+  ],
+};
+
+export const accordionAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    allowMultipleOpen: {
+      type: 'boolean',
+      description: 'Allow multiple accordion items open. Accordion elements only.',
+    },
+    items: {
+      type: 'array',
+      description:
+        'Accordion items. Accordion elements only. Each item needs id, title, and body as InlineRun objects.',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          title: { type: 'string' },
+          body: { type: 'array', items: { type: 'object' } },
+        },
+        required: ['id', 'title', 'body'],
+      },
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.allowMultipleOpen !== undefined) {
+      if (typeof args.allowMultipleOpen !== 'boolean') {
+        throw new Error('allowMultipleOpen must be a boolean');
+      }
+      patch.allowMultipleOpen = args.allowMultipleOpen;
+    }
+    if (args.items !== undefined) {
+      if (!Array.isArray(args.items)) throw new Error('items must be an array');
+      patch.items = args.items;
+    }
+    return patch;
+  },
 };

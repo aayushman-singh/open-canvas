@@ -13,6 +13,8 @@
 // from matching page metadata.
 
 import type { BaseElement, CanvasElement } from '../schema.js';
+import type { AgentToolSpec } from './agent-tool-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 
 // The collection-child wrapper used to add `data-rev01-element`, a positioning
@@ -105,3 +107,23 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
 }
 
 export const COLLECTION_RECIPE_ID = 'collection-grid' as const;
+
+// Collection has no per-type agent surface: the LLM cannot directly add or
+// update a collection via the cross-element tools — collections are created
+// from recipes (createSection / insertSection). Shared fields (box, motion,
+// elementStyle) still apply via updateElement at the canvas-tools.ts level.
+// The empty spec exists so the dispatch can satisfy its mapped-type contract
+// without forcing the canvas-tools merger to special-case "missing entry."
+export const collectionAgentToolSpec: AgentToolSpec = {
+  patchProperties: {},
+  parsePatch: () => ({}),
+};
+
+// Collection has no sidebar drop-in: the Owner adds collections by inserting
+// a collection-grid recipe section, not by clicking a sidebar component
+// button. The empty commands array satisfies the dispatch's mapped-type
+// contract without surfacing a button that would create an empty collection
+// outside its recipe context.
+export const collectionSidebarSpec: SidebarSpec = {
+  commands: [],
+};

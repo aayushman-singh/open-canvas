@@ -8,7 +8,9 @@
 // The five chart-kind renderers live under `src/charts/`. All math is pure
 // (no DOM, no I/O).
 
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
 import { renderAreaChartBody } from '../../charts/area.js';
 import { renderBarChartBody } from '../../charts/bar.js';
@@ -115,4 +117,68 @@ export const chartInspectorSpec: InspectorSpec = {
     // table-like (same reason as table-grid lives in mount form).
     { kind: 'custom-mount', name: 'chart-data' },
   ],
+};
+
+export const chartSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'chart',
+      sidebarLabel: 'Chart',
+      sidebarTip: 'Add a data chart',
+      toolbarLabel: '+📊',
+      toolbarTip: 'Add chart',
+      factoryName: 'chart',
+    },
+  ],
+};
+
+export const chartAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    kind: {
+      type: 'string',
+      enum: [...CHART_KINDS],
+      description: 'Chart type. Chart elements only.',
+    },
+    showLegend: {
+      type: 'boolean',
+      description: 'Show chart legend. Chart elements only.',
+    },
+    series: {
+      type: 'array',
+      description: 'Chart data series. Chart elements only.',
+      items: {
+        type: 'object',
+        properties: {
+          label: { type: 'string' },
+          values: { type: 'array', items: { type: 'number' } },
+        },
+        required: ['label', 'values'],
+      },
+    },
+    categories: {
+      type: 'array',
+      description: 'Chart category labels. Chart elements only.',
+      items: { type: 'string' },
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.kind !== undefined) {
+      if (typeof args.kind !== 'string') throw new Error('kind must be a string');
+      patch.kind = args.kind;
+    }
+    if (args.showLegend !== undefined) {
+      if (typeof args.showLegend !== 'boolean') throw new Error('showLegend must be a boolean');
+      patch.showLegend = args.showLegend;
+    }
+    if (args.series !== undefined) {
+      if (!Array.isArray(args.series)) throw new Error('series must be an array');
+      patch.series = args.series;
+    }
+    if (args.categories !== undefined) {
+      if (!Array.isArray(args.categories)) throw new Error('categories must be an array');
+      patch.categories = args.categories;
+    }
+    return patch;
+  },
 };

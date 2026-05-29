@@ -52,6 +52,8 @@ import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
 
 import { escapeAttr, escapeCssAttrId, escapeHtml } from './render-utils.js';
+import type { AgentToolSpec } from './agent-tool-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import { buildTablePhoneCollapseCss } from './table-responsive.js';
 
 export interface TableColumn {
@@ -236,4 +238,77 @@ export const tableInspectorSpec: InspectorSpec = {
     { kind: 'checkbox', label: 'Zebra striping', path: 'zebra' },
     { kind: 'checkbox', label: 'Collapse on phone', path: 'collapseOnPhone' },
   ],
+};
+
+export const tableSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'table',
+      sidebarLabel: 'Table',
+      sidebarTip: 'Add a data table',
+      factoryName: 'table',
+    },
+  ],
+};
+
+export const tableAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    zebra: {
+      type: 'boolean',
+      description: 'Alternating row colors. Table elements only.',
+    },
+    collapseOnPhone: {
+      type: 'boolean',
+      description: 'Collapse to card layout on phone. Table elements only.',
+    },
+    columns: {
+      type: 'array',
+      description:
+        'Table columns. Table elements only. Each column needs id and header; align can be left, center, or right.',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          header: { type: 'string' },
+          align: { type: 'string', enum: ['left', 'center', 'right'] },
+        },
+        required: ['id', 'header'],
+      },
+    },
+    rows: {
+      type: 'array',
+      description:
+        'Table rows. Table elements only. Each row needs id and cells as a column-id to text map.',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          cells: { type: 'object' },
+        },
+        required: ['id', 'cells'],
+      },
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.zebra !== undefined) {
+      if (typeof args.zebra !== 'boolean') throw new Error('zebra must be a boolean');
+      patch.zebra = args.zebra;
+    }
+    if (args.collapseOnPhone !== undefined) {
+      if (typeof args.collapseOnPhone !== 'boolean') {
+        throw new Error('collapseOnPhone must be a boolean');
+      }
+      patch.collapseOnPhone = args.collapseOnPhone;
+    }
+    if (args.columns !== undefined) {
+      if (!Array.isArray(args.columns)) throw new Error('columns must be an array');
+      patch.columns = args.columns;
+    }
+    if (args.rows !== undefined) {
+      if (!Array.isArray(args.rows)) throw new Error('rows must be an array');
+      patch.rows = args.rows;
+    }
+    return patch;
+  },
 };

@@ -20,21 +20,15 @@ import {
   BACKGROUND_EFFECTS,
   BUILT_IN_STYLE_KITS,
   ELEMENT_TYPES,
-  INLINE_MARK_TYPES,
-  MEDIA_KINDS,
   MOTION_PRESETS,
-  type ActionHref,
   type AgentRecipeId,
   type BackgroundEffect,
   type BuiltInStyleKit,
   type ElementType,
-  type InlineMark,
-  type InlineRun,
-  type MediaKind,
   type MotionPreset,
   type StyleKit,
 } from '../canvas/schema.js';
-import { isAllowedHref } from '../canvas/validate.js';
+import { AGENT_TOOL_DISPATCH } from '../canvas/elements/index.js';
 
 // ---------------------------------------------------------------------------
 // ParseResult
@@ -73,149 +67,35 @@ function parseNullableSectionId(
   return { ok: true, value };
 }
 
-function parseActionHref(value: unknown, fieldName: string): ActionHref {
-  if (typeof value === 'string') {
-    if (value.length === 0) throw new Error(`${fieldName} must be a non-empty string`);
-    if (!isAllowedHref(value))
-      throw new Error(`${fieldName} ${JSON.stringify(value)} is not allowed`);
-    return { type: 'external', url: value };
+// ---------------------------------------------------------------------------
+// Standalone tool parsers — sourced from AGENT_TOOL_DISPATCH
+// ---------------------------------------------------------------------------
+//
+// rewriteText (text) and replaceMedia (media) used to declare per-tool
+// schemas + parsers inline. ADR 0011 Step 2 moved both into their owning
+// element modules (text.ts, media.ts) under `standaloneTool`. The dispatch
+// is now the canonical source; `translateToolCall` and `parseApplyOp` look
+// up the standalone parser keyed by element type.
+
+function getStandaloneTool<K extends keyof typeof AGENT_TOOL_DISPATCH>(
+  key: K,
+): NonNullable<(typeof AGENT_TOOL_DISPATCH)[K]['standaloneTool']> {
+  const tool = AGENT_TOOL_DISPATCH[key].standaloneTool;
+  if (tool === undefined) {
+    throw new Error(`tool-parsers: ${key} spec must declare a standaloneTool`);
   }
-  if (!isRecord(value)) {
-    throw new Error(`${fieldName} must be a string or an ActionHref object`);
-  }
-  if (value.type === 'external') {
-    if (typeof value.url !== 'string' || value.url.length === 0) {
-      throw new Error(`${fieldName}.url must be a non-empty string`);
-    }
-    if (!isAllowedHref(value.url)) {
-      throw new Error(`${fieldName}.url ${JSON.stringify(value.url)} is not allowed`);
-    }
-    return { type: 'external', url: value.url };
-  }
-  if (value.type === 'page') {
-    if (typeof value.pageId !== 'string' || value.pageId.length === 0) {
-      throw new Error(`${fieldName}.pageId must be a non-empty string`);
-    }
-    const href: ActionHref = { type: 'page', pageId: value.pageId };
-    if (value.anchor !== undefined) {
-      if (typeof value.anchor !== 'string') {
-        throw new Error(`${fieldName}.anchor must be a string when present`);
-      }
-      href.anchor = value.anchor;
-    }
-    return href;
-  }
-  throw new Error(`${fieldName}.type must be "external" or "page"`);
+  return tool;
 }
 
-// ---------------------------------------------------------------------------
-// Inline run parsing
-// ---------------------------------------------------------------------------
-
-function parseInlineMark(value: unknown, runIdx: number, markIdx: number): InlineMark | string {
-  if (!isRecord(value)) {
-    return `mark[${runIdx}][${markIdx}] must be an object`;
-  }
-  if (!isOneOf(value.type, INLINE_MARK_TYPES)) {
-    return `mark[${runIdx}][${markIdx}].type must be one of [${INLINE_MARK_TYPES.join(', ')}] (got ${JSON.stringify(value.type)})`;
-  }
-  if (value.type === 'link') {
-    if (typeof value.href !== 'string' || value.href.length === 0) {
-      return `mark[${runIdx}][${markIdx}] is a link mark but href is missing or empty`;
-    }
-    if (!isAllowedHref(value.href)) {
-      return `mark[${runIdx}][${markIdx}] link href ${JSON.stringify(value.href)} is not allowed`;
-    }
-    return { type: 'link', href: value.href };
-  }
-  // Other mark types have no extra fields.
-  return { type: value.type };
-}
-
-export function parseInlineRuns(
-  value: unknown,
-): { ok: true; runs: InlineRun[] } | { ok: false; error: string } {
-  if (!Array.isArray(value)) {
-    return { ok: false, error: 'content must be an array of InlineRun objects (not a string)' };
-  }
-  if (value.length === 0) {
-    return { ok: false, error: 'content must be a non-empty array' };
-  }
-  const runs: InlineRun[] = [];
-  const items: unknown[] = value;
-  for (let i = 0; i < items.length; i++) {
-    const raw: unknown = items[i];
-    if (!isRecord(raw)) {
-      return { ok: false, error: `content[${String(i)}] must be an object` };
-    }
-    const text = raw.text;
-    if (typeof text !== 'string') {
-      return { ok: false, error: `content[${String(i)}].text must be a string` };
-    }
-    const run: InlineRun = { text };
-    const rawMarks = raw.marks;
-    if (rawMarks !== undefined) {
-      if (!Array.isArray(rawMarks)) {
-        return { ok: false, error: `content[${String(i)}].marks must be an array when present` };
-      }
-      const marks: InlineMark[] = [];
-      const markItems: unknown[] = rawMarks;
-      for (let m = 0; m < markItems.length; m++) {
-        const parsed = parseInlineMark(markItems[m], i, m);
-        if (typeof parsed === 'string') return { ok: false, error: parsed };
-        marks.push(parsed);
-      }
-      run.marks = marks;
-    }
-    runs.push(run);
-  }
-  return { ok: true, runs };
-}
-
-// ---------------------------------------------------------------------------
-// Existing tool parsers (extracted from canvas-agent.ts / orchestrator.ts)
-// ---------------------------------------------------------------------------
+const standaloneTextTool = getStandaloneTool('text');
+const standaloneMediaTool = getStandaloneTool('media');
 
 export function parseRewriteText(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'rewriteText arguments must be an object' };
-  if (typeof args.elementId !== 'string' || args.elementId.length === 0) {
-    return { ok: false, error: 'rewriteText.elementId must be a non-empty string' };
-  }
-  const parsed = parseInlineRuns(args.content);
-  if (!parsed.ok) return { ok: false, error: `rewriteText.${parsed.error}` };
-  return {
-    ok: true,
-    op: { kind: 'rewriteText', elementId: args.elementId, content: parsed.runs },
-  };
+  return standaloneTextTool.parse(args);
 }
 
 export function parseReplaceMedia(args: unknown): ParseResult {
-  if (!isRecord(args)) return { ok: false, error: 'replaceMedia arguments must be an object' };
-  if (typeof args.elementId !== 'string' || args.elementId.length === 0) {
-    return { ok: false, error: 'replaceMedia.elementId must be a non-empty string' };
-  }
-  if (!isOneOf<MediaKind>(args.mediaKind, MEDIA_KINDS)) {
-    return {
-      ok: false,
-      error: `replaceMedia.mediaKind must be one of [${MEDIA_KINDS.join(', ')}] (got ${JSON.stringify(args.mediaKind)})`,
-    };
-  }
-  if (typeof args.assetId !== 'string' || args.assetId.length === 0) {
-    return { ok: false, error: 'replaceMedia.assetId must be a non-empty string' };
-  }
-  if (typeof args.alt !== 'string') {
-    return { ok: false, error: 'replaceMedia.alt must be a string' };
-  }
-  return {
-    ok: true,
-    op: {
-      kind: 'replaceMedia',
-      elementId: args.elementId,
-      mediaKind: args.mediaKind,
-      assetId: args.assetId,
-      alt: args.alt,
-    },
-  };
+  return standaloneMediaTool.parse(args);
 }
 
 export function parseDesignSection(args: unknown): ParseResult {
@@ -351,16 +231,23 @@ function parseMotion(
 }
 
 /**
- * Collect patch fields from `args` for updateElement / addElement. Only
- * collects fields that are present; does basic type checks (strings are
- * strings, numbers are numbers, booleans are booleans, arrays are arrays,
- * objects are objects). The apply handler does deeper type-checking against
- * the actual element schema.
+ * Collect patch fields from `args` for updateElement / addElement. Shared
+ * BaseElement fields (box, motion, elementStyle, responsive) are parsed
+ * here; per-element-type fields route through `AGENT_TOOL_DISPATCH` and the
+ * owning element module owns its parser (ADR 0011 Step 2).
+ *
+ * `elementType` is the caller's validated `elementType` field. Each element
+ * spec inspects only the fields it advertises in `patchProperties`, so
+ * cross-type field bleed (e.g. `variant` on text) is silently dropped at
+ * parse time; the downstream `validate.ts` write gate is the authoritative
+ * shape check per ADR 0012.
  */
-function collectElementPatch(args: Record<string, unknown>): Record<string, unknown> {
+function collectElementPatch(
+  args: Record<string, unknown>,
+  elementType: ElementType,
+): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
 
-  // -- Box / motion / style / responsive (shared across all element types) --
   const boxResult = parseBox(args.box);
   if (boxResult !== undefined) {
     if (!boxResult.ok) throw new Error(boxResult.error);
@@ -383,184 +270,8 @@ function collectElementPatch(args: Record<string, unknown>): Record<string, unkn
     patch.responsive = args.responsive;
   }
 
-  // -- Text fields --
-  if (args.fontSize !== undefined) {
-    if (!isFiniteNumber(args.fontSize)) throw new Error('fontSize must be a number');
-    patch.fontSize = args.fontSize;
-  }
-  if (args.fontWeight !== undefined) {
-    if (!isFiniteNumber(args.fontWeight)) throw new Error('fontWeight must be a number');
-    patch.fontWeight = args.fontWeight;
-  }
-  if (args.align !== undefined) {
-    if (typeof args.align !== 'string') throw new Error('align must be a string');
-    patch.align = args.align;
-  }
-  if (args.role !== undefined) {
-    if (typeof args.role !== 'string') throw new Error('role must be a string');
-    patch.role = args.role;
-  }
-  if (args.content !== undefined) {
-    const parsed = parseInlineRuns(args.content);
-    if (!parsed.ok) throw new Error(parsed.error);
-    patch.content = parsed.runs;
-  }
-
-  // -- Media fields --
-  if (args.fit !== undefined) {
-    if (typeof args.fit !== 'string') throw new Error('fit must be a string');
-    patch.fit = args.fit;
-  }
-  if (args.alt !== undefined) {
-    if (typeof args.alt !== 'string') throw new Error('alt must be a string');
-    patch.alt = args.alt;
-  }
-  if (args.mediaKind !== undefined) {
-    if (typeof args.mediaKind !== 'string') throw new Error('mediaKind must be a string');
-    patch.mediaKind = args.mediaKind;
-  }
-  if (args.assetId !== undefined) {
-    if (typeof args.assetId !== 'string') throw new Error('assetId must be a string');
-    patch.assetId = args.assetId;
-  }
-
-  // -- Action fields --
-  if (args.variant !== undefined) {
-    if (typeof args.variant !== 'string') throw new Error('variant must be a string');
-    patch.variant = args.variant;
-  }
-  if (args.label !== undefined) {
-    if (typeof args.label !== 'string') throw new Error('label must be a string');
-    patch.label = args.label;
-  }
-  if (args.href !== undefined) {
-    patch.href = parseActionHref(args.href, 'href');
-  }
-
-  // -- Shape / Container fields (variant already handled above) --
-
-  // -- Chart fields --
-  if (args.kind !== undefined) {
-    if (typeof args.kind !== 'string') throw new Error('kind must be a string');
-    patch.kind = args.kind;
-  }
-  if (args.showLegend !== undefined) {
-    if (typeof args.showLegend !== 'boolean') throw new Error('showLegend must be a boolean');
-    patch.showLegend = args.showLegend;
-  }
-  if (args.series !== undefined) {
-    if (!Array.isArray(args.series)) throw new Error('series must be an array');
-    patch.series = args.series;
-  }
-  if (args.categories !== undefined) {
-    if (!Array.isArray(args.categories)) throw new Error('categories must be an array');
-    patch.categories = args.categories;
-  }
-
-  // -- Code fields --
-  if (args.language !== undefined) {
-    if (typeof args.language !== 'string') throw new Error('language must be a string');
-    patch.language = args.language;
-  }
-  if (args.source !== undefined) {
-    if (typeof args.source !== 'string') throw new Error('source must be a string');
-    patch.source = args.source;
-  }
-  if (args.showLineNumbers !== undefined) {
-    if (typeof args.showLineNumbers !== 'boolean')
-      throw new Error('showLineNumbers must be a boolean');
-    patch.showLineNumbers = args.showLineNumbers;
-  }
-
-  // -- Form fields --
-  if (args.submitLabel !== undefined) {
-    if (typeof args.submitLabel !== 'string') throw new Error('submitLabel must be a string');
-    patch.submitLabel = args.submitLabel;
-  }
-  if (args.successMessage !== undefined) {
-    if (typeof args.successMessage !== 'string') throw new Error('successMessage must be a string');
-    patch.successMessage = args.successMessage;
-  }
-  if (args.fields !== undefined) {
-    if (!Array.isArray(args.fields)) throw new Error('fields must be an array');
-    patch.fields = args.fields;
-  }
-
-  // -- Embed fields --
-  if (args.url !== undefined) {
-    if (typeof args.url !== 'string') throw new Error('url must be a string');
-    patch.url = args.url;
-  }
-  if (args.title !== undefined) {
-    if (typeof args.title !== 'string') throw new Error('title must be a string');
-    patch.title = args.title;
-  }
-  if (args.aspectRatio !== undefined) {
-    if (!isFiniteNumber(args.aspectRatio)) throw new Error('aspectRatio must be a number');
-    patch.aspectRatio = args.aspectRatio;
-  }
-
-  // -- Accordion fields --
-  if (args.allowMultipleOpen !== undefined) {
-    if (typeof args.allowMultipleOpen !== 'boolean')
-      throw new Error('allowMultipleOpen must be a boolean');
-    patch.allowMultipleOpen = args.allowMultipleOpen;
-  }
-  if (args.items !== undefined) {
-    if (!Array.isArray(args.items)) throw new Error('items must be an array');
-    patch.items = args.items;
-  }
-
-  // -- Carousel fields --
-  if (args.showArrows !== undefined) {
-    if (typeof args.showArrows !== 'boolean') throw new Error('showArrows must be a boolean');
-    patch.showArrows = args.showArrows;
-  }
-  if (args.showDots !== undefined) {
-    if (typeof args.showDots !== 'boolean') throw new Error('showDots must be a boolean');
-    patch.showDots = args.showDots;
-  }
-  if (args.slides !== undefined) {
-    if (!Array.isArray(args.slides)) throw new Error('slides must be an array');
-    patch.slides = args.slides;
-  }
-
-  // -- Table fields --
-  if (args.zebra !== undefined) {
-    if (typeof args.zebra !== 'boolean') throw new Error('zebra must be a boolean');
-    patch.zebra = args.zebra;
-  }
-  if (args.collapseOnPhone !== undefined) {
-    if (typeof args.collapseOnPhone !== 'boolean')
-      throw new Error('collapseOnPhone must be a boolean');
-    patch.collapseOnPhone = args.collapseOnPhone;
-  }
-  if (args.columns !== undefined) {
-    if (!Array.isArray(args.columns)) throw new Error('columns must be an array');
-    patch.columns = args.columns;
-  }
-  if (args.rows !== undefined) {
-    if (!Array.isArray(args.rows)) throw new Error('rows must be an array');
-    patch.rows = args.rows;
-  }
-
-  // -- Nav fields --
-  if (args.sticky !== undefined) {
-    if (typeof args.sticky !== 'boolean') throw new Error('sticky must be a boolean');
-    patch.sticky = args.sticky;
-  }
-  if (args.layout !== undefined) {
-    if (typeof args.layout !== 'string') throw new Error('layout must be a string');
-    patch.layout = args.layout;
-  }
-  if (args.links !== undefined) {
-    if (!Array.isArray(args.links)) throw new Error('links must be an array');
-    patch.links = args.links;
-  }
-  if (args.logoAssetId !== undefined) {
-    if (typeof args.logoAssetId !== 'string') throw new Error('logoAssetId must be a string');
-    patch.logoAssetId = args.logoAssetId;
-  }
+  const elementPatch = AGENT_TOOL_DISPATCH[elementType].parsePatch(args);
+  Object.assign(patch, elementPatch);
 
   return patch;
 }
@@ -578,7 +289,7 @@ export function parseUpdateElement(args: unknown): ParseResult {
   }
   let patch: Record<string, unknown>;
   try {
-    patch = collectElementPatch(args);
+    patch = collectElementPatch(args, args.elementType);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `updateElement.${message}` };
@@ -615,7 +326,7 @@ export function parseAddElement(args: unknown): ParseResult {
     delete argsWithoutBox.sectionId;
     delete argsWithoutBox.elementType;
     delete argsWithoutBox.box;
-    props = collectElementPatch(argsWithoutBox);
+    props = collectElementPatch(argsWithoutBox, args.elementType);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `addElement.${message}` };
@@ -921,7 +632,7 @@ function parseCanonicalUpdateElementOp(value: Record<string, unknown>): ParseRes
   }
   let patch: Record<string, unknown>;
   try {
-    patch = collectElementPatch(value.patch);
+    patch = collectElementPatch(value.patch, value.elementType);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `updateElement.${message}` };
@@ -954,7 +665,7 @@ function parseCanonicalAddElementOp(value: Record<string, unknown>): ParseResult
   }
   let props: Record<string, unknown>;
   try {
-    props = collectElementPatch(value.props);
+    props = collectElementPatch(value.props, value.elementType);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `addElement.${message}` };

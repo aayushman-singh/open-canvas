@@ -570,44 +570,51 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
   return out;
 }
 
+// ----------------------------------------------------------------------------
+// Y_ENCODE_DISPATCH (ADR 0011 Step 4)
+// ----------------------------------------------------------------------------
+//
+// The encode/decode pair is the highest-severity drift locus in the
+// per-element fanout: encoder + decoder live ~250 lines apart in this file,
+// and a missing case in either is a silent data-loss bug on round-trip.
+//
+// `Y_ENCODE_DISPATCH` formalises what the existing exhaustive switch
+// guaranteed at compile time; `Y_DECODE_DISPATCH` (below) does the same for
+// the decoder side, which previously inlined every case. The mapped type
+// makes "added an ElementType but forgot to wire its encoder/decoder" a
+// TypeScript compile error in both directions.
+type YEncodeDispatch = {
+  [K in CanvasElement['type']]: (el: Extract<CanvasElement, { type: K }>) => Y.Map<unknown>;
+};
+
+const Y_ENCODE_DISPATCH: YEncodeDispatch = {
+  text: encodeTextElement,
+  media: encodeMediaElement,
+  action: encodeActionElement,
+  shape: encodeShapeElement,
+  container: encodeContainerElement,
+  form: encodeFormElement,
+  embed: encodeEmbedElement,
+  chart: encodeChartElement,
+  accordion: encodeAccordionElement,
+  carousel: encodeCarouselElement,
+  table: encodeTableElement,
+  code: encodeCodeElement,
+  nav: encodeNavElement,
+  collection: encodeCollectionElement,
+};
+
 function encodeElement(el: CanvasElement): Y.Map<unknown> {
-  switch (el.type) {
-    case 'text':
-      return encodeTextElement(el);
-    case 'media':
-      return encodeMediaElement(el);
-    case 'action':
-      return encodeActionElement(el);
-    case 'shape':
-      return encodeShapeElement(el);
-    case 'container':
-      return encodeContainerElement(el);
-    case 'form':
-      return encodeFormElement(el);
-    case 'embed':
-      return encodeEmbedElement(el);
-    case 'chart':
-      return encodeChartElement(el);
-    case 'accordion':
-      return encodeAccordionElement(el);
-    case 'carousel':
-      return encodeCarouselElement(el);
-    case 'table':
-      return encodeTableElement(el);
-    case 'code':
-      return encodeCodeElement(el);
-    case 'nav':
-      return encodeNavElement(el);
-    case 'collection':
-      return encodeCollectionElement(el);
-    default: {
-      // Exhaustiveness — TS narrows `el` to `never` here. If a new
-      // ElementType is added to the schema without an encode case, the
-      // compiler refuses to compile this line.
-      const _exhaustive: never = el;
-      throw new Error(`yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`);
-    }
+  // `el.type` indexes a mapped-type record; TypeScript narrows the encoder
+  // arg type per case. The runtime guard against an unknown type at the
+  // JSONB boundary (legacy data, failed migration) mirrors renderElementBody.
+  const fn = (Y_ENCODE_DISPATCH as Record<string, (e: CanvasElement) => Y.Map<unknown>>)[el.type];
+  if (typeof fn !== 'function') {
+    throw new Error(
+      `yjs-projection: no Y_ENCODE_DISPATCH entry for element type=${JSON.stringify(el.type)} id=${JSON.stringify(el.id)}`,
+    );
   }
+  return fn(el);
 }
 
 function encodeSection(section: CanvasSection): Y.Map<unknown> {
@@ -823,232 +830,271 @@ function decodeBaseElement(map: Y.Map<unknown>): BaseElement {
   return out;
 }
 
+function decodeTextElement(map: Y.Map<unknown>, base: BaseElement): TextElement {
+  return {
+    ...base,
+    type: 'text',
+    content: decodeInlineRuns(map.get('content') as Y.Array<Y.Map<unknown>>),
+    role: map.get('role') as TextElement['role'],
+    fontSize: map.get('fontSize') as number,
+    fontWeight: map.get('fontWeight') as TextElement['fontWeight'],
+    align: map.get('align') as TextElement['align'],
+  };
+}
+
+function decodeMediaElement(map: Y.Map<unknown>, base: BaseElement): MediaElement {
+  const mediaKind = map.get('mediaKind') as MediaElement['mediaKind'];
+  const shared = {
+    ...base,
+    type: 'media' as const,
+    assetId: map.get('assetId') as string,
+    alt: map.get('alt') as string,
+    fit: map.get('fit') as MediaElement['fit'],
+  };
+  if (mediaKind === 'image') {
+    return { ...shared, mediaKind: 'image' };
+  }
+  const el: VideoMediaElement = { ...shared, mediaKind: 'video' };
+  if (map.has('posterAssetId')) el.posterAssetId = map.get('posterAssetId') as string;
+  if (map.has('playback')) {
+    const playback = map.get('playback') as Y.Map<unknown>;
+    const playbackOut: NonNullable<VideoMediaElement['playback']> = {};
+    if (playback.has('autoplay')) playbackOut.autoplay = playback.get('autoplay') as boolean;
+    if (playback.has('muted')) playbackOut.muted = playback.get('muted') as boolean;
+    if (playback.has('loop')) playbackOut.loop = playback.get('loop') as boolean;
+    if (playback.has('controls')) playbackOut.controls = playback.get('controls') as boolean;
+    el.playback = playbackOut;
+  }
+  return el;
+}
+
+function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElement {
+  const hrefMap = map.get('href') as Y.Map<unknown>;
+  const hrefType = hrefMap.get('type') as string;
+  const href: ActionElement['href'] =
+    hrefType === 'page'
+      ? {
+          type: 'page',
+          pageId: hrefMap.get('pageId') as string,
+          ...(hrefMap.has('anchor') ? { anchor: hrefMap.get('anchor') as string } : {}),
+        }
+      : { type: 'external', url: hrefMap.get('url') as string };
+  return {
+    ...base,
+    type: 'action',
+    label: map.get('label') as string,
+    href,
+    variant: map.get('variant') as ActionElement['variant'],
+  };
+}
+
+function decodeShapeElement(map: Y.Map<unknown>, base: BaseElement): ShapeElement {
+  return {
+    ...base,
+    type: 'shape',
+    variant: map.get('variant') as ShapeElement['variant'],
+  };
+}
+
+function decodeContainerElement(map: Y.Map<unknown>, base: BaseElement): ContainerElement {
+  return {
+    ...base,
+    type: 'container',
+    variant: map.get('variant') as ContainerElement['variant'],
+  };
+}
+
+function decodeFormElement(map: Y.Map<unknown>, base: BaseElement): FormElement {
+  const fields = (map.get('fields') as Y.Array<Y.Map<unknown>>).map(decodeFormFieldDef);
+  const el: FormElement = {
+    ...base,
+    type: 'form',
+    fields,
+    submitLabel: map.get('submitLabel') as string,
+    successMessage: map.get('successMessage') as string,
+  };
+  if (map.has('webhookUrl')) el.webhookUrl = map.get('webhookUrl') as string;
+  return el;
+}
+
+function decodeEmbedElement(map: Y.Map<unknown>, base: BaseElement): EmbedElement {
+  const el: EmbedElement = {
+    ...base,
+    type: 'embed',
+    url: map.get('url') as string,
+  };
+  if (map.has('title')) el.title = map.get('title') as string;
+  if (map.has('aspectRatio')) el.aspectRatio = map.get('aspectRatio') as number;
+  return el;
+}
+
+function decodeChartElement(map: Y.Map<unknown>, base: BaseElement): ChartElement {
+  const series = (map.get('series') as Y.Array<Y.Map<unknown>>).map(decodeChartSeries);
+  const categories = (map.get('categories') as Y.Array<string>).toArray();
+  const el: ChartElement = {
+    ...base,
+    type: 'chart',
+    kind: map.get('kind') as ChartElement['kind'],
+    series,
+    categories,
+    showLegend: map.get('showLegend') as boolean,
+  };
+  if (map.has('xAxisTitle')) el.xAxisTitle = map.get('xAxisTitle') as string;
+  if (map.has('yAxisTitle')) el.yAxisTitle = map.get('yAxisTitle') as string;
+  return el;
+}
+
+function decodeAccordionElement(map: Y.Map<unknown>, base: BaseElement): AccordionElement {
+  const items = (map.get('items') as Y.Array<Y.Map<unknown>>).map(decodeAccordionItem);
+  return {
+    ...base,
+    type: 'accordion',
+    items,
+    allowMultipleOpen: map.get('allowMultipleOpen') as boolean,
+  };
+}
+
+function decodeCarouselElement(map: Y.Map<unknown>, base: BaseElement): CarouselElement {
+  const slides = (map.get('slides') as Y.Array<Y.Map<unknown>>).map(decodeCarouselSlide);
+  return {
+    ...base,
+    type: 'carousel',
+    slides,
+    showArrows: map.get('showArrows') as boolean,
+    showDots: map.get('showDots') as boolean,
+  };
+}
+
+function decodeTableElement(map: Y.Map<unknown>, base: BaseElement): TableElement {
+  const columns = (map.get('columns') as Y.Array<Y.Map<unknown>>).map(decodeTableColumn);
+  const rows = (map.get('rows') as Y.Array<Y.Map<unknown>>).map(decodeTableRow);
+  return {
+    ...base,
+    type: 'table',
+    columns,
+    rows,
+    zebra: map.get('zebra') as boolean,
+    collapseOnPhone: map.get('collapseOnPhone') as boolean,
+  };
+}
+
+function decodeCodeElement(map: Y.Map<unknown>, base: BaseElement): CodeElement {
+  return {
+    ...base,
+    type: 'code',
+    language: map.get('language') as CodeElement['language'],
+    source: map.get('source') as string,
+    showLineNumbers: map.get('showLineNumbers') as boolean,
+  };
+}
+
+function decodeNavElement(map: Y.Map<unknown>, base: BaseElement): NavElement {
+  const links = (map.get('links') as Y.Array<Y.Map<unknown>>).map(decodeNavLink);
+  const el: NavElement = {
+    ...base,
+    type: 'nav',
+    links,
+    layout: map.get('layout') as NavElement['layout'],
+    sticky: map.get('sticky') as boolean,
+  };
+  if (map.has('logoAssetId')) el.logoAssetId = map.get('logoAssetId') as string;
+  return el;
+}
+
+function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): CollectionElement {
+  const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
+  const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
+  const entries = rawEntries.map((row) => row.map(decodeElement));
+  const layoutMap = map.get('layout') as Y.Map<unknown>;
+  const el: CollectionElement = {
+    ...base,
+    type: 'collection',
+    mode: map.get('mode') as CollectionElement['mode'],
+    entryTemplate,
+    entries,
+    layout: {
+      columns: layoutMap.get('columns') as number,
+      gap: layoutMap.get('gap') as number,
+    },
+  };
+  if (map.has('filter')) {
+    const filterMap = map.get('filter') as Y.Map<unknown>;
+    const filter: CollectionElement['filter'] = {};
+    if (filterMap.has('category')) filter.category = filterMap.get('category') as string;
+    if (filterMap.has('tags')) {
+      filter.tags = (filterMap.get('tags') as Y.Array<string>).toArray();
+    }
+    if (filterMap.has('limit')) filter.limit = filterMap.get('limit') as number;
+    el.filter = filter;
+  }
+  if (map.has('sort')) {
+    const sortMap = map.get('sort') as Y.Map<unknown>;
+    el.sort = {
+      field: sortMap.get('field') as NonNullable<CollectionElement['sort']>['field'],
+      order: sortMap.get('order') as 'asc' | 'desc',
+    };
+  }
+  if (map.has('cardTemplate')) {
+    el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
+  }
+  if (map.has('fieldBindings')) {
+    const bindingsMap = map.get('fieldBindings') as Y.Map<string>;
+    const bindings: Record<string, string> = {};
+    for (const [elementId, field] of bindingsMap.entries()) {
+      bindings[elementId] = field;
+    }
+    el.fieldBindings = bindings as Record<
+      string,
+      NonNullable<CollectionElement['fieldBindings']>[string]
+    >;
+  }
+  return el;
+}
+
+// ----------------------------------------------------------------------------
+// Y_DECODE_DISPATCH (ADR 0011 Step 4)
+// ----------------------------------------------------------------------------
+//
+// Mirrors Y_ENCODE_DISPATCH above. Each decoder takes the Y.Map plus a
+// pre-decoded `BaseElement`, returns its specific element shape. The
+// mapped type catches "added an ElementType but forgot its decoder" at
+// compile time; the existing round-trip smoke (yjs-projection:smoke) is
+// the runtime safety net against silent data loss.
+type YDecodeDispatch = {
+  [K in CanvasElement['type']]: (
+    map: Y.Map<unknown>,
+    base: BaseElement,
+  ) => Extract<CanvasElement, { type: K }>;
+};
+
+const Y_DECODE_DISPATCH: YDecodeDispatch = {
+  text: decodeTextElement,
+  media: decodeMediaElement,
+  action: decodeActionElement,
+  shape: decodeShapeElement,
+  container: decodeContainerElement,
+  form: decodeFormElement,
+  embed: decodeEmbedElement,
+  chart: decodeChartElement,
+  accordion: decodeAccordionElement,
+  carousel: decodeCarouselElement,
+  table: decodeTableElement,
+  code: decodeCodeElement,
+  nav: decodeNavElement,
+  collection: decodeCollectionElement,
+};
+
 function decodeElement(map: Y.Map<unknown>): CanvasElement {
   const base = decodeBaseElement(map);
-  const type = base.type;
-  switch (type) {
-    case 'text': {
-      const el: TextElement = {
-        ...base,
-        type,
-        content: decodeInlineRuns(map.get('content') as Y.Array<Y.Map<unknown>>),
-        role: map.get('role') as TextElement['role'],
-        fontSize: map.get('fontSize') as number,
-        fontWeight: map.get('fontWeight') as TextElement['fontWeight'],
-        align: map.get('align') as TextElement['align'],
-      };
-      return el;
-    }
-    case 'media': {
-      const mediaKind = map.get('mediaKind') as MediaElement['mediaKind'];
-      const shared = {
-        ...base,
-        type,
-        assetId: map.get('assetId') as string,
-        alt: map.get('alt') as string,
-        fit: map.get('fit') as MediaElement['fit'],
-      };
-      if (mediaKind === 'image') {
-        return { ...shared, mediaKind: 'image' };
-      }
-      const el: VideoMediaElement = { ...shared, mediaKind: 'video' };
-      if (map.has('posterAssetId')) el.posterAssetId = map.get('posterAssetId') as string;
-      if (map.has('playback')) {
-        const playback = map.get('playback') as Y.Map<unknown>;
-        const playbackOut: NonNullable<VideoMediaElement['playback']> = {};
-        if (playback.has('autoplay')) playbackOut.autoplay = playback.get('autoplay') as boolean;
-        if (playback.has('muted')) playbackOut.muted = playback.get('muted') as boolean;
-        if (playback.has('loop')) playbackOut.loop = playback.get('loop') as boolean;
-        if (playback.has('controls')) playbackOut.controls = playback.get('controls') as boolean;
-        el.playback = playbackOut;
-      }
-      return el;
-    }
-    case 'action': {
-      const hrefMap = map.get('href') as Y.Map<unknown>;
-      const hrefType = hrefMap.get('type') as string;
-      const href: ActionElement['href'] =
-        hrefType === 'page'
-          ? {
-              type: 'page',
-              pageId: hrefMap.get('pageId') as string,
-              ...(hrefMap.has('anchor') ? { anchor: hrefMap.get('anchor') as string } : {}),
-            }
-          : { type: 'external', url: hrefMap.get('url') as string };
-      const el: ActionElement = {
-        ...base,
-        type,
-        label: map.get('label') as string,
-        href,
-        variant: map.get('variant') as ActionElement['variant'],
-      };
-      return el;
-    }
-    case 'shape': {
-      const el: ShapeElement = {
-        ...base,
-        type,
-        variant: map.get('variant') as ShapeElement['variant'],
-      };
-      return el;
-    }
-    case 'container': {
-      const el: ContainerElement = {
-        ...base,
-        type,
-        variant: map.get('variant') as ContainerElement['variant'],
-      };
-      return el;
-    }
-    case 'form': {
-      const fields = (map.get('fields') as Y.Array<Y.Map<unknown>>).map(decodeFormFieldDef);
-      const el: FormElement = {
-        ...base,
-        type,
-        fields,
-        submitLabel: map.get('submitLabel') as string,
-        successMessage: map.get('successMessage') as string,
-      };
-      if (map.has('webhookUrl')) el.webhookUrl = map.get('webhookUrl') as string;
-      return el;
-    }
-    case 'embed': {
-      const el: EmbedElement = {
-        ...base,
-        type,
-        url: map.get('url') as string,
-      };
-      if (map.has('title')) el.title = map.get('title') as string;
-      if (map.has('aspectRatio')) el.aspectRatio = map.get('aspectRatio') as number;
-      return el;
-    }
-    case 'chart': {
-      const series = (map.get('series') as Y.Array<Y.Map<unknown>>).map(decodeChartSeries);
-      const categories = (map.get('categories') as Y.Array<string>).toArray();
-      const el: ChartElement = {
-        ...base,
-        type,
-        kind: map.get('kind') as ChartElement['kind'],
-        series,
-        categories,
-        showLegend: map.get('showLegend') as boolean,
-      };
-      if (map.has('xAxisTitle')) el.xAxisTitle = map.get('xAxisTitle') as string;
-      if (map.has('yAxisTitle')) el.yAxisTitle = map.get('yAxisTitle') as string;
-      return el;
-    }
-    case 'accordion': {
-      const items = (map.get('items') as Y.Array<Y.Map<unknown>>).map(decodeAccordionItem);
-      const el: AccordionElement = {
-        ...base,
-        type,
-        items,
-        allowMultipleOpen: map.get('allowMultipleOpen') as boolean,
-      };
-      return el;
-    }
-    case 'carousel': {
-      const slides = (map.get('slides') as Y.Array<Y.Map<unknown>>).map(decodeCarouselSlide);
-      const el: CarouselElement = {
-        ...base,
-        type,
-        slides,
-        showArrows: map.get('showArrows') as boolean,
-        showDots: map.get('showDots') as boolean,
-      };
-      return el;
-    }
-    case 'table': {
-      const columns = (map.get('columns') as Y.Array<Y.Map<unknown>>).map(decodeTableColumn);
-      const rows = (map.get('rows') as Y.Array<Y.Map<unknown>>).map(decodeTableRow);
-      const el: TableElement = {
-        ...base,
-        type,
-        columns,
-        rows,
-        zebra: map.get('zebra') as boolean,
-        collapseOnPhone: map.get('collapseOnPhone') as boolean,
-      };
-      return el;
-    }
-    case 'code': {
-      const el: CodeElement = {
-        ...base,
-        type,
-        language: map.get('language') as CodeElement['language'],
-        source: map.get('source') as string,
-        showLineNumbers: map.get('showLineNumbers') as boolean,
-      };
-      return el;
-    }
-    case 'nav': {
-      const links = (map.get('links') as Y.Array<Y.Map<unknown>>).map(decodeNavLink);
-      const el: NavElement = {
-        ...base,
-        type,
-        links,
-        layout: map.get('layout') as NavElement['layout'],
-        sticky: map.get('sticky') as boolean,
-      };
-      if (map.has('logoAssetId')) el.logoAssetId = map.get('logoAssetId') as string;
-      return el;
-    }
-    case 'collection': {
-      const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(
-        decodeElement,
-      );
-      const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
-      const entries = rawEntries.map((row) => row.map(decodeElement));
-      const layoutMap = map.get('layout') as Y.Map<unknown>;
-      const el: CollectionElement = {
-        ...base,
-        type,
-        mode: map.get('mode') as CollectionElement['mode'],
-        entryTemplate,
-        entries,
-        layout: {
-          columns: layoutMap.get('columns') as number,
-          gap: layoutMap.get('gap') as number,
-        },
-      };
-      if (map.has('filter')) {
-        const filterMap = map.get('filter') as Y.Map<unknown>;
-        const filter: CollectionElement['filter'] = {};
-        if (filterMap.has('category')) filter.category = filterMap.get('category') as string;
-        if (filterMap.has('tags')) {
-          filter.tags = (filterMap.get('tags') as Y.Array<string>).toArray();
-        }
-        if (filterMap.has('limit')) filter.limit = filterMap.get('limit') as number;
-        el.filter = filter;
-      }
-      if (map.has('sort')) {
-        const sortMap = map.get('sort') as Y.Map<unknown>;
-        el.sort = {
-          field: sortMap.get('field') as NonNullable<CollectionElement['sort']>['field'],
-          order: sortMap.get('order') as 'asc' | 'desc',
-        };
-      }
-      if (map.has('cardTemplate')) {
-        el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
-      }
-      if (map.has('fieldBindings')) {
-        const bindingsMap = map.get('fieldBindings') as Y.Map<string>;
-        const bindings: Record<string, string> = {};
-        for (const [elementId, field] of bindingsMap.entries()) {
-          bindings[elementId] = field;
-        }
-        el.fieldBindings = bindings as Record<
-          string,
-          NonNullable<CollectionElement['fieldBindings']>[string]
-        >;
-      }
-      return el;
-    }
-    default: {
-      const _exhaustive: never = type;
-      throw new Error(`yjs-projection: unknown element type ${JSON.stringify(_exhaustive)}`);
-    }
+  const fn = (
+    Y_DECODE_DISPATCH as Record<string, (m: Y.Map<unknown>, b: BaseElement) => CanvasElement>
+  )[base.type];
+  if (typeof fn !== 'function') {
+    throw new Error(
+      `yjs-projection: no Y_DECODE_DISPATCH entry for element type=${JSON.stringify(base.type)} id=${JSON.stringify(base.id)}`,
+    );
   }
+  return fn(map, base);
 }
 
 function decodeFormFieldDef(map: Y.Map<unknown>): FormFieldDef {

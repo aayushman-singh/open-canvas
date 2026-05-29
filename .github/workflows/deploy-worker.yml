@@ -31,6 +31,9 @@ jobs:
       - run: bun run host-literal-guard:smoke
       - run: bun run canvas:smoke
       - run: bun run inspector-dispatch:smoke
+      - run: bun run agent-tool-dispatch:smoke
+      - run: bun run sidebar-dispatch:smoke
+      - run: bun run yjs-projection:smoke
       - run: bun run canvas-agent:smoke
       - run: bun run build
 

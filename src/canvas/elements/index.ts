@@ -8,21 +8,43 @@
 
 import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
-import { accordionInspectorSpec, renderAccordion } from './accordion.js';
-import { actionInspectorSpec, renderAction } from './action.js';
-import { carouselInspectorSpec, renderCarousel } from './carousel.js';
-import { chartInspectorSpec, renderChart } from './chart.js';
-import { codeInspectorSpec, renderCode } from './code.js';
-import { renderCollection } from './collection.js';
-import { containerInspectorSpec, renderContainer } from './container.js';
-import { embedInspectorSpec, renderEmbed } from './embed.js';
-import { formInspectorSpec, renderForm } from './form.js';
+import {
+  accordionAgentToolSpec,
+  accordionInspectorSpec,
+  accordionSidebarSpec,
+  renderAccordion,
+} from './accordion.js';
+import {
+  actionAgentToolSpec,
+  actionInspectorSpec,
+  actionSidebarSpec,
+  renderAction,
+} from './action.js';
+import {
+  carouselAgentToolSpec,
+  carouselInspectorSpec,
+  carouselSidebarSpec,
+  renderCarousel,
+} from './carousel.js';
+import { chartAgentToolSpec, chartInspectorSpec, chartSidebarSpec, renderChart } from './chart.js';
+import { codeAgentToolSpec, codeInspectorSpec, codeSidebarSpec, renderCode } from './code.js';
+import { collectionAgentToolSpec, collectionSidebarSpec, renderCollection } from './collection.js';
+import {
+  containerAgentToolSpec,
+  containerInspectorSpec,
+  containerSidebarSpec,
+  renderContainer,
+} from './container.js';
+import { embedAgentToolSpec, embedInspectorSpec, embedSidebarSpec, renderEmbed } from './embed.js';
+import { formAgentToolSpec, formInspectorSpec, formSidebarSpec, renderForm } from './form.js';
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
-import { mediaInspectorSpec, renderMedia } from './media.js';
-import { navInspectorSpec, renderNav } from './nav.js';
-import { renderShape, shapeInspectorSpec } from './shape.js';
-import { renderTable, tableInspectorSpec } from './table.js';
-import { renderText, textInspectorSpec } from './text.js';
+import type { SidebarSpec } from './sidebar-spec.js';
+import { mediaAgentToolSpec, mediaInspectorSpec, mediaSidebarSpec, renderMedia } from './media.js';
+import { navAgentToolSpec, navInspectorSpec, navSidebarSpec, renderNav } from './nav.js';
+import { renderShape, shapeAgentToolSpec, shapeInspectorSpec, shapeSidebarSpec } from './shape.js';
+import { renderTable, tableAgentToolSpec, tableInspectorSpec, tableSidebarSpec } from './table.js';
+import { renderText, textAgentToolSpec, textInspectorSpec, textSidebarSpec } from './text.js';
 
 // Re-export every element interface so downstream code has a single import
 // point. The five originals come from `schema.ts` (legacy location); the
@@ -213,4 +235,76 @@ export const INSPECTOR_DISPATCH: InspectorDispatch = {
   nav: navInspectorSpec,
   chart: chartInspectorSpec,
   form: formInspectorSpec,
+};
+
+// ---------------------------------------------------------------------------
+// Agent tool dispatch (ADR 0011 Step 2)
+// ---------------------------------------------------------------------------
+//
+// Per-element JSON-Schema + parser fragments for the cross-element
+// `updateElement` / `addElement` LLM tools, plus optional standalone tools
+// (`rewriteText`, `replaceMedia`) that target a single element type. See
+// `agent-tool-spec.ts` for the spec shape.
+//
+// `AGENT_TOOL_DISPATCH` is a full `Record<CanvasElement['type'], AgentToolSpec>`
+// — missing an entry is a TypeScript compile error, mirroring the
+// `RenderDispatch` and `InspectorDispatch` guarantees from ADR 0011 dec 2.
+// `collection` carries an empty spec (recipe-only creation; see
+// `collectionAgentToolSpec` in `collection.ts`).
+export type AgentToolDispatch = Record<CanvasElement['type'], AgentToolSpec>;
+
+// ---------------------------------------------------------------------------
+// Sidebar dispatch (ADR 0011 Step 3)
+// ---------------------------------------------------------------------------
+//
+// Per-element sidebar + section-toolbar commands. `route.tsx` reads this
+// dispatch directly to render the sidebar grid; `canvas-client.ts`
+// interpolates it as JSON to wire `data-sidebar-add-component` clicks and
+// the in-section toolbar. Named factories in canvas-client's
+// `SIDEBAR_FACTORIES` registry build the default element JSON; the spec
+// names a factory by string and the smoke catches drift.
+//
+// Full `Record<CanvasElement['type'], SidebarSpec>` — missing an entry is
+// a TypeScript compile error, mirroring RenderDispatch / InspectorDispatch
+// / AgentToolDispatch.
+export type SidebarDispatch = Record<CanvasElement['type'], SidebarSpec>;
+
+// Order is load-bearing: `Object.values(SIDEBAR_DISPATCH).flatMap(s =>
+// s.commands)` drives the visible order in both the editor sidebar
+// (route.tsx) and the per-section toolbar (canvas-client.ts). Preserving
+// the legacy order — Text first (most common), then Image/Video, Button,
+// layout primitives, Chart, then the less-common compound types — keeps
+// the Owner's muscle memory intact through the migration.
+export const SIDEBAR_DISPATCH: SidebarDispatch = {
+  text: textSidebarSpec,
+  media: mediaSidebarSpec,
+  action: actionSidebarSpec,
+  shape: shapeSidebarSpec,
+  container: containerSidebarSpec,
+  chart: chartSidebarSpec,
+  form: formSidebarSpec,
+  embed: embedSidebarSpec,
+  code: codeSidebarSpec,
+  accordion: accordionSidebarSpec,
+  carousel: carouselSidebarSpec,
+  table: tableSidebarSpec,
+  nav: navSidebarSpec,
+  collection: collectionSidebarSpec,
+};
+
+export const AGENT_TOOL_DISPATCH: AgentToolDispatch = {
+  shape: shapeAgentToolSpec,
+  container: containerAgentToolSpec,
+  code: codeAgentToolSpec,
+  embed: embedAgentToolSpec,
+  collection: collectionAgentToolSpec,
+  text: textAgentToolSpec,
+  action: actionAgentToolSpec,
+  media: mediaAgentToolSpec,
+  accordion: accordionAgentToolSpec,
+  carousel: carouselAgentToolSpec,
+  table: tableAgentToolSpec,
+  nav: navAgentToolSpec,
+  form: formAgentToolSpec,
+  chart: chartAgentToolSpec,
 };

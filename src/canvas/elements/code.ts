@@ -20,7 +20,9 @@ import {
   isSupportedLanguage,
   renderPlainCodeSnippet,
 } from '../../code/highlight.js';
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, escapeCssValue } from './render-utils.js';
 
 export const CODE_LANGUAGES = [
@@ -149,4 +151,51 @@ export const codeInspectorSpec: InspectorSpec = {
     },
     { kind: 'checkbox', label: 'Line numbers', path: 'showLineNumbers' },
   ],
+};
+
+export const codeSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'code',
+      sidebarLabel: 'Code',
+      sidebarTip: 'Add a code snippet',
+      factoryName: 'code',
+    },
+  ],
+};
+
+export const codeAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    language: {
+      type: 'string',
+      enum: [...CODE_LANGUAGES],
+      description: 'Programming language. Code elements only.',
+    },
+    source: {
+      type: 'string',
+      description: 'Source code content. Code elements only.',
+    },
+    showLineNumbers: {
+      type: 'boolean',
+      description: 'Show line numbers. Code elements only.',
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.language !== undefined) {
+      if (typeof args.language !== 'string') throw new Error('language must be a string');
+      patch.language = args.language;
+    }
+    if (args.source !== undefined) {
+      if (typeof args.source !== 'string') throw new Error('source must be a string');
+      patch.source = args.source;
+    }
+    if (args.showLineNumbers !== undefined) {
+      if (typeof args.showLineNumbers !== 'boolean') {
+        throw new Error('showLineNumbers must be a boolean');
+      }
+      patch.showLineNumbers = args.showLineNumbers;
+    }
+    return patch;
+  },
 };

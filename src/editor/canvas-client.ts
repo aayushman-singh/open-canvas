@@ -21,7 +21,7 @@
 // `bun run review:smoke` after editing string-heavy code here; that smoke
 // imports the emitted client as JavaScript and catches broken escaping.
 
-import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
+import { INSPECTOR_DISPATCH, SIDEBAR_DISPATCH } from '../canvas/elements/index.js';
 
 export interface CanvasClientScriptParams {
   siteId: string;
@@ -44,18 +44,256 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     );
   }
 
-  // Safe interpolations: siteId, apiBase, INSPECTOR_DISPATCH. siteId + apiBase
-  // are validated above; INSPECTOR_DISPATCH is a static module export of pure
-  // data (ADR 0011 Step 1) so JSON.stringify produces a value-only payload
-  // with no embedded code.
+  // Safe interpolations: siteId, apiBase, INSPECTOR_DISPATCH, SIDEBAR_DISPATCH.
+  // siteId + apiBase are validated above; INSPECTOR_DISPATCH (ADR 0011 Step 1)
+  // and SIDEBAR_DISPATCH (ADR 0011 Step 3) are static module exports of pure
+  // data so JSON.stringify produces value-only payloads with no embedded code.
   // Everything inside the IIFE is plain JavaScript, not TypeScript.
   const inspectorDispatchJson = JSON.stringify(INSPECTOR_DISPATCH);
+  const sidebarDispatchJson = JSON.stringify(SIDEBAR_DISPATCH);
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
   const API_BASE = ${JSON.stringify(apiBase)};
   const WS_TOKEN = ${JSON.stringify(wsToken)};
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
   const INSPECTOR_DISPATCH = ${inspectorDispatchJson};
+  const SIDEBAR_DISPATCH = ${sidebarDispatchJson};
+  // Flatten SIDEBAR_DISPATCH to a key→command map for O(1) lookups by
+  // sidebar-add-component value or "add-X" action key (ADR 0011 Step 3).
+  const SIDEBAR_COMMANDS = (function() {
+    var byKey = {};
+    var types = Object.keys(SIDEBAR_DISPATCH);
+    for (var t = 0; t < types.length; t++) {
+      var cmds = SIDEBAR_DISPATCH[types[t]].commands;
+      for (var i = 0; i < cmds.length; i++) {
+        byKey[cmds[i].key] = cmds[i];
+      }
+    }
+    return byKey;
+  })();
+
+  // Named factories for the sidebar's "drop in a new X" buttons. Each
+  // SidebarCommandSpec in SIDEBAR_DISPATCH names one of these by
+  // factoryName; the factory returns { defaultSize, payload } where payload
+  // is the new element minus its id + box (the caller fills both). Match
+  // the sidebar-dispatch.smoke REGISTERED_FACTORIES list — added a factory
+  // here means add the name there.
+  //
+  // newElementId / defaultBox are hoisted function declarations, so it is
+  // safe for factories defined at IIFE top to reference them — calls only
+  // happen at click time, well after declaration execution.
+  const SIDEBAR_FACTORIES = {
+    text: function() {
+      return {
+        defaultSize: { w: 320, h: 80 },
+        payload: {
+          type: "text",
+          content: [{ text: "New text" }],
+          role: "body",
+          fontSize: 16,
+          fontWeight: 400,
+          align: "left",
+        },
+      };
+    },
+    image: function() {
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "media",
+          mediaKind: "image",
+          assetId: "__placeholder__",
+          alt: "Image",
+          fit: "cover",
+        },
+      };
+    },
+    video: function() {
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "media",
+          mediaKind: "video",
+          assetId: "__placeholder__",
+          alt: "Video",
+          fit: "cover",
+          playback: { autoplay: false, muted: true, loop: false, controls: true },
+        },
+      };
+    },
+    action: function() {
+      return {
+        defaultSize: { w: 160, h: 48 },
+        payload: {
+          type: "action",
+          label: "Action",
+          href: "#",
+          variant: "solid",
+        },
+      };
+    },
+    shape: function() {
+      return {
+        defaultSize: { w: 120, h: 120 },
+        payload: {
+          type: "shape",
+          variant: "rect",
+        },
+      };
+    },
+    container: function() {
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "container",
+          variant: "flat",
+        },
+      };
+    },
+    chart: function() {
+      // Default to a small bar chart with two series across three categories
+      // so the Owner has something to edit in the data grid immediately.
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "chart",
+          kind: "bar",
+          series: [
+            { label: "Series A", values: [3, 5, 2] },
+            { label: "Series B", values: [4, 1, 6] },
+          ],
+          categories: ["Jan", "Feb", "Mar"],
+          showLegend: true,
+        },
+      };
+    },
+    form: function() {
+      return {
+        defaultSize: { w: 480, h: 360 },
+        payload: {
+          type: "form",
+          fields: [
+            { id: newElementId(), label: "Name", kind: "text", required: true, placeholder: "Your name" },
+            { id: newElementId(), label: "Email", kind: "email", required: true, placeholder: "you@example.com" },
+            { id: newElementId(), label: "Message", kind: "textarea", required: false, placeholder: "Your message" },
+          ],
+          submitLabel: "Send",
+          successMessage: "Thanks! We received your submission.",
+        },
+      };
+    },
+    embed: function() {
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "embed",
+          url: "",
+          title: "Embed",
+        },
+      };
+    },
+    code: function() {
+      // String.fromCharCode(10) is the newline trick — embedding a literal
+      // backslash-n here would be reinterpreted by the outer TS template literal.
+      return {
+        defaultSize: { w: 480, h: 240 },
+        payload: {
+          type: "code",
+          language: "typescript",
+          source: "function hello() {" + String.fromCharCode(10) + "  return 'world';" + String.fromCharCode(10) + "}",
+          showLineNumbers: true,
+        },
+      };
+    },
+    accordion: function() {
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "accordion",
+          items: [
+            { id: newElementId(), title: "First question", body: [{ text: "Answer to the first question." }] },
+            { id: newElementId(), title: "Second question", body: [{ text: "Answer to the second question." }] },
+            { id: newElementId(), title: "Third question", body: [{ text: "Answer to the third question." }] },
+          ],
+          allowMultipleOpen: false,
+        },
+      };
+    },
+    carousel: function() {
+      return {
+        defaultSize: { w: 480, h: 320 },
+        payload: {
+          type: "carousel",
+          slides: [
+            { id: newElementId(), assetId: "__placeholder__", caption: "Slide 1" },
+            { id: newElementId(), assetId: "__placeholder__", caption: "Slide 2" },
+            { id: newElementId(), assetId: "__placeholder__", caption: "Slide 3" },
+          ],
+          showArrows: true,
+          showDots: true,
+        },
+      };
+    },
+    table: function() {
+      var colA = newElementId();
+      var colB = newElementId();
+      var colC = newElementId();
+      return {
+        defaultSize: { w: 480, h: 240 },
+        payload: {
+          type: "table",
+          columns: [
+            { id: colA, header: "Name" },
+            { id: colB, header: "Role" },
+            { id: colC, header: "Status" },
+          ],
+          rows: [
+            { id: newElementId(), cells: Object.fromEntries([[colA, "Alice"], [colB, "Engineer"], [colC, "Active"]]) },
+            { id: newElementId(), cells: Object.fromEntries([[colA, "Bob"], [colB, "Designer"], [colC, "Active"]]) },
+          ],
+          zebra: true,
+          collapseOnPhone: true,
+        },
+      };
+    },
+    nav: function() {
+      return {
+        defaultSize: { w: 960, h: 56 },
+        payload: {
+          type: "nav",
+          links: [
+            { label: "Home", href: "/home", kind: "internal" },
+            { label: "About", href: "/about", kind: "internal" },
+            { label: "Contact", href: "/contact", kind: "internal" },
+          ],
+          layout: "left-right",
+          sticky: false,
+        },
+      };
+    },
+  };
+
+  // Resolve a sidebar command key (e.g. "image", "table") to an inserted
+  // element + add it to the section. Caller has already validated the
+  // section. Throws loudly when the command key is unknown or names a
+  // factory that has not been registered — both are programming errors
+  // the sidebar-dispatch:smoke catches at build time, but failing here is
+  // the runtime safety net.
+  function insertElementForSidebarCommand(section, commandKey) {
+    var cmd = SIDEBAR_COMMANDS[commandKey];
+    if (!cmd) throw new Error("insertElementForSidebarCommand: unknown command key " + JSON.stringify(commandKey));
+    var factory = SIDEBAR_FACTORIES[cmd.factoryName];
+    if (typeof factory !== "function") {
+      throw new Error("insertElementForSidebarCommand: no factory registered for " + JSON.stringify(cmd.factoryName));
+    }
+    var built = factory(section);
+    var newEl = { id: newElementId() };
+    var payload = built.payload;
+    var keys = Object.keys(payload);
+    for (var i = 0; i < keys.length; i++) newEl[keys[i]] = payload[keys[i]];
+    newEl.box = defaultBox(section, built.defaultSize.w, built.defaultSize.h);
+    addElementToSection(section, newEl);
+  }
 
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic"];
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
@@ -2372,23 +2610,25 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function buildSectionToolbar(section) {
     const bar = document.createElement("div");
     bar.className = "section-toolbar";
-    const buttons = [
-      { label: "+T", action: "add-text", tip: "Add text" },
-      { label: "+Img", action: "add-image", tip: "Add image" },
-      { label: "+Vid", action: "add-video", tip: "Add video" },
-      { label: "+Btn", action: "add-action", tip: "Add button" },
-      { label: "+◇", action: "add-shape", tip: "Add shape" },
-      { label: "+□", action: "add-container", tip: "Add container" },
-      { label: "+📊", action: "add-chart", tip: "Add chart" },
-    ];
-    for (const def of buttons) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = def.label;
-      button.title = def.tip;
-      button.setAttribute("data-section-action", def.action);
-      button.setAttribute("data-section-id", section.id);
-      bar.appendChild(button);
+    // Section toolbar surfaces the curated subset of SIDEBAR_DISPATCH
+    // commands that declared a toolbarLabel (ADR 0011 Step 3). The
+    // dispatch insertion order in src/canvas/elements/index.ts controls
+    // the visible toolbar order; missing a toolbarLabel means the
+    // command appears in the sidebar grid only, not on every section.
+    var types = Object.keys(SIDEBAR_DISPATCH);
+    for (var t = 0; t < types.length; t++) {
+      var cmds = SIDEBAR_DISPATCH[types[t]].commands;
+      for (var i = 0; i < cmds.length; i++) {
+        var cmd = cmds[i];
+        if (!cmd.toolbarLabel) continue;
+        var button = document.createElement("button");
+        button.type = "button";
+        button.textContent = cmd.toolbarLabel;
+        button.title = cmd.toolbarTip || cmd.sidebarTip;
+        button.setAttribute("data-section-action", "add-" + cmd.key);
+        button.setAttribute("data-section-id", section.id);
+        bar.appendChild(button);
+      }
     }
     return bar;
   }
@@ -7967,22 +8207,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     setStatus("Section added", "ok");
   }
 
+  // Sidebar drop-in keys are sourced from SIDEBAR_DISPATCH; "add-X" is the
+  // canonical section-action string (matches buildSectionToolbar's data
+  // attribute + handleSectionAction's branch lookup).
   function componentActionForSidebar(component) {
-    if (component === "text") return "add-text";
-    if (component === "image") return "add-image";
-    if (component === "video") return "add-video";
-    if (component === "action") return "add-action";
-    if (component === "shape") return "add-shape";
-    if (component === "container") return "add-container";
-    if (component === "chart") return "add-chart";
-    if (component === "form") return "add-form";
-    if (component === "embed") return "add-embed";
-    if (component === "code") return "add-code";
-    if (component === "accordion") return "add-accordion";
-    if (component === "carousel") return "add-carousel";
-    if (component === "table") return "add-table";
-    if (component === "nav") return "add-nav";
-    return null;
+    if (!SIDEBAR_COMMANDS[component]) return null;
+    return "add-" + component;
   }
 
   function addComponentFromSidebar(component) {
@@ -8036,164 +8266,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (idx < 0 && !siteSection) return;
     var section = siteSection || page.sections[idx];
 
-    if (action === "add-text") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "text",
-        content: [{ text: "New text" }],
-        role: "body",
-        fontSize: 16,
-        fontWeight: 400,
-        align: "left",
-        box: defaultBox(section, 320, 80),
-      });
-    } else if (action === "add-image") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "media",
-        mediaKind: "image",
-        assetId: "__placeholder__",
-        alt: "Image",
-        fit: "cover",
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-video") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "media",
-        mediaKind: "video",
-        assetId: "__placeholder__",
-        alt: "Video",
-        fit: "cover",
-        playback: { autoplay: false, muted: true, loop: false, controls: true },
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-action") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "action",
-        label: "Action",
-        href: "#",
-        variant: "solid",
-        box: defaultBox(section, 160, 48),
-      });
-    } else if (action === "add-shape") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "shape",
-        variant: "rect",
-        box: defaultBox(section, 120, 120),
-      });
-    } else if (action === "add-container") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "container",
-        variant: "flat",
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-chart") {
-      // Default to a small bar chart with two series across three categories
-      // so the Owner has something to edit in the data grid immediately.
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "chart",
-        kind: "bar",
-        series: [
-          { label: "Series A", values: [3, 5, 2] },
-          { label: "Series B", values: [4, 1, 6] },
-        ],
-        categories: ["Jan", "Feb", "Mar"],
-        showLegend: true,
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-form") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "form",
-        fields: [
-          { id: newElementId(), label: "Name", kind: "text", required: true, placeholder: "Your name" },
-          { id: newElementId(), label: "Email", kind: "email", required: true, placeholder: "you@example.com" },
-          { id: newElementId(), label: "Message", kind: "textarea", required: false, placeholder: "Your message" },
-        ],
-        submitLabel: "Send",
-        successMessage: "Thanks! We received your submission.",
-        box: defaultBox(section, 480, 360),
-      });
-    } else if (action === "add-embed") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "embed",
-        url: "",
-        title: "Embed",
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-code") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "code",
-        language: "typescript",
-        source: "function hello() {" + String.fromCharCode(10) + "  return 'world';" + String.fromCharCode(10) + "}",
-        showLineNumbers: true,
-        box: defaultBox(section, 480, 240),
-      });
-    } else if (action === "add-accordion") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "accordion",
-        items: [
-          { id: newElementId(), title: "First question", body: [{ text: "Answer to the first question." }] },
-          { id: newElementId(), title: "Second question", body: [{ text: "Answer to the second question." }] },
-          { id: newElementId(), title: "Third question", body: [{ text: "Answer to the third question." }] },
-        ],
-        allowMultipleOpen: false,
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-carousel") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "carousel",
-        slides: [
-          { id: newElementId(), assetId: "__placeholder__", caption: "Slide 1" },
-          { id: newElementId(), assetId: "__placeholder__", caption: "Slide 2" },
-          { id: newElementId(), assetId: "__placeholder__", caption: "Slide 3" },
-        ],
-        showArrows: true,
-        showDots: true,
-        box: defaultBox(section, 480, 320),
-      });
-    } else if (action === "add-table") {
-      var colA = newElementId();
-      var colB = newElementId();
-      var colC = newElementId();
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "table",
-        columns: [
-          { id: colA, header: "Name" },
-          { id: colB, header: "Role" },
-          { id: colC, header: "Status" },
-        ],
-        rows: [
-          { id: newElementId(), cells: Object.fromEntries([[colA, "Alice"], [colB, "Engineer"], [colC, "Active"]]) },
-          { id: newElementId(), cells: Object.fromEntries([[colA, "Bob"], [colB, "Designer"], [colC, "Active"]]) },
-        ],
-        zebra: true,
-        collapseOnPhone: true,
-        box: defaultBox(section, 480, 240),
-      });
-    } else if (action === "add-nav") {
-      addElementToSection(section, {
-        id: newElementId(),
-        type: "nav",
-        links: [
-          { label: "Home", href: "/home", kind: "internal" },
-          { label: "About", href: "/about", kind: "internal" },
-          { label: "Contact", href: "/contact", kind: "internal" },
-        ],
-        layout: "left-right",
-        sticky: false,
-        box: defaultBox(section, 960, 56),
-      });
+    // "add-X" routes through SIDEBAR_DISPATCH + SIDEBAR_FACTORIES (ADR 0011
+    // Step 3). The previous 14-arm switch is gone; each per-element module
+    // owns its sidebar metadata and the canvas-client owns the matching
+    // factory closure. The sidebar-dispatch:smoke verifies every spec
+    // factoryName has a registered factory above.
+    if (action.indexOf("add-") === 0 && SIDEBAR_COMMANDS[action.slice(4)]) {
+      insertElementForSidebarCommand(section, action.slice(4));
     } else if (action === "duplicate-section") {
       if (isPinnedSection(section)) return;
       const copy = JSON.parse(JSON.stringify(section));

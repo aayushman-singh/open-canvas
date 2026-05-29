@@ -27,7 +27,9 @@
 //     a missing iframe in the DOM would be a silent skip.
 
 import { escapeAttr } from './render-utils.js';
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
 import { resolveEmbed } from '../../embed/oembed-resolve.js';
 
@@ -125,4 +127,50 @@ export const embedInspectorSpec: InspectorSpec = {
       tolerance: 0.01,
     },
   ],
+};
+
+export const embedSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'embed',
+      sidebarLabel: 'Embed',
+      sidebarTip: 'Embed external content (YouTube, maps, etc.)',
+      factoryName: 'embed',
+    },
+  ],
+};
+
+export const embedAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    url: {
+      type: 'string',
+      description: 'Embed URL (YouTube, Vimeo, etc). Embed elements only.',
+    },
+    title: {
+      type: 'string',
+      description: 'Embed title. Embed elements only.',
+    },
+    aspectRatio: {
+      type: 'number',
+      description: 'Embed aspect ratio (default 16/9). Embed elements only.',
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.url !== undefined) {
+      if (typeof args.url !== 'string') throw new Error('url must be a string');
+      patch.url = args.url;
+    }
+    if (args.title !== undefined) {
+      if (typeof args.title !== 'string') throw new Error('title must be a string');
+      patch.title = args.title;
+    }
+    if (args.aspectRatio !== undefined) {
+      if (typeof args.aspectRatio !== 'number' || !Number.isFinite(args.aspectRatio)) {
+        throw new Error('aspectRatio must be a number');
+      }
+      patch.aspectRatio = args.aspectRatio;
+    }
+    return patch;
+  },
 };

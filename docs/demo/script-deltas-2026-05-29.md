@@ -154,7 +154,7 @@ If you want to keep the script as drafted and patch the product, these are the t
 2. **Topbar Dark preview toggle** (resolves S2.A.5). Already a tokenized CSS variable swap per the script's Act 2 voiceover.
 3. **Topbar RTL preview toggle** (resolves S2.A.6). Same shape as Dark preview.
 4. **AI Agent prompt modal as a separate topbar surface** (resolves S2.C entirely). Largest piece, distinct UX.
-5. **Collection direct-add button in the Add sidebar** (resolves S2.B.1/.2). Small.
+5. **Collection direct-add button + dedicated inspector** only if Collection stops being recipe-backed. The current recording path keeps it in the Sections tab.
 
 None are recording-blockers; they're polish.
 

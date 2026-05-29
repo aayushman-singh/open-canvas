@@ -19,7 +19,9 @@
 //
 // Out of scope: auto-play, multi-row carousels, touch inertia.
 
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml } from './render-utils.js';
 
@@ -156,4 +158,59 @@ export const carouselInspectorSpec: InspectorSpec = {
     { kind: 'checkbox', label: 'Show arrows', path: 'showArrows' },
     { kind: 'checkbox', label: 'Show dots', path: 'showDots' },
   ],
+};
+
+export const carouselSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'carousel',
+      sidebarLabel: 'Carousel',
+      sidebarTip: 'Add an image carousel / slideshow',
+      factoryName: 'carousel',
+    },
+  ],
+};
+
+export const carouselAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    showArrows: {
+      type: 'boolean',
+      description: 'Show navigation arrows. Carousel elements only.',
+    },
+    showDots: {
+      type: 'boolean',
+      description: 'Show dot pagination. Carousel elements only.',
+    },
+    slides: {
+      type: 'array',
+      description:
+        'Carousel slides. Carousel elements only. Each slide needs id and assetId; caption and href are optional.',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          assetId: { type: 'string' },
+          caption: { type: 'string' },
+          href: { type: 'string' },
+        },
+        required: ['id', 'assetId'],
+      },
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.showArrows !== undefined) {
+      if (typeof args.showArrows !== 'boolean') throw new Error('showArrows must be a boolean');
+      patch.showArrows = args.showArrows;
+    }
+    if (args.showDots !== undefined) {
+      if (typeof args.showDots !== 'boolean') throw new Error('showDots must be a boolean');
+      patch.showDots = args.showDots;
+    }
+    if (args.slides !== undefined) {
+      if (!Array.isArray(args.slides)) throw new Error('slides must be an array');
+      patch.slides = args.slides;
+    }
+    return patch;
+  },
 };

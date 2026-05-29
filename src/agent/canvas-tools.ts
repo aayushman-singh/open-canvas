@@ -20,14 +20,11 @@ import {
   BACKGROUND_EFFECTS,
   BUILT_IN_STYLE_KITS,
   ELEMENT_TYPES,
-  INLINE_MARK_TYPES,
-  MEDIA_KINDS,
   MOTION_PRESETS,
   SHAPE_VARIANTS,
   SURFACE_VARIANTS,
 } from '../canvas/schema.js';
-import { CHART_KINDS } from '../canvas/elements/chart.js';
-import { CODE_LANGUAGES } from '../canvas/elements/code.js';
+import { AGENT_TOOL_DISPATCH } from '../canvas/elements/index.js';
 import {
   COLOR_TOKENS,
   FONT_TOKENS,
@@ -41,106 +38,66 @@ import {
 import type { JsonSchema, LlmTool } from './llm.js';
 
 // ---------------------------------------------------------------------------
-// rewriteText
+// Per-element schema fragment merger (ADR 0011 Step 2 cutover)
 // ---------------------------------------------------------------------------
+//
+// `updateElement` and `addElement` advertise the union of every element
+// type's editable fields. The shape used to live inline (one giant
+// "X elements only"-annotated bag per tool). It now comes from
+// `AGENT_TOOL_DISPATCH` — each per-element module contributes its own
+// `patchProperties`; this merger unions them.
+//
+// When two specs claim the same field name AND both schemas have `enum`s
+// (e.g. `variant` across shape/container/action), the merger unions the
+// enums and concatenates the descriptions so the LLM sees every per-type
+// meaning. Non-enum collisions keep the first declarer's shape — the
+// `agent-tool-dispatch:smoke` check on no-shape-leakage catches surprising
+// new collisions at build time.
+function mergeAgentPatchProperties(): Record<string, JsonSchema> {
+  const merged: Record<string, JsonSchema> = {};
+  for (const spec of Object.values(AGENT_TOOL_DISPATCH)) {
+    for (const [name, schema] of Object.entries(spec.patchProperties)) {
+      const existing = merged[name];
+      if (existing === undefined) {
+        merged[name] = schema;
+        continue;
+      }
+      if (existing.enum !== undefined && schema.enum !== undefined) {
+        const unionEnum = Array.from(new Set([...existing.enum, ...schema.enum]));
+        const existingDesc = existing.description ?? '';
+        const newDesc = schema.description ?? '';
+        merged[name] = {
+          ...existing,
+          enum: unionEnum,
+          description: existingDesc.includes(newDesc)
+            ? existingDesc
+            : `${existingDesc} ${newDesc}`.trim(),
+        };
+      }
+    }
+  }
+  return merged;
+}
 
-// One inline mark. The `type` field discriminates the union; `href` is only
-// required when type === 'link'. JsonSchema as represented in `LlmTool` does
-// not support `oneOf`, so we expose a single object schema and rely on the
-// description to spell out the contract. The apply function + validator
-// reject invalid combinations loudly.
-const inlineMarkSchema: JsonSchema = {
-  type: 'object',
-  description:
-    'One inline mark applied to a run of text. Valid shapes:\n' +
-    '  { "type": "bold" } | { "type": "italic" } | { "type": "underline" } |\n' +
-    '  { "type": "strike" } | { "type": "code" } | { "type": "highlight" } |\n' +
-    '  { "type": "link", "href": "https://example.com" }\n' +
-    'For link marks, `href` MUST be http:, https:, mailto:, tel:, /relative, or #anchor — javascript: and data: are rejected.',
-  properties: {
-    type: {
-      type: 'string',
-      enum: [...INLINE_MARK_TYPES],
-      description: 'Mark kind. Required.',
-    },
-    href: {
-      type: 'string',
-      description:
-        'Required ONLY when type=="link". http:/https:/mailto:/tel: schemes, plus /relative and #anchor, are allowed.',
-    },
-  },
-  required: ['type'],
-};
+const AGENT_PATCH_PROPERTIES: Record<string, JsonSchema> = mergeAgentPatchProperties();
 
-const inlineRunSchema: JsonSchema = {
-  type: 'object',
-  description:
-    'One inline run of text. `text` is the raw run text (no HTML). `marks` carries 0..N InlineMark objects.',
-  properties: {
-    text: {
-      type: 'string',
-      description:
-        'Raw text for this run. Empty string is allowed only when the run carries marks.',
-    },
-    marks: {
-      type: 'array',
-      items: inlineMarkSchema,
-      description:
-        'Optional. 0..N marks applied to this run. A run cannot carry two marks of the same `type`.',
-    },
-  },
-  required: ['text'],
-};
-
-const rewriteTextSchema: JsonSchema = {
-  type: 'object',
-  properties: {
-    elementId: {
-      type: 'string',
-      description: 'The id of the existing text element to rewrite. Must be present on the page.',
-    },
-    content: {
-      type: 'array',
-      items: inlineRunSchema,
-      description:
-        'The replacement content. MUST be an array of InlineRun objects — NEVER a plain string. ' +
-        'Example: [{ "text": "Ship a site that feels " }, { "text": "lived-in", "marks": [{ "type": "bold" }] }, { "text": "." }]. ' +
-        'The concatenated plain text must not be empty.',
-    },
-  },
-  required: ['elementId', 'content'],
-};
+// Standalone LLM tools that target a single element type (currently
+// rewriteText for text, replaceMedia for media). Sourced from the
+// `standaloneTool` slot on per-element specs in dispatch insertion order
+// (text precedes media, matching the original CANVAS_AGENT_TOOLS order).
+const STANDALONE_AGENT_TOOLS: LlmTool[] = Object.values(AGENT_TOOL_DISPATCH)
+  .filter((spec) => spec.standaloneTool !== undefined)
+  .map((spec) => {
+    // Non-null asserted by the filter above; spec.standaloneTool is defined.
+    return spec.standaloneTool!.tool;
+  });
 
 // ---------------------------------------------------------------------------
-// replaceMedia
+// rewriteText + replaceMedia
 // ---------------------------------------------------------------------------
-
-const replaceMediaSchema: JsonSchema = {
-  type: 'object',
-  properties: {
-    elementId: {
-      type: 'string',
-      description: 'The id of the existing media element whose asset should be replaced.',
-    },
-    mediaKind: {
-      type: 'string',
-      enum: [...MEDIA_KINDS],
-      description: 'The kind of media — must match the kind of the uploaded asset.',
-    },
-    assetId: {
-      type: 'string',
-      description:
-        'The id of an EXISTING uploaded asset on this site. The model does NOT generate media bytes; ' +
-        'the Owner uploads assets via the canvas API, and the model picks one of those ids.',
-    },
-    alt: {
-      type: 'string',
-      description:
-        'Accessible alt text for the new asset. Empty string is acceptable for purely decorative media.',
-    },
-  },
-  required: ['elementId', 'mediaKind', 'assetId', 'alt'],
-};
+//
+// The standalone tool schemas now live next to their owning element files
+// (text.ts, media.ts) and are sourced via STANDALONE_AGENT_TOOLS above.
 
 // ---------------------------------------------------------------------------
 // designSection
@@ -359,20 +316,7 @@ const designSectionSchema: JsonSchema = {
 // ---------------------------------------------------------------------------
 
 export const CANVAS_AGENT_TOOLS: LlmTool[] = [
-  {
-    name: 'rewriteText',
-    description:
-      'Replace the inline runs of an existing text element. The replacement MUST be an InlineRun[] ' +
-      '(array of { text, marks? } objects) — never a plain string. The concatenated plain text must not be empty.',
-    parameters: rewriteTextSchema,
-  },
-  {
-    name: 'replaceMedia',
-    description:
-      "Replace a media element's asset with an EXISTING uploaded asset id. " +
-      'The model picks an asset that has already been uploaded to the site; this tool does NOT generate media bytes.',
-    parameters: replaceMediaSchema,
-  },
+  ...STANDALONE_AGENT_TOOLS,
   {
     name: 'designSection',
     description:
@@ -405,7 +349,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
   {
     name: 'updateElement',
     description:
-      'Update properties of an existing content element. You MUST pass elementType matching the element\'s actual type — a mismatch is rejected. Only include the fields you want to change. Use rewriteText instead for changing text content with inline marks.',
+      "Update properties of an existing content element. You MUST pass elementType matching the element's actual type — a mismatch is rejected. Only include the fields you want to change. Use rewriteText instead for changing text content with inline marks.",
     parameters: {
       type: 'object',
       properties: {
@@ -413,9 +357,10 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
         elementType: {
           type: 'string',
           enum: [...ELEMENT_TYPES],
-          description: 'The element\'s current type. Must match the actual type — acts as a validation gate.',
+          description:
+            "The element's current type. Must match the actual type — acts as a validation gate.",
         },
-        // -- Shared BaseElement fields --
+        // Shared BaseElement fields
         box: {
           type: 'object',
           description: 'Partial position/size update. Only include fields you want to change.',
@@ -436,136 +381,8 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
             delayMs: { type: 'number' },
           },
         },
-        // -- Text fields --
-        fontSize: { type: 'number', description: 'Font size in px (12-96). Text elements only.' },
-        fontWeight: {
-          type: 'number',
-          description: 'Font weight (400, 500, 600, 700). Text elements only.',
-        },
-        align: {
-          type: 'string',
-          enum: ['left', 'center', 'right'],
-          description: 'Text alignment. Text elements only.',
-        },
-        role: {
-          type: 'string',
-          enum: ['heading', 'body', 'label'],
-          description: 'Semantic role. Text elements only.',
-        },
-        // -- Media fields --
-        fit: {
-          type: 'string',
-          enum: ['cover', 'contain'],
-          description: 'Media fit mode. Media elements only.',
-        },
-        alt: { type: 'string', description: 'Alt text. Media elements only.' },
-        assetId: {
-          type: 'string',
-          description:
-            'Asset ID to display. Media elements only. Must be an existing uploaded asset.',
-        },
-        mediaKind: {
-          type: 'string',
-          enum: [...MEDIA_KINDS],
-          description: 'Media kind. Media elements only.',
-        },
-        // -- Action fields --
-        label: { type: 'string', description: 'Button label text. Action elements only.' },
-        href: {
-          type: 'string',
-          description:
-            'Button link URL. Action elements only. Must be http/https/mailto/tel or a relative path.',
-        },
-        variant: {
-          type: 'string',
-          description:
-            'Visual variant. For action: button style. For shape: shape type. For container: surface style.',
-          enum: [...new Set([...ACTION_VARIANTS, ...SHAPE_VARIANTS, ...SURFACE_VARIANTS])],
-        },
-        // -- Chart fields --
-        kind: {
-          type: 'string',
-          enum: [...CHART_KINDS],
-          description: 'Chart type. Chart elements only.',
-        },
-        showLegend: { type: 'boolean', description: 'Show chart legend. Chart elements only.' },
-        series: {
-          type: 'array',
-          description: 'Chart data series. Chart elements only.',
-          items: {
-            type: 'object',
-            properties: {
-              label: { type: 'string' },
-              values: { type: 'array', items: { type: 'number' } },
-            },
-            required: ['label', 'values'],
-          },
-        },
-        categories: {
-          type: 'array',
-          description: 'Chart category labels. Chart elements only.',
-          items: { type: 'string' },
-        },
-        // -- Code fields --
-        language: {
-          type: 'string',
-          enum: [...CODE_LANGUAGES],
-          description: 'Programming language. Code elements only.',
-        },
-        source: { type: 'string', description: 'Source code content. Code elements only.' },
-        showLineNumbers: {
-          type: 'boolean',
-          description: 'Show line numbers. Code elements only.',
-        },
-        // -- Form fields --
-        submitLabel: {
-          type: 'string',
-          description: 'Submit button text. Form elements only.',
-        },
-        successMessage: {
-          type: 'string',
-          description: 'Message shown after submission. Form elements only.',
-        },
-        // -- Embed fields --
-        url: {
-          type: 'string',
-          description: 'Embed URL (YouTube, Vimeo, etc). Embed elements only.',
-        },
-        title: { type: 'string', description: 'Embed title. Embed elements only.' },
-        aspectRatio: {
-          type: 'number',
-          description: 'Embed aspect ratio (default 16/9). Embed elements only.',
-        },
-        // -- Accordion fields --
-        allowMultipleOpen: {
-          type: 'boolean',
-          description: 'Allow multiple accordion items open. Accordion elements only.',
-        },
-        // -- Carousel fields --
-        showArrows: {
-          type: 'boolean',
-          description: 'Show navigation arrows. Carousel elements only.',
-        },
-        showDots: {
-          type: 'boolean',
-          description: 'Show dot pagination. Carousel elements only.',
-        },
-        // -- Table fields --
-        zebra: {
-          type: 'boolean',
-          description: 'Alternating row colors. Table elements only.',
-        },
-        collapseOnPhone: {
-          type: 'boolean',
-          description: 'Collapse to card layout on phone. Table elements only.',
-        },
-        // -- Nav fields --
-        sticky: { type: 'boolean', description: 'Sticky positioning. Nav elements only.' },
-        layout: {
-          type: 'string',
-          enum: ['left-center-right', 'left-right'],
-          description: 'Nav layout. Nav elements only.',
-        },
+        // Per-element fields — merged from AGENT_TOOL_DISPATCH (ADR 0011 Step 2)
+        ...AGENT_PATCH_PROPERTIES,
       },
       required: ['elementId', 'elementType'],
     },
@@ -599,155 +416,11 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
           },
           required: ['x', 'y', 'w', 'h'],
         },
-        // Text
-        content: {
-          type: 'array',
-          description: 'Text content as InlineRun[]. Required for text elements.',
-          items: {
-            type: 'object',
-            properties: {
-              text: { type: 'string' },
-              marks: { type: 'array', items: { type: 'object' } },
-            },
-            required: ['text'],
-          },
-        },
-        role: { type: 'string', enum: ['heading', 'body', 'label'] },
-        fontSize: { type: 'number' },
-        fontWeight: { type: 'number' },
-        align: { type: 'string', enum: ['left', 'center', 'right'] },
-        // Media
-        assetId: {
-          type: 'string',
-          description: 'Existing uploaded asset ID. Required for media elements.',
-        },
-        mediaKind: { type: 'string', enum: [...MEDIA_KINDS] },
-        alt: { type: 'string' },
-        fit: { type: 'string', enum: ['cover', 'contain'] },
-        // Action
-        label: { type: 'string', description: 'Button label. Required for action elements.' },
-        href: { type: 'string', description: 'Button link URL.' },
-        variant: {
-          type: 'string',
-          enum: [...new Set([...ACTION_VARIANTS, ...SHAPE_VARIANTS, ...SURFACE_VARIANTS])],
-        },
-        // Chart
-        kind: { type: 'string', enum: [...CHART_KINDS] },
-        series: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              label: { type: 'string' },
-              values: { type: 'array', items: { type: 'number' } },
-            },
-            required: ['label', 'values'],
-          },
-        },
-        categories: { type: 'array', items: { type: 'string' } },
-        showLegend: { type: 'boolean' },
-        // Code
-        language: { type: 'string', enum: [...CODE_LANGUAGES] },
-        source: { type: 'string' },
-        showLineNumbers: { type: 'boolean' },
-        // Form
-        fields: {
-          type: 'array',
-          description: 'Form field definitions. Required for form elements.',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              label: { type: 'string' },
-              kind: {
-                type: 'string',
-                enum: ['text', 'email', 'textarea', 'checkbox', 'select'],
-              },
-              required: { type: 'boolean' },
-              placeholder: { type: 'string' },
-            },
-            required: ['id', 'label', 'kind', 'required'],
-          },
-        },
-        submitLabel: { type: 'string' },
-        successMessage: { type: 'string' },
-        // Embed
-        url: { type: 'string' },
-        title: { type: 'string' },
-        aspectRatio: { type: 'number' },
-        // Accordion
-        items: {
-          type: 'array',
-          description: 'Accordion items. Required for accordion elements.',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              title: { type: 'string' },
-              body: { type: 'array', items: { type: 'object' } },
-            },
-            required: ['id', 'title', 'body'],
-          },
-        },
-        allowMultipleOpen: { type: 'boolean' },
-        // Carousel
-        slides: {
-          type: 'array',
-          description: 'Carousel slides. Required for carousel elements.',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              assetId: { type: 'string' },
-              caption: { type: 'string' },
-            },
-            required: ['id', 'assetId'],
-          },
-        },
-        showArrows: { type: 'boolean' },
-        showDots: { type: 'boolean' },
-        // Table
-        columns: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              header: { type: 'string' },
-              align: { type: 'string', enum: ['left', 'center', 'right'] },
-            },
-            required: ['id', 'header'],
-          },
-        },
-        rows: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              cells: { type: 'object' },
-            },
-            required: ['id', 'cells'],
-          },
-        },
-        zebra: { type: 'boolean' },
-        collapseOnPhone: { type: 'boolean' },
-        // Nav
-        links: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              label: { type: 'string' },
-              href: { type: 'string' },
-              kind: { type: 'string', enum: ['internal', 'external'] },
-            },
-            required: ['label', 'href', 'kind'],
-          },
-        },
-        layout: { type: 'string', enum: ['left-center-right', 'left-right'] },
-        sticky: { type: 'boolean' },
-        logoAssetId: { type: 'string' },
+        // Per-element creation fields — merged from AGENT_TOOL_DISPATCH
+        // (ADR 0011 Step 2). Same shape as updateElement: each per-element
+        // module owns its fields and the merger unions enums when multiple
+        // specs claim the same field name (e.g. variant on shape/container/action).
+        ...AGENT_PATCH_PROPERTIES,
       },
       required: ['sectionId', 'elementType'],
     },
@@ -916,7 +589,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
   {
     name: 'setStyleKit',
     description:
-      'Switch the site\'s visual theme to one of the built-in style kits. This restyles the entire site without changing content.',
+      "Switch the site's visual theme to one of the built-in style kits. This restyles the entire site without changing content.",
     parameters: {
       type: 'object',
       properties: {
@@ -936,8 +609,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
   // -------------------------------------------------------------------------
   {
     name: 'setSiteConfig',
-    description:
-      'Update site-level configuration flags. Only include fields you want to change.',
+    description: 'Update site-level configuration flags. Only include fields you want to change.',
     parameters: {
       type: 'object',
       properties: {
@@ -951,8 +623,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
         },
         siteNoIndex: {
           type: 'boolean',
-          description:
-            'When true, tells search engines not to index any page on this site.',
+          description: 'When true, tells search engines not to index any page on this site.',
         },
       },
     },

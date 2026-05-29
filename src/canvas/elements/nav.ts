@@ -31,7 +31,9 @@
 //   the brand. A `logoAlt` field is not yet on the schema; empty alt is the
 //   honest default until then.
 
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml, styleFromEntries } from './render-utils.js';
 
@@ -150,4 +152,67 @@ export const navInspectorSpec: InspectorSpec = {
       emptyOmits: true,
     },
   ],
+};
+
+export const navSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'nav',
+      sidebarLabel: 'Nav',
+      sidebarTip: 'Add a navigation bar',
+      factoryName: 'nav',
+    },
+  ],
+};
+
+export const navAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    sticky: {
+      type: 'boolean',
+      description: 'Sticky positioning. Nav elements only.',
+    },
+    layout: {
+      type: 'string',
+      enum: ['left-center-right', 'left-right'],
+      description: 'Nav layout. Nav elements only.',
+    },
+    links: {
+      type: 'array',
+      description:
+        'Navigation links. Nav elements only. Each link needs label, href, and kind (internal, external, or anchor).',
+      items: {
+        type: 'object',
+        properties: {
+          label: { type: 'string' },
+          href: { type: 'string' },
+          kind: { type: 'string', enum: ['internal', 'external', 'anchor'] },
+        },
+        required: ['label', 'href', 'kind'],
+      },
+    },
+    logoAssetId: {
+      type: 'string',
+      description: 'Optional logo asset id. Nav elements only.',
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.sticky !== undefined) {
+      if (typeof args.sticky !== 'boolean') throw new Error('sticky must be a boolean');
+      patch.sticky = args.sticky;
+    }
+    if (args.layout !== undefined) {
+      if (typeof args.layout !== 'string') throw new Error('layout must be a string');
+      patch.layout = args.layout;
+    }
+    if (args.links !== undefined) {
+      if (!Array.isArray(args.links)) throw new Error('links must be an array');
+      patch.links = args.links;
+    }
+    if (args.logoAssetId !== undefined) {
+      if (typeof args.logoAssetId !== 'string') throw new Error('logoAssetId must be a string');
+      patch.logoAssetId = args.logoAssetId;
+    }
+    return patch;
+  },
 };

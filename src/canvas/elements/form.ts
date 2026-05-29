@@ -14,7 +14,9 @@
 // fails on a missing token, so a no-widget form would be unsubmittable dead
 // UX, never an acceptable degraded mode.
 
+import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
+import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, escapeHtml } from './render-utils.js';
 import type { BaseElement } from '../schema.js';
 
@@ -171,4 +173,65 @@ export const formInspectorSpec: InspectorSpec = {
       noRebuild: true,
     },
   ],
+};
+
+export const formSidebarSpec: SidebarSpec = {
+  commands: [
+    {
+      key: 'form',
+      sidebarLabel: 'Form',
+      sidebarTip: 'Add a contact or signup form',
+      factoryName: 'form',
+    },
+  ],
+};
+
+export const formAgentToolSpec: AgentToolSpec = {
+  patchProperties: {
+    submitLabel: {
+      type: 'string',
+      description: 'Submit button text. Form elements only.',
+    },
+    successMessage: {
+      type: 'string',
+      description: 'Message shown after submission. Form elements only.',
+    },
+    fields: {
+      type: 'array',
+      description:
+        'Form field definitions. Form elements only. Each field needs id, label, kind, and required; kind is text, email, textarea, checkbox, or select.',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          label: { type: 'string' },
+          kind: {
+            type: 'string',
+            enum: ['text', 'email', 'textarea', 'checkbox', 'select'],
+          },
+          required: { type: 'boolean' },
+          placeholder: { type: 'string' },
+        },
+        required: ['id', 'label', 'kind', 'required'],
+      },
+    },
+  },
+  parsePatch: (args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.submitLabel !== undefined) {
+      if (typeof args.submitLabel !== 'string') throw new Error('submitLabel must be a string');
+      patch.submitLabel = args.submitLabel;
+    }
+    if (args.successMessage !== undefined) {
+      if (typeof args.successMessage !== 'string') {
+        throw new Error('successMessage must be a string');
+      }
+      patch.successMessage = args.successMessage;
+    }
+    if (args.fields !== undefined) {
+      if (!Array.isArray(args.fields)) throw new Error('fields must be an array');
+      patch.fields = args.fields;
+    }
+    return patch;
+  },
 };

@@ -15,6 +15,7 @@ import { raw } from 'hono/html';
 import { clerkAuth, resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
 import { clerkFrontendApiHost, requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
+import { SIDEBAR_DISPATCH } from '../canvas/elements';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
 import {
@@ -302,118 +303,24 @@ export function editorPageJsx(opts: EditorPageOptions) {
               <section class="rev01-sidebar-group">
                 <h2>Components</h2>
                 <div class="rev01-sidebar-command-grid">
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="text"
-                    title="Add text"
-                  >
-                    Text
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="image"
-                    title="Add an image"
-                  >
-                    Image
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="video"
-                    title="Add a video player"
-                  >
-                    Video
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="action"
-                    title="Add a clickable button"
-                  >
-                    Button
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="shape"
-                    title="Add a decorative shape"
-                  >
-                    Shape
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="container"
-                    title="Add a layout container to group elements"
-                  >
-                    Container
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="chart"
-                    title="Add a data chart"
-                  >
-                    Chart
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="form"
-                    title="Add a contact or signup form"
-                  >
-                    Form
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="embed"
-                    title="Embed external content (YouTube, maps, etc.)"
-                  >
-                    Embed
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="code"
-                    title="Add a code snippet"
-                  >
-                    Code
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="accordion"
-                    title="Add a collapsible accordion (FAQ-style)"
-                  >
-                    Accordion
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="carousel"
-                    title="Add an image carousel / slideshow"
-                  >
-                    Carousel
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="table"
-                    title="Add a data table"
-                  >
-                    Table
-                  </button>
-                  <button
-                    type="button"
-                    class="rev01-sidebar-command"
-                    data-sidebar-add-component="nav"
-                    title="Add a navigation bar"
-                  >
-                    Nav
-                  </button>
+                  {/* Sidebar grid is built from SIDEBAR_DISPATCH per ADR 0011
+                      Step 3. Each element type contributes 0..N commands; the
+                      previous 14 hardcoded <button> entries lived in lockstep
+                      with canvas-client.ts's componentActionForSidebar +
+                      handleSectionAction switches. Order follows dispatch
+                      insertion order — see src/canvas/elements/index.ts. */}
+                  {Object.values(SIDEBAR_DISPATCH)
+                    .flatMap((spec) => spec.commands)
+                    .map((cmd) => (
+                      <button
+                        type="button"
+                        class="rev01-sidebar-command"
+                        data-sidebar-add-component={cmd.key}
+                        title={cmd.sidebarTip}
+                      >
+                        {cmd.sidebarLabel}
+                      </button>
+                    ))}
                 </div>
               </section>
               <section class="rev01-sidebar-group">
