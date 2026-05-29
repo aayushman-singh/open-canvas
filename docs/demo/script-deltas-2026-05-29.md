@@ -4,16 +4,16 @@ Per-row decisions for the script-vs-reality table that `dryrun-report.md` surfac
 
 A beat marked **trivial-script-fix** can be edited directly into [act-1-script.md](act-1-script.md) — no product change. Beats marked **product-change-needed** require either an editor update before recording, or a script rewrite.
 
-> *Outdated as soon as the editor moves. If a row's "reality" changes, re-verify before recording.*
+> _Outdated as soon as the editor moves. If a row's "reality" changes, re-verify before recording._
 
 ---
 
 ## Quick wins (apply directly, no question)
 
-| Beat | Script | Reality | Recommended call |
-|---|---|---|---|
-| **S0.2** | cursor lands on the **"Sign in"** button | actual label is **"Launch dashboard"** | **trivial-script-fix.** Replace "Sign in" → "Launch dashboard" in the voiceover. Also the action: "Click 'Launch dashboard'." |
-| **S0.3** | "Let's start where she would start." Click "Sign in." | same delta as S0.2 | Update the action to "Click 'Launch dashboard.'" |
+| Beat       | Script                                                                           | Reality                                                                                                                                                                                                                   | Recommended call                                                                                                                                                                                                                                 |
+| ---------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **S0.2**   | cursor lands on the **"Sign in"** button                                         | actual label is **"Launch dashboard"**                                                                                                                                                                                    | **trivial-script-fix.** Replace "Sign in" → "Launch dashboard" in the voiceover. Also the action: "Click 'Launch dashboard'."                                                                                                                    |
+| **S0.3**   | "Let's start where she would start." Click "Sign in."                            | same delta as S0.2                                                                                                                                                                                                        | Update the action to "Click 'Launch dashboard.'"                                                                                                                                                                                                 |
 | **S2.B.2** | "fourteen direct-add buttons for every element type, plus the style kits picker" | sidebar shows **14 buttons** (text, image, video, button, shape, container, chart, form, embed, code, accordion, carousel, table, nav) — Media is split into Image + Video, **Collection is in the Sections tab not Add** | **trivial-script-fix.** Keep "fourteen" but list the names explicitly. Move the Collection mention to S2.B.3 ("Sections — searchable catalog of section recipes she can drop in, plus the Collection element which lives here rather than Add"). |
 
 These three are pure voiceover/action edits; no product change.
@@ -26,10 +26,10 @@ S2.A.4–S2.A.7 all assume the topbar has Undo/Redo, Dark preview, RTL preview, 
 
 Two paths, pick one:
 
-| Option | Effect | Cost |
-|---|---|---|
-| **A. Drop the beats.** Cut S2.A.4 (Undo/Redo), S2.A.5 (Dark preview), S2.A.6 (RTL preview), and re-script S2.A.7 to match the actual topbar. Undo/Redo coverage moves to Ctrl+Z mention in S2.E. Dark/RTL preview moves to S5 element exercise (mentions only). | **Honest with current product.** Loses three minutes of editor-tour density. | trivial-script-fix only. |
-| **B. Add the buttons.** Wire Undo/Redo, Dark preview toggle, RTL preview toggle into the editor topbar before recording. | **Matches the script as written.** Adds product polish viewers see. | medium product change (4 button slots + handlers in `src/editor/canvas-client.ts`). |
+| Option                                                                                                                                                                                                                                                          | Effect                                                                       | Cost                                                                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **A. Drop the beats.** Cut S2.A.4 (Undo/Redo), S2.A.5 (Dark preview), S2.A.6 (RTL preview), and re-script S2.A.7 to match the actual topbar. Undo/Redo coverage moves to Ctrl+Z mention in S2.E. Dark/RTL preview moves to S5 element exercise (mentions only). | **Honest with current product.** Loses three minutes of editor-tour density. | trivial-script-fix only.                                                            |
+| **B. Add the buttons.** Wire Undo/Redo, Dark preview toggle, RTL preview toggle into the editor topbar before recording.                                                                                                                                        | **Matches the script as written.** Adds product polish viewers see.          | medium product change (4 button slots + handlers in `src/editor/canvas-client.ts`). |
 
 **Recommendation: A.** Recording is overdue, product polish doesn't change the architectural story. The script's editor tour is densest in S2.B (sidebar tabs + inspector) anyway — losing 4 topbar beats doesn't gut the session.
 
@@ -40,6 +40,7 @@ Two paths, pick one:
 ## S2.C/D AI Agent vs AI Chat — collapse into one surface
 
 The script splits AI into two distinct surfaces:
+
 - **S2.C** an "AI Agent prompt modal" — one-shot bulk rebrand
 - **S2.D** an "AI Chat slide-out panel" — iterative refinement
 
@@ -47,11 +48,11 @@ Reality: only the **AI Chat** button exists in the topbar. There is no separate 
 
 Three options:
 
-| Option | Effect | Cost |
-|---|---|---|
-| **A. Collapse into one chat-only flow.** Merge S2.C and S2.D under a single "AI Chat panel" session. First few prompts: bulk rebrand ("Rename every Apogee..."). Then iterative refinement ("Hero copy calmer..."). Both happen in the same chat thread. | Most honest, removes a fictional surface. | trivial-script-fix. |
-| **B. Add the Agent modal.** Introduce a one-shot AI Agent prompt modal as a separate topbar button + dedicated surface. | Matches script. | medium-large product change. |
-| **C. Demo the chat in two phases as if they were different surfaces.** Camera framing makes the same chat panel look like two different uses. | Coverage stays, no product change, but it's deceptive viewing. | trivial-script-fix. |
+| Option                                                                                                                                                                                                                                                   | Effect                                                         | Cost                         |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------- |
+| **A. Collapse into one chat-only flow.** Merge S2.C and S2.D under a single "AI Chat panel" session. First few prompts: bulk rebrand ("Rename every Apogee..."). Then iterative refinement ("Hero copy calmer..."). Both happen in the same chat thread. | Most honest, removes a fictional surface.                      | trivial-script-fix.          |
+| **B. Add the Agent modal.** Introduce a one-shot AI Agent prompt modal as a separate topbar button + dedicated surface.                                                                                                                                  | Matches script.                                                | medium-large product change. |
+| **C. Demo the chat in two phases as if they were different surfaces.** Camera framing makes the same chat panel look like two different uses.                                                                                                            | Coverage stays, no product change, but it's deceptive viewing. | trivial-script-fix.          |
 
 **Recommendation: A.** Honest, the narrative still works: "AI Chat — same model under the hood, can do one-shot batches OR multi-turn refinement. Watch."
 
@@ -61,11 +62,11 @@ Three options:
 
 The dryrun observed the agent batches 1-2 ops per Accept card and lost track around 14 ops on Apogee. The deterministic 34-op rebrand only landed cleanly after a direct mass-apply bypassing the chat.
 
-| Option | Effect | Cost |
-|---|---|---|
-| **A. Honest small-batch recording.** Maya runs the rebrand prompt, accepts the first 6-8 op cards as they stream, voiceover frames this as "the agent shows me each batch as it goes." | Matches reality, viewers see the actual UX. | trivial-script-fix (voiceover + S2.C.5 caption: "She accepts each batch as it arrives" instead of "Scroll the stack."). |
-| **B. Pre-seed a smaller starting state.** Use a 6-page slim Apogee variant where 34 ops fits in one batch. | Matches the original "34 ops one batch" framing. | medium fixture change. |
-| **C. Add a system-prompt directive** asking the agent to emit ≥N ops at once. | Matches framing, no fixture change. | small orchestrator change in `src/agent/chat/orchestrator.ts` system prompt. |
+| Option                                                                                                                                                                                 | Effect                                           | Cost                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **A. Honest small-batch recording.** Maya runs the rebrand prompt, accepts the first 6-8 op cards as they stream, voiceover frames this as "the agent shows me each batch as it goes." | Matches reality, viewers see the actual UX.      | trivial-script-fix (voiceover + S2.C.5 caption: "She accepts each batch as it arrives" instead of "Scroll the stack."). |
+| **B. Pre-seed a smaller starting state.** Use a 6-page slim Apogee variant where 34 ops fits in one batch.                                                                             | Matches the original "34 ops one batch" framing. | medium fixture change.                                                                                                  |
+| **C. Add a system-prompt directive** asking the agent to emit ≥N ops at once.                                                                                                          | Matches framing, no fixture change.              | small orchestrator change in `src/agent/chat/orchestrator.ts` system prompt.                                            |
 
 **Recommendation: A.** Aligns with the chat-concurrency boundary memory — single chat at a time, multiple op-cards is fine. Viewers see the real model behavior. Honest narration wins.
 
@@ -75,10 +76,10 @@ The dryrun observed the agent batches 1-2 ops per Accept card and lost track aro
 
 The chat panel returns one preview card per prompt, with an Accept button. No two-option choice picker.
 
-| Option | Effect | Cost |
-|---|---|---|
-| **A. Two prompts.** Maya sends prompt 1 ("Rewrite the hero heading. Option 1 please."), accepts, then sends prompt 2 ("Now option 2 — alternative tone."), compares the two on-screen. | Matches the per-card flow. | trivial-script-fix. |
-| **B. Add a 2-option chat tool.** Extend the orchestrator to emit `rewriteText` with an alternatives array; the panel surfaces an A/B card. | Matches script as written. | medium product change. |
+| Option                                                                                                                                                                                 | Effect                     | Cost                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------- |
+| **A. Two prompts.** Maya sends prompt 1 ("Rewrite the hero heading. Option 1 please."), accepts, then sends prompt 2 ("Now option 2 — alternative tone."), compares the two on-screen. | Matches the per-card flow. | trivial-script-fix.    |
+| **B. Add a 2-option chat tool.** Extend the orchestrator to emit `rewriteText` with an alternatives array; the panel surfaces an A/B card.                                             | Matches script as written. | medium product change. |
 
 **Recommendation: A.** Same chat-boundary reason as S2.C.4.
 
@@ -88,11 +89,11 @@ The chat panel returns one preview card per prompt, with an Accept button. No tw
 
 End of dryrun session removed popup-trigger sections (`wf-popup-exit`, `wf-popup-delay`, `wf-popup-scroll`) from `apogee-showcase.json` because they rendered as empty modals on Briar. New sites won't have them; Briar still has stale popup sections from the pre-removal fixture.
 
-| Option | Effect | Cost |
-|---|---|---|
-| **A. Add popup live via inspector.** Maya selects a section, opens the section inspector, picks a popup trigger from the popupTrigger dropdown, voiceover walks through exit-intent / delay / scroll-depth. No content editing inside the popup. | Demonstrates the feature without relying on fixture content. | trivial-script-fix. |
-| **B. Skip the popup beat entirely.** Cut S5.R from the element exercise. | Loses ~30s of coverage for an under-developed area. | trivial-script-fix. |
-| **C. Improve popup content editing first.** Per handoff "Editor support for popup *content* editing is currently weak." Polish the inspector before recording. | Matches the most comprehensive beat. | medium product change. |
+| Option                                                                                                                                                                                                                                           | Effect                                                       | Cost                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ | ---------------------- |
+| **A. Add popup live via inspector.** Maya selects a section, opens the section inspector, picks a popup trigger from the popupTrigger dropdown, voiceover walks through exit-intent / delay / scroll-depth. No content editing inside the popup. | Demonstrates the feature without relying on fixture content. | trivial-script-fix.    |
+| **B. Skip the popup beat entirely.** Cut S5.R from the element exercise.                                                                                                                                                                         | Loses ~30s of coverage for an under-developed area.          | trivial-script-fix.    |
+| **C. Improve popup content editing first.** Per handoff "Editor support for popup _content_ editing is currently weak." Polish the inspector before recording.                                                                                   | Matches the most comprehensive beat.                         | medium product change. |
 
 **Recommendation: A.** Trigger is the interesting bit; the popup content is incidental. Easy live add demonstrates the feature.
 
@@ -100,7 +101,7 @@ End of dryrun session removed popup-trigger sections (`wf-popup-exit`, `wf-popup
 
 ## S7 "A11y blocks publish" — the route ALREADY gates this
 
-The handoff/dryrun listed P2-1 as "audit does not block publish." Per memory [`a11y-audit-gates-publish`](../../C:/Users/Aayushman/.claude/projects/c--Repo-rev01/memory/project_a11y_audit_gates_publish.md): the publish route at [src/routes/api/publish.ts:300-310](../../src/routes/api/publish.ts#L300-L310) actually returns a structured 422 with `blockers[]` when `runAudit(editableState).blockerCount > 0`. The dryrun's Briar publish succeeded because Briar genuinely had no blocking a11y issues, not because the gate didn't fire.
+The handoff/dryrun listed P2-1 as "audit does not block publish." The publish route at [src/routes/api/publish.ts:300-310](../../src/routes/api/publish.ts#L300-L310) actually returns a structured 422 with `blockers[]` when `runAudit(editableState).blockerCount > 0`. The dryrun's Briar publish succeeded because Briar genuinely had no blocking a11y issues, not because the gate didn't fire.
 
 **Recommendation: keep S7 as written, but verify on prod before recording.** Set Briar's hero media `alt` to empty (and `decorative: false`), attempt publish — expect 422 with blockers in body. Then re-add alt text and re-publish. The narrative in S7.A–H is accurate.
 
@@ -112,10 +113,10 @@ Cost: zero script change. One verification step.
 
 Maya's authenticated owner already has Briar + others sitting at the Free plan cap. The script claims the dashboard is empty at start.
 
-| Option | Effect | Cost |
-|---|---|---|
-| **A. Pre-record state explicit.** Add to S1's pre-record block: "Maya is recorded from a fresh Clerk session on a brand-new test account with 0 sites." Pre-record-state assumption rather than reactive narrative. | Recordable. | trivial-script-fix. |
-| **B. Use a Pro account.** Maya is on Pro with cap higher than 3. The plan-cap line never appears in the narrative anyway. | Recordable, also bumps account-settings beat in S11.I. | trivial-script-fix. |
+| Option                                                                                                                                                                                                              | Effect                                                 | Cost                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------- |
+| **A. Pre-record state explicit.** Add to S1's pre-record block: "Maya is recorded from a fresh Clerk session on a brand-new test account with 0 sites." Pre-record-state assumption rather than reactive narrative. | Recordable.                                            | trivial-script-fix. |
+| **B. Use a Pro account.** Maya is on Pro with cap higher than 3. The plan-cap line never appears in the narrative anyway.                                                                                           | Recordable, also bumps account-settings beat in S11.I. | trivial-script-fix. |
 
 **Recommendation: A.** Free plan matches the indie-founder persona better than Pro. Test account is cheap to refresh.
 
@@ -133,13 +134,13 @@ Was blocked by P0-1 (Worker 1102 on v2 publish). Re-verified working as part of 
 
 These were marked blocked in `dryrun-report.md` and remain so unless someone supplies the prerequisites:
 
-| Beat | Blocker |
-|---|---|
-| **I1 Sam collaborator** | needs a second authenticated Clerk account; recording operator's call. |
-| **S9 Custom domain** | needs real DNS for `briar.app` (or a sandbox domain) pointed at Cloudflare for SaaS. |
-| **S10 Addon Shop** | only verified that the routes exist; not driven. |
-| **S11 Dashboard tour** | surfaces exist; per-control behaviour not exercised. |
-| **S12 Version restore** | UI exists, restore flow not driven. Worth a single-restore drive before recording. |
+| Beat                    | Blocker                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| **I1 Sam collaborator** | needs a second authenticated Clerk account; recording operator's call.               |
+| **S9 Custom domain**    | needs real DNS for `briar.app` (or a sandbox domain) pointed at Cloudflare for SaaS. |
+| **S10 Addon Shop**      | only verified that the routes exist; not driven.                                     |
+| **S11 Dashboard tour**  | surfaces exist; per-control behaviour not exercised.                                 |
+| **S12 Version restore** | UI exists, restore flow not driven. Worth a single-restore drive before recording.   |
 
 The other blocked beats (S13 v2 publish + AI Agent stress on a fresh site + POST /api/sites) are now unblocked per this session's verification.
 

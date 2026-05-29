@@ -1,4 +1,4 @@
-# rev01 Demo Video — Script + Diagrams
+# Open Canvas Demo Video — Script + Diagrams
 
 This directory holds the working artifacts for the YouTube demo video: a two-act script (product walkthrough, then engineering walkthrough), the feature-coverage ledger that drives it, and the diagram sources for Act 2.
 
