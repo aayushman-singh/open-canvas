@@ -180,7 +180,7 @@ export const RENDER_DISPATCH: RenderDispatch = {
 };
 
 // ---------------------------------------------------------------------------
-// Inspector dispatch (ADR 0011 Step 1)
+// Inspector dispatch (ADR 0011 Step 1, cutover)
 // ---------------------------------------------------------------------------
 //
 // Declarative spec per element type. The editor client at
@@ -189,18 +189,20 @@ export const RENDER_DISPATCH: RenderDispatch = {
 // replacing the per-type `buildXInspector` functions that previously fanned
 // out inside the IIFE.
 //
-// Partial during migration per ADR 0011 dec 3: this PR migrates shape,
-// container, code, embed as the proof-of-pattern. Unmigrated element types
-// fall through to their existing `buildXInspector` function inside
-// canvas-client.ts. The cutover ADR flips this to a full
-// `Record<CanvasElement['type'], InspectorSpec>` once every element has a
-// spec — at which point the mapped-type enforcement matches RENDER_DISPATCH
-// above and "added a type, forgot the spec" becomes a compile error.
-//
-// `collection` is intentionally never in this dispatch: it has no inspector
-// fields of its own (the children's inspectors render when the visitor
-// selects a child element).
-export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], InspectorSpec>> = {
+// The mapped type below is `Record<Exclude<ElementType, 'collection'>,
+// InspectorSpec>` — `collection` is the one element type that intentionally
+// has no inspector of its own (the children's inspectors render when the
+// Owner selects a child). Excluding it at the type level means "added a
+// new element type, forgot the spec" is a TypeScript compile error rather
+// than a runtime no-op, matching the failure mode RENDER_DISPATCH catches.
+// A future element type that legitimately wants no inspector adds itself
+// to the Exclude<...> list as an explicit opt-out.
+export type InspectorDispatch = Record<
+  Exclude<CanvasElement['type'], 'collection'>,
+  InspectorSpec
+>;
+
+export const INSPECTOR_DISPATCH: InspectorDispatch = {
   shape: shapeInspectorSpec,
   container: containerInspectorSpec,
   code: codeInspectorSpec,

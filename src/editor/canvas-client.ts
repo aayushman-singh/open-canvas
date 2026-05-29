@@ -4218,13 +4218,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(buildZOrderGroup(section, element));
     inspector.appendChild(buildElementActionsGroup(section, element));
 
-    // ADR 0011 Step 1: every element type now has an INSPECTOR_DISPATCH
-    // spec. The dispatch is still declared as Partial<Record> in
-    // src/canvas/elements/index.ts during this PR; the cutover PR flips it
-    // to a full Record<ElementType, InspectorSpec> so the mapped-type check
-    // catches "added a type, forgot the spec" at compile time. Collection
-    // is intentionally absent from the dispatch — it has no inspector
-    // fields of its own (children render their inspectors instead).
+    // ADR 0011 Step 1 cutover: INSPECTOR_DISPATCH is now
+    // Record<Exclude<ElementType, 'collection'>, InspectorSpec> — every
+    // element type except collection has a spec; missing a spec for a new
+    // element type fails TypeScript compile in src/canvas/elements/index.ts.
+    // collection still flows through here at runtime; the indexed lookup
+    // returns undefined for it and the inspector body stays empty (children
+    // render their own inspectors when selected).
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
       renderInspectorSpec(inspectorSpec, element);
