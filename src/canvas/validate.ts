@@ -1138,49 +1138,117 @@ function validatePageCardinality(pages: unknown[], errors: string[]): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// FIELD_VALIDATORS — registry-driven exhaustiveness (ADR 0012 dec 2)
+// ---------------------------------------------------------------------------
+//
+// Every key of `EditableSite` has an entry. The mapped type
+// `Record<keyof EditableSite, SiteFieldValidator>` makes "added a schema
+// field but forgot to validate it" a TypeScript compile error — mirroring
+// the INSPECTOR_DISPATCH / SIDEBAR_DISPATCH / AGENT_TOOL_DISPATCH /
+// Y_*_DISPATCH pattern from ADR 0011.
+//
+// Each validator inspects ONE field by name. Cross-field deps
+// (`customStyleKit` requires `styleKit === 'custom'`; `header`/`footer`
+// section validation needs the `validPageIds` set built from the pages
+// array) get their inputs via the `SiteFieldValidatorCtx` payload, which
+// `validateSiteShape` populates in a documented order: page-id +
+// page-slug uniqueness checks build `validPageIds` first; only after that
+// does the dispatch run.
+//
+// Fields whose validation depends on the page-id set (`header`, `footer`,
+// and `pages` itself for per-page deep validation) run AFTER the dispatch
+// pass — the dispatch handles shape only; deep validation is the next
+// phase of `validateSiteShape`.
+interface SiteFieldValidatorCtx {
+  state: Record<string, unknown>;
+  errors: string[];
+}
+
+type SiteFieldValidator = (ctx: SiteFieldValidatorCtx) => void;
+
+const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } = {
+  styleKit: ({ state, errors }) => {
+    assertOneOf<StyleKit>(state.styleKit, STYLE_KITS, 'styleKit', errors);
+  },
+  pages: ({ state, errors }) => {
+    if (!Array.isArray(state.pages) || state.pages.length === 0) {
+      errors.push('pages must be a non-empty array');
+    }
+  },
+  // `header` and `footer` are sections. Top-level shape (when present) is
+  // an object; deep section validation runs in `validateSiteShape`'s post-
+  // dispatch phase because it needs `validPageIds`. The shape check here
+  // catches "header was set to a number" early so the deep pass never sees
+  // a non-object.
+  header: ({ state, errors }) => {
+    if (state.header !== undefined && !isRecord(state.header)) {
+      errors.push(`state.header must be a section object when present (got ${describe(state.header)})`);
+    }
+  },
+  footer: ({ state, errors }) => {
+    if (state.footer !== undefined && !isRecord(state.footer)) {
+      errors.push(`state.footer must be a section object when present (got ${describe(state.footer)})`);
+    }
+  },
+  // `customStyleKit` is required iff styleKit === 'custom'; validated for
+  // shape in either case so a malformed object can't ride through the
+  // publish spread.
+  customStyleKit: ({ state, errors }) => {
+    if (state.styleKit === 'custom') {
+      if (state.customStyleKit === undefined) {
+        errors.push('customStyleKit is required when styleKit === "custom"');
+        return;
+      }
+    } else if (state.customStyleKit === undefined) {
+      return;
+    }
+    validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
+  },
+  defaultLocale: ({ state, errors }) => {
+    if (state.defaultLocale !== undefined && !isNonEmptyString(state.defaultLocale)) {
+      errors.push(
+        `defaultLocale must be a non-empty BCP-47 string when present (got ${describe(state.defaultLocale)})`,
+      );
+    }
+  },
+  siteNoIndex: ({ state, errors }) => {
+    if (state.siteNoIndex !== undefined && typeof state.siteNoIndex !== 'boolean') {
+      errors.push(`siteNoIndex must be a boolean when present (got ${describe(state.siteNoIndex)})`);
+    }
+  },
+  darkModeEnabled: ({ state, errors }) => {
+    if (state.darkModeEnabled !== undefined && typeof state.darkModeEnabled !== 'boolean') {
+      errors.push(
+        `darkModeEnabled must be a boolean when present (got ${describe(state.darkModeEnabled)})`,
+      );
+    }
+  },
+  faviconAssetId: ({ state, errors }) => {
+    if (state.faviconAssetId !== undefined && !isAssetIdLike(state.faviconAssetId)) {
+      errors.push(
+        `faviconAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(state.faviconAssetId)})`,
+      );
+    }
+  },
+};
+
 function validateSiteShape(state: unknown, errors: string[]): void {
   if (!isRecord(state)) {
     errors.push('state must be an object');
     return;
   }
-  assertOneOf<StyleKit>(state.styleKit, STYLE_KITS, 'styleKit', errors);
-  // Site-level optional fields. customStyleKit is required when styleKit ===
-  // 'custom'; the other four (defaultLocale, siteNoIndex, darkModeEnabled,
-  // faviconAssetId) are always optional. Each is typed-narrowed here so junk
-  // shapes cannot ride through the publish pipeline at publish.ts:373-386.
-  if (state.styleKit === 'custom') {
-    if (state.customStyleKit === undefined) {
-      errors.push('customStyleKit is required when styleKit === "custom"');
-    } else {
-      validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
-    }
-  } else if (state.customStyleKit !== undefined) {
-    // Documented as ignored, but a malformed object here would propagate to
-    // PublishedSnapshot via spread-copy. Validate shape when present.
-    validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
+
+  // Phase 1 — per-field shape via SITE_FIELD_VALIDATORS dispatch.
+  // Missing a field is a compile error via the mapped type above.
+  const ctx: SiteFieldValidatorCtx = { state, errors };
+  for (const validate of Object.values(SITE_FIELD_VALIDATORS)) {
+    validate(ctx);
   }
-  if (state.defaultLocale !== undefined && !isNonEmptyString(state.defaultLocale)) {
-    errors.push(
-      `defaultLocale must be a non-empty BCP-47 string when present (got ${describe(state.defaultLocale)})`,
-    );
-  }
-  if (state.siteNoIndex !== undefined && typeof state.siteNoIndex !== 'boolean') {
-    errors.push(`siteNoIndex must be a boolean when present (got ${describe(state.siteNoIndex)})`);
-  }
-  if (state.darkModeEnabled !== undefined && typeof state.darkModeEnabled !== 'boolean') {
-    errors.push(
-      `darkModeEnabled must be a boolean when present (got ${describe(state.darkModeEnabled)})`,
-    );
-  }
-  if (state.faviconAssetId !== undefined && !isAssetIdLike(state.faviconAssetId)) {
-    errors.push(
-      `faviconAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(state.faviconAssetId)})`,
-    );
-  }
-  if (!Array.isArray(state.pages) || state.pages.length === 0) {
-    errors.push('pages must be a non-empty array');
-    return;
-  }
+
+  // Phase 2 — cross-field structural validation that needs the page-id
+  // and page-slug sets built from the pages array.
+  if (!Array.isArray(state.pages) || state.pages.length === 0) return;
   validatePageCardinality(state.pages, errors);
   const validPageIds = new Set<string>();
   const pageSlugs = new Set<string>();
@@ -1211,11 +1279,11 @@ function validateSiteShape(state: unknown, errors: string[]): void {
   // is intentionally skipped here — it checks position-in-array for inline
   // header/footer sections, but state.header / state.footer are standalone
   // fields, not array entries, so there is no positional invariant to assert.
-  if (state.header !== undefined) {
+  if (isRecord(state.header)) {
     const headerIds = new Set<string>();
     validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds);
   }
-  if (state.footer !== undefined) {
+  if (isRecord(state.footer)) {
     const footerIds = new Set<string>();
     validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds);
   }
