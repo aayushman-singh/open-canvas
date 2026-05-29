@@ -101,20 +101,42 @@ Site: Briar at `74a8854d-6f2a-45f8-af18-19b0f74bf215`, published v1.
 
 ---
 
-## Sessions 8–13 — not driven
+## Sessions 6–13 — Pass-6 (immediate continuation)
 
-Time-budget hit. The handoff's "each fits in one Playwright sweep" estimate held for the cheap-five but breaks down at this depth — S5 alone has 20 sub-beats, S8–S11 each have ~6 sub-beats, S12–S13 are sequence-y restores + saves. A Pass-6 driver pass is the right shape: open the editor, walk Sessions 8–13 by hand, log mismatches.
+| Beat | Status | Notes |
+|---|---|---|
+| **S6.A.1 / S6.D.1** "No editor switcher — demos on published site" | ✓ **as-scripted** | The script ALREADY says no editor switcher exists. Pass-5's "G9 breakpoint switcher" delta is moot for recording — script's published-site-resize path is the workaround. Drop G9 from the must-ship gate. |
+| **S6.F.1 / S6.G.1** Save to library / Save as template | ✓ | Pass-5 Gap-3 flow live (name → description → Private/Community). Verified all three modals open in sequence (S13 step-through below). |
+| **S7.A.1** A11y route `/dashboard/sites/{id}/a11y` | ✓ | Page loads. Headline "Accessibility", "Looking good!" tag when no blockers, score `50 / 100`, "Re-run check" button, 10 "Fix in editor" links. |
+| **S7.A.1 button label "Run audit"** | **SCRIPT DELTA** | Live button text is **"Re-run check"** (not "Run audit"). Pre-publish-blocker version not exercised this pass (Briar has no blockers). |
+| **S7.A.1 numeric a11y score** | **SCRIPT delta** | The audit page shows `50 / 100` — script doesn't mention a numeric score; either acknowledge it or hide it. |
+| **S7.E.1 / S7.F.1 publish flow** | not run live | Briar already published v1; rerunning would create v2 and pollute the recording state. Pass-4 confirmed `Saved → Saving... → Published v1` flow without per-stage messages. |
+| **S8.A.1** top-level forms inbox totals | ✓ | `/dashboard/sites/{id}/forms` shows Total messages 0 / Forms 1 / Pages with a form 1 + per-form row (wf-form-element / 6 fields on /enterprise / 0 messages). |
+| **S8.B Export CSV at form-detail** | ✓ | `/forms/wf-form-element` has the Export CSV link with href `/api/forms/{siteId}/{formId}/export.csv`. Pass-4 finding holds. |
+| **S11.G TOC chip row** | ✓ **(Pass-5 Gap-4)** | 7 chips at top of `/settings`: Hosting / Password / Search engines / Favicon / Dark mode / Collaborators / Delete site. Anchor hrefs match the section IDs. |
+| **S11.B password scope** | confirmed Pass-4 delta | Single password input, no scope picker. Schema is site-wide. Script needs the rewrite already catalogued. |
+| **S11.D dark mode** | confirmed Pass-4 delta | Single checkbox, no 3-way picker. "Visitor dark mode" with copy "Give visitors a moon button…Toggleable by visitors." Schema bool. |
+| **S11.M Account page** | confirmed Pass-4 delta | `/dashboard/profile` shows Display name (Clerk-managed, read-only) / Email / Bio / Timezone dropdown. No Free/Pro/Team tiles, no meters, no invoices. |
+| **S12.A-G Version history** | partial | `/snapshots` shows 1 row (Live v1) with no Preview / Restore buttons because there's nothing to restore TO. Save-snapshot form is present. To exercise restore + safety snapshot, the recording needs Briar pre-loaded with at least one prior snapshot. |
+| **S13.E.1 Save as Community template** | ✓ **(Pass-5 Gap-3)** | Three modals fire in sequence: Title `Save as template` / Label `Template name` → `Description` → `Who can use this template?` with options `Private — only me` and `Community — anyone on Open Canvas`. Matches script verbatim (modulo the slightly more verbose option labels). |
 
-Likely deltas to watch for:
-- S8 collaborators + invites — email flow + token handler.
-- S10 addons — entitlement shop UX.
-- S11 forms inbox.
-- S12 version-restore safety snapshot — verified end-to-end in code; live exercise still useful.
-- S13 Community-template save — exercises Pass-5 Gap-3 flow.
+### Still not driven (need an external prereq)
+
+- **Interlude 1** Sam-as-collaborator — needs second Clerk-LIVE account + visible inbox.
+- **S9 visitor visit** — needs a clean-cookie second browser profile.
+- **Interlude 6** Yjs live + edit-token cookie — same as I1.
+- **S10 addons / entitlement shop** — exists per source-read; not driven live.
+- **Old-snapshot restore + safety snapshot (S12.F-H)** — needs Briar pre-snapshotted multiple times.
+
+These all match the original handoff's "blocked on external prereqs" group. No new findings expected without setting up the prereq first.
+
+### Net Pass-6 verdict
+
+**All recordable surfaces verified that don't require multi-account / external-service / multi-version state.** Five Pass-1-to-4 deltas retracted because they're already shipped (Gap-1 reserved-slug, Gap-3 description+visibility, Gap-4 TOC chips, Gap-5 version badge + OG pill). Two new minor deltas added (a11y button label "Re-run check" not "Run audit"; a11y page shows numeric `50 / 100` score). The Pass-5 delta about Gap-9 (breakpoint switcher) is **retracted** — script already does the published-site workaround at S6.A.1.
 
 ---
 
-## Cumulative script-vs-product deltas (Pass-5)
+## Cumulative script-vs-product deltas (Pass-5 + Pass-6)
 
 To fold into `docs/demo/script-deltas-2026-05-29.md` and `docs/demo/act-1-script.md`:
 
@@ -125,8 +147,10 @@ To fold into `docs/demo/script-deltas-2026-05-29.md` and `docs/demo/act-1-script
 5. **S4.F.1** — `_404` rename is now **blocked** by Pass-5 Gap-1 guard. Rewrite the beat: "editor flashes 'Slug 404 is reserved'; no rename applies".
 6. **S5.A.1 / S5.S.1** — pick a consistent count (16 or 17) for motion presets and use it in both beats.
 7. **S5.P / S5.R / S5.Q.1 reel-open** — accurate as written, no change needed.
-8. **S6 breakpoint switcher** — **product gap** (Gap 9). Either ship it or rewrite beats.
+8. ~~**S6 breakpoint switcher** — product gap (Gap 9). Either ship it or rewrite beats.~~ **RETRACTED Pass-6**: script already uses the published-site-resize workaround at S6.A.1 ("No editor switcher in this build; she demos it on the published site"). Gap 9 is not a recording blocker.
 9. **S7 a11y access from editor** — no link in the editor header. Either add one or route through the dashboard `/a11y`.
+10. **(NEW Pass-6)** **S7.A.1 button label** — live audit button is "Re-run check", script says "Run audit". Update label OR product-rename.
+11. **(NEW Pass-6)** **S7.A.1 numeric score** — audit page shows `50 / 100` score. Script doesn't mention it. Either acknowledge ("score 50/100 with no blockers") or product-hide the score line.
 
 ---
 

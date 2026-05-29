@@ -489,3 +489,43 @@ status in [drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings
 - **S8–S13** — collaborators + invite token, addons + entitlement shop, forms inbox + CSV export, version restore + safety snapshot, Save as Community template. All untouched.
 
 A **Pass-6 manual walkthrough** is the recommended shape — drive each remaining beat by hand, log mismatches in this file. Pass-5's automated drive caught the easy structural deltas; Pass-6's value is in catching per-interaction behaviour the editor only reveals on user input.
+
+---
+
+# Pass 6 — finish the deep walk (2026-05-30, after the delta-resolution handoff)
+
+Continuation of Pass-5, driven against the same prod deploy `59494fc8`. Covers S6 → S13 (skipping beats blocked on external prereqs). Full per-beat table in [drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md) Pass-6 section.
+
+## Retractions (Pass-5 deltas that turned out to be non-issues)
+
+- **#8 S6 breakpoint switcher / Gap 9** — **NOT a recording blocker.** The script already says "No editor switcher in this build; she demos it on the published site" (S6.A.1) and uses DevTools resize on `briar.opencanvas.aayushman.dev` for the responsive tour. Gap 9 stays in the medium-five product backlog but does not gate Pass-7 recording.
+
+## New deltas Pass-6 surfaced
+
+| # | Beat | Delta | Fix |
+|---|---|---|---|
+| 10 | **S7.A.1 button label** | Live audit page shows **"Re-run check"** button, script says "Run audit". | Script-fix to "Re-run check", OR product-rename the button. |
+| 11 | **S7.A.1 numeric score** | Audit page renders a `50 / 100` score badge above the "Looking good!" headline. Script doesn't mention it. | Add a voiceover beat ("Audit shows 50 out of 100 — no blockers but room to improve") OR hide the score in the audit headline UI. |
+
+## Verified live this pass (no script change needed)
+
+- **S6.F.1 / S6.G.1** — Save section to library + Save as template now ship Pass-5's description + visibility flow (Gap-3).
+- **S7.A.1** — A11y route reachable + "Looking good!" / "Fix in editor" / score render.
+- **S8.A.1 / S8.B** — Top-level forms inbox totals; Export CSV at form-detail.
+- **S11.G** — TOC chip row at top of `/settings` (Pass-5 Gap-4 live).
+- **S11.B / S11.D / S11.M** — Pass-4 deltas confirmed (still need script rewrites per delta-resolution handoff).
+- **S13.E.1** — Three modal flow: Template name → Description → "Who can use this template?" select with `Private — only me` / `Community — anyone on Open Canvas`. Matches the recording beat verbatim.
+
+## Still not run live (external-prereq blockers, unchanged)
+
+- I1, S9, I6, I3 — needs second Clerk account or clean-cookie profile.
+- S10 addons — exists in source; not driven.
+- S12 restore — Briar only has v1 live; need at least one prior snapshot to exercise Restore + safety-snapshot flow.
+- S3.F (file upload) / S3.G (Replicate) / S3.I (WOFF2 upload) — external services / file system.
+
+## Net state going into recording
+
+- **All recordable surfaces verified end-to-end except the prereq-blocked ones above.**
+- **18 script-only rewrites** queued in [handoff-delta-resolution-2026-05-30.md](handoff-delta-resolution-2026-05-30.md) — half a day of writing.
+- **3 product fixes** still ship-or-rewrite-the-beat decisions: G6 section inspector, G7 + New Page modal, OG-PNG fixture leak. G9 breakpoint switcher demoted from this list.
+- **2 smaller product fixes**: canonical leak in apogee-showcase.json; a11y entry point in editor header.

@@ -37,6 +37,11 @@ The product is correct; the script is wrong. These can be done in one writing sw
 5. **S5.A.1 / S5.S.1** motion-preset count: pick **"sixteen entrance presets + `none`"** and use it consistently in both beats. Dropdown has 17 values including `none`.
 6. **S3.F / S3.I** Assets and Theme beats: there is no Assets entry and no Theme panel in the canvas sidebar. Either drop the beats or relocate to the element-image-picker / dedicated font upload route.
 
+### Pass-6 batch (added 2026-05-30)
+
+19. **S7.A.1 button label** — script says "Run audit", live button reads **"Re-run check"**. Pick one and apply.
+20. **S7.A.1 numeric score** — audit page renders `50 / 100`. Either acknowledge in voiceover or product-hide the score line.
+
 ### Pass-1–4 backlog (still un-rewritten)
 
 7. **S5.D Shape variants** — script says "rectangle / circle / triangle / line / divider / blob"; reality is **"rect / pill / circle / line / badge / blob"**. Update list.
@@ -65,9 +70,7 @@ Each of these is a real product gap. The script can be recorded only if the gap 
 - Pattern to mirror: `buildTextInspector` at `canvas-client.ts:2877`.
 - Without this: drop S5.P / Q / R or keep them voiceover-only.
 
-**G9 — Editor breakpoint switcher** (S5.I phone-collapse, S6 responsive sweep)
-- Add desktop / tablet / phone preview to the editor toolbar.
-- Without this: rewrite the responsive flow to use the published site + manual browser resize.
+~~**G9 — Editor breakpoint switcher**~~ — **demoted Pass-6**. The script already says "No editor switcher in this build; she demos it on the published site" (S6.A.1). Published-site + DevTools resize is the recording path; G9 stays in the medium-five product backlog but does not gate the recording.
 
 **G7 — + New Page modal** (S4.A.1 surface + I4.B)
 - Currently page-create is instant. No name / slug / locale prompt.
