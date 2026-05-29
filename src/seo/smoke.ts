@@ -360,5 +360,91 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-process.stdout.write('[seo:smoke] OK — 6 assertions + bonus checks passed\n');
+// Audit follow-ups — 2026-05-29 SEO setup pass.
+//
+// The original meta-emit module shipped without:
+//   - og:locale, og:image:alt, og:image:type, og:image:width, og:image:height
+//   - twitter:image:alt
+//
+// These fields tighten the crawler/unfurl contract. Generated cards (the
+// `/og/<siteId>/<slug>.png` fallback) come from the satori renderer at a
+// known 1200×630 PNG, so dimensions + image type are emitted. Owner-
+// uploaded images route through `/assets/...` and have unknown aspect
+// ratios; dimensions + type are omitted in that branch (assertions below).
+// ---------------------------------------------------------------------------
+
+// Generated-card branch: page with no ogImageAssetId — emits dimensions.
+const meta_gen = emitPageMeta(page4, { siteId: SITE_ID, host: HOST, snapshot: snapshot4 });
+assert(
+  meta_gen.includes('<meta property="og:image:alt" content="Contact">'),
+  'audit: generated card emits og:image:alt with the page title',
+);
+assert(
+  meta_gen.includes('<meta property="og:image:type" content="image/png">'),
+  'audit: generated card emits og:image:type=image/png',
+);
+assert(
+  meta_gen.includes('<meta property="og:image:width" content="1200">'),
+  'audit: generated card emits og:image:width=1200',
+);
+assert(
+  meta_gen.includes('<meta property="og:image:height" content="630">'),
+  'audit: generated card emits og:image:height=630',
+);
+assert(
+  meta_gen.includes('<meta name="twitter:image:alt" content="Contact">'),
+  'audit: generated card emits twitter:image:alt with the page title',
+);
+assert(
+  meta_gen.includes('<meta property="og:locale" content="en">'),
+  'audit: og:locale falls back to the snapshot default (en) when no per-page locale set',
+);
+
+// Owner-upload branch: ogImageAssetId set — must NOT emit dimensions or
+// og:image:type because the asset can be any aspect ratio / format.
+const meta_override = emitPageMeta(page3, {
+  siteId: SITE_ID,
+  host: HOST,
+  snapshot: snapshot3,
+  assetLookup: stubAssetLookup,
+});
+assert(
+  meta_override.includes('<meta property="og:image:alt" content="Launch">'),
+  'audit: owner-upload still emits og:image:alt (alt text applies to any image)',
+);
+assert(
+  !meta_override.includes('og:image:width'),
+  'audit: owner-upload must NOT emit og:image:width (unknown dimensions)',
+);
+assert(
+  !meta_override.includes('og:image:height'),
+  'audit: owner-upload must NOT emit og:image:height (unknown dimensions)',
+);
+assert(
+  !meta_override.includes('og:image:type'),
+  'audit: owner-upload must NOT emit og:image:type (unknown format)',
+);
+assert(
+  meta_override.includes('<meta name="twitter:image:alt" content="Launch">'),
+  'audit: owner-upload still emits twitter:image:alt',
+);
+
+// Locale resolution drives og:locale and converts BCP-47 `-` to OG `_`.
+const pageEsMx: CanvasPage = {
+  id: 'page-es-mx',
+  slug: 'about',
+  title: 'Acerca',
+  width: 1440,
+  sections: [],
+  locale: 'es-MX',
+};
+const snapshotEs = makeSnapshot([pageEsMx]);
+const metaEs = emitPageMeta(pageEsMx, { siteId: SITE_ID, host: HOST, snapshot: snapshotEs });
+assert(
+  metaEs.includes('<meta property="og:locale" content="es_MX">'),
+  'audit: og:locale converts BCP-47 hyphen to OG underscore (es-MX → es_MX)',
+);
+
+// ---------------------------------------------------------------------------
+process.stdout.write('[seo:smoke] OK — 6 assertions + audit follow-ups passed\n');
 process.exit(0);

@@ -9,10 +9,18 @@
 //
 //   - `<title>`                                — page.title (required field).
 //   - `<meta name="description">`              — page.description, when set.
-//   - Open Graph: og:title, og:description, og:image, og:url, og:type=website
-//   - Twitter: twitter:card=summary_large_image, twitter:title, twitter:description, twitter:image
+//   - Open Graph: og:title, og:description, og:image, og:image:type,
+//                 og:image:width, og:image:height, og:image:alt, og:url,
+//                 og:type=website, og:locale (when locale resolvable)
+//   - Twitter: twitter:card=summary_large_image, twitter:title,
+//              twitter:description, twitter:image, twitter:image:alt
 //   - `<link rel="canonical">`                 — page.canonical || computed.
 //   - `<meta name="robots" content="noindex,nofollow">` when noIndex || siteNoIndex.
+//
+// OG image dimensions: the generated card is always 1200×630 (matches
+// `OG_WIDTH` / `OG_HEIGHT` in `src/og-image/render.tsx`). Owner-uploaded
+// images can be any aspect ratio, so dimensions + image type are emitted
+// only when the URL came from the generator path (i.e. starts with `/og/`).
 //
 // The `<html lang="…">` attribute is owned by the document envelope in
 // `src/routes/public.ts` (main thread integration). This module exposes the
@@ -198,6 +206,15 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
   const ogOrigin = ctx.host.length > 0 ? `${ctx.protocol ?? 'https'}://${ctx.host}` : '';
   const ogImageUrl = ogImageRelative !== null ? `${ogOrigin}${ogImageRelative}` : null;
   const ogImageAttr = ogImageUrl !== null ? escapeAttr(ogImageUrl) : null;
+  // Generated OG cards are produced by `src/og-image/render.tsx` at a fixed
+  // 1200×630 size and rasterised to PNG by `src/og-image/rasterise.ts`. The
+  // generator path is `/og/<siteId>/<slug>.png`; owner-uploaded overrides
+  // route through `/assets/<id-or-hash>`. We branch on the relative URL
+  // prefix to decide whether we know the dimensions + image type.
+  const OG_GENERATED_WIDTH = 1200;
+  const OG_GENERATED_HEIGHT = 630;
+  const isGeneratedOgImage =
+    ogImageRelative !== null && ogImageRelative.startsWith('/og/');
 
   // -- Open Graph ----------------------------------------------------------
   // og:url uses the canonical URL when available — OG crawlers treat og:url
@@ -210,8 +227,25 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
   if (canonical !== null) {
     lines.push(`<meta property="og:url" content="${escapeAttr(canonical)}">`);
   }
+  // og:locale — OG specifies `language_TERRITORY` (underscore). We carry
+  // BCP-47 internally (`en`, `es-MX`); swap the hyphen so the emitted value
+  // matches the spec. A bare-language tag (`en`) without a region is left
+  // verbatim — crawlers tolerate the bare form.
+  const lang = resolveLang(page, ctx.snapshot);
+  if (lang.length > 0) {
+    lines.push(`<meta property="og:locale" content="${escapeAttr(lang.replace('-', '_'))}">`);
+  }
   if (ogImageAttr !== null) {
     lines.push(`<meta property="og:image" content="${ogImageAttr}">`);
+    // Image alt is the page title — the visible focus of every generated
+    // card — so screen readers and crawler accessibility checks see a
+    // meaningful description rather than the file name.
+    lines.push(`<meta property="og:image:alt" content="${titleAttr}">`);
+    if (isGeneratedOgImage) {
+      lines.push(`<meta property="og:image:type" content="image/png">`);
+      lines.push(`<meta property="og:image:width" content="${String(OG_GENERATED_WIDTH)}">`);
+      lines.push(`<meta property="og:image:height" content="${String(OG_GENERATED_HEIGHT)}">`);
+    }
   }
 
   // -- Twitter Card --------------------------------------------------------
@@ -222,6 +256,7 @@ export function emitPageMeta(page: CanvasPage, ctx: EmitMetaContext): string {
   }
   if (ogImageAttr !== null) {
     lines.push(`<meta name="twitter:image" content="${ogImageAttr}">`);
+    lines.push(`<meta name="twitter:image:alt" content="${titleAttr}">`);
   }
 
   // -- Schema.org JSON-LD ----------------------------------------------------
