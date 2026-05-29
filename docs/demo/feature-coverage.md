@@ -1,0 +1,125 @@
+# rev01 Demo — Feature Coverage Ledger
+
+The pre-recording verification matrix. Every shipped feature has a home in Act 1 (Maya does it on camera), Act 2 (a diagram explains it), or both. Before recording, every row should be ticked off as either "scripted" or "explicitly out of scope."
+
+**Last audit:** 2026-05-29. **Source documents:** the script files in this directory, the patched Apogee fixture (`src/canvas/fixtures/apogee-showcase.json`), the ADRs in `docs/adr/`, and the live code under `src/`.
+
+> **Two dead features stay omitted** — symbols (FEATURES.md §14, removed from src) and translate-via-Gemini (FEATURES.md §34, dead scope). Per-page locale picker + RTL — the surviving half of §34 — are covered in Interlude 4.
+
+---
+
+## Legend
+
+- **A1 home** — the Act 1 beat that drives this feature (Session `Sn` or Interlude `In`). `—` means Act 1 does not exercise it.
+- **A2 home** — the Act 2 diagram or explanation block (D1–D20). `—` means Act 2 does not explain it.
+- **Fixture-encoded** — `✓` means the feature is already present in the patched Apogee fixture before recording starts; `runtime` means it has to be activated during recording.
+
+---
+
+## Shipped features (FEATURES.md cross-walk)
+
+| § | Feature | A1 home | A2 home | Fixture-encoded |
+|---|---|---|---|---|
+| 1 | Canvas Editor — drag/drop, inspector, header controls, film reel, pan/zoom, live preview, status line, styled modal system | S2, S5 | D1 architecture | ✓ |
+| 1 | Topbar undo/redo + dark preview + RTL preview | S2 | — | runtime |
+| 1 | On-site editing (edit-token cookie) | S9 | D5 edit-token sequence | runtime |
+| 2 | 14 design primitives — text/media/action/shape/container/form/embed/code/chart/table/accordion/carousel/nav/collection | S5 (all) | D1 element registry | ✓ |
+| 2 | Action variants (7) | S5 | — | ✓ |
+| 2 | Container surface variants (7) | S5 | — | ✓ |
+| 2 | Shape variants (6) | S5 | — | ✓ |
+| 3 | Style Kits (4 built-in + Custom) | S3 | D2 kit determinism | ✓ |
+| 4 | Template Seeds (6 — Apogee picked) | S1 | — | ✓ |
+| 5 | Publish + version snapshot + live broadcast | S7, S13, I2 | D3 SiteRoom fan-out | runtime |
+| 5 | Site favicon | S11 | — | ✓ |
+| 5 | Responsive CSS memoization | — | D9 layout engine | — |
+| 5 | Scroll entrance animations | I2 | — | ✓ (per-section) |
+| 6 | Multi-page, slug routing, ordering, default page | S4 | D4 published-address routing (ADR 0002) | ✓ |
+| 6 | Slug validation | S4 | — | runtime |
+| 6 | Custom 404 (`_404` slug) + rename protection | S4, I2 | — | ✓ (_404 page) |
+| 6 | Nav element (layout/sticky/logo/links) + Nav editor panel | S5, S11 | — | ✓ (header nav) |
+| 7 | Responsive (3 breakpoints, per-element overrides, table phone collapse) | S6 | D9 layout engine | partial ✓ |
+| 8 | AI Agent (15 mutating tools) + section recipes | S2, S4, S5 | D6 agent gate (ADR 0012, 0014) | runtime |
+| 8 | Gemini 2.5 Pro streaming + tool parsers | S2, S4 | D6 | runtime |
+| 9 | AI Chat — multi-turn, persistence, `query_site`, `query_assets`, op-preview | S2, S11 | D6 + chat persistence | runtime |
+| 10 | Yjs CRDT + DO socket + awareness + autosave + element style projection | I1 | D7 Yjs revival (ADR 0007) | — |
+| 11 | Collaborator invites (HMAC JWT 7-day, editor/viewer roles, removal, self-invite prevention) | I1 | D10 invite token sequence | runtime |
+| 12 | Owner Assets — R2 content-addressed, dedup, dimension probing, AI image gen (Replicate) | S3 | D11 asset pipeline (ADR 0004, 0006) | runtime |
+| 13 | Custom fonts — WOFF2 upload, @font-face emission, delete UX, site-scoped | S3 | — | runtime |
+| 14 | ~~Symbols~~ | DEAD | DEAD | — |
+| 15 | Section library — save, scopes, asset manifest, import | S6 | D12 library section import | runtime |
+| 16 | Custom templates — save, Community vs Personal, preview scaling, delete | S6, S13 | — | runtime |
+| 17 | Version history — manual + auto snapshots, timeline, preview, restore, pre-restore safety, Yjs binary | S7, S12, S13 | D13 version snapshot pipeline | runtime |
+| 18 | Site Import (scraper) | I3 (gloss) | D14 scraper architecture (ADR 0008) | — |
+| 19 | Forms — 5 field kinds, Turnstile, DO rate limiter, HMAC webhook, inbox, CSV export, owner notification, success message | I2, S8, I6 | D15 form pipeline (Turnstile→DO→HMAC→Resend) | ✓ (form element) |
+| 20 | Password-protected publishing — PBKDF2, HS256 unlock cookie, rate limit, redirect sanitization, timing-safe | S11, I5 | D16 password gate sequence | runtime |
+| 21 | Custom domains — register, CF for SaaS, DCV, cron poll, SSL, stuck-row detection, on-site editing | S9 | D17 CF state machine (ADR 0005) | runtime |
+| 22 | SEO — title/desc/canonical/OG/Twitter/JSON-LD/lang/noIndex | S4 (page SEO panel) | D18 meta emission | ✓ |
+| 22 | Locale pickers (site + page) | S4, S11, I4 | — | ✓ (locale='en') |
+| 23 | OG image — Satori → resvg PNG, content-hash cache, two modes (simple/section) | S7 (shown at publish) | D19 OG render pipeline | — |
+| 24 | Sitemap + robots.txt | I2 | — | runtime |
+| 25 | Site search — PG FTS tsvector + GIN, auto-rebuild, password-gate aware | I2, S7 | D20 atomic search rebuild | — |
+| 26 | A11y audit — 6 checks, severity, element-level remediation, ARIA emission | S7 | D8 a11y pipeline + crash isolation + contrast resolution | — |
+| 27 | Light/dark — visitor toggle, dual `:root`, anti-flash inline script, pre-computed dark variants | I2, S11 | D2 (extends kit) | ✓ (darkModeEnabled) |
+| 28 | Interactive elements — accordion, carousel, popup; smart injection / zero-byte when unused | S5, I2 | — | ✓ (3 popup triggers, accordion, carousel) |
+| 29 | Embeds — 9 named providers + generic; CSP dynamic frame-src | S5 | — | ✓ (4 providers — YouTube/Vimeo/Figma/Google Maps; voiceover lists rest) |
+| 30 | Charts — 5 kinds (bar/line/area/pie/donut), server SVG, kit-derived colors | S5 | — | ✓ (5/5) |
+| 31 | Code — 11 langs via Shiki, optional line numbers, plain fallback | S5 | — | ✓ (4 of 11 — TS/Python/Bash/JSON; voiceover lists rest) |
+| 32 | Collections — manual + page-bound, filter/sort/grid, field binding, entry templates, add button, nested child selection | S5 | — | ✓ (1 manual collection) |
+| 33 | Addon System — GA4 + Custom Scripts, account entitlement vs site config, validation | S10 | D21 entitlement split (ADR 0009) | runtime |
+| 34 | ~~Auto-translate~~ | DEAD | DEAD | — |
+| 34 | Per-page locale + RTL direction + coordinate mirroring + BCP-47 fallback | I4 | — | runtime |
+| 35 | Auth — Clerk JWT, edit-token, invite-token, unlock cookie | S1, S9, I1, I5 | D5, D10, D16 + security pass | runtime |
+| 35 | Security hardening — PBKDF2, timing-safe, CSP, XSS guards, rate limiters, redirect sanitization, SMTP injection, GA validation, admin null-safety, SQL injection prevention via Drizzle | — (mentioned in voiceover at S7, S9, S10, S11) | D22 security pass | — |
+| 36 | Dashboard panels (14 — grid/templates/settings/nav editor/page SEO/forms/versions/a11y/chat/domains/site addons/addon shop/profile/account settings) | S1, S4, S8, S9, S10, S11, S12 | — | — |
+| 36 | Account settings — Free/Pro/Team plans, usage meters, invoices | S11 | — | runtime |
+| 37 | Landing page — hero animated demo, tagline, feature grid, stat line, footer | S0 (cold open) | — | runtime |
+| 38 | Email — Resend, invite template, signed links, owner form notifications | I1, S8, I6 | D10 (invite) + D15 (form) | — |
+| 39 | Slot history — MRU per media element, gallery picker, restore, clear, composite key | S3 | — | runtime |
+| 40 | Motion presets — 16 (kit-customized values) | S5 (all 16 visible) | D2 (extends kit) | ✓ (16/16) |
+| 41 | Database schema — 17 tables | — | D23 schema ER | — |
+| 42 | API surface — 90+ endpoints | — | D24 surface map | — |
+| 43 | Infra — Workers, Hono, Neon, R2, DOs, Yjs, Clerk, Resend, Gemini, Replicate, Turnstile, CF for SaaS, scraper, Bun, TS, CI | bridge between acts | D1 architecture + D25 deploy | — |
+
+---
+
+## Micro-features (FEATURES.md tail)
+
+| Feature | A1 home | A2 home |
+|---|---|---|
+| Section background video | S5 | D1 |
+| 6 background effects | S5 | — |
+| 3 popup trigger types (exit-intent / delay / scroll) | S5 | — |
+| Element rotation, opacity, elementStyle, pinned styles | S3, S5 | — |
+| Page background override | S3 | — |
+| `_404` slug + rename protection | S4 | — |
+| Paste-safe rich text + adjacent run merging + mark nesting order | S2 | — |
+| Editor link visitor preview + canvas link click handling | S2 | — |
+| Href legacy normalization | — | D1 (renderer notes) |
+| A11y audit crash isolation, contrast resolution against innermost surface, heading from font size | — | D8 |
+| Atomic search index rebuild | — | D20 |
+| Form webhook HMAC-SHA256 + SMTP header injection guard | S8 (mentioned) | D15 + D22 |
+| Editor link / version timeline / chart SVG / element selector escaping | — | D22 |
+| GA measurement ID validation | S10 (validation error → fix) | D21 + D22 |
+| On-site edit origin binding | S9 | D5 |
+| Dual rate-limiter (in-process vs DO) | — | D26 |
+| Y.Doc deterministic encoding | — | D7 |
+| Redirect sanitization (password unlock) | I5 | D16 |
+| CSP dynamic frame-src from used embed providers | — | D27 |
+| Smart interactive injection / zero-byte when unused | — | D1 |
+| Carousel via CSS attribute selectors (no client state) | S5 | — |
+| Responsive scaling factors / table phone collapse | S6 | D9 |
+| AI section design (`designSection`), agent recipe catalog, `query_site`, `query_assets`, full-site ops | S2, S4 | D6 |
+| Chat session persistence | S11 | D6 |
+| Content-addressed dedup, magic-byte image dim probing, slot history MRU, section import seed materialization | S3, S6 | D11 + D12 |
+| 40+ smoke test scripts, pure validators, layout engine, design section parser | — | D28 (DevEx) |
+
+---
+
+## Coverage status
+
+- Every shipped feature has at least one home.
+- 5 features are mentioned-only in Act 1 voiceover (the security hardening items, sitemap/robots, dual rate limiter, etc.) — these get their full treatment in Act 2 diagrams.
+- 1 feature is glossed only (Site Import — public POC disabled; user decision 2026-05-29).
+- 2 features are dead and explicitly omitted (Symbols, auto-translate via Gemini).
+
+If you add a feature after this date, append a row above + give it an A1 or A2 home before recording.
