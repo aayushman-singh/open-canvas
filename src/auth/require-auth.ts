@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory';
-import { resolveAuthRedirectUrl, resolveClerkKeys, type ClerkAuthVariables } from './middleware';
-import type { HostConfigEnv } from '../host-config';
+import { resolveAuthRedirectUrl, type ClerkAuthVariables } from './middleware';
+import { appOrigin, type HostConfigEnv } from '../host-config';
 
 type ClerkBindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -78,6 +78,22 @@ export function buildSignInUrl(
   return url.toString();
 }
 
+/**
+ * Build the URL of the worker-local `/auth/` sign-in surface
+ * (`src/auth/sign-in-route.tsx`) for a redirect from `requireAuth()`. The
+ * page renders the OC-branded split shell with a `<SignIn>` widget mounted
+ * inside the right pane; the widget reads `redirect_url` from the query
+ * string and uses it for `redirectUrl` / `afterSignInUrl` / `afterSignUpUrl`.
+ *
+ * Using the local surface keeps the Owner inside the OC brand instead of
+ * bouncing to Clerk's hosted Account Portal at `accounts.<root>`.
+ */
+export function buildLocalSignInUrl(env: HostConfigEnv, redirectUrl: string): string {
+  const url = new URL('/auth/', appOrigin(env));
+  url.searchParams.set('redirect_url', redirectUrl);
+  return url.toString();
+}
+
 // NOTE: sign-out used to construct a `<portal>/sign-out` URL, but Clerk's
 // hosted Account Portal does not expose that path (the portal serves only
 // /sign-in, /sign-up, /user, /organization, /create-organization,
@@ -111,12 +127,7 @@ export function requireAuth() {
       return c.json({ error: 'unauthorized' }, 401);
     }
 
-    const { publishableKey } = resolveClerkKeys(c.env);
-    const signInUrl = buildSignInUrl(
-      publishableKey,
-      resolveAuthRedirectUrl(c.env, c.req.url),
-      c.env.CLERK_FRONTEND_API_URL,
-    );
+    const signInUrl = buildLocalSignInUrl(c.env, resolveAuthRedirectUrl(c.env, c.req.url));
     return c.redirect(signInUrl, 302);
   });
 }
