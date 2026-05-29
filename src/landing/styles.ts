@@ -186,49 +186,108 @@ a:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-rad
 
 .demo-body {
   display: grid;
-  grid-template-columns: 56px 1fr 268px;
+  grid-template-columns: 180px 1fr 268px;
   height: 460px;
   position: relative;
 }
 
-/* left rail */
-.rail {
+/* left sidebar — visual analogue of the real editor's #canvas-sidebar.
+   Tabs row at top mirrors .rev01-sidebar-tabs (Add / Sections / Pages /
+   Versions); the tool buttons below mirror the Add panel grid. Kept
+   narrower than the real 360px sidebar because the demo width is
+   constrained, but the structural layout is the same so the demo reads
+   like the actual editor. */
+.sidebar {
   border-right: 1px solid var(--line);
-  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.sidebar .sb-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 10px 0;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.sidebar .sb-tab {
+  appearance: none;
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 11.5px;
+  line-height: 1;
+  padding: 9px 0;
+  position: relative;
+  transition: color .14s;
+}
+
+.sidebar .sb-tab:hover { color: var(--ink-2); }
+
+.sidebar .sb-tab.active {
+  color: var(--ink);
+}
+
+.sidebar .sb-tab.active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 3px;
+  background: var(--red);
+  border-radius: 999px;
+}
+
+.sidebar .sb-panel {
+  padding: 14px 12px 18px;
+  overflow-y: auto;
+}
+
+.sidebar .sb-tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.sidebar .tool {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  background: var(--surface);
-}
-
-.rail .tool {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  display: flex;
-  align-items: center;
   justify-content: center;
+  gap: 4px;
+  height: 56px;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  border: 1px solid var(--line);
   color: var(--ink-2);
   cursor: pointer;
-  transition: background .14s ease, color .14s ease;
+  transition: background .14s ease, color .14s ease, border-color .14s ease;
 }
 
-.rail .tool:hover {
+.sidebar .tool:hover {
   background: var(--surface-2);
   color: var(--ink);
 }
 
-.rail .tool.active {
+.sidebar .tool.active {
   background: var(--red-soft);
   color: var(--red-ink);
+  border-color: var(--red-line);
 }
 
-.rail .sep {
-  width: 24px;
-  height: 1px;
-  background: var(--line);
-  margin: 6px 0;
+.sidebar .tool-label {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 650;
 }
 
 /* canvas */

@@ -3991,20 +3991,30 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // -- Animation replay ---------------------------------------------------
   function replayAnimations(scope) {
     // scope: "page" replays all, or an element id replays just that one.
+    // Two motion paths exist server-side (src/canvas/render.ts):
+    //   1. on-load: the element gets data-motion-preset right away and the
+    //      style-kit's @keyframes fires once on mount.
+    //   2. on-scroll: the page renders with data-entrance-animation +
+    //      data-scroll-trigger="on-scroll" and the public renderer's
+    //      IntersectionObserver promotes the attribute when the element
+    //      intersects the viewport.
+    // The editor doesn't ship that observer so on-scroll items would never
+    // animate without help. Replay treats both paths the same: read either
+    // attribute, then drive data-motion-preset to trigger the keyframes.
     var page = currentPage();
     if (!page) return;
     var targets;
     if (scope === "page") {
       var artboard = root.querySelector('[data-page-id="' + cssEscape(activePageId || page.id) + '"]');
       if (!artboard) return;
-      targets = artboard.querySelectorAll("[data-motion-preset]");
+      targets = artboard.querySelectorAll("[data-motion-preset], [data-entrance-animation]");
     } else {
       var el = root.querySelector('[data-rev01-element="' + cssEscape(scope) + '"]');
       if (!el) { targets = []; } else { targets = [el]; }
     }
     for (var i = 0; i < targets.length; i++) {
       var t = targets[i];
-      var preset = t.getAttribute("data-motion-preset");
+      var preset = t.getAttribute("data-motion-preset") || t.getAttribute("data-entrance-animation");
       if (!preset || preset === "none") continue;
       t.removeAttribute("data-motion-preset");
       // Force layout so the browser restarts the CSS animation. Reading
@@ -4360,32 +4370,78 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         scheduleSave();
       }
 
-      // -- Background color
-      var bgRow = document.createElement("div");
-      bgRow.className = "style-row";
-      var bgColor = document.createElement("input");
-      bgColor.type = "color";
-      bgColor.value = es.backgroundColor || "#000000";
-      bgColor.className = "color-swatch";
-      var bgEnabled = document.createElement("input");
-      bgEnabled.type = "checkbox";
-      bgEnabled.checked = !!es.backgroundColor;
-      bgEnabled.title = "Enable background color";
-      bgEnabled.addEventListener("change", function() {
-        if (bgEnabled.checked) {
-          es.backgroundColor = bgColor.value;
-        } else {
-          delete es.backgroundColor;
+      // Build a [enable checkbox | color swatch | hex text input] row.
+      // The hex input is the typed-entry escape hatch the swatch picker
+      // alone doesn't offer. All three controls stay synchronised: the
+      // swatch syncs to the hex text on each pick, the hex text accepts
+      // both #rgb and #rrggbb (expanded to #rrggbb internally), and any
+      // valid edit flips the enabled checkbox on so partial edits don't
+      // silently lose the value.
+      function buildColorRow(opts) {
+        var row = document.createElement("div");
+        row.className = "style-row";
+        var initial = opts.getValue();
+        var enabled = document.createElement("input");
+        enabled.type = "checkbox";
+        enabled.checked = !!initial;
+        enabled.title = opts.enabledTitle;
+        var swatch = document.createElement("input");
+        swatch.type = "color";
+        swatch.value = initial || opts.swatchDefault || "#000000";
+        swatch.className = "color-swatch";
+        var hex = document.createElement("input");
+        hex.type = "text";
+        hex.className = "color-hex";
+        hex.value = initial || "";
+        hex.placeholder = opts.swatchDefault || "#000000";
+        hex.spellcheck = false;
+        hex.maxLength = 7;
+        function expandShort(v) {
+          if (v.length === 4) {
+            return ("#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]).toLowerCase();
+          }
+          return v.toLowerCase();
         }
-        onStyleChange();
+        enabled.addEventListener("change", function() {
+          if (enabled.checked) {
+            opts.setValue(swatch.value);
+            hex.value = swatch.value;
+          } else {
+            opts.clearValue();
+            hex.value = "";
+          }
+          onStyleChange();
+        });
+        swatch.addEventListener("input", function() {
+          if (!enabled.checked) enabled.checked = true;
+          opts.setValue(swatch.value);
+          hex.value = swatch.value;
+          onStyleChange();
+        });
+        hex.addEventListener("input", function() {
+          var v = hex.value.trim();
+          if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
+            var normalised = expandShort(v);
+            swatch.value = normalised;
+            if (!enabled.checked) enabled.checked = true;
+            opts.setValue(normalised);
+            onStyleChange();
+          }
+        });
+        row.appendChild(enabled);
+        row.appendChild(swatch);
+        row.appendChild(hex);
+        return row;
+      }
+
+      // -- Background color
+      var bgRow = buildColorRow({
+        getValue: function() { return es.backgroundColor; },
+        setValue: function(v) { es.backgroundColor = v; },
+        clearValue: function() { delete es.backgroundColor; },
+        enabledTitle: "Enable background color",
+        swatchDefault: "#000000",
       });
-      bgColor.addEventListener("input", function() {
-        if (!bgEnabled.checked) { bgEnabled.checked = true; }
-        es.backgroundColor = bgColor.value;
-        onStyleChange();
-      });
-      bgRow.appendChild(bgEnabled);
-      bgRow.appendChild(bgColor);
       inspector.appendChild(field("Background", bgRow));
 
       // -- Background image upload
@@ -4490,6 +4546,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       borderColor.type = "color";
       borderColor.value = es.borderColor || "#ffffff";
       borderColor.className = "color-swatch";
+      var borderHex = document.createElement("input");
+      borderHex.type = "text";
+      borderHex.className = "color-hex";
+      borderHex.value = es.borderColor || "";
+      borderHex.placeholder = "#ffffff";
+      borderHex.spellcheck = false;
+      borderHex.maxLength = 7;
       var borderEnabled = document.createElement("input");
       borderEnabled.type = "checkbox";
       borderEnabled.checked = !!(es.borderColor || typeof es.borderWidth === "number");
@@ -4507,17 +4570,33 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (borderEnabled.checked) {
           es.borderColor = borderColor.value;
           es.borderWidth = Number(borderWidth.value) || 1;
+          borderHex.value = borderColor.value;
         } else {
           delete es.borderColor;
           delete es.borderWidth;
+          borderHex.value = "";
         }
         onStyleChange();
       });
       borderColor.addEventListener("input", function() {
         if (!borderEnabled.checked) borderEnabled.checked = true;
         es.borderColor = borderColor.value;
+        borderHex.value = borderColor.value;
         if (typeof es.borderWidth !== "number") es.borderWidth = Number(borderWidth.value) || 1;
         onStyleChange();
+      });
+      borderHex.addEventListener("input", function() {
+        var v = borderHex.value.trim();
+        if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
+          var normalised = v.length === 4
+            ? ("#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]).toLowerCase()
+            : v.toLowerCase();
+          borderColor.value = normalised;
+          if (!borderEnabled.checked) borderEnabled.checked = true;
+          es.borderColor = normalised;
+          if (typeof es.borderWidth !== "number") es.borderWidth = Number(borderWidth.value) || 1;
+          onStyleChange();
+        }
       });
       borderWidth.addEventListener("change", function() {
         var n = Number(borderWidth.value);
@@ -4530,6 +4609,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       borderRow.appendChild(borderEnabled);
       borderRow.appendChild(borderColor);
+      borderRow.appendChild(borderHex);
       borderRow.appendChild(borderWidth);
       borderRow.appendChild(bwUnit);
       inspector.appendChild(field("Border", borderRow));
@@ -4576,31 +4656,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       inspector.appendChild(field("Shadow", shadowInput));
 
       // -- Text color
-      var textColorRow = document.createElement("div");
-      textColorRow.className = "style-row";
-      var textColor = document.createElement("input");
-      textColor.type = "color";
-      textColor.value = es.color || "#ffffff";
-      textColor.className = "color-swatch";
-      var textColorEnabled = document.createElement("input");
-      textColorEnabled.type = "checkbox";
-      textColorEnabled.checked = !!es.color;
-      textColorEnabled.title = "Enable text color override";
-      textColorEnabled.addEventListener("change", function() {
-        if (textColorEnabled.checked) {
-          es.color = textColor.value;
-        } else {
-          delete es.color;
-        }
-        onStyleChange();
+      var textColorRow = buildColorRow({
+        getValue: function() { return es.color; },
+        setValue: function(v) { es.color = v; },
+        clearValue: function() { delete es.color; },
+        enabledTitle: "Enable text color override",
+        swatchDefault: "#ffffff",
       });
-      textColor.addEventListener("input", function() {
-        if (!textColorEnabled.checked) textColorEnabled.checked = true;
-        es.color = textColor.value;
-        onStyleChange();
-      });
-      textColorRow.appendChild(textColorEnabled);
-      textColorRow.appendChild(textColor);
       inspector.appendChild(field("Text color", textColorRow));
 
       // -- Overflow
@@ -8290,6 +8352,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           setActivePage(labelPageId);
           fitToPage(labelPageId);
         }
+        root.classList.remove("canvas-pages-deselected");
         return;
       }
       // -- Inactive artboard click: activate it ---------------------------
@@ -8299,6 +8362,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (abPageId) {
           setActivePage(abPageId);
         }
+        root.classList.remove("canvas-pages-deselected");
         return;
       }
       var menuTrigger = target.closest("[data-element-menu-trigger]");
@@ -8350,6 +8414,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // document-level mousedown listener below.
       if (selectedSectionId) selectSection(null);
       if (selectedElementId) selectElement(null);
+      // Mark the canvas as page-deselected — CSS clears the .7 dim that
+      // .rev01-artboard[data-active="false"] usually carries so every page
+      // reads as neutral until the user clicks an artboard or label again.
+      root.classList.add("canvas-pages-deselected");
     });
 
     root.addEventListener("dblclick", function(ev) {
@@ -8468,30 +8536,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function attachSidebarTabs() {
+    // Listeners attach to the 3 static tabs rendered in route.tsx (Add /
+    // Sections / Pages). The Versions tab is mounted dynamically later by
+    // ensureVersionsTabMounted and brings its own click handler. All four
+    // delegate to the single activateSidebarTab() function so the active
+    // class is toggled on every live tab — querying [data-sidebar-tab]
+    // fresh on each click is what keeps the Versions tab's underline from
+    // sticking when the user switches back to Add/Sections/Pages.
     const tabButtons = document.querySelectorAll('[data-sidebar-tab]');
     const panels = document.querySelectorAll('[data-sidebar-panel]');
     if (tabButtons.length === 0 || panels.length === 0) return;
 
-    function activate(tabName) {
-      tabButtons.forEach((button) => {
-        const isActive = button.getAttribute('data-sidebar-tab') === tabName;
-        button.classList.toggle('active', isActive);
-        button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      });
-      panels.forEach((panel) => {
-        panel.hidden = panel.getAttribute('data-sidebar-panel') !== tabName;
-      });
-      if (tabName === 'sections') {
-        ensureSectionsPanelLoaded();
-      }
-      if (tabName === 'pages') {
-        updatePageSidebar();
-      }
-    }
-
     tabButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        activate(button.getAttribute('data-sidebar-tab'));
+        const tabName = button.getAttribute('data-sidebar-tab');
+        if (tabName) activateSidebarTab(tabName);
       });
     });
   }
@@ -9266,6 +9325,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     panels.forEach((p) => {
       p.hidden = p.getAttribute("data-sidebar-panel") !== tabName;
     });
+    if (tabName === "sections") {
+      ensureSectionsPanelLoaded();
+    }
     if (tabName === "versions") {
       renderVersionsPanel();
     }
@@ -9541,6 +9603,37 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           var collapsed = sidebar.classList.toggle("collapsed");
           sidebarToggle.textContent = collapsed ? "›" : "‹";
           if (viewport) viewport.classList.toggle("sidebar-collapsed", collapsed);
+        });
+      }
+      var inspectorToggle = document.getElementById("inspector-toggle");
+      if (inspectorToggle && inspector) {
+        // Sync the arrow with the initial state — inspector boots hidden,
+        // so the user-facing affordance is "expand" (›). Click flips both
+        // the collapsed class AND forces a page-inspector render the first
+        // time so an empty inspector has something to show.
+        function syncInspectorToggleIcon() {
+          var collapsed = inspector.classList.contains("collapsed");
+          var hiddenAttr = inspector.hidden;
+          inspectorToggle.textContent = (collapsed || hiddenAttr) ? "‹" : "›";
+        }
+        syncInspectorToggleIcon();
+        inspectorToggle.addEventListener("click", function() {
+          var willOpen = inspector.hidden || inspector.classList.contains("collapsed");
+          if (willOpen) {
+            inspector.classList.remove("collapsed");
+            // If nothing is selected, surface the page inspector so the
+            // expanded panel has content. selectElement(null) already
+            // routes through renderInspector → renderPageInspector when
+            // both selectedElementId and selectedSectionId are null.
+            if (!selectedElementId && !selectedSectionId) {
+              renderInspector();
+            } else if (inspector.hidden) {
+              renderInspector();
+            }
+          } else {
+            inspector.classList.add("collapsed");
+          }
+          syncInspectorToggleIcon();
         });
       }
       // Inject tabs dynamically so the static canvas shell can stay focused

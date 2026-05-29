@@ -529,7 +529,7 @@ body.rev01-modal-open {
   top: 58px;
   left: 0;
   bottom: 36px;
-  width: 320px;
+  width: 360px;
   z-index: 150;
   min-width: 0;
   border-right: 1px solid var(--line);
@@ -540,8 +540,14 @@ body.rev01-modal-open {
 }
 .rev01-editor-sidebar.collapsed {
   width: 0;
-  overflow: hidden;
+  overflow: visible;
   border-right: none;
+}
+/* Keep the sidebar contents themselves clipped while collapsed — only
+   the .sidebar-toggle (positioned at right:-20px) should remain visible
+   so the user can re-open the sidebar. */
+.rev01-editor-sidebar.collapsed > :not(.sidebar-toggle) {
+  display: none;
 }
 .sidebar-toggle {
   position: absolute;
@@ -1050,6 +1056,14 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-artboard[data-active="true"] {
   opacity: 1;
 }
+/* Blank-canvas-click clears the dim on every artboard so no page reads
+   as the "selected" one. The active page keeps rendering — only the
+   visual highlight goes away. Cleared as soon as an artboard or label
+   is clicked again. */
+#canvas-root.canvas-pages-deselected .rev01-artboard[data-active="false"] {
+  opacity: 1;
+  pointer-events: auto;
+}
 .rev01-artboard-label {
   position: absolute;
   top: -32px;
@@ -1357,11 +1371,53 @@ body[data-placement-active="true"] .rev01-section-slot {
   background: var(--surface);
   padding: 4px 16px 20px;
   overflow-y: auto;
+  overflow-x: visible;
   font-family: var(--sans);
   font-size: 13px;
   color: var(--ink);
+  transition: width 0.15s ease;
 }
 #canvas-inspector[hidden] { display: none; }
+#canvas-inspector.collapsed {
+  width: 0;
+  overflow: hidden;
+  border-left: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+/* The inspector-toggle lives as a sibling of #canvas-inspector (outside
+   the clipped box) so it stays reachable when the inspector is
+   collapsed to 0 width OR is hidden entirely. */
+/* Inspector toggle — fixed-positioned sibling of #canvas-inspector so it
+   stays reachable when the inspector is collapsed (width:0) or hidden.
+   Sits visually attached to the inspector's left edge in both states;
+   the sibling combinator below moves it flush to the viewport edge once
+   the inspector collapses. */
+.inspector-toggle {
+  position: fixed;
+  top: 66px;
+  right: 320px;
+  width: 20px;
+  height: 32px;
+  z-index: 152;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-right: none;
+  border-radius: var(--r-xs) 0 0 var(--r-xs);
+  color: var(--ink-2);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: right 0.15s ease, color 0.14s, background-color 0.14s;
+}
+.inspector-toggle:hover { color: var(--ink); background: var(--surface-2); }
+#canvas-inspector.collapsed ~ .inspector-toggle,
+#canvas-inspector[hidden] ~ .inspector-toggle {
+  right: 0;
+}
 #canvas-inspector h3 {
   margin: 16px 0 11px;
   padding-top: 16px;
@@ -1492,6 +1548,25 @@ body[data-placement-active="true"] .rev01-section-slot {
   flex-shrink: 0;
   border: 1px solid var(--line-2);
   background: var(--surface);
+}
+/* Manual hex entry alongside each color swatch. Mono so the user can
+   read #AABBCC values at a glance; width sized for a #rrggbb literal
+   plus a hair so the caret has room. */
+#canvas-inspector .color-hex {
+  flex: 0 0 auto;
+  width: 84px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xs);
+  text-transform: lowercase;
+}
+#canvas-inspector .color-hex:focus {
+  outline: none;
+  border-color: var(--ink-3);
 }
 #canvas-inspector .unit-label {
   font-family: var(--mono);
@@ -2605,6 +2680,73 @@ body[data-placement-active="true"] .rev01-section-slot {
 
 .media-picker .picker-current-actions input[type="file"] {
   display: none;
+}
+
+/* Brand-matching scrollbars across the editor surfaces. Webkit-only
+   pseudo-elements (Chromium + Safari + Edge); Firefox picks up the
+   thinner rendering via scrollbar-width + scrollbar-color, set on the
+   same scroll containers. The thumb tracks the brand red on hover so
+   the scroll affordance lines up with the rest of the chrome's
+   accent colour without being loud in the idle state. */
+.rev01-editor-sidebar,
+#canvas-inspector,
+.rev01-sidebar-panel,
+.rev01-chat-panel,
+#canvas-chat-messages,
+.rev01-version-pill,
+.rev01-modal {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+.rev01-editor-sidebar::-webkit-scrollbar,
+#canvas-inspector::-webkit-scrollbar,
+.rev01-sidebar-panel::-webkit-scrollbar,
+.rev01-chat-panel::-webkit-scrollbar,
+#canvas-chat-messages::-webkit-scrollbar,
+.rev01-version-pill::-webkit-scrollbar,
+.rev01-modal::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.rev01-editor-sidebar::-webkit-scrollbar-track,
+#canvas-inspector::-webkit-scrollbar-track,
+.rev01-sidebar-panel::-webkit-scrollbar-track,
+.rev01-chat-panel::-webkit-scrollbar-track,
+#canvas-chat-messages::-webkit-scrollbar-track,
+.rev01-version-pill::-webkit-scrollbar-track,
+.rev01-modal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rev01-editor-sidebar::-webkit-scrollbar-thumb,
+#canvas-inspector::-webkit-scrollbar-thumb,
+.rev01-sidebar-panel::-webkit-scrollbar-thumb,
+.rev01-chat-panel::-webkit-scrollbar-thumb,
+#canvas-chat-messages::-webkit-scrollbar-thumb,
+.rev01-version-pill::-webkit-scrollbar-thumb,
+.rev01-modal::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.rev01-editor-sidebar::-webkit-scrollbar-thumb:hover,
+#canvas-inspector::-webkit-scrollbar-thumb:hover,
+.rev01-sidebar-panel::-webkit-scrollbar-thumb:hover,
+.rev01-chat-panel::-webkit-scrollbar-thumb:hover,
+#canvas-chat-messages::-webkit-scrollbar-thumb:hover,
+.rev01-version-pill::-webkit-scrollbar-thumb:hover,
+.rev01-modal::-webkit-scrollbar-thumb:hover {
+  background: var(--red);
+  background-clip: padding-box;
+}
+.rev01-editor-sidebar::-webkit-scrollbar-corner,
+#canvas-inspector::-webkit-scrollbar-corner,
+.rev01-sidebar-panel::-webkit-scrollbar-corner,
+.rev01-chat-panel::-webkit-scrollbar-corner,
+#canvas-chat-messages::-webkit-scrollbar-corner,
+.rev01-version-pill::-webkit-scrollbar-corner,
+.rev01-modal::-webkit-scrollbar-corner {
+  background: transparent;
 }
 `;
 

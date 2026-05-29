@@ -467,6 +467,21 @@ export function editorPageJsx(opts: EditorPageOptions) {
           </aside>
           <div id="canvas-root" data-site-id={siteId} />
           <aside id="canvas-inspector" hidden />
+          {/* Inspector toggle — fixed-positioned sibling so it stays
+              reachable when the inspector is collapsed (width:0) or
+              hidden (no selection). Mirrors the existing left
+              #sidebar-toggle pattern. The arrow character flips between
+              ‹ (open: click to collapse) and › (collapsed: click to
+              expand) via the client script. */}
+          <button
+            type="button"
+            id="inspector-toggle"
+            class="inspector-toggle"
+            aria-label="Toggle inspector"
+            title="Toggle inspector"
+          >
+            &#x203A;
+          </button>
           <aside id="canvas-chat-panel" class="rev01-chat-panel" hidden>
             <div class="rev01-chat-header">
               <span>AI Chat</span>
