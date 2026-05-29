@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { resolveClerkKeys } from './middleware';
+import { resolveAuthRedirectUrl, resolveClerkKeys } from './middleware';
 import { clerkFrontendApiHost } from './require-auth';
 import { OcLogo } from '../ui/brand';
 import {
@@ -12,6 +12,7 @@ import {
   readThemeCookie,
 } from '../ui';
 import type { Theme } from '../ui';
+import type { HostConfigEnv } from '../host-config';
 
 // Open Canvas sign-in / create-account surface — MIGRATION.md §5g + README
 // §3 entry 12. Renders the split shell from
@@ -25,7 +26,7 @@ import type { Theme } from '../ui';
 // the hosted Clerk Account Portal for back-compat (review-smoke locks that
 // path). Owners who reach `/auth` directly stay inside our chrome.
 
-type Bindings = {
+type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   CLERK_FRONTEND_API_URL?: string;
@@ -34,6 +35,38 @@ type Bindings = {
 };
 
 const signInRoute = new Hono<{ Bindings: Bindings }>();
+
+export function resolveLocalSignInRedirect(env: Bindings, requestUrl: string): string {
+  const request = new URL(requestUrl);
+  const rawRedirect = request.searchParams.get('redirect_url');
+  const allowedOrigin = new URL(resolveAuthRedirectUrl(env, requestUrl, '/')).origin;
+
+  if (rawRedirect === null || rawRedirect.length === 0) {
+    return resolveAuthRedirectUrl(env, requestUrl, '/dashboard');
+  }
+
+  if (rawRedirect.startsWith('/')) {
+    if (rawRedirect.startsWith('//')) {
+      throw new Error(`redirect_url must be root-relative, not protocol-relative: ${rawRedirect}`);
+    }
+    return resolveAuthRedirectUrl(env, requestUrl, rawRedirect);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rawRedirect);
+  } catch (error) {
+    throw new Error(`redirect_url must be an absolute URL or root-relative path: ${rawRedirect}`, {
+      cause: error,
+    });
+  }
+
+  if (parsed.origin !== allowedOrigin) {
+    throw new Error(`redirect_url origin must match ${allowedOrigin} (got ${parsed.origin})`);
+  }
+
+  return parsed.toString();
+}
 
 // Page-scoped CSS for the split shell. Mirrors
 // `design-references/auth.html` <style> verbatim (tokens come from
@@ -357,8 +390,7 @@ const clerkAppearanceJson = JSON.stringify({
     colorBackground: '#FBFAF8',
     colorInputBackground: '#FFFFFF',
     colorInputText: '#1A1917',
-    fontFamily:
-      '"Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
+    fontFamily: '"Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
     fontFamilyButtons:
       '"Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif',
     borderRadius: '12px',
@@ -391,10 +423,12 @@ const clerkAppearanceJson = JSON.stringify({
 function Page({
   publishableKey,
   frontendApiHost,
+  redirectUrl,
   theme,
 }: {
   publishableKey: string;
   frontendApiHost: string;
+  redirectUrl: string;
   theme?: Theme | undefined;
 }) {
   // Bootstraps clerk-js from the Clerk CDN. The host is resolved server-side
@@ -424,7 +458,15 @@ function Page({
       var pending=document.getElementById("oc-clerk-pending");
       if(pending)pending.remove();
       var mode="signin";
-      var redirectUrl=new URLSearchParams(window.location.search).get("redirect_url")||"/dashboard";
+      var redirectUrl=${JSON.stringify(redirectUrl)};
+      function unmountClerkWidget(kind,fn){
+        if(!fn)return;
+        try{fn.call(window.Clerk,host);}
+        catch(err){
+          console.error("[auth] Clerk widget unmount failed",{kind:kind,mode:mode,error:err});
+          throw err;
+        }
+      }
       function mount(){
         // Tear down the previous widget through Clerk's own unmount so its
         // React reconciler clears its internal node references. Skipping
@@ -432,8 +474,8 @@ function Page({
         // Clerk later throws NotFoundError: Failed to execute 'removeChild'
         // when it tries to clean up its own listeners. Both unmount calls
         // are safe to invoke even when the widget isn't mounted.
-        try{window.Clerk.unmountSignIn&&window.Clerk.unmountSignIn(host);}catch(_){ }
-        try{window.Clerk.unmountSignUp&&window.Clerk.unmountSignUp(host);}catch(_){ }
+        unmountClerkWidget("SignIn",window.Clerk.unmountSignIn);
+        unmountClerkWidget("SignUp",window.Clerk.unmountSignUp);
         var opts={appearance:appearance,redirectUrl:redirectUrl,afterSignInUrl:redirectUrl,afterSignUpUrl:redirectUrl};
         if(mode==="signup"){window.Clerk.mountSignUp(host,opts);}
         else{window.Clerk.mountSignIn(host,opts);}
@@ -529,8 +571,7 @@ function Page({
               </div>
             </div>
             <div class="quote">
-              &ldquo;I had my shop online by lunchtime.&rdquo; — Real small-business owner,
-              probably
+              &ldquo;I had my shop online by lunchtime.&rdquo; — Real small-business owner, probably
             </div>
           </div>
 
@@ -575,12 +616,7 @@ function Page({
                   <button class="on" id="tab-signin" type="button" role="tab" aria-selected="true">
                     Sign in
                   </button>
-                  <button
-                    id="tab-signup"
-                    type="button"
-                    role="tab"
-                    aria-selected="false"
-                  >
+                  <button id="tab-signup" type="button" role="tab" aria-selected="false">
                     Create account
                   </button>
                 </div>
@@ -604,10 +640,21 @@ function Page({
 signInRoute.get('/', (c) => {
   const { publishableKey } = resolveClerkKeys(c.env);
   const frontendApiHost = clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL);
+  let redirectUrl: string;
+  try {
+    redirectUrl = resolveLocalSignInRedirect(c.env, c.req.url);
+  } catch (error) {
+    console.error('[auth] invalid /auth redirect_url', {
+      requestUrl: c.req.url,
+      error,
+    });
+    return c.text('invalid redirect_url', 400);
+  }
   return c.html(
     <Page
       publishableKey={publishableKey}
       frontendApiHost={frontendApiHost}
+      redirectUrl={redirectUrl}
       theme={readThemeCookie(c)}
     />,
   );

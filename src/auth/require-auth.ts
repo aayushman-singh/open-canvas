@@ -1,6 +1,6 @@
 import { createMiddleware } from 'hono/factory';
 import { resolveAuthRedirectUrl, type ClerkAuthVariables } from './middleware';
-import { appOrigin, type HostConfigEnv } from '../host-config';
+import { appOrigin, resolveDevPublicOrigin, type HostConfigEnv } from '../host-config';
 
 type ClerkBindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -106,11 +106,24 @@ export function buildSignInUrl(
  * Using the local surface keeps the Owner inside the OC brand instead of
  * bouncing to Clerk's hosted Account Portal at `accounts.<root>`.
  */
-export function buildLocalSignInUrl(env: HostConfigEnv, redirectUrl: string): string {
+export function buildLocalSignInUrl(env: ClerkBindings, redirectUrl: string): string {
+  const redirect = new URL(redirectUrl);
+  const allowedOrigins = new Set([appOrigin(env)]);
+  if (
+    typeof env.CLERK_TEST_PUBLISHABLE_KEY === 'string' &&
+    env.CLERK_TEST_PUBLISHABLE_KEY.length > 0 &&
+    typeof env.CLERK_TEST_SECRET_KEY === 'string' &&
+    env.CLERK_TEST_SECRET_KEY.length > 0
+  ) {
+    allowedOrigins.add(resolveDevPublicOrigin(env));
+  }
+  if (!allowedOrigins.has(redirect.origin)) {
+    throw new Error(`local sign-in origin must match an allowed auth origin: ${redirect.origin}`);
+  }
   // Path is `/auth` (no trailing slash) — the signInRoute is mounted with
   // exact-prefix `/auth` and a `get('/', ...)` handler inside, which Hono
   // matches as `/auth` (not `/auth/`). The trailing-slash form 404s.
-  const url = new URL('/auth', appOrigin(env));
+  const url = new URL('/auth', redirect.origin);
   url.searchParams.set('redirect_url', redirectUrl);
   return url.toString();
 }

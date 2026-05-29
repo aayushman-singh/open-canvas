@@ -17,7 +17,12 @@ import { clerkFrontendApiHost, requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
-import { themeBootScript, themeFontHeadHtml, themeToggleScript, readThemeCookie } from '../ui/theme';
+import {
+  themeBootScript,
+  themeFontHeadHtml,
+  themeToggleScript,
+  readThemeCookie,
+} from '../ui/theme';
 import type { Theme } from '../ui/theme';
 import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
@@ -112,7 +117,22 @@ async function lookupOwnedSite(
 }
 
 export function editorPageJsx(opts: EditorPageOptions) {
-  const { siteId, siteName, subdomain, styleKit, apex, apexOrigin, context = 'dashboard', clerkPublishableKey, clerkFrontendApiHost: clerkHost, wsToken, theme } = opts;
+  const {
+    siteId,
+    siteName,
+    subdomain,
+    styleKit,
+    apex,
+    apexOrigin,
+    context = 'dashboard',
+    clerkPublishableKey,
+    clerkFrontendApiHost: clerkHost,
+    wsToken,
+    theme,
+  } = opts;
+  if (clerkPublishableKey && !clerkHost) {
+    throw new Error('editorPageJsx requires clerkFrontendApiHost when clerkPublishableKey is set');
+  }
   const apiBase = context === 'public' ? '/__api' : '/api';
   const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
   const publicAddress = `${subdomain}.${apex}`;
@@ -153,7 +173,8 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
         <style>{raw(canvasEditorStyles)}</style>
-        {clerkPublishableKey && clerkHost && raw(`<script>
+        {clerkPublishableKey &&
+          raw(`<script>
 (function(){
   var pk = ${JSON.stringify(clerkPublishableKey)};
   var s = document.createElement("script");
@@ -175,11 +196,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <button id="canvas-chat-toggle" type="button" title="Chat with AI to edit your site">
               AI Chat
             </button>
-            <a
-              id="canvas-settings-link"
-              href={settingsHref}
-              title="Open site settings"
-            >
+            <a id="canvas-settings-link" href={settingsHref} title="Open site settings">
               Settings
             </a>
             <button id="canvas-save" type="button">
@@ -207,7 +224,15 @@ export function editorPageJsx(opts: EditorPageOptions) {
             </span>
           </header>
           <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
-            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" title="Toggle sidebar">&#x2039;</button>
+            <button
+              type="button"
+              class="sidebar-toggle"
+              id="sidebar-toggle"
+              aria-label="Toggle sidebar"
+              title="Toggle sidebar"
+            >
+              &#x2039;
+            </button>
             <div class="rev01-sidebar-tabs" role="tablist" aria-label="Canvas tools">
               <button
                 type="button"
@@ -219,10 +244,22 @@ export function editorPageJsx(opts: EditorPageOptions) {
               >
                 Add
               </button>
-              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="sections" title="Browse and reuse saved sections">
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-sidebar-tab="sections"
+                title="Browse and reuse saved sections"
+              >
                 Sections
               </button>
-              <button type="button" role="tab" aria-selected="false" data-sidebar-tab="pages" title="Manage your site pages">
+              <button
+                type="button"
+                role="tab"
+                aria-selected="false"
+                data-sidebar-tab="pages"
+                title="Manage your site pages"
+              >
                 Pages
               </button>
             </div>
@@ -414,7 +451,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
           <aside id="canvas-chat-panel" class="rev01-chat-panel" hidden>
             <div class="rev01-chat-header">
               <span>Chat</span>
-              <button type="button" id="canvas-chat-close" title="Close chat">&times;</button>
+              <button type="button" id="canvas-chat-close" title="Close chat">
+                &times;
+              </button>
             </div>
             <div id="canvas-chat-messages" class="rev01-chat-messages" />
             <form id="canvas-chat-form" class="rev01-chat-input">

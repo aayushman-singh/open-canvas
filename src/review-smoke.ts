@@ -27,7 +27,8 @@ import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
 import { canvasClientScript } from './editor/canvas-client';
 import { signEditToken } from './auth/edit-token';
-import { buildSignInUrl } from './auth/require-auth';
+import { buildLocalSignInUrl, buildSignInUrl } from './auth/require-auth';
+import { resolveLocalSignInRedirect } from './auth/sign-in-route';
 import {
   prepareSeedAssetsForCustomer,
   RESERVED_SUBDOMAINS,
@@ -723,6 +724,43 @@ assert(
   devSignInUrl.searchParams.get('redirect_url') === devSignInRedirect,
   'expected dev sign-in redirect_url query param to match the resolved local URL',
 );
+const devLocalSignInUrl = new URL(buildLocalSignInUrl(devClerkEnv, devSignInRedirect));
+assert(
+  devLocalSignInUrl.origin === 'http://localhost:8787',
+  `expected dev local sign-in surface to stay on DEV_PUBLIC_HOST, got ${devLocalSignInUrl.origin}`,
+);
+assert(
+  devLocalSignInUrl.searchParams.get('redirect_url') === devSignInRedirect,
+  'expected dev local sign-in redirect_url query param to match the resolved local URL',
+);
+const resolvedDirectAuthRedirect = resolveLocalSignInRedirect(
+  devClerkEnv,
+  `${SMOKE_APP_ORIGIN}/auth?redirect_url=${encodeURIComponent(devSignInRedirect)}`,
+);
+assert(
+  resolvedDirectAuthRedirect === devSignInRedirect,
+  `expected direct /auth redirect_url to resolve to the dev-safe redirect, got ${resolvedDirectAuthRedirect}`,
+);
+const resolvedRelativeAuthRedirect = resolveLocalSignInRedirect(
+  devClerkEnv,
+  `${SMOKE_APP_ORIGIN}/auth?redirect_url=${encodeURIComponent('/dashboard/sites')}`,
+);
+assert(
+  resolvedRelativeAuthRedirect === 'http://localhost:8787/dashboard/sites',
+  `expected root-relative /auth redirect_url to resolve through DEV_PUBLIC_HOST, got ${resolvedRelativeAuthRedirect}`,
+);
+try {
+  resolveLocalSignInRedirect(
+    liveClerkEnv,
+    `${SMOKE_APP_ORIGIN}/auth?redirect_url=${encodeURIComponent('https://evil.example/dashboard')}`,
+  );
+  throw new Error('expected cross-origin /auth redirect_url to be rejected');
+} catch (error) {
+  assert(
+    error instanceof Error && error.message.includes('redirect_url origin must match'),
+    `expected cross-origin /auth redirect_url failure, got ${String(error)}`,
+  );
+}
 // Sign-out is no longer a Clerk Account Portal URL — see
 // src/auth/sign-out-route.ts. The `overridePath='/'` form of
 // resolveAuthRedirectUrl is still validated below since other callers
@@ -739,6 +777,11 @@ const liveRedirect = resolveAuthRedirectUrl(
 assert(
   liveRedirect === `${SMOKE_APP_ORIGIN}/dashboard?next=sites`,
   `expected live sign-in redirect_url to keep the request URL, got ${liveRedirect}`,
+);
+const liveLocalSignInUrl = new URL(buildLocalSignInUrl(liveClerkEnv, liveRedirect));
+assert(
+  liveLocalSignInUrl.origin === SMOKE_APP_ORIGIN,
+  `expected live local sign-in surface to stay on the app origin, got ${liveLocalSignInUrl.origin}`,
 );
 const liveRootRedirect = resolveAuthRedirectUrl(liveClerkEnv, `${SMOKE_APP_ORIGIN}/dashboard`, '/');
 assert(
@@ -763,6 +806,7 @@ try {
 
 const canvasIndexSource = await readSource('./editor/route.tsx');
 const canvasClientSource = await readSource('./editor/canvas-client.ts');
+const signInRouteSource = await readSource('./auth/sign-in-route.tsx');
 const canvasApiSource = await readSource('./routes/api/canvas.ts');
 const publishApiSource = await readSource('./routes/api/publish.ts');
 const importApiSource = await readSource('./routes/api/import.ts');
@@ -779,6 +823,21 @@ assert(
 assert(
   canvasClientSource.includes('const publishButton = document.getElementById("canvas-publish")'),
   'expected canvas client to look up #canvas-publish',
+);
+assert(
+  signInRouteSource.includes('resolveLocalSignInRedirect') &&
+    !signInRouteSource.includes('new URLSearchParams(window.location.search).get("redirect_url")'),
+  'expected /auth to resolve redirect_url server-side instead of trusting browser query params',
+);
+assert(
+  signInRouteSource.includes('[auth] Clerk widget unmount failed') &&
+    !signInRouteSource.includes('catch(_){ }'),
+  'expected Clerk widget unmount failures to log context and rethrow, not disappear',
+);
+assert(
+  canvasIndexSource.includes('editorPageJsx requires clerkFrontendApiHost') &&
+    !canvasIndexSource.includes('clerkPublishableKey && clerkHost && raw'),
+  'expected editorPageJsx to throw when Clerk publishable key is present without a resolved frontend host',
 );
 assert(
   canvasClientSource.includes('API_BASE + "/publish/sites/" + SITE_ID'),
