@@ -8,7 +8,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
-import { Button } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -50,201 +50,123 @@ function formatFullDate(d: Date): string {
   return `${months[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 }
 
+// MIGRATION.md §5e — Profile route wears the Open Canvas account skin.
+// account.html's Profile pane renders inside a centred 820px column with
+// stacked `.card` panels. The profile sidebar (avatar + site count) is
+// folded into the same column as the editor card, matching how
+// account.html keeps every account-scoped surface inside one narrow page.
 const profileStyles = `
-  .profile-layout {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 32px;
-    align-items: start;
-  }
-  .profile-sidebar {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 28px 24px;
-    text-align: center;
-  }
-  .profile-avatar {
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid var(--line);
-    margin-bottom: 16px;
-  }
-  .profile-avatar--fallback {
-    width: 96px;
-    height: 96px;
-    border-radius: 50%;
-    background: rgba(125,211,252,0.12);
-    color: var(--accent);
-    font-size: 36px;
+  .content { max-width: 820px; padding-bottom: 70px; }
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; margin-bottom: 6px; }
+  .content > .sub { color: var(--ink-2); margin: 6px 0 24px; font-size: 14.5px; }
+
+  .acc-card { padding: 24px; margin-bottom: 16px; }
+  .acc-card h2 {
+    font-family: var(--display);
+    font-size: 18px;
     font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--ink);
+  }
+  .acc-card .ch-sub {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    margin: 0 0 18px;
+  }
+
+  .ava-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .ava-big {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #E9837A, #C5332F);
+    color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 16px;
-    border: 3px solid var(--line);
-  }
-  .profile-sidebar h2 {
-    margin: 0 0 4px;
-    font-size: 20px;
-    font-weight: 600;
-  }
-  .profile-sidebar .profile-email {
-    font-size: 13px;
-    color: var(--faint);
-    margin: 0 0 16px;
-    word-break: break-all;
-  }
-  .profile-stat-row {
-    display: flex;
-    justify-content: center;
-    gap: 24px;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
-    margin-top: 4px;
-  }
-  .profile-stat {
-    text-align: center;
-  }
-  .profile-stat .val {
-    font-size: 22px;
     font-weight: 700;
-    color: var(--text);
-    display: block;
+    font-size: 24px;
+    font-family: var(--display);
+    flex-shrink: 0;
+    overflow: hidden;
   }
-  .profile-stat .label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--faint);
-  }
-  .profile-joined {
-    font-size: 12px;
-    color: var(--faint);
-    margin-top: 14px;
-  }
+  .ava-big img { width: 100%; height: 100%; object-fit: cover; }
+  .ava-meta b { font-size: 15px; font-family: var(--display); color: var(--ink); }
+  .ava-meta small { display: block; color: var(--ink-3); font-size: 12.5px; margin-top: 4px; }
 
-  .profile-main {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 28px 32px;
-  }
-  .profile-main h2 {
-    margin: 0 0 24px;
-    font-size: 20px;
-    font-weight: 600;
-  }
-  .form-group {
-    margin-bottom: 20px;
-  }
-  .form-group label {
-    display: block;
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-  .form-group input,
-  .form-group textarea,
-  .form-group select {
-    width: 100%;
-    padding: 10px 14px;
-    border-radius: 8px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 14px;
-    font-family: inherit;
-    outline: none;
-    box-sizing: border-box;
-    transition: border-color 0.12s;
-  }
-  .form-group input:focus,
-  .form-group textarea:focus,
-  .form-group select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(125,211,252,0.12);
-  }
-  .form-group textarea {
-    resize: vertical;
-    min-height: 80px;
-  }
-  .form-group .hint {
-    font-size: 12px;
-    color: var(--faint);
-    margin-top: 4px;
-  }
-  .form-group input[readonly] {
-    color: var(--faint);
-    cursor: not-allowed;
-    background: rgba(255,255,255,0.02);
-  }
-  .form-row {
+  .grid2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
+    margin-bottom: 16px;
   }
-  .form-actions {
+  .fieldset { display: grid; gap: 7px; }
+  .fieldset .hint { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .fieldset textarea.field {
+    min-height: 86px;
+    resize: vertical;
+    line-height: 1.5;
+  }
+  .fieldset select.field {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--ink-2) 50%),
+      linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 36px;
+  }
+  .field[readonly] {
+    background: var(--surface-2);
+    color: var(--ink-3);
+    cursor: not-allowed;
+  }
+
+  .acc-stats {
+    display: flex;
+    gap: 22px;
+    padding-top: 18px;
+    margin-top: 6px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+    color: var(--ink-2);
+  }
+  .acc-stats b {
+    color: var(--ink);
+    font-family: var(--display);
+    font-weight: 700;
+  }
+
+  .save-row {
     display: flex;
     gap: 10px;
     align-items: center;
-    margin-top: 28px;
-    padding-top: 20px;
-    border-top: 1px solid var(--line);
+    margin-top: 18px;
   }
   .save-feedback {
     font-size: 13px;
-    color: #4ade80;
-    margin-left: 8px;
+    color: var(--ok);
+    margin-left: 4px;
     opacity: 0;
     transition: opacity 0.2s;
   }
   .save-feedback.visible { opacity: 1; }
-  .save-feedback.error { color: #ef4444; }
-  .sign-out-row {
-    margin-top: 24px;
-    padding-top: 20px;
-    border-top: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .sign-out-row p {
-    margin: 0;
-    font-size: 13px;
-    color: var(--faint);
-  }
-  .btn-signout {
-    padding: 8px 18px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    background: rgba(239,68,68,0.10);
-    color: #ef4444;
-    border: 1px solid rgba(239,68,68,0.22);
-    cursor: pointer;
-    font-family: inherit;
-    text-decoration: none;
-  }
-  .btn-signout:hover {
-    background: rgba(239,68,68,0.18);
-  }
+  .save-feedback.error { color: var(--red-ink); }
 
-  @media (max-width: 768px) {
-    .profile-layout {
-      grid-template-columns: 1fr;
-    }
-    .form-row {
-      grid-template-columns: 1fr;
-    }
+  @media (max-width: 760px) {
+    .grid2 { grid-template-columns: 1fr; }
   }
 `;
 
+// Inline form-submit script. DOM hooks (#profile-form / #save-feedback /
+// #save-btn) preserved through the restyle — the API contract is the same
+// PATCH /api/profile call the previous chrome used.
 const profileScript = raw(`<script>
 (function() {
   var form = document.getElementById('profile-form');
@@ -326,7 +248,7 @@ profileRoute.get('/profile', async (c) => {
 
   return c.html(
     <DashboardShell
-      title="rev01 — profile"
+      title="Open Canvas — profile"
       crumbs={[
         { label: 'Dashboard', href: '/dashboard' },
         { label: 'Profile' },
@@ -334,60 +256,66 @@ profileRoute.get('/profile', async (c) => {
       activePath="/dashboard/profile"
       pageStyles={profileStyles}
       userMeta={{ avatarUrl, displayName: displayName || undefined, email: primaryEmail }}
+      theme={readThemeCookie(c)}
     >
-      <div class="profile-layout">
-        <aside class="profile-sidebar">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" class="profile-avatar" width="96" height="96" />
-          ) : (
-            <div class="profile-avatar--fallback">{initial}</div>
-          )}
-          <h2>{displayName || primaryEmail.split('@')[0]}</h2>
-          <p class="profile-email">{primaryEmail}</p>
-          <div class="profile-stat-row">
-            <div class="profile-stat">
-              <span class="val">{String(siteCount)}</span>
-              <span class="label">Sites</span>
+      <h1>Account</h1>
+      <p class="sub">Manage how you appear to collaborators and how Open Canvas treats this account.</p>
+
+      <section class="card acc-card">
+        <h2>Your profile</h2>
+        <p class="ch-sub">This is how you appear to collaborators and on shared projects.</p>
+
+        <div class="ava-row">
+          <div class="ava-big">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" width="64" height="64" />
+            ) : (
+              initial
+            )}
+          </div>
+          <div class="ava-meta">
+            <b>{displayName || primaryEmail.split('@')[0]}</b>
+            <small>{primaryEmail}</small>
+          </div>
+        </div>
+
+        <form id="profile-form">
+          <div class="grid2">
+            <div class="fieldset">
+              <label class="lbl" for="displayName">Display name</label>
+              <input
+                class="field"
+                type="text"
+                id="displayName"
+                name="displayName"
+                value={displayName}
+                maxlength={100}
+                placeholder="How you want to be known"
+              />
             </div>
-            <div class="profile-stat">
-              <span class="val">Free</span>
-              <span class="label">Plan</span>
+            <div class="fieldset">
+              <label class="lbl" for="email">Email</label>
+              <input class="field" type="email" id="email" value={primaryEmail} readonly />
+              <span class="hint">Managed by Clerk — change in account settings.</span>
             </div>
           </div>
-          <p class="profile-joined">Joined {formatFullDate(profile.createdAt)}</p>
-        </aside>
 
-        <div class="profile-main">
-          <h2>Edit profile</h2>
-          <form id="profile-form">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="displayName">Display name</label>
-                <input
-                  type="text"
-                  id="displayName"
-                  name="displayName"
-                  value={displayName}
-                  maxlength={100}
-                  placeholder="How you want to be known"
-                />
-              </div>
-              <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" value={primaryEmail} readonly />
-                <p class="hint">Managed by Clerk — change in account settings</p>
-              </div>
-            </div>
+          <div class="fieldset" style="margin-bottom:16px">
+            <label class="lbl" for="bio">Bio</label>
+            <textarea
+              class="field"
+              id="bio"
+              name="bio"
+              maxlength={500}
+              placeholder="What you do, who you build for…"
+            >{profile.bio ?? ''}</textarea>
+            <span class="hint">Shown on shared projects. Max 500 characters.</span>
+          </div>
 
-            <div class="form-group">
-              <label for="bio">Bio</label>
-              <textarea id="bio" name="bio" maxlength={500} placeholder="What you do, who you build for...">{profile.bio ?? ''}</textarea>
-              <p class="hint">Shown on shared projects. Max 500 characters.</p>
-            </div>
-
-            <div class="form-group">
-              <label for="timezone">Timezone</label>
-              <select id="timezone" name="timezone">
+          <div class="grid2">
+            <div class="fieldset">
+              <label class="lbl" for="timezone">Timezone</label>
+              <select class="field" id="timezone" name="timezone">
                 {TIMEZONES.map((tz) => (
                   <option value={tz} selected={tz === (profile.timezone ?? 'UTC')}>
                     {tz.replace(/_/g, ' ')}
@@ -395,19 +323,29 @@ profileRoute.get('/profile', async (c) => {
                 ))}
               </select>
             </div>
-
-            <div class="form-actions">
-              <Button variant="primary" id="save-btn" type="submit">Save changes</Button>
-              <span id="save-feedback" class="save-feedback"></span>
+            <div class="fieldset">
+              <label class="lbl">Joined</label>
+              <input class="field" type="text" value={formatFullDate(profile.createdAt)} readonly />
             </div>
-          </form>
-
-          <div class="sign-out-row">
-            <p>Sign out of your account on this device.</p>
-            <a href="/sign-out" class="btn-signout">Sign out</a>
           </div>
-        </div>
-      </div>
+
+          <div class="acc-stats">
+            <div><b>{String(siteCount)}</b> {siteCount === 1 ? 'site' : 'sites'} on this account</div>
+          </div>
+
+          <div class="save-row">
+            <Button variant="primary" id="save-btn" type="submit">Save changes</Button>
+            <span id="save-feedback" class="save-feedback"></span>
+          </div>
+        </form>
+      </section>
+
+      <section class="card acc-card">
+        <h2>Sign out</h2>
+        <p class="ch-sub">Sign out of Open Canvas on this device.</p>
+        <a href="/sign-out" class="btn btn-outline">Sign out</a>
+      </section>
+
       {profileScript}
     </DashboardShell>,
   );

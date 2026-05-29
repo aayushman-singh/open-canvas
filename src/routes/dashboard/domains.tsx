@@ -2,24 +2,18 @@
 //
 // Dashboard route — GET /dashboard/sites/:siteId/domains.
 //
-// Renders the custom-domain management surface for a site:
-//   - "Add a domain" form (POST → /api/sites/:siteId/domains).
-//   - List of every customDomain row for this site, each with:
-//       - status badge (pending / verifying / active / failed),
-//       - DNS instructions extracted from `verificationRecord`,
-//       - per-row DELETE button.
-//   - Lazy refresh: the route hits the GET API endpoint which itself polls
-//     CF on every read (see route.ts), so the rendered page is always
-//     within one CF round-trip of CF's view of the world.
+// Renders the custom-domain management surface for a site under the Open
+// Canvas chrome (MIGRATION.md §5d / domains.html):
+//   - "Current addresses" card: rows for the free subdomain + every
+//     custom hostname, each with a status chip (Active / Verifying /
+//     Failed / Pending).
+//   - "Connect a new domain" card: `<input class="field">` + primary
+//     button + the DNS records to add at the user's provider.
+//   - Per-row "Remove" button hits DELETE on the API.
 //
-// The page ships a small inline client script that:
-//   - submits the add-domain form via fetch + JSON,
-//   - hits DELETE via fetch on each delete button,
-//   - re-renders by reload on success (the simplest correct behaviour;
-//     status polling already happens server-side).
-//
-// All styles inline via DashboardShell's `pageStyles` slot to keep the
-// surface self-contained.
+// Lazy refresh: the route hits the GET API endpoint which itself polls
+// CF on every read (see route.ts), so the rendered page is always
+// within one CF round-trip of CF's view of the world.
 
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -29,7 +23,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customDomain, customer, site, type CustomDomain } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
-import { Button, Badge } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -44,83 +38,116 @@ export const domainsRoute = new Hono<Env>();
 domainsRoute.use('*', clerkAuth());
 domainsRoute.use('*', requireAuth());
 
+// Surface chrome lifted from domains.html — current-address rows + DNS
+// records card. Uses theme tokens only.
 const pageStyles = `
-  .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
-  form.add-domain {
-    display: flex;
-    align-items: end;
-    gap: 12px;
-    margin: 0 0 28px;
-    padding: 18px;
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; }
+  .content > .sub { color: var(--ink-2); margin: 6px 0 28px; }
+
+  .dcard {
     border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    padding: 22px;
+    margin-bottom: 16px;
   }
-  form.add-domain label {
-    display: grid;
-    gap: 6px;
-    flex: 1;
-    font-size: 13px;
-    color: var(--muted);
+  .dcard h2 {
+    font-family: var(--display);
+    font-size: 18px;
+    margin: 0 0 6px;
   }
-  form.add-domain input {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #0c1220;
-    color: var(--text);
-    padding: 10px 12px;
-    font-size: 15px;
+  .dcard .helper {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    margin: 0 0 14px;
   }
-  form.add-domain button[disabled] { opacity: 0.5; cursor: not-allowed; }
-  .domains-empty {
-    padding: 24px;
-    border: 1px dashed var(--line);
-    border-radius: 10px;
-    color: var(--muted);
-    text-align: center;
-  }
-  .domain {
-    padding: 18px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
-    margin-bottom: 12px;
-  }
-  .domain-head {
+
+  .drow {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 14px;
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
   }
-  .domain-host {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 16px;
-    color: var(--text);
+  .drow:first-of-type { border-top: none; }
+  .drow .dn { flex: 1; min-width: 0; }
+  .drow .dn b {
+    font-size: 15px;
+    font-family: var(--mono);
+    color: var(--ink);
+    word-break: break-all;
   }
-  .domain-actions { margin-left: auto; }
-  .dns {
-    margin: 4px 0 0;
-    padding: 12px;
-    border-radius: 6px;
-    background: #0c1220;
-    border: 1px solid var(--line);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  .drow .dn small {
+    display: block;
     font-size: 12.5px;
-    color: var(--muted);
-    line-height: 1.5;
-    white-space: pre-wrap;
+    color: var(--ink-3);
+    margin-top: 3px;
   }
-  .dns strong { color: var(--text); }
+  .drow .actions { display: flex; gap: 8px; align-items: center; }
+
+  .add-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .add-row .field { flex: 1; }
+
+  .dns {
+    margin-top: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .dns .dns-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 1fr;
+    gap: 12px;
+    padding: 5px 0;
+  }
+  .dns .dns-row.h {
+    color: var(--ink-3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: var(--sans);
+    font-weight: 700;
+  }
+  .dns .dns-row .v { color: var(--ink); word-break: break-all; }
+
+  /* chip variants the audit + domain surfaces share */
+  .chip-warn {
+    background: var(--warn-soft);
+    color: var(--warn);
+    border-color: transparent;
+  }
+  .chip-pending {
+    background: var(--warn-soft);
+    color: var(--warn);
+    border-color: transparent;
+  }
+
   .errors {
     margin: 8px 0 0;
-    color: #fca5a5;
+    color: var(--red-ink);
     font-size: 13px;
   }
   .form-error {
     margin: 8px 0 0;
-    color: #fca5a5;
+    color: var(--red-ink);
     font-size: 13px;
     min-height: 18px;
+  }
+
+  .empty {
+    padding: 20px 4px;
+    color: var(--ink-3);
+    text-align: center;
+    font-size: 13.5px;
   }
 `;
 
@@ -154,9 +181,6 @@ async function lookupOwnedSite(
 
 interface VerificationInstruction {
   kind: 'cname' | 'txt' | 'http' | 'none';
-  /** Human-readable copy. */
-  title: string;
-  /** Optional record details. */
   recordType?: string;
   recordName?: string;
   recordValue?: string;
@@ -179,23 +203,19 @@ interface VerificationInstruction {
  */
 function deriveInstructions(record: Record<string, unknown>): VerificationInstruction[] {
   const out: VerificationInstruction[] = [];
-  // CNAME target — every custom hostname needs this regardless of validation.
   out.push({
     kind: 'cname',
-    title: 'Point your domain at rev01',
     recordType: 'CNAME',
     recordName: typeof record.hostname === 'string' ? record.hostname : 'your hostname',
     recordValue: 'rev01.aayushman.dev',
   });
 
-  // Ownership verification (TXT).
   const ownership = record.ownership_verification;
   if (ownership && typeof ownership === 'object') {
     const ov = ownership as { type?: unknown; name?: unknown; value?: unknown };
     if (typeof ov.name === 'string' && typeof ov.value === 'string') {
       out.push({
         kind: 'txt',
-        title: 'Verify ownership',
         recordType: typeof ov.type === 'string' ? ov.type.toUpperCase() : 'TXT',
         recordName: ov.name,
         recordValue: ov.value,
@@ -203,7 +223,6 @@ function deriveInstructions(record: Record<string, unknown>): VerificationInstru
     }
   }
 
-  // SSL HTTP validation token, if present.
   const ssl = record.ssl;
   if (ssl && typeof ssl === 'object') {
     const sslRec = ssl as { validation_records?: unknown };
@@ -214,7 +233,6 @@ function deriveInstructions(record: Record<string, unknown>): VerificationInstru
         if (typeof v.http_url === 'string' && typeof v.http_body === 'string') {
           out.push({
             kind: 'http',
-            title: 'SSL token (Cloudflare serves automatically)',
             recordType: 'HTTP',
             recordName: v.http_url,
             recordValue: v.http_body,
@@ -237,51 +255,90 @@ function esc(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
 }
 
-function DomainCard({ domain }: { domain: CustomDomain }) {
+function statusChip(status: CustomDomain['status']) {
+  if (status === 'active') {
+    return (
+      <span class="chip chip-ok">
+        <span class="dot" />
+        Active
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span class="chip chip-red">
+        <span class="dot" />
+        Failed
+      </span>
+    );
+  }
+  if (status === 'verifying') {
+    return (
+      <span class="chip chip-pending">
+        <span class="dot" />
+        Verifying
+      </span>
+    );
+  }
+  return (
+    <span class="chip">
+      <span class="dot" />
+      Pending
+    </span>
+  );
+}
+
+function DomainRow({ domain }: { domain: CustomDomain }) {
   const instructions = deriveInstructions(domain.verificationRecord);
   const errorsRaw = (domain.verificationRecord as { verification_errors?: unknown })
     .verification_errors;
   const errors: string[] = Array.isArray(errorsRaw)
     ? errorsRaw.filter((s): s is string => typeof s === 'string')
     : [];
+  const subline =
+    domain.status === 'active'
+      ? `Connected · certificate issued${domain.certIssuedAt ? ` ${new Date(domain.certIssuedAt).toISOString().slice(0, 10)}` : ''}`
+      : domain.status === 'verifying'
+        ? 'Connected · verifying DNS — this can take a few minutes'
+        : domain.status === 'failed'
+          ? 'Connected · verification failed'
+          : 'Connected · pending verification';
   return (
-    <article class="domain" data-domain-id={domain.id} data-hostname={domain.hostname}>
-      <div class="domain-head">
-        <span class="domain-host">{domain.hostname}</span>
-        <Badge variant={domain.status === 'active' ? 'success' : domain.status === 'failed' ? 'danger' : domain.status === 'verifying' ? 'warning' : 'info'}>{domain.status}</Badge>
-        <span class="domain-actions">
-          <Button variant="secondary" data-action="delete" size="sm">Remove</Button>
-        </span>
+    <div class="drow" data-domain-id={domain.id} data-hostname={domain.hostname}>
+      <div class="dn">
+        <b>{domain.hostname}</b>
+        <small>{subline}</small>
+        {errors.length > 0 ? (
+          <p class="errors">Verification errors: {errors.join('; ')}</p>
+        ) : null}
+        {instructions.length > 0 ? (
+          <div class="dns">
+            <div class="dns-row h">
+              <span>Type</span>
+              <span>Name</span>
+              <span>Value</span>
+            </div>
+            {instructions.map((ins) => (
+              <div class="dns-row">
+                <span>{ins.recordType ?? ''}</span>
+                <span class="v">{ins.recordName ?? ''}</span>
+                <span class="v">{ins.recordValue ?? ''}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
-      {instructions.map((ins) => (
-        <p class="dns">
-          <strong>{ins.title}</strong>
-          {ins.recordType && ins.recordName && ins.recordValue ? (
-            <>
-              {'\n'}
-              {ins.recordType} {ins.recordName} → {ins.recordValue}
-            </>
-          ) : null}
-        </p>
-      ))}
-      {errors.length > 0 ? (
-        <p class="errors">
-          Verification errors: {errors.join('; ')}
-        </p>
-      ) : null}
-      {domain.certIssuedAt ? (
-        <p class="dns">
-          <strong>Certificate issued:</strong> {new Date(domain.certIssuedAt).toISOString()}
-        </p>
-      ) : null}
-    </article>
+      {statusChip(domain.status)}
+      <div class="actions">
+        <Button variant="ghost" size="sm" data-action="delete">
+          Remove
+        </Button>
+      </div>
+    </div>
   );
 }
 
 function clientScript(siteId: string): string {
-  // Inline client: form submit + delete buttons. We use `addEventListener`,
-  // no inline handlers, so the page stays compatible with strict CSP if
-  // one is added later. The site id is baked in as a string literal.
   const sid = JSON.stringify(siteId);
   return String.raw`
 (() => {
@@ -326,7 +383,7 @@ function clientScript(siteId: string): string {
       }
     });
   }
-  document.querySelectorAll('article.domain').forEach((card) => {
+  document.querySelectorAll('.drow[data-domain-id]').forEach((card) => {
     const removeBtn = card.querySelector('button[data-action="delete"]');
     if (!removeBtn) return;
     removeBtn.addEventListener('click', async () => {
@@ -363,8 +420,6 @@ function clientScript(siteId: string): string {
 domainsRoute.get('/sites/:siteId/domains', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) {
-    // requireAuth would have redirected on a missing auth; this guard is
-    // narrowing for TS.
     throw new Error('dashboard domains route reached without an authenticated user');
   }
   const siteId = c.req.param('siteId');
@@ -383,36 +438,83 @@ domainsRoute.get('/sites/:siteId/domains', async (c) => {
 
   return c.html(
     <DashboardShell
-      title={`${owned.name} — custom domains`}
+      title={`${owned.name} — domains`}
       crumbs={[
         { href: '/dashboard', label: 'Dashboard' },
         { href: `/dashboard/sites/${esc(siteId)}/edit`, label: owned.name },
-        { label: 'Custom domains' },
+        { label: 'Domains' },
       ]}
       pageStyles={pageStyles}
       siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/domains`)}
+      theme={readThemeCookie(c)}
     >
-      <h1>Custom domains</h1>
-      <p class="lede">
-        Add a hostname you own (e.g. <code>www.example.com</code>) and follow the DNS instructions.
-        Cloudflare verifies the CNAME and issues a certificate — once status flips to{' '}
-        <strong>active</strong>, your published site is live at that hostname.
-      </p>
-      <form class="add-domain">
-        <label>
-          <span>Hostname</span>
-          <input type="text" name="hostname" placeholder="www.example.com" autocomplete="off" required />
-        </label>
-        <Button variant="primary" type="submit">Add domain</Button>
-      </form>
-      <p class="form-error" role="status" aria-live="polite"></p>
-      {domains.length === 0 ? (
-        <div class="domains-empty">
-          No custom domains yet. Add one above to start the verification flow.
+      <h1>Domains</h1>
+      <p class="sub">Use your own web address instead of the free one.</p>
+
+      <div class="dcard">
+        <div class="drow">
+          <div class="dn">
+            <b>{owned.subdomain}.rev01.aayushman.dev</b>
+            <small>Free address · included with every site</small>
+          </div>
+          <span class="chip chip-ok">
+            <span class="dot" />
+            Active
+          </span>
         </div>
-      ) : (
-        domains.map((row) => <DomainCard domain={row} />)
-      )}
+        {domains.length === 0 ? (
+          <div class="empty">
+            No custom domains yet. Connect one below to use your own web address.
+          </div>
+        ) : (
+          domains.map((row) => <DomainRow domain={row} />)
+        )}
+      </div>
+
+      <div class="dcard">
+        <h2>Connect a new domain</h2>
+        <p class="helper">
+          Already own a domain? Enter it below, then add the records we give you at your domain
+          provider.
+        </p>
+        <form class="add-domain">
+          <div class="add-row">
+            <input
+              class="field"
+              type="text"
+              name="hostname"
+              placeholder="yourbusiness.com"
+              autocomplete="off"
+              required
+            />
+            <Button variant="primary" type="submit">
+              Connect
+            </Button>
+          </div>
+        </form>
+        <p class="form-error" role="status" aria-live="polite"></p>
+        <div class="dns">
+          <div class="dns-row h">
+            <span>Type</span>
+            <span>Name</span>
+            <span>Value</span>
+          </div>
+          <div class="dns-row">
+            <span>CNAME</span>
+            <span class="v">www</span>
+            <span class="v">rev01.aayushman.dev</span>
+          </div>
+          <div class="dns-row">
+            <span>A</span>
+            <span class="v">@</span>
+            <span class="v">76.76.21.21</span>
+          </div>
+        </div>
+        <p class="faint" style="font-size:12px; margin-top:10px;">
+          We&apos;ll check automatically and issue a secure (HTTPS) certificate once it&apos;s
+          verified.
+        </p>
+      </div>
       <script type="module">{raw(clientScript(siteId))}</script>
     </DashboardShell>,
   );

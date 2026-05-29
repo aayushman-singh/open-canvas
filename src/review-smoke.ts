@@ -85,8 +85,8 @@ async function readSource(relativePath: string): Promise<string> {
 const root = await responseText('/');
 assert(root.status === 200, `expected public / to return 200, got ${root.status}`);
 assert(
-  root.body.includes('multiplayer site builder'),
-  'expected public / to render the Post-Aero landing',
+  root.body.includes('site builder for the rest of us'),
+  'expected public / to render the Open Canvas landing eyebrow',
 );
 assert(!root.body.includes('Math.random'), 'expected landing counters not to fake live activity');
 assert(
@@ -1139,8 +1139,8 @@ assert(
   `expected rev01.aayushman.dev / to still serve the landing page, got ${appHostLanding.status}`,
 );
 assert(
-  appHostLanding.body.includes('multiplayer site builder'),
-  'expected rev01.aayushman.dev / to render the Post-Aero landing copy',
+  appHostLanding.body.includes('site builder for the rest of us'),
+  'expected rev01.aayushman.dev / to render the Open Canvas landing copy',
 );
 
 // -- Task 5.5: publish smoke + broadcast payload hardening ----------------
@@ -1189,8 +1189,8 @@ try {
   const unpubResp = await responseFromHost(SMOKE_HOST, '/');
   assert(unpubResp.status === 404, `expected unpublished site to 404, got ${unpubResp.status}`);
   assert(
-    /not yet published|not found/i.test(unpubResp.body),
-    `expected unpublished body to mention "not yet published" or "not found" (got ${JSON.stringify(unpubResp.body)})`,
+    /not yet published|coming soon|not found|been published/i.test(unpubResp.body),
+    `expected unpublished body to mention "not yet published", "coming soon", "been published", or "not found" (got ${JSON.stringify(unpubResp.body)})`,
   );
 
   // 2. Insert a Published Snapshot directly. The publish endpoint requires

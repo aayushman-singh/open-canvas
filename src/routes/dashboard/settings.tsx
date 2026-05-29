@@ -14,7 +14,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
-import { Button, Badge } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -37,257 +37,275 @@ function formatBytes(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
+// MIGRATION.md §5e — settings.tsx is account/billing (NOT site-settings).
+// Layout matches account.html's Billing pane: 820px column, the current
+// plan summary card, three usage meters (`.mtr`), three plan cards
+// (`.plan`/.plan.feat for the highlighted upgrade slot) and the invoice
+// list (`.inv`). The Notifications + Account tabs reuse the same `.tabs`
+// affordance from account.html so all three are visible under one header.
+//
+// DOM hooks preserved through the restyle: `.settings-tab` /
+// `.settings-panel` / `data-tab` / `data-active` / `data-plan-card`
+// remain the IDs the inline tab-switch script reads, and the
+// `tab-billing` / `tab-notifications` / `tab-account` panel IDs stay
+// stable so deep-links keep working.
 const settingsStyles = `
+  .content { max-width: 820px; padding-bottom: 70px; }
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; margin-bottom: 4px; }
+  .content > .sub { color: var(--ink-2); margin: 6px 0 0; font-size: 14.5px; }
+
   .settings-tabs {
     display: flex;
-    gap: 2px;
-    margin-bottom: 28px;
+    gap: 4px;
+    margin: 22px 0 26px;
     border-bottom: 1px solid var(--line);
-    padding-bottom: 0;
   }
   .settings-tab {
-    padding: 10px 20px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--muted);
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.12s, border-color 0.12s;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 650;
+    padding: 12px 4px;
+    margin-right: 22px;
+    border: none;
+    background: transparent;
+    color: var(--ink-3);
     cursor: pointer;
-    background: none;
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    font-family: inherit;
+    position: relative;
+    white-space: nowrap;
   }
-  .settings-tab:hover { color: var(--text); }
-  .settings-tab[aria-selected="true"] {
-    color: var(--text);
-    border-bottom-color: var(--accent);
+  .settings-tab:hover { color: var(--ink-2); }
+  .settings-tab[aria-selected="true"] { color: var(--ink); }
+  .settings-tab[aria-selected="true"]::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    background: var(--red);
+    border-radius: 99px;
   }
-
   .settings-panel { display: none; }
   .settings-panel[data-active="true"] { display: block; }
 
-  .settings-section {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 24px 28px;
-    margin-bottom: 20px;
-  }
-  .settings-section h3 {
-    margin: 0 0 4px;
-    font-size: 17px;
-    font-weight: 600;
-  }
-  .settings-section .desc {
-    font-size: 13px;
-    color: var(--faint);
-    margin: 0 0 20px;
-  }
-
-  .plan-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 20px;
-  }
-  .plan-card {
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 20px;
-    position: relative;
-  }
-  .plan-card--current { border-color: var(--accent); }
-  .plan-card--current::before {
-    content: 'Current plan';
-    position: absolute;
-    top: -10px;
-    left: 16px;
-    background: var(--accent);
-    color: var(--bg);
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 2px 10px;
-    border-radius: 4px;
-  }
-  .plan-name {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 4px;
-  }
-  .plan-price {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    margin: 8px 0;
-  }
-  .plan-price .period {
-    font-size: 14px;
-    font-weight: 400;
-    color: var(--faint);
-  }
-  .plan-features {
-    list-style: none;
-    padding: 0;
-    margin: 16px 0 0;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  .plan-features li {
-    padding: 4px 0;
+  /* current-plan summary card (account.html .plan-now) */
+  .plan-now {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 16px;
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 18px;
   }
-  .plan-features li::before {
-    content: '\\2713';
-    color: #4ade80;
-    font-weight: 700;
-    font-size: 12px;
-    flex-shrink: 0;
+  .plan-now .pn { flex: 1; min-width: 0; }
+  .plan-now .pn b {
+    font-family: var(--display);
+    font-size: 20px;
+    color: var(--ink);
+  }
+  .plan-now .pn small {
+    display: block;
+    color: var(--ink-2);
+    font-size: 13.5px;
+    margin-top: 3px;
+    line-height: 1.45;
   }
 
-  .usage-grid {
+  /* usage meters (.mtr) */
+  .meters {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
+    margin-bottom: 22px;
   }
-  .usage-card {
-    background: var(--bg);
+  .mtr {
+    padding: 16px 18px;
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 18px 20px;
+    border-radius: var(--r);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
   }
-  .usage-card .label {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--faint);
-    margin-bottom: 6px;
+  .mtr .k {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
   }
-  .usage-card .value {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--text);
-  }
-  .usage-card .of {
-    font-size: 13px;
-    color: var(--faint);
-    margin-top: 4px;
-  }
-  .usage-bar {
-    height: 4px;
-    background: rgba(255,255,255,0.08);
-    border-radius: 2px;
+  .mtr .bar {
+    height: 6px;
+    border-radius: 99px;
+    background: var(--surface-3);
     margin-top: 10px;
     overflow: hidden;
   }
-  .usage-bar-fill {
+  .mtr .bar i {
+    display: block;
     height: 100%;
-    border-radius: 2px;
-    background: var(--accent);
-    transition: width 0.3s;
+    background: var(--red);
+    border-radius: 99px;
+    transition: width .35s ease;
   }
+  .mtr .bar i.warn { background: var(--warn); }
+  .mtr .bar i.ok { background: var(--ok); }
 
-  .invoice-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
+  /* plan tier cards (.plan) */
+  .plans {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
   }
-  .invoice-table th {
-    text-align: left;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--faint);
-    padding: 8px 0;
-    border-bottom: 1px solid var(--line);
+  .plan {
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    padding: 22px;
+    position: relative;
+    box-shadow: var(--shadow-sm);
   }
-  .invoice-table td {
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    color: var(--muted);
+  .plan.feat {
+    border-color: var(--red);
+    box-shadow: var(--shadow);
   }
-  .invoice-table td:last-child { text-align: right; }
+  .plan .tag {
+    position: absolute;
+    top: -10px;
+    left: 22px;
+  }
+  .plan h3 {
+    font-family: var(--display);
+    font-size: 18px;
+    margin: 0 0 8px;
+    color: var(--ink);
+  }
+  .plan .price {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 32px;
+    margin: 8px 0 2px;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .plan .price small {
+    font-size: 14px;
+    color: var(--ink-3);
+    font-weight: 500;
+    font-family: var(--sans);
+    margin-left: 2px;
+  }
+  .plan ul {
+    list-style: none;
+    padding: 0;
+    margin: 14px 0 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .plan li {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .plan li svg { color: var(--ok); flex-shrink: 0; margin-top: 2px; }
 
-  .notif-row {
+  /* invoice list (.inv) */
+  .inv-heading {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 18px 0 12px;
+    color: var(--ink);
+  }
+  .invoices {
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .inv {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 14px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    gap: 14px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+    font-size: 13.5px;
+    color: var(--ink-2);
   }
-  .notif-row:last-child { border-bottom: none; }
-  .notif-info h4 { margin: 0; font-size: 14px; font-weight: 500; }
-  .notif-info p { margin: 2px 0 0; font-size: 12px; color: var(--faint); }
-  .toggle {
-    position: relative;
-    width: 42px;
-    height: 24px;
-    flex-shrink: 0;
+  .inv:first-child { border-top: none; }
+  .inv .sp { flex: 1; }
+  .inv .muted { color: var(--ink-3); }
+  .inv a {
+    color: var(--red-ink);
+    font-weight: 650;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 1px;
   }
-  .toggle input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-    position: absolute;
+  .inv a:hover { border-bottom-color: currentColor; }
+
+  /* notifications + account panes (sparse, but use card surface) */
+  .acc-card { padding: 24px; margin-bottom: 16px; }
+  .acc-card h2 {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--ink);
   }
-  .toggle-track {
-    position: absolute;
-    inset: 0;
-    background: rgba(255,255,255,0.1);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: background 0.15s;
+  .acc-card .ch-sub {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    margin: 0 0 18px;
+    line-height: 1.5;
   }
-  .toggle-track::after {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 18px;
-    height: 18px;
+  .acc-card.danger { border-color: var(--red-line); }
+  .acc-card.danger h2 { color: var(--red-ink); }
+
+  .acc-user-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .acc-user-row .ava-small {
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: var(--muted);
-    transition: transform 0.15s, background 0.15s;
+    background: linear-gradient(135deg, #E9837A, #C5332F);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 18px;
+    font-family: var(--display);
+    flex-shrink: 0;
+    overflow: hidden;
   }
-  .toggle input:checked + .toggle-track {
-    background: rgba(125,211,252,0.25);
+  .acc-user-row .ava-small img {
+    width: 100%; height: 100%; object-fit: cover;
   }
-  .toggle input:checked + .toggle-track::after {
-    transform: translateX(18px);
-    background: var(--accent);
-  }
-
-  .danger-zone {
-    border-color: rgba(239,68,68,0.3);
-  }
-  .danger-zone h3 { color: #ef4444; }
-  .btn-danger {
-    padding: 8px 18px;
-    border-radius: 6px;
+  .acc-user-row .who { flex: 1; min-width: 0; }
+  .acc-user-row .who b { font-size: 15px; color: var(--ink); font-family: var(--display); }
+  .acc-user-row .who small {
+    display: block;
+    color: var(--ink-3);
     font-size: 13px;
-    font-weight: 500;
-    background: rgba(239,68,68,0.10);
-    color: #ef4444;
-    border: 1px solid rgba(239,68,68,0.22);
-    cursor: pointer;
-    font-family: inherit;
+    margin-top: 2px;
+    word-break: break-all;
   }
-  .btn-danger:hover { background: rgba(239,68,68,0.18); }
 
-  @media (max-width: 768px) {
-    .plan-grid,
-    .usage-grid {
-      grid-template-columns: 1fr;
-    }
+  @media (max-width: 760px) {
+    .meters, .plans { grid-template-columns: 1fr; }
+    .plan-now { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .plan-now .btn { width: 100%; justify-content: center; }
   }
 `;
 
@@ -307,19 +325,28 @@ const tabScript = raw(`<script>
 })();
 </script>`);
 
+// Inline SVG used in plan-feature rows. Kept in JSX (not Wordmark / not
+// brand) because it's pure ornamentation specific to the plan cards.
+function CheckIcon() {
+  return raw(
+    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`,
+  );
+}
+
 const PLANS: Array<{
   id: BillingPlan;
   name: string;
   price: string;
   period: string;
   features: string[];
+  highlight?: boolean;
 }> = [
   {
     id: 'free',
     name: 'Free',
     price: '$0',
     period: '/mo',
-    features: ['3 sites', 'Community templates', 'rev01 subdomain', '100 MB storage'],
+    features: ['3 sites', 'Community templates', 'Open Canvas address', '100 MB storage'],
   },
   {
     id: 'pro',
@@ -327,6 +354,7 @@ const PLANS: Array<{
     price: '$19',
     period: '/mo',
     features: ['Unlimited sites', 'Custom domains', 'Remove branding', '10 GB storage'],
+    highlight: true,
   },
   {
     id: 'team',
@@ -338,9 +366,9 @@ const PLANS: Array<{
 ];
 
 const INVOICES = [
-  { date: 'May 2026', description: 'Free plan', amount: '$0.00', status: 'Paid' },
-  { date: 'Apr 2026', description: 'Free plan', amount: '$0.00', status: 'Paid' },
-  { date: 'Mar 2026', description: 'Free plan', amount: '$0.00', status: 'Paid' },
+  { date: 'May 2026' },
+  { date: 'April 2026' },
+  { date: 'March 2026' },
 ];
 
 settingsRoute.get('/settings', async (c) => {
@@ -380,30 +408,41 @@ settingsRoute.get('/settings', async (c) => {
 
   const siteLimit = siteLimitForPlan(customerPlan);
   const storageBytesLimit = storageLimitForPlan(customerPlan);
-  const siteLimitLabel = siteLimit === null ? 'Unlimited' : String(siteLimit);
+  const siteLimitLabel = siteLimit === null ? '∞' : String(siteLimit);
   const storageLimitLabel = formatBytes(storageBytesLimit);
   const planName = billingPlanLabel(customerPlan);
-  const currentPlanLabel = billingPlanLabel(customerPlan);
   const currentInvoiceAmount = billingPlanInvoiceAmount(customerPlan);
   const sitesFillPct = siteLimit === null ? 0 : Math.min(100, (siteCount / siteLimit) * 100);
   const storageFillPct = Math.min(100, (storageBytes / storageBytesLimit) * 100);
 
+  // Usage band tint — green under 60%, warn under 90%, red at/above.
+  function fillTone(pct: number): string {
+    if (pct >= 90) return '';
+    if (pct >= 60) return 'warn';
+    return 'ok';
+  }
+  const sitesTone = fillTone(sitesFillPct);
+  const storageTone = fillTone(storageFillPct);
+
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
+  const initial = (displayName ?? primaryEmail ?? '?').charAt(0).toUpperCase();
 
   return c.html(
     <DashboardShell
-      title="rev01 — settings"
+      title="Open Canvas — settings"
       crumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]}
       activePath="/dashboard/settings"
       pageStyles={settingsStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
+      theme={readThemeCookie(c)}
     >
-      <h1>Settings</h1>
+      <h1>Plan &amp; billing</h1>
+      <p class="sub">Track usage on the current billing cycle, change plans, and download invoices.</p>
 
       <div class="settings-tabs" role="tablist">
         <button class="settings-tab" role="tab" aria-selected="true" data-tab="tab-billing">
-          Billing
+          Plan &amp; billing
         </button>
         <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-notifications">
           Notifications
@@ -414,83 +453,99 @@ settingsRoute.get('/settings', async (c) => {
       </div>
 
       <div class="settings-panel" id="tab-billing" data-active="true">
-        <div class="settings-section">
-          <h3>Plan</h3>
-          <p class="desc">You're on the {currentPlan.name} plan. {customerPlan === 'team' ? 'You have access to every rev01 feature.' : 'Plan changes are coming soon — contact support to switch plans.'}</p>
-          <div class="plan-grid">
-            {PLANS.map((plan) => {
-              const isCurrent = plan.id === customerPlan;
-              return (
-                <div class={`plan-card${isCurrent ? ' plan-card--current' : ''}`} data-plan-card={plan.id}>
-                  <p class="plan-name">{plan.name}</p>
-                  <p class="plan-price">{plan.price}<span class="period">{plan.period}</span></p>
-                  <ul class="plan-features">
-                    {plan.features.map((f) => <li>{f}</li>)}
-                  </ul>
-                  <Button variant="secondary" style="margin-top:16px;width:100%" disabled>
-                    {isCurrent ? 'Current plan' : 'Coming soon'}
+        <div class="plan-now">
+          <div class="pn">
+            <b>{currentPlan.name} plan</b>
+            <small>
+              {customerPlan === 'team'
+                ? "You're on the top tier — every Open Canvas feature is unlocked."
+                : customerPlan === 'pro'
+                  ? 'Unlimited sites and custom domains. Cancel or downgrade anytime.'
+                  : "You're on the house plan — upgrade anytime for more sites and storage."}
+            </small>
+          </div>
+          {customerPlan === 'team' ? null : (
+            <Button variant="primary" disabled>
+              {customerPlan === 'pro' ? 'Upgrade to Team' : 'Upgrade to Pro'}
+            </Button>
+          )}
+        </div>
+
+        <div class="meters">
+          <div class="mtr">
+            <div class="k">
+              <span>Sites</span>
+              <span>{String(siteCount)} / {siteLimitLabel}</span>
+            </div>
+            <div class="bar">
+              <i class={sitesTone} style={`width:${sitesFillPct}%`} />
+            </div>
+          </div>
+          <div class="mtr">
+            <div class="k">
+              <span>Storage</span>
+              <span>{formatBytes(storageBytes)} / {storageLimitLabel}</span>
+            </div>
+            <div class="bar">
+              <i class={storageTone} style={`width:${storageFillPct}%`} />
+            </div>
+          </div>
+          <div class="mtr">
+            <div class="k">
+              <span>Build minutes</span>
+              <span>— / {planName === 'Free' ? '60' : 'unlimited'}</span>
+            </div>
+            <div class="bar">
+              <i class="ok" style="width:0%" />
+            </div>
+          </div>
+        </div>
+
+        <div class="plans">
+          {PLANS.map((plan) => {
+            const isCurrent = plan.id === customerPlan;
+            const isFeat = plan.highlight && !isCurrent;
+            return (
+              <div class={`plan${isFeat ? ' feat' : ''}`} data-plan-card={plan.id}>
+                {isFeat && <span class="tag chip chip-red">Most popular</span>}
+                <h3>{plan.name}</h3>
+                <div class="price">{plan.price}<small>{plan.period}</small></div>
+                <ul>
+                  {plan.features.map((f) => (
+                    <li><CheckIcon />{f}</li>
+                  ))}
+                </ul>
+                {isCurrent ? (
+                  <Button variant="secondary" style="width:100%" disabled>
+                    Current plan
                   </Button>
-                </div>
-              );
-            })}
-          </div>
+                ) : (
+                  <Button variant={isFeat ? 'primary' : 'secondary'} style="width:100%" disabled>
+                    {plan.id === 'team' ? 'Choose Team' : `Upgrade to ${plan.name}`}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div class="settings-section">
-          <h3>Usage</h3>
-          <p class="desc">Current billing period: May 1 – May 31, 2026</p>
-          <div class="usage-grid">
-            <div class="usage-card">
-              <div class="label">Sites</div>
-              <div class="value">{String(siteCount)}</div>
-              <div class="of">of {siteLimitLabel} on {planName}</div>
-              <div class="usage-bar">
-                <div class="usage-bar-fill" style={`width:${sitesFillPct}%`} />
-              </div>
+        <h2 class="inv-heading">Invoices</h2>
+        <div class="invoices">
+          {INVOICES.map((inv) => (
+            <div class="inv">
+              <span>{inv.date}</span>
+              <span class="sp" />
+              <span class="muted">{currentInvoiceAmount} · {currentPlan.name}</span>
+              <a href="#" onclick="event.preventDefault();window.__rev01Modal.alert('Invoice PDFs ship with billing v1.', 'Coming soon')">PDF</a>
             </div>
-            <div class="usage-card">
-              <div class="label">Storage</div>
-              <div class="value">{formatBytes(storageBytes)}</div>
-              <div class="of">of {storageLimitLabel} on {planName}</div>
-              <div class="usage-bar">
-                <div class="usage-bar-fill" style={`width:${storageFillPct}%`} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section">
-          <h3>Invoices</h3>
-          <p class="desc">Download past invoices and receipts.</p>
-          <table class="invoice-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th style="text-align:right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {INVOICES.map((inv) => (
-                <tr>
-                  <td>{inv.date}</td>
-                  <td>{currentPlanLabel} plan</td>
-                  <td>{currentInvoiceAmount}</td>
-                  <td>
-                    <Badge variant="success">{inv.status}</Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          ))}
         </div>
       </div>
 
       <div class="settings-panel" id="tab-notifications" data-active="false">
-        <div class="settings-section">
-          <h3>Email notifications</h3>
-          <p class="desc">
+        <div class="card acc-card">
+          <h2>Email notifications</h2>
+          <p class="ch-sub">
             Per-event email preferences aren't wired up in this build. You'll receive
             transactional account emails (sign-in, publish receipts) regardless; everything
             else lands here once the notifications service ships.
@@ -499,38 +554,35 @@ settingsRoute.get('/settings', async (c) => {
       </div>
 
       <div class="settings-panel" id="tab-account" data-active="false">
-        <div class="settings-section">
-          <h3>Account</h3>
-          <p class="desc">Manage your rev01 account.</p>
-          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                style="width:48px;height:48px;border-radius:50%;border:2px solid var(--line)"
-              />
-            ) : (
-              <div style="width:48px;height:48px;border-radius:50%;background:rgba(125,211,252,0.12);display:flex;align-items:center;justify-content:center;color:var(--accent);font-weight:700;font-size:20px">
-                {(displayName ?? primaryEmail ?? '?').charAt(0).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <div style="font-weight:600">{displayName ?? primaryEmail.split('@')[0]}</div>
-              <div style="font-size:13px;color:var(--faint)">{primaryEmail}</div>
+        <div class="card acc-card">
+          <h2>Account</h2>
+          <p class="ch-sub">Manage your Open Canvas identity. Profile details live on a dedicated page.</p>
+          <div class="acc-user-row">
+            <div class="ava-small">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" width="48" height="48" />
+              ) : (
+                initial
+              )}
             </div>
-            <Button variant="secondary" href="/dashboard/profile" style="margin-left:auto">
+            <div class="who">
+              <b>{displayName ?? primaryEmail.split('@')[0]}</b>
+              <small>{primaryEmail}</small>
+            </div>
+            <Button variant="secondary" href="/dashboard/profile">
               Edit profile
             </Button>
           </div>
         </div>
 
-        <div class="settings-section danger-zone">
-          <h3>Danger zone</h3>
-          <p class="desc">
+        <div class="card acc-card danger">
+          <h2>Danger zone</h2>
+          <p class="ch-sub">
             Permanently delete your account and all associated data. This cannot be undone.
           </p>
           <button
-            class="btn-danger"
+            class="btn btn-outline"
+            style="color:var(--red-ink);border-color:var(--red-line)"
             onclick="__rev01Modal.alert('Account deletion is not available in the demo.', 'Not available')"
           >
             Delete account

@@ -1,7 +1,9 @@
 // src/editor/canvas-styles.ts
 //
 // Stylesheet for the desktop Canvas Editor. Inlined into the editor route
-// via raw(canvasEditorStyles). Dark theme tuned for dense desktop editing.
+// via raw(canvasEditorStyles). The chrome wears the Open Canvas skin
+// (warm-neutral surfaces, brand-red accent, hairlines) and follows the
+// theme attribute on <html> for light/dark.
 //
 // The visitor renderer (src/canvas/public-styles.ts) and this editor preview
 // share a single source of truth for kit tokens, variants, and motion:
@@ -9,37 +11,22 @@
 // per-kit `--kit-*` table that used to live here was removed earlier — the
 // editor and the visitor cannot drift because they read the same map.
 //
-// Color space: chrome tokens use OKLCH (perceptual uniformity for the dark
-// editor surfaces). Browser floor: Chrome 111 / Safari 15.4 / Firefox 113.
-// Acceptable for the owner-facing editor; visitor-side kit colors in
-// style-kits.ts intentionally stay in hex for older-browser reach since the
-// published site must render on a wider range than the editor.
+// IMPORTANT: the artboard (`.rev01-page`) renders the user's published
+// site, NOT chrome — it stays driven by kit tokens (`--kit-bg`, `--kit-fg`)
+// regardless of chrome theme. The chrome lives in the topbar, sidebar,
+// inspector, viewport background, zoom toolbar, status bar, AI / chat
+// panels, selection handles, and modal — all theme-token driven.
 
 import { buildAllStyleKitsCss } from '../canvas/style-kits.js';
+import { componentsCss, themeCss } from '../ui/theme.js';
 
 const kitCss = buildAllStyleKitsCss();
 
+// The :root{--rev01-...} block that used to head chromeCss has been
+// deleted — `themeCss` (prepended below) defines every --rev01-* alias
+// the chrome reads. See
+// design_handoff_opencanvas_rebrand/design-references/MIGRATION.md §1.
 const chromeCss = String.raw`
-:root {
-  --rev01-bg: #0a0e1a;
-  --rev01-bg-panel: oklch(0.2 0.04 245 / 0.82);
-  --rev01-bg-panel-strong: oklch(0.22 0.04 245);
-  --rev01-bg-titlebar: oklch(0.16 0.03 245 / 0.92);
-  --rev01-fg: oklch(0.96 0.02 240);
-  --rev01-fg-mute: oklch(0.72 0.04 240);
-  --rev01-fg-faint: oklch(0.55 0.03 240);
-  --rev01-accent: oklch(0.78 0.15 200);
-  --rev01-accent-soft: oklch(0.78 0.15 200 / 0.22);
-  --rev01-warn: oklch(0.85 0.18 70);
-  --rev01-ok: oklch(0.82 0.18 145);
-  --rev01-danger: oklch(0.7 0.21 25);
-  --rev01-hairline: oklch(0.6 0.02 240 / 0.18);
-  --rev01-hairline-strong: oklch(0.6 0.02 240 / 0.32);
-  --rev01-radius: 8px;
-  --rev01-font-sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
-  --rev01-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
-}
-
 * { box-sizing: border-box; }
 
 html, body {
@@ -78,102 +65,154 @@ body.rev01-modal-open {
    the inner <main class="rev01-site">, so the editor preview and the
    published render share the same tokens. */
 
+/* Topbar (.ebar in editor.html) — sits at z-index:200 above the docks;
+   surface + hairline + sticky so it stays visible while the body scrolls.
+   Switched from mono → sans for the chrome (the address chip below keeps
+   mono since the URL is data, not chrome). */
 .rev01-editor-header {
   position: sticky;
   top: 0;
   z-index: 200;
-  height: 56px;
+  height: 58px;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--rev01-hairline);
-  background: var(--rev01-bg-titlebar);
-  font-family: var(--rev01-font-mono);
-  font-size: 12px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
 }
 
 .rev01-editor-header .crumbs {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: var(--rev01-fg-mute);
+  gap: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  color: var(--ink-2);
 }
 .rev01-editor-header .crumbs .sep {
-  color: var(--rev01-fg-faint);
+  color: var(--ink-3);
 }
 .rev01-editor-header .crumbs .here {
-  color: var(--rev01-fg);
+  color: var(--ink);
+  font-weight: 650;
 }
 
+/* Address chip — pill, mono so the URL reads as data. */
 .rev01-editor-header .address {
-  margin-left: 8px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--rev01-hairline);
-  background: var(--rev01-bg-panel);
-  color: var(--rev01-fg-mute);
+  margin-left: 4px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .rev01-editor-header .spacer {
   flex: 1 1 auto;
 }
 
+/* Header action buttons — outline pill so the topbar reads as one row. */
 .rev01-editor-header #canvas-save,
-.rev01-editor-header #canvas-publish,
 .rev01-editor-header #canvas-save-template,
 .rev01-editor-header #canvas-settings-link {
   appearance: none;
-  border: 1px solid var(--rev01-hairline-strong);
-  background: var(--rev01-bg-panel-strong);
-  color: var(--rev01-fg);
+  border: 1.5px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
   font: inherit;
-  padding: 6px 12px;
-  border-radius: 6px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   text-decoration: none;
-  line-height: 1.4;
+  line-height: 1;
+  transition: border-color 0.15s, background-color 0.15s;
 }
 .rev01-editor-header #canvas-save:hover,
 .rev01-editor-header #canvas-save-template:hover,
 .rev01-editor-header #canvas-settings-link:hover {
-  border-color: var(--rev01-accent);
+  border-color: var(--ink);
+}
+
+/* Publish: brand-red pill, the highest-affordance action in the topbar. */
+.rev01-editor-header #canvas-publish {
+  appearance: none;
+  border: 1.5px solid transparent;
+  background: var(--red);
+  color: #fff;
+  box-shadow: var(--shadow-red);
+  font: inherit;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  line-height: 1;
+  transition: background-color 0.18s, transform 0.12s;
+}
+.rev01-editor-header #canvas-publish:hover {
+  background: var(--red-strong);
+  transform: translateY(-1px);
 }
 .rev01-editor-header #canvas-publish[disabled] {
   opacity: 0.55;
   cursor: not-allowed;
 }
+.rev01-editor-header #canvas-publish[disabled]:hover {
+  background: var(--red);
+  transform: none;
+}
 
+/* AI Chat toggle — soft red surface + red ink, hints AI affordance. */
 .rev01-editor-header #canvas-chat-toggle {
   appearance: none;
-  border: 1px solid var(--rev01-accent);
-  background: var(--rev01-accent-soft);
-  color: var(--rev01-accent);
+  border: 1.5px solid var(--red-line);
+  background: var(--surface);
+  color: var(--red-ink);
   font: inherit;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: var(--r-pill);
   cursor: pointer;
+  line-height: 1;
+  transition: background-color 0.15s;
 }
 .rev01-editor-header #canvas-chat-toggle:hover {
-  background: var(--rev01-accent);
-  color: var(--rev01-bg);
+  background: var(--red-soft);
 }
 .rev01-editor-header #canvas-chat-toggle.active {
-  background: var(--rev01-accent);
-  color: var(--rev01-bg);
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
 }
 
-/* Chat slide-out panel */
+/* Chat slide-out panel — mirrors editor.html .ai-panel: surface + hairline
+   left border + shadow-lg so it visually peels off the right dock. The
+   chat bubbles follow the same .ai-msg pattern (user = ink chip, assistant
+   = surface-2 chip). */
 .rev01-chat-panel {
   position: fixed;
-  top: 56px;
+  top: 58px;
   right: 0;
-  bottom: 28px;
+  bottom: 36px;
   width: 360px;
   z-index: 200;
-  background: var(--rev01-bg-panel-strong);
-  border-left: 1px solid var(--rev01-hairline);
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
 }
@@ -182,22 +221,28 @@ body.rev01-modal-open {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--rev01-hairline);
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--rev01-fg);
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 15px;
+  color: var(--ink);
 }
 .rev01-chat-header button {
   appearance: none;
   border: none;
-  background: none;
-  color: var(--rev01-fg-mute);
-  font-size: 18px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 20px;
   cursor: pointer;
-  padding: 0 4px;
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
+  transition: background-color 0.14s, color 0.14s;
 }
-.rev01-chat-header button:hover { color: var(--rev01-fg); }
+.rev01-chat-header button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
 .rev01-chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -207,9 +252,10 @@ body.rev01-modal-open {
   gap: 12px;
 }
 .rev01-chat-msg {
-  max-width: 90%;
-  padding: 8px 12px;
-  border-radius: 8px;
+  max-width: 88%;
+  padding: 11px 13px;
+  border-radius: 14px;
+  font-family: var(--sans);
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -217,73 +263,86 @@ body.rev01-modal-open {
 }
 .rev01-chat-msg.user {
   align-self: flex-end;
-  background: var(--rev01-accent-soft);
-  color: var(--rev01-fg);
-  border-bottom-right-radius: 2px;
+  background: var(--ink);
+  color: var(--paper);
+  border-bottom-right-radius: 4px;
 }
 .rev01-chat-msg.assistant {
   align-self: flex-start;
-  background: oklch(0.18 0.03 245);
-  color: var(--rev01-fg);
-  border-bottom-left-radius: 2px;
+  background: var(--surface-2);
+  color: var(--ink);
+  border-bottom-left-radius: 4px;
 }
 .rev01-chat-msg.error {
   align-self: center;
-  background: oklch(0.2 0.08 25 / 0.4);
-  color: var(--rev01-danger);
+  background: var(--red-soft);
+  color: var(--red-ink);
   font-size: 12px;
+  border-radius: var(--r-sm);
 }
 .rev01-chat-input {
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--rev01-hairline);
+  padding: 14px;
+  border-top: 1px solid var(--line);
+  align-items: center;
 }
 .rev01-chat-input input {
   flex: 1;
   appearance: none;
-  border: 1px solid var(--rev01-hairline-strong);
-  background: var(--rev01-bg);
-  color: var(--rev01-fg);
+  border: 1.5px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
   font: inherit;
-  font-size: 13px;
-  padding: 8px 12px;
-  border-radius: 6px;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  padding: 10px 14px;
+  border-radius: var(--r-pill);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
+.rev01-chat-input input::placeholder { color: var(--ink-3); }
 .rev01-chat-input input:focus {
   outline: none;
-  border-color: var(--rev01-accent);
+  border-color: var(--red);
+  box-shadow: var(--ring);
 }
 .rev01-chat-input button {
   appearance: none;
-  border: 1px solid var(--rev01-accent);
-  background: var(--rev01-accent);
-  color: var(--rev01-bg);
+  border: none;
+  background: var(--red);
+  color: #fff;
   font: inherit;
-  font-weight: 600;
+  font-family: var(--sans);
+  font-weight: 650;
   font-size: 13px;
-  padding: 8px 14px;
-  border-radius: 6px;
+  padding: 9px 16px;
+  border-radius: var(--r-pill);
   cursor: pointer;
+  box-shadow: var(--shadow-red);
+  transition: background-color 0.18s, transform 0.12s;
 }
-.rev01-chat-input button:hover {
-  opacity: 0.9;
-}
+.rev01-chat-input button:hover { background: var(--red-strong); transform: translateY(-1px); }
 .rev01-chat-input button[disabled] {
   opacity: 0.55;
   cursor: not-allowed;
+  transform: none;
+  background: var(--red);
 }
 
+/* Left sidebar (.lpanel in editor.html) — surface + right hairline.
+   Width unchanged (320 is the existing rev01 dock width; editor.html uses
+   284 but the editor's grids/buttons are sized for 320 — keeping the rev01
+   dimension preserves canvas-client.ts positioning). */
 .rev01-editor-sidebar {
   position: fixed;
-  top: 56px;
+  top: 58px;
   left: 0;
-  bottom: 28px;
+  bottom: 36px;
   width: 320px;
   z-index: 150;
   min-width: 0;
-  border-right: 1px solid var(--rev01-hairline);
-  background: linear-gradient(180deg, var(--rev01-bg-titlebar), var(--rev01-bg-panel-strong));
+  border-right: 1px solid var(--line);
+  background: var(--surface);
   overflow-y: auto;
   overflow-x: hidden;
   transition: width 0.15s ease, transform 0.15s ease;
@@ -300,42 +359,62 @@ body.rev01-modal-open {
   width: 20px;
   height: 32px;
   z-index: 151;
-  background: var(--rev01-bg-panel-strong);
-  border: 1px solid var(--rev01-hairline);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-left: none;
-  border-radius: 0 6px 6px 0;
-  color: var(--rev01-fg-mute);
+  border-radius: 0 var(--r-xs) var(--r-xs) 0;
+  color: var(--ink-2);
   font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  transition: color 0.14s, background-color 0.14s;
 }
-.sidebar-toggle:hover { color: var(--rev01-fg); }
+.sidebar-toggle:hover { color: var(--ink); background: var(--surface-2); }
 .rev01-viewport.sidebar-collapsed { margin-left: 0; }
 
+/* Sidebar tabs (.tabs in editor.html) — flat row, underline-on-active
+   in brand red. Sans not mono so the tab labels feel like nav, not data. */
 .rev01-sidebar-tabs {
   display: flex;
-  gap: 6px;
-  padding: 12px 12px 8px;
-  border-bottom: 1px solid var(--rev01-hairline);
+  gap: 2px;
+  padding: 10px 12px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .rev01-sidebar-tabs button {
   appearance: none;
-  border: 1px solid var(--rev01-hairline-strong);
-  border-radius: 6px;
-  background: var(--rev01-bg-panel);
-  color: var(--rev01-fg);
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-3);
   cursor: pointer;
-  font: 600 12px/1 var(--rev01-font-mono);
-  padding: 7px 10px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 13.5px;
+  line-height: 1;
+  padding: 11px 0;
+  position: relative;
+  transition: color 0.14s;
 }
+.rev01-sidebar-tabs button:hover { color: var(--ink-2); }
 
 .rev01-sidebar-tabs button.active {
-  border-color: var(--rev01-accent);
-  background: var(--rev01-accent-soft);
+  color: var(--ink);
+  background: transparent;
+}
+.rev01-sidebar-tabs button.active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 3px;
+  background: var(--red);
+  border-radius: var(--r-pill);
 }
 
 .rev01-sidebar-panel {
@@ -348,24 +427,29 @@ body.rev01-modal-open {
   display: none;
 }
 
+/* Dashed "add" action — used for "+ New Page" etc. Outline pill so it
+   reads as a low-affordance helper next to the firmer command tiles. */
 .rev01-sidebar-action {
   appearance: none;
   display: block;
   width: calc(100% - 16px);
-  margin: 0 8px 8px;
-  padding: 8px 12px;
-  border: 1px dashed var(--rev01-hairline-strong);
-  border-radius: 6px;
+  margin: 8px 8px;
+  padding: 9px 14px;
+  border: 1.5px dashed var(--line-2);
+  border-radius: var(--r-pill);
   background: transparent;
-  color: var(--rev01-fg-mute);
-  font: 12px/1.25 var(--rev01-font-mono);
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
   text-align: center;
+  transition: border-color 0.14s, color 0.14s, background-color 0.14s;
 }
 .rev01-sidebar-action:hover {
-  border-color: var(--rev01-accent);
-  color: var(--rev01-fg);
-  background: var(--rev01-accent-soft);
+  border-color: var(--red);
+  color: var(--red-ink);
+  background: var(--red-tint);
 }
 
 .rev01-page-list {
@@ -589,13 +673,14 @@ body[data-placement-active="true"] .rev01-section-slot {
   display: none;
 }
 
+/* Sidebar group label (.lgroup in editor.html). */
 .rev01-sidebar-group h2 {
   margin: 0;
-  color: var(--rev01-fg-mute);
-  font-family: var(--rev01-font-mono);
+  color: var(--ink-3);
+  font-family: var(--sans);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -603,54 +688,65 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-sidebar-kit-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
+/* Element tiles (.el in editor.html) — square cards with hover-warm
+   to red-tint + lift, conveying drag affordance. */
 .rev01-sidebar-command,
 .rev01-sidebar-kit-grid button {
   appearance: none;
   min-width: 0;
-  border: 1px solid var(--rev01-hairline);
-  border-radius: 6px;
-  background: oklch(0.18 0.035 245 / 0.78);
-  color: var(--rev01-fg);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink-2);
   cursor: pointer;
-  font: 12px/1.25 var(--rev01-font-mono);
-  min-height: 34px;
-  padding: 8px 9px;
-  text-align: left;
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.25;
+  min-height: 64px;
+  padding: 10px 12px;
+  text-align: center;
+  transition: border-color 0.14s, background-color 0.14s, color 0.14s, transform 0.1s;
 }
 
 .rev01-sidebar-command:hover,
 .rev01-sidebar-kit-grid button:hover {
-  border-color: var(--rev01-accent);
-  background: var(--rev01-bg-panel);
+  border-color: var(--red-line);
+  background: var(--red-tint);
+  color: var(--red-ink);
+  transform: translateY(-2px);
 }
 
 .rev01-sidebar-kit-grid button.active {
-  border-color: var(--rev01-accent);
-  background: var(--rev01-accent-soft);
-  color: var(--rev01-fg);
+  border-color: var(--red);
+  background: var(--red-tint);
+  color: var(--red-ink);
+  transform: none;
 }
 
 /* Viewport wraps #canvas-root. The camera object drives all positioning:
    translate(cam.x, cam.y) scale(cam.zoom) on #canvas-root. The viewport
    has overflow:hidden — no body scroll, the camera handles everything.
    Left/right margins clear the fixed sidebar + inspector docks. */
+/* Viewport (the wrapper around #canvas-root, where the artboard floats).
+   Mirrors editor.html .cstage: warm surface-2 with a subtle dot grid so
+   the artboard pops as a paper surface against the chrome wallpaper. The
+   artboard itself (.rev01-page) renders the user's site in kit colors and
+   is unaffected by this chrome wallpaper. */
 .rev01-viewport {
   position: relative;
   overflow: hidden;
-  background-color: #07101f;
+  background-color: var(--surface-2);
   background-image:
-    linear-gradient(oklch(0.95 0.02 240 / 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.95 0.02 240 / 0.05) 1px, transparent 1px),
-    radial-gradient(ellipse at 18% -10%, oklch(0.32 0.1 220 / 0.18), transparent 55%),
-    linear-gradient(180deg, #0a0e1a 0%, #060912 100%);
-  background-size: 32px 32px, 32px 32px, auto, auto;
-  background-position: 0 0, 0 0, 0 0, 0 0;
+    radial-gradient(circle at 1px 1px, var(--line-2) 1px, transparent 0);
+  background-size: 24px 24px;
+  background-position: 0 0;
   margin-left: 340px;
   margin-right: 320px;
-  height: calc(100vh - 56px);
+  height: calc(100vh - 58px);
   display: block;
 }
 
@@ -662,57 +758,70 @@ body[data-placement-active="true"] .rev01-section-slot {
   left: 0;
 }
 
-/* Floating zoom toolbar pinned to the top-left of the canvas area, just
-   inside the sidebar dock and below the header. Fixed so it stays visible
-   while the body scrolls; sits above the canvas via z-index. */
+/* Zoom toolbar (.zoom in editor.html) — pinned bottom-left of the canvas
+   area as a pill above the warm wallpaper. Buttons are borderless circles
+   inside the pill, mode-action buttons fill with red when pressed. */
 .rev01-zoom-toolbar {
   position: fixed;
-  top: 64px;
-  left: 308px;
+  left: 356px;
+  bottom: 52px;
   z-index: 160;
   width: max-content;
   display: inline-flex;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--rev01-bg-titlebar);
-  border: 1px solid var(--rev01-hairline-strong);
-  box-shadow: 0 6px 18px oklch(0 0 0 / 0.35);
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-family: var(--sans);
+  font-size: 13px;
 }
 .rev01-zoom-toolbar button {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
+  border: none;
+  color: var(--ink-2);
   font: inherit;
-  padding: 3px 8px;
-  border-radius: 4px;
+  font-weight: 600;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   cursor: pointer;
-  min-width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.14s, color 0.14s;
 }
 .rev01-zoom-toolbar button:hover {
-  border-color: var(--rev01-accent);
+  background: var(--surface-2);
+  color: var(--ink);
 }
 .rev01-zoom-toolbar .zoom-readout {
   display: inline-flex;
   align-items: center;
   padding: 0 8px;
-  color: var(--rev01-fg-mute);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
   min-width: 44px;
   justify-content: center;
 }
 .rev01-zoom-toolbar .zoom-toolbar-sep {
   width: 1px;
   align-self: stretch;
-  background: var(--rev01-hairline);
-  margin: 2px 2px;
+  background: var(--line);
+  margin: 4px 2px;
 }
 .rev01-zoom-toolbar button[data-mode-action][aria-pressed="true"] {
-  background: var(--rev01-accent);
+  background: var(--red);
   color: #fff;
-  border-color: var(--rev01-accent);
+}
+.rev01-zoom-toolbar button[data-mode-action][aria-pressed="true"]:hover {
+  background: var(--red-strong);
+  color: #fff;
 }
 .rev01-viewport[data-interaction-mode="pan"] {
   cursor: grab;
@@ -725,12 +834,16 @@ body[data-placement-active="true"] .rev01-section-slot {
   pointer-events: none;
 }
 
+/* Artboard page (.artboard in editor.html). Kept on kit tokens so the
+   editor preview matches the published render. Shadow swapped for the
+   warm-neutral Open Canvas shadow-lg so the paper feels lifted off the
+   warm chrome wallpaper instead of stamped onto a dark canvas. */
 .rev01-page {
   margin: 0 auto;
   background: var(--kit-bg);
   color: var(--kit-fg);
-  box-shadow: 0 24px 60px oklch(0 0 0 / 0.5);
-  border-radius: 6px;
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--r);
   overflow: hidden;
 }
 
@@ -782,7 +895,7 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 
 .rev01-section {
-  border-bottom: 1px dashed oklch(0.6 0.02 240 / 0.15);
+  border-bottom: 1px dashed var(--rev01-hairline);
 }
 .rev01-section:last-child {
   border-bottom: 0;
@@ -871,23 +984,27 @@ body[data-placement-active="true"] .rev01-section-slot {
   cursor: text;
   user-select: text;
 }
+/* Selection (.selbox in editor.html) — 2px red outline + slight inset so
+   it reads as a frame around the element, not a stroke. */
 .rev01-element[data-selected="true"] {
-  outline: 2px solid var(--rev01-accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
 }
 .rev01-element [contenteditable="true"] {
   cursor: text;
   user-select: text;
-  outline: 1px dashed var(--rev01-accent);
+  outline: 1px dashed var(--red);
   outline-offset: 2px;
 }
 
+/* Resize handles — small white squares with red border, mirrors .selbox .h. */
 .rev01-element .resize-handle {
   position: absolute;
-  width: 10px;
-  height: 10px;
-  background: var(--rev01-accent);
-  border: 1px solid var(--rev01-bg);
+  width: 9px;
+  height: 9px;
+  background: var(--surface);
+  border: 2px solid var(--red);
   border-radius: 2px;
   display: none;
   z-index: 10000;
@@ -967,7 +1084,7 @@ body[data-placement-active="true"] .rev01-section-slot {
   color: var(--rev01-danger);
 }
 .element-menu .menu-item.danger:hover {
-  background: oklch(0.7 0.21 25 / 0.15);
+  background: var(--red-soft);
 }
 .element-menu .menu-divider {
   height: 1px;
@@ -1002,8 +1119,8 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-surface {
   width: 100%;
   height: 100%;
-  background: oklch(0.95 0 0 / 0.06);
-  border: 1px solid oklch(0.6 0.02 240 / 0.25);
+  background: var(--rev01-kit-panel, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--rev01-hairline-strong);
   border-radius: 8px;
 }
 
@@ -1024,8 +1141,8 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-media {
   width: 100%;
   height: 100%;
-  background: oklch(0.6 0.02 240 / 0.12);
-  border: 1px dashed oklch(0.6 0.02 240 / 0.35);
+  background: var(--rev01-kit-panel, rgba(255, 255, 255, 0.06));
+  border: 1px dashed var(--rev01-hairline-strong);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -1035,50 +1152,77 @@ body[data-placement-active="true"] .rev01-section-slot {
   color: var(--rev01-fg-mute);
 }
 
+/* Inspector dock (.ipanel in editor.html) — surface + left hairline,
+   sans body. Field labels keep mono ONLY for the .meta debug strip; the
+   form labels themselves switch to sans-bold per Open Canvas. */
 #canvas-inspector {
   position: fixed;
-  top: 56px;
+  top: 58px;
   right: 0;
-  bottom: 28px;
+  bottom: 36px;
   width: 320px;
   z-index: 150;
-  border-left: 1px solid var(--rev01-hairline);
-  background: var(--rev01-bg-panel-strong);
-  padding: 16px;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  padding: 4px 16px 20px;
   overflow-y: auto;
+  font-family: var(--sans);
   font-size: 13px;
+  color: var(--ink);
 }
 #canvas-inspector[hidden] { display: none; }
 #canvas-inspector h3 {
-  margin: 0 0 12px;
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--rev01-fg-mute);
+  margin: 16px 0 11px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--ink-2);
+}
+#canvas-inspector h3:first-child {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: none;
 }
 #canvas-inspector .field {
   display: grid;
-  gap: 4px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 11px;
 }
 #canvas-inspector .field label {
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
-  color: var(--rev01-fg-mute);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
 }
 #canvas-inspector input,
 #canvas-inspector select {
   appearance: none;
-  background: var(--rev01-bg-panel);
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
-  border-radius: 4px;
-  padding: 5px 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
   font: inherit;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+#canvas-inspector input::placeholder { color: var(--ink-3); }
+#canvas-inspector input:focus,
+#canvas-inspector select:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: var(--ring);
 }
 #canvas-inspector input[type="checkbox"] {
   width: auto;
+  padding: 0;
+  accent-color: var(--red);
 }
 #canvas-inspector .row {
   display: flex;
@@ -1086,23 +1230,23 @@ body[data-placement-active="true"] .rev01-section-slot {
   align-items: center;
 }
 #canvas-inspector .meta {
-  font-family: var(--rev01-font-mono);
+  font-family: var(--mono);
   font-size: 11px;
-  color: var(--rev01-fg-faint);
+  color: var(--ink-3);
   margin-bottom: 12px;
   word-break: break-all;
 }
 #canvas-inspector .inspector-list-card {
-  border: 1px solid var(--rev01-hairline);
-  border-radius: 6px;
-  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px;
   margin-bottom: 8px;
-  background: color-mix(in srgb, var(--rev01-bg-panel) 60%, transparent);
+  background: var(--surface-2);
 }
 #canvas-inspector .inspector-section-heading {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--rev01-hairline);
+  border-top: 1px solid var(--line);
 }
 #canvas-inspector .style-row {
   display: flex;
@@ -1110,48 +1254,84 @@ body[data-placement-active="true"] .rev01-section-slot {
   align-items: center;
 }
 #canvas-inspector .style-row input[type="number"] {
-  width: 60px;
+  width: 70px;
+  padding: 7px 10px;
 }
-#canvas-inspector .style-row input[type="range"] {
+/* Range slider (.slider in editor.html) — track is surface-3, thumb is
+   the brand red disk. Both the WebKit + Moz selectors are stamped so the
+   appearance matches across engines. */
+#canvas-inspector .style-row input[type="range"],
+#canvas-inspector input[type="range"] {
   flex: 1;
   min-width: 0;
-  appearance: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--surface-3);
+  border: none;
+  outline: none;
+  padding: 0;
+}
+#canvas-inspector input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--red);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  border: none;
+}
+#canvas-inspector input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--red);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  border: none;
 }
 #canvas-inspector .color-swatch {
   width: 32px;
   height: 28px;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   cursor: pointer;
   flex-shrink: 0;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
 }
 #canvas-inspector .unit-label {
-  font-family: var(--rev01-font-mono);
+  font-family: var(--mono);
   font-size: 11px;
-  color: var(--rev01-fg-mute);
+  color: var(--ink-3);
   flex-shrink: 0;
 }
 #canvas-inspector .style-btn {
   appearance: none;
-  background: var(--rev01-bg-panel);
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  color: var(--ink);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 12.5px;
   cursor: pointer;
+  transition: border-color 0.15s;
 }
 #canvas-inspector .style-btn:hover {
-  background: var(--rev01-hairline);
+  border-color: var(--ink);
 }
 #canvas-inspector .style-btn-clear {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg-mute);
-  border-radius: 4px;
-  width: 24px;
-  height: 24px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  border-radius: var(--r-xs);
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1159,6 +1339,11 @@ body[data-placement-active="true"] .rev01-section-slot {
   font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
+  transition: border-color 0.14s, color 0.14s;
+}
+#canvas-inspector .style-btn-clear:hover {
+  border-color: var(--ink);
+  color: var(--ink);
 }
 #canvas-inspector .style-btn-clear:disabled {
   opacity: 0.3;
@@ -1167,15 +1352,16 @@ body[data-placement-active="true"] .rev01-section-slot {
 #canvas-inspector .bg-img-thumb {
   width: 40px;
   height: 28px;
-  border-radius: 4px;
-  border: 1px solid var(--rev01-hairline);
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: var(--rev01-fg-faint);
+  color: var(--ink-3);
   flex-shrink: 0;
+  background: var(--surface-2);
 }
 #canvas-inspector .bg-img-thumb img {
   width: 100%;
@@ -1406,27 +1592,30 @@ body[data-placement-active="true"] .rev01-section-slot {
   box-shadow: 0 0 4px var(--rev01-accent);
 }
 
+/* Status bar (.status in editor.html) — surface + top hairline at the
+   bottom of the chrome, sans-faint typography so it reads as ambient state. */
 .rev01-editor-status {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 28px;
+  height: 36px;
   z-index: 150;
   display: flex;
   align-items: center;
+  gap: 16px;
   padding: 0 16px;
-  border-top: 1px solid var(--rev01-hairline);
-  background: var(--rev01-bg-titlebar);
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
-  color: var(--rev01-fg-mute);
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-3);
 }
 .rev01-editor-status .error {
-  color: var(--rev01-warn);
+  color: var(--warn);
 }
 .rev01-editor-status .ok {
-  color: var(--rev01-ok);
+  color: var(--ok);
 }
 
 /* Inline links inside contenteditable — accent underline + text cursor so
@@ -1447,40 +1636,44 @@ body[data-placement-active="true"] .rev01-section-slot {
    edit mode. Appended to document.body and pinned via position: fixed by
    the client so it stays anchored above the text element regardless of
    body scroll. */
+/* Inline mark toolbar — floats above contenteditable text. Surface chip
+   with brand-red hover, mirrors the zoom toolbar's pill aesthetic. */
 .rev01-mark-toolbar {
   position: fixed;
   display: inline-flex;
   gap: 2px;
   z-index: 180;
   padding: 4px;
-  border-radius: 6px;
-  background: var(--rev01-bg-titlebar);
-  border: 1px solid var(--rev01-hairline-strong);
-  box-shadow: 0 6px 18px oklch(0 0 0 / 0.35);
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-family: var(--sans);
+  font-size: 12px;
 }
 .rev01-mark-toolbar button {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
+  border: 1px solid transparent;
+  color: var(--ink-2);
   font: inherit;
-  padding: 3px 7px;
-  border-radius: 4px;
+  padding: 5px 9px;
+  border-radius: var(--r-xs);
   cursor: pointer;
-  min-width: 22px;
+  min-width: 24px;
+  transition: background-color 0.14s, color 0.14s;
 }
 .rev01-mark-toolbar button:hover {
-  border-color: var(--rev01-accent);
-  color: var(--rev01-fg);
+  background: var(--surface-2);
+  color: var(--ink);
 }
 .rev01-mark-toolbar .rev01-mark-drag {
   cursor: move;
-  padding: 3px 5px;
+  padding: 5px 7px;
   margin-right: 2px;
-  border-right: 1px solid var(--rev01-hairline-strong);
-  border-radius: 4px 0 0 4px;
+  border-right: 1px solid var(--line);
+  border-radius: var(--r-xs) 0 0 var(--r-xs);
+  color: var(--ink-3);
 }
 .rev01-mark-toolbar .rev01-mark-drag svg {
   display: block;
@@ -1492,25 +1685,27 @@ body[data-placement-active="true"] .rev01-section-slot {
    trigger modes are visually indicated by data-rev01-link-popover-pinned.
    Positioned below (or above) the link via position: fixed. Z-index above
    the mark toolbar (180). */
+/* Link popover — floating chip above an inline link inside a text element
+   in edit mode. Same warm-surface chip language as the mark toolbar. */
 .rev01-link-popover {
   position: fixed;
   display: flex;
   flex-direction: column;
   gap: 6px;
   z-index: 190;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--rev01-bg-titlebar);
-  border: 1px solid var(--rev01-hairline-strong);
-  box-shadow: 0 6px 18px oklch(0 0 0 / 0.35);
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
-  color: var(--rev01-fg);
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink);
   max-width: 420px;
   pointer-events: auto;
 }
 .rev01-link-popover[data-rev01-link-popover-pinned="true"] {
-  border-color: var(--rev01-accent, var(--rev01-hairline-strong));
+  border-color: var(--red);
 }
 .rev01-link-popover .rev01-link-popover-row {
   display: inline-flex;
@@ -1522,24 +1717,28 @@ body[data-placement-active="true"] .rev01-section-slot {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--rev01-fg-mute);
+  color: var(--ink-2);
   max-width: 240px;
   user-select: none;
+  font-family: var(--mono);
+  font-size: 11.5px;
 }
 .rev01-link-popover button {
   appearance: none;
   background: transparent;
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
+  border: 1.5px solid var(--line-2);
+  color: var(--ink);
   font: inherit;
-  padding: 3px 7px;
-  border-radius: 4px;
+  font-family: var(--sans);
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   white-space: nowrap;
+  transition: border-color 0.14s;
 }
 .rev01-link-popover button:hover {
-  border-color: var(--rev01-accent);
-  color: var(--rev01-fg);
+  border-color: var(--ink);
 }
 .rev01-link-popover button:disabled {
   opacity: 0.5;
@@ -1555,20 +1754,22 @@ body[data-placement-active="true"] .rev01-section-slot {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 6px;
-  border-radius: 4px;
-  background: var(--rev01-bg-panel);
-  border: 1px dashed var(--rev01-hairline);
-  font-family: var(--rev01-font-body, inherit);
+  padding: 5px 8px;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+  border: 1px dashed var(--line);
+  font-family: var(--sans);
   font-size: 12px;
-  color: var(--rev01-fg);
+  color: var(--ink);
   max-width: 100%;
 }
 .rev01-link-popover .rev01-link-popover-preview-label {
+  font-family: var(--sans);
   font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--rev01-fg-mute);
+  color: var(--ink-3);
   user-select: none;
   flex: 0 0 auto;
 }
@@ -1680,9 +1881,9 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 
 /* AI preview panel — transient overlay that appears after the canvas-agent
-   preview endpoint returns. Anchored top-right; Accept/Dismiss buttons live
-   at the bottom. The panel does not persist across edits — it is rebuilt
-   fresh on every preview. */
+   preview endpoint returns. Mirrors editor.html .ai-op (the "operation"
+   card inside .ai-panel): soft red surface with red-line border so the
+   suggestion reads as a brand-coloured pending action. */
 .rev01-ai-panel {
   position: fixed;
   top: 80px;
@@ -1690,47 +1891,62 @@ body[data-placement-active="true"] .rev01-section-slot {
   width: 360px;
   max-height: calc(100vh - 120px);
   overflow: auto;
-  background: var(--rev01-bg-panel-strong);
-  border: 1px solid var(--rev01-hairline-strong);
-  border-radius: var(--rev01-radius);
+  background: var(--red-tint);
+  border: 1px solid var(--red-line);
+  border-radius: var(--r);
   padding: 16px;
   z-index: 170;
-  box-shadow: 0 12px 32px oklch(0 0 0 / 0.4);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--sans);
 }
 .rev01-ai-panel h3 {
   margin: 0 0 8px;
-  font-size: 14px;
-  letter-spacing: 0.02em;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--rev01-fg-mute);
+  color: var(--red-ink);
 }
-.rev01-ai-panel p { margin: 6px 0; color: var(--rev01-fg); font-size: 13px; }
+.rev01-ai-panel p { margin: 6px 0; color: var(--ink); font-size: 13px; }
 .rev01-ai-panel .rev01-ai-note {
-  color: var(--rev01-fg-mute);
+  color: var(--ink-2);
   font-style: italic;
-  border-left: 2px solid var(--rev01-hairline);
+  border-left: 2px solid var(--red-line);
   padding-left: 8px;
 }
 .rev01-ai-panel ol { padding-left: 18px; margin: 6px 0 14px; }
-.rev01-ai-panel li { margin: 4px 0; font-size: 13px; color: var(--rev01-fg); }
-.rev01-ai-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.rev01-ai-panel li { margin: 4px 0; font-size: 13px; color: var(--ink); }
+.rev01-ai-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .rev01-ai-actions button {
   appearance: none;
   font: inherit;
-  padding: 6px 14px;
-  border-radius: 4px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 12.5px;
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  background: var(--rev01-bg-panel);
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  color: var(--ink-2);
+  transition: border-color 0.15s, background-color 0.15s;
 }
 .rev01-ai-actions button:hover:not(:disabled) {
-  border-color: var(--rev01-accent);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 .rev01-ai-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .rev01-ai-actions button:first-child {
-  background: var(--rev01-accent-soft);
-  border-color: var(--rev01-accent);
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+  box-shadow: var(--shadow-red);
+}
+.rev01-ai-actions button:first-child:hover:not(:disabled) {
+  background: var(--red-strong);
+  border-color: var(--red-strong);
+  color: #fff;
 }
 
 /* Animation replay — owner-only control surfaced over an element while
@@ -1799,13 +2015,13 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 
 /* Modal overlay — replaces window.prompt() for the link/AI dialogs. Single
-   modal stack only; the JS throws if two are opened at once. Visual
-   language mirrors the AI preview panel so the editor reads as one
-   surface. */
+   modal stack only; the JS throws if two are opened at once. Mirrors the
+   Open Canvas component primitives: surface card + rounded corners +
+   shadow-lg, brand-red pill on the primary action. */
 .rev01-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(26, 25, 23, 0.55);
   z-index: 9999;
   display: flex;
   align-items: center;
@@ -1814,86 +2030,115 @@ body[data-placement-active="true"] .rev01-section-slot {
 .rev01-modal {
   min-width: 360px;
   max-width: 480px;
-  background: var(--rev01-bg-panel-strong);
-  border: 1px solid var(--rev01-hairline-strong);
-  border-radius: var(--rev01-radius);
-  padding: 18px 18px 16px;
-  box-shadow: 0 16px 40px oklch(0 0 0 / 0.5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 22px;
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  color: var(--rev01-fg);
+  gap: 12px;
+  color: var(--ink);
+  font-family: var(--sans);
   font: inherit;
 }
 .rev01-modal h3 {
   margin: 0;
-  font-size: 14px;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--rev01-fg-mute);
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--ink);
 }
 .rev01-modal label {
-  font-size: 12px;
-  color: var(--rev01-fg-mute);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
 }
 .rev01-modal input[type="text"],
 .rev01-modal textarea,
 .rev01-modal select {
   appearance: none;
   font: inherit;
-  background: var(--rev01-bg-panel);
-  color: var(--rev01-fg);
-  border: 1px solid var(--rev01-hairline);
-  border-radius: 4px;
-  padding: 8px 10px;
+  font-family: var(--sans);
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 10px 12px;
   outline: none;
   width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .rev01-modal textarea {
   resize: vertical;
   min-height: 80px;
-  font-family: var(--rev01-font-sans);
 }
 .rev01-modal input[type="text"]:focus,
 .rev01-modal textarea:focus,
 .rev01-modal select:focus {
-  border-color: var(--rev01-accent);
+  border-color: var(--red);
+  box-shadow: var(--ring);
 }
 .rev01-modal-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 .rev01-modal-actions button {
   appearance: none;
   font: inherit;
-  padding: 6px 14px;
-  border-radius: 4px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 13.5px;
+  padding: 9px 18px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  background: var(--rev01-bg-panel);
-  border: 1px solid var(--rev01-hairline);
-  color: var(--rev01-fg);
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  color: var(--ink-2);
+  transition: border-color 0.15s, background-color 0.15s, transform 0.12s, color 0.15s;
 }
-.rev01-modal-actions button:hover { border-color: var(--rev01-accent); }
+.rev01-modal-actions button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
 .rev01-modal-actions button:last-child {
-  background: var(--rev01-accent-soft);
-  border-color: var(--rev01-accent);
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+  box-shadow: var(--shadow-red);
+}
+.rev01-modal-actions button:last-child:hover {
+  background: var(--red-strong);
+  border-color: var(--red-strong);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
-/* AI trigger buttons — inspector + section toolbar both stamp these. */
+/* AI trigger buttons — inspector + section toolbar both stamp these.
+   Soft red surface with red-line border, mirrors .btn-ai in editor.html. */
 [data-ai-button] {
   appearance: none;
   font: inherit;
-  padding: 4px 10px;
-  border-radius: 4px;
+  font-family: var(--sans);
+  font-weight: 650;
+  font-size: 12.5px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  background: var(--rev01-accent-soft);
-  border: 1px solid var(--rev01-accent);
-  color: var(--rev01-fg);
+  background: var(--surface);
+  border: 1.5px solid var(--red-line);
+  color: var(--red-ink);
+  transition: background-color 0.15s;
 }
 [data-ai-button]:hover:not(:disabled) {
-  filter: brightness(1.1);
+  background: var(--red-soft);
 }
 [data-ai-button]:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -1902,13 +2147,13 @@ body[data-placement-active="true"] .rev01-section-slot {
    which kit they're editing without having to scroll the header. */
 .rev01-kit-summary {
   margin: 12px 0;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--rev01-bg-panel);
-  border: 1px solid var(--rev01-hairline);
-  font-family: var(--rev01-font-mono);
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-family: var(--mono);
   font-size: 11px;
-  color: var(--rev01-fg-mute);
+  color: var(--ink-2);
   display: grid;
   gap: 4px;
 }
@@ -1922,19 +2167,21 @@ body[data-placement-active="true"] .rev01-section-slot {
   width: 10px;
   height: 10px;
   border-radius: 2px;
-  border: 1px solid var(--rev01-hairline);
+  border: 1px solid var(--line-2);
 }
 
 /* Presence indicator pill in the editor header. Hidden by default; the
-   client script unhides when count > 1. */
+   client script unhides when count > 1. Pill on surface-2 mirrors the
+   address chip. */
 .rev01-editor-header [data-rev01-presence] {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--rev01-hairline);
-  background: var(--rev01-bg-panel);
-  color: var(--rev01-fg-mute);
-  font-family: var(--rev01-font-mono);
-  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
 }
 .rev01-editor-header [data-rev01-presence][hidden] {
   display: none;
@@ -2083,7 +2330,11 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 `;
 
-// Concatenate chrome CSS + shared kit CSS. The kit CSS lives in
-// src/canvas/style-kits.ts and is the single source of truth shared with the
-// public renderer (src/canvas/public-styles.ts).
-export const canvasEditorStyles = `${chromeCss}\n${kitCss}`;
+// Concatenate Open Canvas tokens + chrome CSS + shared kit CSS. theme.css
+// (themeCss) goes FIRST so its --rev01-* alias block re-points the
+// chrome's variable names onto the Open Canvas palette before any chrome
+// rule reads them. The kit CSS lives in src/canvas/style-kits.ts and is
+// the single source of truth shared with the public renderer
+// (src/canvas/public-styles.ts) — it is UNTOUCHED by the rebrand to
+// preserve byte-identical visitor output.
+export const canvasEditorStyles = `${themeCss}\n${componentsCss}\n${chromeCss}\n${kitCss}`;

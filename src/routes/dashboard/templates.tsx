@@ -15,7 +15,8 @@ import { customer, customTemplate, site } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
-import { Button } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
+import type { Theme } from '../../ui';
 
 // Seed asset bytes inlined as base64 so the template preview works in
 // Workers (no filesystem access). Each key matches a SeedAsset.sourcePath.
@@ -53,26 +54,34 @@ templatesRoute.use('*', requireAuth());
 
 const PUBLISHED_SUFFIX = '.rev01.aayushman.dev';
 
+// MIGRATION.md §5e — templates page wears the Open Canvas dashboard
+// chrome. The `.ttab-bar` Community/Personal toggle becomes a settings-
+// style underlined tab strip; each template card adopts the `.tpl`
+// idiom from landing.html — preview surface on top, label + style-kit
+// caption below. The site-name / subdomain fields use `.field`/`label.lbl`
+// from components.css.
+//
+// DOM hooks preserved through the restyle:
+//   - `<input type="radio" name="templateId" ...>` per review-smoke
+//     ("visible templateId radio inputs").
+//   - `<iframe ... src=".../preview" sandbox="allow-scripts">` per
+//     review-smoke (no allow-same-origin).
+//   - The `.ttab-radio` / `.ttab-bar` / `.ttab-panel` pattern still
+//     drives the pure-CSS tab toggle; only its skin changes.
 const pageStyles = `
-  .limit-notice {
-    padding: 14px 20px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(255,255,255,0.04);
-    color: var(--muted);
-    font-size: 14px;
-    margin-top: 12px;
-  }
-  .limit-notice a { color: var(--accent); font-weight: 600; }
+  .content { max-width: 1100px; padding-bottom: 70px; }
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; }
   .lede {
-    margin: 10px 0 24px;
-    max-width: 640px;
-    color: var(--muted);
+    margin: 10px 0 26px;
+    max-width: 720px;
+    color: var(--ink-2);
     font-size: 15px;
+    line-height: 1.55;
   }
-  form {
+
+  form.tpl-form {
     display: grid;
-    gap: 20px;
+    gap: 22px;
   }
   fieldset {
     min-width: 0;
@@ -81,16 +90,15 @@ const pageStyles = `
     border: 0;
   }
   legend {
-    margin-bottom: 10px;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--ink-3);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
-  .templates {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 16px;
-  }
+
+  /* tab toggle: Community / Personal — restyled to settings-style underlined tabs */
   .ttab-radio {
     position: absolute;
     opacity: 0;
@@ -98,35 +106,44 @@ const pageStyles = `
     scroll-margin-top: 72px;
   }
   .ttab-bar {
-    display: inline-flex;
+    display: flex;
     gap: 4px;
-    padding: 4px;
-    margin-bottom: 16px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--panel);
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
   }
   .ttab-bar label {
-    padding: 8px 16px;
-    border-radius: 6px;
-    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 14.5px;
+    font-weight: 650;
+    padding: 12px 4px;
+    margin-right: 22px;
+    color: var(--ink-3);
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
-    transition: background 140ms ease, color 140ms ease;
+    position: relative;
+    white-space: nowrap;
+    transition: color .14s ease;
   }
-  .ttab-bar label:hover {
-    color: var(--text);
-  }
+  .ttab-bar label:hover { color: var(--ink-2); }
   #ttab-community:checked ~ .ttab-bar label[for='ttab-community'],
   #ttab-personal:checked ~ .ttab-bar label[for='ttab-personal'] {
-    background: var(--accent);
-    color: #05070c;
+    color: var(--ink);
+  }
+  #ttab-community:checked ~ .ttab-bar label[for='ttab-community']::after,
+  #ttab-personal:checked ~ .ttab-bar label[for='ttab-personal']::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    background: var(--red);
+    border-radius: 99px;
   }
   .ttab-radio:focus-visible ~ .ttab-bar label[for='ttab-community'],
   .ttab-radio:focus-visible ~ .ttab-bar label[for='ttab-personal'] {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
+    outline: 2px solid var(--red);
+    outline-offset: 3px;
+    border-radius: var(--r-xs);
   }
   .ttab-panel { display: none; }
   #ttab-community:checked ~ .ttab-panel[data-tab='community'],
@@ -135,46 +152,71 @@ const pageStyles = `
   }
   .ttab-empty {
     padding: 40px 24px;
-    border: 1px dashed var(--line);
-    border-radius: 8px;
+    border: 1px dashed var(--line-2);
+    border-radius: var(--r);
     text-align: center;
-    color: var(--muted);
+    color: var(--ink-2);
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.6;
+    background: var(--surface);
   }
   .ttab-empty strong {
-    color: var(--text);
+    color: var(--ink);
     display: block;
     margin-bottom: 6px;
+    font-family: var(--display);
+    font-size: 15px;
   }
-  .template {
+
+  /* template gallery (.tpl) — same idiom as landing.html templates section */
+  .tpl-grid {
     display: grid;
-    min-height: 370px;
-    cursor: pointer;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
   }
-  .template input {
+  .tpl {
+    position: relative;
+    display: block;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: transform .16s ease, box-shadow .2s ease, border-color .14s ease;
+  }
+  .tpl:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow);
+  }
+  .tpl input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
+    inset: 0;
   }
-  .template-body {
+  .tpl input:checked ~ .tpl-body {
+    /* selected ring */
+    box-shadow: inset 0 0 0 2px var(--red);
+  }
+  .tpl:focus-within {
+    outline: 2px solid var(--red);
+    outline-offset: 3px;
+  }
+  .tpl-body {
     display: grid;
-    align-content: space-between;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--panel);
-    overflow: hidden;
-    transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+    grid-template-rows: auto 1fr;
+    height: 100%;
   }
-  .template-preview {
+  .tpl-shot {
     position: relative;
-    height: 232px;
+    height: 168px;
+    background: var(--surface-2);
     border-bottom: 1px solid var(--line);
-    background: #05070c;
     overflow: hidden;
     container-type: inline-size;
   }
-  .template-preview iframe {
+  .tpl-shot iframe {
     position: absolute;
     top: 0;
     left: 0;
@@ -186,87 +228,106 @@ const pageStyles = `
     pointer-events: none;
   }
   @container (min-width: 1px) {
-    .template-preview iframe { transform: scale(calc(100cqi / 1440)); }
+    .tpl-shot iframe { transform: scale(calc(100cqi / 1440)); }
   }
-  .template-copy {
+  .tpl-cap {
     display: grid;
-    align-content: space-between;
-    gap: 18px;
-    padding: 16px;
+    gap: 8px;
+    padding: 14px 16px 16px;
   }
-  .template input:checked + .template-body {
-    border-color: var(--accent);
-    background: var(--panel-strong);
+  .tpl-cap b {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    line-height: 1.25;
   }
-  .template:focus-within .template-body {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-  }
-  .template:hover .template-body {
-    transform: translateY(-1px);
-  }
-  .template h2 {
-    margin: 0 0 6px;
-    font-size: 17px;
-    letter-spacing: 0;
-  }
-  .template p {
+  .tpl-cap p {
     margin: 0;
-    color: var(--muted);
+    color: var(--ink-2);
     font-size: 13px;
     line-height: 1.45;
   }
-  .kit {
-    color: var(--accent);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 11px;
-  }
-  .fields {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 14px;
-  }
-  label.field {
-    display: grid;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 13px;
-  }
-  input[type='text'] {
-    width: 100%;
-    min-width: 0;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #0c1220;
-    color: var(--text);
-    padding: 11px 12px;
-    font-size: 15px;
-  }
-  .subdomain {
+  .tpl-cap .meta {
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-top: 4px;
   }
+  .tpl-cap .kit {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--red-ink);
+    letter-spacing: -0.01em;
+  }
+
+  /* create-form fields under the template grid */
+  .create-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    padding: 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .create-fields .fset { display: grid; gap: 7px; min-width: 0; }
+  .create-fields .fset small.hint {
+    color: var(--ink-3);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .subdomain {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    min-width: 0;
+  }
+  .subdomain .field { min-width: 0; }
   .suffix {
-    color: var(--faint);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 12px;
+    color: var(--ink-3);
+    font-family: var(--mono);
+    font-size: 12.5px;
     white-space: nowrap;
+    align-self: center;
+    flex-shrink: 0;
   }
-  small {
-    color: var(--faint);
-    font-size: 12px;
+
+  .submit-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
   }
-  .rev01-ui-btn { justify-self: start; }
+  .limit-notice {
+    padding: 14px 20px;
+    border: 1px solid var(--red-line);
+    border-radius: var(--r);
+    background: var(--red-tint);
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .limit-notice a {
+    color: var(--red-ink);
+    font-weight: 650;
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 1px;
+  }
+
   @media (max-width: 760px) {
-    .templates { grid-template-columns: 1fr; }
-    .fields { grid-template-columns: 1fr; }
-    .subdomain { align-items: stretch; flex-direction: column; }
+    .tpl-grid { grid-template-columns: 1fr; }
+    .create-fields { grid-template-columns: 1fr; padding: 18px; }
+    .subdomain { flex-direction: column; align-items: stretch; }
+    .suffix { align-self: flex-start; }
   }
 `;
 
 const previewStyles = `
-  html, body { margin: 0; overflow: hidden; background: #05070c; }
+  html, body { margin: 0; overflow: hidden; background: var(--paper); }
 `;
 
 function PreviewPage({
@@ -321,10 +382,10 @@ interface CustomTemplateCard {
 
 function CustomTemplateTile({ dt }: { dt: CustomTemplateCard }) {
   return (
-    <label class="template">
+    <label class="tpl">
       <input type="radio" name="templateId" value={dt.id} required checked={false} />
-      <span class="template-body">
-        <span class="template-preview">
+      <span class="tpl-body">
+        <span class="tpl-shot">
           <iframe
             src={`/api/custom-templates/${dt.id}/preview`}
             scrolling="no"
@@ -334,12 +395,12 @@ function CustomTemplateTile({ dt }: { dt: CustomTemplateCard }) {
             sandbox="allow-scripts"
           />
         </span>
-        <span class="template-copy">
-          <span>
-            <h2>{dt.name}</h2>
-            <p>{dt.tagline}</p>
+        <span class="tpl-cap">
+          <b>{dt.name}</b>
+          <p>{dt.tagline}</p>
+          <span class="meta">
+            <span class="kit">{dt.styleKit}</span>
           </span>
-          <span class="kit">{dt.styleKit}</span>
         </span>
       </span>
     </label>
@@ -350,10 +411,12 @@ function Page({
   communityCustomTemplates,
   personalCustomTemplates,
   siteLimitErrorMessage,
+  theme,
 }: {
   communityCustomTemplates: CustomTemplateCard[];
   personalCustomTemplates: CustomTemplateCard[];
   siteLimitErrorMessage: string | null;
+  theme?: Theme | undefined;
 }) {
   const subdomainPattern = SUBDOMAIN_RE.source;
   const communityCount = allTemplateSeeds.length + communityCustomTemplates.length;
@@ -361,18 +424,19 @@ function Page({
   const hasAnyCustom = communityCustomTemplates.length + personalCustomTemplates.length > 0;
   return (
     <DashboardShell
-      title="rev01 — create site"
+      title="Open Canvas — create site"
       crumbs={[{ label: 'Templates' }]}
       activePath="/dashboard/templates"
       pageStyles={pageStyles}
+      theme={theme}
     >
-      <h1>Choose a starting point</h1>
+      <h1>Pick a starting point</h1>
       <p class="lede">
-        Pick the canvas seed closest to what you want. You can still move every primitive, rewrite
+        Choose the canvas seed closest to what you want. You can still move every primitive, rewrite
         the rich text, swap the Style Kit, and publish when it feels right.
       </p>
 
-      <form method="post" action="/api/sites">
+      <form class="tpl-form" method="post" action="/api/sites">
         <fieldset>
           <legend>Template</legend>
           <input type="radio" id="ttab-community" name="__ttab" class="ttab-radio" checked />
@@ -383,9 +447,9 @@ function Page({
           </div>
 
           <div class="ttab-panel" data-tab="community">
-            <div class="templates">
+            <div class="tpl-grid">
               {allTemplateSeeds.map((template, idx) => (
-                <label class="template">
+                <label class="tpl">
                   <input
                     type="radio"
                     name="templateId"
@@ -393,8 +457,8 @@ function Page({
                     required
                     checked={idx === 0 && !hasAnyCustom}
                   />
-                  <span class="template-body">
-                    <span class="template-preview">
+                  <span class="tpl-body">
+                    <span class="tpl-shot">
                       <iframe
                         src={`/dashboard/templates/${template.id}/preview`}
                         scrolling="no"
@@ -404,12 +468,12 @@ function Page({
                         sandbox="allow-scripts"
                       />
                     </span>
-                    <span class="template-copy">
-                      <span>
-                        <h2>{template.name}</h2>
-                        <p>{template.tagline}</p>
+                    <span class="tpl-cap">
+                      <b>{template.name}</b>
+                      <p>{template.tagline}</p>
+                      <span class="meta">
+                        <span class="kit">{template.state.styleKit}</span>
                       </span>
-                      <span class="kit">{template.state.styleKit}</span>
                     </span>
                   </span>
                 </label>
@@ -428,7 +492,7 @@ function Page({
                 templates are only visible to you.
               </div>
             ) : (
-              <div class="templates">
+              <div class="tpl-grid">
                 {personalCustomTemplates.map((dt) => (
                   <CustomTemplateTile dt={dt} />
                 ))}
@@ -437,19 +501,29 @@ function Page({
           </div>
         </fieldset>
 
-        <div class="fields">
-          <label class="field">
-            <span>Site name</span>
-            <input type="text" name="siteName" maxlength={80} required placeholder="My site" />
-          </label>
+        <div class="create-fields">
+          <div class="fset">
+            <label class="lbl" for="siteName">Site name</label>
+            <input
+              class="field"
+              type="text"
+              id="siteName"
+              name="siteName"
+              maxlength={80}
+              required
+              placeholder="My site"
+            />
+          </div>
 
-          <label class="field">
-            <span>
-              Subdomain <small>(optional — auto-generated from name if blank)</small>
-            </span>
+          <div class="fset">
+            <label class="lbl" for="subdomain">
+              Subdomain <small class="hint">(optional — auto-generated from name if blank)</small>
+            </label>
             <span class="subdomain">
               <input
+                class="field"
                 type="text"
+                id="subdomain"
                 name="subdomain"
                 maxlength={63}
                 pattern={subdomainPattern}
@@ -457,18 +531,20 @@ function Page({
               />
               <span class="suffix">{PUBLISHED_SUFFIX}</span>
             </span>
-          </label>
+          </div>
         </div>
 
-        {siteLimitErrorMessage ? (
-          <p class="limit-notice">
-            {siteLimitErrorMessage} <a href="/dashboard/settings">Upgrade</a> to create more.
-          </p>
-        ) : (
-          <Button variant="primary" type="submit">
-            Create site
-          </Button>
-        )}
+        <div class="submit-row">
+          {siteLimitErrorMessage ? (
+            <p class="limit-notice">
+              {siteLimitErrorMessage} <a href="/dashboard/settings">Upgrade</a> to create more.
+            </p>
+          ) : (
+            <Button variant="primary" type="submit">
+              Create site
+            </Button>
+          )}
+        </div>
       </form>
     </DashboardShell>
   );
@@ -564,6 +640,7 @@ templatesRoute.get('/', async (c) => {
       communityCustomTemplates={communityCustomTemplates}
       personalCustomTemplates={personalCustomTemplates}
       siteLimitErrorMessage={siteLimitErrorMessage}
+      theme={readThemeCookie(c)}
     />,
   );
 });

@@ -17,11 +17,19 @@
 //     for the unlock to persist anyway. The flow degrades cleanly: post the
 //     form, get the cookie, see the site.
 //
-// Styling: a single `<style>` block scoped to the page. We do NOT try to
-// resolve the site's Style Kit here because that would require a DB lookup
-// on every gate render and leak the site's brand color before unlock — the
-// gate is intentionally neutral so visitors can't enumerate which sites
-// belong to which Owner just by looking at the gate.
+// Open Canvas chrome (MIGRATION.md §5h): the styling uses the OC design
+// tokens (--paper / --ink / --red / --red-soft) inlined directly so the
+// gate stays a single self-contained HTML document — no external font
+// fetches, no theme-toggle button, no imports from src/ui/theme.ts (which
+// would drag componentsCss in unnecessarily). A 4-line pre-paint script
+// stamps data-theme from localStorage to avoid the light/dark flash for
+// returning visitors. That is the only JS on the page.
+//
+// We do NOT try to resolve the site's Style Kit here because that would
+// require a DB lookup on every gate render and leak the site's brand
+// color before unlock — the gate is intentionally neutral so visitors
+// can't enumerate which sites belong to which Owner just by looking at
+// the gate.
 //
 // Failed-attempt rendering: when the unlock route 303-redirects back to the
 // gate after a wrong password, it sets `?retry=1` in the URL. The gate
@@ -51,6 +59,14 @@ interface GateOptions {
    * accepts any string; the middleware passes `site.name` verbatim.
    */
   siteName: string;
+  /**
+   * Persisted chrome theme from the `oc-theme` cookie, when present. SSR
+   * stamp on `<html>` so a returning visitor's dark choice renders dark on
+   * first paint even before the inline boot script runs. The middleware
+   * parses the cookie header with an anchored regex restricted to the
+   * `light|dark` alphabet — any other value arrives here as undefined.
+   */
+  theme?: 'light' | 'dark';
 }
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -90,93 +106,117 @@ function sanitiseRedirect(raw: string): string {
   return raw;
 }
 
+// Open Canvas tokens — paper / ink / red / shadow — inlined verbatim from
+// src/ui/theme.ts. Duplication is intentional: importing themeCss would
+// pull the full token layer (~3KB minified) plus the chrome aliases the
+// gate never uses. The gate's surface area is tiny on purpose, so we copy
+// the half-dozen variables it needs instead. If the canonical tokens drift
+// from these values, update both — design review treats src/ui/theme.css
+// as the source of truth.
 const GATE_STYLES = `
+:root {
+  --paper:#FBFAF8; --surface:#FFFFFF; --surface-2:#F4F1EC;
+  --ink:#1A1917; --ink-2:#5B564E; --ink-3:#948D82;
+  --line:#ECE7DF; --line-2:#DCD6CB;
+  --red:#E84D4A; --red-strong:#D33C39; --red-ink:#C5332F;
+  --red-soft:#FBEDEC; --red-line:#F4CFCD;
+  --r-sm:12px; --r-pill:999px;
+  --shadow:0 2px 6px rgba(40,34,26,.06),0 12px 28px -10px rgba(40,34,26,.14);
+  --shadow-red:0 8px 22px -8px rgba(232,77,74,.5);
+  --ring:0 0 0 4px rgba(232,77,74,.22);
+  --display:"Bricolage Grotesque","Hanken Grotesk",system-ui,sans-serif;
+  --sans:"Hanken Grotesk",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+[data-theme="dark"] {
+  --paper:#16140F; --surface:#201D17; --surface-2:#2A261F;
+  --ink:#F6F2E9; --ink-2:#B7AFA1; --ink-3:#837B6D;
+  --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.17);
+  --red:#FF6257; --red-strong:#FF7468; --red-ink:#FF8378;
+  --red-soft:rgba(255,98,87,.15); --red-line:rgba(255,98,87,.32);
+  --shadow:0 2px 8px rgba(0,0,0,.4),0 16px 36px -14px rgba(0,0,0,.6);
+  --shadow-red:0 8px 24px -8px rgba(255,98,87,.5);
+  --ring:0 0 0 4px rgba(255,98,87,.28);
+}
 * { box-sizing: border-box; }
-html, body {
-  margin: 0;
-  padding: 0;
-  min-height: 100%;
-}
+html, body { margin: 0; padding: 0; min-height: 100%; }
 body {
-  display: grid;
-  place-items: center;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #0b0f1a;
-  color: #f1f5f9;
-  padding: 32px 16px;
+  font-family: var(--sans);
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
-.card {
-  width: min(420px, 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  background: #111827;
-  padding: 32px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+.scene { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; position: relative; }
+.gate { width: 100%; max-width: 400px; text-align: center; }
+.gate .lock { width: 64px; height: 64px; border-radius: 20px; background: var(--red-soft); color: var(--red-ink); display: flex; align-items: center; justify-content: center; margin: 0 auto 22px; }
+.gate h1 { font-family: var(--display); font-weight: 700; font-size: 28px; letter-spacing: -.02em; margin: 0; color: var(--ink); }
+.gate .sub { color: var(--ink-2); font-size: 15px; margin: 10px 0 26px; line-height: 1.5; }
+.gate form { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.gate label.lbl { display: block; font-size: 12.5px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink-2); margin-bottom: 4px; }
+.gate .field {
+  font-family: var(--sans); font-size: 14.5px; color: var(--ink);
+  background: var(--surface); border: 1.5px solid var(--line-2);
+  border-radius: var(--r-sm); padding: 11px 14px; width: 100%;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
-.card h1 {
-  margin: 0 0 8px;
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.gate .field::placeholder { color: var(--ink-3); }
+.gate .field:focus { outline: none; border-color: var(--red); box-shadow: var(--ring); }
+.gate .btn {
+  font-family: var(--sans); font-weight: 650; font-size: 16px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 15px 26px; border-radius: var(--r-pill); border: 1.5px solid transparent;
+  cursor: pointer; white-space: nowrap; width: 100%;
+  background: var(--red); color: #fff; box-shadow: var(--shadow-red);
+  transition: background-color .18s ease, transform .12s ease;
 }
-.card .sub {
-  margin: 0 0 24px;
-  color: #94a3b8;
-  font-size: 14px;
-  line-height: 1.55;
+.gate .btn:hover { background: var(--red-strong); transform: translateY(-1px); }
+.gate .btn:active { transform: translateY(1px); }
+.gate .err {
+  background: var(--red-soft); border: 1px solid var(--red-line);
+  color: var(--red-ink); font-size: 13px; font-weight: 600;
+  padding: 10px 14px; border-radius: 12px;
 }
-.card label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  color: #cbd5e1;
+.gate .rate {
+  background: var(--red-soft); border: 1px solid var(--red-line);
+  color: var(--red-ink); font-size: 13px; font-weight: 600;
+  padding: 10px 14px; border-radius: 12px;
 }
-.card input[type="password"] {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: #0b1220;
-  color: #f1f5f9;
-  font-size: 15px;
-}
-.card input[type="password"]:focus {
-  outline: none;
-  border-color: #7dd3fc;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.2);
-}
-.card button {
-  margin-top: 16px;
-  width: 100%;
-  padding: 12px 16px;
-  border: 0;
-  border-radius: 8px;
-  background: #7dd3fc;
-  color: #05111a;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-}
-.card button:hover { background: #93dcfd; }
-.card .err {
-  margin: 0 0 16px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(248, 113, 113, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.32);
-  color: #fca5a5;
-  font-size: 13px;
-}
-.card .rate {
-  margin: 0 0 16px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: rgba(250, 204, 21, 0.1);
-  border: 1px solid rgba(250, 204, 21, 0.32);
-  color: #fde047;
-  font-size: 13px;
+.powered { position: absolute; bottom: 24px; left: 0; right: 0; display: flex; justify-content: center; }
+.powered a { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; text-decoration: none; }
+.powered a:hover { color: var(--ink-2); }
+.oc-logo { display: inline-flex; align-items: center; gap: 8px; }
+.oc-logo svg { display: block; flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
 }
 `;
+
+// Pre-paint theme-restore — the single piece of JS on the page. Stamps
+// data-theme on <html> from localStorage('oc-theme') so a returning
+// visitor's dark-mode choice doesn't flash light first. Mirrors the
+// canonical themeBootScript in src/ui/theme.ts but is inlined here to
+// keep gate.ts a self-contained dependency-free module.
+const GATE_THEME_BOOT = `(function(){try{var t=localStorage.getItem('oc-theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
+
+// Inline lock-glyph SVG — matches the padlock in design-references/locked.html
+// (rounded body + shackle stroke). currentColor inherits from `.gate .lock`
+// so the icon themes for free between light and dark.
+const LOCK_GLYPH_SVG =
+  `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">` +
+  `<rect x="4" y="10" width="16" height="11" rx="2.5"/>` +
+  `<path d="M8 10V7a4 4 0 0 1 8 0v3"/>` +
+  `</svg>`;
+
+// Open Canvas brand mark for the "Powered by" footer. Mirrors OcLogo in
+// src/ui/brand.tsx but inlined here so gate.ts has no JSX dependency and
+// can stay a `.ts` module shipped from the password package.
+const OC_LOGO_SVG =
+  `<svg width="18" height="18" viewBox="0 0 64 64" fill="none" aria-hidden="true">` +
+  `<rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="3"/>` +
+  `<circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="8"/>` +
+  `<rect x="40" y="19" width="21" height="4.5" rx="2" fill="var(--red)"/>` +
+  `<rect x="6" y="43" width="21" height="4.5" rx="2" fill="var(--red)"/>` +
+  `</svg>`;
 
 /**
  * Render the gate HTML. Returns a complete `<!doctype html>` document body
@@ -185,36 +225,46 @@ body {
 export function renderGateHtml(options: GateOptions): string {
   const safeRedirect = sanitiseRedirect(options.redirect);
   const errorBlock = options.showError
-    ? `<p class="err">That password was incorrect. Try again.</p>`
+    ? `<div class="err">That password was incorrect. Try again.</div>`
     : '';
   const rateBlock = options.showRateLimit
-    ? `<p class="rate">Too many attempts. Please wait a minute and try again.</p>`
+    ? `<div class="rate">Too many attempts. Please wait a minute and try again.</div>`
     : '';
   const heading = escapeText(options.siteName.length > 0 ? options.siteName : 'This site');
   const safeRedirectAttr = escapeAttr(safeRedirect);
+  // theme is constrained to the 'light' | 'dark' enum by the caller; we
+  // stamp only the 'dark' case so the light default keeps the attribute off
+  // (matches the chrome surfaces). Defence in depth: even if a malformed
+  // value somehow reached this layer, the literal comparison would drop it.
+  const themeAttr = options.theme === 'dark' ? ' data-theme="dark"' : '';
 
   return `<!doctype html>
-<html lang="en">
+<html lang="en"${themeAttr}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>${heading} — password required</title>
     <style>${GATE_STYLES}</style>
+    <script>${GATE_THEME_BOOT}</script>
   </head>
   <body>
-    <main class="card">
-      <h1>${heading}</h1>
-      <p class="sub">This site is password protected. Enter the password to continue.</p>
-      ${rateBlock}
-      ${errorBlock}
-      <form method="post" action="/__rev01/unlock">
-        <label for="rev01-pw">Password</label>
-        <input id="rev01-pw" type="password" name="password" autocomplete="current-password" autofocus required />
-        <input type="hidden" name="redirect" value="${safeRedirectAttr}" />
-        <button type="submit">Continue</button>
-      </form>
-    </main>
+    <div class="scene">
+      <main class="gate">
+        <div class="lock">${LOCK_GLYPH_SVG}</div>
+        <h1>${heading}</h1>
+        <p class="sub">This site is password protected. Enter the password to continue.</p>
+        <form method="post" action="/__rev01/unlock">
+          ${rateBlock}
+          ${errorBlock}
+          <label class="lbl" for="rev01-pw">Password</label>
+          <input class="field" id="rev01-pw" type="password" name="password" placeholder="Enter password" autocomplete="current-password" autofocus required />
+          <input type="hidden" name="redirect" value="${safeRedirectAttr}" />
+          <button class="btn" type="submit">Unlock site</button>
+        </form>
+      </main>
+      <div class="powered"><a href="https://rev01.aayushman.dev" target="_blank" rel="noopener"><span class="oc-logo" style="color:var(--ink-3)">${OC_LOGO_SVG}</span>Powered by Open Canvas</a></div>
+    </div>
   </body>
 </html>
 `;

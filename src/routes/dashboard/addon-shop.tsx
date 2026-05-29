@@ -1,15 +1,30 @@
 // src/routes/dashboard/addon-shop.tsx
 //
-// Top-level addon catalogue at `/dashboard/addons`. Surfaces every addon in
-// the registry as a card:
+// Root add-on catalogue at `/dashboard/addons` (sidebar: primary nav).
+// Surfaces every add-on in the registry as an `.addon` card under the
+// Open Canvas chrome (MIGRATION.md §5f / shop.html):
 //
-//   - Not owned        → "Get addon" button (POST /api/addons/:id/acquire).
-//   - Owned            → inline config panel with a site selector. Picking a
-//                        site swaps the visible enabled-state + config fields
-//                        for that site, sourced from the embedded JSON state
-//                        block. Saving PUTs to /api/addons/sites/:siteId/:id.
+//   - Owned add-ons render with a `.chip .chip-ok` "Owned" badge and an
+//     inline config panel: site selector + Enabled switch + config
+//     fields + Save. Saves PUT to `/api/addons/sites/:siteId/:id`.
+//   - Unowned add-ons render with the "Free" price + a `.btn .btn-primary`
+//     "Get add-on" CTA that POSTs to `/api/addons/:id/acquire`.
 //
-// `/dashboard/shop` is kept as a 301 alias so old links keep working.
+// Coming-soon variants live as static cards rendered from the design
+// reference (newsletter / online-store / bookings) — they have no entry
+// in the registry yet, so they're rendered inline with `.addon.soon` +
+// a disabled "Notify me" button.
+//
+// `/dashboard/shop` remains a 301 redirect so old bookmarks still land.
+//
+// DOM hooks preserved for the inline client script + API:
+//   - data-acquire="<addonId>"        — acquire flow
+//   - data-addon-config="<addonId>"   — per-site config form root
+//   - data-site-select                — site selector inside config form
+//   - data-addon-enable               — enable/disable checkbox
+//   - data-config-key="<fieldKey>"    — text/textarea config inputs
+//   - data-save                       — save button
+//   - id="addon-state" + <script type="application/json">  — state seed
 
 import { eq, inArray } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -19,7 +34,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customer, addonEntitlement, site, siteAddon } from '../../db/schema';
 import { DashboardShell } from './shell';
-import { Badge } from '../../ui';
+import { readThemeCookie } from '../../ui';
 import { allAddons } from '../../addons/registry';
 
 interface Bindings {
@@ -35,193 +50,183 @@ export const addonShopRoute = new Hono<Env>();
 addonShopRoute.use('*', clerkAuth());
 addonShopRoute.use('*', requireAuth());
 
+// Open Canvas chrome for the add-on catalogue. `.addon` cards, `.secttl`
+// group labels, inline config panel — all variables come from theme.css.
 const pageStyles = `
-  .shop-lede {
-    margin: 4px 0 28px;
-    color: var(--muted);
-    max-width: 560px;
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; }
+  .content > .sub {
+    color: var(--ink-2);
+    font-size: 16px;
+    margin: 6px 0 30px;
+    max-width: 56ch;
     line-height: 1.55;
-    font-size: 14px;
   }
+
+  .secttl {
+    font-family: var(--display);
+    font-size: 18px;
+    margin: 28px 0 14px;
+    color: var(--ink);
+  }
+  .secttl:first-of-type { margin-top: 8px; }
+
   .addon-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
   }
-  .addon-card {
-    background: var(--panel);
+
+  .addon {
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 24px;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    padding: 22px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    transition: transform .16s ease, box-shadow .2s ease;
   }
-  .addon-card-header {
+  .addon:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .addon.soon { opacity: .75; }
+  .addon.soon:hover { transform: none; box-shadow: var(--shadow-sm); }
+
+  .addon .ic {
+    width: 48px;
+    height: 48px;
+    border-radius: 13px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 14px;
   }
-  .addon-card-header h3 {
+  .addon h3 {
+    font-family: var(--display);
+    font-size: 18px;
     margin: 0;
-    font-size: 17px;
-    font-weight: 600;
+    color: var(--ink);
   }
-  .addon-card-tagline {
-    color: var(--muted);
-    font-size: 13px;
+  .addon .tag {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    margin: 7px 0 0;
     line-height: 1.5;
-    margin: 0;
+    flex: 1;
   }
-  .addon-card-desc {
-    color: var(--faint);
-    font-size: 12px;
-    line-height: 1.55;
-    margin: 0;
-  }
-  .addon-card-footer {
-    margin-top: 4px;
-    padding-top: 8px;
+  .addon .foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid rgba(255,255,255,0.05);
+    gap: 10px;
+    margin-top: 18px;
   }
-  .addon-price {
+  .addon .price {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text);
-  }
-  .btn-acquire {
-    padding: 8px 18px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-    background: var(--accent);
-    color: var(--bg);
-    transition: filter 0.12s;
-  }
-  .btn-acquire:hover { filter: brightness(0.88); }
-  .btn-acquire:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    filter: none;
+    color: var(--ink-3);
   }
 
-  /* --- Inline config panel (owned addons) ----------------------------- */
+  /* inline config panel — slides under the head row for owned add-ons */
   .addon-config {
-    border-top: 1px solid rgba(255,255,255,0.05);
-    padding-top: 14px;
-    margin-top: 4px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
     display: flex;
     flex-direction: column;
+    gap: 14px;
+  }
+  .addon-config .row {
+    display: grid;
+    grid-template-columns: 88px 1fr;
     gap: 12px;
-  }
-  .addon-config-row {
-    display: flex;
     align-items: center;
-    gap: 10px;
   }
-  .addon-config select {
-    padding: 7px 10px;
-    border-radius: 6px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 13px;
-    font-family: inherit;
-    flex: 1;
-    min-width: 0;
-  }
-  .addon-config select:focus {
-    border-color: var(--accent);
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(125,211,252,0.15);
-  }
-  .addon-config-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--text);
-  }
-  .addon-config-toggle input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--accent);
-    cursor: pointer;
-  }
-  .addon-field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-  .addon-field label {
-    font-size: 11px;
+  .addon-config label.lbl-inline {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    font-weight: 500;
+    color: var(--ink-3);
   }
-  .addon-field input[type="text"],
-  .addon-field textarea {
+  .addon-config select.field,
+  .addon-config input[type="text"].field,
+  .addon-config textarea.field {
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line-2);
+    border-radius: var(--r-sm);
     padding: 9px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 13px;
-    font-family: ui-monospace, 'JetBrains Mono', SFMono-Regular, Consolas, monospace;
+    width: 100%;
+    transition: border-color .15s ease, box-shadow .15s ease;
     outline: none;
-    box-sizing: border-box;
+  }
+  .addon-config textarea.field {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    min-height: 80px;
     resize: vertical;
   }
-  .addon-field textarea { min-height: 70px; }
-  .addon-field input[type="text"]:focus,
-  .addon-field textarea:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(125,211,252,0.15);
+  .addon-config select.field:focus,
+  .addon-config input[type="text"].field:focus,
+  .addon-config textarea.field:focus {
+    border-color: var(--red);
+    box-shadow: var(--ring);
   }
-  .addon-field-hint {
-    font-size: 11px;
-    color: var(--faint);
-  }
-  .addon-save-row {
+  .addon-config .toggle-row {
     display: flex;
-    gap: 10px;
     align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: var(--ink);
+  }
+  .addon-config .toggle-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--red);
+    cursor: pointer;
+  }
+  .addon-config .field-block {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .addon-config .field-block label {
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .addon-config .field-hint {
+    font-size: 12px;
+    color: var(--ink-3);
+  }
+  .addon-config .save-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
     margin-top: 2px;
   }
-  .btn-save {
-    padding: 7px 16px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-    background: var(--accent);
-    color: var(--bg);
-    transition: filter 0.12s;
-  }
-  .btn-save:hover { filter: brightness(0.88); }
-  .btn-save:disabled { opacity: 0.55; cursor: wait; filter: none; }
   .addon-msg {
-    font-size: 12.5px;
-    min-height: 14px;
+    font-size: 13px;
+    color: var(--ink-2);
+    min-height: 16px;
+    margin: 0;
   }
-  .addon-msg-ok { color: #4ade80; }
-  .addon-msg-err { color: #ef4444; }
-  .addon-empty-sites {
-    font-size: 12.5px;
-    color: var(--faint);
-    line-height: 1.55;
+  .addon-msg-ok { color: var(--ok); }
+  .addon-msg-err { color: var(--red-ink); }
+
+  .empty-sites {
+    margin: 18px 0 0;
+    padding: 14px 16px;
+    border: 1px dashed var(--line-2);
+    border-radius: var(--r);
+    background: var(--surface-2);
+    font-size: 13px;
+    color: var(--ink-2);
   }
-  .addon-empty-sites a { color: var(--accent); }
+  .empty-sites a { color: var(--red-ink); font-weight: 600; }
 `;
 
 function clientScript(): string {
@@ -233,6 +238,7 @@ function clientScript(): string {
     if (!btn) return;
     var addonId = btn.getAttribute('data-acquire');
     btn.disabled = true;
+    var prev = btn.textContent;
     btn.textContent = 'Acquiring...';
     fetch('/api/addons/' + addonId + '/acquire', {
       method: 'POST',
@@ -244,7 +250,7 @@ function clientScript(): string {
       location.reload();
     })
     .catch(function() {
-      btn.textContent = 'Failed — retry';
+      btn.textContent = prev + ' — retry';
       btn.disabled = false;
     });
   });
@@ -296,7 +302,7 @@ function clientScript(): string {
       });
       saveBtn.disabled = true;
       var prev = saveBtn.textContent;
-      saveBtn.textContent = 'Saving…';
+      saveBtn.textContent = 'Saving...';
       if (msg) { msg.textContent = ''; msg.className = 'addon-msg'; }
       fetch('/api/addons/sites/' + siteId + '/' + addonId, {
         method: 'PUT',
@@ -325,6 +331,58 @@ function clientScript(): string {
 })();
 `;
 }
+
+// Icon palette for each registry add-on. Matches the visual style of
+// shop.html where every card has a tinted square icon.
+type AddonGlyph = { bg: string; fg: string; path: string };
+const ADDON_GLYPHS: Record<string, AddonGlyph> = {
+  addon_google_analytics: {
+    bg: '#fef0e6',
+    fg: '#E8710A',
+    path: '<path d="M4 19V10M10 19V5M16 19v-6M22 19H2" stroke-linecap="round"/>',
+  },
+  addon_custom_scripts: {
+    bg: 'var(--surface-2)',
+    fg: 'var(--ink)',
+    path: '<path d="M8 9l-3 3 3 3M16 9l3 3-3 3M13 5l-2 14" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+};
+const DEFAULT_GLYPH: AddonGlyph = {
+  bg: 'var(--surface-2)',
+  fg: 'var(--ink-2)',
+  path: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8" stroke-linecap="round"/>',
+};
+
+function AddonIcon({ glyph }: { glyph: AddonGlyph }) {
+  return raw(
+    `<span class="ic" style="background:${glyph.bg};color:${glyph.fg}">` +
+      `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${glyph.path}</svg>` +
+      `</span>`,
+  );
+}
+
+// Coming-soon catalogue from shop.html — these have no registry entry yet,
+// so they render as static, non-interactive cards in the bottom group.
+const COMING_SOON: Array<{ name: string; tag: string; iconPath: string }> = [
+  {
+    name: 'Newsletter',
+    tag: 'Collect emails and send updates without leaving Open Canvas.',
+    iconPath:
+      '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h6" stroke-linecap="round"/>',
+  },
+  {
+    name: 'Online Store',
+    tag: 'Sell products and take payments with a simple checkout.',
+    iconPath:
+      '<path d="M6 2h9l3 3v17H6z"/><path d="M9 12h6M9 16h6" stroke-linecap="round"/>',
+  },
+  {
+    name: 'Bookings',
+    tag: 'Let customers schedule appointments straight from your site.',
+    iconPath:
+      '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke-linecap="round"/>',
+  },
+];
 
 // Old /shop path redirects to /addons so existing bookmarks keep working.
 addonShopRoute.get('/shop', (c) => c.redirect('/dashboard/addons', 301));
@@ -384,100 +442,159 @@ addonShopRoute.get('/addons', async (c) => {
   // so a malicious config string can't close the script tag early.
   const stateJson = JSON.stringify(stateByAddon).replace(/</g, '\\u003c');
 
+  // Group registry add-ons: Owned (with inline config) → Available (CTA).
+  const ownedAddons = allAddons.filter((a) => ownedAddonIds.has(a.id));
+  const availableAddons = allAddons.filter((a) => !ownedAddonIds.has(a.id));
+
   return c.html(
     <DashboardShell
-      title="rev01 — addons"
-      crumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: 'Addons' }]}
+      title="Open Canvas — Add-ons"
+      crumbs={[{ href: '/dashboard', label: 'Dashboard' }, { label: 'Add-ons' }]}
       activePath="/dashboard/addons"
       pageStyles={pageStyles}
+      theme={readThemeCookie(c)}
     >
-      <h1>Addons</h1>
-      <p class="shop-lede">
-        Extend your sites with integrations. Acquire an addon once, then configure it per site —
-        each site gets its own settings.
+      <h1>Add-ons</h1>
+      <p class="sub">
+        Bolt on extra powers — analytics, tracking, and more. Turn them on per site,
+        no code required.
       </p>
 
-      <div class="addon-grid">
-        {allAddons.map((addon) => {
-          const owned = ownedAddonIds.has(addon.id);
-          return (
-            <div class="addon-card">
-              <div class="addon-card-header">
-                <h3>{addon.name}</h3>
-                {owned && <Badge variant="success">Owned</Badge>}
-              </div>
-              <p class="addon-card-tagline">{addon.tagline}</p>
-              <p class="addon-card-desc">{addon.description}</p>
+      {ownedAddons.length > 0 && (
+        <>
+          <div class="secttl">Installed</div>
+          <div class="addon-grid">
+            {ownedAddons.map((addon) => {
+              const glyph = ADDON_GLYPHS[addon.id] ?? DEFAULT_GLYPH;
+              return (
+                <div class="addon">
+                  <AddonIcon glyph={glyph} />
+                  <h3>{addon.name}</h3>
+                  <p class="tag">{addon.tagline}</p>
+                  <div class="foot">
+                    <span class="chip chip-ok">
+                      <span class="dot" />
+                      Owned
+                    </span>
+                  </div>
 
-              {owned ? (
-                sites.length === 0 ? (
-                  <div class="addon-config">
-                    <p class="addon-empty-sites">
-                      Create a site first to configure this addon.{' '}
+                  {sites.length === 0 ? (
+                    <p class="empty-sites">
+                      Create a site first to configure this add-on.{' '}
                       <a href="/dashboard">Go to your sites →</a>
                     </p>
-                  </div>
-                ) : (
-                  <div class="addon-config" data-addon-config={addon.id}>
-                    <div class="addon-config-row">
-                      <label
-                        for={`site-select-${addon.id}`}
-                        style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;"
-                      >
-                        Site
-                      </label>
-                      <select id={`site-select-${addon.id}`} data-site-select>
-                        {sites.map((s) => (
-                          <option value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <label class="addon-config-toggle">
-                      <input type="checkbox" data-addon-enable />
-                      <span>Enabled on this site</span>
-                    </label>
-                    {addon.configFields.map((field) => (
-                      <div class="addon-field">
-                        <label for={`f-${addon.id}-${field.key}`}>{field.label}</label>
-                        {field.key === 'headScripts' || field.key === 'bodyScripts' ? (
-                          <textarea
-                            id={`f-${addon.id}-${field.key}`}
-                            data-config-key={field.key}
-                            placeholder={field.placeholder}
-                          ></textarea>
-                        ) : (
-                          <input
-                            type="text"
-                            id={`f-${addon.id}-${field.key}`}
-                            data-config-key={field.key}
-                            placeholder={field.placeholder}
-                            {...(field.pattern ? { pattern: field.pattern } : {})}
-                          />
-                        )}
-                        {field.patternHint && (
-                          <span class="addon-field-hint">{field.patternHint}</span>
-                        )}
+                  ) : (
+                    <div class="addon-config" data-addon-config={addon.id}>
+                      <div class="row">
+                        <label
+                          class="lbl-inline"
+                          for={`site-select-${addon.id}`}
+                        >
+                          Site
+                        </label>
+                        <select
+                          class="field"
+                          id={`site-select-${addon.id}`}
+                          data-site-select
+                        >
+                          {sites.map((s) => (
+                            <option value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
                       </div>
-                    ))}
-                    <div class="addon-save-row">
-                      <button type="button" class="btn-save" data-save>
-                        Save
-                      </button>
-                      <p class="addon-msg" role="status" aria-live="polite"></p>
+                      <label class="toggle-row">
+                        <input type="checkbox" data-addon-enable />
+                        <span>Enabled on this site</span>
+                      </label>
+                      {addon.configFields.map((field) => (
+                        <div class="field-block">
+                          <label for={`f-${addon.id}-${field.key}`}>{field.label}</label>
+                          {field.key === 'headScripts' || field.key === 'bodyScripts' ? (
+                            <textarea
+                              class="field"
+                              id={`f-${addon.id}-${field.key}`}
+                              data-config-key={field.key}
+                              placeholder={field.placeholder}
+                            ></textarea>
+                          ) : (
+                            <input
+                              class="field"
+                              type="text"
+                              id={`f-${addon.id}-${field.key}`}
+                              data-config-key={field.key}
+                              placeholder={field.placeholder}
+                              {...(field.pattern ? { pattern: field.pattern } : {})}
+                            />
+                          )}
+                          {field.patternHint && (
+                            <span class="field-hint">{field.patternHint}</span>
+                          )}
+                        </div>
+                      ))}
+                      <div class="save-row">
+                        <button type="button" class="btn btn-primary btn-sm" data-save>
+                          Save
+                        </button>
+                        <p class="addon-msg" role="status" aria-live="polite"></p>
+                      </div>
                     </div>
-                  </div>
-                )
-              ) : (
-                <div class="addon-card-footer">
-                  <span class="addon-price">Free</span>
-                  <button type="button" class="btn-acquire" data-acquire={addon.id}>
-                    Get addon
-                  </button>
+                  )}
                 </div>
-              )}
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {availableAddons.length > 0 && (
+        <>
+          <div class="secttl">Available</div>
+          <div class="addon-grid">
+            {availableAddons.map((addon) => {
+              const glyph = ADDON_GLYPHS[addon.id] ?? DEFAULT_GLYPH;
+              return (
+                <div class="addon">
+                  <AddonIcon glyph={glyph} />
+                  <h3>{addon.name}</h3>
+                  <p class="tag">{addon.tagline}</p>
+                  <div class="foot">
+                    <span class="price">Free</span>
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      data-acquire={addon.id}
+                    >
+                      Get add-on
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <div class="secttl">Coming soon</div>
+      <div class="addon-grid">
+        {COMING_SOON.map((entry) => (
+          <div class="addon soon">
+            <AddonIcon
+              glyph={{
+                bg: 'var(--surface-2)',
+                fg: 'var(--ink-2)',
+                path: entry.iconPath,
+              }}
+            />
+            <h3>{entry.name}</h3>
+            <p class="tag">{entry.tag}</p>
+            <div class="foot">
+              <span class="price">Soon</span>
+              <button type="button" class="btn btn-ghost btn-sm" disabled>
+                Notify me
+              </button>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       <script type="application/json" id="addon-state">

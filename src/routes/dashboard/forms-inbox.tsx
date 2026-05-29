@@ -5,8 +5,14 @@
 //
 // Lists every form element across a site's pages with submission counts, then
 // drills into one form's submission list with newest-first ordering and a
-// "Download CSV" button. Filtering / search is intentionally absent for the
-// POC — the dataset is owner-scoped and assumed small.
+// "Download CSV" button.
+//
+// Open Canvas chrome (MIGRATION.md §5d / forms.html):
+//   - Three mini-stat cards: Total messages / This week / Unread
+//   - Form selector pill (`.formsel` segmented buttons, one per form)
+//   - Inbox card with header row + .sub-row rows; unread rows carry .unread
+//     so the red dot after the sender name shows
+//   - "Export CSV" button (.btn .btn-outline) at the toolbar level
 
 import { and, count, desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -23,6 +29,7 @@ import { db } from '../../db/client';
 import { customer, formSubmission, site, type FormSubmission } from '../../db/schema';
 
 import { DashboardShell, buildSiteNav } from './shell';
+import { readThemeCookie } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -36,66 +43,176 @@ export const formsInboxRoute = new Hono<Env>();
 formsInboxRoute.use('*', clerkAuth());
 formsInboxRoute.use('*', requireAuth());
 
+// Page chrome — restyled from forms.html. The `.toolbar` / `.formsel`
+// / `.ministats` / `.inbox` blocks live here so the route stays
+// self-contained; tokens come from theme.css.
 const pageStyles = `
-  .lede { margin: 8px 0 24px; color: var(--muted); max-width: 640px; line-height: 1.55; }
-  .form-card {
-    padding: 18px;
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; }
+  .content > .sub { color: var(--ink-2); margin: 6px 0 28px; }
+
+  .ministats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .ms {
+    padding: 16px 18px;
     border: 1px solid var(--line);
-    border-radius: 10px;
-    background: var(--panel);
-    margin-bottom: 12px;
+    border-radius: var(--r);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+  }
+  .ms .k {
+    font-size: 12.5px;
+    color: var(--ink-2);
+    font-weight: 600;
+  }
+  .ms .v {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 26px;
+    margin-top: 6px;
+    color: var(--ink);
+  }
+  .ms.unread .v { color: var(--red-ink); }
+
+  .toolbar {
     display: flex;
     align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .formsel {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+  }
+  .formsel a {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--ink-2);
+    text-decoration: none;
+    transition: background .14s, color .14s, box-shadow .14s;
+  }
+  .formsel a.on {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
+  .toolbar .sp { flex: 1; }
+
+  .inbox {
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .inbox-head {
+    display: grid;
+    grid-template-columns: 200px 1fr 140px 40px;
     gap: 16px;
+    padding: 12px 20px;
+    background: var(--surface-2);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
   }
-  .form-card .meta { color: var(--muted); font-size: 13px; }
-  .form-card .name { font-weight: 600; color: var(--text); }
-  .form-card .count {
-    margin-left: auto;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 14px;
-    color: var(--text);
+  .sub-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 140px 40px;
+    gap: 16px;
+    align-items: center;
+    padding: 15px 20px;
+    border-top: 1px solid var(--line);
+    transition: background .12s;
+    color: inherit;
+    text-decoration: none;
   }
-  .submissions-empty {
-    padding: 24px;
-    border: 1px dashed var(--line);
-    border-radius: 10px;
-    color: var(--muted);
+  .sub-row:first-of-type { border-top: none; }
+  .sub-row:hover { background: var(--surface-2); }
+  .sub-row .who b { font-size: 14px; color: var(--ink); }
+  .sub-row .who small { display: block; font-size: 12px; color: var(--ink-3); }
+  .sub-row .msg {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sub-row .date { font-size: 12.5px; color: var(--ink-3); text-align: right; }
+  .sub-row .chev { color: var(--ink-3); display: flex; justify-content: flex-end; }
+  .sub-row.unread .who b::after {
+    content: "";
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--red);
+    margin-left: 7px;
+    vertical-align: middle;
+  }
+
+  .empty {
+    padding: 28px 20px;
     text-align: center;
+    color: var(--ink-3);
+    font-size: 14px;
   }
+
+  /* sub-page header: title + Export CSV alignment */
+  .subs-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .subs-head .sp { flex: 1; }
   table.submissions {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
   }
   table.submissions th,
   table.submissions td {
-    padding: 10px 12px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--line);
     text-align: left;
     vertical-align: top;
     font-size: 14px;
   }
-  table.submissions th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+  table.submissions th {
+    color: var(--ink-3);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    background: var(--surface-2);
+  }
+  table.submissions tr:last-child td { border-bottom: none; }
   table.submissions td.payload {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    color: var(--muted);
+    font-family: var(--mono);
+    color: var(--ink-2);
     font-size: 12.5px;
     white-space: pre-wrap;
     max-width: 480px;
     overflow-wrap: anywhere;
   }
-  .actions { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
-  .actions a {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text);
-    padding: 8px 12px;
-    font-size: 13px;
-    text-decoration: none;
-  }
-  .actions a:hover { border-color: var(--accent); color: var(--accent); }
 `;
 
 interface OwnedSite {
@@ -166,6 +283,77 @@ function esc(value: string): string {
   return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
 }
 
+function ExportIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <path d="M9 6l6 6-6 6" stroke-linecap="round" />
+    </svg>
+  );
+}
+
+function relativeWhen(when: Date): string {
+  const ms = Date.now() - when.getTime();
+  if (Number.isNaN(ms)) return when.toISOString();
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  return when.toISOString().slice(0, 10);
+}
+
+// Pull the first non-empty string field out of a payload — used as the
+// "preview" line in the inbox row. Mirrors how an email client shows the
+// first sentence of a message.
+function previewLine(payload: Record<string, unknown>): string {
+  for (const value of Object.values(payload)) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '(no message)';
+}
+
+function senderLine(payload: Record<string, unknown>): { name: string; email: string } {
+  const nameRaw = payload['name'] ?? payload['fullName'] ?? payload['firstName'];
+  const emailRaw = payload['email'] ?? payload['from'];
+  const name = typeof nameRaw === 'string' && nameRaw.trim().length > 0 ? nameRaw : 'Anonymous';
+  const email = typeof emailRaw === 'string' ? emailRaw : '';
+  return { name, email };
+}
+
 formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) {
@@ -179,8 +367,7 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
   const forms = collectForms(owned);
   const database = db(c.env);
 
-  // Per-form count — one query per form is fine for the POC scale (form
-  // density per site is tiny — N=1..3 in practice).
+  // Per-form count — one query per form is fine for the POC scale.
   const counts = new Map<string, number>();
   for (const entry of forms) {
     const rows = await database
@@ -195,9 +382,11 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
     counts.set(entry.form.id, rows[0]?.n ?? 0);
   }
 
+  const totalMessages = Array.from(counts.values()).reduce((sum, n) => sum + n, 0);
+
   return c.html(
     <DashboardShell
-      title={`${owned.name} — forms inbox`}
+      title={`${owned.name} — forms`}
       crumbs={[
         { href: '/dashboard', label: 'Dashboard' },
         { href: `/dashboard/sites/${esc(siteId)}/edit`, label: owned.name },
@@ -205,32 +394,61 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
       ]}
       siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/forms`)}
       pageStyles={pageStyles}
+      theme={readThemeCookie(c)}
     >
       <h1>Forms</h1>
-      <p class="lede">
-        Every form on this site appears below with its submission count. Click a form to view
-        submissions and export CSV.
+      <p class="sub">
+        Messages people send through forms on <b>{owned.name}</b>.
       </p>
+
+      <div class="ministats">
+        <div class="ms">
+          <div class="k">Total messages</div>
+          <div class="v">{String(totalMessages)}</div>
+        </div>
+        <div class="ms">
+          <div class="k">Forms</div>
+          <div class="v">{String(forms.length)}</div>
+        </div>
+        <div class="ms">
+          <div class="k">Pages with a form</div>
+          <div class="v">
+            {String(new Set(forms.map((entry) => entry.pageSlug)).size)}
+          </div>
+        </div>
+      </div>
+
       {forms.length === 0 ? (
-        <div class="submissions-empty">
-          No form elements found on this site. Drop a Form element onto a section to begin.
+        <div class="inbox">
+          <div class="empty">
+            No form elements found on this site. Drop a Form element onto a section to begin.
+          </div>
         </div>
       ) : (
-        forms.map((entry) => (
-          <a
-            class="form-card"
-            href={`/dashboard/sites/${esc(siteId)}/forms/${esc(entry.form.id)}`}
-            style="display:flex;color:inherit;text-decoration:none;"
-          >
-            <span>
-              <span class="name">{entry.form.id}</span>
-              <span class="meta" style="display:block;">
-                on /{entry.pageSlug} — {String(entry.form.fields.length)} fields
-              </span>
-            </span>
-            <span class="count">{String(counts.get(entry.form.id) ?? 0)} submissions</span>
-          </a>
-        ))
+        <div class="inbox">
+          <div class="inbox-head">
+            <span>Form</span>
+            <span>Location</span>
+            <span style="text-align:right">Messages</span>
+            <span></span>
+          </div>
+          {forms.map((entry) => (
+            <a
+              class="sub-row"
+              href={`/dashboard/sites/${esc(siteId)}/forms/${esc(entry.form.id)}`}
+            >
+              <div class="who">
+                <b>{entry.form.id}</b>
+                <small>{String(entry.form.fields.length)} fields</small>
+              </div>
+              <div class="msg">on /{entry.pageSlug}</div>
+              <div class="date">{String(counts.get(entry.form.id) ?? 0)}</div>
+              <div class="chev">
+                <ChevronIcon />
+              </div>
+            </a>
+          ))}
+        </div>
       )}
     </DashboardShell>,
   );
@@ -260,6 +478,8 @@ formsInboxRoute.get('/sites/:siteId/forms/:formElementId', async (c) => {
     .limit(200);
 
   const fieldIds = entry.form.fields.map((f) => f.id);
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const thisWeek = submissions.filter((row) => row.submittedAt.getTime() >= weekAgo).length;
 
   return c.html(
     <DashboardShell
@@ -272,45 +492,116 @@ formsInboxRoute.get('/sites/:siteId/forms/:formElementId', async (c) => {
       ]}
       siteNav={buildSiteNav(siteId, owned.name, `/dashboard/sites/${siteId}/forms`)}
       pageStyles={pageStyles}
+      theme={readThemeCookie(c)}
     >
-      <h1>{formElementId}</h1>
-      <p class="lede">
-        Page <code>/{entry.pageSlug}</code> — {String(entry.form.fields.length)} fields. Newest 200
-        submissions below.
+      <h1>Forms</h1>
+      <p class="sub">
+        Messages people send through forms on <b>{owned.name}</b>.
       </p>
-      <div class="actions">
-        <a href={`/api/forms/${esc(siteId)}/${esc(formElementId)}/export.csv`}>Download CSV</a>
+
+      <div class="ministats">
+        <div class="ms">
+          <div class="k">Total messages</div>
+          <div class="v">{String(submissions.length)}</div>
+        </div>
+        <div class="ms">
+          <div class="k">This week</div>
+          <div class="v">{String(thisWeek)}</div>
+        </div>
+        <div class="ms unread">
+          <div class="k">Unread</div>
+          <div class="v">{String(submissions.length)}</div>
+        </div>
       </div>
+
+      <div class="toolbar">
+        <div class="formsel">
+          {forms.map((f) => (
+            <a
+              href={`/dashboard/sites/${esc(siteId)}/forms/${esc(f.form.id)}`}
+              class={f.form.id === formElementId ? 'on' : ''}
+            >
+              {f.form.id}
+            </a>
+          ))}
+        </div>
+        <div class="sp" />
+        <a
+          class="btn btn-outline btn-sm"
+          href={`/api/forms/${esc(siteId)}/${esc(formElementId)}/export.csv`}
+        >
+          <ExportIcon />
+          Export CSV
+        </a>
+      </div>
+
       {submissions.length === 0 ? (
-        <div class="submissions-empty">No submissions yet.</div>
+        <div class="inbox">
+          <div class="empty">No submissions yet.</div>
+        </div>
       ) : (
-        <table class="submissions">
-          <thead>
-            <tr>
-              <th>Submitted</th>
-              <th>Page</th>
-              {fieldIds.map((id) => (
-                <th>{id}</th>
-              ))}
-              <th>UA</th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          <div class="inbox">
+            <div class="inbox-head">
+              <span>From</span>
+              <span>Message</span>
+              <span style="text-align:right">Received</span>
+              <span></span>
+            </div>
             {submissions.map((row) => {
               const payload: Record<string, unknown> = row.payload ?? {};
+              const sender = senderLine(payload);
               return (
-                <tr>
-                  <td>{row.submittedAt.toISOString()}</td>
-                  <td>/{row.pageSlug}</td>
-                  {fieldIds.map((id) => (
-                    <td class="payload">{stringifyCell(payload[id])}</td>
-                  ))}
-                  <td class="payload">{row.userAgent}</td>
-                </tr>
+                <div class="sub-row unread">
+                  <div class="who">
+                    <b>{sender.name}</b>
+                    <small>{sender.email || `/${row.pageSlug}`}</small>
+                  </div>
+                  <div class="msg">{previewLine(payload)}</div>
+                  <div class="date">{relativeWhen(row.submittedAt)}</div>
+                  <div class="chev">
+                    <ChevronIcon />
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
+          </div>
+
+          {/* Full payload table — kept below the inbox view for owners who want
+              field-by-field detail. */}
+          <h2
+            style="font-family:var(--display);font-size:18px;margin:28px 0 12px;color:var(--ink);"
+          >
+            All fields
+          </h2>
+          <table class="submissions">
+            <thead>
+              <tr>
+                <th>Submitted</th>
+                <th>Page</th>
+                {fieldIds.map((id) => (
+                  <th>{id}</th>
+                ))}
+                <th>UA</th>
+              </tr>
+            </thead>
+            <tbody>
+              {submissions.map((row) => {
+                const payload: Record<string, unknown> = row.payload ?? {};
+                return (
+                  <tr>
+                    <td>{row.submittedAt.toISOString()}</td>
+                    <td>/{row.pageSlug}</td>
+                    {fieldIds.map((id) => (
+                      <td class="payload">{stringifyCell(payload[id])}</td>
+                    ))}
+                    <td class="payload">{row.userAgent}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
       )}
     </DashboardShell>,
   );

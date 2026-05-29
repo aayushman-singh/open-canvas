@@ -1,23 +1,22 @@
-import { Button } from '../../ui';
-
+// Social-proof row — small businesses / studios / side-projects.
+// Matches the `.proof` section in design-references/landing.html.
+//
+// File name `Tagline` is preserved so index.tsx imports don't churn,
+// but the rendered surface is now the social-proof strip rather than
+// the old rev01 product tagline.
 export function Tagline() {
   return (
-    <section class="tagline scroll-reveal" aria-label="product tagline">
-      <span class="eyebrow">// rev01</span>
-      <h1>
-        multiplayer site builder with an <span class="accent">agent</span> at the cursor.
-      </h1>
-      <p>
-        One canvas model, one Style Kit graph, one Published Address. The agent proposes concrete
-        canvas edits you can preview, accept, and publish.
-      </p>
-      <div class="tagline-cta">
-        <Button variant="primary" size="lg" href="/dashboard">
-          Start building
-        </Button>
-        <Button variant="secondary" size="lg" href="https://github.com/aayushman-singh/rev01" target="_blank" rel="noopener">
-          View source
-        </Button>
+    <section class="proof scroll-reveal" aria-label="Trusted by">
+      <div class="wrap">
+        <p>Trusted by small shops, studios, and side-projects everywhere</p>
+        <div class="logos" aria-hidden="true">
+          <b>Bloom&nbsp;&amp;&nbsp;Co</b>
+          <b>Northside&nbsp;Yoga</b>
+          <b>Pixel&nbsp;Pretzel</b>
+          <b>Harbor&nbsp;Coffee</b>
+          <b>Maple&nbsp;Dental</b>
+          <b>The&nbsp;Book&nbsp;Nook</b>
+        </div>
       </div>
     </section>
   );

@@ -8,10 +8,15 @@
 //   - "Preview" button → GET …/preview, swap the HTML into a sandbox iframe
 //   - "Restore" button → POST …/restore (with one confirm step)
 //
-// Disjoint from any other Wave 1 surface — the editor (canvas-index.tsx)
-// already exists; this is a new sidebar panel served at its own dashboard
-// route. Wave 4 may fold it into a unified sidebar; for now it stands alone
-// so an Owner can demo the timeline against any site without editor wiring.
+// Open Canvas chrome (MIGRATION.md §5d / versions.html):
+//   - Vertical timeline with `::before` rail at the left edge.
+//   - Each row is a `.vrow` card with a coloured dot — publishes get
+//     the red dot (`.vrow.pub`), the active "Live" entry gets the ok
+//     halo (`.vrow.now`), and a plain dot marks manual snapshots.
+//   - Per-row Preview / Restore buttons, plus a "Live" pill on the
+//     current entry.
+//   - The preview iframe lives in a sibling section so an Owner can
+//     scrub past versions without losing the list.
 
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -24,7 +29,7 @@ import { customer, site } from '../../db/schema.js';
 
 import { listSnapshots, type SnapshotListItem } from '../../version/list.js';
 import { DashboardShell, buildSiteNav } from './shell.js';
-import { Button, Badge } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -40,95 +45,132 @@ export const versionTimeline = new Hono<{
 versionTimeline.use('*', clerkAuth());
 versionTimeline.use('*', requireAuth());
 
-const panelStyles = `
-  .timeline-panel {
-    display: grid;
-    grid-template-columns: minmax(280px, 360px) 1fr;
-    gap: 20px;
-    margin-top: 24px;
-  }
-  .timeline-list {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 16px;
-  }
-  .timeline-list h2 {
-    margin: 0 0 12px;
-    font-size: 16px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--faint);
-  }
-  .timeline-list ol {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+// Page chrome lifted from versions.html. The list lives in a 1-col
+// vertical timeline; the preview iframe drops into a card below the
+// timeline when activated (single-column layout = less competition
+// with the per-site sidebar than the prior 2-col split).
+const pageStyles = `
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; }
+  .content > .sub { color: var(--ink-2); margin: 6px 0 28px; }
+
+  .vhead {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
   }
-  .timeline-entry {
+  .vhead .vh-text h1 { margin-bottom: 4px; }
+  .vhead .vh-text p { margin: 0; }
+
+  .timeline {
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 28px;
+  }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 9px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: var(--line-2);
+  }
+  .vrow {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px 12px;
-    background: var(--panel-strong);
+    border-radius: var(--r);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
   }
-  .timeline-entry.is-active {
-    border-color: var(--accent);
+  .vrow::before {
+    content: "";
+    position: absolute;
+    left: -25px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--line-2);
   }
-  .timeline-entry .when {
+  .vrow.pub::before { border-color: var(--red); }
+  .vrow.now::before {
+    border-color: var(--ok);
+    box-shadow: 0 0 0 4px var(--ok-soft);
+  }
+  .vrow .vt { flex: 1; min-width: 0; }
+  .vrow .vt b { font-size: 14.5px; color: var(--ink); }
+  .vrow .vt small {
+    display: block;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+  .vrow .vno {
+    font-family: var(--mono);
     font-size: 12px;
-    color: var(--faint);
-    margin-bottom: 4px;
+    color: var(--ink-3);
   }
-  .timeline-entry .what {
-    font-size: 14px;
-    color: var(--text);
-    margin-bottom: 8px;
+  .vrow .acts { display: flex; gap: 7px; }
+
+  .empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: 13.5px;
+    border: 1px dashed var(--line);
+    border-radius: var(--r);
   }
-  .timeline-entry .actions {
+
+  .snapshot-form {
     display: flex;
-    gap: 6px;
-  }
-  .timeline-form {
-    margin-top: 16px;
-    display: flex;
-    gap: 8px;
-  }
-  .timeline-form input {
-    flex: 1;
-    background: var(--panel-strong);
-    color: var(--text);
+    gap: 10px;
+    margin-top: 4px;
+    padding: 14px 16px;
     border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 13px;
-    padding: 6px 10px;
+    border-radius: var(--r);
+    background: var(--surface);
+    align-items: center;
   }
-  .timeline-preview {
-    background: var(--panel);
+  .snapshot-form input.field { flex: 1; max-width: 380px; }
+
+  .preview-card {
+    margin-top: 24px;
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 16px;
-    min-height: 320px;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    padding: 18px;
   }
-  .timeline-preview h2 {
-    margin: 0 0 12px;
+  .preview-card h2 {
+    font-family: var(--display);
     font-size: 16px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--faint);
+    color: var(--ink-3);
+    margin: 0 0 12px;
   }
-  .timeline-preview .empty {
-    color: var(--faint);
-    font-style: italic;
+  .preview-card .empty-preview {
+    color: var(--ink-3);
+    font-size: 13.5px;
+    padding: 24px;
+    text-align: center;
   }
-  .timeline-preview iframe {
+  .preview-card iframe {
     width: 100%;
     height: 480px;
     background: #fff;
     border: 1px solid var(--line);
-    border-radius: 8px;
+    border-radius: var(--r-sm);
   }
 `;
 
@@ -153,6 +195,30 @@ function entryLabel(entry: SnapshotListItem): string {
     return v !== null ? `Published v${String(v)}` : 'Published';
   }
   return entry.label ?? 'Manual snapshot';
+}
+
+function entryVersionTag(entry: SnapshotListItem): string {
+  if (entry.reason === 'publish' && entry.publishedVersion !== null) {
+    return `v${String(entry.publishedVersion)}`;
+  }
+  return '—';
+}
+
+function SaveIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <path d="M5 3h11l3 3v15H5z" />
+      <path d="M8 3v5h7" stroke-linecap="round" />
+    </svg>
+  );
 }
 
 versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
@@ -189,10 +255,10 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
 
   const apiBase = `/api/sites/${row.id}/snapshots`;
 
-  // Inline script that wires the three actions. Plain JS — no bundler step.
-  // Confirm dialogs gate the destructive restore action. Preview swaps the
-  // returned HTML into a sandboxed iframe via srcdoc so an Owner viewing a
-  // past snapshot never accidentally runs scripts against the live editor.
+  // Inline script wires the three actions. Confirm dialogs gate the
+  // destructive restore action. Preview swaps the returned HTML into a
+  // sandboxed iframe via srcdoc so an Owner viewing a past snapshot never
+  // accidentally runs scripts against the live editor.
   const inlineScript = `
     (function () {
       const apiBase = ${JSON.stringify(apiBase)};
@@ -208,13 +274,17 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
 
       async function doPreview(id) {
         if (!preview) return;
-        preview.innerHTML = '<h2>Preview</h2><p class="empty">Loading…</p>';
+        preview.innerHTML = '<h2>Preview</h2><p class="empty-preview">Loading…</p>';
         const res = await fetch(apiBase + '/' + encodeURIComponent(id) + '/preview', {
           headers: { 'accept': 'application/json' },
         });
         if (!res.ok) {
           const body = await res.text();
-          var errP = document.createElement('p'); errP.className = 'empty'; errP.textContent = 'Preview failed: ' + body; preview.innerHTML = '<h2>Preview</h2>'; preview.appendChild(errP);
+          var errP = document.createElement('p');
+          errP.className = 'empty-preview';
+          errP.textContent = 'Preview failed: ' + body;
+          preview.innerHTML = '<h2>Preview</h2>';
+          preview.appendChild(errP);
           return;
         }
         const data = await res.json();
@@ -265,9 +335,11 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         list.addEventListener('click', function (event) {
           const target = event.target;
           if (!(target instanceof HTMLElement)) return;
-          const action = target.getAttribute('data-timeline-action');
+          const actionTarget = target.closest('[data-timeline-action]');
+          if (!actionTarget) return;
+          const action = actionTarget.getAttribute('data-timeline-action');
           if (!action) return;
-          const entry = target.closest('[data-timeline-entry]');
+          const entry = actionTarget.closest('[data-timeline-entry]');
           if (!entry) return;
           const id = entry.getAttribute('data-timeline-entry') || '';
           const label = entry.getAttribute('data-timeline-label') || '';
@@ -286,6 +358,12 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
     })();
   `;
 
+  // The first item in the timeline is treated as the "Live" version when
+  // it carries reason=publish. This mirrors versions.html where the
+  // current entry is decorated with .now .pub.
+  const items = page.items;
+  const liveId = items.find((entry) => entry.reason === 'publish')?.id ?? null;
+
   return c.html(
     <DashboardShell
       title={`Version history — ${row.name}`}
@@ -295,60 +373,88 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         { label: 'Version history' },
       ]}
       siteNav={buildSiteNav(row.id, row.name, `/dashboard/sites/${row.id}/snapshots`)}
-      pageStyles={panelStyles}
+      pageStyles={pageStyles}
+      theme={readThemeCookie(c)}
     >
-      <h1>Version history</h1>
-      <p>
-        Past publishes of <strong>{row.name}</strong> appear here, newest first. Preview a past
-        version, restore it, or capture a labelled snapshot of your current state.
-      </p>
+      <div class="vhead">
+        <div class="vh-text">
+          <h1>Version history</h1>
+          <p class="sub">
+            Every publish is saved. Roll back anytime — nothing is ever lost.
+          </p>
+        </div>
+        <Button variant="secondary" size="sm">
+          <SaveIcon />
+          Save a snapshot
+        </Button>
+      </div>
 
-      <div class="timeline-panel">
-        <section class="timeline-list">
-          <h2>Timeline</h2>
-          {page.items.length === 0 ? (
-            <p class="empty">No snapshots yet. Publish or save one to start the history.</p>
-          ) : (
-            <ol data-timeline-list>
-              {page.items.map((entry) => (
-                <li
-                  class="timeline-entry"
+      <div class="timeline">
+        {items.length === 0 ? (
+          <div class="empty">No snapshots yet. Publish or save one to start the history.</div>
+        ) : (
+          <div data-timeline-list>
+            {items.map((entry) => {
+              const isPub = entry.reason === 'publish';
+              const isLive = entry.id === liveId;
+              const classes = ['vrow'];
+              if (isPub) classes.push('pub');
+              if (isLive) classes.push('now');
+              const label = isLive ? `Current — live version` : entryLabel(entry);
+              const ago = relativeWhen(entry.capturedAt);
+              return (
+                <div
+                  class={classes.join(' ')}
                   data-timeline-entry={entry.id}
                   data-timeline-label={entryLabel(entry)}
                 >
-                  <div class="when">{relativeWhen(entry.capturedAt)}</div>
-                  <div class="what">
-                    {entryLabel(entry)}
-                    {entry.reason === 'publish' && <Badge variant="info">publish</Badge>}
+                  <div class="vt">
+                    <b>{label}</b>
+                    <small>{ago}</small>
                   </div>
-                  <div class="actions">
-                    <Button variant="secondary" size="sm" data-timeline-action="preview">
-                      Preview
-                    </Button>
-                    <Button variant="danger" size="sm" data-timeline-action="restore">
-                      Restore
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-          <form class="timeline-form" data-timeline-form>
-            <input
-              type="text"
-              name="label"
-              placeholder="Save snapshot label…"
-              maxlength={200}
-              required
-            />
-            <Button variant="primary" type="submit" size="sm">Save</Button>
-          </form>
-        </section>
-        <section class="timeline-preview" data-timeline-preview>
-          <h2>Preview</h2>
-          <p class="empty">Click "Preview" on a timeline entry to see how the site looked then.</p>
-        </section>
+                  {isLive ? (
+                    <span class="chip chip-ok">
+                      <span class="dot" />
+                      Live
+                    </span>
+                  ) : (
+                    <div class="acts">
+                      <Button variant="ghost" size="sm" data-timeline-action="preview">
+                        Preview
+                      </Button>
+                      <Button variant="secondary" size="sm" data-timeline-action="restore">
+                        Restore
+                      </Button>
+                    </div>
+                  )}
+                  <span class="vno">{entryVersionTag(entry)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      <form class="snapshot-form" data-timeline-form>
+        <input
+          type="text"
+          class="field"
+          name="label"
+          placeholder="Save snapshot label…"
+          maxlength={200}
+          required
+        />
+        <Button variant="primary" type="submit" size="sm">
+          Save snapshot
+        </Button>
+      </form>
+
+      <section class="preview-card" data-timeline-preview>
+        <h2>Preview</h2>
+        <p class="empty-preview">
+          Click &ldquo;Preview&rdquo; on a timeline entry to see how the site looked then.
+        </p>
+      </section>
       <script>{raw(inlineScript)}</script>
     </DashboardShell>,
   );

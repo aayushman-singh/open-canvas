@@ -9,7 +9,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
-import { Button, Badge, Pill } from '../../ui';
+import { Button, Badge, Pill, readThemeCookie } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
@@ -112,47 +112,41 @@ function buildThumbHtml(
   ].join('');
 }
 
+// Per-page styles for the dashboard root. Restyled to Open Canvas tokens
+// per MIGRATION.md §4 — stats cards become `.stat`, segmented filter
+// `.seg`, site cards adopt warm-neutral surfaces + `--shadow-sm` instead
+// of the previous dark literal palette. Sky-blue rgba(125,211,252) and
+// black-on-black overlays are gone.
 const cardStyles = `
-  .dash-header {
+  .page-head {
     display: flex;
-    align-items: baseline;
+    align-items: flex-end;
     justify-content: space-between;
-    margin-bottom: 4px;
+    gap: 16px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
   }
-  .dash-header h1 { margin: 0; font-size: 28px; }
-  .dash-header-actions {
+  .page-head h1 {
+    margin: 0;
+    font-size: 34px;
+    letter-spacing: -0.03em;
+  }
+  .page-head .hi {
+    color: var(--ink-2);
+    font-size: 15px;
+    margin-top: 6px;
+  }
+  .page-head-actions {
     display: flex;
     gap: 8px;
     align-items: center;
   }
-  .dash-header .new-site,
-  .dash-header .import-site {
-    font-size: 13px;
-    font-weight: 500;
-    padding: 6px 14px;
-    border-radius: 6px;
-    text-decoration: none;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-  }
-  .dash-header .new-site {
-    background: var(--accent);
-    color: var(--bg);
-  }
-  .dash-header .new-site:hover { filter: brightness(0.88); }
-  .dash-header .import-site {
-    background: rgba(125,211,252,0.10);
-    color: var(--accent);
-    border: 1px solid rgba(125,211,252,0.18);
-  }
-  .dash-header .import-site:hover { background: rgba(125,211,252,0.18); }
 
   .import-modal-overlay {
     position: fixed;
     inset: 0;
     z-index: 2000;
-    background: rgba(0,0,0,0.7);
+    background: rgba(26, 25, 23, 0.55);
     backdrop-filter: blur(4px);
     display: none;
     align-items: center;
@@ -160,12 +154,12 @@ const cardStyles = `
   }
   .import-modal-overlay[data-open="true"] { display: flex; }
   .import-modal {
-    background: var(--panel);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--r);
     width: min(480px, calc(100vw - 48px));
     padding: 28px;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    box-shadow: var(--shadow-lg);
   }
   .import-modal-header {
     display: flex;
@@ -175,9 +169,11 @@ const cardStyles = `
   }
   .import-modal h2 {
     margin: 0 0 4px;
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text);
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
   .import-close {
     flex-shrink: 0;
@@ -186,53 +182,51 @@ const cardStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    border: none;
-    background: rgba(255,255,255,0.06);
-    color: var(--muted);
-    border-radius: 6px;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border-radius: var(--r-xs);
     font-size: 18px;
     line-height: 1;
     cursor: pointer;
     padding: 0;
   }
-  .import-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+  .import-close:hover { background: var(--surface-3); color: var(--ink); }
   .import-modal .import-sub {
     margin: 0 0 20px;
-    font-size: 13px;
-    color: var(--faint);
+    font-size: 13.5px;
+    color: var(--ink-3);
   }
-  .import-field {
-    margin-bottom: 14px;
-  }
+  .import-field { margin-bottom: 14px; }
   .import-field label {
     display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    margin-bottom: 5px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink-2);
+    margin-bottom: 7px;
+    letter-spacing: 0.02em;
   }
   .import-field input {
     width: 100%;
-    padding: 9px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    font-size: 14px;
+    padding: 11px 14px;
+    border-radius: var(--r-sm);
+    border: 1.5px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 14.5px;
     font-family: inherit;
     outline: none;
     box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
   .import-field input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(125,211,252,0.15);
+    border-color: var(--red);
+    box-shadow: var(--ring);
   }
   .import-field .field-hint {
-    font-size: 11px;
-    color: var(--faint);
-    margin-top: 4px;
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 5px;
   }
   .import-actions {
     display: flex;
@@ -240,66 +234,84 @@ const cardStyles = `
     justify-content: flex-end;
     margin-top: 20px;
   }
-  .import-actions button {
-    padding: 8px 18px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    border: none;
-    font-family: inherit;
-  }
-  .btn-import-cancel {
-    background: rgba(255,255,255,0.06);
-    color: var(--muted);
-  }
-  .btn-import-cancel:hover { background: rgba(255,255,255,0.10); }
-  .btn-import-submit {
-    background: var(--accent);
-    color: var(--bg);
-  }
-  .btn-import-submit:hover { filter: brightness(0.88); }
-  .btn-import-submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    filter: none;
-  }
   .import-error {
     margin-top: 12px;
     padding: 8px 12px;
-    border-radius: 6px;
-    background: rgba(239,68,68,0.10);
-    border: 1px solid rgba(239,68,68,0.25);
-    color: #ef4444;
+    border-radius: var(--r-xs);
+    background: var(--red-soft);
+    border: 1px solid var(--red-line);
+    color: var(--red-ink);
     font-size: 13px;
     display: none;
   }
   .import-progress {
     margin-top: 12px;
     font-size: 13px;
-    color: var(--accent);
+    color: var(--red-ink);
     display: none;
   }
-  .dash-sub { color: var(--faint); font-size: 13px; margin: 0 0 24px; }
+  .dash-sub { color: var(--ink-3); font-size: 13px; margin: 0 0 24px; }
+
+  /* segmented filter — All / Published / Drafts */
+  .sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 6px 0 16px;
+  }
+  .sec-head h2 {
+    font-family: var(--display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    margin: 0;
+  }
+  .seg {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--surface-2);
+    border-radius: var(--r-pill);
+    border: 1px solid var(--line);
+  }
+  .seg button {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: var(--r-pill);
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    cursor: pointer;
+  }
+  .seg button.on {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+  }
 
   .site-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 20px;
+    gap: 18px;
     margin: 0 0 32px;
   }
   .site-card {
     position: relative;
-    background: var(--panel);
-    border-radius: 12px;
+    background: var(--surface);
+    border-radius: var(--r-lg);
     border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
     cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s ease;
+    transition: transform 0.16s, box-shadow 0.2s, border-color 0.2s;
   }
   .site-card:hover:not(.site-card--expanded) {
-    border-color: rgba(125,211,252,0.35);
-    transform: translateY(-3px);
+    border-color: var(--line-2);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-4px);
   }
 
   /* backdrop — fades in */
@@ -307,7 +319,7 @@ const cardStyles = `
     position: fixed;
     inset: 0;
     z-index: 999;
-    background: rgba(0,0,0,0.65);
+    background: rgba(26, 25, 23, 0.55);
     backdrop-filter: blur(4px);
     opacity: 0;
     pointer-events: none;
@@ -329,8 +341,8 @@ const cardStyles = `
     max-height: calc(100vh - 48px);
     overflow-y: auto;
     cursor: default;
-    border-color: var(--accent);
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px var(--accent);
+    border-color: var(--red);
+    box-shadow: var(--shadow-lg);
     transition: none;
     animation: card-fade-in 0.12s ease-out;
   }
@@ -348,7 +360,7 @@ const cardStyles = `
     width: 100%;
     height: 200px;
     overflow: hidden;
-    background: #0a0a0a;
+    background: var(--surface-3);
     border-bottom: 1px solid var(--line);
   }
   .site-card-thumb iframe {
@@ -363,24 +375,24 @@ const cardStyles = `
     pointer-events: none;
   }
 
-  .site-card-body {
-    padding: 16px 20px;
-  }
+  .site-card-body { padding: 16px 20px; }
   .site-card-body h3 {
     margin: 0 0 4px;
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--text);
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
   }
   .site-card-addr {
     display: inline-block;
+    font-family: var(--mono);
     font-size: 12px;
-    color: var(--accent);
+    color: var(--ink-2);
     text-decoration: none;
     margin-bottom: 10px;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
   }
-  .site-card-addr:hover { text-decoration: underline; }
+  .site-card-addr:hover { color: var(--red-ink); text-decoration: underline; }
 
   .site-card-meta {
     display: flex;
@@ -390,8 +402,8 @@ const cardStyles = `
     margin-bottom: 14px;
   }
   .site-card-date {
-    font-size: 12px;
-    color: var(--faint);
+    font-size: 12.5px;
+    color: var(--ink-3);
   }
 
   /* --- card actions: Edit | Publish/Live | ... --- */
@@ -405,92 +417,94 @@ const cardStyles = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 8px 14px;
-    border-radius: 6px;
+    padding: 9px 14px;
+    border-radius: var(--r-pill);
+    font-family: var(--sans);
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 650;
     text-decoration: none;
-    transition: background 0.12s, filter 0.12s;
+    transition: background 0.14s, color 0.14s, border-color 0.14s, box-shadow 0.14s;
     cursor: pointer;
-    border: none;
-    font-family: inherit;
+    border: 1.5px solid transparent;
   }
   .btn-edit {
     flex: 1;
-    background: var(--accent);
-    color: var(--bg);
+    background: var(--red);
+    color: #fff;
+    box-shadow: var(--shadow-red);
   }
-  .btn-edit:hover { filter: brightness(0.88); }
+  .btn-edit:hover { background: var(--red-strong); }
 
   .btn-live {
     flex: 1;
-    background: rgba(74,222,128,0.12);
-    color: #4ade80;
-    border: 1px solid rgba(74,222,128,0.22);
+    background: var(--ok-soft);
+    color: var(--ok);
+    border-color: transparent;
   }
-  .btn-live:hover { background: rgba(74,222,128,0.20); }
+  .btn-live:hover { filter: brightness(0.96); }
   .btn-live .dot {
     display: inline-block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #4ade80;
+    background: currentColor;
     margin-right: 6px;
   }
 
   .btn-publish {
     flex: 1;
-    background: rgba(250,204,21,0.10);
-    color: #facc15;
-    border: 1px solid rgba(250,204,21,0.18);
+    background: var(--warn-soft);
+    color: var(--warn);
+    border-color: transparent;
   }
-  .btn-publish:hover { background: rgba(250,204,21,0.18); }
+  .btn-publish:hover { filter: brightness(0.96); }
 
   .btn-unpublish {
     flex: 1;
-    background: rgba(74,222,128,0.10);
-    color: #4ade80;
-    border: 1px solid rgba(74,222,128,0.18);
+    background: var(--ok-soft);
+    color: var(--ok);
+    border-color: transparent;
   }
-  .btn-unpublish:hover { background: rgba(239,68,68,0.12); color: #ef4444; border-color: rgba(239,68,68,0.25); }
+  .btn-unpublish:hover {
+    background: var(--red-soft);
+    color: var(--red-ink);
+    border-color: var(--red-line);
+  }
   .btn-unpublish .dot {
     display: inline-block;
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #4ade80;
+    background: currentColor;
     margin-right: 6px;
   }
-  .btn-unpublish:hover .dot { background: #ef4444; }
 
   .btn-dots {
     width: 38px;
     min-width: 38px;
-    background: var(--panel-strong, #182235);
-    color: var(--muted);
-    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+    border: 1.5px solid var(--line-2);
     font-size: 18px;
     letter-spacing: 1px;
     line-height: 1;
     padding: 0;
   }
-  .btn-dots:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .btn-dots:hover { background: var(--surface-2); color: var(--ink); }
   .btn-dots[aria-expanded="true"] {
-    background: rgba(125,211,252,0.10);
-    color: var(--accent);
-    border-color: rgba(125,211,252,0.25);
+    background: var(--red-soft);
+    color: var(--red-ink);
+    border-color: var(--red-line);
   }
 
   /* --- expandable details panel --- */
   .site-card-details {
     display: none;
     border-top: 1px solid var(--line);
-    background: var(--bg);
+    background: var(--paper);
     padding: 14px 16px 16px;
   }
-  .site-card-details[data-open="true"] {
-    display: block;
-  }
+  .site-card-details[data-open="true"] { display: block; }
   .details-header {
     display: flex;
     align-items: center;
@@ -500,10 +514,10 @@ const cardStyles = `
   .details-heading {
     margin: 0;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--faint);
+    color: var(--ink-3);
   }
   .details-gear {
     display: inline-flex;
@@ -511,67 +525,57 @@ const cardStyles = `
     justify-content: center;
     width: 28px;
     height: 28px;
-    border-radius: 6px;
-    color: var(--muted);
+    border-radius: var(--r-xs);
+    color: var(--ink-2);
     text-decoration: none;
-    transition: background 0.12s, color 0.12s;
+    transition: background 0.14s, color 0.14s;
   }
   .details-gear:hover {
-    color: var(--accent);
-    background: rgba(125, 211, 252, 0.10);
+    color: var(--red-ink);
+    background: var(--red-soft);
   }
   .details-gear:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--red);
     outline-offset: 1px;
   }
-  .details-list {
-    display: flex;
-    flex-direction: column;
-  }
+  .details-list { display: flex; flex-direction: column; }
   .detail-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     padding: 9px 8px;
-    border-radius: 6px;
+    border-radius: var(--r-xs);
     font-size: 13px;
     text-decoration: none;
     color: inherit;
   }
   .detail-row + .detail-row {
-    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    border-top: 1px solid var(--line);
   }
   .detail-row--link {
     cursor: pointer;
-    transition: background 0.12s;
+    transition: background 0.14s;
   }
-  .detail-row--link:hover {
-    background: rgba(255, 255, 255, 0.04);
-  }
-  .detail-row--link:hover .detail-label {
-    color: var(--text);
-  }
+  .detail-row--link:hover { background: var(--surface-2); }
+  .detail-row--link:hover .detail-label { color: var(--ink); }
   .detail-row--link:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--red);
     outline-offset: -2px;
   }
   .detail-label {
-    color: var(--muted);
+    color: var(--ink-2);
     flex: 1;
-    transition: color 0.12s;
+    transition: color 0.14s;
   }
-  .detail-value {
-    display: inline-flex;
-    align-items: center;
-  }
+  .detail-value { display: inline-flex; align-items: center; }
   .detail-chevron {
-    color: var(--faint);
+    color: var(--ink-3);
     font-size: 16px;
     line-height: 1;
     margin-left: 2px;
     opacity: 0;
-    transition: opacity 0.12s, transform 0.12s;
+    transition: opacity 0.14s, transform 0.14s;
   }
   .detail-row--link:hover .detail-chevron {
     opacity: 1;
@@ -579,8 +583,9 @@ const cardStyles = `
   }
   .dash-sign-out {
     font-size: 13px;
-    color: var(--faint);
+    color: var(--ink-3);
   }
+  .dash-sign-out:hover { color: var(--ink); }
 
   .site-card-thumb { container-type: inline-size; }
   @container (min-width: 1px) {
@@ -588,103 +593,74 @@ const cardStyles = `
     .site-card--expanded .site-card-thumb iframe { transform: scale(calc(100cqi / 1440)); }
   }
 
-  .status-live {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 0 8px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #4ade80;
-  }
-  .status-live .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #4ade80;
-  }
-
-  .detail-link a {
-    display: contents;
-    text-decoration: none;
-    color: inherit;
-    cursor: pointer;
-  }
-  .detail-link:hover {
-    background: rgba(125,211,252,0.06);
-  }
-  .detail-link td:first-child::after {
-    content: ' \\2192';
-    color: var(--accent);
-    opacity: 0;
-    transition: opacity 0.12s;
-  }
-  .detail-link:hover td:first-child::after {
-    opacity: 1;
-  }
-
   .import-arrow {
     text-align: center;
-    color: var(--faint);
+    color: var(--ink-3);
     font-size: 12px;
     padding: 4px 0;
     letter-spacing: 0.03em;
   }
 
+  /* stat cards — match dashboard.html .stat */
   .dash-stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 14px;
-    margin-bottom: 28px;
+    margin-bottom: 30px;
   }
   .dash-stat-card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 10px;
     padding: 18px 20px;
+    border-radius: var(--r);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
   }
   .dash-stat-card .stat-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--faint);
+    font-size: 13px;
+    color: var(--ink-2);
+    font-weight: 600;
     margin-bottom: 6px;
   }
   .dash-stat-card .stat-value {
-    font-size: 26px;
+    font-family: var(--display);
     font-weight: 700;
-    color: var(--text);
+    font-size: 32px;
+    letter-spacing: -0.02em;
+    color: var(--ink);
     line-height: 1;
+    margin-top: 12px;
   }
   .dash-stat-card .stat-sub {
-    font-size: 12px;
-    color: var(--faint);
+    font-size: 12.5px;
+    color: var(--ink-3);
     margin-top: 4px;
   }
-  .dash-stat-card .stat-value .accent {
-    color: var(--accent);
-  }
+  .dash-stat-card .stat-value .accent { color: var(--red-ink); }
 
   .dash-welcome {
-    background: var(--panel);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--r-lg);
     padding: 32px;
     text-align: center;
     margin-bottom: 28px;
+    box-shadow: var(--shadow-sm);
   }
   .dash-welcome h2 {
     margin: 0 0 8px;
-    font-size: 22px;
-    font-weight: 600;
+    font-family: var(--display);
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
   .dash-welcome p {
     margin: 0 0 20px;
-    font-size: 14px;
-    color: var(--faint);
+    font-size: 14.5px;
+    color: var(--ink-2);
     max-width: 480px;
     margin-left: auto;
     margin-right: auto;
+    line-height: 1.5;
   }
   .dash-welcome-actions {
     display: flex;
@@ -698,17 +674,19 @@ const cardStyles = `
     margin-bottom: 28px;
   }
   .dash-quick-card {
-    background: var(--panel);
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--r);
     padding: 18px 20px;
     text-decoration: none;
     color: inherit;
-    transition: border-color 0.12s, transform 0.12s;
+    transition: border-color 0.14s, transform 0.14s, box-shadow 0.14s;
+    box-shadow: var(--shadow-sm);
   }
   .dash-quick-card:hover {
-    border-color: rgba(125,211,252,0.35);
+    border-color: var(--line-2);
     transform: translateY(-2px);
+    box-shadow: var(--shadow);
   }
   .dash-quick-card .qicon {
     font-size: 20px;
@@ -717,22 +695,20 @@ const cardStyles = `
   }
   .dash-quick-card h3 {
     margin: 0 0 4px;
-    font-size: 14px;
-    font-weight: 600;
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
   .dash-quick-card p {
     margin: 0;
-    font-size: 12px;
-    color: var(--faint);
+    font-size: 12.5px;
+    color: var(--ink-3);
   }
 
   @media (max-width: 768px) {
-    .dash-stats {
-      grid-template-columns: repeat(2, 1fr);
-    }
-    .dash-quick {
-      grid-template-columns: 1fr;
-    }
+    .dash-stats { grid-template-columns: repeat(2, 1fr); }
+    .dash-quick { grid-template-columns: 1fr; }
   }
 `;
 
@@ -1168,14 +1144,50 @@ dashboard.get('/', async (c) => {
   const avatarUrl = user.imageUrl;
   const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
 
+  const greetingName = displayName ?? primaryEmail.split('@')[0];
+
   return c.html(
     <DashboardShell
-      title="rev01 — dashboard"
+      title="Open Canvas — Your sites"
       crumbs={[{ label: 'Dashboard' }]}
       activePath="/dashboard"
       pageStyles={cardStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
+      theme={readThemeCookie(c)}
     >
+      <div class="page-head">
+        <div>
+          <h1>Your sites</h1>
+          <p class="hi">
+            Welcome back, {greetingName}. You have{' '}
+            <b>
+              {String(publishedCount)} live {publishedCount === 1 ? 'site' : 'sites'}
+            </b>{' '}
+            and {String(Math.max(cards.length - publishedCount, 0))} in progress.
+          </p>
+        </div>
+        <div class="page-head-actions">
+          <Button
+            variant="secondary"
+            class="import-site"
+            id="import-btn"
+            disabled
+            title="Site import is disabled in the public POC. Run the scraper locally to enable."
+          >
+            Import
+          </Button>
+          {atSiteLimit ? (
+            <Button variant="primary" class="new-site" href="/dashboard/settings">
+              Upgrade to add sites
+            </Button>
+          ) : (
+            <Button variant="primary" class="new-site" href="/dashboard/templates">
+              + New site
+            </Button>
+          )}
+        </div>
+      </div>
+
       <div class="dash-stats">
         <div class="dash-stat-card">
           <div class="stat-label">Total sites</div>
@@ -1205,27 +1217,12 @@ dashboard.get('/', async (c) => {
         </div>
       </div>
 
-      <div class="dash-header">
-        <h1>Your sites</h1>
-        <div class="dash-header-actions">
-          <Button
-            variant="secondary"
-            class="import-site"
-            id="import-btn"
-            disabled
-            title="Site import is disabled in the public POC. Run the scraper locally to enable."
-          >
-            Import
-          </Button>
-          {atSiteLimit ? (
-            <Button variant="primary" class="new-site" href="/dashboard/settings">
-              Upgrade to add sites
-            </Button>
-          ) : (
-            <Button variant="primary" class="new-site" href="/dashboard/templates">
-              + New site
-            </Button>
-          )}
+      <div class="sec-head">
+        <h2>All sites</h2>
+        <div class="seg">
+          <button class="on">All</button>
+          <button>Published</button>
+          <button>Drafts</button>
         </div>
       </div>
 
@@ -1357,7 +1354,7 @@ dashboard.get('/', async (c) => {
       ) : (
         <>
           <div class="dash-welcome">
-            <h2>Welcome to rev01</h2>
+            <h2>Welcome to Open Canvas</h2>
             <p>
               Build your first client site in minutes. Pick a template, customize with the canvas
               editor, and publish to a live URL.

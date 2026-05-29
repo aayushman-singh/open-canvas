@@ -35,7 +35,7 @@ import { getStyleKitPreset } from '../../canvas/style-kits';
 import { db } from '../../db/client';
 import { customer, site } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
-import { Button, Card } from '../../ui';
+import { Button, Card, readThemeCookie } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -1077,6 +1077,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
       ]}
       pageStyles={pageStyles}
       siteNav={buildSiteNav(siteId, siteName, `/dashboard/sites/${siteId}/settings`)}
+      theme={readThemeCookie(c)}
     >
       <h1>SEO &amp; metadata</h1>
       <p class="lede">

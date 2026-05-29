@@ -40,6 +40,7 @@ import { customTemplatesAdmin } from './routes/api/custom-templates';
 import { editTokenAuth } from './auth/middleware';
 import editTokenRefreshRoute from './auth/refresh-route';
 import signOutRoute from './auth/sign-out-route';
+import signInRoute from './auth/sign-in-route';
 import onSiteEditRoute from './routes/api/on-site-edit';
 import collaboratorsApi from './routes/api/collaborators';
 import inviteRedirectRoute from './auth/invite-redirect-route';
@@ -62,6 +63,13 @@ app.route('/__live', socketRoute);
 app.get('/health', (c) => c.json({ ok: true, ts: Date.now() }));
 
 app.route('/sign-out', signOutRoute);
+
+// Open Canvas-branded sign-in / create-account surface (MIGRATION.md §5g).
+// `requireAuth()` still bounces unauthenticated owners to the Clerk Account
+// Portal for back-compat (locked by review-smoke); `/auth` is a separate
+// entry point that keeps owners inside our chrome by mounting Clerk's
+// `<SignIn>` widget client-side. See src/auth/sign-in-route.tsx.
+app.route('/auth', signInRoute);
 
 // Stable invite landing page (#7): collaborator emails point at the main
 // domain instead of a specific subdomain, so renames don't break links.

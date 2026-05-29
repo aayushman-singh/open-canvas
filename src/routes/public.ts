@@ -60,6 +60,17 @@ import { makeFontLookup, resolveFontTokens } from '../fonts/resolve';
 // Wrap is a no-op when no interactive elements present in the snapshot.
 import { injectInteractiveRuntime } from '../interactive/inject';
 import { emitAddonBodyScripts, emitAddonHeadScripts } from '../addons/emit';
+// Open Canvas chrome (MIGRATION.md §5h) — friendly 404 + "coming soon" draft
+// pages now consume the shared design tokens, component primitives, brand
+// mark, and pre-paint theme-restore script so they match the rest of the
+// app surface (landing / dashboard / editor).
+import {
+  themeCss,
+  componentsCss,
+  themeFontHeadHtml,
+  themeBootScript,
+  readThemeCookie,
+} from '../ui/theme';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -461,6 +472,8 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   }
 
   const opts = await buildOnSiteEditorOptions(siteRow, payload, c.env);
+  const theme = readThemeCookie(c);
+  if (theme) opts.theme = theme;
   return c.html(editorPageJsx(opts));
 }
 
@@ -534,36 +547,162 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   });
 }
 
+// Open Canvas brand SVG — inlined (rather than importing OcLogo from
+// src/ui/brand.tsx) so this module stays a `.ts` file without a JSX
+// dependency. The marks below match the silhouette of `OcLogo({size: N})`
+// and the footer wordmark used across landing / dashboard.
+function ocLogoSvg(size: number): string {
+  return (
+    `<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" aria-hidden="true">` +
+    `<rect x="14" y="9" width="40" height="46" stroke="currentColor" stroke-width="2.4"/>` +
+    `<circle cx="34" cy="32" r="11" stroke="currentColor" stroke-width="7"/>` +
+    `<rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="var(--red)"/>` +
+    `<rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="var(--red)"/>` +
+    `</svg>`
+  );
+}
+
+// "Powered by Open Canvas" mark used by both the 404 and draft scenes.
+// Visitors land here unauthenticated; we link the wordmark out to the
+// product surface so the brand stays consumable but never injects the
+// authenticated chrome.
+function poweredByOpenCanvasHtml(): string {
+  return (
+    `<div class="powered"><a href="https://rev01.aayushman.dev" target="_blank" rel="noopener">` +
+    `<span class="oc-logo" style="color:var(--ink-3)">${ocLogoSvg(18)}</span>` +
+    `Powered by Open Canvas</a></div>`
+  );
+}
+
+// Shared <head> for the two public scene pages (404 + draft). Loads the
+// design tokens, component primitives, Open Canvas font stack, and the
+// pre-paint theme-restore script so a previously-visited surface doesn't
+// flash light/dark on first paint. NO theme-toggle button: the visitor is
+// unauthenticated and the gate/draft/404 surfaces stay minimal.
+function buildPublicSceneHead(title: string, sceneStyles: string): string {
+  return (
+    `<meta charset="utf-8" />` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1" />` +
+    `<meta name="robots" content="noindex" />` +
+    `<title>${title}</title>` +
+    `<script>${themeBootScript}</script>` +
+    themeFontHeadHtml +
+    `<style>${themeCss}\n${componentsCss}\n${sceneStyles}</style>`
+  );
+}
+
+// Common scene chrome — centred column on `var(--paper)` with the
+// "Powered by Open Canvas" lockup pinned to the bottom. Used by both
+// the 404 and the draft scenes; the per-scene `.scene` rule lives in
+// each page's local style block.
+const PUBLIC_SCENE_STYLES = `
+html, body { height: 100%; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); }
+.scene { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 24px; position: relative; }
+.scene .inner { max-width: 620px; text-align: center; }
+.powered { position: absolute; bottom: 24px; left: 0; right: 0; display: flex; justify-content: center; }
+.powered a { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-3); font-weight: 600; }
+.powered a:hover { color: var(--ink-2); }
+`;
+
+// 404 scene — paper background, oversized "4 0 4" with the lens-red middle
+// "0" echoing the Open Canvas logo, plus a "Back to home" CTA. Used by
+// the unknown-slug branch below (visitor reaches a real site but the
+// requested page doesn't exist and the snapshot has no custom _404 page).
+const NOT_FOUND_SCENE_STYLES = `
+.bigcode { font-family: var(--display); font-weight: 800; font-size: clamp(80px, 18vw, 160px); letter-spacing: -.04em; line-height: .9; color: var(--ink); }
+.scene .mark { margin-bottom: 30px; color: var(--ink); }
+.scene .mark svg { display: block; margin: 0 auto; }
+.scene h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: -.03em; line-height: 1.14; margin-top: 22px; }
+.scene p { color: var(--ink-2); font-size: 17px; max-width: 44ch; margin: 20px auto 0; line-height: 1.55; }
+.scene .acts { display: flex; gap: 12px; justify-content: center; margin-top: 30px; flex-wrap: wrap; }
+`;
+
+function buildNotFoundPage<P extends string, I extends Input>(
+  c: Context<PublicEnv, P, I>,
+): Response {
+  const head = buildPublicSceneHead(
+    'Page not found — Open Canvas',
+    `${PUBLIC_SCENE_STYLES}\n${NOT_FOUND_SCENE_STYLES}`,
+  );
+  const theme = readThemeCookie(c);
+  const themeAttr = theme === 'dark' ? ' data-theme="dark"' : '';
+  return c.html(
+    `<!doctype html>
+<html lang="en"${themeAttr}>
+<head>${head}</head>
+<body>
+  <div class="scene">
+    <div class="inner">
+      <div class="mark">${ocLogoSvg(78)}</div>
+      <div class="bigcode">4<span style="color:var(--red)">0</span>4</div>
+      <h1>This page took a wrong turn.</h1>
+      <p>The page you&rsquo;re looking for isn&rsquo;t here &mdash; it may have moved, or the link might have a typo.</p>
+      <div class="acts">
+        <a href="/" class="btn btn-primary btn-lg">Back to home</a>
+      </div>
+    </div>
+    ${poweredByOpenCanvasHtml()}
+  </div>
+</body>
+</html>`,
+    404,
+  );
+}
+
+// "Coming soon" draft scene — half-built canvas with the lens-red sweep
+// shimmer, an owner sign-in nudge, and the wordmark footer. Served when
+// the site row exists but `publishedSnapshot` is null. The function name
+// is referenced by public-invite:smoke as a body-of-handler boundary
+// marker — do not rename without updating the smoke.
+const COMING_SOON_SCENE_STYLES = `
+.chip-soon { margin-bottom: 22px; }
+.scene h1 { font-size: clamp(30px, 5.2vw, 52px); letter-spacing: -.035em; line-height: 1.05; max-width: 16ch; }
+.scene p { color: var(--ink-2); font-size: 17px; max-width: 46ch; margin: 18px auto 0; line-height: 1.55; }
+.build { position: relative; width: min(360px, 80vw); margin: 38px auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+.build .ph { height: 78px; background: linear-gradient(135deg,#E9837A,#E84D4A 60%,#C5332F); position: relative; }
+.build .ph .scan { position: absolute; left: 0; right: 0; top: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent); animation: sweep 2.4s ease-in-out infinite; }
+.build .bd { padding: 16px 18px 20px; text-align: left; }
+.build .ln { height: 9px; border-radius: 5px; background: var(--surface-3); margin-bottom: 9px; }
+.build .dash { height: 34px; border-radius: 10px; border: 1.5px dashed var(--line-2); display: flex; align-items: center; justify-content: center; color: var(--ink-3); font-size: 11px; margin-top: 6px; }
+@keyframes sweep { 0% { transform: translateX(-100%);} 60%,100% { transform: translateX(100%);} }
+.owner { margin-top: 30px; font-size: 13.5px; color: var(--ink-3); }
+.owner a { color: var(--red-ink); font-weight: 650; }
+.owner a:hover { color: var(--red-strong); }
+@media (prefers-reduced-motion: reduce) { .build .ph .scan { animation: none; } }
+`;
+
 function buildComingSoonPage<P extends string, I extends Input>(
   c: Context<PublicEnv, P, I>,
   siteRow: PublicSiteRow,
 ): Response {
+  const safeName = escapeHtmlForPage(siteRow.name);
+  const head = buildPublicSceneHead(
+    `${safeName} — coming soon`,
+    `${PUBLIC_SCENE_STYLES}\n${COMING_SOON_SCENE_STYLES}`,
+  );
+  const theme = readThemeCookie(c);
+  const themeAttr = theme === 'dark' ? ' data-theme="dark"' : '';
   return c.html(
-    `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="noindex" />
-  <title>${escapeHtmlForPage(siteRow.name)} — not yet published</title>
-  <style>
-    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column;
-           align-items: center; justify-content: center; font-family: system-ui, sans-serif;
-           background: #0d1117; color: #e6edf3; }
-    .wrap { text-align: center; max-width: 480px; padding: 32px; }
-    h1 { font-size: 28px; font-weight: 700; margin: 0 0 12px; }
-    p { font-size: 14px; opacity: 0.6; line-height: 1.6; margin: 0; }
-    .badge { display: inline-block; margin-top: 32px; padding: 6px 14px;
-             border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
-             font-size: 11px; opacity: 0.4; }
-    .badge a { color: inherit; text-decoration: none; }
-  </style>
-</head>
+    `<!doctype html>
+<html lang="en"${themeAttr}>
+<head>${head}</head>
 <body>
-  <div class="wrap">
-    <h1>${escapeHtmlForPage(siteRow.name)}</h1>
-    <p>This site is not yet published.</p>
-    <div class="badge"><a href="https://rev01.aayushman.dev">made with rev01</a></div>
+  <div class="scene">
+    <span class="chip chip-red chip-soon"><span class="dot"></span>Building in progress</span>
+    <h1>${safeName} is <span class="marker">on the way</span>.</h1>
+    <p>This site hasn&rsquo;t been published yet. The owner is still putting it together &mdash; check back soon!</p>
+    <div class="build">
+      <div class="ph"><div class="scan"></div></div>
+      <div class="bd">
+        <div class="ln" style="width:55%"></div>
+        <div class="ln" style="width:85%"></div>
+        <div class="ln" style="width:70%"></div>
+        <div class="dash">+ more coming soon</div>
+      </div>
+    </div>
+    <p class="owner">Are you the owner? <a href="/?edit">Sign in</a> to finish and publish your site.</p>
+    ${poweredByOpenCanvasHtml()}
   </div>
 </body>
 </html>`,
@@ -775,7 +914,10 @@ export async function handlePublicRequest<P extends string, I extends Input>(
       activeRender = notFoundRender;
       statusCode = 404;
     } else {
-      return c.text('page not found', 404);
+      // No custom _404 page in the snapshot — serve the Open Canvas
+      // friendly 404 scene (MIGRATION.md §5h). The site row exists and
+      // the snapshot was published; only this specific slug is missing.
+      return buildNotFoundPage(c);
     }
   }
   const renderSnapshot = activeRender.renderSnapshot;

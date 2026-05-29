@@ -25,7 +25,7 @@ import { db } from '../../db/client.js';
 import { customer, site } from '../../db/schema.js';
 
 import { DashboardShell, buildSiteNav } from './shell.js';
-import { Button } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -344,6 +344,7 @@ chatPanelRoute.get('/sites/:siteId/chat', async (c) => {
       ]}
       siteNav={buildSiteNav(row.id, row.name, `/dashboard/sites/${row.id}/chat`)}
       pageStyles={pageStyles}
+      theme={readThemeCookie(c)}
     >
       <div data-site-id={row.id}>
         <h1>Chat</h1>

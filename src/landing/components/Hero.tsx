@@ -1,35 +1,33 @@
-import { HeroPanel } from './HeroPanel';
+import { Button } from '../../ui';
 
+// Centred Open Canvas hero (eyebrow + Bricolage headline with `.marker` +
+// sub + dual CTA + note). Copy is benefit-first and plain — per
+// MIGRATION.md §5a and design-references/landing.html.
 export function Hero() {
   return (
-    <section class="hero" aria-label="hero — live editor, preview, agent">
-      <div class="panel">
-        <div class="titlebar" aria-hidden="true">
-          <span class="glyphs">
-            <span class="glyph close"></span>
-            <span class="glyph min"></span>
-            <span class="glyph max"></span>
-          </span>
-          <span class="path">
-            rev01/<span class="accent">dashboard</span>/sites/maple-coffee/pages/home
-          </span>
-          <span class="right">demo workspace · local replay</span>
+    <section class="hero" aria-label="Build your website, together">
+      <div class="wrap">
+        <span class="eyebrow" style="white-space:normal">
+          The site builder for the rest of us
+        </span>
+        <h1>
+          Build your website,
+          <br />
+          <span class="marker">together</span>.
+        </h1>
+        <p class="sub">
+          Drag things where you want them. Ask the built-in assistant for a hand. Hit publish
+          and it&apos;s live — no code, no plugins, no headaches.
+        </p>
+        <div class="hero-cta">
+          <Button variant="primary" size="lg" href="/dashboard">
+            Start building — it&apos;s free
+          </Button>
+          <Button variant="secondary" size="lg" href="#demo">
+            See how it works
+          </Button>
         </div>
-        <div class="hero-grid">
-          <HeroPanel kind="editor" />
-          <HeroPanel kind="preview" />
-          <HeroPanel kind="agent" />
-        </div>
-        <div class="hero-foot" aria-hidden="true">
-          <span>
-            <span class="ok">●</span> demo trace
-          </span>
-          <span class="sep">/</span>
-          <span>3 collaborators</span>
-          <span class="sep">/</span>
-          <span>local replay</span>
-          <span class="right">124 ops in scenario</span>
-        </div>
+        <p class="hero-note">No credit card · Your first site publishes in minutes</p>
       </div>
     </section>
   );

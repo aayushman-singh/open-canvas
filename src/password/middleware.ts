@@ -48,6 +48,20 @@ export interface RequireUnlockEnv {
 
 const UNLOCK_PATH = '/__rev01/unlock';
 
+// Anchored cookie regex: matches `oc-theme=light` or `oc-theme=dark` only
+// when the pair sits at the start of the header or after a `; ` separator.
+// The alternation pins the captured value to the closed alphabet
+// `light|dark` — anything else returns undefined without touching the gate.
+// Mirrors readThemeCookie in src/ui/theme.ts; duplicated here so the gate
+// package keeps its zero-dependency surface.
+const THEME_COOKIE_RE = /(?:^|;\s*)oc-theme=(light|dark)(?:;|$)/;
+
+function readGateTheme(cookieHeader: string | null): 'light' | 'dark' | undefined {
+  if (!cookieHeader) return undefined;
+  const match = THEME_COOKIE_RE.exec(cookieHeader);
+  return match ? (match[1] as 'light' | 'dark') : undefined;
+}
+
 /**
  * Check the unlock cookie for `site` against the incoming request.
  *
@@ -121,11 +135,13 @@ export async function requireUnlock(
   const redirectPath =
     filteredQs.length > 0 ? `${requestUrl.pathname}?${filteredQs}` : requestUrl.pathname;
 
+  const gateTheme = readGateTheme(cookieHeader);
   const html = renderGateHtml({
     redirect: redirectPath,
     showError,
     showRateLimit,
     siteName: site.name,
+    ...(gateTheme ? { theme: gateTheme } : {}),
   });
 
   return new Response(html, {

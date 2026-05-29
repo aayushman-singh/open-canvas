@@ -1,134 +1,206 @@
-import { LANDING_DEMO_IDS } from '../demo-hooks';
-
-// The data-tab / data-panel / data-cmp / data-kit literal values below are
-// also referenced by the inlined IIFE in src/landing/demo-script.ts. The
-// drift smoke at src/landing/demo-hooks.smoke.ts asserts every value in
-// demo-hooks.ts appears in LANDING_DEMO_SRC, catching the class where a
-// rename in demo-hooks.ts (which auto-flows into this file via the imports
-// above) is not mirrored in demo-script.ts.
-
-type Kind = 'editor' | 'preview' | 'agent';
-
-export function HeroPanel(props: { kind: Kind }) {
-  if (props.kind === 'editor') return <EditorPanel />;
-  if (props.kind === 'preview') return <PreviewPanel />;
-  return <AgentPanel />;
-}
-
-function EditorPanel() {
+// Live multiplayer-editing demo, matching design-references/demo.js.
+//
+// Vignette loop (driven by `demo-script.ts`):
+//   reset → Sam selects the button → assistant recolors it → You drop
+//   a delivery badge → Publish toast → reset.
+//
+// The DOM IDs (`canvas`, `artboard`, `abBtn`, `selRing`, `newBadge`,
+// `curSam`, `curYou`, `toast`, `asType`, `m1`/`m2`/`opCard`/`m3`) are
+// the contract demo-script.ts queries. Names match landing.html so the
+// reference demo.js will swap in cleanly if a tighter port is wanted.
+//
+// The component file name `HeroPanel` is kept (existing import sites
+// depend on it). The export is now a single `Demo` block — the old
+// per-pane variants (editor/preview/agent) are dead and gone.
+export function HeroPanel() {
   return (
-    <div class="hero-panel" aria-label="editor sidebar">
-      <div class="heading">
-        <span class="kind">editor</span>
-        <span>home.canvas.json</span>
-      </div>
-      <div class="body" style="padding:0;">
-        <aside class="demo-sidebar" id={LANDING_DEMO_IDS.sidebar} aria-hidden="true">
-          <div class="demo-sb-tabs">
-            <button type="button" class="active" data-tab="add">Add</button>
-            <button type="button" data-tab="sections">Sections</button>
-            <button type="button" data-tab="pages">Pages</button>
-          </div>
-
-          <div class="demo-sb-upload" id={LANDING_DEMO_IDS.sidebarUpload} hidden>
-            <div class="row">
-              <span class="filename">hero.jpg</span>
-              <span class="pct">0%</span>
+    <section class="demo-wrap" id="demo" aria-label="Live multiplayer demo">
+      <div class="wrap">
+        <div class="demo-window" id="demoWindow">
+          <div class="demo-chrome" aria-hidden="true">
+            <div class="traffic">
+              <i style="background:#E8534E"></i>
+              <i style="background:#E9B44C"></i>
+              <i style="background:#5BB98C"></i>
             </div>
-            <div class="bar">
-              <div class="fill"></div>
+            <div class="demo-url">
+              <span class="lock" aria-hidden="true">🔒</span> bloomandco.opencanvas.site
+            </div>
+            <div class="presence" aria-label="Currently editing">
+              <span class="av" style="background:#E84D4A" title="You">Y</span>
+              <span class="av" style="background:#3BA1A1" title="Sam">S</span>
+              <span class="av" style="background:#7C6FE0" title="Mia">M</span>
             </div>
           </div>
-
-          <div class="demo-sb-panel" data-panel="add">
-            <div class="demo-sb-group">
-              <h2>Sections</h2>
-              <button type="button" class="demo-sb-cmd">+ Blank section</button>
-            </div>
-            <div class="demo-sb-group">
-              <h2>Components</h2>
-              <div class="demo-sb-cmd-grid">
-                <button type="button" data-cmp="text">Text</button>
-                <button type="button" data-cmp="image">Image</button>
-                <button type="button" data-cmp="button">Button</button>
-                <button type="button" data-cmp="shape">Shape</button>
-                <button type="button" data-cmp="container">Container</button>
-                <button type="button" data-cmp="nav">Nav</button>
-                <button type="button" data-cmp="chart">Chart</button>
-                <button type="button" data-cmp="form">Form</button>
+          <div class="demo-body" id="demoBody">
+            {/* left rail */}
+            <div class="rail" aria-hidden="true">
+              <div class="tool active" title="Move">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 3l4 16 2.5-6.5L18 10z" />
+                </svg>
+              </div>
+              <div class="tool" title="Text">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                >
+                  <path d="M4 6h16M9 6v13M15 6v13" />
+                </svg>
+              </div>
+              <div class="tool" title="Image">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <circle cx="9" cy="10" r="2" />
+                  <path d="M21 16l-5-5L5 20" stroke-linecap="round" />
+                </svg>
+              </div>
+              <div class="tool" title="Button">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="3" y="8" width="18" height="8" rx="4" />
+                </svg>
+              </div>
+              <div class="sep"></div>
+              <div class="tool" title="Shapes">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="8" cy="8" r="4" />
+                  <rect x="12" y="12" width="8" height="8" rx="1.5" />
+                </svg>
               </div>
             </div>
-            <div class="demo-sb-group">
-              <h2>Style Kit</h2>
-              <div class="demo-sb-kit-grid">
-                <button type="button" class="active" data-kit="charcoal">charcoal</button>
-                <button type="button" data-kit="orange-editorial">orange</button>
-                <button type="button" data-kit="blue-saas">blue</button>
-                <button type="button" data-kit="green-organic">green</button>
+
+            {/* canvas (artboard + cursors) */}
+            <div class="canvas" id="canvas" aria-hidden="true">
+              <div class="artboard" id="artboard">
+                <div class="ab-photo">
+                  <span class="ph-tag">photo · storefront.jpg</span>
+                </div>
+                <div class="ab-pad">
+                  <span class="ab-eyebrow">Fresh, local, daily</span>
+                  <h2 class="ab-h" id="abHeading">Bloom &amp; Co.</h2>
+                  <p class="ab-p">
+                    Hand-tied bouquets and seasonal stems, delivered across town the same day.
+                  </p>
+                  <span class="ab-btn" id="abBtn">Order flowers</span>
+                </div>
+              </div>
+              <div class="sel-ring" id="selRing">
+                <span class="tag">Sam</span>
+              </div>
+              <div class="new-badge" id="newBadge">★ Same-day delivery</div>
+
+              {/* peer cursors */}
+              <div class="cursor" id="curSam" style="transform:translate(60px,300px)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#3BA1A1">
+                  <path d="M5 2l14 8-6 1.5L10 19z" />
+                </svg>
+                <span class="label" style="background:#3BA1A1">Sam</span>
+              </div>
+              <div class="cursor" id="curYou" style="transform:translate(360px,80px)">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#E84D4A">
+                  <path d="M5 2l14 8-6 1.5L10 19z" />
+                </svg>
+                <span class="label" style="background:#E84D4A">You</span>
               </div>
             </div>
-          </div>
 
-          <div class="demo-sb-panel" data-panel="sections" hidden>
-            <div class="demo-sb-empty">Saved sections appear here.</div>
-          </div>
-
-          <div class="demo-sb-panel" data-panel="pages" hidden>
-            <div class="demo-sb-page-list">
-              <div class="demo-sb-page-item" data-active="true">
-                <span class="title">Home</span>
-                <span class="slug">/</span>
+            {/* assistant */}
+            <div class="assistant">
+              <div class="as-head">
+                <span class="spark" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l1.8 5.5L19 9l-4.4 3.2L16 18l-4-3.4L8 18l1.4-5.8L5 9l5.2-1.5z" />
+                  </svg>
+                </span>
+                <span class="t">
+                  Assistant
+                  <small>here to help</small>
+                </span>
               </div>
-              <div class="demo-sb-page-item">
-                <span class="title">About</span>
-                <span class="slug">/about</span>
+              <div class="as-feed" id="asFeed">
+                <div class="msg user" id="m1">
+                  Make the button match our brand red
+                </div>
+                <div class="msg bot" id="m2">
+                  On it — here&apos;s a preview of that change:
+                </div>
+                <div class="op-card" id="opCard">
+                  <div class="ol">Update button</div>
+                  <div class="od">Fill → Brand Red · white text</div>
+                  <div class="oa">
+                    <button type="button" class="acc">✓ Accept</button>
+                    <button type="button" class="dis">Discard</button>
+                  </div>
+                </div>
+                <div class="msg bot" id="m3">
+                  Done! Want me to add a delivery badge too?
+                </div>
+              </div>
+              <div class="as-input">
+                <div class="box">
+                  <span id="asType">
+                    <span class="typed"></span>
+                  </span>
+                  <span class="caret" aria-hidden="true"></span>
+                </div>
               </div>
             </div>
-            <button type="button" class="demo-sb-action">+ New page</button>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
-}
 
-function PreviewPanel() {
-  return (
-    <div class="hero-panel" aria-label="live preview pane">
-      <div class="heading">
-        <span class="kind">preview</span>
-        <span>your-site.rev01.dev</span>
-      </div>
-      <div class="body" style="padding:0.4rem;">
-        <div class="demo-canvas" id={LANDING_DEMO_IDS.canvas} data-kit="charcoal" aria-hidden="true">
-          <div class="demo-cursor" id={LANDING_DEMO_IDS.cursorJohn}>
-            <svg class="ptr" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3 1 L3 14 L6.5 11 L8.5 14.5 L10.5 13.5 L8.5 10 L13 10 Z" />
-            </svg>
-            <span class="label">john</span>
-          </div>
-          <div class="demo-cursor" id={LANDING_DEMO_IDS.cursorAgent}>
-            <svg class="ptr" viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3 1 L3 14 L6.5 11 L8.5 14.5 L10.5 13.5 L8.5 10 L13 10 Z" />
-            </svg>
-            <span class="label">agent</span>
+            <div class="toast" id="toast" role="status" aria-live="polite">
+              <span class="tick" aria-hidden="true">
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Published — your visitors see it now
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function AgentPanel() {
-  return (
-    <div class="hero-panel" aria-label="agent operations log">
-      <div class="heading">
-        <span class="kind">agent</span>
-        <span>ops.log</span>
-      </div>
-      <div class="body">
-        <div class="agent-feed" id={LANDING_DEMO_IDS.feed} aria-live="polite" aria-atomic="false"></div>
-      </div>
-    </div>
+    </section>
   );
 }

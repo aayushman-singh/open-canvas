@@ -17,6 +17,8 @@ import { requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { canvasClientScript } from './canvas-client';
 import { canvasEditorStyles } from './canvas-styles';
+import { themeBootScript, themeFontHeadHtml, themeToggleScript, readThemeCookie } from '../ui/theme';
+import type { Theme } from '../ui/theme';
 import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
 import { db } from '../db/client';
@@ -56,6 +58,14 @@ export interface EditorPageOptions {
   context?: 'dashboard' | 'public';
   clerkPublishableKey?: string;
   wsToken?: string;
+  // SSR pre-paint theme stamp. Resolved from the `oc-theme` cookie by the
+  // caller (see readThemeCookie). 'dark' becomes `data-theme="dark"` on
+  // <html>; undefined leaves the attribute off so light (the implicit
+  // default) renders without flash. The editor artboard itself stays
+  // kit-token-driven regardless of chrome theme (see canvas-styles.ts).
+  // The `| undefined` keeps callers free of conditional spread under
+  // exactOptionalPropertyTypes.
+  theme?: Theme | undefined;
 }
 
 async function lookupOwnedSite(
@@ -88,7 +98,7 @@ async function lookupOwnedSite(
 }
 
 export function editorPageJsx(opts: EditorPageOptions) {
-  const { siteId, siteName, subdomain, styleKit, context = 'dashboard', clerkPublishableKey, wsToken } = opts;
+  const { siteId, siteName, subdomain, styleKit, context = 'dashboard', clerkPublishableKey, wsToken, theme } = opts;
   const apiBase = context === 'public' ? '/__api' : '/api';
   const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
   const publicAddress = `${subdomain}.rev01.aayushman.dev`;
@@ -120,12 +130,14 @@ export function editorPageJsx(opts: EditorPageOptions) {
     );
 
   return (
-    <html lang="en">
+    <html lang="en" data-theme={theme === 'dark' ? 'dark' : undefined}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="dark" />
         <title>rev01 — editing {siteName}</title>
+        <script>{raw(themeBootScript)}</script>
+        {raw(themeFontHeadHtml)}
         <style>{raw(canvasEditorStyles)}</style>
         {clerkPublishableKey && raw(`<script>
 (function(){
@@ -409,6 +421,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         </main>
         {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
         {raw(`<script type="module">${inlineScript}</script>`)}
+        <script>{raw(themeToggleScript)}</script>
       </body>
     </html>
   );
@@ -445,6 +458,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
       wsToken,
+      theme: readThemeCookie(c),
     }),
   );
 });

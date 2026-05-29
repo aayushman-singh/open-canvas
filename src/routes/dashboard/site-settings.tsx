@@ -25,7 +25,7 @@ import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
 import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
-import { Button, Badge, Card } from '../../ui';
+import { Button, readThemeCookie } from '../../ui';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -40,133 +40,106 @@ export const siteSettingsRoute = new Hono<Env>();
 siteSettingsRoute.use('*', clerkAuth());
 siteSettingsRoute.use('*', requireAuth());
 
+// Open Canvas chrome for the site-settings surface (MIGRATION.md §5d /
+// settings.html). Sections render as `.set` cards with a `.set-h` header
+// (icon + title + helper text + trailing action/switch) and a `.set-body`
+// for the section's controls. The collaborator list and danger zone keep
+// the same DOM hooks the inline client script + smoke test depend on
+// (`form.pw`, `form.collab-form`, `ul.collab-list`, `.remove-btn`, etc.)
+// but get restyled to match the design source.
 const pageStyles = `
-  h1 { font-size: 26px; letter-spacing: -0.01em; margin: 0 0 4px; }
-  .lede { margin: 6px 0 28px; color: var(--muted); max-width: 640px; line-height: 1.55; font-size: 14px; }
-  .lede code {
-    background: rgba(125, 211, 252, 0.10);
-    color: var(--accent);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 12.5px;
-  }
+  .content > h1 { font-size: 32px; letter-spacing: -.03em; }
+  .content > .sub { color: var(--ink-2); margin: 6px 0 28px; }
+  .content { max-width: 760px; }
 
-  /* Section-anchor highlight: when arriving via /settings#password etc.,
-     pulse the target card briefly so the user sees the destination. */
-  .rev01-ui-card { scroll-margin-top: 24px; transition: border-color 0.4s, box-shadow 0.4s; }
-  .rev01-ui-card:target {
-    border-color: rgba(125, 211, 252, 0.55);
-    box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.12);
-  }
-
-  /* --- Hosting summary grid -------------------------------------------- */
-  .hosting-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-    margin-top: 4px;
-  }
-  .hosting-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 12px 14px;
+  .set {
     border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 16px;
+    overflow: hidden;
+    scroll-margin-top: 24px;
   }
-  .hosting-cell .hosting-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--faint);
-  }
-  .hosting-cell code {
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 12.5px;
-    color: var(--text);
-    word-break: break-all;
-  }
+  .set:target { border-color: var(--red-line); box-shadow: 0 0 0 3px var(--red-tint); }
 
-  /* --- Toggle switch --------------------------------------------------- */
-  .toggle-row {
+  .set-h {
+    padding: 20px 22px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .set-h .ic {
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    background: var(--surface-2);
+    color: var(--ink-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .set-h .tt { flex: 1; min-width: 0; }
+  .set-h h2 {
+    font-size: 17px;
+    font-family: var(--display);
+    color: var(--ink);
+    margin: 0;
+  }
+  .set-h p {
+    font-size: 13.5px;
+    color: var(--ink-2);
+    margin: 4px 0 0;
+    line-height: 1.45;
+  }
+  .set-h code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: var(--r-xs);
+  }
+  .set-body { padding: 0 22px 20px; }
+
+  .row-line {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 14px 16px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.02);
+    gap: 14px;
+    padding: 14px 0;
+    border-top: 1px solid var(--line);
   }
-  .toggle-text { display: flex; flex-direction: column; gap: 2px; }
-  .toggle-text .toggle-label { font-size: 14px; color: var(--text); font-weight: 500; }
-  .toggle-text .toggle-state { font-size: 12.5px; color: var(--muted); }
-  .toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-    flex-shrink: 0;
-  }
-  .toggle-switch input {
-    position: absolute;
-    opacity: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    cursor: pointer;
-    z-index: 2;
-  }
-  .toggle-switch .slider {
-    position: absolute;
-    inset: 0;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--line);
-    transition: background 0.16s, border-color 0.16s;
-  }
-  .toggle-switch .slider::before {
-    content: "";
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: #cbd5f5;
-    transition: transform 0.18s ease, background 0.18s;
-  }
-  .toggle-switch input:checked + .slider {
-    background: rgba(125, 211, 252, 0.30);
-    border-color: var(--accent);
-  }
-  .toggle-switch input:checked + .slider::before {
-    transform: translateX(20px);
-    background: var(--accent);
-  }
-  .toggle-switch input:focus-visible + .slider {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  .toggle-switch input:disabled { cursor: wait; }
-  .toggle-switch input:disabled + .slider { opacity: 0.55; }
-  .hint {
-    margin: 10px 2px 0;
+  .row-line:first-child { border-top: none; }
+  .row-line .rt { flex: 1; min-width: 0; }
+  .row-line .rt b { font-size: 14px; color: var(--ink); }
+  .row-line .rt small {
+    display: block;
     font-size: 12.5px;
-    color: var(--faint);
-    line-height: 1.5;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+  .row-line .rt code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
   }
 
+  /* danger zone — red-tinted card */
+  .set.danger { border-color: var(--red-line); }
+  .set.danger .set-h .ic { background: var(--red-soft); color: var(--red-ink); }
+
+  /* status row — Enabled / Disabled badge + meta date */
   .status-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 18px;
+    margin: 0 0 18px;
   }
-  .status-row .meta { color: var(--muted); font-size: 13px; }
+  .status-row .meta { color: var(--ink-3); font-size: 13px; }
 
+  /* password set/change form: input + Update button */
   form.pw {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -177,21 +150,22 @@ const pageStyles = `
     display: grid;
     gap: 6px;
     font-size: 13px;
-    color: var(--muted);
+    color: var(--ink-2);
   }
   form.pw input[type="password"] {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    padding: 10px 12px;
-    font-size: 15px;
+    font-family: var(--sans);
+    font-size: 14.5px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line-2);
+    border-radius: var(--r-sm);
+    padding: 11px 14px;
+    transition: border-color .15s ease, box-shadow .15s ease;
     outline: none;
-    transition: border-color 0.12s, box-shadow 0.12s;
   }
   form.pw input[type="password"]:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.15);
+    border-color: var(--red);
+    box-shadow: var(--ring);
   }
 
   .err, .ok {
@@ -199,129 +173,114 @@ const pageStyles = `
     font-size: 13px;
     min-height: 18px;
   }
-  .err { color: #fca5a5; }
-  .ok { color: #86efac; }
+  .err { color: var(--red-ink); }
+  .ok { color: var(--ok); }
 
-  .collab-form {
+  /* collaborator invite form: email + role + Invite button */
+  form.collab-form {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: 1fr 140px auto;
     gap: 10px;
     align-items: end;
   }
-  .collab-form label {
+  form.collab-form label {
     display: grid;
     gap: 6px;
     font-size: 13px;
-    color: var(--muted);
+    color: var(--ink-2);
   }
-  .collab-form input[type="email"],
-  .collab-form select {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--text);
-    padding: 10px 12px;
-    font-size: 14px;
+  form.collab-form input[type="email"],
+  form.collab-form select {
+    font-family: var(--sans);
+    font-size: 14.5px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line-2);
+    border-radius: var(--r-sm);
+    padding: 11px 14px;
     outline: none;
-    transition: border-color 0.12s, box-shadow 0.12s;
+    transition: border-color .15s ease, box-shadow .15s ease;
   }
-  .collab-form input[type="email"]:focus,
-  .collab-form select:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.15);
+  form.collab-form input[type="email"]:focus,
+  form.collab-form select:focus {
+    border-color: var(--red);
+    box-shadow: var(--ring);
   }
 
-  .collab-list { list-style: none; padding: 0; margin: 16px 0 0; }
+  /* collaborator list — DOM hooks (.collab-list, .collab-item,
+     .role-select, .remove-btn, .resend-btn) preserved for the inline
+     client script + smoke test selectors. */
+  ul.collab-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+  }
   .collab-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.02);
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
     font-size: 14px;
-    margin-bottom: 8px;
   }
-  .collab-item:last-child { margin-bottom: 0; }
-  .collab-item .email { flex: 1; color: var(--text); }
-  .collab-item .role-badge {
-    font-size: 11px;
-    padding: 3px 9px;
-    border-radius: 10px;
-    background: rgba(34,211,238,0.15);
-    color: #22d3ee;
-    text-transform: capitalize;
-  }
-  .collab-item .status-badge {
-    font-size: 11px;
-    padding: 3px 9px;
-    border-radius: 10px;
-    text-transform: capitalize;
-  }
-  .collab-item .status-badge.pending {
-    background: rgba(250,204,21,0.15);
-    color: #facc15;
-  }
-  .collab-item .status-badge.active {
-    background: rgba(134,239,172,0.15);
-    color: #86efac;
-  }
+  .collab-item:first-of-type { border-top: none; }
+  .collab-item .email { flex: 1; color: var(--ink); min-width: 0; word-break: break-all; }
   .collab-item .role-select {
-    border: 1px solid var(--line);
-    background: var(--bg);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 12px;
+    border: 1.5px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: var(--r-sm);
+    padding: 6px 10px;
+    font-size: 12.5px;
     cursor: pointer;
     text-transform: capitalize;
     outline: none;
-    transition: border-color 0.12s;
+    transition: border-color .15s ease;
   }
   .collab-item .role-select:focus,
-  .collab-item .role-select:hover {
-    border-color: var(--accent);
+  .collab-item .role-select:hover { border-color: var(--ink); }
+  .collab-item .role-select:disabled { opacity: 0.6; cursor: wait; }
+  .collab-item .status-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: var(--r-pill);
+    text-transform: capitalize;
+    border: 1px solid transparent;
+    font-weight: 600;
   }
-  .collab-item .role-select:disabled {
-    opacity: 0.6;
-    cursor: wait;
+  .collab-item .status-badge.pending {
+    background: var(--warn-soft);
+    color: var(--warn);
   }
-  .collab-item .resend-btn {
-    background: transparent;
-    border: 1px solid rgba(125,211,252,0.35);
-    color: #7dd3fc;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
+  .collab-item .status-badge.active {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .collab-item button.resend-btn,
+  .collab-item button.remove-btn {
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 12.5px;
+    padding: 6px 12px;
+    border-radius: var(--r-pill);
     cursor: pointer;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
+    border: 1.5px solid var(--line-2);
+    background: var(--surface);
+    color: var(--ink-2);
+    transition: border-color .15s, color .15s, background .15s;
   }
-  .collab-item .resend-btn:hover {
-    background: rgba(125, 211, 252, 0.08);
-    border-color: rgba(125, 211, 252, 0.65);
+  .collab-item button.resend-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .collab-item button.remove-btn {
+    color: var(--red-ink);
+    border-color: var(--red-line);
   }
-  .collab-item .resend-btn:disabled {
-    opacity: 0.6;
-    cursor: wait;
+  .collab-item button.remove-btn:hover {
+    background: var(--red-soft);
+    border-color: var(--red);
   }
-  .collab-item .remove-btn {
-    background: transparent;
-    border: 1px solid rgba(252,165,165,0.30);
-    color: #fca5a5;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s, border-color 0.12s;
-  }
-  .collab-item .remove-btn:hover {
-    background: rgba(248, 113, 113, 0.08);
-    color: #fda4a4;
-    border-color: rgba(248, 113, 113, 0.55);
-  }
+  .collab-item button:disabled { opacity: 0.55; cursor: wait; }
 
-  /* --- Favicon picker --------------------------------------------------- */
+  /* favicon picker — uses theme tokens for the dashed drop zone */
   .favicon-picker {
     display: grid;
     grid-template-columns: 48px 1fr auto;
@@ -329,70 +288,90 @@ const pageStyles = `
     align-items: center;
     padding: 14px 16px;
     border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(255,255,255,0.02);
+    border-radius: var(--r);
+    background: var(--surface-2);
+    margin: 6px 0 4px;
   }
   .favicon-picker .fv-thumb {
     width: 48px;
     height: 48px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.05);
-    border: 1px dashed rgba(255,255,255,0.12);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    border: 1px dashed var(--line-2);
     background-size: cover;
     background-position: center;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--faint);
+    color: var(--ink-3);
     font-size: 11px;
   }
   .favicon-picker .fv-thumb[data-has-image="true"] {
     border-style: solid;
-    border-color: rgba(255,255,255,0.18);
-    background-color: #fff;
+    border-color: var(--line);
+    background-color: var(--paper);
   }
   .favicon-picker .fv-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .favicon-picker .fv-label { font-size: 14px; color: var(--text); font-weight: 500; }
-  .favicon-picker .fv-state { font-size: 12.5px; color: var(--muted); }
+  .favicon-picker .fv-label { font-size: 14px; color: var(--ink); font-weight: 600; }
+  .favicon-picker .fv-state { font-size: 12.5px; color: var(--ink-2); }
   .favicon-picker .fv-actions { display: flex; gap: 8px; }
   .favicon-picker button {
-    background: rgba(125, 211, 252, 0.10);
-    border: 1px solid rgba(125, 211, 252, 0.30);
-    color: var(--accent);
-    border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 12.5px;
+    padding: 7px 14px;
+    border-radius: var(--r-pill);
     cursor: pointer;
+    background: var(--surface);
+    border: 1.5px solid var(--line-2);
+    color: var(--ink);
+    transition: border-color .15s, color .15s;
   }
+  .favicon-picker button:hover { border-color: var(--ink); }
   .favicon-picker button.clear {
-    background: transparent;
-    border-color: rgba(252,165,165,0.30);
-    color: #fca5a5;
+    color: var(--red-ink);
+    border-color: var(--red-line);
   }
+  .favicon-picker button.clear:hover { background: var(--red-soft); border-color: var(--red); }
   .favicon-picker button:disabled { opacity: 0.55; cursor: wait; }
 
-  /* --- Picker modal (shared structure with page-settings) --------------- */
+  .hint {
+    margin: 10px 2px 0;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    line-height: 1.5;
+  }
+  .hint code {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    background: var(--surface-2);
+    padding: 1px 6px;
+    border-radius: var(--r-xs);
+  }
+
+  /* shared asset picker modal — reskinned in Open Canvas surface colours */
   .picker-modal {
     position: fixed;
     inset: 0;
-    background: rgba(5, 8, 16, 0.78);
-    backdrop-filter: blur(6px);
+    background: rgba(26, 25, 23, 0.55);
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 10000;
     padding: 24px;
   }
   .picker-modal[data-open="true"] { display: flex; }
   .picker-sheet {
     width: min(900px, 100%);
     max-height: 86vh;
-    background: #0c1220;
+    background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--r);
     display: flex;
     flex-direction: column;
-    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    box-shadow: var(--shadow-lg);
+    color: var(--ink);
   }
   .picker-head {
     display: flex;
@@ -401,22 +380,29 @@ const pageStyles = `
     padding: 16px 20px;
     border-bottom: 1px solid var(--line);
   }
-  .picker-head h3 { margin: 0; font-size: 16px; color: var(--text); }
+  .picker-head h3 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 17px;
+    color: var(--ink);
+  }
   .picker-actions { display: flex; gap: 8px; align-items: center; }
-  .picker-actions button, .picker-actions label {
-    background: rgba(125,211,252,0.10);
-    border: 1px solid rgba(125,211,252,0.30);
-    color: var(--accent);
-    border-radius: 6px;
-    padding: 6px 12px;
+  .picker-actions button,
+  .picker-actions label {
+    font-family: var(--sans);
+    font-weight: 650;
     font-size: 13px;
+    padding: 7px 14px;
+    border-radius: var(--r-pill);
     cursor: pointer;
+    background: var(--surface);
+    border: 1.5px solid var(--line-2);
+    color: var(--ink);
+    transition: border-color .15s, color .15s;
   }
-  .picker-actions .close {
-    background: transparent;
-    border-color: var(--line);
-    color: var(--muted);
-  }
+  .picker-actions button:hover,
+  .picker-actions label:hover { border-color: var(--ink); }
+  .picker-actions .close { color: var(--ink-2); }
   .picker-body { padding: 16px 20px; overflow: auto; flex: 1; }
   .picker-grid {
     display: grid;
@@ -425,42 +411,30 @@ const pageStyles = `
   }
   .picker-tile {
     aspect-ratio: 1 / 1;
-    border-radius: 8px;
+    border-radius: var(--r-sm);
     border: 1px solid var(--line);
     background-size: cover;
     background-position: center;
-    background-color: rgba(255,255,255,0.04);
+    background-color: var(--surface-2);
     cursor: pointer;
     position: relative;
-    transition: border-color 0.12s, transform 0.12s;
+    transition: border-color .12s, transform .12s;
   }
-  .picker-tile:hover { border-color: var(--accent); transform: translateY(-1px); }
-  .picker-tile .alt {
-    position: absolute;
-    inset: auto 0 0 0;
-    padding: 6px 8px;
-    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.7));
-    color: #fff;
-    font-size: 11px;
-    border-radius: 0 0 7px 7px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .picker-tile:hover { border-color: var(--ink); transform: translateY(-1px); }
   .picker-empty {
     padding: 40px 20px;
     text-align: center;
-    color: var(--muted);
+    color: var(--ink-2);
     font-size: 14px;
   }
   .picker-status {
     padding: 8px 20px;
-    color: var(--muted);
+    color: var(--ink-2);
     font-size: 12.5px;
     border-top: 1px solid var(--line);
     min-height: 16px;
   }
-  .picker-status.error { color: #fca5a5; }
+  .picker-status.error { color: var(--red-ink); }
 `;
 
 interface OwnedSite {
@@ -974,6 +948,79 @@ const rev01SiteSettingsConfig = (() => {
 `;
 }
 
+// Section header icons. Each one is a 19px stroked SVG sized to fit the
+// 38px `.ic` rounded square; they consume `currentColor` so the icon
+// rides the theme tokens for hue (.set-h .ic colour pair).
+function HostingIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4-4" stroke-linecap="round" />
+    </svg>
+  );
+}
+
+function FaviconIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <circle cx="12" cy="12" r="4" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z" />
+    </svg>
+  );
+}
+
+function PeopleIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3 20a6 6 0 0 1 12 0M16 5a3.5 3.5 0 0 1 0 6M21 20a6 6 0 0 0-3-5" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+    </svg>
+  );
+}
+
 siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) {
@@ -1014,100 +1061,158 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
       ]}
       pageStyles={pageStyles}
       siteNav={buildSiteNav(owned.id, owned.name, `/dashboard/sites/${owned.id}/settings`)}
+      theme={readThemeCookie(c)}
     >
       <h1>Settings</h1>
-      <p class="lede">
-        Per-site controls for the published address{' '}
-        <code>{owned.subdomain}.rev01.aayushman.dev</code>.
+      <p class="sub">
+        Manage how <b>{owned.name}</b> is hosted, secured, and shared.
       </p>
 
-      <Card class="hosting-card" id="hosting">
-        <h2>Hosting</h2>
-        <p class="sub">
-          Where this site lives and how visitors reach it. Plan, region, and CDN are managed by
-          rev01; the publish status and address are yours to change.
-        </p>
-        <div class="hosting-grid">
-          <div class="hosting-cell">
-            <span class="hosting-label">Plan</span>
-            <Badge variant="info">Starter</Badge>
+      {/* Hosting card — read-only summary of plan/CDN/style-kit/status + the
+          public address. Mirrors settings.html § Hosting. */}
+      <div class="set" id="hosting">
+        <div class="set-h">
+          <span class="ic">
+            <HostingIcon />
+          </span>
+          <div class="tt">
+            <h2>Hosting</h2>
+            <p>
+              Your site is live. Share the address or connect your own domain.
+            </p>
           </div>
-          <div class="hosting-cell">
-            <span class="hosting-label">CDN</span>
-            <Badge variant="info">Cloudflare Edge</Badge>
-          </div>
-          <div class="hosting-cell">
-            <span class="hosting-label">Style kit</span>
-            <Badge variant="neutral">{owned.styleKit}</Badge>
-          </div>
-          <div class="hosting-cell">
-            <span class="hosting-label">Status</span>
-            {owned.publishedVersion > 0 ? (
-              <Badge variant="success">Live · v{String(owned.publishedVersion)}</Badge>
-            ) : (
-              <Badge variant="warning">Draft</Badge>
-            )}
-          </div>
-          <div class="hosting-cell" style="grid-column: 1 / -1">
-            <span class="hosting-label">Address</span>
-            <code>{owned.subdomain}.rev01.aayushman.dev</code>
-          </div>
+          {owned.publishedVersion > 0 ? (
+            <span class="chip chip-ok">
+              <span class="dot" />
+              Published
+            </span>
+          ) : (
+            <span class="chip">
+              <span class="dot" />
+              Draft
+            </span>
+          )}
         </div>
-      </Card>
-
-      <Card id="password">
-        <h2>Password protection</h2>
-        <p class="sub">
-          When enabled, visitors must enter a password before they see any page of this site. The
-          same password applies to every page. Changing the password signs out everyone who
-          previously unlocked the site — they'll have to re-enter the new password.
-        </p>
-        <div class="status-row">
-          <Badge variant={enabled ? 'success' : 'neutral'}>
-            {enabled ? 'Enabled' : 'Disabled'}
-          </Badge>
-          <span class="meta">{setAtLine}</span>
-        </div>
-        <form class="pw" autocomplete="off">
-          <label>
-            <span>{enabled ? 'Change password' : 'Set password'}</span>
-            <input
-              type="password"
-              name="password"
-              autocomplete="new-password"
-              placeholder="At least 4 characters"
-              minlength={4}
-              maxlength={200}
-              required
-            />
-          </label>
-          <Button variant="primary" type="submit">
-            {enabled ? 'Update' : 'Enable'}
-          </Button>
-        </form>
-        <p class="err" role="alert" aria-live="polite"></p>
-        <p class="ok" role="status" aria-live="polite"></p>
-        {enabled ? (
-          <Button variant="danger" data-action="disable">
-            Disable password protection
-          </Button>
-        ) : null}
-      </Card>
-
-      <Card id="seo">
-        <h2>Search indexing</h2>
-        <p class="sub">
-          Allow search engines like Google and Bing to index this site and surface it in results.
-          Turn this off if you're publishing privately or want to delay public discovery.
-        </p>
-        <div class="toggle-row">
-          <div class="toggle-text">
-            <span class="toggle-label">Allow search engines to index this site</span>
-            <span class="toggle-state" data-toggle-state>
-              {owned.siteNoIndex ? 'Hidden from search' : 'Visible in search'}
+        <div class="set-body">
+          <div class="row-line">
+            <div class="rt">
+              <b>Public address</b>
+              <small>Anyone with this link can view your site</small>
+            </div>
+            <span class="chip chip-url">
+              {owned.subdomain}.rev01.aayushman.dev
             </span>
           </div>
-          <label class="toggle-switch">
+          <div class="row-line">
+            <div class="rt">
+              <b>Custom domain</b>
+              <small>Use a domain you already own</small>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              href={`/dashboard/sites/${esc(siteId)}/domains`}
+            >
+              Connect domain
+            </Button>
+          </div>
+          <div class="row-line">
+            <div class="rt">
+              <b>Style kit</b>
+              <small>The visual language applied across every page</small>
+            </div>
+            <span class="chip">{owned.styleKit}</span>
+          </div>
+          <div class="row-line">
+            <div class="rt">
+              <b>Published version</b>
+              <small>
+                {owned.publishedVersion > 0
+                  ? `Latest publish: v${String(owned.publishedVersion)}`
+                  : 'Not published yet — open the editor and click Publish.'}
+              </small>
+            </div>
+            {owned.publishedVersion > 0 ? (
+              <span class="chip chip-ok">v{String(owned.publishedVersion)}</span>
+            ) : (
+              <span class="chip">draft</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Password protection — `.switch` from components.css toggles the
+          inline form below. The form selectors (`form.pw`, .err, .ok,
+          [data-action="disable"]) are consumed by the inline client
+          script — do not rename. */}
+      <div class="set" id="password">
+        <div class="set-h">
+          <span class="ic">
+            <LockIcon />
+          </span>
+          <div class="tt">
+            <h2>Password protection</h2>
+            <p>Ask visitors for a password before they can see the site.</p>
+          </div>
+          <span
+            class={`chip ${enabled ? 'chip-ok' : ''}`}
+            title={setAtLine}
+          >
+            {enabled ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+        <div class="set-body">
+          <div class="status-row">
+            <span class="meta">{setAtLine}</span>
+          </div>
+          <form class="pw" autocomplete="off">
+            <label>
+              <span>{enabled ? 'Change password' : 'Set password'}</span>
+              <input
+                type="password"
+                name="password"
+                autocomplete="new-password"
+                placeholder="At least 4 characters"
+                minlength={4}
+                maxlength={200}
+                required
+              />
+            </label>
+            <Button variant="primary" type="submit">
+              {enabled ? 'Update' : 'Enable'}
+            </Button>
+          </form>
+          <p class="err" role="alert" aria-live="polite"></p>
+          <p class="ok" role="status" aria-live="polite"></p>
+          {enabled ? (
+            <div style="margin-top:14px;">
+              <Button variant="secondary" size="sm" data-action="disable">
+                Disable password protection
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Search engines — single switch, no body. `.toggle-row` is kept as
+          the wrapper because the inline script reads
+          `cb.closest('.toggle-row')?.querySelector('[data-toggle-state]')`
+          when rendering the saved-state label. */}
+      <div class="set" id="seo">
+        <div class="set-h">
+          <span class="ic">
+            <SearchIcon />
+          </span>
+          <div class="tt">
+            <h2>Search engines</h2>
+            <p>
+              Let Google and others find and list your site.{' '}
+              <span data-toggle-state>
+                {owned.siteNoIndex ? 'Hidden from search.' : 'Visible in search.'}
+              </span>
+            </p>
+          </div>
+          <label class="switch toggle-row" aria-label="Allow search engines to index this site">
             <input
               type="checkbox"
               checked={!owned.siteNoIndex}
@@ -1115,147 +1220,216 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               data-invert="true"
               data-on-label="Visible in search"
               data-off-label="Hidden from search"
-              aria-label="Allow search engines to index this site"
             />
-            <span class="slider" aria-hidden="true"></span>
+            <span class="track" />
           </label>
         </div>
-        <p class="hint">Takes effect at the next publish — emits <code>&lt;meta name="robots"&gt;</code> across every page.</p>
-      </Card>
+        <div class="set-body">
+          <p class="hint">
+            Takes effect at the next publish — emits{' '}
+            <code>&lt;meta name=&quot;robots&quot;&gt;</code> across every page.
+          </p>
+        </div>
+      </div>
 
-      <Card id="favicon">
-        <h2>Favicon</h2>
-        <p class="sub">
-          The small icon shown in browser tabs, bookmarks, and Google search results. PNG or SVG
-          works well — square images render best (32×32 or 192×192 are the common sizes browsers
-          ask for).
-        </p>
-        <div
-          class="favicon-picker"
-          data-asset-picker="favicon"
-          data-asset-id={owned.faviconAssetId ?? ''}
-        >
-          <div
-            class="fv-thumb"
-            data-picker-thumb
-            data-has-image={owned.faviconAssetId ? 'true' : 'false'}
-            style={owned.faviconAssetId ? `background-image:url(/api/canvas/sites/${encodeURIComponent(owned.id)}/assets/${encodeURIComponent(owned.faviconAssetId)})` : ''}
-          >
-            {owned.faviconAssetId ? '' : 'none'}
-          </div>
-          <div class="fv-meta">
-            <span class="fv-label">Site favicon</span>
-            <span class="fv-state" data-picker-meta>
-              {owned.faviconAssetId
-                ? 'Set — emitted as <link rel="icon"> on every page.'
-                : 'Not set — browsers will show the default tab icon.'}
-            </span>
-          </div>
-          <div class="fv-actions">
-            <button type="button" data-picker-choose>
-              {owned.faviconAssetId ? 'Change' : 'Choose image'}
-            </button>
-            <button
-              type="button"
-              class="clear"
-              data-picker-clear
-              hidden={!owned.faviconAssetId}
-            >
-              Remove
-            </button>
+      {/* Favicon — owner-scoped asset picker, modal opens via the inline
+          script. DOM hooks (data-asset-picker, data-picker-*) are required
+          by the client script. */}
+      <div class="set" id="favicon">
+        <div class="set-h">
+          <span class="ic">
+            <FaviconIcon />
+          </span>
+          <div class="tt">
+            <h2>Favicon</h2>
+            <p>
+              The small icon shown in browser tabs, bookmarks, and Google search results. PNG or SVG
+              works well — square images render best.
+            </p>
           </div>
         </div>
-        <p class="hint">
-          Takes effect at the next publish.{' '}
-          <span class="ok" data-favicon-status role="status" aria-live="polite"></span>
-          <span class="err" data-favicon-err role="alert" aria-live="polite"></span>
-        </p>
-      </Card>
-
-      <Card id="dark-mode">
-        <h2>Visitor dark mode</h2>
-        <p class="sub">
-          When on, the public site exposes a light/dark toggle to visitors and ships both token
-          blocks. When off, your site is locked to the Style Kit's default mode.
-        </p>
-        <div class="toggle-row">
-          <div class="toggle-text">
-            <span class="toggle-label">Let visitors switch between light and dark</span>
-            <span class="toggle-state" data-toggle-state>
-              {owned.darkModeEnabled ? 'Toggleable by visitors' : 'Locked to default mode'}
-            </span>
+        <div class="set-body">
+          <div
+            class="favicon-picker"
+            data-asset-picker="favicon"
+            data-asset-id={owned.faviconAssetId ?? ''}
+          >
+            <div
+              class="fv-thumb"
+              data-picker-thumb
+              data-has-image={owned.faviconAssetId ? 'true' : 'false'}
+              style={owned.faviconAssetId ? `background-image:url(/api/canvas/sites/${encodeURIComponent(owned.id)}/assets/${encodeURIComponent(owned.faviconAssetId)})` : ''}
+            >
+              {owned.faviconAssetId ? '' : 'none'}
+            </div>
+            <div class="fv-meta">
+              <span class="fv-label">Site favicon</span>
+              <span class="fv-state" data-picker-meta>
+                {owned.faviconAssetId
+                  ? 'Set — emitted as <link rel="icon"> on every page.'
+                  : 'Not set — browsers will show the default tab icon.'}
+              </span>
+            </div>
+            <div class="fv-actions">
+              <button type="button" data-picker-choose>
+                {owned.faviconAssetId ? 'Change' : 'Choose image'}
+              </button>
+              <button
+                type="button"
+                class="clear"
+                data-picker-clear
+                hidden={!owned.faviconAssetId}
+              >
+                Remove
+              </button>
+            </div>
           </div>
-          <label class="toggle-switch">
+          <p class="hint">
+            Takes effect at the next publish.{' '}
+            <span class="ok" data-favicon-status role="status" aria-live="polite"></span>
+            <span class="err" data-favicon-err role="alert" aria-live="polite"></span>
+          </p>
+        </div>
+      </div>
+
+      {/* Visitor dark mode toggle. Same `.switch` + `.toggle-row` wrapper
+          pattern as Search engines. */}
+      <div class="set" id="dark-mode">
+        <div class="set-h">
+          <span class="ic">
+            <MoonIcon />
+          </span>
+          <div class="tt">
+            <h2>Visitor dark mode</h2>
+            <p>
+              Give visitors a moon button to switch your site to a dark theme.{' '}
+              <span data-toggle-state>
+                {owned.darkModeEnabled ? 'Toggleable by visitors.' : 'Locked to default mode.'}
+              </span>
+            </p>
+          </div>
+          <label class="switch toggle-row" aria-label="Let visitors switch between light and dark">
             <input
               type="checkbox"
               checked={owned.darkModeEnabled}
               data-config-key="darkModeEnabled"
               data-on-label="Toggleable by visitors"
               data-off-label="Locked to default mode"
-              aria-label="Let visitors switch between light and dark"
             />
-            <span class="slider" aria-hidden="true"></span>
+            <span class="track" />
           </label>
         </div>
-        <p class="hint">Takes effect at the next publish — adds the visitor-mode CSS and toggle script to the published site.</p>
-      </Card>
+        <div class="set-body">
+          <p class="hint">
+            Takes effect at the next publish — adds the visitor-mode CSS and toggle script to the
+            published site.
+          </p>
+        </div>
+      </div>
 
-      <Card id="collaborators">
-        <h2>Collaborators</h2>
-        <p class="sub">
-          Add people by email to let them edit this site. They must have a rev01 account. An
-          invitation email will be sent when you add them.
-        </p>
-        <form class="collab-form" autocomplete="off">
-          <label>
-            <span>Email address</span>
-            <input type="email" name="email" placeholder="collaborator@example.com" required />
-          </label>
-          <label>
-            <span>Role</span>
-            <select name="role">
-              <option value="editor">Editor</option>
-              <option value="viewer">Viewer</option>
-            </select>
-          </label>
-          <Button variant="primary" type="submit">
-            Invite
-          </Button>
-        </form>
-        <p class="err collab-err" role="alert" aria-live="polite"></p>
-        <p class="ok collab-ok" role="status" aria-live="polite"></p>
-        <ul class="collab-list">
-          {collaborators.map((collab) => (
-            <li class="collab-item" data-collab-id={collab.id}>
-              <span class="email">{collab.email}</span>
-              <select
-                class="role-select"
-                data-role-collab={collab.id}
-                data-prev-role={collab.role}
-                aria-label="Role"
-              >
-                <option value="editor" selected={collab.role === 'editor'}>
-                  Editor
-                </option>
-                <option value="viewer" selected={collab.role === 'viewer'}>
-                  Viewer
-                </option>
+      {/* Collaborators — invite form + per-row role select + Remove/Resend.
+          DOM hooks (form.collab-form, ul.collab-list, .role-select,
+          .remove-btn, .resend-btn, data-collab-id) are consumed by the
+          inline client script + smoke test — do not rename. */}
+      <div class="set" id="collaborators">
+        <div class="set-h">
+          <span class="ic">
+            <PeopleIcon />
+          </span>
+          <div class="tt">
+            <h2>Collaborators</h2>
+            <p>Invite people to help edit. They&apos;ll get an email invitation.</p>
+          </div>
+        </div>
+        <div class="set-body">
+          <form class="collab-form" autocomplete="off">
+            <label>
+              <span>Email address</span>
+              <input type="email" name="email" placeholder="collaborator@example.com" required />
+            </label>
+            <label>
+              <span>Role</span>
+              <select name="role">
+                <option value="editor">Editor</option>
+                <option value="viewer">Viewer</option>
               </select>
-              <span class={`status-badge ${collab.acceptedAt ? 'active' : 'pending'}`}>
-                {collab.acceptedAt ? 'active' : 'pending'}
-              </span>
-              {collab.acceptedAt ? null : (
-                <button type="button" class="resend-btn" data-resend-collab={collab.id}>
-                  Resend
-                </button>
-              )}
-              <button type="button" class="remove-btn" data-remove-collab={collab.id}>
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Card>
+            </label>
+            <Button variant="primary" type="submit">
+              Invite
+            </Button>
+          </form>
+          <p class="err collab-err" role="alert" aria-live="polite"></p>
+          <p class="ok collab-ok" role="status" aria-live="polite"></p>
+          <ul class="collab-list">
+            {collaborators.length === 0 ? (
+              <li
+                class="collab-item"
+                style="color:var(--ink-3); font-size:13.5px; justify-content:center;"
+              >
+                <span class="email" style="text-align:center;">
+                  No collaborators yet. Invite someone above to start sharing this site.
+                </span>
+              </li>
+            ) : (
+              collaborators.map((collab) => (
+                <li class="collab-item" data-collab-id={collab.id}>
+                  <span class="email">{collab.email}</span>
+                  <select
+                    class="role-select"
+                    data-role-collab={collab.id}
+                    data-prev-role={collab.role}
+                    aria-label="Role"
+                  >
+                    <option value="editor" selected={collab.role === 'editor'}>
+                      Editor
+                    </option>
+                    <option value="viewer" selected={collab.role === 'viewer'}>
+                      Viewer
+                    </option>
+                  </select>
+                  <span class={`status-badge ${collab.acceptedAt ? 'active' : 'pending'}`}>
+                    {collab.acceptedAt ? 'active' : 'pending'}
+                  </span>
+                  {collab.acceptedAt ? null : (
+                    <button type="button" class="resend-btn" data-resend-collab={collab.id}>
+                      Resend
+                    </button>
+                  )}
+                  <button type="button" class="remove-btn" data-remove-collab={collab.id}>
+                    Remove
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      </div>
+
+      {/* Danger zone — destructive actions live here so they're visually
+          quarantined from routine controls. Today: future "Delete site"
+          CTA will land here as a separate stage; for now it's a
+          placeholder card so the chrome matches settings.html. */}
+      <div class="set danger" id="danger">
+        <div class="set-h">
+          <span class="ic">
+            <TrashIcon />
+          </span>
+          <div class="tt">
+            <h2>Delete this site</h2>
+            <p>
+              Permanently remove {owned.name} and everything in it. This can&apos;t be undone.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            class="rev01-danger-cta"
+            style="color:var(--red-ink); border-color:var(--red-line);"
+          >
+            Delete site
+          </Button>
+        </div>
+      </div>
 
       {/* Shared asset picker modal (favicon + any future picker on this page). */}
       <div class="picker-modal" data-picker-modal>
