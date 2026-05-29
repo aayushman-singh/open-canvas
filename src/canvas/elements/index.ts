@@ -8,7 +8,7 @@
 
 import type { CanvasElement, CanvasPage, StyleKitPreset } from '../schema.js';
 
-import { renderAccordion } from './accordion.js';
+import { accordionInspectorSpec, renderAccordion } from './accordion.js';
 import { actionInspectorSpec, renderAction } from './action.js';
 import { renderCarousel } from './carousel.js';
 import { renderChart } from './chart.js';
@@ -208,4 +208,5 @@ export const INSPECTOR_DISPATCH: Partial<Record<CanvasElement['type'], Inspector
   text: textInspectorSpec,
   action: actionInspectorSpec,
   media: mediaInspectorSpec,
+  accordion: accordionInspectorSpec,
 };

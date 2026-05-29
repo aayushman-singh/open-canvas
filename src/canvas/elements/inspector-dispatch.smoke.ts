@@ -89,6 +89,13 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     alt: 'fixture image',
     fit: 'cover',
   },
+  accordion: {
+    id: 'fx-accordion',
+    type: 'accordion',
+    box: { x: 0, y: 0, w: 320, h: 240, z: 0 },
+    items: [{ id: 'fx-item-1', title: 'Item 1', body: [{ text: 'Body', marks: [] }] }],
+    allowMultipleOpen: false,
+  },
 };
 
 // Action handlers, busy flags, and mount handlers the interpreter binds
@@ -98,7 +105,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
 // handler, so this check catches the gap at build-time instead.
 const REGISTERED_ACTIONS = ['rewrite-text', 'replace-media'] as const;
 const REGISTERED_BUSY_FLAGS = ['aiBusy'] as const;
-const REGISTERED_MOUNTS = ['media-picker', 'video-playback'] as const;
+const REGISTERED_MOUNTS = ['media-picker', 'video-playback', 'accordion-items'] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {
   // `action-href` carries its own two labels (discriminator + value) instead

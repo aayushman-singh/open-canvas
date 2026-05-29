@@ -3139,6 +3139,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   var INSPECTOR_MOUNT_HANDLERS = {
     "media-picker": function(element, host) { mountMediaPicker(element, host); },
     "video-playback": function(element, host) { mountVideoPlayback(element, host); },
+    "accordion-items": function(element, host) { mountAccordionItems(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -3394,7 +3395,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH
   // per ADR 0011 Step 1; see src/canvas/elements/{embed,code}.ts.
 
-  function buildAccordionInspector(element) {
+  // buildAccordionInspector migrated to INSPECTOR_DISPATCH per ADR 0011
+  // Step 1; see src/canvas/elements/accordion.ts. The per-item editor
+  // (title + rich-text body with contentEditable toolbar) lives in
+  // mountAccordionItems below; the allowMultipleOpen checkbox is now a
+  // declarative checkbox field in the spec.
+  function mountAccordionItems(element, host) {
     if (!Array.isArray(element.items)) element.items = [];
     var itemListHost = document.createElement("div");
 
@@ -3510,17 +3516,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       itemListHost.appendChild(addBtn);
     }
     renderItemList();
-    inspector.appendChild(field("Items", itemListHost));
-
-    var multiCheck = document.createElement("input");
-    multiCheck.type = "checkbox";
-    multiCheck.checked = !!element.allowMultipleOpen;
-    multiCheck.addEventListener("change", function() {
-      element.allowMultipleOpen = multiCheck.checked;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    inspector.appendChild(field("Allow multiple open", multiCheck));
+    host.appendChild(field("Items", itemListHost));
   }
 
   function buildCarouselInspector(element) {
@@ -4352,8 +4348,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // ADR 0011 Step 1: dispatch via spec when available, else fall back to
     // the per-type buildXInspector. Migrated types (shape, container, code,
-    // embed, text, action, media) have specs; remaining types (chart, form,
-    // accordion, carousel, table, nav) still use their per-type builders
+    // embed, text, action, media, accordion) have specs; remaining types
+    // (chart, form, carousel, table, nav) still use their per-type builders
     // until the next PR in the migration series.
     const inspectorSpec = INSPECTOR_DISPATCH[element.type];
     if (inspectorSpec) {
@@ -4362,7 +4358,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const inspectorBuilders = {
         chart: buildChartInspector,
         form: buildFormInspector,
-        accordion: buildAccordionInspector,
         carousel: buildCarouselInspector,
         table: buildTableInspector,
         nav: buildNavInspector,
