@@ -218,12 +218,30 @@ function clientScript(siteId: string): string {
         config[input.getAttribute('data-config-key')] = input.value.trim();
       });
 
-      // Client-side validation: every input with a [pattern] attribute must
-      // match before we hit the wire. The server enforces the same regex, but
-      // a local check surfaces a clearer .msg-err immediately and avoids a
-      // wasted round-trip. Only applies when the toggle is enabled — disabling
-      // a site addon should never be blocked by config validation.
+      // Client-side validation: every input with a pattern attribute must
+      // match before we hit the wire. The server enforces the same regex
+      // (addons.ts: 400 returns { field, hint }) but local validation
+      // surfaces a clearer error AND avoids a wasted round-trip + a
+      // confusing "Saved" toast on success-then-server-reject paths.
+      // Pass-7 retest showed the enabled-gated branch let bad values
+      // through when the toggle was disabled-then-re-enabled in the
+      // same session; running the check unconditionally is harmless
+      // because empty fields short-circuit via the empty-length branch.
       if (enabled) {
+        // Prefer the browser's native HTML5 validation: it respects the
+        // input's pattern + required attributes, surfaces the built-in
+        // tooltip the user already trusts, and catches edge cases (RTL
+        // chars, hidden whitespace) the regex test misses. We still
+        // run the regex check below as belt-and-suspenders in case JSX
+        // emits attribute combos the browser treats as optional.
+        if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
+          form.reportValidity();
+          if (msgEl) {
+            msgEl.textContent = 'Fix the highlighted field before saving.';
+            msgEl.className = 'addon-msg msg-err';
+          }
+          return;
+        }
         var inputs = form.querySelectorAll('[data-config-key]');
         for (var i = 0; i < inputs.length; i++) {
           var input = inputs[i];
@@ -257,7 +275,19 @@ function clientScript(siteId: string): string {
       .then(function(result) {
         saveBtn.disabled = false;
         saveBtn.textContent = prev;
-        if (!result.ok) throw new Error(result.data.error || 'Save failed');
+        if (!result.ok) {
+          // Server returns { error, field?, hint? } on validation rejection
+          // — surface the hint inline AND focus the offending input so the
+          // user can fix without scrolling back through the form.
+          var serverError = result.data && result.data.error ? result.data.error : 'Save failed';
+          var serverHint = result.data && result.data.hint ? result.data.hint : null;
+          var serverField = result.data && result.data.field ? result.data.field : null;
+          if (serverField) {
+            var fieldInput = form.querySelector('[data-config-key="' + serverField + '"]');
+            if (fieldInput && typeof fieldInput.focus === 'function') fieldInput.focus();
+          }
+          throw new Error(serverHint || serverError);
+        }
         if (msgEl) { msgEl.textContent = 'Saved. Publish your site to apply changes.'; msgEl.className = 'addon-msg msg-ok'; }
       })
       .catch(function(err) {

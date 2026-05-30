@@ -30,6 +30,7 @@ import {
 } from '../auth/edit-token';
 import { verifyInviteToken } from '../auth/invite-token';
 import { buildInviteErrorResponse } from '../auth/invite-error-page';
+import { hasLiveEditorSocketAccess } from '../live/editor-auth';
 import { editorPageJsx, type EditorPageOptions } from '../editor/route';
 import { siteCollaborator } from '../db/schema';
 import { canvasPublishedStyles } from '../canvas/public-styles';
@@ -857,10 +858,34 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     if (upgrade !== 'websocket') {
       return c.text('expected websocket upgrade', 426);
     }
+    // The on-site editor (`/?edit`) opens its WebSocket to /__live on the
+    // published subdomain — same path visitors hit, because canvas-client
+    // computes the URL from `location.host`. If we hardcoded role=visitor
+    // here, on-site editors would never receive the editable-state-replaced
+    // broadcast fan-out (SiteRoom.sendToEditorSockets() filters by role) and
+    // their tab would silently miss every dashboard write — the B3 retest
+    // symptom. The fix: when a valid edit-token is presented as wsToken,
+    // upgrade the socket to role=editor; otherwise fall back to visitor.
+    // The token is signed by the apex; access checks (collaborator removal,
+    // ownership transfer) flow through hasLiveEditorSocketAccess so a
+    // revoked collaborator's stale token can't keep editing.
+    let socketRole: 'editor' | 'visitor' = 'visitor';
+    const wsToken = requestUrl.searchParams.get('wsToken');
+    if (wsToken) {
+      const payload = await verifyEditToken(wsToken, c.env.UNLOCK_SIGNING_SECRET);
+      if (payload && payload.siteId === siteRow.id) {
+        const hasAccess = await hasLiveEditorSocketAccess(
+          db(c.env),
+          siteRow.id,
+          payload.customerId,
+        );
+        if (hasAccess) socketRole = 'editor';
+      }
+    }
     const id = c.env.SITE_ROOM.idFromName(siteRow.id);
     const stub = c.env.SITE_ROOM.get(id);
     const doRequest = new Request(
-      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}&role=visitor`,
+      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}&role=${socketRole}`,
       {
         method: 'GET',
         headers: c.req.raw.headers,

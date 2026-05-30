@@ -8225,7 +8225,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (type === "bold") return applyExecCommand("bold");
     if (type === "italic") return applyExecCommand("italic");
     if (type === "underline") return applyExecCommand("underline");
-    if (type === "strike") return applyExecCommand("strikeThrough");
+    // Browsers' execCommand("strikeThrough") emits the HTML4-deprecated
+    // <strike> tag (verified on Chrome 130, Firefox 132) which trips both
+    // the render-utils smoke and any consumer parsing the contenteditable
+    // back to mark-runs by tag name. Use the Range-based wrap path that
+    // already powers code / highlight to land <s> instead.
+    if (type === "strike") return wrapSelectionWith("s");
     if (type === "code") return wrapSelectionWith("code");
     if (type === "highlight") return wrapSelectionWith("mark");
     if (type === "link") {

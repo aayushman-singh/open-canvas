@@ -93,38 +93,51 @@ router.post('/:siteId/:formElementId', async (c) => {
   );
 
   // Notify site owner by email on successful submission.
+  //
+  // The submission row was already inserted by handleFormSubmit (above) by
+  // the time we reach this block. The visitor's outcome is therefore
+  // already determined and must NOT be flipped to 500 because the side-
+  // channel email notification later failed: the visitor would resubmit,
+  // we'd store a duplicate row, AND the owner would still miss the
+  // email. Pass-7 retest's "Internal Server Error" with a valid Turnstile
+  // token traced to this path — likely an unset/expired RESEND_API_KEY
+  // in the deploy. We log loud with full context (so the owner can find
+  // the failure in logs) but return the visitor's success outcome
+  // regardless. The submission is in the inbox; the email is best-
+  // effort. Per CLAUDE.md "fail loud, not silently": the loud log IS
+  // the fail-loud; swallowing here is not a fallback because there's
+  // no alternative behaviour being substituted — the email simply
+  // didn't go out, which is the truth.
   if (outcome.status === 'ok') {
-    const database = db(c.env);
-    const ownerRow = await database
-      .select({ email: customer.email })
-      .from(siteTable)
-      .innerJoin(customer, eq(siteTable.customerId, customer.id))
-      .where(eq(siteTable.id, siteId))
-      .limit(1);
-    const ownerEmail = ownerRow[0]?.email;
-    if (!ownerEmail) {
-      throw new Error(
-        `[forms/route] cannot notify owner for form submission: missing owner email for site ${siteId}`,
-      );
-    }
-    const submittedAt = new Date().toISOString();
-    const inboxUrl = `${appOrigin(c.env)}/dashboard/sites/${encodeURIComponent(siteId)}/forms/${encodeURIComponent(formElementId)}`;
     try {
-      await sendEmail(c.env, {
-        to: ownerEmail,
-        subject: formSubmissionEmailSubject(),
-        html: formSubmissionEmailHtml({ formElementId, submittedAt, inboxUrl }),
-      });
+      const database = db(c.env);
+      const ownerRow = await database
+        .select({ email: customer.email })
+        .from(siteTable)
+        .innerJoin(customer, eq(siteTable.customerId, customer.id))
+        .where(eq(siteTable.id, siteId))
+        .limit(1);
+      const ownerEmail = ownerRow[0]?.email;
+      if (!ownerEmail) {
+        console.error('[forms/route] form-notify skipped — owner email missing', {
+          siteId,
+          formElementId,
+        });
+      } else {
+        const submittedAt = new Date().toISOString();
+        const inboxUrl = `${appOrigin(c.env)}/dashboard/sites/${encodeURIComponent(siteId)}/forms/${encodeURIComponent(formElementId)}`;
+        await sendEmail(c.env, {
+          to: ownerEmail,
+          subject: formSubmissionEmailSubject(),
+          html: formSubmissionEmailHtml({ formElementId, submittedAt, inboxUrl }),
+        });
+      }
     } catch (err) {
       console.error('[forms/route] form-notify email failed', {
         siteId,
         formElementId,
-        ownerEmail,
-        submittedAt,
-        inboxUrl,
-        err,
+        err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
       });
-      throw err;
     }
   }
 

@@ -473,6 +473,31 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     const idx = next.pages.findIndex((p) => p.id === op.pageId);
     if (idx < 0) throw new Error(`deletePage: page not found: ${op.pageId}`);
     next.pages.splice(idx, 1);
+    // After removing the page, action elements that linked TO it via
+    // { type: 'page', pageId } would be left dangling — validate.ts:194
+    // rejects this as "must reference an existing page" and the entire
+    // /apply call 400s. Pass-7 retest hit this: footer "View customers"
+    // CTA referenced the deleted /customers page. Rewriting to a
+    // type:'external' href that points at "#" preserves the button so
+    // the Owner can re-link or delete it; auto-routing to another page
+    // would silently lose intent. The rewrite walks all REMAINING
+    // pages — the deleted one is already gone.
+    const deletedPageId = op.pageId;
+    for (const page of next.pages) {
+      for (const section of page.sections) {
+        for (const element of section.elements) {
+          if (
+            element.type === 'action' &&
+            typeof element.href === 'object' &&
+            element.href !== null &&
+            element.href.type === 'page' &&
+            element.href.pageId === deletedPageId
+          ) {
+            element.href = { type: 'external', url: '#' };
+          }
+        }
+      }
+    }
     return next;
   }
 

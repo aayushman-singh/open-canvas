@@ -1259,6 +1259,29 @@ body[data-placement-active="true"] .rev01-section-slot {
   cursor: pointer;
   background: transparent;
 }
+/* Pass-7 retest showed only chart was actually selectable via the shield —
+   the other four widgets render content that creates its own stacking
+   context (form's input, table's td, code's syntax highlighter spans,
+   carousel's transform-positioned slides). Those descendants stack above
+   the ::after pseudo even at z-index 100, so the shield never received the
+   click. Setting pointer-events: none on the entire descendant tree while
+   unselected forces every click to bubble back to the wrapper element (and
+   thus to the shield) regardless of internal stacking. Re-enabled by the
+   data-selected="true" swap below so a second click hits the widget. */
+.rev01-element[data-element-type="chart"]:not([data-selected="true"]) *,
+.rev01-element[data-element-type="table"]:not([data-selected="true"]) *,
+.rev01-element[data-element-type="code"]:not([data-selected="true"]) *,
+.rev01-element[data-element-type="form"]:not([data-selected="true"]) *,
+.rev01-element[data-element-type="carousel"]:not([data-selected="true"]) * {
+  pointer-events: none;
+}
+.rev01-element[data-element-type="chart"][data-selected="true"] *,
+.rev01-element[data-element-type="table"][data-selected="true"] *,
+.rev01-element[data-element-type="code"][data-selected="true"] *,
+.rev01-element[data-element-type="form"][data-selected="true"] *,
+.rev01-element[data-element-type="carousel"][data-selected="true"] * {
+  pointer-events: auto;
+}
 
 /* Resize handles — small white squares with red border, mirrors .selbox .h. */
 .rev01-element .resize-handle {
