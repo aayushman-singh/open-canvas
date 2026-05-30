@@ -14,7 +14,34 @@ If you can't articulate *why* the script's UX is wrong, treat the delta as a pro
 **Source-of-truth UX:** [docs/demo/act-1-script.md](act-1-script.md)
 **Evidence trail (re-verify every claim here):** [docs/demo/drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md) — Playwright per-beat table, Passes 5 + 6
 **Chronological deltas log:** [docs/demo/script-deltas-2026-05-29.md](script-deltas-2026-05-29.md) (Passes 1–6)
-**Latest deploy:** version `59494fc8` (commit `a88933a` on `origin/main`)
+**Latest deploy:** version `59494fc8` (commit `a88933a` on `origin/main` at time of writing — implementation pass below has landed further commits on `origin/main` that require a fresh deploy to go live)
+
+---
+
+## Implementation status (2026-05-30 pass, post-rewrite)
+
+All §3 product-backlog items below were addressed in a single implementation pass that landed 14 ADRs (0028–0042) on `origin/main`. Status per item:
+
+| Handoff item | ADR | Status |
+|---|---|---|
+| §3.1 Page background colour picker | [0028](../adr/0028-page-background-colour-picker-verification.md) | Accepted — `buildColorRow` hoisted to module scope + wired to page-bg field. Hex-only (loses `transparent` / named colors); noted in ADR decision 4. |
+| §3.2 Custom-404 toggle on page inspector | [0029](../adr/0029-custom-404-toggle-on-page-inspector.md) | Accepted — toggle at top of `renderPageInspector`; always-confirm modal on demotion. |
+| §3.3 Audit button rename `Re-run check` → `Run audit` | [0030](../adr/0030-audit-button-label-run-audit.md) | Accepted — single-string rename. |
+| §3.4 Audit score handling | [0031](../adr/0031-audit-numeric-score-handling.md) | Accepted with decision **hide the score**. Rubric was broken on its own terms (2 blockers + 0 warnings scored 60; 1 blocker + 8 warnings scored 40, the latter is worse despite being closer to publishable). Ring fill + headline + per-finding rows stay; digits removed. Script S7.A.1 stays silent on the score. |
+| §3.5 CSV per-row icon on top-level Forms inbox | [0032](../adr/0032-csv-export-at-top-level-forms-inbox.md) | Accepted — per-row SVG download icon hits the existing per-form CSV endpoint. |
+| §3.6 G6 — section inspector fields | [0033](../adr/0033-section-inspector-fields-for-role-bgeffect-entrance-bgvideo-popup.md) | Accepted — Identity / Background / Motion / Behaviour groups added above the existing action buttons. |
+| §3.7 G7 — `+ New Page` modal | [0034](../adr/0034-new-page-modal-with-title-slug-locale.md) | Accepted — modal collects title / slug (auto-derives) / locale (top-10 BCP-47 + Site default + Other escape). Reserved-slug pre-validation; duplicate-slug pre-validation. |
+| §3.8 G8 — visitor dark-mode 3-way picker | [0035](../adr/0035-visitor-dark-mode-three-way-enum.md) | Accepted — schema field renamed `darkModeEnabled` → `visitorTheme` enum (`light` / `dark` / `toggleable`); hard-cutover Drizzle migration `0012_visitor_theme_enum.sql`; UI replaced with 3-way radio. |
+| §3.9 G10 — per-page password gate scope | [0036](../adr/0036-per-page-password-gate-scope.md) | **Rejected** — per-page scope not justified given the draft / unpublish primitive already covers the use case. Site-wide stays the only mechanism. Script S11.B + I5 record against the site-wide gate. |
+| §3.10 S11.M account meters | [0042](../adr/0042-account-page-metering-only.md) (supersedes [0037](../adr/0037-account-page-billing-surface-pre-billing.md)) | Accepted — Account page reshaped to Usage (Sites + Storage meters) + Notifications + Account profile. Plan tiles, invoices, "Coming soon" alerts stripped per the Owner directive "im not implementing billing at all just metering." |
+| §3.11 S12.F snapshot preview iframe | [0038](../adr/0038-snapshot-preview-iframe.md) | Accepted — verification confirmed the feature already ships end-to-end (`renderSnapshotPreview` at `src/version/preview-render.ts:55`, sandboxed `srcdoc` iframe at `version-timeline.tsx:291-295`). ADR ratifies the existing implementation; no new code. |
+| §3.12 A11y link in editor header | [0039](../adr/0039-a11y-link-in-canvas-editor-header.md) | Accepted — `<a id="canvas-a11y-link">` between Settings and Save in the editor header; same-tab nav to `/dashboard/sites/{id}/a11y`. |
+| §3.13 Canonical URL fixture-fix | [0040](../adr/0040-canonical-urls-from-host-config.md) | **Hot-fix shipped, structural fix Proposed.** Five `apogee.rev01.aayushman.dev` → `opencanvas.aayushman.dev` literals replaced in `apogee-showcase.json`. The ADR's structural decisions ({{APEX}} placeholder + loader substitution + boot-time check) stay Proposed for a follow-up implementation pass. |
+| §3.14 OG-image fresh render per page | [0041](../adr/0041-og-image-fresh-render-per-page.md) | Accepted — three `ogImageAssetId: "seed-feature-canvas-1"` entries removed from the Apogee fixture; `resolveOgUrl` falls through to the existing `/og/{siteId}/{slug}.png` generator path. |
+
+The §3 product backlog below is preserved as the original framing record. Per-row status is in the table above; do NOT re-implement closed items.
+
+Pass-7 reset checklist (§4) and external prereqs (§5) remain unchanged.
 
 ---
 
