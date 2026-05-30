@@ -1,14 +1,9 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { eq, count, sum } from 'drizzle-orm';
-import {
-  billingPlanInvoiceAmount,
-  billingPlanLabel,
-  siteLimitForPlan,
-  storageLimitForPlan,
-} from '../../billing/plan-limits';
+import { siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, site, ownerAsset, type BillingPlan } from '../../db/schema';
+import { customer, site, ownerAsset } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
@@ -37,18 +32,17 @@ function formatBytes(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
-// MIGRATION.md §5e — settings.tsx is account/billing (NOT site-settings).
-// Layout matches account.html's Billing pane: 820px column, the current
-// plan summary card, three usage meters (`.mtr`), three plan cards
-// (`.plan`/.plan.feat for the highlighted upgrade slot) and the invoice
-// list (`.inv`). The Notifications + Account tabs reuse the same `.tabs`
-// affordance from account.html so all three are visible under one header.
+// Per ADR 0042 (which supersedes ADR 0037), settings.tsx renders a
+// metering-only Account page — Sites + Storage usage meters, plus the
+// Notifications and Account profile tabs. The original layout (plan
+// tiles, fake invoices, "Coming soon" alerts) was removed because the
+// billing engine itself isn't being implemented; rendering an
+// engine-less billing surface would be a no-fallback violation.
 //
-// DOM hooks preserved through the restyle: `.settings-tab` /
-// `.settings-panel` / `data-tab` / `data-active` / `data-plan-card`
-// remain the IDs the inline tab-switch script reads, and the
-// `tab-billing` / `tab-notifications` / `tab-account` panel IDs stay
-// stable so deep-links keep working.
+// Naming kept stable for deep-link continuity: the first tab still
+// uses panel id 'tab-billing' (now visually labelled 'Usage'), and
+// the .settings-tab / .settings-panel / data-tab / data-active hooks
+// the inline tab-switch script reads are unchanged.
 const settingsStyles = `
   .content { max-width: 820px; padding-bottom: 70px; }
   .content > h1 { font-size: 32px; letter-spacing: -.03em; margin-bottom: 4px; }
@@ -89,35 +83,10 @@ const settingsStyles = `
   .settings-panel[data-active="true"] { display: block; }
 
   /* current-plan summary card (account.html .plan-now) */
-  .plan-now {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 22px 24px;
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 18px;
-  }
-  .plan-now .pn { flex: 1; min-width: 0; }
-  .plan-now .pn b {
-    font-family: var(--display);
-    font-size: 20px;
-    color: var(--ink);
-  }
-  .plan-now .pn small {
-    display: block;
-    color: var(--ink-2);
-    font-size: 13.5px;
-    margin-top: 3px;
-    line-height: 1.45;
-  }
-
-  /* usage meters (.mtr) */
+  /* usage meters (.mtr) — ADR 0042: only Sites + Storage ship. */
   .meters {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
     margin-bottom: 22px;
   }
@@ -152,104 +121,6 @@ const settingsStyles = `
   }
   .mtr .bar i.warn { background: var(--warn); }
   .mtr .bar i.ok { background: var(--ok); }
-
-  /* plan tier cards (.plan) */
-  .plans {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-bottom: 24px;
-  }
-  .plan {
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-    padding: 22px;
-    position: relative;
-    box-shadow: var(--shadow-sm);
-  }
-  .plan.feat {
-    border-color: var(--red);
-    box-shadow: var(--shadow);
-  }
-  .plan .tag {
-    position: absolute;
-    top: -10px;
-    left: 22px;
-  }
-  .plan h3 {
-    font-family: var(--display);
-    font-size: 18px;
-    margin: 0 0 8px;
-    color: var(--ink);
-  }
-  .plan .price {
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: 32px;
-    margin: 8px 0 2px;
-    color: var(--ink);
-    line-height: 1;
-  }
-  .plan .price small {
-    font-size: 14px;
-    color: var(--ink-3);
-    font-weight: 500;
-    font-family: var(--sans);
-    margin-left: 2px;
-  }
-  .plan ul {
-    list-style: none;
-    padding: 0;
-    margin: 14px 0 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-  }
-  .plan li {
-    font-size: 13.5px;
-    color: var(--ink-2);
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-  }
-  .plan li svg { color: var(--ok); flex-shrink: 0; margin-top: 2px; }
-
-  /* invoice list (.inv) */
-  .inv-heading {
-    font-family: var(--display);
-    font-size: 18px;
-    font-weight: 700;
-    margin: 18px 0 12px;
-    color: var(--ink);
-  }
-  .invoices {
-    border: 1px solid var(--line);
-    border-radius: var(--r-lg);
-    background: var(--surface);
-    overflow: hidden;
-    box-shadow: var(--shadow-sm);
-  }
-  .inv {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 20px;
-    border-top: 1px solid var(--line);
-    font-size: 13.5px;
-    color: var(--ink-2);
-  }
-  .inv:first-child { border-top: none; }
-  .inv .sp { flex: 1; }
-  .inv .muted { color: var(--ink-3); }
-  .inv a {
-    color: var(--red-ink);
-    font-weight: 650;
-    text-decoration: none;
-    border-bottom: 1px solid transparent;
-    padding-bottom: 1px;
-  }
-  .inv a:hover { border-bottom-color: currentColor; }
 
   /* notifications + account panes (sparse, but use card surface) */
   .acc-card { padding: 24px; margin-bottom: 16px; }
@@ -303,9 +174,7 @@ const settingsStyles = `
   }
 
   @media (max-width: 760px) {
-    .meters, .plans { grid-template-columns: 1fr; }
-    .plan-now { flex-direction: column; align-items: flex-start; gap: 14px; }
-    .plan-now .btn { width: 100%; justify-content: center; }
+    .meters { grid-template-columns: 1fr; }
   }
 `;
 
@@ -325,52 +194,6 @@ const tabScript = raw(`<script>
 })();
 </script>`);
 
-// Inline SVG used in plan-feature rows. Kept in JSX (not Wordmark / not
-// brand) because it's pure ornamentation specific to the plan cards.
-function CheckIcon() {
-  return raw(
-    `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`,
-  );
-}
-
-const PLANS: Array<{
-  id: BillingPlan;
-  name: string;
-  price: string;
-  period: string;
-  features: string[];
-  highlight?: boolean;
-}> = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: '$0',
-    period: '/mo',
-    features: ['3 sites', 'Community templates', 'Open Canvas address', '100 MB storage'],
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: '$19',
-    period: '/mo',
-    features: ['Unlimited sites', 'Custom domains', 'Remove branding', '10 GB storage'],
-    highlight: true,
-  },
-  {
-    id: 'team',
-    name: 'Team',
-    price: '$49',
-    period: '/mo',
-    features: ['Everything in Pro', '5 team seats', 'Shared asset library', 'Priority support', '50 GB storage'],
-  },
-];
-
-const INVOICES = [
-  { date: 'May 2026' },
-  { date: 'April 2026' },
-  { date: 'March 2026' },
-];
-
 settingsRoute.get('/settings', async (c) => {
   const user = c.get('user');
   if (!user) {
@@ -387,8 +210,13 @@ settingsRoute.get('/settings', async (c) => {
     .limit(1);
   const customerRecord = customerRow[0];
   const customerId = customerRecord?.id;
+  // Per ADR 0042: the customer.plan column still exists (cohorts seeded
+  // by ADR 0009 / migration 0007), but the Account surface no longer
+  // exposes billing — no plan tiles, no invoices, no upgrade prompts.
+  // We still read the plan to drive the *limits* the meters render
+  // against (siteLimitForPlan / storageLimitForPlan), because the
+  // limit is a real product constraint enforced at write time.
   const customerPlan = customerRecord?.plan ?? 'free';
-  const currentPlan = PLANS.find((p) => p.id === customerPlan) ?? PLANS[0]!;
 
   let siteCount = 0;
   let storageBytes = 0;
@@ -410,8 +238,6 @@ settingsRoute.get('/settings', async (c) => {
   const storageBytesLimit = storageLimitForPlan(customerPlan);
   const siteLimitLabel = siteLimit === null ? '∞' : String(siteLimit);
   const storageLimitLabel = formatBytes(storageBytesLimit);
-  const planName = billingPlanLabel(customerPlan);
-  const currentInvoiceAmount = billingPlanInvoiceAmount(customerPlan);
   const sitesFillPct = siteLimit === null ? 0 : Math.min(100, (siteCount / siteLimit) * 100);
   const storageFillPct = Math.min(100, (storageBytes / storageBytesLimit) * 100);
 
@@ -437,12 +263,12 @@ settingsRoute.get('/settings', async (c) => {
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
       theme={readThemeCookie(c)}
     >
-      <h1>Plan &amp; billing</h1>
-      <p class="sub">Track usage on the current billing cycle, change plans, and download invoices.</p>
+      <h1>Settings</h1>
+      <p class="sub">Track how much of your account you're using and manage your profile.</p>
 
       <div class="settings-tabs" role="tablist">
         <button class="settings-tab" role="tab" aria-selected="true" data-tab="tab-billing">
-          Plan &amp; billing
+          Usage
         </button>
         <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-notifications">
           Notifications
@@ -453,24 +279,12 @@ settingsRoute.get('/settings', async (c) => {
       </div>
 
       <div class="settings-panel" id="tab-billing" data-active="true">
-        <div class="plan-now">
-          <div class="pn">
-            <b>{currentPlan.name} plan</b>
-            <small>
-              {customerPlan === 'team'
-                ? "You're on the top tier — every Open Canvas feature is unlocked."
-                : customerPlan === 'pro'
-                  ? 'Unlimited sites and custom domains. Cancel or downgrade anytime.'
-                  : "You're on the house plan — upgrade anytime for more sites and storage."}
-            </small>
-          </div>
-          {customerPlan === 'team' ? null : (
-            <Button variant="primary" disabled>
-              {customerPlan === 'pro' ? 'Upgrade to Team' : 'Upgrade to Pro'}
-            </Button>
-          )}
-        </div>
-
+        {/* ADR 0042: usage meters only. The previous plan-tiles + invoices
+            block was removed alongside the billing-engine deferral. The
+            customer.plan column still drives the *limits* the meters
+            render against (the limit is a real product constraint
+            enforced at write time), but no plan-change UX or invoice
+            history is exposed. */}
         <div class="meters">
           <div class="mtr">
             <div class="k">
@@ -490,55 +304,6 @@ settingsRoute.get('/settings', async (c) => {
               <i class={storageTone} style={`width:${storageFillPct}%`} />
             </div>
           </div>
-          <div class="mtr">
-            <div class="k">
-              <span>Build minutes</span>
-              <span>— / {planName === 'Free' ? '60' : 'unlimited'}</span>
-            </div>
-            <div class="bar">
-              <i class="ok" style="width:0%" />
-            </div>
-          </div>
-        </div>
-
-        <div class="plans">
-          {PLANS.map((plan) => {
-            const isCurrent = plan.id === customerPlan;
-            const isFeat = plan.highlight && !isCurrent;
-            return (
-              <div class={`plan${isFeat ? ' feat' : ''}`} data-plan-card={plan.id}>
-                {isFeat && <span class="tag chip chip-red">Most popular</span>}
-                <h3>{plan.name}</h3>
-                <div class="price">{plan.price}<small>{plan.period}</small></div>
-                <ul>
-                  {plan.features.map((f) => (
-                    <li><CheckIcon />{f}</li>
-                  ))}
-                </ul>
-                {isCurrent ? (
-                  <Button variant="secondary" style="width:100%" disabled>
-                    Current plan
-                  </Button>
-                ) : (
-                  <Button variant={isFeat ? 'primary' : 'secondary'} style="width:100%" disabled>
-                    {plan.id === 'team' ? 'Choose Team' : `Upgrade to ${plan.name}`}
-                  </Button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        <h2 class="inv-heading">Invoices</h2>
-        <div class="invoices">
-          {INVOICES.map((inv) => (
-            <div class="inv">
-              <span>{inv.date}</span>
-              <span class="sp" />
-              <span class="muted">{currentInvoiceAmount} · {currentPlan.name}</span>
-              <a href="#" onclick="event.preventDefault();window.__rev01Modal.alert('Invoice PDFs ship with billing v1.', 'Coming soon')">PDF</a>
-            </div>
-          ))}
         </div>
       </div>
 

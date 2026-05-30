@@ -1,9 +1,16 @@
 # ADR 0037 — Account page ships the billing surface before the billing engine
 
-**Status:** Proposed
+**Status:** Superseded by [ADR 0042](0042-account-page-metering-only.md)
 **Date:** 2026-05-30
+**Superseded:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** Demo recording Session 11.M ([`docs/demo/act-1-script.md`](../demo/act-1-script.md) line 415) and item #15 in [`docs/demo/handoff-delta-resolution-2026-05-30.md`](../demo/handoff-delta-resolution-2026-05-30.md) ("Account meters — rewrite Free/Pro/Team tiles + meters + invoices out"). The handoff's first-cut resolution was to delete the script beat; the new framing rule treats that as a stale capitulation to the product gap and forces the question the other way — what does the Account page have to be for the script to record as written, and how much of a real billing system does that pull in?
+
+## Superseded (2026-05-30)
+
+Superseded by [ADR 0042](0042-account-page-metering-only.md) the same day. The Owner directive — *"im not implementing billing at all just metering"* — eliminated the question this ADR was framed around. There is no pre-billing surface because there is no billing engine on the roadmap. The new ADR scopes the Account page to usage metering (Sites + Storage) plus the existing profile and notifications panes; plan tiles, invoice rows, and Coming-soon alerts were stripped.
+
+The decisions and consequences below remain as the record of what was considered before the directive landed.
 
 ## Context
 
