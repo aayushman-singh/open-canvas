@@ -25,7 +25,7 @@
 //   {
 //     "before": { siteRev, hero CTA label, ... },
 //     "after":  { siteRev, hero CTA label, ... },
-//     "diff":   "preserved" | "reverted" | "applied",
+//     "diff":   "applied" | "reverted-or-never-saved" | "unexpected",
 //     "tabA":   { url, wsFrames: [...], consoleErrors: [...] },
 //     "tabB":   { url, wsFrames: [...], consoleErrors: [...],
 //                 coEditSyncLog: [...], statusLineHistory: [...] }
@@ -33,7 +33,7 @@
 
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
-import { argv, exit } from 'node:process';
+import { argv } from 'node:process';
 
 const CDP_URL = 'http://127.0.0.1:9223';
 const DEFAULT_APEX = 'https://opencanvas.aayushman.dev';
@@ -157,17 +157,98 @@ async function fetchEditableState(page) {
   }, CANVAS_API_URL);
 }
 
-function findElementLabel(editableState, elementId) {
+function findElementRecord(editableState, elementId) {
   for (const page of editableState.pages || []) {
     for (const section of page.sections || []) {
       for (const element of section.elements || []) {
         if (element.id === elementId) {
-          return element.label ?? element.text ?? null;
+          return element;
         }
       }
     }
   }
   return null;
+}
+
+function findElementLabel(editableState, elementId) {
+  const element = findElementRecord(editableState, elementId);
+  return element ? (element.label ?? element.text ?? null) : null;
+}
+
+async function clickEditorElement(page, elementId) {
+  await page.evaluate((id) => {
+    const wrapper = Array.from(document.querySelectorAll('[data-rev01-element]')).find(
+      (candidate) => candidate.getAttribute('data-rev01-element') === id,
+    );
+    if (!wrapper) throw new Error(`element not found in editor DOM: ${id}`);
+    wrapper.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true, view: window }),
+    );
+  }, elementId);
+}
+
+async function waitForEditorElement(page, elementId) {
+  await page.waitForFunction(
+    (id) =>
+      Array.from(document.querySelectorAll('[data-rev01-element]')).some(
+        (candidate) => candidate.getAttribute('data-rev01-element') === id,
+      ),
+    elementId,
+    { timeout: 10_000 },
+  );
+}
+
+async function setInspectorTextField(page, label, value) {
+  await page.evaluate(
+    ({ fieldLabel, nextValue }) => {
+      const inspector = document.getElementById('canvas-inspector');
+      if (!inspector || inspector.hidden) {
+        throw new Error('canvas inspector did not open');
+      }
+      const field = Array.from(inspector.querySelectorAll('.field')).find(
+        (candidate) => candidate.querySelector('label')?.textContent?.trim() === fieldLabel,
+      );
+      if (!field) throw new Error(`inspector field not found: ${fieldLabel}`);
+      const input = field.querySelector('input[type="text"], textarea');
+      if (!input) throw new Error(`inspector field has no text input: ${fieldLabel}`);
+      input.focus();
+      input.value = nextValue;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.blur();
+    },
+    { fieldLabel: label, nextValue: value },
+  );
+}
+
+async function driveElementLabelEdit(page, elementId, element, newLabel) {
+  await waitForEditorElement(page, elementId);
+
+  if (element.type === 'action') {
+    // Action/button labels are inspector fields, not inline-editable DOM.
+    // Driving the canvas with keyboard input would leave the element
+    // unchanged and turn the diagnostic into a false "autosave failed" report.
+    await clickEditorElement(page, elementId);
+    await setInspectorTextField(page, 'Label', newLabel);
+    return;
+  }
+
+  if (element.type === 'text') {
+    await clickEditorElement(page, elementId);
+    // Wait for contenteditable to be focused. The inspector + inline editing
+    // toolbar appear; the element itself becomes the active element.
+    await page.waitForTimeout(500);
+    // Replace selection with new label.
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type(newLabel, { delay: 20 });
+    // Blur — the editor's blur handler fires coEditSync() → schedules autosave.
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    return;
+  }
+
+  throw new Error(
+    `unsupported element type for label-edit diagnostic: ${element.type}. Use an action or text element.`,
+  );
 }
 
 async function main() {
@@ -192,16 +273,12 @@ async function main() {
   await tabB.goto(ON_SITE_EDIT_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
   process.stderr.write(`[b4-repro] waiting for editor JS to attach on both tabs…\n`);
-  await tabA.waitForFunction(
-    () => typeof window.__rev01CoEdit !== 'undefined',
-    null,
-    { timeout: 20_000 },
-  ).catch(() => {});
-  await tabB.waitForFunction(
-    () => typeof window.__rev01CoEdit !== 'undefined',
-    null,
-    { timeout: 20_000 },
-  ).catch(() => {});
+  await tabA
+    .waitForFunction(() => typeof window.__rev01CoEdit !== 'undefined', null, { timeout: 20_000 })
+    .catch(() => {});
+  await tabB
+    .waitForFunction(() => typeof window.__rev01CoEdit !== 'undefined', null, { timeout: 20_000 })
+    .catch(() => {});
   // The IIFE attaches scheduleSave / coEditConnection on the page. Give it
   // a beat so the WS handshake completes before we sample state.
   await tabA.waitForTimeout(2_000);
@@ -213,35 +290,35 @@ async function main() {
     before.ok && before.body && before.body.editableState
       ? findElementLabel(before.body.editableState, ELEMENT_ID)
       : null;
+  const beforeElement =
+    before.ok && before.body && before.body.editableState
+      ? findElementRecord(before.body.editableState, ELEMENT_ID)
+      : null;
+  if (!beforeElement) {
+    throw new Error(`element ${ELEMENT_ID} was not found in editableState before edit`);
+  }
 
-  process.stderr.write(`[b4-repro] driving edit in tab B…\n`);
-  const elementSelector = `[data-rev01-element="${ELEMENT_ID}"]`;
+  process.stderr.write(`[b4-repro] driving ${beforeElement.type} label edit in tab B…\n`);
   await tabB.bringToFront();
-  await tabB.locator(elementSelector).first().waitFor({ timeout: 10_000 });
-  await tabB.locator(elementSelector).first().dblclick({ timeout: 10_000 });
-  // Wait for contenteditable to be focused. The inspector + inline editing
-  // toolbar appear; the element itself becomes the active element.
-  await tabB.waitForTimeout(500);
-  // Replace selection with new label.
-  await tabB.keyboard.press('Control+A');
-  await tabB.keyboard.type(NEW_LABEL, { delay: 20 });
-  // Blur — the editor's blur handler fires coEditSync() → schedules autosave.
-  await tabB.locator('body').click({ position: { x: 5, y: 5 } });
+  await driveElementLabelEdit(tabB, ELEMENT_ID, beforeElement, NEW_LABEL);
 
   // Capture tab B's status line history for ~the next 30s. The text reads
   // "Synced" on Yjs-projection success, "Saved" on HTTP-PUT success, or
   // "Co-edit disconnected; changes not saved" on the silent-failure path.
   const statusEvalScript = () => {
-    const el = document.querySelector('[data-rev01-status]') ||
-      document.getElementById('canvas-status');
+    const el =
+      document.querySelector('[data-rev01-status]') || document.getElementById('canvas-status');
     return el ? el.textContent : null;
   };
   const statusLineHistory = [];
   const sampleStart = nowMs();
   while (nowMs() - sampleStart < WAIT_MS) {
     const status = await tabB.evaluate(statusEvalScript).catch(() => null);
-    if (status && (statusLineHistory.length === 0 ||
-        statusLineHistory[statusLineHistory.length - 1].text !== status)) {
+    if (
+      status &&
+      (statusLineHistory.length === 0 ||
+        statusLineHistory[statusLineHistory.length - 1].text !== status)
+    ) {
       statusLineHistory.push({ ts: nowMs() - sampleStart, text: status });
     }
     await tabB.waitForTimeout(500);
@@ -270,7 +347,12 @@ async function main() {
       dashboardUrl: DASHBOARD_URL,
       onSiteUrl: ON_SITE_EDIT_URL,
     },
-    before: { status: before.status, ok: before.ok, elementLabel: beforeLabel },
+    before: {
+      status: before.status,
+      ok: before.ok,
+      elementType: beforeElement.type,
+      elementLabel: beforeLabel,
+    },
     after: { status: after.status, ok: after.ok, elementLabel: afterLabel },
     diff,
     tabA: {
