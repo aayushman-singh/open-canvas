@@ -141,6 +141,11 @@ export function editorPageJsx(opts: EditorPageOptions) {
     context === 'public'
       ? `${apexOrigin}/dashboard/sites/${encodeURIComponent(siteId)}/settings`
       : settingsPath;
+  const a11yPath = `/dashboard/sites/${encodeURIComponent(siteId)}/a11y`;
+  const a11yHref =
+    context === 'public'
+      ? `${apexOrigin}${a11yPath}`
+      : a11yPath;
 
   const breadcrumbs =
     context === 'public' ? (
@@ -212,6 +217,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
             </button>
             <a id="canvas-settings-link" href={settingsHref} title="Open site settings">
               Settings
+            </a>
+            <a id="canvas-a11y-link" href={a11yHref} title="Run the accessibility audit">
+              A11y
             </a>
             <button id="canvas-save" type="button">
               Save

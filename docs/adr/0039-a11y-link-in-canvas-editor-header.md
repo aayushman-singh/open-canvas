@@ -1,6 +1,6 @@
 # ADR 0039 — A11y link in the canvas editor header
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** Session 7 entry beat of [docs/demo/act-1-script.md](../demo/act-1-script.md) (S7.A.1 / S7.D.1), and the gap named in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3 "A11y link from editor header". Sits adjacent to [ADR 0030](0030-audit-button-label-run-audit.md) (audit button label) and [ADR 0031](0031-audit-numeric-score-handling.md) (audit score line) — same recording, same audit page.
