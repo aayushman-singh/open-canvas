@@ -17,6 +17,7 @@
 // callers rely on (one head meta block per page, in render order).
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
+import { apogeeShowcaseTemplate } from '../templates/registry.js';
 import { emitPageMeta, renderCanvasHead, resolveLang, resolveNoIndex } from './meta-emit.js';
 import { resolveOgUrl } from './og-resolve.js';
 
@@ -446,5 +447,67 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-process.stdout.write('[seo:smoke] OK — 6 assertions + audit follow-ups passed\n');
+// Apogee Showcase fixture audit — ADRs 0040 & 0041.
+//
+// Closes the regression loop for both leaks: the built-in Apogee Showcase
+// template must produce canonicals from the request host and OG image URLs
+// from the `/og/` generator path, with zero literal hostnames or seed asset
+// references baked into the fixture's page SEO blocks.
+// ---------------------------------------------------------------------------
+
+// The fixture itself must not carry any per-page canonical or
+// ogImageAssetId — the runtime path is the single source of truth.
+for (const fixturePage of apogeeShowcaseTemplate.state.pages) {
+  assert(
+    fixturePage.canonical === undefined || fixturePage.canonical.length === 0,
+    `apogee fixture: page "${fixturePage.slug}" must not carry a pre-baked canonical (ADR 0040)`,
+  );
+  assert(
+    fixturePage.ogImageAssetId === undefined || fixturePage.ogImageAssetId.length === 0,
+    `apogee fixture: page "${fixturePage.slug}" must not carry a pre-baked ogImageAssetId (ADR 0041)`,
+  );
+}
+
+// Render every page of the fixture and verify the emitted canonical points
+// at the request host (not at any apex literal) and og:image routes through
+// the /og/ generator path (not /assets/).
+const APEX_LITERALS = [
+  'apogee.rev01.aayushman.dev',
+  'opencanvas.aayushman.dev',
+  'rev01.aayushman.dev',
+];
+const BRIAR_HOST = 'briar.opencanvas.aayushman.dev';
+const APOGEE_SITE_ID = 'site-apogee-smoke';
+const apogeeSnapshot = makeSnapshot(apogeeShowcaseTemplate.state.pages);
+for (const fixturePage of apogeeShowcaseTemplate.state.pages) {
+  const metaApogee = emitPageMeta(fixturePage, {
+    siteId: APOGEE_SITE_ID,
+    host: BRIAR_HOST,
+    snapshot: apogeeSnapshot,
+  });
+  const expectedPath = fixturePage.slug.length > 0 ? `/${fixturePage.slug}` : '/';
+  const expectedCanonical = `https://${BRIAR_HOST}${expectedPath}`;
+  assert(
+    metaApogee.includes(`<link rel="canonical" href="${expectedCanonical}">`),
+    `apogee fixture: page "${fixturePage.slug}" canonical must compose from request host, got block:\n${metaApogee}`,
+  );
+  for (const apexLiteral of APEX_LITERALS) {
+    assert(
+      !metaApogee.includes(`canonical" href="https://${apexLiteral}`),
+      `apogee fixture: page "${fixturePage.slug}" canonical must not contain literal "${apexLiteral}"`,
+    );
+  }
+  const expectedOgPath = `/og/${encodeURIComponent(APOGEE_SITE_ID)}/${encodeURIComponent(fixturePage.slug)}.png`;
+  assert(
+    metaApogee.includes(`<meta property="og:image" content="https://${BRIAR_HOST}${expectedOgPath}">`),
+    `apogee fixture: page "${fixturePage.slug}" og:image must route through /og/ generator, got block:\n${metaApogee}`,
+  );
+  assert(
+    !metaApogee.includes('content="https://' + BRIAR_HOST + '/assets/seed-feature-canvas-1'),
+    `apogee fixture: page "${fixturePage.slug}" og:image must not reference the seed asset`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+process.stdout.write('[seo:smoke] OK — 6 assertions + audit follow-ups + apogee fixture audit passed\n');
 process.exit(0);

@@ -130,6 +130,27 @@ const pageStyles = `
     font-size: 13px;
     min-height: 18px;
   }
+  /* Canonical host-mismatch warning. Shown when the canonical URL's
+     hostname does not equal the site's actual publishing host — a strong
+     hint the canonical is a stale fixture leak or a typo. Purely
+     advisory; the field still saves whatever the Owner typed. */
+  .canonical-warning {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.32);
+    color: #fcd34d;
+    border-radius: 6px;
+    font-size: 12.5px;
+    line-height: 1.45;
+  }
+  .canonical-warning[hidden] { display: none; }
+  .canonical-warning code {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11.5px;
+  }
 
   /* --- Asset picker control (replaces the old "asset id" text box) ------- */
   .asset-picker {
@@ -734,18 +755,51 @@ function clientScript(siteId: string, pageId: string): string {
   bindPreview('title', 'data-preview-title');
   bindPreview('description', 'data-preview-desc');
 
-  // Canonical URL preview (SERP) — if the user sets a custom canonical, use
-  // it; otherwise show the computed default already rendered server-side.
+  // Canonical URL preview (SERP) + host-mismatch warning. The SERP preview
+  // shows whatever URL the renderer will emit (canonical override when set,
+  // auto-derived publishedUrl when blank). The warning fires when the
+  // canonical's hostname does not match the site's publishing host — that's
+  // either a fixture leak (the dashboard never edited a stale value baked
+  // in by a template) or a deliberate cross-host canonical (umbrella site).
+  // We don't auto-clear or block save; the field is the Owner's to control.
   const canonicalInput = form.querySelector('[name="canonical"]');
-  const canonicalDefault = document.querySelector('[data-preview-canonical]')?.textContent || '';
-  if (canonicalInput) {
-    canonicalInput.addEventListener('input', () => {
-      const node = document.querySelector('[data-preview-canonical]');
-      if (!node) return;
-      const v = canonicalInput.value.trim();
-      node.textContent = v.length > 0 ? v : canonicalDefault;
-    });
+  const canonicalPreviewNode = document.querySelector('[data-preview-canonical]');
+  const publishedUrlDefault = canonicalPreviewNode
+    ? canonicalPreviewNode.getAttribute('data-published-url') || ''
+    : '';
+  const publishingHost = canonicalInput
+    ? canonicalInput.getAttribute('data-publishing-host') || ''
+    : '';
+  const canonicalWarningNode = document.querySelector('[data-canonical-warning]');
+  const warningHostNode = document.querySelector('[data-warning-host]');
+  function evaluateCanonicalState() {
+    if (!canonicalInput) return;
+    const v = canonicalInput.value.trim();
+    if (canonicalPreviewNode) {
+      canonicalPreviewNode.textContent = v.length > 0 ? v : publishedUrlDefault;
+    }
+    if (canonicalWarningNode) {
+      let mismatchHost = null;
+      if (v.length > 0 && publishingHost.length > 0) {
+        try {
+          const parsedHost = new URL(v).host;
+          if (parsedHost.toLowerCase() !== publishingHost.toLowerCase()) {
+            mismatchHost = parsedHost;
+          }
+        } catch (_) { /* malformed URL — skip the warning */ }
+      }
+      if (mismatchHost !== null) {
+        if (warningHostNode) warningHostNode.textContent = mismatchHost;
+        canonicalWarningNode.hidden = false;
+      } else {
+        canonicalWarningNode.hidden = true;
+      }
+    }
   }
+  if (canonicalInput) {
+    canonicalInput.addEventListener('input', evaluateCanonicalState);
+  }
+  evaluateCanonicalState();
 
   // noIndex toggle → toggle the SERP "Google won't show this" notice live.
   const noIndexCb = form.querySelector('[name="noIndex"]');
@@ -1044,7 +1098,8 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
   const titleVal = esc(page.title);
   const descriptionVal = esc(page.description ?? '');
   const ogImageVal = esc(page.ogImageAssetId ?? '');
-  const canonicalVal = esc(page.canonical ?? '');
+  const canonicalRaw = page.canonical ?? '';
+  const canonicalVal = esc(canonicalRaw);
   const localeVal = esc(page.locale ?? '');
   const publishedDateVal = esc(page.publishedDate ?? '');
   const authorVal = esc(page.author ?? '');
@@ -1058,6 +1113,29 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
     `/api/canvas/sites/${encodeURIComponent(siteId)}/assets/${encodeURIComponent(id)}`;
   const publishedHost = `${subdomain}.${appDomain(c.env)}`;
   const publishedUrl = `https://${publishedHost}${page.slug.length > 0 ? `/${page.slug}` : '/'}`;
+  // SERP preview URL: prefer the Owner's canonical override when set, so the
+  // preview reflects what the renderer actually emits rather than the
+  // auto-derived URL. A fixture-leaked canonical now appears in the preview
+  // instead of being silently masked by `publishedUrl`.
+  const serpPreviewUrl = canonicalRaw.length > 0 ? canonicalRaw : publishedUrl;
+  // Hostname-mismatch warning input: null when no warning should show, else
+  // the canonical's hostname for the message. Empty canonicals fall through
+  // to the auto-derived URL, which always matches; we only check non-empty
+  // values. URL parsing is best-effort — a malformed URL is its own UI
+  // problem (the input type="url" handles validation feedback), so we don't
+  // warn on parse failure here.
+  let canonicalHostMismatch: string | null = null;
+  if (canonicalRaw.length > 0) {
+    try {
+      const parsedHost = new URL(canonicalRaw).host;
+      if (parsedHost.toLowerCase() !== publishedHost.toLowerCase()) {
+        canonicalHostMismatch = parsedHost;
+      }
+    } catch {
+      // Malformed URL — skip the warning rather than render a confusing
+      // "different host than..." message about an unparseable value.
+    }
+  }
   // Initials for the SERP favicon fallback (when no custom favicon is set).
   const siteInitial = siteName.trim().slice(0, 1).toUpperCase() || 'R';
   // Inline style binding the preview colours to the actual Style Kit preset.
@@ -1167,7 +1245,26 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                 name="canonical"
                 value={canonicalVal}
                 placeholder="leave blank to use the page's own URL"
+                data-publishing-host={publishedHost}
               />
+              <div
+                class="canonical-warning"
+                data-canonical-warning
+                hidden={canonicalHostMismatch === null}
+              >
+                {canonicalHostMismatch !== null ? (
+                  <>
+                    This canonical points at <code data-warning-host>{canonicalHostMismatch}</code>,
+                    not the site's publishing host <code>{publishedHost}</code>. Search engines
+                    will treat that as a redirect away from this page — usually a mistake.
+                  </>
+                ) : (
+                  <>
+                    This canonical points at a different host than this site publishes on.
+                    Search engines will treat that as a redirect away from this page — usually a mistake.
+                  </>
+                )}
+              </div>
             </label>
             <label>
               <span>Locale (BCP-47)</span>
@@ -1313,7 +1410,13 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                     </div>
                     <div class="pv-host-text">
                       <span class="pv-sitename">{esc(siteName)}</span>
-                      <span class="pv-url" data-preview-canonical>{publishedUrl}</span>
+                      <span
+                        class="pv-url"
+                        data-preview-canonical
+                        data-published-url={publishedUrl}
+                      >
+                        {serpPreviewUrl}
+                      </span>
                     </div>
                   </div>
                   <h3

@@ -238,3 +238,40 @@ const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, t
 export function getTemplateSeed(id: string): TemplateSeed | null {
   return templatesById.get(id) ?? null;
 }
+
+// ---------------------------------------------------------------------------
+// Boot-time fixture SEO check — ADRs 0040 & 0041.
+//
+// Built-in template fixtures must not pre-bake per-page `canonical` URLs or
+// `ogImageAssetId` values. The runtime emit path composes the correct
+// canonical from the request host and falls through to the live OG render
+// when no asset is set; any literal in the fixture is by definition stale
+// against a fork's apex or a site's per-subdomain publish host.
+//
+// Failing loud at module load means a fixture author who reintroduces a
+// literal URL or seed asset id sees the regression at PR-author time, not
+// after publishing a real site that emits the wrong meta tag.
+export function assertNoFixtureSeoLeak(seeds: readonly TemplateSeed[]): void {
+  const offenders: string[] = [];
+  for (const seed of seeds) {
+    for (const page of seed.state.pages) {
+      if (typeof page.canonical === 'string' && page.canonical.length > 0) {
+        offenders.push(
+          `${seed.id}: page "${page.slug}" carries canonical="${page.canonical}" — built-in fixtures must leave this empty (ADR 0040)`,
+        );
+      }
+      if (typeof page.ogImageAssetId === 'string' && page.ogImageAssetId.length > 0) {
+        offenders.push(
+          `${seed.id}: page "${page.slug}" carries ogImageAssetId="${page.ogImageAssetId}" — built-in fixtures must leave this empty so the lazy OG render path is used (ADR 0041)`,
+        );
+      }
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      `Built-in template fixture SEO leak detected:\n  - ${offenders.join('\n  - ')}`,
+    );
+  }
+}
+
+assertNoFixtureSeoLeak(allTemplateSeeds);
