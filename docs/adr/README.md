@@ -41,6 +41,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0031 | Accessibility audit hides the numeric score | Accepted | [`docs/adr/0031-audit-numeric-score-handling.md`](0031-audit-numeric-score-handling.md) |
 | 0038 | Snapshot preview is a server-rendered sandboxed iframe via srcdoc | Accepted | [`docs/adr/0038-snapshot-preview-iframe.md`](0038-snapshot-preview-iframe.md) |
 | 0039 | A11y link in the canvas editor header | Accepted | [`docs/adr/0039-a11y-link-in-canvas-editor-header.md`](0039-a11y-link-in-canvas-editor-header.md) |
+| 0041 | Apogee Showcase fixture og:image renders fresh per published page | Accepted | [`docs/adr/0041-og-image-fresh-render-per-page.md`](0041-og-image-fresh-render-per-page.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

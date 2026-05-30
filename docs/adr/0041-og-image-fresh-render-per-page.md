@@ -1,6 +1,6 @@
 # ADR 0041 — Apogee Showcase fixture og:image renders fresh per published page, not pre-baked to a seed asset
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** the og:image leak surfaced in Pass 4 + Pass 5 of the demo drive and named in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.14. Three `ogImageAssetId: "seed-feature-canvas-1"` literals live in [src/canvas/fixtures/apogee-showcase.json](../../src/canvas/fixtures/apogee-showcase.json) at lines 617, 2359, 4952. Every site created from Apogee Showcase publishes those pages with an og:image pointing at the Apogee fixture's hero asset — not at a freshly-rendered OG PNG with the Owner's own page title / description / style kit.
