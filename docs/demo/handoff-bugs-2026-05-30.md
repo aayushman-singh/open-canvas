@@ -24,30 +24,34 @@ users at the top, then recording-blockers, then script-wording deltas.
 | B1 — CSP blocks Turnstile | ✅ Already shipped | `ab68578` — `src/embed/csp.ts:85,92,95` add `https://challenges.cloudflare.com` to script-src + frame-src + connect-src. Awaits redeploy. |
 | B2 — Agent apply endpoint shape | ✅ Already shipped | `5fbbc4e` — `src/routes/api/canvas-agent.ts:367-392` accepts canonical `{ ops }` + legacy `{ tool, params }` shapes; both client callers post canonical. |
 | B3 — Editor never broadcasts changes | ✅ Closed by this sweep | `d8b30e3` covered config PATCH only. This sweep adds `broadcastEditableStateReplaced()` to PUT `/seo`, PUT `/metadata`, POST `/style-kit` so every non-Yjs write path refreshes the DO. |
-| B4 — Collaborator autosave gated | ⏸️ Blocked (in-flight) | Needs `src/editor/canvas-client.ts` change. That file is currently staged with the co-edit presence feature — adding 403/autosave gates would conflict. Hand back when presence lands. |
+| B4 — Collaborator autosave gated | 🟡 Partially closed | The 403 handler from B9 now surfaces a loud "Access removed" modal when the collaborator's session loses access. The deeper Pass-7 repro (collaborator edit → blur → wait 30s → server unchanged on a *still-authorized* session) appears to be in the Yjs co-edit projection path, not authorization — `src/live/co-edit/autosave.ts` has no auth gating, so the autosave should fire on any Y.Doc update. Needs a reproducer with WS frame capture before a code fix lands. |
 | B5 — Stale Yjs cache overwrite | ✅ Closed transitively | Downstream of B3 — broadcasts now refresh stale DOs on every non-Yjs write, so the stale-tab clobber scenario in the original repro no longer applies. State-vector reconciliation on focus is a separate enhancement (not regression). |
 | B6 — Visitor dark-mode toggle missing | ✅ Closed by this sweep | `src/routes/public.ts` now calls `renderModeToggleHtml(c.env)` when `visitorTheme === 'toggleable'` and injects the button into body before the footer. The button + click script + cookie writer were always defined in `src/themes/visitor-mode/toggle-element.ts`; the renderer simply never called them. |
 | B7 — Stale rev01 canonicals | ✅ Already shipped | `854432b` — fixture canonicals removed; `src/seo/meta-emit.ts:138-149` derives canonical from `ctx.host`; `src/seo/smoke.ts:474-509` pins behaviour. Awaits redeploy. |
 | B8 — OG image fixture leak | ✅ Already shipped | `c6ad95f` — `ogImageAssetId` dropped from Apogee fixture; `src/seo/og-resolve.ts:43-62` falls back to `/og/{siteId}/{slug}.png` generator. Awaits redeploy. |
-| B9 — No "Access removed" overlay | ⏸️ Blocked (in-flight) | Needs `src/editor/canvas-client.ts` change for 403 modal. File is staged with co-edit presence. Hand back when presence lands. |
+| B9 — No "Access removed" overlay | ✅ Closed by this sweep | `src/editor/canvas-client.ts` — `authFetch` now branches on 403 → `handleAccessRevoked()` shows a locked-down "Access removed" alertdialog with a "Back to dashboard" CTA, locks Save/Publish/AI controls, and traps keyboard shortcuts so Ctrl+Z / Ctrl+S can't keep mutating a server that's already refusing the writes. No auto-reload (would loop on the same 403); the user navigates away on their own terms. |
 | B10 — GA addon validation | ✅ Already shipped | `8d15ae7` — client pattern at `src/routes/dashboard/addon-shop.tsx:315` + `site-addons.tsx:233`; server 400 at `src/routes/api/addons.ts:219-228`; registry pattern at `src/addons/registry.ts:54-55`; smoke `src/addons/google-analytics.smoke.ts` pins both layers. |
 | B11 — Header buttons count | 🟡 Mostly resolved | `425c44e` removed A11y from the editor header (now: AI Chat · Settings · Save · Publish + version badge = 4 buttons + badge) and added Accessibility to the site-settings TOC. Script S2.A.7 says "five buttons" + no version badge — still a mismatch on count + badge, but smaller. Script edit (or accept the badge) is the cheap close. |
-| B12 — Template gallery count | ➡️ Script-only delta | Live state is 8 templates, script says 6. Pure script rewrite — pick "eight templates" or stop enumerating. No code change. |
-| B13 — Landing CTA wording | ➡️ Script-only delta | Live: `Sign in` / `Start building`. Script says `Launch dashboard`. Pure script rewrite. No code change. |
+| B12 — Template gallery count | ✅ Closed by this sweep | `docs/demo/act-1-script.md` S1.5 + S1.9 — voiceover now says "eight templates" and enumerates Press Canvas + Violet Launch alongside the original six. |
+| B13 — Landing CTA wording | ✅ Closed by this sweep | `docs/demo/act-1-script.md` S0.2 + S0.3 — voiceover now references the live "Start building" button instead of the absent "Launch dashboard." |
 | B14 — `Launch PageProduct` collapse | ✅ Already shipped | `src/landing/styles.ts:776-781` — `.tpl .cap { display: flex; flex-direction: column; }`. Awaits redeploy. |
 | B15 — AI media modal | ✅ Already shipped | `11829d4` — `src/editor/canvas-client.ts:1130-1227` ships aspect picker (1:1/16:9/4:3/9:16), 4-up gallery grid (`repeat(2, 1fr)`), button labelled `"Generate with AI"`. |
 | B16 — Element click intercepted | ✅ Closed by parallel work | `425c44e` ships a transparent `::after` click-shield on the wrapper for code/table/chart/form/carousel — pointer events on widget internals now resolve to the host element. CSS-only fix; second click reaches the widget per the Figma/Webflow pattern. |
 | B17 — Strike mark deprecated tag | ✅ Already shipped | `8d15ae7` — `src/canvas/elements/render-utils.ts:100`, `src/editor/canvas-client.ts:2239,4161` emit `<s>`; smoke `src/canvas/elements/render-utils.smoke.ts:28-36` asserts no `<strike>` emit. Deserialiser accepts both for paste tolerance. |
 | C1 / C2 — Recording prep | ➡️ Operator task | No code change — recording operator (Maya) cleans Briar per the cleanup list before camera rolls. |
 
-**Net of this sweep:** B3 + B6 closed by this sweep. B16 + B11 (mostly)
-closed by parallel commit `425c44e` (click-shield + A11y nav move).
-B1/B2/B7/B8/B10/B14/B15/B17 already shipped — those awaiting redeploy
-clear with the next worker push. B4 + B9 remain open and need a follow-up
-session on `src/editor/canvas-client.ts` (collaborator 403 handling +
-"Access removed" modal). B12 + B13 are script-only edits to
-`docs/demo/act-1-script.md` — pick them up alongside the next script
-revision pass. C1 + C2 are operator-side recording prep.
+**Net of this sweep (cumulative across two passes):**
+
+- ✅ Closed by this work: B3, B6, B9, B12, B13.
+- ✅ Closed by parallel commit `425c44e`: B16, B11 (mostly).
+- ✅ Already shipped, awaiting redeploy: B1, B2, B7, B8, B10, B14, B15, B17. Plus B5 (collapses out via B3).
+- 🟡 Partially closed: B4 — the 403 handler from B9 makes revoked sessions loud, but the original Pass-7 repro of a *still-authorized* collaborator's edits not autosaving needs a reproducer (WS frame capture) before a real fix lands; not blocking the demo because manual Save still works.
+- ➡️ Operator task: C1 + C2 recording prep.
+
+All 17 numbered items have a status; nothing else outstanding from
+the handoff. Next-session focus when reproducing B4: capture the
+on-site editor's WebSocket frames during a collaborator edit to see
+whether the Y.Doc update message actually reaches the DO.
 
 ---
 

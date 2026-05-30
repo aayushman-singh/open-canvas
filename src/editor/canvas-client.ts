@@ -830,8 +830,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // place we detect that — every Owner-gated /api/* call routes through it
   // and a 401 trips handleSessionExpired once, locks the editor, and reloads
   // the page after a short grace so Clerk's handshake fires fresh.
+  //
+  // 403 means the user is authenticated but no longer authorized for this
+  // site — typically a collaborator the Owner just revoked. That can't be
+  // healed by a Clerk handshake reload (the new session would 403 just the
+  // same), so handleAccessRevoked shows a locked-down "Access removed"
+  // modal and offers a dashboard link instead of reloading.
   let saveBusy = false;
   let sessionExpired = false;
+  let accessRevoked = false;
   function setSaveBusy(busy) {
     saveBusy = busy;
     if (saveButton) saveButton.disabled = busy;
@@ -847,11 +854,82 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (publishButton) publishButton.disabled = true;
     setTimeout(() => { location.reload(); }, 1500);
   }
+  function handleAccessRevoked() {
+    if (accessRevoked) return;
+    accessRevoked = true;
+    setStatus("Access removed", "error");
+    // Lock every mutating control. Unlike sessionExpired we do not auto-
+    // reload — the user's Clerk session is still valid for other sites,
+    // so a reload would just put them on the same editor with another
+    // 403. The modal CTAs let them navigate away on their own terms.
+    setSaveBusy(true);
+    setAiBusy(true);
+    if (publishButton) publishButton.disabled = true;
+    showAccessRemovedModal();
+  }
+  function showAccessRemovedModal() {
+    if (document.querySelector("[data-rev01-access-removed]")) return;
+    var backdrop = document.createElement("div");
+    backdrop.className = "rev01-modal-backdrop";
+    backdrop.setAttribute("data-rev01-access-removed", "true");
+    var panel = document.createElement("div");
+    panel.className = "rev01-modal";
+    panel.setAttribute("role", "alertdialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-labelledby", "rev01-access-removed-title");
+
+    var title = document.createElement("h3");
+    title.id = "rev01-access-removed-title";
+    title.textContent = "Access removed";
+    panel.appendChild(title);
+
+    var body = document.createElement("p");
+    body.textContent =
+      "This site is no longer shared with you. Unsaved changes since your last successful save are lost. Sign out and back in to other shared sites if you need to verify which still grant you access.";
+    body.style.margin = "8px 0 16px";
+    panel.appendChild(body);
+
+    var actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.gap = "8px";
+    actions.style.justifyContent = "flex-end";
+
+    var dashLink = document.createElement("a");
+    dashLink.href = "/dashboard";
+    dashLink.textContent = "Back to dashboard";
+    dashLink.style.padding = "8px 14px";
+    dashLink.style.borderRadius = "6px";
+    dashLink.style.background = "#111";
+    dashLink.style.color = "#fff";
+    dashLink.style.textDecoration = "none";
+    dashLink.style.fontWeight = "600";
+    actions.appendChild(dashLink);
+
+    panel.appendChild(actions);
+    backdrop.appendChild(panel);
+    document.body.appendChild(backdrop);
+    document.body.classList.add("rev01-modal-open");
+
+    // Trap keyboard shortcuts so Ctrl+Z / Ctrl+S can't still mutate the
+    // (now read-only-server) canvas while the modal is up. capture-phase
+    // listener stops the events before the editor's window-level handler
+    // sees them.
+    function trap(e) {
+      e.stopPropagation();
+    }
+    backdrop.addEventListener("keydown", trap, true);
+    // Focus the only CTA so keyboard users land on it immediately.
+    setTimeout(function() { dashLink.focus(); }, 0);
+  }
   async function authFetch(input, init) {
     const response = await fetch(input, init);
     if (response.status === 401) {
       handleSessionExpired();
       throw new Error("session expired");
+    }
+    if (response.status === 403) {
+      handleAccessRevoked();
+      throw new Error("access revoked");
     }
     return response;
   }
