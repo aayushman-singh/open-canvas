@@ -57,11 +57,13 @@ const SMOKE_UNLOCK_SIGNING_SECRET = process.env.UNLOCK_SIGNING_SECRET ?? 'smoke-
 // not require touching this file.
 const SMOKE_APP_DOMAIN = 'opencanvas.aayushman.dev';
 const SMOKE_APP_ORIGIN = `https://${SMOKE_APP_DOMAIN}`;
+const SMOKE_CLERK_PUBLISHABLE_KEY = `pk_live_${btoa(`clerk.${SMOKE_APP_DOMAIN}$`)}`;
+const SMOKE_CLERK_SECRET_KEY = 'sk_live_review_smoke';
 
 const smokeEnv: Record<string, string> = {
   DATABASE_URL: process.env.DATABASE_URL ?? '',
-  CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY ?? '',
-  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? '',
+  CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY ?? SMOKE_CLERK_PUBLISHABLE_KEY,
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY ?? SMOKE_CLERK_SECRET_KEY,
   UNLOCK_SIGNING_SECRET: SMOKE_UNLOCK_SIGNING_SECRET,
   APP_DOMAIN: SMOKE_APP_DOMAIN,
   AUTHORIZED_PARTIES: `http://localhost:8787,http://127.0.0.1:8787,${SMOKE_APP_ORIGIN}`,
@@ -862,6 +864,15 @@ assert(
     ) &&
     !canvasClientSource.includes('offset: sel.anchorOffset | 0'),
   'expected co-edit presence to publish cumulative editable text offsets, not node-local Selection.anchorOffset values',
+);
+assert(
+  canvasClientSource.includes('saveBusy = busy || sessionExpired || accessRevoked;') &&
+    canvasClientSource.includes('aiBusy = busy || sessionExpired || accessRevoked;') &&
+    canvasClientSource.includes(
+      'if (!accessRevoked && !sessionExpired) publishButton.disabled = false;',
+    ) &&
+    canvasClientSource.includes('if (!saved && !accessRevoked && !sessionExpired)'),
+  'expected revoked-access/session-expired locks to survive save, AI, and publish cleanup paths',
 );
 assert(
   canvasApiSource.includes('cannot save: missing assets'),

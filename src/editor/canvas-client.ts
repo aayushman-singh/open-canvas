@@ -840,8 +840,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   let sessionExpired = false;
   let accessRevoked = false;
   function setSaveBusy(busy) {
-    saveBusy = busy;
-    if (saveButton) saveButton.disabled = busy;
+    saveBusy = busy || sessionExpired || accessRevoked;
+    if (saveButton) saveButton.disabled = saveBusy;
   }
   function handleSessionExpired() {
     if (sessionExpired) return;
@@ -2086,6 +2086,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   async function persistStateSnapshot(snapshot) {
+    if (accessRevoked || sessionExpired) return false;
     setStatus("Saving...");
     try {
       const response = await authFetch(SITE_BASE, {
@@ -2110,13 +2111,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           // confusing "SyntaxError" toast. The real save failure (the !ok
           // response itself) is the loud signal.
         }
-        setStatus("Save failed: " + detail, "error");
+        if (!accessRevoked && !sessionExpired) setStatus("Save failed: " + detail, "error");
         return false;
       }
+      if (accessRevoked || sessionExpired) return false;
       setStatus("Saved", "ok");
       return true;
     } catch (err) {
-      setStatus("Save failed: " + (err && err.message ? err.message : String(err)), "error");
+      if (!accessRevoked && !sessionExpired) {
+        setStatus("Save failed: " + (err && err.message ? err.message : String(err)), "error");
+      }
       return false;
     }
   }
@@ -2135,7 +2139,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       saveTimer = null;
     }
     const saved = await saveStateNow();
-    if (!saved) {
+    if (!saved && !accessRevoked && !sessionExpired) {
       setStatus("Save failed; action stopped", "error");
     }
     return saved;
@@ -8607,10 +8611,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // Owner cannot stack previews on top of each other.
 
   function setAiBusy(busy) {
-    aiBusy = busy;
+    aiBusy = busy || sessionExpired || accessRevoked;
     const buttons = document.querySelectorAll("[data-ai-button]");
     for (let i = 0; i < buttons.length; i++) {
-      buttons[i].disabled = busy;
+      buttons[i].disabled = aiBusy;
     }
   }
 
@@ -8662,6 +8666,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ ops }),
       });
+      if (accessRevoked || sessionExpired) {
+        closeAiPanel();
+        return;
+      }
       if (!response.ok) {
         let detail = response.statusText;
         try {
@@ -8690,7 +8698,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       closeAiPanel();
       setStatus("AI edit applied", "ok");
     } catch (err) {
-      setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      if (!accessRevoked && !sessionExpired) {
+        setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      }
       closeAiPanel();
     }
   }
@@ -10371,6 +10381,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         method: "POST",
         headers: { "content-type": "application/json" },
       });
+      if (accessRevoked || sessionExpired) return;
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         let detail = response.statusText;
@@ -10435,9 +10446,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         // success so the Owner is not left without feedback.
       }
     } catch (err) {
-      setStatus("Publish failed: " + (err && err.message ? err.message : String(err)), "error");
+      if (!accessRevoked && !sessionExpired) {
+        setStatus("Publish failed: " + (err && err.message ? err.message : String(err)), "error");
+      }
     } finally {
-      publishButton.disabled = false;
+      if (!accessRevoked && !sessionExpired) publishButton.disabled = false;
     }
   }
 
