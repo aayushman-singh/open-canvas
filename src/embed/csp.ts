@@ -15,10 +15,14 @@
 //   default-src 'self';
 //   img-src 'self' data: blob:;          ← canvas styles use data: backgrounds
 //   style-src 'self' 'unsafe-inline';    ← <style> block is inlined
-//   script-src 'self' 'unsafe-inline';   ← visitor-live + mode-setter scripts
-//   frame-src 'self' <origins…>;         ← the embed-aware bit; per-snapshot
+//   script-src 'self' 'unsafe-inline'
+//     https://static.cloudflareinsights.com
+//     https://challenges.cloudflare.com; ← Turnstile widget loader
+//   frame-src 'self' https://challenges.cloudflare.com <origins…>;
+//                                         ← Turnstile challenge iframe + embeds
 //   font-src 'self' data:;
-//   connect-src 'self' wss: ws:;         ← visitor WebSocket
+//   connect-src 'self' wss: ws:
+//     https://challenges.cloudflare.com;  ← Turnstile siteverify XHR
 //
 // The non-frame-src directives are a static baseline — they mirror what the
 // public renderer already implicitly relies on (inline <style> blocks, an
@@ -72,16 +76,23 @@ export function collectEmbedFrameSrcOrigins(snapshot: PublishedSnapshot): string
 export function buildEmbedCsp(snapshot: PublishedSnapshot): string {
   const frameOrigins = collectEmbedFrameSrcOrigins(snapshot);
   // 'self' is always permitted as a frame-src so the editor's `/__live`
-  // iframe and any future first-party embeds keep working. We do not allow
-  // 'none' because that would mask `'self'` per CSP semantics.
-  const frameSrc = ["'self'", ...frameOrigins].join(' ');
+  // iframe and any future first-party embeds keep working. Turnstile renders
+  // its challenge in an iframe at `https://challenges.cloudflare.com`, so
+  // every published page with a Form element must allow that origin. We
+  // include it unconditionally — forms are common enough that varying the
+  // CSP by element presence adds inspection cost for no payoff. We do not
+  // allow 'none' because that would mask `'self'` per CSP semantics.
+  const frameSrc = ["'self'", 'https://challenges.cloudflare.com', ...frameOrigins].join(' ');
   return [
     `default-src 'self'`,
     `img-src 'self' data: blob:`,
     `style-src 'self' 'unsafe-inline'`,
-    `script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com`,
+    // Turnstile widget loader is the only third-party script the public
+    // renderer emits. Cloudflare Insights is allowed for Workers analytics.
+    `script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com`,
     `font-src 'self' data:`,
-    `connect-src 'self' wss: ws:`,
+    // Turnstile's challenge JS posts back to challenges.cloudflare.com.
+    `connect-src 'self' wss: ws: https://challenges.cloudflare.com`,
     `frame-src ${frameSrc}`,
   ].join('; ');
 }

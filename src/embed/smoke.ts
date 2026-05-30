@@ -215,8 +215,18 @@ assert(
 const csp = buildEmbedCsp(snapshot);
 assert(csp.startsWith(`default-src 'self'`), `CSP must start with default-src 'self'; got: ${csp}`);
 assert(
-  csp.includes(`frame-src 'self' https://www.loom.com https://www.youtube.com`),
-  `CSP frame-src must include 'self' + both provider origins in sorted order; got: ${csp}`,
+  csp.includes(
+    `frame-src 'self' https://challenges.cloudflare.com https://www.loom.com https://www.youtube.com`,
+  ),
+  `CSP frame-src must include 'self' + Turnstile + both provider origins in order; got: ${csp}`,
+);
+assert(
+  csp.includes(`script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com`),
+  `CSP script-src must include the Turnstile widget loader; got: ${csp}`,
+);
+assert(
+  csp.includes(`connect-src 'self' wss: ws: https://challenges.cloudflare.com`),
+  `CSP connect-src must include Turnstile so the challenge JS can post back; got: ${csp}`,
 );
 
 // A snapshot with NO embeds at all must still produce a valid CSP header
@@ -239,8 +249,8 @@ const noEmbedSnapshot: PublishedSnapshot = {
 };
 const bareCsp = buildEmbedCsp(noEmbedSnapshot);
 assert(
-  bareCsp.includes(`frame-src 'self'`),
-  `bare snapshot CSP must include frame-src 'self'; got: ${bareCsp}`,
+  bareCsp.includes(`frame-src 'self' https://challenges.cloudflare.com`),
+  `bare snapshot CSP must include frame-src 'self' + Turnstile origin; got: ${bareCsp}`,
 );
 
 // ---------------------------------------------------------------------------
