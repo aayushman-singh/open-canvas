@@ -21,16 +21,12 @@
 
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import {
-  buildUnlockCookieHeader,
-  signUnlockCookie,
-} from './cookie.js';
+import { buildUnlockCookieHeader, signUnlockCookie } from './cookie.js';
 import { sanitiseRedirect } from './gate.js';
 import { verifyPassword } from './hash.js';
 import {
   type RateLimiter,
   DurableObjectRateLimiter,
-  InProcessRateLimiter,
   type FormRateLimiterDoNamespace,
 } from './rate-limit.js';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router.js';
@@ -43,13 +39,8 @@ type Bindings = HostConfigEnv & {
   UNLOCK_SIGNING_SECRET: string;
   CF_API_TOKEN?: string;
   CF_ZONE_ID?: string;
-  /**
-   * Shared FormRateLimiter DO (see `src/forms/`). Optional at the type level
-   * because the DO body may not have landed; the route falls back to an
-   * in-process limiter when missing. Production deploys ALWAYS have the
-   * binding (declared in wrangler.toml).
-   */
-  FORM_RATE_LIMITER?: FormRateLimiterDoNamespace;
+  /** Shared FormRateLimiter DO (see `src/live/form-rate-limiter.ts`). */
+  FORM_RATE_LIMITER: FormRateLimiterDoNamespace;
 };
 
 type Env = { Bindings: Bindings };
@@ -72,10 +63,7 @@ interface SiteRow {
   passwordSetAt: Date | null;
 }
 
-async function loadSiteBySubdomain(
-  env: Bindings,
-  subdomain: string,
-): Promise<SiteRow | null> {
+async function loadSiteBySubdomain(env: Bindings, subdomain: string): Promise<SiteRow | null> {
   const database = db(env);
   const rows = await database
     .select({
@@ -132,22 +120,14 @@ async function resolveSiteForHost(env: Bindings, host: string): Promise<SiteRow 
 // Rate limiter selection
 // ---------------------------------------------------------------------------
 //
-// Prefer the production DO when bound; fall back to a per-isolate in-memory
-// limiter otherwise. Per-isolate is NOT enough for prod (concurrent isolates
-// each maintain their own counter), but it keeps local dev usable when the
-// FORM_RATE_LIMITER binding is absent (e.g. a bare `wrangler dev` without
-// the DO migration applied).
-
-// Module-singleton fallback so a sequence of unlock POSTs in the same isolate
-// share counters. Reset per cold start; acceptable for dev. Production uses
-// the DO when bound.
-const moduleFallback = new InProcessRateLimiter();
-
+// Route traffic must use the shared Durable Object. A missing binding means
+// deployment config drift, so the route fails closed instead of substituting
+// a per-isolate counter.
 function pickLimiter(env: Bindings): RateLimiter {
-  if (env.FORM_RATE_LIMITER) {
-    return new DurableObjectRateLimiter(env.FORM_RATE_LIMITER);
+  if (!env.FORM_RATE_LIMITER) {
+    throw new Error('[password/unlock-route] FORM_RATE_LIMITER binding missing');
   }
-  return moduleFallback;
+  return new DurableObjectRateLimiter(env.FORM_RATE_LIMITER);
 }
 
 // ---------------------------------------------------------------------------

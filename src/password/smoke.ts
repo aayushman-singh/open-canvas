@@ -31,7 +31,11 @@ import {
 import { renderGateHtml, sanitiseRedirect } from './gate.js';
 import { hashPassword, verifyPassword } from './hash.js';
 import { requireUnlock, type PasswordProtectedSite, type RequireUnlockEnv } from './middleware.js';
-import { InProcessRateLimiter } from './rate-limit.js';
+import {
+  DurableObjectRateLimiter,
+  type FormRateLimiterDoNamespace,
+  InProcessRateLimiter,
+} from './rate-limit.js';
 import { cookieName, type HostConfigEnv } from '../host-config.js';
 
 // Test env reused across suites. Per ADR 0013 dec 7 + ADR 0017 dec 1, the
@@ -365,6 +369,19 @@ async function runRateLimitSuite(): Promise<void> {
   now += 70_000;
   const after = await limiter.checkAndRecord({ ipKey: '1.2.3.4', kind: 'password-unlock' });
   assert(after.allowed, 'after window expires the budget should reset');
+
+  const malformedNs: FormRateLimiterDoNamespace = {
+    idFromName: () => ({}) as DurableObjectId,
+    get: () => ({
+      fetch: () =>
+        Promise.resolve(Response.json({ allowed: false, remaining: 0 }, { status: 429 })),
+    }),
+  };
+  const durableLimiter = new DurableObjectRateLimiter(malformedNs);
+  await assertThrowsAsync(
+    () => durableLimiter.checkAndRecord({ ipKey: '1.2.3.4', kind: 'password-unlock' }),
+    'DurableObjectRateLimiter should reject malformed DO responses',
+  );
 }
 
 // ---------------------------------------------------------------------------

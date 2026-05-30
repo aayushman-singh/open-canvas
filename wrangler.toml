@@ -29,9 +29,8 @@ fallthrough = false
 name = "SITE_ROOM"
 class_name = "SiteRoom"
 
-# Phase 0 scaffold — Wave 2 #7 (forms) rate limiter. Binding declared so the
-# Wave 2 agent can wire the env access without touching wrangler.toml. The
-# implementation in src/live/form-rate-limiter.ts throws until Wave 2 lands.
+# Shared Durable Object for form-submit and password-unlock rate limiting.
+# Both routes fail closed when this binding is missing.
 [[durable_objects.bindings]]
 name = "FORM_RATE_LIMITER"
 class_name = "FormRateLimiter"
@@ -52,7 +51,7 @@ new_sqlite_classes = ["SiteRoom"]
 tag = "v3"
 deleted_classes = ["PageDocument"]
 
-# Phase 0 scaffold — register the Wave 2 #7 forms-rate-limiter DO class.
+# Register the shared forms/password rate-limiter DO class.
 [[migrations]]
 tag = "v4"
 new_sqlite_classes = ["FormRateLimiter"]

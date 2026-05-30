@@ -15,10 +15,10 @@
 //     takes a `{ kind, key, limit, windowSeconds }` JSON body and returns
 //     `{ allowed: boolean, remaining: number }`.
 //
-//   - We route through a `RateLimiter` interface so the smoke can swap in
-//     an in-process `Map<key, timestamps[]>` implementation that runs
-//     without a DO binding. Production picks `DurableObjectRateLimiter`
-//     when the binding is present.
+//   - We route through a `RateLimiter` interface so the smoke can inject an
+//     in-process `Map<key, timestamps[]>` implementation directly. The route
+//     itself requires the DO binding and fails closed if deployment config is
+//     wrong.
 //
 // All-or-nothing failure: a rate-limit storage failure throws to the caller.
 // The unlock route catches that and returns 503 — we do NOT silently let
@@ -69,11 +69,11 @@ const DEFAULT_WINDOW_SECONDS = 60;
 // In-process implementation
 // ---------------------------------------------------------------------------
 //
-// Used by the smoke (deterministic, no DO required) and by the unlock route
-// when the DO binding is missing in dev. The Worker isolate is per-request
-// short-lived in production, so this is NOT a viable production limiter —
-// concurrent isolates each have their own Map and the budget is per-isolate,
-// not per-IP-globally. The DO-backed adapter below is the production path.
+// Used by the smoke (deterministic, no DO required). The Worker isolate is
+// per-request short-lived in production, so this is NOT a viable production
+// limiter — concurrent isolates each have their own Map and the budget is
+// per-isolate, not per-IP-globally. The route never chooses this
+// implementation on its own.
 //
 // We keep the in-process limiter exported so the smoke can drive it directly
 // without going through the route.
@@ -145,8 +145,7 @@ export class InProcessRateLimiter implements RateLimiter {
 // automatic — we don't have to trust the DO body to honour the `kind` field.
 //
 // The smoke pins an InProcessRateLimiter via the same `RateLimiter`
-// interface — the DO-backed path runs only in production (and in dev when
-// the DO binding is present).
+// interface; route traffic uses this DO-backed adapter.
 
 export interface FormRateLimiterDoNamespace {
   idFromName(name: string): DurableObjectId;
@@ -190,17 +189,16 @@ export class DurableObjectRateLimiter implements RateLimiter {
     if (typeof obj.allowed !== 'boolean') {
       throw new Error('DurableObjectRateLimiter: DO response missing boolean allowed');
     }
-    const remaining = typeof obj.remaining === 'number' ? obj.remaining : 0;
-    const retryAfterMs =
-      typeof obj.retryAfterMs === 'number'
-        ? obj.retryAfterMs
-        : obj.retryAfterMs === null
-          ? null
-          : null;
+    if (typeof obj.remaining !== 'number') {
+      throw new Error('DurableObjectRateLimiter: DO response missing numeric remaining');
+    }
+    if (typeof obj.retryAfterMs !== 'number' && obj.retryAfterMs !== null) {
+      throw new Error('DurableObjectRateLimiter: DO response missing retryAfterMs');
+    }
     return {
       allowed: obj.allowed,
-      remaining,
-      retryAfterMs,
+      remaining: obj.remaining,
+      retryAfterMs: obj.retryAfterMs,
     };
   }
 }
