@@ -15,11 +15,10 @@
 //     takes a `{ kind, key, limit, windowSeconds }` JSON body and returns
 //     `{ allowed: boolean, remaining: number }`.
 //
-//   - The DO body may not have landed yet. To stay decoupled we route
-//     through a `RateLimiter` interface that the smoke implements as an
-//     in-process `Map<key, timestamps[]>`. When the DO body lands the
-//     production caller swaps the implementation by passing the DO-backed
-//     adapter at the call site.
+//   - We route through a `RateLimiter` interface so the smoke can swap in
+//     an in-process `Map<key, timestamps[]>` implementation that runs
+//     without a DO binding. Production picks `DurableObjectRateLimiter`
+//     when the binding is present.
 //
 // All-or-nothing failure: a rate-limit storage failure throws to the caller.
 // The unlock route catches that and returns 503 — we do NOT silently let
@@ -145,9 +144,9 @@ export class InProcessRateLimiter implements RateLimiter {
 // own DO instance. The DO storage is per-instance so the partitioning is
 // automatic — we don't have to trust the DO body to honour the `kind` field.
 //
-// The shared DO's stub currently throws on every call. Production usage of
-// this adapter waits on the real DO body landing; until then, callers must
-// pass an InProcessRateLimiter (the smoke does exactly that).
+// The smoke pins an InProcessRateLimiter via the same `RateLimiter`
+// interface — the DO-backed path runs only in production (and in dev when
+// the DO binding is present).
 
 export interface FormRateLimiterDoNamespace {
   idFromName(name: string): DurableObjectId;

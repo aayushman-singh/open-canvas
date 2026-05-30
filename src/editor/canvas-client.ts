@@ -8926,7 +8926,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (wrapper) { beginResize(ev, wrapper, dir); ev.preventDefault(); }
         return;
       }
-      const wrapper = ev.target instanceof Element ? ev.target.closest('.rev01-element') : null;
+      const wrapper = ev.target instanceof Element
+        ? resolveElementWrapperAtPoint(ev.target, ev.clientX, ev.clientY)
+        : null;
       if (!wrapper) return;
       const elementId = wrapper.getAttribute('data-rev01-element');
       if (!elementId) return;
@@ -9376,6 +9378,104 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // -- Click → element wrapper resolution --------------------------------
+  //
+  // Resolving the clicked widget is harder than ev.target.closest('.rev01-
+  // element') because three widget bodies (form / table / carousel) render
+  // semantic HTML (form, table, transformed divs) whose layout/overflow
+  // rules let the inner content escape the wrapper's bounding box. The CSS
+  // shield (the wrappers .rev01-element::after pseudo) catches centre
+  // clicks, but clicks on overflowed cells, transformed slides, or stacked
+  // form rows can:
+  //   (1) skip the ::after shield because the click coord is outside the
+  //       wrapper's box,
+  //   (2) report ev.target as the section or the canvas background — both
+  //       outside any .rev01-element subtree, so closest() returns null and
+  //       the click bounces to the section / page inspector.
+  // Pass-9 retest pinned this regression to table / form / carousel even
+  // though Pass-8 added an elementsFromPoint() fallback.
+  //
+  // The resolver below combines three signals so the deepest widget wins:
+  //   - ev.target ancestor walk (cheap, handles centre-of-wrapper clicks).
+  //   - document.elementsFromPoint(clientX, clientY) (handles wrapper-area
+  //     clicks where descendants forward the event to the wrapper itself).
+  //   - For every element in that stack, walk its ancestor chain so a click
+  //     on overflowed content inside a section still resolves to its
+  //     .rev01-element wrapper.
+  // It then ranks candidates by DOM depth and picks the deepest one whose
+  // box contains the click coords (or, lacking a containing match, the
+  // deepest match overall). The bbox-contains pass guards against picking
+  // a different widget that merely sits in the same stack.
+  function resolveElementWrapperAtPoint(target, clientX, clientY) {
+    const seen = new Set();
+    const candidates = [];
+
+    function addCandidate(node) {
+      while (node && node !== root) {
+        if (
+          node.nodeType === 1 &&
+          node.classList &&
+          node.classList.contains('rev01-element')
+        ) {
+          if (!seen.has(node)) {
+            seen.add(node);
+            candidates.push(node);
+          }
+          return;
+        }
+        node = node.parentNode;
+      }
+    }
+
+    if (target instanceof Element) {
+      addCandidate(target);
+    }
+    if (typeof document.elementsFromPoint === 'function') {
+      const stack = document.elementsFromPoint(clientX, clientY);
+      for (let i = 0; i < stack.length; i++) {
+        const node = stack[i];
+        if (node instanceof Element) addCandidate(node);
+      }
+    }
+    if (candidates.length === 0) return null;
+
+    function depth(node) {
+      let d = 0;
+      let n = node;
+      while (n && n !== root) { d += 1; n = n.parentNode; }
+      return d;
+    }
+
+    function rectContains(node, x, y) {
+      const r = node.getBoundingClientRect();
+      return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+    }
+
+    let best = null;
+    let bestDepth = -1;
+    let bestContains = false;
+    for (let i = 0; i < candidates.length; i++) {
+      const node = candidates[i];
+      const contains = rectContains(node, clientX, clientY);
+      const d = depth(node);
+      // Prefer bbox-containing candidates over not-containing ones. Within
+      // the same containment bucket, deeper wins so a widget nested under a
+      // container is picked over the container.
+      if (best === null) {
+        best = node; bestDepth = d; bestContains = contains;
+        continue;
+      }
+      if (contains && !bestContains) {
+        best = node; bestDepth = d; bestContains = contains;
+        continue;
+      }
+      if (contains === bestContains && d > bestDepth) {
+        best = node; bestDepth = d;
+      }
+    }
+    return best;
+  }
+
   // -- Wire root events ---------------------------------------------------
 
   function attachRootEvents() {
@@ -9425,30 +9525,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ev.stopPropagation();
         return;
       }
-      let elementNode = target.closest('.rev01-element');
-      // Hit-test fallback for widgets whose content overflows the wrapper.
-      // Pass-8 retest showed table/form/carousel still bounced to the
-      // section inspector despite the CSS pointer-events shield: their
-      // inner content (form's <input>, table's <td>, carousel's
-      // transform-positioned slides) renders OUTSIDE the wrapper's
-      // bounding box. pointer-events:none on those descendants forwards
-      // the click to the visually-behind element — which is the section,
-      // not the wrapper. closest() walking up from the section never
-      // finds .rev01-element. Doing a coordinate-based hit test with
-      // elementsFromPoint catches the case: the wrapper IS in the stack
-      // at the click coordinate even when it's not in the closest()
-      // walk path. Cheap (single call per click) and only runs on the
-      // fallback path.
-      if (!elementNode && typeof document.elementsFromPoint === 'function') {
-        const stack = document.elementsFromPoint(ev.clientX, ev.clientY);
-        for (let si = 0; si < stack.length; si++) {
-          const candidate = stack[si];
-          if (candidate instanceof Element && candidate.matches('.rev01-element')) {
-            elementNode = candidate;
-            break;
-          }
-        }
-      }
+      let elementNode = resolveElementWrapperAtPoint(target, ev.clientX, ev.clientY);
       if (elementNode) {
         const id = elementNode.getAttribute('data-rev01-element');
         if (!id) return;

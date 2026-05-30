@@ -171,6 +171,9 @@ const pageStyles = `
     color: var(--ink-3);
     margin: 0;
   }
+  .field-hint.field-hint-err {
+    color: var(--red-ink);
+  }
   .save-row {
     display: flex;
     align-items: center;
@@ -210,48 +213,52 @@ function clientScript(siteId: string): string {
     var saveBtn = form.querySelector('[data-save]');
     if (!saveBtn) return;
 
-    saveBtn.addEventListener('click', function() {
-      var enabledEl = form.querySelector('[name="enabled"]');
+    saveBtn.addEventListener('click', function(event) {
+      // Save is type="button" so the form's submit event never fires and
+      // the browser never auto-validates. We resolve the form via
+      // closest('form') from the click target (more robust than the
+      // closure's form ref — survives any future DOM reshuffle) and run
+      // reportValidity() ourselves before the PUT. reportValidity returns
+      // true when every field passes its pattern/required check, false
+      // otherwise — and in the false branch it also pops the browser's
+      // native tooltip on the offending input.
+      var formEl = (event && event.currentTarget && event.currentTarget.closest)
+        ? event.currentTarget.closest('form')
+        : form;
+      if (!formEl) formEl = form;
+
+      var enabledEl = formEl.querySelector('[name="enabled"]');
       var enabled = enabledEl ? enabledEl.checked : false;
       var config = {};
-      form.querySelectorAll('[data-config-key]').forEach(function(input) {
+      formEl.querySelectorAll('[data-config-key]').forEach(function(input) {
         config[input.getAttribute('data-config-key')] = input.value.trim();
       });
 
-      // Client-side validation: every input with a pattern attribute must
-      // match before we hit the wire. The server enforces the same regex
-      // (addons.ts: 400 returns { field, hint }) but local validation
-      // surfaces a clearer error AND avoids a wasted round-trip + a
-      // confusing "Saved" toast on success-then-server-reject paths.
-      // Pass-7 retest showed the enabled-gated branch let bad values
-      // through when the toggle was disabled-then-re-enabled in the
-      // same session; running the check unconditionally is harmless
-      // because empty fields short-circuit via the empty-length branch.
-      if (enabled) {
-        // Prefer the browser's native HTML5 validation: it respects the
-        // input's pattern + required attributes, surfaces the built-in
-        // tooltip the user already trusts, and catches edge cases (RTL
-        // chars, hidden whitespace) the regex test misses. We still
-        // run the regex check below as belt-and-suspenders in case JSX
-        // emits attribute combos the browser treats as optional.
-        if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
-          form.reportValidity();
+      // Server only validates patterns when enabled (addons.ts:205) — we
+      // mirror that so disabling an addon with stale config in its inputs
+      // still works (the Owner can clear bad values later).
+      if (enabled && typeof formEl.reportValidity === 'function') {
+        if (!formEl.reportValidity()) {
           if (msgEl) {
             msgEl.textContent = 'Fix the highlighted field before saving.';
             msgEl.className = 'addon-msg msg-err';
           }
           return;
         }
-        var inputs = form.querySelectorAll('[data-config-key]');
+        // Belt-and-suspenders manual pass for required + pattern. Catches
+        // empty values (HTML5 pattern treats empty as valid unless the
+        // input also carries required, which configFields don't) and
+        // surfaces the field's patternHint inline.
+        var inputs = formEl.querySelectorAll('[data-config-key]');
         for (var i = 0; i < inputs.length; i++) {
           var input = inputs[i];
           var pattern = input.getAttribute('pattern');
           if (!pattern) continue;
           var value = input.value.trim();
           if (value.length === 0 || !new RegExp('^(?:' + pattern + ')$').test(value)) {
+            var hintBlock = input.parentNode ? input.parentNode.querySelector('.field-hint') : null;
+            var hint = hintBlock ? hintBlock.textContent : 'Value does not match required format';
             if (msgEl) {
-              var hintBlock = input.parentNode ? input.parentNode.querySelector('.field-hint') : null;
-              var hint = hintBlock ? hintBlock.textContent : 'Value does not match required format';
               msgEl.textContent = hint;
               msgEl.className = 'addon-msg msg-err';
             }
@@ -276,15 +283,25 @@ function clientScript(siteId: string): string {
         saveBtn.disabled = false;
         saveBtn.textContent = prev;
         if (!result.ok) {
-          // Server returns { error, field?, hint? } on validation rejection
-          // — surface the hint inline AND focus the offending input so the
-          // user can fix without scrolling back through the form.
+          // Server returns { error, field?, hint? } on validation rejection.
+          // Surface the hint both in the toast AND inline (replace the
+          // static field-hint text) and focus the offending input so the
+          // Owner can fix without scrolling back through the form.
           var serverError = result.data && result.data.error ? result.data.error : 'Save failed';
           var serverHint = result.data && result.data.hint ? result.data.hint : null;
           var serverField = result.data && result.data.field ? result.data.field : null;
           if (serverField) {
-            var fieldInput = form.querySelector('[data-config-key="' + serverField + '"]');
-            if (fieldInput && typeof fieldInput.focus === 'function') fieldInput.focus();
+            var fieldInput = formEl.querySelector('[data-config-key="' + serverField + '"]');
+            if (fieldInput) {
+              if (typeof fieldInput.focus === 'function') fieldInput.focus();
+              if (serverHint && fieldInput.parentNode) {
+                var inlineHint = fieldInput.parentNode.querySelector('.field-hint');
+                if (inlineHint) {
+                  inlineHint.textContent = serverHint;
+                  inlineHint.className = 'field-hint field-hint-err';
+                }
+              }
+            }
           }
           throw new Error(serverHint || serverError);
         }

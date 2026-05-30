@@ -135,7 +135,8 @@ async function resolveSiteForHost(env: Bindings, host: string): Promise<SiteRow 
 // Prefer the production DO when bound; fall back to a per-isolate in-memory
 // limiter otherwise. Per-isolate is NOT enough for prod (concurrent isolates
 // each maintain their own counter), but it keeps local dev usable when the
-// FormRateLimiter DO from #7 is still throwing-stub.
+// FORM_RATE_LIMITER binding is absent (e.g. a bare `wrangler dev` without
+// the DO migration applied).
 
 // Module-singleton fallback so a sequence of unlock POSTs in the same isolate
 // share counters. Reset per cold start; acceptable for dev. Production uses

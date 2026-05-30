@@ -59,12 +59,10 @@ export interface RestoreEnv {
 }
 
 /**
- * Broadcast payload sent to the SiteRoom DO when a restore lands.
- *
- * The DO handler for this `kind` is owned by the co-edit subsystem
- * (`src/live/`). Until that body lands, the SiteRoom stub will reject with
- * HTTP 400 — the restore primitive fails loudly because connected editors
- * would otherwise keep stale state after the row swap.
+ * Broadcast payload sent to the SiteRoom DO when a restore lands. The DO
+ * handler (`src/live/site-room.ts`) wipes its in-memory Y.Doc and ships a
+ * fresh `y-sync-step2` to every connected editor so live state matches the
+ * restored row.
  */
 export interface EditableStateReplacedBroadcast {
   kind: 'editable-state-replaced';
