@@ -9395,13 +9395,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // Pass-9 retest pinned this regression to table / form / carousel even
   // though Pass-8 added an elementsFromPoint() fallback.
   //
-  // The resolver below combines three signals so the deepest widget wins:
+  // The resolver below combines four signals so the deepest widget wins:
   //   - ev.target ancestor walk (cheap, handles centre-of-wrapper clicks).
   //   - document.elementsFromPoint(clientX, clientY) (handles wrapper-area
   //     clicks where descendants forward the event to the wrapper itself).
   //   - For every element in that stack, walk its ancestor chain so a click
   //     on overflowed content inside a section still resolves to its
   //     .rev01-element wrapper.
+  //   - A geometry pass over wrapper + descendant client rects, which catches
+  //     visible overflow whose descendants were removed from hit-testing by
+  //     pointer-events:none while the widget is unselected.
   // It then ranks candidates by DOM depth and picks the deepest one whose
   // box contains the click coords (or, lacking a containing match, the
   // deepest match overall). The bbox-contains pass guards against picking
@@ -9427,6 +9430,36 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     }
 
+    function pointInsideAnyRect(node, x, y) {
+      if (!node || typeof node.getClientRects !== "function") return false;
+      const rects = node.getClientRects();
+      for (let i = 0; i < rects.length; i++) {
+        const r = rects[i];
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function addGeometryCandidates() {
+      const wrappers = root.querySelectorAll(".rev01-element");
+      for (let i = 0; i < wrappers.length; i++) {
+        const wrapper = wrappers[i];
+        if (pointInsideAnyRect(wrapper, clientX, clientY)) {
+          addCandidate(wrapper);
+          continue;
+        }
+        const descendants = wrapper.querySelectorAll("*");
+        for (let j = 0; j < descendants.length; j++) {
+          if (pointInsideAnyRect(descendants[j], clientX, clientY)) {
+            addCandidate(wrapper);
+            break;
+          }
+        }
+      }
+    }
+
     if (target instanceof Element) {
       addCandidate(target);
     }
@@ -9437,6 +9470,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (node instanceof Element) addCandidate(node);
       }
     }
+    addGeometryCandidates();
     if (candidates.length === 0) return null;
 
     function depth(node) {

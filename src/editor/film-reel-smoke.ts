@@ -46,7 +46,10 @@ assert(
 );
 
 const buildElementNodeStart = source.indexOf('function buildElementNode(element) {');
-const buildElementNodeEnd = source.indexOf('function rebuildElement(elementId)', buildElementNodeStart);
+const buildElementNodeEnd = source.indexOf(
+  'function rebuildElement(elementId)',
+  buildElementNodeStart,
+);
 assert(buildElementNodeStart >= 0, 'canvas client must define buildElementNode');
 assert(buildElementNodeEnd > buildElementNodeStart, 'buildElementNode body must be found');
 const buildElementNodeSource = source.slice(buildElementNodeStart, buildElementNodeEnd);
@@ -67,14 +70,33 @@ assert(
   'style inspector must reattach elementStyle after the last property was removed and a new property is set',
 );
 
+const elementHitTestStart = source.indexOf(
+  'function resolveElementWrapperAtPoint(target, clientX, clientY) {',
+);
+const elementHitTestEnd = source.indexOf('// -- Wire root events', elementHitTestStart);
+assert(elementHitTestStart >= 0, 'canvas client must define resolveElementWrapperAtPoint');
+assert(elementHitTestEnd > elementHitTestStart, 'resolveElementWrapperAtPoint body must be found');
+const elementHitTestSource = source.slice(elementHitTestStart, elementHitTestEnd);
+assert(
+  elementHitTestSource.includes('function addGeometryCandidates()') &&
+    elementHitTestSource.includes('wrapper.querySelectorAll("*")') &&
+    elementHitTestSource.includes('pointInsideAnyRect(descendants[j], clientX, clientY)'),
+  'element click resolution must scan descendant geometry so overflowed widget content selects its owning wrapper',
+);
+assert(
+  elementHitTestSource.indexOf('addGeometryCandidates();') >
+    elementHitTestSource.indexOf('document.elementsFromPoint'),
+  'element click resolution must run the geometry pass after the native hit-test stack pass',
+);
+
 const replayAnimationsStart = source.indexOf('function replayAnimations(scope) {');
 const replayAnimationsEnd = source.indexOf('function pageHasMotion()', replayAnimationsStart);
 assert(replayAnimationsStart >= 0, 'canvas client must define replayAnimations');
 assert(replayAnimationsEnd > replayAnimationsStart, 'replayAnimations body must be found');
 const replayAnimationsSource = source.slice(replayAnimationsStart, replayAnimationsEnd);
 assert(
-  replayAnimationsSource.includes('root.querySelector(\'[data-page-id="\'') &&
-    replayAnimationsSource.includes('root.querySelector(\'[data-rev01-element="\''),
+  replayAnimationsSource.includes("root.querySelector('[data-page-id=\"'") &&
+    replayAnimationsSource.includes("root.querySelector('[data-rev01-element=\"'"),
   'animation replay must query the data attributes emitted by renderAll/buildElementNode',
 );
 
@@ -83,8 +105,13 @@ const applyPageStylesEnd = source.indexOf('function renderInspector()', applyPag
 assert(applyPageStylesStart >= 0, 'canvas client must define applyPageStyles');
 assert(applyPageStylesEnd > applyPageStylesStart, 'applyPageStyles body must be found');
 const applyPageStylesSource = source.slice(applyPageStylesStart, applyPageStylesEnd);
-const applyPageStylePropertiesStart = source.indexOf('function applyPageStyleProperties(article, page) {');
-const applyPageStylePropertiesEnd = source.indexOf('function renderAll()', applyPageStylePropertiesStart);
+const applyPageStylePropertiesStart = source.indexOf(
+  'function applyPageStyleProperties(article, page) {',
+);
+const applyPageStylePropertiesEnd = source.indexOf(
+  'function renderAll()',
+  applyPageStylePropertiesStart,
+);
 assert(applyPageStylePropertiesStart >= 0, 'canvas client must define applyPageStyleProperties');
 assert(
   applyPageStylePropertiesEnd > applyPageStylePropertiesStart,
@@ -95,7 +122,7 @@ const applyPageStylePropertiesSource = source.slice(
   applyPageStylePropertiesEnd,
 );
 assert(
-  applyPageStylesSource.includes('root.querySelector(\'[data-page-id="\'') &&
+  applyPageStylesSource.includes("root.querySelector('[data-page-id=\"'") &&
     applyPageStylesSource.includes('applyPageStyleProperties(article, page);') &&
     applyPageStylePropertiesSource.includes(
       'article.style.display = page.sectionGap != null ? "flex" : ""',
