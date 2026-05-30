@@ -300,6 +300,31 @@ function clientScript(): string {
       form.querySelectorAll('[data-config-key]').forEach(function(input) {
         config[input.getAttribute('data-config-key')] = input.value;
       });
+
+      // Client-side pattern validation (mirrors addons.ts server-side check).
+      // When the toggle is enabled, every input carrying a [pattern] attribute
+      // must match before we PUT to /api/addons/...; we surface the field's
+      // .field-hint as the error message so the failure is self-explanatory.
+      if (enabled) {
+        var inputs = form.querySelectorAll('[data-config-key]');
+        for (var i = 0; i < inputs.length; i++) {
+          var input = inputs[i];
+          var pattern = input.getAttribute('pattern');
+          if (!pattern) continue;
+          var value = input.value.trim();
+          if (value.length === 0 || !new RegExp('^(?:' + pattern + ')$').test(value)) {
+            if (msg) {
+              var hintBlock = input.parentNode ? input.parentNode.querySelector('.field-hint') : null;
+              var hint = hintBlock ? hintBlock.textContent : 'Value does not match required format';
+              msg.textContent = hint;
+              msg.className = 'addon-msg addon-msg-err';
+            }
+            input.focus();
+            return;
+          }
+        }
+      }
+
       saveBtn.disabled = true;
       var prev = saveBtn.textContent;
       saveBtn.textContent = 'Saving...';

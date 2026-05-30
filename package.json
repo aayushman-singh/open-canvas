@@ -88,6 +88,8 @@
     "wishlist:smoke": "bun run src/wishlist-smoke.ts",
     "video-bg:smoke": "bun run src/canvas/video-bg.smoke.ts",
     "custom-scripts:smoke": "bun run src/addons/custom-scripts.smoke.ts",
+    "google-analytics:smoke": "bun run src/addons/google-analytics.smoke.ts",
+    "render-utils:smoke": "bun run src/canvas/elements/render-utils.smoke.ts",
     "on-site-edit-security:smoke": "bun run src/auth/on-site-edit-security.smoke.ts",
     "layout-engine:smoke": "bun run src/canvas/layout/engine-smoke.ts",
     "google-maps:smoke": "bun run src/embed/google-maps.smoke.ts",

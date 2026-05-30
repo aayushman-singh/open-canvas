@@ -218,6 +218,31 @@ function clientScript(siteId: string): string {
         config[input.getAttribute('data-config-key')] = input.value.trim();
       });
 
+      // Client-side validation: every input with a [pattern] attribute must
+      // match before we hit the wire. The server enforces the same regex, but
+      // a local check surfaces a clearer .msg-err immediately and avoids a
+      // wasted round-trip. Only applies when the toggle is enabled — disabling
+      // a site addon should never be blocked by config validation.
+      if (enabled) {
+        var inputs = form.querySelectorAll('[data-config-key]');
+        for (var i = 0; i < inputs.length; i++) {
+          var input = inputs[i];
+          var pattern = input.getAttribute('pattern');
+          if (!pattern) continue;
+          var value = input.value.trim();
+          if (value.length === 0 || !new RegExp('^(?:' + pattern + ')$').test(value)) {
+            if (msgEl) {
+              var hintBlock = input.parentNode ? input.parentNode.querySelector('.field-hint') : null;
+              var hint = hintBlock ? hintBlock.textContent : 'Value does not match required format';
+              msgEl.textContent = hint;
+              msgEl.className = 'addon-msg msg-err';
+            }
+            input.focus();
+            return;
+          }
+        }
+      }
+
       saveBtn.disabled = true;
       var prev = saveBtn.textContent;
       saveBtn.textContent = 'Saving...';
