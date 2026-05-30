@@ -38,12 +38,18 @@ import {
 } from '../ui';
 import type { Theme } from '../ui';
 import { appOrigin, type HostConfigEnv } from '../host-config';
+import { resolveClerkKeys, type ClerkKeyEnv } from '../auth/middleware';
+import { clerkFrontendApiHost } from '../auth/require-auth';
 import { APEX_OG_DESCRIPTION, APEX_OG_HEADLINE, APEX_OG_SITE_NAME } from '../seo/apex';
 
 // The marketing page reads APP_DOMAIN to compose canonical / og:url. Typing
 // the binding here lets `c.env.APP_DOMAIN` flow into `appOrigin()` without a
 // cast at every call site; the parent app's `PublicEnv` is a strict superset.
-type LandingEnv = { Bindings: HostConfigEnv };
+// Clerk keys are needed so the page can boot clerk-js client-side and swap
+// header / CTA chrome between the signed-out and signed-in variants.
+type LandingEnv = {
+  Bindings: HostConfigEnv & ClerkKeyEnv & { CLERK_FRONTEND_API_URL?: string };
+};
 
 const landing = new Hono<LandingEnv>();
 
@@ -64,6 +70,37 @@ const OG_IMAGE_ALT = `${APEX_OG_SITE_NAME} — ${APEX_OG_HEADLINE}`;
 interface PageProps {
   theme?: Theme | undefined;
   origin: string;
+  clerkPublishableKey: string;
+  clerkFrontendApiHost: string;
+}
+
+// Boots clerk-js on the public landing page so the header CTA pair + hero
+// "Start building" can swap to a single "Open dashboard" link when a session
+// is present. The page itself stays publicly cacheable: we render the
+// signed-out variant server-side and let this script flip
+// html[data-signed-in] after Clerk.load() resolves. No customer upsert, no
+// per-request server-side Clerk handshake.
+function buildAuthDetectScript(publishableKey: string, frontendApiHost: string): string {
+  return (
+    `(function(){` +
+    `var pk=${JSON.stringify(publishableKey)};` +
+    `var s=document.createElement("script");` +
+    `s.src="https://"+${JSON.stringify(frontendApiHost)}+"/npm/@clerk/clerk-js@latest/dist/clerk.browser.js";` +
+    `s.crossOrigin="anonymous";s.async=true;` +
+    `s.setAttribute("data-clerk-publishable-key",pk);` +
+    `s.onload=function(){` +
+    `if(!window.Clerk)return;` +
+    `window.Clerk.load().then(function(){` +
+    `if(window.Clerk.user){` +
+    `document.documentElement.setAttribute("data-signed-in","");` +
+    `}` +
+    `}).catch(function(err){` +
+    `console.error("[landing] Clerk.load failed",err);` +
+    `});` +
+    `};` +
+    `document.head.appendChild(s);` +
+    `})();`
+  );
 }
 
 function buildJsonLd(origin: string): string {
@@ -105,9 +142,10 @@ function buildJsonLd(origin: string): string {
   return JSON.stringify(payload).replace(/</g, '\\u003c');
 }
 
-function Page({ theme, origin }: PageProps) {
+function Page({ theme, origin, clerkPublishableKey, clerkFrontendApiHost }: PageProps) {
   const canonical = `${origin}/`;
   const ogImageUrl = `${origin}${OG_IMAGE_PATH}`;
+  const authDetectScript = buildAuthDetectScript(clerkPublishableKey, clerkFrontendApiHost);
   return (
     <html lang="en" data-theme={theme === 'dark' ? 'dark' : undefined}>
       <head>
@@ -154,12 +192,24 @@ function Page({ theme, origin }: PageProps) {
         </main>
         <script>{raw(themeToggleScript)}</script>
         <script>{raw(LANDING_DEMO_SRC)}</script>
+        <script>{raw(authDetectScript)}</script>
       </body>
     </html>
   );
 }
 
-landing.get('/', (c) => c.html(<Page theme={readThemeCookie(c)} origin={appOrigin(c.env)} />));
+landing.get('/', (c) => {
+  const { publishableKey } = resolveClerkKeys(c.env);
+  const frontendApiHost = clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL);
+  return c.html(
+    <Page
+      theme={readThemeCookie(c)}
+      origin={appOrigin(c.env)}
+      clerkPublishableKey={publishableKey}
+      clerkFrontendApiHost={frontendApiHost}
+    />,
+  );
+});
 
 // Brand favicon — served regardless of which landing path is hit. Kept here
 // (next to the rest of the brand surface) rather than in src/index.ts so

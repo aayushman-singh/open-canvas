@@ -31,17 +31,16 @@ export function Footer() {
               without hiring a developer.
             </p>
             <div class="hero-cta">
-              <Button variant="primary" size="lg" href="/dashboard">
-                Start building — it&apos;s free
-              </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                href="/dashboard"
-                style="background:transparent; color:var(--paper); border-color:rgba(255,255,255,.3);"
-              >
-                Open the editor
-              </Button>
+              <span class="auth-state-wrap auth-signed-out">
+                <Button variant="primary" size="lg" href="/auth">
+                  Start building — it&apos;s free
+                </Button>
+              </span>
+              <span class="auth-state-wrap auth-signed-in">
+                <Button variant="primary" size="lg" href="/dashboard">
+                  Open your dashboard
+                </Button>
+              </span>
             </div>
           </div>
         </div>

@@ -20,14 +20,20 @@ export function Hero() {
           and it&apos;s live — no code, no plugins, no headaches.
         </p>
         <div class="hero-cta">
-          <Button variant="primary" size="lg" href="/dashboard">
-            Start building — it&apos;s free
-          </Button>
-          <Button variant="secondary" size="lg" href="#demo">
-            See how it works
-          </Button>
+          <span class="auth-state-wrap auth-signed-out">
+            <Button variant="primary" size="lg" href="/auth">
+              Start building — it&apos;s free
+            </Button>
+          </span>
+          <span class="auth-state-wrap auth-signed-in">
+            <Button variant="primary" size="lg" href="/dashboard">
+              Open your dashboard
+            </Button>
+          </span>
         </div>
-        <p class="hero-note">No credit card · Your first site publishes in minutes</p>
+        <p class="hero-note auth-signed-out">
+          No credit card · Your first site publishes in minutes
+        </p>
       </div>
     </section>
   );

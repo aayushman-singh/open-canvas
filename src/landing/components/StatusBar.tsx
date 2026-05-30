@@ -54,12 +54,19 @@ export function StatusBar() {
               <path d="M20 14.5A8 8 0 1 1 9.5 4a6.3 6.3 0 0 0 10.5 10.5z" />
             </svg>
           </button>
-          <Button variant="ghost" size="sm" href="/dashboard">
-            Sign in
-          </Button>
-          <Button variant="primary" size="sm" href="/dashboard">
-            Start building
-          </Button>
+          <span class="auth-state-wrap auth-signed-out">
+            <Button variant="ghost" size="sm" href="/auth">
+              Sign in
+            </Button>
+            <Button variant="primary" size="sm" href="/auth?mode=signup">
+              Sign up free
+            </Button>
+          </span>
+          <span class="auth-state-wrap auth-signed-in">
+            <Button variant="primary" size="sm" href="/dashboard">
+              Open dashboard
+            </Button>
+          </span>
         </div>
       </div>
     </header>

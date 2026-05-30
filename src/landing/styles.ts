@@ -883,6 +883,19 @@ footer.site .legal {
   color: var(--ink-3);
 }
 
+/* ============ auth-state visibility ============ */
+
+/* Header + hero/footer CTAs render the signed-out variant by default so the
+   page stays publicly cacheable. The landing page boots clerk-js, calls
+   Clerk.load(), and if a session resolves, stamps data-signed-in on <html>;
+   the rules below swap which variant is visible. .auth-state-wrap is set to
+   display:contents so the <span> wrapper participates in the parent's flex
+   layout without introducing its own box. */
+.auth-state-wrap { display: contents; }
+.auth-signed-in { display: none; }
+html[data-signed-in] .auth-signed-out { display: none; }
+html[data-signed-in] .auth-signed-in.auth-state-wrap { display: contents; }
+
 /* ============ scroll reveal ============ */
 
 .scroll-reveal {

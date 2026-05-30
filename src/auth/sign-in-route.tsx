@@ -424,11 +424,13 @@ function Page({
   publishableKey,
   frontendApiHost,
   redirectUrl,
+  initialMode,
   theme,
 }: {
   publishableKey: string;
   frontendApiHost: string;
   redirectUrl: string;
+  initialMode: 'signin' | 'signup';
   theme?: Theme | undefined;
 }) {
   // Bootstraps clerk-js from the Clerk CDN. The host is resolved server-side
@@ -457,7 +459,7 @@ function Page({
       if(!host)return;
       var pending=document.getElementById("oc-clerk-pending");
       if(pending)pending.remove();
-      var mode="signin";
+      var mode=${JSON.stringify(initialMode)};
       var redirectUrl=${JSON.stringify(redirectUrl)};
       function unmountClerkWidget(kind,fn){
         if(!fn)return;
@@ -607,16 +609,32 @@ function Page({
             </div>
             <div class="formwrap">
               <div class="formcard">
-                <h2 id="auth-title">Welcome back</h2>
+                <h2 id="auth-title">
+                  {initialMode === 'signup' ? 'Create your account' : 'Welcome back'}
+                </h2>
                 <p class="lead" id="auth-lead">
-                  Sign in to pick up where you left off.
+                  {initialMode === 'signup'
+                    ? "It's free to start — no credit card needed."
+                    : 'Sign in to pick up where you left off.'}
                 </p>
 
                 <div class="seg" role="tablist" aria-label="Sign in or create an account">
-                  <button class="on" id="tab-signin" type="button" role="tab" aria-selected="true">
+                  <button
+                    class={initialMode === 'signin' ? 'on' : undefined}
+                    id="tab-signin"
+                    type="button"
+                    role="tab"
+                    aria-selected={initialMode === 'signin' ? 'true' : 'false'}
+                  >
                     Sign in
                   </button>
-                  <button id="tab-signup" type="button" role="tab" aria-selected="false">
+                  <button
+                    class={initialMode === 'signup' ? 'on' : undefined}
+                    id="tab-signup"
+                    type="button"
+                    role="tab"
+                    aria-selected={initialMode === 'signup' ? 'true' : 'false'}
+                  >
                     Create account
                   </button>
                 </div>
@@ -650,11 +668,14 @@ signInRoute.get('/', (c) => {
     });
     return c.text('invalid redirect_url', 400);
   }
+  const modeParam = new URL(c.req.url).searchParams.get('mode');
+  const initialMode: 'signin' | 'signup' = modeParam === 'signup' ? 'signup' : 'signin';
   return c.html(
     <Page
       publishableKey={publishableKey}
       frontendApiHost={frontendApiHost}
       redirectUrl={redirectUrl}
+      initialMode={initialMode}
       theme={readThemeCookie(c)}
     />,
   );
