@@ -23,6 +23,7 @@ type Bindings = {
   DATABASE_URL: string;
   REPLICATE_API_TOKEN: string;
   ASSETS_BUCKET: R2Bucket;
+  SITE_ROOM: DurableObjectNamespace;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -105,6 +106,46 @@ async function persistEditableState(
     })
     .where(and(eq(site.id, siteId), eq(site.customerId, ownerCustomerId)));
   return null;
+}
+
+/**
+ * Push a freshly-saved EditableSite to the SiteRoom Durable Object so any
+ * connected editors replace their in-memory Y.Doc with the new state.
+ *
+ * Why this exists: site-level config fields (visitorTheme, siteNoIndex,
+ * faviconAssetId) are written directly to `site.editableState` by the
+ * PATCH `/config` handler — they do NOT flow through the Yjs doc. A hot
+ * DurableObject still holds the prior Yjs doc, and its autosave path
+ * encodes that doc back into `editableState`, silently clobbering the
+ * config change. The broadcast forces the DO to swap its Y.Doc to the new
+ * state, so the next autosave preserves what the Owner just saved.
+ *
+ * Fails loud on a non-2xx response. The DB write already succeeded; the
+ * caller treats broadcast failure as a 502 so the Owner sees that the
+ * change may not survive an autosave from a connected editor.
+ */
+async function broadcastEditableStateReplaced(
+  env: Bindings,
+  siteId: string,
+  newState: EditableSite,
+): Promise<void> {
+  const id = env.SITE_ROOM.idFromName(siteId);
+  const stub = env.SITE_ROOM.get(id);
+  const response = await stub.fetch('https://do.invalid/broadcast', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      kind: 'editable-state-replaced',
+      siteId,
+      newState,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(
+      `SiteRoom editable-state-replaced broadcast failed (${String(response.status)}): ${text}`,
+    );
+  }
 }
 
 /**
@@ -319,6 +360,19 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
 
   const failure = await persistEditableState(c, siteId, result.ownerCustomerId, next);
   if (failure) return failure;
+
+  // The PATCH writes site-level config straight to `editableState`. Without
+  // this broadcast, a connected editor's autosave path would encode its hot
+  // Y.Doc back into `editableState` and silently revert the change — visible
+  // to the Owner as a config toggle that "took effect" but then disappeared
+  // after publish. The broadcast is what makes the toggle stick.
+  try {
+    await broadcastEditableStateReplaced(c.env, siteId, next);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[canvas/config] editable-state-replaced broadcast failed', { siteId, err });
+    return c.json({ error: `config saved but broadcast failed: ${message}` }, 502);
+  }
 
   return c.json({
     ok: true,
