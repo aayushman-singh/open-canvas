@@ -24,7 +24,7 @@ users at the top, then recording-blockers, then script-wording deltas.
 | B1 — CSP blocks Turnstile | ✅ Already shipped | `ab68578` — `src/embed/csp.ts:85,92,95` add `https://challenges.cloudflare.com` to script-src + frame-src + connect-src. Awaits redeploy. |
 | B2 — Agent apply endpoint shape | ✅ Already shipped | `5fbbc4e` — `src/routes/api/canvas-agent.ts:367-392` accepts canonical `{ ops }` + legacy `{ tool, params }` shapes; both client callers post canonical. |
 | B3 — Editor never broadcasts changes | ✅ Closed by this sweep | `d8b30e3` covered config PATCH only. This sweep adds `broadcastEditableStateReplaced()` to PUT `/seo`, PUT `/metadata`, POST `/style-kit` so every non-Yjs write path refreshes the DO. |
-| B4 — Collaborator autosave gated | 🟡 Partially closed | The 403 handler from B9 now surfaces a loud "Access removed" modal when the collaborator's session loses access. The deeper Pass-7 repro (collaborator edit → blur → wait 30s → server unchanged on a *still-authorized* session) appears to be in the Yjs co-edit projection path, not authorization — `src/live/co-edit/autosave.ts` has no auth gating, so the autosave should fire on any Y.Doc update. Needs a reproducer with WS frame capture before a code fix lands. |
+| B4 — Collaborator autosave gated | 🟡 Partially closed | The 403 handler from B9 now surfaces a loud "Access removed" modal when the collaborator's session loses access. The deeper Pass-7 repro (collaborator edit → blur → wait 30s → server unchanged on a *still-authorized* session) appears to be in the Yjs co-edit projection path, not authorization — `src/live/co-edit/autosave.ts` has no auth gating, so the autosave should fire on any Y.Doc update. **Diagnostic harness shipped: `e2e/live-driver/b4-repro.mjs`** — see B4 investigation notes below before the next code change. |
 | B5 — Stale Yjs cache overwrite | ✅ Closed transitively | Downstream of B3 — broadcasts now refresh stale DOs on every non-Yjs write, so the stale-tab clobber scenario in the original repro no longer applies. State-vector reconciliation on focus is a separate enhancement (not regression). |
 | B6 — Visitor dark-mode toggle missing | ✅ Closed by this sweep | `src/routes/public.ts` now calls `renderModeToggleHtml(c.env)` when `visitorTheme === 'toggleable'` and injects the button into body before the footer. The button + click script + cookie writer were always defined in `src/themes/visitor-mode/toggle-element.ts`; the renderer simply never called them. |
 | B7 — Stale rev01 canonicals | ✅ Already shipped | `854432b` — fixture canonicals removed; `src/seo/meta-emit.ts:138-149` derives canonical from `ctx.host`; `src/seo/smoke.ts:474-509` pins behaviour. Awaits redeploy. |
@@ -52,6 +52,59 @@ All 17 numbered items have a status; nothing else outstanding from
 the handoff. Next-session focus when reproducing B4: capture the
 on-site editor's WebSocket frames during a collaborator edit to see
 whether the Y.Doc update message actually reaches the DO.
+
+## B4 investigation — how to use the diagnostic harness
+
+`e2e/live-driver/b4-repro.mjs` reproduces the Pass-7 evidence beat with
+WebSocket frame capture on both tabs and a before/after read of
+`editableState` via the canvas API. Three plausible root causes:
+
+1. **`coEditSync()` silently returns false** — `canvas-client.ts:2143-2161`
+   has an `if (coEditConnection) { ... return; }` branch that toasts
+   "Co-edit disconnected; changes not saved" and never falls back to the
+   HTTP autosave. Edits land in this branch when the WebSocket is open
+   but the Y.Doc projection hits a transient.
+2. **WS handshake never opens** for the on-site editor on a published
+   subdomain — possible cookie / SameSite / CSP / domain mismatch.
+   `coEditConnection` stays null, the HTTP debounce *should* fire as the
+   fallback path, but if the editor's session-cookie scope doesn't cover
+   the subdomain the HTTP PUT itself would 401 (and the new B9 modal
+   would unmask that case).
+3. **DO autosave debounce keeps getting canceled** — `co-edit/autosave.ts`
+   uses a 750ms debounce; if a noisy peer keeps poking the Y.Doc the
+   timer can in principle reset forever. Unlikely but worth eliminating.
+
+How to run it:
+
+```
+node e2e/live-driver/driver.mjs start &        # window 1, persistent
+node e2e/live-driver/b4-repro.mjs \             # window 2
+  --siteId 74a8854d-6f2a-45f8-af18-19b0f74bf215 \
+  --subdomain briar \
+  --elementId wf-hero-cta-primary \
+  --newLabel "B4-diag-$(date +%s)" \
+  --out /tmp/b4-report.json
+```
+
+Read the JSON's `diff` field first:
+- `applied` → the autosave path worked end-to-end. The original Pass-7
+  evidence may have been a stale-state artifact rather than a real bug;
+  rerun on a fresh editor session before filing a new code fix.
+- `reverted-or-never-saved` → B4 reproduces. Then read
+  `tabB.statusLineHistory` to learn which leg failed:
+  - history contains `"Synced"` → Y.Doc projection ran, DO is the
+    culprit. Look at `tabB.wsFrames` for unanswered `sent` frames.
+  - history contains `"Co-edit disconnected; changes not saved"` →
+    root cause #1, fix in `scheduleSave()` HTTP fallback.
+  - history contains `"Saved"` only → coEditConnection was null;
+    HTTP debounce fired but the PUT was rejected (look at console
+    errors for the response detail).
+
+The harness reuses the existing Clerk-authenticated profile in
+`e2e/live-driver/.profile/` (started by `driver.mjs start`), so no
+extra account setup is required for a single-account / two-tab repro.
+Two-account collaborator-vs-owner setup is a follow-up if the single-
+account repro doesn't reveal anything.
 
 ---
 
