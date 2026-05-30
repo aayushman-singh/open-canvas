@@ -1,6 +1,6 @@
 # ADR 0031 — Accessibility audit hides the numeric score
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** beat S7.A.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md). The audit page at [src/routes/dashboard/a11y-report.tsx:428-438](../../src/routes/dashboard/a11y-report.tsx) renders `<b>{score}</b><small>/ 100</small>` inside the score ring. For the Briar demo state that reads `50 / 100`. The script delta in [docs/demo/handoff-delta-resolution-2026-05-30.md §Pass-6 #20](../demo/handoff-delta-resolution-2026-05-30.md) named two acceptable resolutions — (a) hide the number, (b) script-add a voiceover line — and the parallel script branch took (b). This ADR re-opens the choice and answers the door of the more honest fence.

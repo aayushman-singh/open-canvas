@@ -76,18 +76,7 @@ const pageStyles = `
     height: 72px;
     border-radius: 50%;
     background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
   }
-  .score .ring .in b {
-    font-family: var(--display);
-    font-weight: 700;
-    font-size: 24px;
-    color: var(--ink);
-  }
-  .score .ring .in small { font-size: 10px; color: var(--ink-3); }
   .score .st h2 { font-family: var(--display); font-size: 19px; }
   .score .st p { font-size: 14px; color: var(--ink-2); margin-top: 5px; }
   .score .actions { margin-left: auto; }
@@ -426,11 +415,16 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
       </p>
 
       <div class="score">
+        {/* Ring fill encodes the trend (red/warn/green by band, fill ratio
+            by score%). The numeric score itself isn't displayed — ADR 0031
+            removed the digits because the rubric (100 - blockers*20 -
+            warnings*5) doesn't track publishability (1 blocker + 8 warnings
+            scores 40, 2 blockers + 0 warnings scores 60, the latter is
+            worse despite being closer to publishable). The ring's fill is
+            the qualitative signal; the per-finding rows below carry the
+            actionable detail. */}
         <div class="ring" style={ringStyle}>
-          <div class="in">
-            <b>{String(score)}</b>
-            <small>/ 100</small>
-          </div>
+          <div class="in" />
         </div>
         <div class="st">
           <h2>{copy.headline}</h2>

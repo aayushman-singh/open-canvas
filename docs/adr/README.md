@@ -38,6 +38,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Proposed | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
 | 0028 | Page background uses the buildColorRow swatch+hex pattern | Accepted | [`docs/adr/0028-page-background-colour-picker-verification.md`](0028-page-background-colour-picker-verification.md) |
 | 0030 | Audit re-run button reads "Run audit" | Accepted | [`docs/adr/0030-audit-button-label-run-audit.md`](0030-audit-button-label-run-audit.md) |
+| 0031 | Accessibility audit hides the numeric score | Accepted | [`docs/adr/0031-audit-numeric-score-handling.md`](0031-audit-numeric-score-handling.md) |
 | 0038 | Snapshot preview is a server-rendered sandboxed iframe via srcdoc | Accepted | [`docs/adr/0038-snapshot-preview-iframe.md`](0038-snapshot-preview-iframe.md) |
 | 0039 | A11y link in the canvas editor header | Accepted | [`docs/adr/0039-a11y-link-in-canvas-editor-header.md`](0039-a11y-link-in-canvas-editor-header.md) |
 
