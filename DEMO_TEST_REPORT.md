@@ -1,7 +1,7 @@
 # Demo Test Report & UX Audit
 
 > Tested 2026-05-27 against production at `rev01.aayushman.dev`
-> Browser: Playwright Chromium, authenticated as kremzylo@gmail.com
+> Browser: Playwright Chromium, authenticated as the repo owner's account
 > Second pass — after bug fixes (B1-B7) and sidebar navigation deployment
 
 ---
