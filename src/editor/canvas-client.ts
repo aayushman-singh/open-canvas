@@ -1109,6 +1109,201 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
+  // Modal for the "+ New Page" flow (ADR 0034). Collects title, slug,
+  // and locale up front so the new page lands fully-formed instead of
+  // the previous instant-create flow that named the page "Page N" and
+  // forced a rename + SEO panel trip. Resolves to {title, slug, locale}
+  // on submit or null on cancel. Slug auto-derives from title and
+  // freezes on first manual slug edit (re-arms on slug clear). Locale
+  // dropdown carries the top-10 BCP-47 tags + "Site default" + an
+  // "Other..." escape that reveals a raw-tag text input. Reserved-slug
+  // pre-validation blocks the reserved _404 / 404 slugs; duplicate-slug pre-validation
+  // blocks any slug already taken on the site.
+  function openNewPageModal(opts) {
+    if (modalOpen) {
+      throw new Error("openNewPageModal: another modal is already open");
+    }
+    var existingSlugs = opts && Array.isArray(opts.existingSlugs) ? opts.existingSlugs : [];
+    modalOpen = true;
+    return new Promise(function(resolve) {
+      var backdrop = document.createElement("div");
+      backdrop.className = "rev01-modal-backdrop";
+      var panel = document.createElement("div");
+      panel.className = "rev01-modal";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      panel.setAttribute("aria-label", "Create new page");
+
+      var h = document.createElement("h3");
+      h.textContent = "New page";
+      panel.appendChild(h);
+
+      // -- Title ---------------------------------------------------------
+      var titleLabel = document.createElement("label");
+      titleLabel.textContent = "Title";
+      panel.appendChild(titleLabel);
+      var titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.placeholder = "About us";
+      panel.appendChild(titleInput);
+
+      // -- Slug ----------------------------------------------------------
+      var slugLabel = document.createElement("label");
+      slugLabel.textContent = "Slug";
+      panel.appendChild(slugLabel);
+      var slugInput = document.createElement("input");
+      slugInput.type = "text";
+      slugInput.placeholder = "about-us";
+      panel.appendChild(slugInput);
+      var slugHint = document.createElement("div");
+      slugHint.style.cssText = "font-size:11px;color:var(--rev01-fg-mute);margin:-6px 0 8px";
+      slugHint.textContent = "Auto-derived from title. Edit to override; clear to re-link.";
+      panel.appendChild(slugHint);
+
+      // -- Locale --------------------------------------------------------
+      var localeLabel = document.createElement("label");
+      localeLabel.textContent = "Locale";
+      panel.appendChild(localeLabel);
+      var localeSel = document.createElement("select");
+      var localeOptions = [
+        { value: "", label: "Site default" },
+        { value: "en", label: "en (English)" },
+        { value: "ar", label: "ar (Arabic)" },
+        { value: "ja", label: "ja (Japanese)" },
+        { value: "zh-Hans", label: "zh-Hans (Chinese simplified)" },
+        { value: "es", label: "es (Spanish)" },
+        { value: "fr", label: "fr (French)" },
+        { value: "de", label: "de (German)" },
+        { value: "pt", label: "pt (Portuguese)" },
+        { value: "ru", label: "ru (Russian)" },
+        { value: "hi", label: "hi (Hindi)" },
+        { value: "__other__", label: "Other (type BCP-47 tag)" },
+      ];
+      for (var i = 0; i < localeOptions.length; i++) {
+        var localeOpt = document.createElement("option");
+        localeOpt.value = localeOptions[i].value;
+        localeOpt.textContent = localeOptions[i].label;
+        localeSel.appendChild(localeOpt);
+      }
+      panel.appendChild(localeSel);
+      var otherLocaleInput = document.createElement("input");
+      otherLocaleInput.type = "text";
+      otherLocaleInput.placeholder = "e.g. en-GB or fr-CA";
+      otherLocaleInput.style.cssText = "margin-top:6px;display:none";
+      panel.appendChild(otherLocaleInput);
+      localeSel.addEventListener("change", function() {
+        otherLocaleInput.style.display = localeSel.value === "__other__" ? "block" : "none";
+        if (localeSel.value === "__other__") otherLocaleInput.focus();
+      });
+
+      // -- Inline error + actions ---------------------------------------
+      var errorLine = document.createElement("div");
+      errorLine.style.cssText = "min-height:18px;font-size:12px;color:#ef4444;margin:8px 0";
+      panel.appendChild(errorLine);
+
+      var actions = document.createElement("div");
+      actions.className = "rev01-modal-actions";
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "Create";
+      actions.appendChild(cancel);
+      actions.appendChild(ok);
+      panel.appendChild(actions);
+
+      backdrop.appendChild(panel);
+
+      // -- Slug auto-derive + freeze/re-arm logic -----------------------
+      var slugManuallyEdited = false;
+      function slugify(str) {
+        var s = str.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        return s.length === 0 ? "page" : s;
+      }
+      titleInput.addEventListener("input", function() {
+        if (!slugManuallyEdited) {
+          slugInput.value = slugify(titleInput.value);
+          validate();
+        }
+      });
+      slugInput.addEventListener("input", function() {
+        if (slugInput.value.length === 0) {
+          slugManuallyEdited = false;
+          slugInput.value = slugify(titleInput.value);
+        } else {
+          slugManuallyEdited = true;
+        }
+        validate();
+      });
+
+      function validate() {
+        var title = titleInput.value.trim();
+        var slug = slugInput.value.trim();
+        if (title.length === 0) { errorLine.textContent = "Title is required."; ok.disabled = true; return; }
+        if (slug.length === 0) { errorLine.textContent = "Slug is required."; ok.disabled = true; return; }
+        if (slug === "_404" || slug === "404") {
+          errorLine.textContent = "Slug '" + slug + "' is reserved for the custom 404 page (toggle in the page inspector after create).";
+          ok.disabled = true;
+          return;
+        }
+        if (existingSlugs.indexOf(slug) !== -1) {
+          errorLine.textContent = "Slug '" + slug + "' is already used by another page on this site.";
+          ok.disabled = true;
+          return;
+        }
+        errorLine.textContent = "";
+        ok.disabled = false;
+      }
+
+      function close(value) {
+        document.removeEventListener("keydown", onKey, true);
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove("rev01-modal-open");
+        modalOpen = false;
+        resolve(value);
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(null); return; }
+        if (ev.key === "Enter" && !ok.disabled) {
+          // Ignore Enter from the "Other locale" input so the user can
+          // type a tag containing whitespace handling without
+          // accidentally submitting.
+          if (document.activeElement === otherLocaleInput) return;
+          ev.preventDefault();
+          ev.stopPropagation();
+          submit();
+        }
+      }
+      function submit() {
+        var locale;
+        if (localeSel.value === "") locale = null;
+        else if (localeSel.value === "__other__") {
+          var custom = otherLocaleInput.value.trim();
+          locale = custom.length > 0 ? custom : null;
+        } else {
+          locale = localeSel.value;
+        }
+        close({
+          title: titleInput.value.trim(),
+          slug: slugInput.value.trim(),
+          locale: locale,
+        });
+      }
+      backdrop.addEventListener("click", function(ev) { if (ev.target === backdrop) close(null); });
+      cancel.addEventListener("click", function() { close(null); });
+      ok.addEventListener("click", submit);
+      document.addEventListener("keydown", onKey, true);
+
+      document.body.classList.add("rev01-modal-open");
+      document.body.appendChild(backdrop);
+      titleInput.focus();
+      // Start in disabled state; validate runs after the first input.
+      ok.disabled = true;
+      validate();
+    });
+  }
+
   function openAlertModal(opts) {
     if (modalOpen) {
       throw new Error("openAlertModal: another modal is already open");
@@ -1392,13 +1587,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
-  function createPage() {
+  async function createPage() {
     if (!state) return;
-    var idx = state.pages.length + 1;
+    var result = await openNewPageModal({
+      existingSlugs: state.pages.map(function(p) { return p.slug; }),
+    });
+    if (!result) return;
     var newPage = {
       id: newPageId(),
-      slug: "page-" + idx,
-      title: "Page " + idx,
+      slug: result.slug,
+      title: result.title,
       width: DEFAULT_PAGE_WIDTH_PX,
       sections: [
         {
@@ -1410,6 +1608,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         },
       ],
     };
+    if (result.locale !== null) newPage.locale = result.locale;
     state.pages.push(newPage);
     captureForUndo();
     setActivePage(newPage.id);

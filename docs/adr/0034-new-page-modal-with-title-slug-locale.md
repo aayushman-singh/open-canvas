@@ -1,6 +1,6 @@
 # ADR 0034 — `+ New Page` opens a modal that captures title, slug, and locale up front
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** G7 in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.7. Resolves the friction surfaced by Interlude 4 in [docs/demo/act-1-script.md](../demo/act-1-script.md) (I4.B), where an Arabic page has to be created, then renamed, then have its locale set via the SEO panel — three round-trips for what the Owner thinks of as one act.
