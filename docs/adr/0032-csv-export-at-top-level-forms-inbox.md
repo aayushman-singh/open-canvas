@@ -1,6 +1,6 @@
 # ADR 0032 — CSV export reachable from the top-level Forms inbox
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** beats S8.A.1, S8.A.2, S8.B.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md). The script wants the Owner to export a form's submissions as CSV directly from the top-level Forms inbox, without first drilling into `/forms/{formId}`. Named as the fix in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.5.

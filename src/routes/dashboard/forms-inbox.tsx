@@ -137,11 +137,31 @@ const pageStyles = `
     padding: 15px 20px;
     border-top: 1px solid var(--line);
     transition: background .12s;
-    color: inherit;
-    text-decoration: none;
   }
   .sub-row:first-of-type { border-top: none; }
   .sub-row:hover { background: var(--surface-2); }
+  /* .row-main is the navigation link covering the first three cells.
+     display:contents lets its children participate directly in
+     .sub-row's grid so the visual layout matches .inbox-head. */
+  .sub-row .row-main {
+    display: contents;
+    color: inherit;
+    text-decoration: none;
+  }
+  /* .row-csv is the per-row CSV download icon button. Sibling of
+     .row-main; sits in the fourth grid column where the chevron used
+     to live. Hover lifts colour to ink-2 so the icon reads as
+     actionable, distinct from the row's whole-row hover surface. */
+  .sub-row .row-csv {
+    color: var(--ink-3);
+    display: flex;
+    justify-content: flex-end;
+    text-decoration: none;
+    padding: 6px;
+    border-radius: var(--r-sm);
+    transition: color .12s, background .12s;
+  }
+  .sub-row .row-csv:hover { color: var(--ink); background: var(--surface-3); }
   .sub-row .who b { font-size: 14px; color: var(--ink); }
   .sub-row .who small { display: block; font-size: 12px; color: var(--ink-3); }
   .sub-row .msg {
@@ -433,20 +453,32 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
             <span></span>
           </div>
           {forms.map((entry) => (
-            <a
-              class="sub-row"
-              href={`/dashboard/sites/${esc(siteId)}/forms/${esc(entry.form.id)}`}
-            >
-              <div class="who">
-                <b>{entry.form.id}</b>
-                <small>{String(entry.form.fields.length)} fields</small>
-              </div>
-              <div class="msg">on /{entry.pageSlug}</div>
-              <div class="date">{String(counts.get(entry.form.id) ?? 0)}</div>
-              <div class="chev">
-                <ChevronIcon />
-              </div>
-            </a>
+            <div class="sub-row">
+              {/* Row navigation (form name → /forms/{id}) and CSV download
+                  are siblings rather than nested links — HTML disallows
+                  <a> inside <a>. Both live as direct grid children via
+                  `display: contents` on .row-main so the 4-column grid
+                  defined by .inbox-head still describes the visual row. */}
+              <a
+                class="row-main"
+                href={`/dashboard/sites/${esc(siteId)}/forms/${esc(entry.form.id)}`}
+              >
+                <div class="who">
+                  <b>{entry.form.id}</b>
+                  <small>{String(entry.form.fields.length)} fields</small>
+                </div>
+                <div class="msg">on /{entry.pageSlug}</div>
+                <div class="date">{String(counts.get(entry.form.id) ?? 0)}</div>
+              </a>
+              <a
+                class="row-csv"
+                href={`/api/forms/${esc(siteId)}/${esc(entry.form.id)}/export.csv`}
+                title="Download CSV of this form's submissions"
+                aria-label={`Download CSV for ${entry.form.id}`}
+              >
+                <ExportIcon />
+              </a>
+            </div>
           ))}
         </div>
       )}
