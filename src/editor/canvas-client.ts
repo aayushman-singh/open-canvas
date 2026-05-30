@@ -4388,30 +4388,29 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(divider2);
 
     // -- Page background --------------------------------------------------
+    // Uses the same swatch + hex pattern as the element-style background.
+    // Page bg is hex-only as of ADR 0028; values that aren't #rgb or
+    // #rrggbb are not representable here (the previous text input
+    // accepted 'transparent' / named colors / gradients, but the demo
+    // case is swatch-picked hex and that's what the picker exposes).
     var group5 = document.createElement("div");
     group5.className = "rev01-page-inspector-group";
     var h4e = document.createElement("h4");
     h4e.textContent = "Page background";
     group5.appendChild(h4e);
 
-    var bgInput = document.createElement("input");
-    bgInput.type = "text";
-    bgInput.placeholder = "e.g. #1a1a2e or transparent";
-    bgInput.value = page.pageBackground || "";
-    bgInput.addEventListener("change", function() {
-      var val = bgInput.value.trim();
-      if (val.length === 0) {
-        delete page.pageBackground;
-      } else if (!isSafeCssValue(val)) {
-        setStatus("Invalid page background", "error");
-        return;
-      } else {
-        page.pageBackground = val;
-      }
-      applyPageStyles(page);
-      scheduleSave();
+    var pageBgRow = buildColorRow({
+      getValue: function() { return page.pageBackground; },
+      setValue: function(v) { page.pageBackground = v; },
+      clearValue: function() { delete page.pageBackground; },
+      onChange: function() {
+        applyPageStyles(page);
+        scheduleSave();
+      },
+      enabledTitle: "Enable page background",
+      swatchDefault: "#ffffff",
     });
-    group5.appendChild(bgInput);
+    group5.appendChild(pageBgRow);
     inspector.appendChild(group5);
 
     // -- Section gap ------------------------------------------------------
@@ -4514,6 +4513,74 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  // Build a [enable checkbox | color swatch | hex text input] row.
+  // The hex input is the typed-entry escape hatch the swatch picker
+  // alone doesn't offer. All three controls stay synchronised: the
+  // swatch syncs to the hex text on each pick, the hex text accepts
+  // both #rgb and #rrggbb (expanded to #rrggbb internally), and any
+  // valid edit flips the enabled checkbox on so partial edits don't
+  // silently lose the value.
+  //
+  // opts.onChange is invoked after every value mutation so the caller
+  // can re-render / persist / repaint as appropriate for whichever
+  // field (element style, page background, etc.) the row writes to.
+  function buildColorRow(opts) {
+    var row = document.createElement("div");
+    row.className = "style-row";
+    var initial = opts.getValue();
+    var enabled = document.createElement("input");
+    enabled.type = "checkbox";
+    enabled.checked = !!initial;
+    enabled.title = opts.enabledTitle;
+    var swatch = document.createElement("input");
+    swatch.type = "color";
+    swatch.value = initial || opts.swatchDefault || "#000000";
+    swatch.className = "color-swatch";
+    var hex = document.createElement("input");
+    hex.type = "text";
+    hex.className = "color-hex";
+    hex.value = initial || "";
+    hex.placeholder = opts.swatchDefault || "#000000";
+    hex.spellcheck = false;
+    hex.maxLength = 7;
+    function expandShort(v) {
+      if (v.length === 4) {
+        return ("#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]).toLowerCase();
+      }
+      return v.toLowerCase();
+    }
+    enabled.addEventListener("change", function() {
+      if (enabled.checked) {
+        opts.setValue(swatch.value);
+        hex.value = swatch.value;
+      } else {
+        opts.clearValue();
+        hex.value = "";
+      }
+      opts.onChange();
+    });
+    swatch.addEventListener("input", function() {
+      if (!enabled.checked) enabled.checked = true;
+      opts.setValue(swatch.value);
+      hex.value = swatch.value;
+      opts.onChange();
+    });
+    hex.addEventListener("input", function() {
+      var v = hex.value.trim();
+      if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
+        var normalised = expandShort(v);
+        swatch.value = normalised;
+        if (!enabled.checked) enabled.checked = true;
+        opts.setValue(normalised);
+        opts.onChange();
+      }
+    });
+    row.appendChild(enabled);
+    row.appendChild(swatch);
+    row.appendChild(hex);
+    return row;
+  }
+
   function renderInspector() {
     if (!inspector) return;
     if (isReelOpen) {
@@ -4609,75 +4676,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         scheduleSave();
       }
 
-      // Build a [enable checkbox | color swatch | hex text input] row.
-      // The hex input is the typed-entry escape hatch the swatch picker
-      // alone doesn't offer. All three controls stay synchronised: the
-      // swatch syncs to the hex text on each pick, the hex text accepts
-      // both #rgb and #rrggbb (expanded to #rrggbb internally), and any
-      // valid edit flips the enabled checkbox on so partial edits don't
-      // silently lose the value.
-      function buildColorRow(opts) {
-        var row = document.createElement("div");
-        row.className = "style-row";
-        var initial = opts.getValue();
-        var enabled = document.createElement("input");
-        enabled.type = "checkbox";
-        enabled.checked = !!initial;
-        enabled.title = opts.enabledTitle;
-        var swatch = document.createElement("input");
-        swatch.type = "color";
-        swatch.value = initial || opts.swatchDefault || "#000000";
-        swatch.className = "color-swatch";
-        var hex = document.createElement("input");
-        hex.type = "text";
-        hex.className = "color-hex";
-        hex.value = initial || "";
-        hex.placeholder = opts.swatchDefault || "#000000";
-        hex.spellcheck = false;
-        hex.maxLength = 7;
-        function expandShort(v) {
-          if (v.length === 4) {
-            return ("#" + v[1] + v[1] + v[2] + v[2] + v[3] + v[3]).toLowerCase();
-          }
-          return v.toLowerCase();
-        }
-        enabled.addEventListener("change", function() {
-          if (enabled.checked) {
-            opts.setValue(swatch.value);
-            hex.value = swatch.value;
-          } else {
-            opts.clearValue();
-            hex.value = "";
-          }
-          onStyleChange();
-        });
-        swatch.addEventListener("input", function() {
-          if (!enabled.checked) enabled.checked = true;
-          opts.setValue(swatch.value);
-          hex.value = swatch.value;
-          onStyleChange();
-        });
-        hex.addEventListener("input", function() {
-          var v = hex.value.trim();
-          if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) {
-            var normalised = expandShort(v);
-            swatch.value = normalised;
-            if (!enabled.checked) enabled.checked = true;
-            opts.setValue(normalised);
-            onStyleChange();
-          }
-        });
-        row.appendChild(enabled);
-        row.appendChild(swatch);
-        row.appendChild(hex);
-        return row;
-      }
-
-      // -- Background color
+      // -- Background color (uses the module-level buildColorRow helper)
       var bgRow = buildColorRow({
         getValue: function() { return es.backgroundColor; },
         setValue: function(v) { es.backgroundColor = v; },
         clearValue: function() { delete es.backgroundColor; },
+        onChange: onStyleChange,
         enabledTitle: "Enable background color",
         swatchDefault: "#000000",
       });

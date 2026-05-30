@@ -1,9 +1,11 @@
 # ADR 0028 — Page background uses the buildColorRow swatch+hex pattern
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
-**Drives:** beat S3.E.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md) (Maya picks a warm-cream page background via a colour picker) plus the gap raised in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.1, against the read-only finding that `buildColorRow` already exists at [src/editor/canvas-client.ts:4677](../../src/editor/canvas-client.ts) and may already be wired to the page-inspector's `backgroundColor` field at [canvas-client.ts:4284-4400](../../src/editor/canvas-client.ts).
+**Drives:** beat S3.E.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md) (Maya picks a warm-cream page background via a colour picker) plus the gap raised in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.1, against the read-only finding that `buildColorRow` already exists at [src/editor/canvas-client.ts:4677](../../src/editor/canvas-client.ts) and may already be wired to the page-inspector's `pageBackground` field at [canvas-client.ts:4284-4400](../../src/editor/canvas-client.ts).
+
+**Resolution:** verification confirmed the field was *not* wired — `pageBackground` rendered as a bare `<input type="text">` accepting any CSS value validated through `isSafeCssValue` (which permitted `transparent`, named colors, and gradients alongside hex). Decision-3's wiring path applied. The wiring landed alongside this acceptance and added decision 4 to record the hex-only restriction the swatch picker imposes.
 
 ## Context
 
@@ -23,9 +25,15 @@ The framing rule from [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo
 
    **Why:** the script is already correct under this branch. The gap was a documentation artefact, not a product gap. Closing it loudly (rather than silently leaving it open) keeps the handoff trustworthy for the next Pass-N drive.
 
-3. **If not wired: wire the page-inspector `backgroundColor` field to `buildColorRow` with the same hex + swatch + "use kit default" checkbox shape every other colour field in the inspector uses.** No new helper, no new design, no new schema field — the schema already carries `backgroundColor`; the only change is the render call.
+3. **If not wired: wire the page-inspector `pageBackground` field to `buildColorRow` with the same hex + swatch + "use kit default" checkbox shape every other colour field in the inspector uses.** No new design, no new schema field — the schema already carries `pageBackground`; the existing `<input type="text">` block in `renderPageInspector` is replaced with one `buildColorRow` call against the same data. The helper is hoisted from its previous nested location (inside `buildStyleSection`) to module scope, and gains an explicit `onChange` callback so each consumer can drive its own repaint / persist path (`onStyleChange` for element bg, `applyPageStyles(page); scheduleSave();` for page bg).
 
-   **Why:** the helper exists and the pattern is established. Inventing a different control shape for one field would split the editor's colour-picking story into two non-parallel UXes for no Owner benefit. The minimal-complexity move is to reuse the existing helper.
+   **Why:** the helper exists and the pattern is established. Inventing a different control shape for one field would split the editor's colour-picking story into two non-parallel UXes for no Owner benefit. Hoisting the helper rather than copying it inline avoids the second-consumer drift problem (the existing element-bg call site and the new page-bg call site stay in lock-step). The minimal-complexity move is to reuse the existing helper at a higher scope, not to copy it.
+
+4. **Page background is hex-only as of this ADR.** Values that aren't `#rgb` or `#rrggbb` — `transparent`, named colors like `rebeccapurple`, gradients, `currentColor`, etc. — are no longer representable through the page-inspector UI. The schema field stays a free-form CSS string (no validator tightening), so existing sites with non-hex values keep rendering; only the *input UX* narrows to hex.
+
+   **Why:** the swatch picker's `<input type="color">` produces `#rrggbb` and nothing else; offering a swatch alongside a free-form text input was the alternative considered, and was rejected because two controls writing the same field create a "which one wins?" question for every Owner interaction. The recording script's S3.E.1 beat is hex-driven ("warm cream" `#f7ede3`) — that's the Owner-perceived primary case, and the loss of `transparent` / gradients on page backgrounds is a real but narrow regression. A future ADR can extend the picker to accept non-hex inputs through the hex text field if Owner demand surfaces; this ADR doesn't pre-commit to it.
+
+   This would be wrong if `transparent` page backgrounds were load-bearing for any built-in template or for accessibility (e.g. a "see-through to the parent" pattern that breaks without it). Verified during this ADR's verification pass that no built-in fixture sets `pageBackground` to `transparent` or to a named colour; the loss is theoretical for current Owner state, not concrete.
 
 ## Out of scope
 
@@ -46,6 +54,6 @@ The framing rule from [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo
 
 ## Follow-ups
 
-- Verify by reading [canvas-client.ts:4284-4400](../../src/editor/canvas-client.ts) for a `buildColorRow` call against `backgroundColor`, then open the editor's page inspector and confirm visually. Report the result as a comment on this ADR's PR.
-- If wired: mark the ADR Accepted as a no-op closure, update [handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.1 to flag gap-1 as already-shipped, and note the warm-cream swatch flow records as-scripted.
-- If not wired: land the minimal wiring patch (one render-call change in the page inspector), then mark this ADR Accepted with the patch link.
+- Verification confirmed not-wired; wiring landed alongside this Acceptance. `buildColorRow` is now defined at module scope after `applyPageStyles` and is called from two sites: the element-style background (with `onChange: onStyleChange`) and the page inspector (with `onChange: function() { applyPageStyles(page); scheduleSave(); }`).
+- Update [handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.1 in a follow-up handoff revision to flag the gap closed.
+- If non-hex page backgrounds (`transparent`, gradients, named colors) become Owner-requested, draft a successor ADR that extends `buildColorRow`'s hex text field to accept a CSS-value passthrough, OR adds a sibling control. Do not silently widen the hex regex — the swatch + hex contract is what every other colour field in the inspector also commits to.
