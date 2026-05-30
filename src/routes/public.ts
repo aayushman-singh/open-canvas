@@ -52,6 +52,7 @@ import { renderCanvasHead, resolveLang } from '../seo/meta-emit';
 // Wave 3 #20 — dual-palette CSS + inline data-mode setter for visitor toggle.
 import { emitDualModeCss } from '../themes/visitor-mode/css-emit';
 import { getModeSetterScript, getDarkModeSetterScript } from '../themes/visitor-mode/inline-script';
+import { renderModeToggleHtml } from '../themes/visitor-mode/toggle-element';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
 import { prepareRender } from '../i18n/render-hook';
 import { emitFontFaceBlocks } from '../fonts/face-emit';
@@ -1014,6 +1015,12 @@ export async function handlePublicRequest<P extends string, I extends Input>(
       ? getDarkModeSetterScript()
       : getModeSetterScript(c.env);
   }
+  // Without this, `visitorTheme === 'toggleable'` only emits the
+  // dual-palette CSS and the cookie-reader script — there is no button
+  // wired to flip the cookie, so visitors are stuck in whatever mode the
+  // setter script pinned at first paint. The button is owner-controlled
+  // via the visitorTheme setting; it does not appear for light/dark-only.
+  const modeToggleHtml = visitorTheme === 'toggleable' ? renderModeToggleHtml(c.env) : '';
 
   const addonScripts = await emitAddonHeadScripts(db(c.env), siteRow.id);
   const addonBodyScripts = await emitAddonBodyScripts(db(c.env), siteRow.id);
@@ -1035,6 +1042,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
         </head>
         <body>
           <div data-rev01-public-root>${raw(snapshotHtml)}</div>
+          ${modeToggleHtml ? raw(modeToggleHtml) : ''}
           ${raw(buildPublishedFooterHtml(c.env))}
           <script type="module">
             ${raw(visitorScript)};

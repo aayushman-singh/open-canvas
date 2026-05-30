@@ -458,6 +458,20 @@ canvasApi.put('/sites/:siteId/pages/:pageId/seo', async (c) => {
 
   const failure = await persistEditableState(c, siteId, result.ownerCustomerId, nextState);
   if (failure) return failure;
+
+  // SEO writes bypass the Yjs autosave path entirely (small PATCH-style
+  // payloads from the SEO modal). Without a broadcast, any connected
+  // editor's hot Y.Doc would encode its stale `editableState` back into
+  // the DB on the next autosave, silently reverting the SEO change. See
+  // PATCH /config above for the canonical justification.
+  try {
+    await broadcastEditableStateReplaced(c.env, siteId, nextState);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[canvas/seo] editable-state-replaced broadcast failed', { siteId, err });
+    return c.json({ error: `seo saved but broadcast failed: ${message}` }, 502);
+  }
+
   return c.json({ ok: true });
 });
 
@@ -520,6 +534,21 @@ canvasApi.put('/sites/:siteId/pages/:pageId/metadata', async (c) => {
 
   const failure = await persistEditableState(c, siteId, result.ownerCustomerId, nextState);
   if (failure) return failure;
+
+  // Metadata writes bypass the Yjs autosave path entirely. See PATCH
+  // /config for the canonical justification; without this broadcast a
+  // connected editor's hot Y.Doc clobbers the change on the next save.
+  try {
+    await broadcastEditableStateReplaced(c.env, siteId, nextState);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[canvas/metadata] editable-state-replaced broadcast failed', {
+      siteId,
+      err,
+    });
+    return c.json({ error: `metadata saved but broadcast failed: ${message}` }, 502);
+  }
+
   return c.json({ ok: true });
 });
 
@@ -897,6 +926,20 @@ canvasApi.post('/sites/:siteId/style-kit', async (c) => {
     styleKit: incoming,
   });
   if (failure) return failure;
+
+  // Style-kit writes bypass the Yjs autosave path. See PATCH /config for
+  // the canonical justification; without this broadcast a connected
+  // editor's hot Y.Doc clobbers the kit swap on the next save.
+  try {
+    await broadcastEditableStateReplaced(c.env, siteId, nextState);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[canvas/style-kit] editable-state-replaced broadcast failed', {
+      siteId,
+      err,
+    });
+    return c.json({ error: `style kit saved but broadcast failed: ${message}` }, 502);
+  }
 
   return c.json({ ok: true, styleKit: incoming });
 });
