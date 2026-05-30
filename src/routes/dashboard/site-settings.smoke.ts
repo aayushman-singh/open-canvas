@@ -63,6 +63,7 @@ const toggle = {
   getAttribute(name: string): string | null {
     const attrs: Record<string, string> = {
       'data-config-key': 'siteNoIndex',
+      'data-invert': 'true',
       'data-on-label': 'On',
       'data-off-label': 'Off',
     };
@@ -134,7 +135,7 @@ dispatchToggleChange(true);
 await flushMicrotasks();
 assert(queuedFetchCount() === 1, 'expected first toggle change to start one PATCH');
 assert(
-  JSON.stringify(queuedFetches[0]?.body) === JSON.stringify({ darkModeEnabled: true }),
+  JSON.stringify(queuedFetches[0]?.body) === JSON.stringify({ siteNoIndex: false }),
   'expected first queued PATCH to capture checked=true',
 );
 
@@ -154,7 +155,7 @@ queuedFetches[0]?.resolve({
 await flushMicrotasks();
 assert(queuedFetchCount() === 2, 'expected second queued PATCH to start after first failure');
 assert(
-  JSON.stringify(queuedFetches[1]?.body) === JSON.stringify({ darkModeEnabled: false }),
+  JSON.stringify(queuedFetches[1]?.body) === JSON.stringify({ siteNoIndex: true }),
   'expected second queued PATCH to preserve the later checked=false value',
 );
 assert(
@@ -170,7 +171,7 @@ queuedFetches[1]?.resolve({
 await flushMicrotasks();
 assert(queuedFetchCount() === 3, 'expected third queued PATCH to start after second success');
 assert(
-  JSON.stringify(queuedFetches[2]?.body) === JSON.stringify({ darkModeEnabled: true }),
+  JSON.stringify(queuedFetches[2]?.body) === JSON.stringify({ siteNoIndex: false }),
   'expected third queued PATCH to preserve the repeated checked=true value',
 );
 

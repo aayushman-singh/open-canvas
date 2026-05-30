@@ -115,4 +115,37 @@ assert(
   'background-image clear button must disclose that it only clears the image override',
 );
 
+const sectionInspector = sliceBetween(
+  'function renderSectionInspector() {',
+  '// -- Page inspector',
+);
+
+assert(
+  sectionInspector.includes(
+    'var roleSel = selectInput(selectableSectionRoles(section), section.role || "body");',
+  ) &&
+    !sectionInspector.includes(
+      'var roleSel = selectInput(["body", "header", "footer"], section.role || "body");',
+    ),
+  'section role selector must only expose roles valid for the selected section position',
+);
+assert(
+  source.includes('function selectableSectionRoles(section) {') &&
+    source.includes('var sectionInfo = findCurrentPageSectionInfo(section.id);') &&
+    source.includes('sectionInfo.index === 0') &&
+    source.includes('sectionInfo.index === sectionInfo.page.sections.length - 1'),
+  'section role options must be derived from page index and existing page roles',
+);
+
+const newPageModal = sliceBetween(
+  'function openNewPageModal(opts) {',
+  'function openAlertModal(opts) {',
+);
+
+assert(
+  newPageModal.includes('{ value: "zh-CN", label: "zh-CN (Chinese simplified)" }') &&
+    !newPageModal.includes('zh-Hans'),
+  'new-page locale picker must use the locale grammar accepted by the router',
+);
+
 console.log('[inspector:smoke] OK');

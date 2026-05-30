@@ -239,7 +239,7 @@ function buildSystemPrompt(state: EditableSite): string {
   lines.push('  updatePage — update page title, slug, SEO description, noIndex, locale, and other metadata.');
   lines.push('  deletePage — remove a page. Cannot delete the last page.');
   lines.push('  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).');
-  lines.push('  setSiteConfig — toggle darkModeEnabled, defaultLocale, or siteNoIndex.');
+  lines.push("  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.");
 
   return lines.join('\n');
 }

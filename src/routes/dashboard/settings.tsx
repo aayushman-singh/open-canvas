@@ -81,7 +81,6 @@ const settingsStyles = `
   .settings-panel { display: none; }
   .settings-panel[data-active="true"] { display: block; }
 
-  /* current-plan summary card (account.html .plan-now) */
   /* usage meters (.mtr) — ADR 0042: only Sites + Storage ship. */
   .meters {
     display: grid;

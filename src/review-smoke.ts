@@ -562,8 +562,12 @@ for (const [name, source] of [
 assert(
   dashboardSource.includes('const atSiteLimit = siteLimit !== null') &&
     !templatesPageSource.includes("You've reached your Free plan limit (3 sites)") &&
-    billingSettingsSource.includes('plan.id === customerPlan'),
-  'expected paid-plan dashboard UI not to present Free as the current capped plan',
+    billingSettingsSource.includes('ADR 0042: usage meters only') &&
+    billingSettingsSource.includes('const siteLimitLabel = siteLimit === null') &&
+    billingSettingsSource.includes('<span>{String(siteCount)} / {siteLimitLabel}</span>') &&
+    !billingSettingsSource.includes('plan.id === customerPlan') &&
+    !billingSettingsSource.includes('plan-now'),
+  'expected paid-plan dashboard UI to honor plan limits while Account stays metering-only',
 );
 
 const publicRouteSource = await readSource('./routes/public.ts');

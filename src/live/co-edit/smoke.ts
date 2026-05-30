@@ -49,6 +49,7 @@ import {
   type WebSocketLike,
   connectCoEdit,
 } from './client.js';
+import { CO_EDIT_BUNDLE } from './bundled.js';
 import {
   Y_SYNC_REMOTE_ORIGIN,
   encodeStateVector,
@@ -68,6 +69,15 @@ function assert(condition: boolean, label: string): void {
   }
   process.stdout.write(`[coedit:smoke] OK   ${label}\n`);
 }
+
+assert(
+  CO_EDIT_BUNDLE.includes('visitorTheme'),
+  'browser bundle preserves visitorTheme through Yjs projection',
+);
+assert(
+  !CO_EDIT_BUNDLE.includes('darkModeEnabled'),
+  'browser bundle no longer references legacy darkModeEnabled',
+);
 
 function assertDeepEqual(actual: unknown, expected: unknown, label: string): void {
   const a = stableStringify(actual);

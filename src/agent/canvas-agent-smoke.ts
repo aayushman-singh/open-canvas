@@ -13,6 +13,8 @@
 // without GEMINI_API_KEY / DATABASE_URL. The route shell is exercised by
 // review-smoke.ts.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { applyCanvasAgentOp, resolveDesignOp, type CanvasAgentOp } from './canvas-ops.js';
 import { CANVAS_AGENT_TOOLS } from './canvas-tools.js';
 import {
@@ -34,6 +36,19 @@ import { parseApplyOp, translateToolCall } from './tool-parsers.js';
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
 }
+
+const canvasAgentRouteSource = readFileSync(
+  join(process.cwd(), 'src', 'routes', 'api', 'canvas-agent.ts'),
+  'utf8',
+);
+assert(
+  canvasAgentRouteSource.includes("setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable')"),
+  'preview/apply route prompt must tell the model to use visitorTheme',
+);
+assert(
+  !canvasAgentRouteSource.includes('setSiteConfig — toggle darkModeEnabled'),
+  'preview/apply route prompt must not mention legacy darkModeEnabled',
+);
 
 // ---------------------------------------------------------------------------
 // Recipe factories cover every SECTION_RECIPE_IDS entry.

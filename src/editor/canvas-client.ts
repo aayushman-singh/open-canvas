@@ -1170,7 +1170,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         { value: "en", label: "en (English)" },
         { value: "ar", label: "ar (Arabic)" },
         { value: "ja", label: "ja (Japanese)" },
-        { value: "zh-Hans", label: "zh-Hans (Chinese simplified)" },
+        { value: "zh-CN", label: "zh-CN (Chinese simplified)" },
         { value: "es", label: "es (Spanish)" },
         { value: "fr", label: "fr (French)" },
         { value: "de", label: "de (German)" },
@@ -4364,6 +4364,41 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
   }
 
+  function findCurrentPageSectionInfo(sectionId) {
+    var page = currentPage();
+    if (!page) return null;
+    for (var i = 0; i < page.sections.length; i++) {
+      if (page.sections[i].id === sectionId) return { page: page, index: i };
+    }
+    return null;
+  }
+
+  function selectableSectionRoles(section) {
+    var roles = ["body"];
+    var sectionInfo = findCurrentPageSectionInfo(section.id);
+    if (!sectionInfo) {
+      if (section.role === "header") return ["header"];
+      if (section.role === "footer") return ["footer"];
+      return roles;
+    }
+    var hasOtherHeader = sectionInfo.page.sections.some(function(candidate) {
+      return candidate.id !== section.id && candidate.role === "header";
+    });
+    if (section.role === "header" || (sectionInfo.index === 0 && !hasOtherHeader)) {
+      roles.push("header");
+    }
+    var hasOtherFooter = sectionInfo.page.sections.some(function(candidate) {
+      return candidate.id !== section.id && candidate.role === "footer";
+    });
+    if (
+      section.role === "footer" ||
+      (sectionInfo.index === sectionInfo.page.sections.length - 1 && !hasOtherFooter)
+    ) {
+      roles.push("footer");
+    }
+    return roles;
+  }
+
   function renderSectionInspector() {
     if (!inspector) return;
     var section = findSection(selectedSectionId);
@@ -4406,7 +4441,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     roleLabel.style.color = "var(--rev01-fg-mute)";
     roleLabel.style.marginBottom = "4px";
     groupIdentity.appendChild(roleLabel);
-    var roleSel = selectInput(["body", "header", "footer"], section.role || "body");
+    var roleSel = selectInput(selectableSectionRoles(section), section.role || "body");
     roleSel.addEventListener("change", function() {
       if (roleSel.value === "body") delete section.role;
       else section.role = roleSel.value;
