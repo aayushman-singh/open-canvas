@@ -533,8 +533,12 @@ assert(
 const dashboardSource = await readSource('./routes/dashboard/index.tsx');
 assert(
   dashboardSource.includes('interface SiteCard') &&
-    dashboardSource.includes('let cards: SiteCard[] = []'),
-  'expected dashboard to model all owned sites as cards, not only one editor link',
+    dashboardSource.includes('function buildCards') &&
+    dashboardSource.includes('): SiteCard[]') &&
+    dashboardSource.includes(
+      'const cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));',
+    ),
+  'expected dashboard to model all owned sites as SiteCard[] rows, not only one editor link',
 );
 assert(
   dashboardSource.includes('cards.map'),
@@ -555,7 +559,8 @@ for (const [name, source] of [
   ['billing settings', billingSettingsSource],
 ] as const) {
   assert(
-    source.includes('plan: customer.plan') && source.includes('siteLimitForPlan(customerPlan)'),
+    source.includes('const customerPlan = customerRecord.plan') &&
+      source.includes('siteLimitForPlan(customerPlan)'),
     `expected ${name} site-limit UI to honor customer.plan instead of hardcoding the Free cap`,
   );
 }
@@ -847,6 +852,16 @@ assert(
 assert(
   canvasClientSource.includes('API_BASE + "/publish/sites/" + SITE_ID'),
   'expected canvas client to POST to the selected publish API base for :siteId',
+);
+assert(
+  canvasClientSource.includes('function localPresenceTextOffset') &&
+    canvasClientSource.includes('range.setStart(editable, 0);') &&
+    canvasClientSource.includes('range.setEnd(anchorNode, boundedOffset);') &&
+    canvasClientSource.includes(
+      'var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);',
+    ) &&
+    !canvasClientSource.includes('offset: sel.anchorOffset | 0'),
+  'expected co-edit presence to publish cumulative editable text offsets, not node-local Selection.anchorOffset values',
 );
 assert(
   canvasApiSource.includes('cannot save: missing assets'),

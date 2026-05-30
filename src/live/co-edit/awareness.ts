@@ -40,7 +40,7 @@ export interface PresenceState {
   /** CSS colour token used for cursor + selection outline. */
   color: string;
   /** Optional caret position — `null` when the peer has no active cursor. */
-  cursor?: { sectionId: string; elementId: string; offset: number } | null;
+  cursor?: { sectionId: string; elementId: string; offset?: number } | null;
   /** Optional selection range — `null` when nothing is selected. */
   selection?: { sectionId: string; elementId: string } | null;
 }
@@ -67,11 +67,7 @@ export function encodeAwareness(awareness: Awareness, clientIds: number[]): Uint
  * forwarded to Awareness observers so peers can distinguish wire-arrived
  * from local-set state.
  */
-export function applyAwareness(
-  awareness: Awareness,
-  update: Uint8Array,
-  origin: unknown,
-): void {
+export function applyAwareness(awareness: Awareness, update: Uint8Array, origin: unknown): void {
   applyAwarenessUpdate(awareness, update, origin);
 }
 

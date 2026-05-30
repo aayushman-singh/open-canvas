@@ -9992,11 +9992,37 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           consumed += len;
           node = walker.nextNode();
         }
-      } catch (_) { /* fall through to bbox */ }
+      } catch (error) {
+        console.warn("[co-edit:presence] remote caret rect failed", { error: error, elementId: elementId, offset: offset });
+      }
     }
     var bb = wrapper.getBoundingClientRect();
     if (bb.height <= 0) return null;
     return { left: bb.left, top: bb.top, height: Math.min(bb.height, 22) };
+  }
+
+  function localPresenceTextOffset(editable, anchorNode, anchorOffset, elementId) {
+    if (!editable || !anchorNode) return null;
+    var anchorRoot = anchorNode.nodeType === 1 ? anchorNode : anchorNode.parentElement;
+    if (!anchorRoot || !editable.contains(anchorRoot)) return null;
+    try {
+      var range = document.createRange();
+      var maxOffset = anchorNode.nodeType === 3
+        ? (anchorNode.nodeValue ? anchorNode.nodeValue.length : 0)
+        : anchorNode.childNodes.length;
+      var boundedOffset = Math.max(0, Math.min(maxOffset, anchorOffset | 0));
+      range.setStart(editable, 0);
+      range.setEnd(anchorNode, boundedOffset);
+      return range.toString().length;
+    } catch (error) {
+      console.warn("[co-edit:presence] local text offset failed", {
+        error: error,
+        elementId: elementId,
+        anchorNodeType: anchorNode.nodeType,
+        anchorOffset: anchorOffset,
+      });
+      return null;
+    }
   }
 
   function repaintRemoteCursors() {
@@ -10039,11 +10065,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         var wrapper = anchorEl ? anchorEl.closest('[data-rev01-element]') : null;
         var sectionNode = anchorEl ? anchorEl.closest('[data-rev01-section]') : null;
         if (wrapper && sectionNode) {
-          cursor = {
-            sectionId: sectionNode.getAttribute('data-rev01-section'),
-            elementId: wrapper.getAttribute('data-rev01-element'),
-            offset: sel.anchorOffset | 0,
-          };
+          var elementId = wrapper.getAttribute('data-rev01-element');
+          var sectionId = sectionNode.getAttribute('data-rev01-section');
+          if (elementId && sectionId) {
+            var editable = wrapper.querySelector('[contenteditable]') || wrapper;
+            var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);
+            cursor = {
+              sectionId: sectionId,
+              elementId: elementId,
+            };
+            if (typeof textOffset === "number") cursor.offset = textOffset;
+          }
         }
       }
       coEditConnection.setPresence({

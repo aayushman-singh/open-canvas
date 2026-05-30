@@ -504,7 +504,9 @@ function Page({
 
         <div class="create-fields">
           <div class="fset">
-            <label class="lbl" for="siteName">Site name</label>
+            <label class="lbl" for="siteName">
+              Site name
+            </label>
             <input
               class="field"
               type="text"
@@ -556,7 +558,9 @@ templatesRoute.get('/:templateId/preview', (c) => {
   if (!template) {
     return c.text('template not found', 404);
   }
-  return c.html(<PreviewPage template={template} turnstileSiteKey={requireTurnstileSiteKey(c.env)} />);
+  return c.html(
+    <PreviewPage template={template} turnstileSiteKey={requireTurnstileSiteKey(c.env)} />,
+  );
 });
 
 templatesRoute.get('/:templateId/assets/:assetId', (c) => {
@@ -592,12 +596,16 @@ templatesRoute.get('/', async (c) => {
     const database = db(c.env);
     // clerkAuth() middleware already loaded the customer row.
     const customerRecord = c.get('customer');
-    const customerId = customerRecord?.id;
-    const customerPlan = customerRecord?.plan ?? 'free';
+    if (!customerRecord) {
+      throw new Error('templates route reached with authenticated user but no customer row');
+    }
+    const customerId = customerRecord.id;
+    const customerPlan = customerRecord.plan;
 
-    const whereClause = customerId
-      ? or(eq(customTemplate.visibility, 'global'), eq(customTemplate.customerId, customerId))
-      : eq(customTemplate.visibility, 'global');
+    const whereClause = or(
+      eq(customTemplate.visibility, 'global'),
+      eq(customTemplate.customerId, customerId),
+    );
 
     const rows = await database
       .select({
@@ -618,16 +626,14 @@ templatesRoute.get('/', async (c) => {
       }
     }
 
-    if (customerId) {
-      const siteLimit = siteLimitForPlan(customerPlan);
-      if (siteLimit !== null) {
-        const countRows = await database
-          .select({ count: sql<number>`count(*)::int` })
-          .from(site)
-          .where(eq(site.customerId, customerId));
-        if ((countRows[0]?.count ?? 0) >= siteLimit) {
-          siteLimitErrorMessage = siteLimitError(customerPlan);
-        }
+    const siteLimit = siteLimitForPlan(customerPlan);
+    if (siteLimit !== null) {
+      const countRows = await database
+        .select({ count: sql<number>`count(*)::int` })
+        .from(site)
+        .where(eq(site.customerId, customerId));
+      if ((countRows[0]?.count ?? 0) >= siteLimit) {
+        siteLimitErrorMessage = siteLimitError(customerPlan);
       }
     }
   }
