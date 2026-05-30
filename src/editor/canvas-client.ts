@@ -1109,6 +1109,270 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
+  // AI media modal: prompt textarea + aspect-ratio radio row + 4-up preview
+  // gallery. requestFn(prompt, aspectRatio) is called four times in
+  // parallel when the Owner clicks "Generate with AI"; each promise resolves
+  // to { blob, mediaType }. Picking a tile resolves the outer promise with
+  // { blob, mediaType, aspectRatio, prompt }. Cancel resolves with null.
+  // Aspect picker offers 1:1, 16:9, 4:3, 9:16 — the existing single-shot
+  // path snapped boxW/boxH to a Flux preset; this modal hands control to
+  // the Owner instead.
+  function openAiMediaModal(opts) {
+    if (modalOpen) {
+      throw new Error("openAiMediaModal: another modal is already open");
+    }
+    var title = typeof opts.title === "string" ? opts.title : "AI media";
+    var defaultPrompt = typeof opts.defaultPrompt === "string" ? opts.defaultPrompt : "";
+    var requestFn = typeof opts.requestFn === "function" ? opts.requestFn : null;
+    if (!requestFn) {
+      throw new Error("openAiMediaModal: requestFn is required");
+    }
+    var aspectOptions = [
+      { label: "1:1", value: "1:1" },
+      { label: "16:9", value: "16:9" },
+      { label: "4:3", value: "4:3" },
+      { label: "9:16", value: "9:16" }
+    ];
+    var defaultAspect = typeof opts.defaultAspect === "string" ? opts.defaultAspect : "1:1";
+    var selectedAspect = defaultAspect;
+    modalOpen = true;
+    return new Promise(function(resolve) {
+      var backdrop = document.createElement("div");
+      backdrop.className = "rev01-modal-backdrop";
+      var panel = document.createElement("div");
+      panel.className = "rev01-modal";
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      panel.setAttribute("aria-label", title);
+      panel.style.minWidth = "440px";
+      panel.style.maxWidth = "560px";
+
+      var h = document.createElement("h3");
+      h.textContent = title;
+      panel.appendChild(h);
+
+      var promptLabel = document.createElement("label");
+      promptLabel.textContent = "Describe the image";
+      panel.appendChild(promptLabel);
+      var promptInput = document.createElement("textarea");
+      promptInput.rows = 3;
+      promptInput.placeholder = "Sunset over ocean";
+      promptInput.value = defaultPrompt;
+      panel.appendChild(promptInput);
+
+      var aspectLabel = document.createElement("label");
+      aspectLabel.textContent = "Aspect ratio";
+      panel.appendChild(aspectLabel);
+
+      var aspectRow = document.createElement("div");
+      aspectRow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
+      var aspectButtons = [];
+      function paintAspect() {
+        for (var i = 0; i < aspectButtons.length; i++) {
+          var b = aspectButtons[i];
+          var on = b.getAttribute("data-aspect") === selectedAspect;
+          b.style.background = on ? "var(--red)" : "var(--surface)";
+          b.style.color = on ? "#fff" : "var(--ink-2)";
+          b.style.borderColor = on ? "var(--red)" : "var(--line-2)";
+          b.setAttribute("aria-pressed", on ? "true" : "false");
+        }
+      }
+      for (var ai = 0; ai < aspectOptions.length; ai++) {
+        (function(option) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.textContent = option.label;
+          btn.setAttribute("data-aspect", option.value);
+          btn.setAttribute("role", "radio");
+          btn.style.cssText =
+            "appearance:none;font:inherit;font-family:var(--sans);font-weight:650;" +
+            "font-size:13px;padding:7px 14px;border-radius:var(--r-pill);cursor:pointer;" +
+            "background:var(--surface);border:1.5px solid var(--line-2);color:var(--ink-2);" +
+            "transition:border-color .15s,background-color .15s,color .15s;";
+          btn.addEventListener("click", function() {
+            selectedAspect = option.value;
+            paintAspect();
+          });
+          aspectButtons.push(btn);
+          aspectRow.appendChild(btn);
+        })(aspectOptions[ai]);
+      }
+      paintAspect();
+      panel.appendChild(aspectRow);
+
+      // Generate row: button + status line.
+      var genRow = document.createElement("div");
+      genRow.style.cssText = "display:flex;gap:10px;align-items:center;margin-top:4px;";
+      var genBtn = document.createElement("button");
+      genBtn.type = "button";
+      genBtn.textContent = "Generate with AI";
+      genBtn.style.cssText =
+        "appearance:none;font:inherit;font-family:var(--sans);font-weight:650;font-size:13.5px;" +
+        "padding:9px 18px;border-radius:var(--r-pill);cursor:pointer;background:var(--red);" +
+        "border:1.5px solid var(--red);color:#fff;box-shadow:var(--shadow-red);transition:background-color .15s,transform .12s;";
+      var genStatus = document.createElement("span");
+      genStatus.style.cssText = "font-size:12.5px;color:var(--ink-3);";
+      genRow.appendChild(genBtn);
+      genRow.appendChild(genStatus);
+      panel.appendChild(genRow);
+
+      // 4-up gallery host — hidden until the first generate fires.
+      var galleryLabel = document.createElement("label");
+      galleryLabel.textContent = "Pick one";
+      galleryLabel.style.display = "none";
+      panel.appendChild(galleryLabel);
+      var gallery = document.createElement("div");
+      gallery.style.cssText =
+        "display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;margin-top:4px;";
+      panel.appendChild(gallery);
+
+      // Tile object URLs we need to revoke on close (whether by cancel or
+      // by pick — we keep only the chosen one alive via a fresh URL on the
+      // resolver side and let the caller manage it).
+      var liveTiles = [];
+      function clearGallery() {
+        for (var t = 0; t < liveTiles.length; t++) {
+          var u = liveTiles[t];
+          if (u) URL.revokeObjectURL(u);
+        }
+        liveTiles = [];
+        while (gallery.firstChild) gallery.removeChild(gallery.firstChild);
+        galleryLabel.style.display = "none";
+      }
+
+      function makeTile(index, payload, promptText, aspect) {
+        var url = URL.createObjectURL(payload.blob);
+        liveTiles[index] = url;
+        var tile = document.createElement("button");
+        tile.type = "button";
+        tile.style.cssText =
+          "appearance:none;padding:0;border:2px solid var(--line-2);border-radius:var(--r-sm);" +
+          "overflow:hidden;cursor:pointer;background:var(--surface);transition:border-color .15s,transform .12s;";
+        tile.addEventListener("mouseenter", function() { tile.style.borderColor = "var(--red)"; });
+        tile.addEventListener("mouseleave", function() { tile.style.borderColor = "var(--line-2)"; });
+        var img = document.createElement("img");
+        img.src = url;
+        img.alt = "AI preview " + (index + 1);
+        img.style.cssText = "display:block;width:100%;height:auto;";
+        tile.appendChild(img);
+        tile.addEventListener("click", function() {
+          // Hand the chosen blob back to the caller. We deliberately do NOT
+          // revoke this tile's URL — the caller is free to use it; the rest
+          // are revoked on close.
+          liveTiles[index] = null;
+          close({
+            blob: payload.blob,
+            mediaType: payload.mediaType,
+            aspectRatio: aspect,
+            prompt: promptText
+          });
+        });
+        gallery.appendChild(tile);
+      }
+
+      function makeFailureTile(index, err) {
+        var tile = document.createElement("div");
+        tile.style.cssText =
+          "border:1.5px dashed var(--line-2);border-radius:var(--r-sm);padding:14px;" +
+          "display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--red-ink);" +
+          "min-height:80px;text-align:center;";
+        tile.textContent = "Failed: " + (err && err.message ? err.message : String(err));
+        gallery.appendChild(tile);
+      }
+
+      var generating = false;
+      genBtn.addEventListener("click", function() {
+        if (generating) return;
+        var promptText = promptInput.value.trim();
+        if (promptText.length === 0) {
+          genStatus.textContent = "Enter a prompt first";
+          genStatus.style.color = "var(--red-ink)";
+          promptInput.focus();
+          return;
+        }
+        generating = true;
+        genBtn.disabled = true;
+        var prev = genBtn.textContent;
+        genBtn.textContent = "Generating...";
+        genStatus.textContent = "Asking the model for 4 previews";
+        genStatus.style.color = "var(--ink-3)";
+        clearGallery();
+        galleryLabel.style.display = "";
+
+        var aspectAtRequest = selectedAspect;
+        var calls = [];
+        for (var i = 0; i < 4; i++) {
+          calls.push(requestFn(promptText, aspectAtRequest));
+        }
+        Promise.all(calls.map(function(p) {
+          return p.then(
+            function(r) { return { ok: true, value: r }; },
+            function(e) { return { ok: false, error: e }; }
+          );
+        })).then(function(results) {
+          generating = false;
+          genBtn.disabled = false;
+          genBtn.textContent = prev;
+          var okCount = 0;
+          for (var i = 0; i < results.length; i++) {
+            var r = results[i];
+            if (r.ok) {
+              makeTile(i, r.value, promptText, aspectAtRequest);
+              okCount++;
+            } else {
+              makeFailureTile(i, r.error);
+            }
+          }
+          if (okCount === 0) {
+            genStatus.textContent = "All previews failed";
+            genStatus.style.color = "var(--red-ink)";
+          } else if (okCount < 4) {
+            genStatus.textContent = okCount + " of 4 previews ready";
+            genStatus.style.color = "var(--ink-3)";
+          } else {
+            genStatus.textContent = "Pick one to apply";
+            genStatus.style.color = "var(--ink-3)";
+          }
+        });
+      });
+
+      var actions = document.createElement("div");
+      actions.className = "rev01-modal-actions";
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      actions.appendChild(cancel);
+      panel.appendChild(actions);
+
+      backdrop.appendChild(panel);
+
+      function close(value) {
+        document.removeEventListener("keydown", onKey, true);
+        clearGallery();
+        if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
+        document.body.classList.remove("rev01-modal-open");
+        modalOpen = false;
+        resolve(value);
+      }
+      function onKey(ev) {
+        if (ev.key === "Escape") {
+          ev.preventDefault();
+          ev.stopPropagation();
+          close(null);
+        }
+      }
+      backdrop.addEventListener("click", function(ev) {
+        if (ev.target === backdrop) close(null);
+      });
+      cancel.addEventListener("click", function() { close(null); });
+      document.addEventListener("keydown", onKey, true);
+
+      document.body.classList.add("rev01-modal-open");
+      document.body.appendChild(backdrop);
+      promptInput.focus();
+    });
+  }
+
   // Modal for the "+ New Page" flow (ADR 0034). Collects title, slug,
   // and locale up front so the new page lands fully-formed instead of
   // the previous instant-create flow that named the page "Page N" and
@@ -8457,6 +8721,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     runAiPreview(prompt);
   }
 
+  // Map the modal's aspect ratio choice to a synthetic boxW/boxH pair so the
+  // /assets/generate server (which snaps box ratio to a Flux preset) lands
+  // on the exact preset the Owner picked. We keep the server contract
+  // unchanged — no new aspect_ratio field on the wire — so the existing
+  // single-shot generation path and tests stay valid.
+  function aspectRatioToBox(aspect) {
+    if (aspect === "1:1") return { w: 1024, h: 1024 };
+    if (aspect === "16:9") return { w: 1024, h: 576 };
+    if (aspect === "4:3") return { w: 1024, h: 768 };
+    if (aspect === "9:16") return { w: 576, h: 1024 };
+    return { w: 1024, h: 1024 };
+  }
+
   async function aiReplaceMedia(elementId) {
     if (aiBusy) return;
     const found = findElement(elementId);
@@ -8464,14 +8741,56 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus("AI generation supports image elements only", "error");
       return;
     }
-    const brief = await openTextModal({
+    const element = found.element;
+    const altInputId = "media-upload-alt-" + element.id;
+    function readAltValue() {
+      var altInput = document.getElementById(altInputId);
+      return altInput && typeof altInput.value === "string" ? altInput.value : (element.alt || "");
+    }
+
+    // requestFn invoked four times in parallel by the modal. Each call hits
+    // the same /assets/generate route the single-shot path uses; only the
+    // synthesised box dimensions change to steer Flux toward the chosen
+    // aspect preset.
+    async function requestOne(prompt, aspectRatio) {
+      var box = aspectRatioToBox(aspectRatio);
+      var altValue = readAltValue();
+      var response = await authFetch(SITE_BASE + "/assets/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt,
+          alt: altValue,
+          boxW: box.w,
+          boxH: box.h
+        }),
+      });
+      if (!response.ok) {
+        var detail = response.statusText;
+        try {
+          var errBody = await response.json();
+          if (errBody && errBody.error) detail = errBody.error;
+        } catch (_) { /* ignore */ }
+        throw new Error(detail);
+      }
+      var mediaType = response.headers.get("content-type") || "image/webp";
+      if (!mediaType.startsWith("image/")) {
+        throw new Error("server did not return image bytes");
+      }
+      var blob = await response.blob();
+      return { blob: blob, mediaType: mediaType };
+    }
+
+    const picked = await openAiMediaModal({
       title: "AI media",
-      label: "Describe the image",
-      placeholder: "Sunset over ocean",
-      multiline: true,
+      defaultPrompt: "",
+      requestFn: requestOne,
     });
-    if (brief === null || brief.trim().length === 0) return;
-    await generateImageForElement(found.element, brief.trim());
+    if (!picked) return;
+    // Reuse the existing preview-in-inspector flow so the chosen image
+    // follows the same Apply / Discard path as the single-shot generator.
+    showGeneratePreview(element, picked.blob, picked.mediaType, readAltValue());
+    setStatus("Preview ready — Apply to save", "ok");
   }
 
   async function aiCreateSection(afterSectionId) {
