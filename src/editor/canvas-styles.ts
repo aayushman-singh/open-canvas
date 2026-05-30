@@ -544,33 +544,52 @@ body.rev01-modal-open {
   border-right: none;
 }
 /* Keep the sidebar contents themselves clipped while collapsed — only
-   the .sidebar-toggle (positioned at right:-20px) should remain visible
-   so the user can re-open the sidebar. */
+   the .sidebar-toggle (position: fixed, escapes the sidebar's overflow)
+   should remain visible so the user can re-open the sidebar. */
 .rev01-editor-sidebar.collapsed > :not(.sidebar-toggle) {
   display: none;
 }
+/* The .sidebar-toggle is position:fixed rather than absolute-inside the
+   sidebar because the sidebar uses overflow-x:hidden to clip its own
+   contents during scroll — that overflow rule would also clip a toggle
+   positioned at right:-20px, so the toggle would only be visible while
+   the sidebar was already collapsed (overflow:visible). Mirroring the
+   right-side .inspector-toggle pattern, the toggle now lives at the
+   viewport edge of the sidebar's right boundary and shifts to left:0
+   when the sidebar collapses. */
 .sidebar-toggle {
-  position: absolute;
-  top: 8px;
-  right: -20px;
+  position: fixed;
+  top: 66px;
+  left: 360px;
   width: 20px;
   height: 32px;
-  z-index: 151;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  z-index: 152;
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
   border-left: none;
   border-radius: 0 var(--r-xs) var(--r-xs) 0;
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 14px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: color 0.14s, background-color 0.14s;
+  transition: left 0.15s ease, color 0.14s, background-color 0.14s;
 }
-.sidebar-toggle:hover { color: var(--ink); background: var(--surface-2); }
+.sidebar-toggle:hover { color: var(--ink); background: var(--surface-3); }
+.rev01-editor-sidebar.collapsed .sidebar-toggle { left: 0; }
 .rev01-viewport.sidebar-collapsed { margin-left: 0; }
+/* When the inspector is collapsed or hidden, the viewport reclaims the
+   320px right gutter — otherwise the body's --rev01-bg shows through
+   that strip and reads as a persistent white panel residue against the
+   canvas. Driven by :has() (not a viewport class) because inspector
+   hidden/collapsed state flips from many call sites in canvas-client.ts
+   — letting CSS observe the inspector directly avoids drift. */
+.rev01-editor:has(#canvas-inspector[hidden]) .rev01-viewport,
+.rev01-editor:has(#canvas-inspector.collapsed) .rev01-viewport {
+  margin-right: 0;
+}
 
 /* Sidebar tabs (.tabs in editor.html) — flat row, underline-on-active
    in brand red. Sans not mono so the tab labels feel like nav, not data. */
@@ -1404,11 +1423,11 @@ body[data-placement-active="true"] .rev01-section-slot {
   width: 20px;
   height: 32px;
   z-index: 152;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border: 1px solid var(--line-2);
   border-right: none;
   border-radius: var(--r-xs) 0 0 var(--r-xs);
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: 14px;
   cursor: pointer;
   display: flex;
@@ -1417,7 +1436,7 @@ body[data-placement-active="true"] .rev01-section-slot {
   padding: 0;
   transition: right 0.15s ease, color 0.14s, background-color 0.14s;
 }
-.inspector-toggle:hover { color: var(--ink); background: var(--surface-2); }
+.inspector-toggle:hover { color: var(--ink); background: var(--surface-3); }
 #canvas-inspector.collapsed ~ .inspector-toggle,
 #canvas-inspector[hidden] ~ .inspector-toggle {
   right: 0;

@@ -6405,6 +6405,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Selection & inline edit -------------------------------------------
 
+  // Force-open the right inspector. Called by user-initiated selection
+  // paths (link popover Inspector / Edit-nav buttons, double-click on an
+  // element) so the inspector content the click produces is actually
+  // visible, regardless of whether the inspector was collapsed or hidden.
+  // Syncs the inspector-toggle arrow so the click affordance still reads
+  // correctly after the force-open.
+  function forceOpenInspector() {
+    if (!inspector) return;
+    inspector.hidden = false;
+    inspector.classList.remove("collapsed");
+    var toggle = document.getElementById("inspector-toggle");
+    if (toggle) toggle.textContent = "›";
+  }
+
   function selectElement(elementId) {
     if (selectedElementId === elementId) return;
     if (selectedElementId) {
@@ -7369,7 +7383,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ev.preventDefault();
         var ownerId = parentElementIdOf(anchorEl);
         removeLinkPopover();
-        if (ownerId) selectElement(ownerId);
+        if (ownerId) {
+          selectElement(ownerId);
+          forceOpenInspector();
+        }
       });
       topRow.appendChild(navEditBtn);
     } else if (kind === 'action') {
@@ -7386,7 +7403,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ev.preventDefault();
         var ownerId = parentElementIdOf(anchorEl);
         removeLinkPopover();
-        if (ownerId) selectElement(ownerId);
+        if (ownerId) {
+          selectElement(ownerId);
+          forceOpenInspector();
+        }
       });
       topRow.appendChild(inspBtn);
     }
