@@ -37,6 +37,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Proposed | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
 | 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Proposed | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
 | 0030 | Audit re-run button reads "Run audit" | Accepted | [`docs/adr/0030-audit-button-label-run-audit.md`](0030-audit-button-label-run-audit.md) |
+| 0038 | Snapshot preview is a server-rendered sandboxed iframe via srcdoc | Accepted | [`docs/adr/0038-snapshot-preview-iframe.md`](0038-snapshot-preview-iframe.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
