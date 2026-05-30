@@ -476,25 +476,32 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     // After removing the page, action elements that linked TO it via
     // { type: 'page', pageId } would be left dangling — validate.ts:194
     // rejects this as "must reference an existing page" and the entire
-    // /apply call 400s. Pass-7 retest hit this: footer "View customers"
-    // CTA referenced the deleted /customers page. Rewriting to a
-    // type:'external' href that points at "#" preserves the button so
-    // the Owner can re-link or delete it; auto-routing to another page
-    // would silently lose intent. The rewrite walks all REMAINING
-    // pages — the deleted one is already gone.
+    // /apply call 400s. Pass-7 retest hit this on a footer "View
+    // customers" CTA; Pass-8 retest re-hit it because the previous
+    // walker only visited next.pages[*].sections[*].elements[*] and
+    // missed EditableSite.footer + EditableSite.header (both are
+    // top-level CanvasSections shared across pages — schema.ts:399,
+    // 401). The corrected walker also visits those two. Rewriting to
+    // a type:'external' href that points at "#" preserves the button
+    // so the Owner can re-link or delete it; auto-routing to another
+    // page would silently lose intent.
     const deletedPageId = op.pageId;
+    const sectionsToScan: CanvasSection[] = [];
     for (const page of next.pages) {
-      for (const section of page.sections) {
-        for (const element of section.elements) {
-          if (
-            element.type === 'action' &&
-            typeof element.href === 'object' &&
-            element.href !== null &&
-            element.href.type === 'page' &&
-            element.href.pageId === deletedPageId
-          ) {
-            element.href = { type: 'external', url: '#' };
-          }
+      for (const section of page.sections) sectionsToScan.push(section);
+    }
+    if (next.header) sectionsToScan.push(next.header);
+    if (next.footer) sectionsToScan.push(next.footer);
+    for (const section of sectionsToScan) {
+      for (const element of section.elements) {
+        if (
+          element.type === 'action' &&
+          typeof element.href === 'object' &&
+          element.href !== null &&
+          element.href.type === 'page' &&
+          element.href.pageId === deletedPageId
+        ) {
+          element.href = { type: 'external', url: '#' };
         }
       }
     }

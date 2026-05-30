@@ -411,7 +411,20 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
           const config: Record<string, string> = sa?.config ?? {};
 
           return (
-            <div class="addon" data-addon-form={addon.id}>
+            // Real <form> (not a <div>) so form.checkValidity() in
+            // clientScript() has a working validator. Pass-7 retest hit
+            // this: the previous div-with-data-addon-form was a no-op for
+            // the HTML5 validity API and bad measurementIds slipped through
+            // to "Saved." Real form preserves the same selector behaviour
+            // (querySelector('[data-addon-form]')) and adds working
+            // checkValidity/reportValidity. The Save button is
+            // type="button" so submit-on-Enter is suppressed; the existing
+            // JS click handler stays the canonical save path.
+            <form
+              class="addon"
+              data-addon-form={addon.id}
+              onsubmit="event.preventDefault();return false;"
+            >
               <AddonIcon glyph={glyph} />
               <h3>{addon.name}</h3>
               <p class="tag">{addon.tagline}</p>
@@ -477,7 +490,7 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
                   </div>
                 </div>
               )}
-            </div>
+            </form>
           );
         })}
       </div>

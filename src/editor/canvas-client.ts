@@ -9425,7 +9425,30 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ev.stopPropagation();
         return;
       }
-      const elementNode = target.closest('.rev01-element');
+      let elementNode = target.closest('.rev01-element');
+      // Hit-test fallback for widgets whose content overflows the wrapper.
+      // Pass-8 retest showed table/form/carousel still bounced to the
+      // section inspector despite the CSS pointer-events shield: their
+      // inner content (form's <input>, table's <td>, carousel's
+      // transform-positioned slides) renders OUTSIDE the wrapper's
+      // bounding box. pointer-events:none on those descendants forwards
+      // the click to the visually-behind element — which is the section,
+      // not the wrapper. closest() walking up from the section never
+      // finds .rev01-element. Doing a coordinate-based hit test with
+      // elementsFromPoint catches the case: the wrapper IS in the stack
+      // at the click coordinate even when it's not in the closest()
+      // walk path. Cheap (single call per click) and only runs on the
+      // fallback path.
+      if (!elementNode && typeof document.elementsFromPoint === 'function') {
+        const stack = document.elementsFromPoint(ev.clientX, ev.clientY);
+        for (let si = 0; si < stack.length; si++) {
+          const candidate = stack[si];
+          if (candidate instanceof Element && candidate.matches('.rev01-element')) {
+            elementNode = candidate;
+            break;
+          }
+        }
+      }
       if (elementNode) {
         const id = elementNode.getAttribute('data-rev01-element');
         if (!id) return;

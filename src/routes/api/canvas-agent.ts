@@ -371,9 +371,57 @@ canvasAgentApi.post('/sites/:siteId/apply', async (c) => {
   } else {
     return c.json({ error: 'body must be { ops: CanvasAgentOp[] }' }, 400);
   }
+
+  // Slug→id lookup used to normalise legacy deletePage payloads. Pass-8
+  // retest showed the LLM and the chat client both sometimes emit
+  // `params: { pageSlug: 'customers' }` instead of `params: { pageId:
+  // 'page-wf-customers' }`. The tool schema says pageId is required;
+  // tightening the model prompt would not catch every flake. Resolving
+  // here means the apply layer keeps its single canonical shape while
+  // the wire boundary tolerates either field.
+  const slugToPageId = new Map<string, string>();
+  for (const page of row.editableState.pages) {
+    if (typeof page.slug === 'string' && page.slug.length > 0) {
+      slugToPageId.set(page.slug, page.id);
+    }
+  }
+  function normalisePageRef(candidate: unknown): unknown {
+    if (!isRecord(candidate)) return candidate;
+    // Canonical shape with a stray pageSlug instead of pageId.
+    if (
+      candidate.kind === 'deletePage' &&
+      typeof (candidate as { pageSlug?: unknown }).pageSlug === 'string' &&
+      typeof (candidate as { pageId?: unknown }).pageId !== 'string'
+    ) {
+      const slug = (candidate as { pageSlug: string }).pageSlug;
+      const resolved = slugToPageId.get(slug);
+      if (resolved) {
+        const next = { ...candidate, pageId: resolved };
+        delete (next as { pageSlug?: unknown }).pageSlug;
+        return next;
+      }
+    }
+    // Legacy tool shape with params.pageSlug.
+    if (
+      candidate.tool === 'deletePage' &&
+      isRecord(candidate.params) &&
+      typeof (candidate.params as { pageSlug?: unknown }).pageSlug === 'string' &&
+      typeof (candidate.params as { pageId?: unknown }).pageId !== 'string'
+    ) {
+      const slug = (candidate.params as { pageSlug: string }).pageSlug;
+      const resolved = slugToPageId.get(slug);
+      if (resolved) {
+        const nextParams = { ...candidate.params, pageId: resolved };
+        delete (nextParams as { pageSlug?: unknown }).pageSlug;
+        return { ...candidate, params: nextParams };
+      }
+    }
+    return candidate;
+  }
+
   const ops: CanvasAgentOp[] = [];
   for (let i = 0; i < opsCandidate.length; i++) {
-    const candidate = opsCandidate[i];
+    const candidate = normalisePageRef(opsCandidate[i]);
     const isLegacyToolShape =
       isRecord(candidate) &&
       typeof candidate.tool === 'string' &&
@@ -381,8 +429,10 @@ canvasAgentApi.post('/sites/:siteId/apply', async (c) => {
     const parsed = isLegacyToolShape
       ? translateToolCall({
           id: '',
-          name: candidate.tool as string,
-          arguments: isRecord(candidate.params) ? candidate.params : {},
+          name: (candidate as { tool: string }).tool,
+          arguments: isRecord((candidate as { params?: unknown }).params)
+            ? ((candidate as { params: Record<string, unknown> }).params)
+            : {},
         })
       : parseApplyOp(candidate, row.styleKit);
     if (!parsed.ok) {

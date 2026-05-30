@@ -62,17 +62,29 @@ router.post('/:siteId/:formElementId', async (c) => {
     return c.json({ error: 'siteId and formElementId required' }, 400);
   }
 
-  let rawFields: Record<string, string | string[]>;
+  // Outer try/catch: Pass-8 retest hit "Internal Server Error" with no JSON
+  // body. That's Workers' default 500 response when an exception escapes the
+  // route handler — no triage hint reaches the operator. The wrap below
+  // turns every uncaught throw into a 500 JSON body with the failing step
+  // labelled. Each step (rawFields parse, turnstile, handleFormSubmit, post-
+  // submit email) records its name in `phase` before doing async work, so a
+  // throw fingerprints itself. The structured response stays inside the
+  // "fail loud" rule — it adds detail, doesn't degrade behaviour.
+  let phase = 'init';
   try {
-    rawFields = await collectFormFields(c.req.raw);
-  } catch {
-    return c.json({ error: 'unsupported content type; use multipart/form-data or application/x-www-form-urlencoded' }, 415);
-  }
-  const turnstileToken = pickStringField(rawFields, 'cf-turnstile-response', '');
-  const ip = c.req.header('cf-connecting-ip') ?? null;
-  const userAgent = c.req.header('user-agent') ?? '';
+    let rawFields: Record<string, string | string[]>;
+    try {
+      phase = 'parse-fields';
+      rawFields = await collectFormFields(c.req.raw);
+    } catch {
+      return c.json({ error: 'unsupported content type; use multipart/form-data or application/x-www-form-urlencoded' }, 415);
+    }
+    const turnstileToken = pickStringField(rawFields, 'cf-turnstile-response', '');
+    const ip = c.req.header('cf-connecting-ip') ?? null;
+    const userAgent = c.req.header('user-agent') ?? '';
 
-  const outcome = await handleFormSubmit(
+    phase = 'handleFormSubmit';
+    const outcome = await handleFormSubmit(
     {
       db: db(c.env),
       formRateLimiter: c.env.FORM_RATE_LIMITER,
@@ -109,6 +121,7 @@ router.post('/:siteId/:formElementId', async (c) => {
   // no alternative behaviour being substituted — the email simply
   // didn't go out, which is the truth.
   if (outcome.status === 'ok') {
+    phase = 'owner-email-notify';
     try {
       const database = db(c.env);
       const ownerRow = await database
@@ -141,7 +154,33 @@ router.post('/:siteId/:formElementId', async (c) => {
     }
   }
 
-  return outcomeToResponse(c, outcome, siteId, formElementId, rawFields);
+    phase = 'outcomeToResponse';
+    return outcomeToResponse(c, outcome, siteId, formElementId, rawFields);
+  } catch (err) {
+    // Loud structured 500: tells the operator which phase threw, what the
+    // message was, and includes a fragment of the stack. Pass-8 retest's
+    // bare "Internal Server Error" gave zero triage signal; this body
+    // surfaces the actual failing step so the next iteration knows
+    // whether to look at handleFormSubmit, Turnstile verification, the
+    // outcome serialiser, or somewhere upstream.
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error && err.stack ? err.stack.slice(0, 1500) : undefined;
+    console.error('[forms/route] form-submit uncaught throw', {
+      siteId,
+      formElementId,
+      phase,
+      message,
+      stack,
+    });
+    return c.json(
+      {
+        error: 'form-submit failed',
+        phase,
+        detail: message,
+      },
+      500,
+    );
+  }
 });
 
 function pickStringField(
