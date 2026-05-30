@@ -28,7 +28,7 @@ import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
-import { addonEntitlement, customer, site, siteAddon } from '../../db/schema';
+import { addonEntitlement, site, siteAddon } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { readThemeCookie } from '../../ui';
 import { allAddons } from '../../addons/registry';
@@ -304,12 +304,8 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
   const siteId = c.req.param('siteId');
   const database = db(c.env);
 
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
+  // clerkAuth() middleware already loaded the customer row.
+  const customerId = c.get('customer')?.id;
   if (!customerId) return c.text('not found', 404);
 
   const siteRow = await database

@@ -3,10 +3,9 @@ import { raw } from 'hono/html';
 import { eq, count, sum } from 'drizzle-orm';
 import { siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, site, ownerAsset } from '../../db/schema';
+import { site, ownerAsset } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
@@ -199,40 +198,40 @@ settingsRoute.get('/settings', async (c) => {
   if (!user) {
     throw new Error('settings page reached without a resolved user');
   }
+  // clerkAuth() middleware already upserted + loaded the customer row; reading
+  // it from context saves the upsert round trip and the redundant SELECT that
+  // used to live here.
+  const customerRecord = c.get('customer');
+  if (!customerRecord) {
+    throw new Error('settings page reached without a resolved customer');
+  }
 
   const database = db(c.env);
-  const { email: primaryEmail } = await upsertCustomerFromClerk(database, user);
-
-  const customerRow = await database
-    .select({ id: customer.id, displayName: customer.displayName, plan: customer.plan })
-    .from(customer)
-    .where(eq(customer.clerkUserId, user.id))
-    .limit(1);
-  const customerRecord = customerRow[0];
-  const customerId = customerRecord?.id;
+  const primaryEmail = customerRecord.email;
+  const customerId = customerRecord.id;
   // Per ADR 0042: the customer.plan column still exists (cohorts seeded
   // by ADR 0009 / migration 0007), but the Account surface no longer
   // exposes billing — no plan tiles, no invoices, no upgrade prompts.
   // We still read the plan to drive the *limits* the meters render
   // against (siteLimitForPlan / storageLimitForPlan), because the
   // limit is a real product constraint enforced at write time.
-  const customerPlan = customerRecord?.plan ?? 'free';
+  const customerPlan = customerRecord.plan;
 
-  let siteCount = 0;
-  let storageBytes = 0;
-  if (customerId) {
-    const sc = await database
+  // Sites count + storage sum are independent; running them in parallel halves
+  // the Neon round trips this page pays. Over the HTTP driver each query is a
+  // fresh HTTPS request, so serial waits stack visibly in the page open time.
+  const [sc, sb] = await Promise.all([
+    database
       .select({ count: count() })
       .from(site)
-      .where(eq(site.customerId, customerId));
-    siteCount = sc[0]?.count ?? 0;
-
-    const sb = await database
+      .where(eq(site.customerId, customerId)),
+    database
       .select({ total: sum(ownerAsset.byteSize) })
       .from(ownerAsset)
-      .where(eq(ownerAsset.customerId, customerId));
-    storageBytes = Number(sb[0]?.total ?? 0);
-  }
+      .where(eq(ownerAsset.customerId, customerId)),
+  ]);
+  const siteCount = sc[0]?.count ?? 0;
+  const storageBytes = Number(sb[0]?.total ?? 0);
 
   const siteLimit = siteLimitForPlan(customerPlan);
   const storageBytesLimit = storageLimitForPlan(customerPlan);
@@ -251,7 +250,7 @@ settingsRoute.get('/settings', async (c) => {
   const storageTone = fillTone(storageFillPct);
 
   const avatarUrl = user.imageUrl;
-  const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
+  const displayName = customerRecord.displayName ?? user.firstName ?? undefined;
   const initial = (displayName ?? primaryEmail ?? '?').charAt(0).toUpperCase();
 
   return c.html(

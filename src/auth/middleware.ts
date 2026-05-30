@@ -4,7 +4,7 @@ import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
-import { site } from '../db/schema';
+import { site, type Customer } from '../db/schema';
 import {
   authorizedParties,
   cookieName,
@@ -41,6 +41,12 @@ export type ClerkAuthVariables = {
   auth: AuthState;
   user: User | null;
   clerk: ReturnType<typeof createClerkClient>;
+  // Set by clerkAuth() after upsertCustomerFromClerk; null on editTokenAuth
+  // paths (the /__api/* edit popup flow doesn't need the customer row).
+  // Routes that previously did `await db.select(...).from(customer).where(
+  // eq(customer.clerkUserId, user.id))` should read c.get('customer') instead
+  // — the row is already populated and one Neon round trip cheaper.
+  customer: Customer | null;
 };
 
 type ClerkKeyPair = {
@@ -269,10 +275,14 @@ export function clerkAuth() {
     // this lived only in three dashboard handlers (index, profile, settings),
     // so a fresh Clerk sign-up that hit any other route first wedged at
     // requireOwnerContext (no customer row -> 403 forever). Centralising it
-    // here removes that latent lockout. The dashboard callers still upsert
-    // themselves for their email-return value; those calls are now redundant
-    // and can be replaced with a context read in a follow-up.
-    await upsertCustomerFromClerk(db(c.env), user);
+    // here removes that latent lockout.
+    //
+    // The upsert RETURNs the full row; we stash it on the request context so
+    // downstream handlers can `c.get('customer')` instead of issuing a second
+    // SELECT against the same row. That removes two Neon round trips per
+    // dashboard request (the duplicate upsert and the redundant SELECT).
+    const customerRow = await upsertCustomerFromClerk(db(c.env), user);
+    c.set('customer', customerRow);
 
     await next();
   });
@@ -356,6 +366,11 @@ export function editTokenAuth() {
       getToken: null,
     });
     c.set('user', null);
+    // editTokenAuth deliberately does not load the customer row — the
+    // /__api/* edit popup flow operates on a site id resolved from the edit
+    // token, not on customer-scoped queries. Routes that need the customer
+    // here can still SELECT explicitly; the absence is loud, not silent.
+    c.set('customer', null);
 
     await next();
   });

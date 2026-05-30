@@ -24,7 +24,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { EditableSite } from '../../canvas/schema';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { site } from '../../db/schema';
 import { runAudit, type AuditIssue } from '../../a11y/audit';
 import type { Severity } from '../../a11y/severity';
 
@@ -169,18 +169,10 @@ interface OwnedSiteRow {
 
 async function lookupOwnedSite(
   env: Bindings,
-  clerkUserId: string,
+  customerId: string,
   siteId: string,
 ): Promise<OwnedSiteRow | null> {
   const database = db(env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, clerkUserId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return null;
-
   const rows = await database
     .select({
       id: site.id,
@@ -379,7 +371,9 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
   const siteId = c.req.param('siteId');
   if (!siteId) return c.text('site not found', 404);
 
-  const owned = await lookupOwnedSite(c.env, auth.userId, siteId);
+  const customerId = c.get('customer')?.id;
+  if (!customerId) return c.text('site not found', 404);
+  const owned = await lookupOwnedSite(c.env, customerId, siteId);
   if (!owned) return c.text('site not found', 404);
 
   const report = runAudit(owned.editableState);

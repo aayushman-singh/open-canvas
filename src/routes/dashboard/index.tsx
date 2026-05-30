@@ -3,10 +3,9 @@ import { raw } from 'hono/html';
 import { desc, eq, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, site, ownerAsset } from '../../db/schema';
+import { site, ownerAsset } from '../../db/schema';
 import { clerkAuth, resolveClerkKeys } from '../../auth/middleware';
 import { clerkFrontendApiHost, requireAuth } from '../../auth/require-auth';
-import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, Badge, Pill, readThemeCookie } from '../../ui';
@@ -1099,27 +1098,24 @@ dashboard.get('/', async (c) => {
   if (!user) {
     throw new Error('dashboard reached without a resolved user');
   }
+  // clerkAuth() middleware already upserted + loaded the customer row.
+  const customerRecord = c.get('customer');
+  if (!customerRecord) {
+    throw new Error('dashboard reached without a resolved customer');
+  }
 
   const database = db(c.env);
-  const { email: primaryEmail } = await upsertCustomerFromClerk(database, user);
-
-  const customerRow = await database
-    .select({ id: customer.id, displayName: customer.displayName, plan: customer.plan })
-    .from(customer)
-    .where(eq(customer.clerkUserId, user.id))
-    .limit(1);
-  const customerRecord = customerRow[0];
-  const customerId = customerRecord?.id;
-  const customerPlan = customerRecord?.plan ?? 'free';
+  const primaryEmail = customerRecord.email;
+  const customerId = customerRecord.id;
+  const customerPlan = customerRecord.plan;
 
   const origin = new URL(c.req.url).origin;
   const apex = appDomain(c.env);
 
-  let cards: SiteCard[] = [];
-  let publishedCount = 0;
-  let storageBytes = 0;
-  if (customerId) {
-    const rows = await database
+  // Site rows and storage sum are independent — parallelize so the page open
+  // pays one Neon round trip's worth of latency instead of two.
+  const [rows, sb] = await Promise.all([
+    database
       .select({
         id: site.id,
         name: site.name,
@@ -1132,17 +1128,16 @@ dashboard.get('/', async (c) => {
       })
       .from(site)
       .where(eq(site.customerId, customerId))
-      .orderBy(desc(site.createdAt));
-
-    cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));
-    publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
-
-    const sb = await database
+      .orderBy(desc(site.createdAt)),
+    database
       .select({ total: sum(ownerAsset.byteSize) })
       .from(ownerAsset)
-      .where(eq(ownerAsset.customerId, customerId));
-    storageBytes = Number(sb[0]?.total ?? 0);
-  }
+      .where(eq(ownerAsset.customerId, customerId)),
+  ]);
+
+  const cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));
+  const publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
+  const storageBytes = Number(sb[0]?.total ?? 0);
 
   const siteLimit = siteLimitForPlan(customerPlan);
   const atSiteLimit = siteLimit !== null && cards.length >= siteLimit;
@@ -1151,7 +1146,7 @@ dashboard.get('/', async (c) => {
   const storageLimitLabel = formatBytes(storageLimitForPlan(customerPlan));
 
   const avatarUrl = user.imageUrl;
-  const displayName = customerRow[0]?.displayName ?? user.firstName ?? undefined;
+  const displayName = customerRecord.displayName ?? user.firstName ?? undefined;
 
   const greetingName = displayName ?? primaryEmail.split('@')[0];
 

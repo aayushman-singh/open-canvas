@@ -33,7 +33,7 @@ import { requireAuth } from '../../auth/require-auth';
 import type { CanvasPage, EditableSite, StyleKitPreset } from '../../canvas/schema';
 import { getStyleKitPreset } from '../../canvas/style-kits';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { site } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Card, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
@@ -568,19 +568,11 @@ interface OwnedPageContext {
 
 async function lookupOwnedPage(
   env: Bindings,
-  clerkUserId: string,
+  customerId: string,
   siteId: string,
   pageId: string,
 ): Promise<OwnedPageContext | null> {
   const database = db(env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, clerkUserId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return null;
-
   const rows = await database
     .select({
       id: site.id,
@@ -1089,7 +1081,11 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
   if (!siteId || !pageId) {
     return c.text('page not found', 404);
   }
-  const owned = await lookupOwnedPage(c.env, auth.userId, siteId, pageId);
+  const customerId = c.get('customer')?.id;
+  if (!customerId) {
+    return c.text('page not found', 404);
+  }
+  const owned = await lookupOwnedPage(c.env, customerId, siteId, pageId);
   if (!owned) {
     return c.text('page not found', 404);
   }

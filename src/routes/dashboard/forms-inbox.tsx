@@ -26,7 +26,7 @@ import type {
   PublishedSnapshot,
 } from '../../canvas/schema';
 import { db } from '../../db/client';
-import { customer, formSubmission, site, type FormSubmission } from '../../db/schema';
+import { formSubmission, site, type FormSubmission } from '../../db/schema';
 
 import { DashboardShell, buildSiteNav } from './shell';
 import { readThemeCookie } from '../../ui';
@@ -244,18 +244,10 @@ interface OwnedSite {
 
 async function lookupOwnedSite(
   env: Bindings,
-  clerkUserId: string,
+  customerId: string,
   siteId: string,
 ): Promise<OwnedSite | null> {
   const database = db(env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, clerkUserId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return null;
-
   const rows = await database
     .select({
       id: site.id,
@@ -381,7 +373,9 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
   }
   const siteId = c.req.param('siteId');
   if (!siteId) return c.text('site not found', 404);
-  const owned = await lookupOwnedSite(c.env, auth.userId, siteId);
+  const customerId = c.get('customer')?.id;
+  if (!customerId) return c.text('site not found', 404);
+  const owned = await lookupOwnedSite(c.env, customerId, siteId);
   if (!owned) return c.text('site not found', 404);
 
   const forms = collectForms(owned);
@@ -494,7 +488,9 @@ formsInboxRoute.get('/sites/:siteId/forms/:formElementId', async (c) => {
   const siteId = c.req.param('siteId');
   const formElementId = c.req.param('formElementId');
   if (!siteId || !formElementId) return c.text('site or form not found', 404);
-  const owned = await lookupOwnedSite(c.env, auth.userId, siteId);
+  const customerId = c.get('customer')?.id;
+  if (!customerId) return c.text('site not found', 404);
+  const owned = await lookupOwnedSite(c.env, customerId, siteId);
   if (!owned) return c.text('site not found', 404);
 
   const forms = collectForms(owned);

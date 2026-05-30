@@ -25,7 +25,7 @@ import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { db } from '../../db/client.js';
-import { customer, site } from '../../db/schema.js';
+import { site } from '../../db/schema.js';
 
 import { listSnapshots, type SnapshotListItem } from '../../version/list.js';
 import { DashboardShell, buildSiteNav } from './shell.js';
@@ -232,12 +232,8 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
   }
   const database = db(c.env);
 
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
+  // clerkAuth() middleware already loaded the customer row.
+  const customerId = c.get('customer')?.id;
   if (!customerId) {
     return c.notFound();
   }

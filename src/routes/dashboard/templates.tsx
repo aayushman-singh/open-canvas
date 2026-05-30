@@ -11,7 +11,7 @@ import { getSeedAsset } from '../../canvas/seed-assets';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { customer, customTemplate, site } from '../../db/schema';
+import { customTemplate, site } from '../../db/schema';
 import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
@@ -590,12 +590,8 @@ templatesRoute.get('/', async (c) => {
   let siteLimitErrorMessage: string | null = null;
   if (auth.userId) {
     const database = db(c.env);
-    const customerRow = await database
-      .select({ id: customer.id, plan: customer.plan })
-      .from(customer)
-      .where(eq(customer.clerkUserId, auth.userId))
-      .limit(1);
-    const customerRecord = customerRow[0];
+    // clerkAuth() middleware already loaded the customer row.
+    const customerRecord = c.get('customer');
     const customerId = customerRecord?.id;
     const customerPlan = customerRecord?.plan ?? 'free';
 

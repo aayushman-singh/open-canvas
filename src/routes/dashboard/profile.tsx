@@ -2,10 +2,9 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { eq, count } from 'drizzle-orm';
 import { db } from '../../db/client';
-import { customer, site } from '../../db/schema';
+import { site } from '../../db/schema';
 import { clerkAuth } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
-import { upsertCustomerFromClerk } from '../../auth/customer-upsert';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
@@ -217,24 +216,14 @@ profileRoute.get('/profile', async (c) => {
   if (!user) {
     throw new Error('profile page reached without a resolved user');
   }
+  // clerkAuth() middleware already upserted + loaded the customer row.
+  const profile = c.get('customer');
+  if (!profile) {
+    throw new Error('profile page reached without a resolved customer');
+  }
 
   const database = db(c.env);
-  const { email: primaryEmail } = await upsertCustomerFromClerk(database, user);
-
-  const rows = await database
-    .select({
-      id: customer.id,
-      email: customer.email,
-      displayName: customer.displayName,
-      bio: customer.bio,
-      timezone: customer.timezone,
-      createdAt: customer.createdAt,
-    })
-    .from(customer)
-    .where(eq(customer.clerkUserId, user.id))
-    .limit(1);
-
-  const profile = rows[0]!;
+  const primaryEmail = profile.email;
 
   const siteCountRows = await database
     .select({ count: count() })

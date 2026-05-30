@@ -22,7 +22,7 @@ import { html, raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { db } from '../../db/client.js';
-import { customer, site } from '../../db/schema.js';
+import { site } from '../../db/schema.js';
 
 import { DashboardShell, buildSiteNav } from './shell.js';
 import { Button, readThemeCookie } from '../../ui';
@@ -319,12 +319,8 @@ chatPanelRoute.get('/sites/:siteId/chat', async (c) => {
   }
   const siteId = c.req.param('siteId');
   const database = db(c.env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
+  // clerkAuth() middleware already loaded the customer row.
+  const customerId = c.get('customer')?.id;
   if (!customerId) return c.text('not found', 404);
   const siteRow = await database
     .select({ id: site.id, name: site.name })

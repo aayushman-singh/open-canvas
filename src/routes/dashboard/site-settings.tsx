@@ -23,7 +23,7 @@ import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
-import { customer, site, siteCollaborator } from '../../db/schema';
+import { site, siteCollaborator } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
@@ -478,18 +478,10 @@ interface OwnedSite {
 
 async function lookupOwnedSite(
   env: Bindings,
-  clerkUserId: string,
+  customerId: string,
   siteId: string,
 ): Promise<OwnedSite | null> {
   const database = db(env);
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, clerkUserId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) return null;
-
   const rows = await database
     .select({
       id: site.id,
@@ -1168,7 +1160,11 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   if (!siteId) {
     return c.text('site not found', 404);
   }
-  const owned = await lookupOwnedSite(c.env, auth.userId, siteId);
+  const customerId = c.get('customer')?.id;
+  if (!customerId) {
+    return c.text('site not found', 404);
+  }
+  const owned = await lookupOwnedSite(c.env, customerId, siteId);
   if (!owned) {
     return c.text('site not found', 404);
   }
