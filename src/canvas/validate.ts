@@ -96,6 +96,58 @@ function assertOneOf<T extends string>(
   return false;
 }
 
+// Shared type-narrowing assertion helpers (ADR 0012 dec 4). Each appends a
+// uniform `${path} must be <kind>[ when present] (got <actual>)` error on
+// failure and returns false so callers can guard subsequent reads. Single
+// source of truth for the error format across the validator.
+
+function assertFiniteNumber(value: unknown, path: string, errors: string[]): value is number {
+  if (isFiniteNumber(value)) return true;
+  errors.push(`${path} must be a finite number (got ${describe(value)})`);
+  return false;
+}
+
+function assertOptionalFiniteNumber(
+  value: unknown,
+  path: string,
+  errors: string[],
+): value is number | undefined {
+  if (value === undefined || isFiniteNumber(value)) return true;
+  errors.push(`${path} must be a finite number when present (got ${describe(value)})`);
+  return false;
+}
+
+function assertNonEmptyString(value: unknown, path: string, errors: string[]): value is string {
+  if (isNonEmptyString(value)) return true;
+  errors.push(`${path} must be a non-empty string (got ${describe(value)})`);
+  return false;
+}
+
+function assertOptionalNonEmptyString(
+  value: unknown,
+  path: string,
+  errors: string[],
+): value is string | undefined {
+  if (value === undefined || isNonEmptyString(value)) return true;
+  errors.push(`${path} must be a non-empty string when present (got ${describe(value)})`);
+  return false;
+}
+
+// Note: an `assertBoolean` (required) helper would be the natural pair with
+// `assertOptionalBoolean` below, but no current required-boolean fields
+// exist in the schema (every boolean is optional with an implied default).
+// Add it when the first required boolean lands.
+
+function assertOptionalBoolean(
+  value: unknown,
+  path: string,
+  errors: string[],
+): value is boolean | undefined {
+  if (value === undefined || typeof value === 'boolean') return true;
+  errors.push(`${path} must be a boolean when present (got ${describe(value)})`);
+  return false;
+}
+
 /** Render an unknown value as a short, safe string for error messages. */
 function describe(value: unknown): string {
   if (value === null) return 'null';
@@ -129,8 +181,8 @@ function validateActionHref(
   }
   const h = href as Record<string, unknown>;
   if (h.type === 'external') {
-    if (!isNonEmptyString(h.url)) {
-      errors.push(basePath + '.url must be a non-empty string');
+    if (!assertNonEmptyString(h.url, `${basePath}.url`, errors)) {
+      // path noted
     } else if (!isAllowedHref(h.url)) {
       errors.push(
         basePath +
@@ -140,8 +192,8 @@ function validateActionHref(
       );
     }
   } else if (h.type === 'page') {
-    if (!isNonEmptyString(h.pageId)) {
-      errors.push(basePath + '.pageId must be a non-empty string');
+    if (!assertNonEmptyString(h.pageId, `${basePath}.pageId`, errors)) {
+      // path noted
     } else if (validPageIds !== null && !validPageIds.has(h.pageId)) {
       errors.push(basePath + '.pageId "' + h.pageId + '" must reference an existing page');
     }
@@ -165,14 +217,12 @@ function validateBox(
     return;
   }
   const { x, y, w, h, z, rotation } = box;
-  if (!isFiniteNumber(x)) errors.push(`${basePath}.box.x must be a finite number`);
-  if (!isFiniteNumber(y)) errors.push(`${basePath}.box.y must be a finite number`);
-  if (!isFiniteNumber(w)) errors.push(`${basePath}.box.w must be a finite number`);
-  if (!isFiniteNumber(h)) errors.push(`${basePath}.box.h must be a finite number`);
-  if (!isFiniteNumber(z)) errors.push(`${basePath}.box.z must be a finite number`);
-  if (rotation !== undefined && !isFiniteNumber(rotation)) {
-    errors.push(`${basePath}.box.rotation must be a finite number when present`);
-  }
+  assertFiniteNumber(x, `${basePath}.box.x`, errors);
+  assertFiniteNumber(y, `${basePath}.box.y`, errors);
+  assertFiniteNumber(w, `${basePath}.box.w`, errors);
+  assertFiniteNumber(h, `${basePath}.box.h`, errors);
+  assertFiniteNumber(z, `${basePath}.box.z`, errors);
+  assertOptionalFiniteNumber(rotation, `${basePath}.box.rotation`, errors);
   if (isFiniteNumber(x) && x < 0) errors.push(`${basePath}.box.x must be >= 0 (got ${String(x)})`);
   if (isFiniteNumber(y) && y < 0) errors.push(`${basePath}.box.y must be >= 0 (got ${String(y)})`);
   if (isFiniteNumber(w) && w < 0) errors.push(`${basePath}.box.w must be >= 0 (got ${String(w)})`);
@@ -197,9 +247,7 @@ function validateMotion(motion: unknown, basePath: string, errors: string[]): vo
     return;
   }
   assertOneOf<MotionPreset>(motion.preset, MOTION_PRESETS, `${basePath}.motion.preset`, errors);
-  if (motion.delayMs !== undefined && !isFiniteNumber(motion.delayMs)) {
-    errors.push(`${basePath}.motion.delayMs must be a finite number when present`);
-  }
+  assertOptionalFiniteNumber(motion.delayMs, `${basePath}.motion.delayMs`, errors);
 }
 
 // Keys must be plain CSS property names (ASCII letters + hyphen). Anything
@@ -712,12 +760,11 @@ function validateElement(
           break;
         }
         for (const field of ['autoplay', 'muted', 'loop', 'controls'] as const) {
-          if (
-            element.playback[field] !== undefined &&
-            typeof element.playback[field] !== 'boolean'
-          ) {
-            errors.push(`${basePath}.playback.${field} must be a boolean when present`);
-          }
+          assertOptionalBoolean(
+            element.playback[field],
+            `${basePath}.playback.${field}`,
+            errors,
+          );
         }
         const { autoplay, muted } = element.playback;
         if (autoplay === true && muted !== true) {
@@ -1046,45 +1093,33 @@ function validatePage(
   if (!isNonEmptyString(page.slug)) {
     errors.push(`${basePath}.slug must be a non-empty string`);
   }
-  if (!isNonEmptyString(page.title)) {
-    errors.push(`${basePath}.title must be a non-empty string`);
-  }
+  assertNonEmptyString(page.title, `${basePath}.title`, errors);
   if (page.publishedDate !== undefined) {
-    if (!isNonEmptyString(page.publishedDate)) {
-      errors.push(`${basePath}.publishedDate must be a non-empty string when present`);
-    } else if (!isParseableDate(page.publishedDate)) {
-      errors.push(`${basePath}.publishedDate must be parseable as a date`);
+    if (assertOptionalNonEmptyString(page.publishedDate, `${basePath}.publishedDate`, errors)) {
+      if (page.publishedDate !== undefined && !isParseableDate(page.publishedDate)) {
+        errors.push(`${basePath}.publishedDate must be parseable as a date`);
+      }
     }
   }
-  if (page.author !== undefined && !isNonEmptyString(page.author)) {
-    errors.push(`${basePath}.author must be a non-empty string when present`);
-  }
+  assertOptionalNonEmptyString(page.author, `${basePath}.author`, errors);
   if (page.tags !== undefined) {
     if (!Array.isArray(page.tags)) {
       errors.push(`${basePath}.tags must be an array when present`);
     } else {
       page.tags.forEach((tag, tagIdx) => {
-        if (!isNonEmptyString(tag)) {
-          errors.push(`${basePath}.tags[${String(tagIdx)}] must be a non-empty string`);
-        }
+        assertNonEmptyString(tag, `${basePath}.tags[${String(tagIdx)}]`, errors);
       });
     }
   }
-  if (page.category !== undefined && !isNonEmptyString(page.category)) {
-    errors.push(`${basePath}.category must be a non-empty string when present`);
-  }
-  if (page.description !== undefined && !isNonEmptyString(page.description)) {
-    errors.push(`${basePath}.description must be a non-empty string when present`);
-  }
+  assertOptionalNonEmptyString(page.category, `${basePath}.category`, errors);
+  assertOptionalNonEmptyString(page.description, `${basePath}.description`, errors);
   if (page.ogImageAssetId !== undefined && !isAssetIdLike(page.ogImageAssetId)) {
     errors.push(
       `${basePath}.ogImageAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(page.ogImageAssetId)})`,
     );
   }
   if (page.canonical !== undefined) {
-    if (!isNonEmptyString(page.canonical)) {
-      errors.push(`${basePath}.canonical must be a non-empty string when present`);
-    } else {
+    if (assertOptionalNonEmptyString(page.canonical, `${basePath}.canonical`, errors) && page.canonical !== undefined) {
       const issue = pinnedStyleValueIssue(page.canonical);
       if (issue !== null) {
         errors.push(
@@ -1093,11 +1128,7 @@ function validatePage(
       }
     }
   }
-  if (page.noIndex !== undefined && typeof page.noIndex !== 'boolean') {
-    errors.push(
-      `${basePath}.noIndex must be a boolean when present (got ${describe(page.noIndex)})`,
-    );
-  }
+  assertOptionalBoolean(page.noIndex, `${basePath}.noIndex`, errors);
   if (page.locale !== undefined && !isNonEmptyString(page.locale)) {
     errors.push(
       `${basePath}.locale must be a non-empty BCP-47 string when present (got ${describe(page.locale)})`,
@@ -1206,6 +1237,9 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
     validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
   },
   defaultLocale: ({ state, errors }) => {
+    // Locale uses the same "non-empty string when present" shape as the
+    // helper but carries an extra "BCP-47" hint in the error prose;
+    // surface it inline so the helper stays format-uniform.
     if (state.defaultLocale !== undefined && !isNonEmptyString(state.defaultLocale)) {
       errors.push(
         `defaultLocale must be a non-empty BCP-47 string when present (got ${describe(state.defaultLocale)})`,
@@ -1213,16 +1247,10 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
     }
   },
   siteNoIndex: ({ state, errors }) => {
-    if (state.siteNoIndex !== undefined && typeof state.siteNoIndex !== 'boolean') {
-      errors.push(`siteNoIndex must be a boolean when present (got ${describe(state.siteNoIndex)})`);
-    }
+    assertOptionalBoolean(state.siteNoIndex, 'siteNoIndex', errors);
   },
   darkModeEnabled: ({ state, errors }) => {
-    if (state.darkModeEnabled !== undefined && typeof state.darkModeEnabled !== 'boolean') {
-      errors.push(
-        `darkModeEnabled must be a boolean when present (got ${describe(state.darkModeEnabled)})`,
-      );
-    }
+    assertOptionalBoolean(state.darkModeEnabled, 'darkModeEnabled', errors);
   },
   faviconAssetId: ({ state, errors }) => {
     if (state.faviconAssetId !== undefined && !isAssetIdLike(state.faviconAssetId)) {
