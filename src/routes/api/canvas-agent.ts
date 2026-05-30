@@ -351,12 +351,40 @@ canvasAgentApi.post('/sites/:siteId/apply', async (c) => {
   } catch {
     return c.json({ error: 'invalid json' }, 400);
   }
-  if (!isRecord(body) || !Array.isArray(body.ops)) {
+  // Accept three wire shapes:
+  //
+  //   (1) `{ ops: [{ kind, ...payload }, ...] }`  — canonical CanvasAgentOp shape.
+  //   (2) `{ ops: [{ tool, params }, ...] }`      — legacy LLM-tool-call shape;
+  //                                                  translated via translateToolCall.
+  //   (3) `{ tool, params }`                       — legacy single tool call as
+  //                                                  the whole body; wrapped + translated.
+  //
+  // Shapes (2) and (3) are byte-equivalent to a canonical op produced by the
+  // same translator the preview path uses (`translateToolCall`), so accepting
+  // them is shape coercion at a boundary, not a degraded fallback. An unknown
+  // tool name from shape (2)/(3) still fails loud with the translator's error.
+  let opsCandidate: unknown[];
+  if (isRecord(body) && Array.isArray(body.ops)) {
+    opsCandidate = body.ops;
+  } else if (isRecord(body) && typeof body.tool === 'string') {
+    opsCandidate = [body];
+  } else {
     return c.json({ error: 'body must be { ops: CanvasAgentOp[] }' }, 400);
   }
   const ops: CanvasAgentOp[] = [];
-  for (let i = 0; i < body.ops.length; i++) {
-    const parsed = parseApplyOp(body.ops[i], row.styleKit);
+  for (let i = 0; i < opsCandidate.length; i++) {
+    const candidate = opsCandidate[i];
+    const isLegacyToolShape =
+      isRecord(candidate) &&
+      typeof candidate.tool === 'string' &&
+      candidate.kind === undefined;
+    const parsed = isLegacyToolShape
+      ? translateToolCall({
+          id: '',
+          name: candidate.tool as string,
+          arguments: isRecord(candidate.params) ? candidate.params : {},
+        })
+      : parseApplyOp(candidate, row.styleKit);
     if (!parsed.ok) {
       return c.json({ error: `ops[${String(i)}]: ${parsed.error}` }, 400);
     }
