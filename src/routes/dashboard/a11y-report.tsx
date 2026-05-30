@@ -438,7 +438,7 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
         </div>
         <div class="actions">
           <Button variant="secondary" size="sm" href={`/dashboard/sites/${siteId}/a11y`}>
-            Re-run check
+            Run audit
           </Button>
         </div>
       </div>

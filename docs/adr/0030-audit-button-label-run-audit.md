@@ -1,6 +1,6 @@
 # ADR 0030 — Audit re-run button reads "Run audit"
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** beat S7.D.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md). The script narrates "Re-run audit" and the on-screen action says `Sidebar → Accessibility → Run audit`. Current UI emits `Re-run check` at [src/routes/dashboard/a11y-report.tsx:441](../../src/routes/dashboard/a11y-report.tsx).
