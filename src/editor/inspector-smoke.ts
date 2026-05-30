@@ -148,4 +148,20 @@ assert(
   'new-page locale picker must use the locale grammar accepted by the router',
 );
 
+const aiMediaModal = sliceBetween(
+  'function openAiMediaModal(opts) {',
+  '// Modal for the "+ New Page" flow',
+);
+
+assert(
+  aiMediaModal.includes('var closed = false;') &&
+    aiMediaModal.includes('closed = true;') &&
+    aiMediaModal.includes('if (closed) return;'),
+  'AI media modal must ignore async generation results after cancel/close',
+);
+assert(
+  !aiMediaModal.includes('liveTiles[index] = null;'),
+  'AI media modal must revoke the chosen tile object URL because preview creates its own URL',
+);
+
 console.log('[inspector:smoke] OK');

@@ -1256,10 +1256,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         img.style.cssText = "display:block;width:100%;height:auto;";
         tile.appendChild(img);
         tile.addEventListener("click", function() {
-          // Hand the chosen blob back to the caller. We deliberately do NOT
-          // revoke this tile's URL — the caller is free to use it; the rest
-          // are revoked on close.
-          liveTiles[index] = null;
+          // Hand the chosen blob back to the caller. The tile URL is only for
+          // this modal; the preview flow creates and owns its own object URL.
           close({
             blob: payload.blob,
             mediaType: payload.mediaType,
@@ -1281,6 +1279,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
 
       var generating = false;
+      var closed = false;
       genBtn.addEventListener("click", function() {
         if (generating) return;
         var promptText = promptInput.value.trim();
@@ -1310,6 +1309,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             function(e) { return { ok: false, error: e }; }
           );
         })).then(function(results) {
+          if (closed) return;
           generating = false;
           genBtn.disabled = false;
           genBtn.textContent = prev;
@@ -1347,6 +1347,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       backdrop.appendChild(panel);
 
       function close(value) {
+        if (closed) return;
+        closed = true;
         document.removeEventListener("keydown", onKey, true);
         clearGallery();
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);

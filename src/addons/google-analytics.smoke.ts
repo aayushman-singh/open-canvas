@@ -16,6 +16,8 @@
 //
 // Run with `bun.cmd run google-analytics:smoke`.
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { getAddon } from './registry.js';
 
 function assert(condition: boolean, message: string): void {
@@ -74,5 +76,18 @@ assert(threwOnMissing, 'emitHeadScripts must throw when measurementId is absent'
 const valid = addon!.emitHeadScripts({ measurementId: 'G-PASS7TEST01' });
 assert(valid.includes('G-PASS7TEST01'), 'emitHeadScripts must inline a valid measurementId');
 assert(valid.includes('googletagmanager.com/gtag/js'), 'emitter must emit the gtag.js loader');
+
+const addonShopSource = readFileSync(
+  join(process.cwd(), 'src', 'routes', 'dashboard', 'addon-shop.tsx'),
+  'utf8',
+);
+assert(
+  addonShopSource.includes("config[input.getAttribute('data-config-key')] = input.value.trim();"),
+  'addon catalogue must send the same trimmed config value that it validates',
+);
+assert(
+  !addonShopSource.includes("config[input.getAttribute('data-config-key')] = input.value;"),
+  'addon catalogue must not validate a trimmed GA id but submit the raw value',
+);
 
 console.log('✓ google-analytics smoke passed');

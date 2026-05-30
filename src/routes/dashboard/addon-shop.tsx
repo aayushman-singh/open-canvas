@@ -298,7 +298,7 @@ function clientScript(): string {
       var enabled = enabledEl ? enabledEl.checked : false;
       var config = {};
       form.querySelectorAll('[data-config-key]').forEach(function(input) {
-        config[input.getAttribute('data-config-key')] = input.value;
+        config[input.getAttribute('data-config-key')] = input.value.trim();
       });
 
       // Client-side pattern validation (mirrors addons.ts server-side check).
