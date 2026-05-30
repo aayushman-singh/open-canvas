@@ -1,9 +1,33 @@
 # ADR 0036 — Per-page password gate scope, single site secret
 
-**Status:** Proposed
+**Status:** Rejected
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** Demo recording Session 11.B + Interlude 5 — Owner publishes v1 of a launched site while keeping a single `/preview` page password-gated. Names G10 in [`docs/demo/handoff-delta-resolution-2026-05-30.md`](../demo/handoff-delta-resolution-2026-05-30.md) §3.9 ("Per-page password gate scope"). The current site-wide gate at [`src/password/middleware.ts`](../../src/password/middleware.ts) cannot express this; the script fell back to "site-wide" (script-fix #13) because the product cannot.
+
+## Rejection rationale (2026-05-30)
+
+Rejected on 2026-05-30 alongside the product-gap implementation sweep. Site-wide password gating stays as the only mechanism — per-page scope does not ship.
+
+**Why rejected:** the per-page use case is genuinely narrow. The Owner's pre-launch flow is better served by the existing draft / unpublish primitive (visitors can't reach a page that isn't in `publishedSnapshot`); the one beat in the script that wanted per-page (S11.B narrating `/preview` as a gated page on an otherwise-public site) is recordable as site-wide with a one-sentence voiceover adjustment. Adding a schema migration, new middleware shape, sitemap/search filter, and a per-page Owner UX for a use case that the draft flow already covers is the wrong cost/benefit trade.
+
+If a future Owner cohort surfaces a real per-page gating need that the draft flow cannot serve — e.g. "publish a public landing PLUS a paywalled members-only page on the same site" — the right vehicle is the addon model from [ADR 0009](0009-addon-entitlement-model.md), not a schema reshape of the core password column. A successor ADR would propose per-page gating as a paid addon with its own data shape (per-page entitlements, per-page secrets if needed) rather than widening the existing single-secret site-wide column.
+
+**What stays in place:**
+- Site-wide `passwordEnabled` / `passwordSetAt` / `passwordHash` on `site` ([src/db/schema.ts:97-103](../../src/db/schema.ts)).
+- Gate middleware at [src/password/middleware.ts](../../src/password/middleware.ts) reading `site.passwordEnabled`.
+- HS256 unlock cookie scoped to `siteId` (per [ADR 0017](0017-cookie-name-prefix-from-env.md) naming + the existing JWT payload).
+- 5/60s DO-backed rate limiter on failed attempts.
+- Script S11.B + I5 record against the site-wide gate (already the live behaviour).
+
+**What does not happen:**
+- No new `passwordGated` column on `CanvasPage`.
+- No drop of `site.passwordEnabled`.
+- No reserved-route allowlist additions to the middleware (the existing site-wide check needs no per-page exceptions).
+- No sitemap/search filter for per-page gating.
+- No Owner UX changes to expose per-page toggles.
+
+The decisions and consequences below describe the path this ADR would have taken if Accepted. They are preserved unchanged as the historical record of what was considered — see the repo's status-flow rule ("Rejected — explored, declined. The ADR stays in the repo as the record of why").
 
 ## Context
 
