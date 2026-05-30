@@ -485,7 +485,13 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
   // -- setSiteConfig --------------------------------------------------------
   if (op.kind === 'setSiteConfig') {
     const patch = op.patch;
-    if (typeof patch.darkModeEnabled === 'boolean') next.darkModeEnabled = patch.darkModeEnabled;
+    if (
+      patch.visitorTheme === 'light' ||
+      patch.visitorTheme === 'dark' ||
+      patch.visitorTheme === 'toggleable'
+    ) {
+      next.visitorTheme = patch.visitorTheme;
+    }
     if (typeof patch.defaultLocale === 'string') next.defaultLocale = patch.defaultLocale;
     if (typeof patch.siteNoIndex === 'boolean') next.siteNoIndex = patch.siteNoIndex;
     return next;

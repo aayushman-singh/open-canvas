@@ -51,7 +51,7 @@ import { requireUnlock } from '../password/middleware';
 import { renderCanvasHead, resolveLang } from '../seo/meta-emit';
 // Wave 3 #20 — dual-palette CSS + inline data-mode setter for visitor toggle.
 import { emitDualModeCss } from '../themes/visitor-mode/css-emit';
-import { getModeSetterScript } from '../themes/visitor-mode/inline-script';
+import { getModeSetterScript, getDarkModeSetterScript } from '../themes/visitor-mode/inline-script';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
 import { prepareRender } from '../i18n/render-hook';
 import { emitFontFaceBlocks } from '../fonts/face-emit';
@@ -994,17 +994,25 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   });
   const lang = resolveLang(currentPage, pageRenderSnapshot);
 
-  // Wave 3 #20 — light/dark visitor toggle. Only emit dual-palette CSS +
-  // early mode setter when the Owner has enabled dark mode for this site.
-  // The flag lives at the editable level and is mirrored into snapshots by a
-  // future Wave 5 patch; until then we read it off the snapshot defensively.
-  const darkModeEnabled =
-    (renderSnapshot as { darkModeEnabled?: boolean }).darkModeEnabled === true;
+  // Wave 3 #20 — light/dark visitor toggle. Per ADR 0035, the
+  // `visitorTheme` enum drives three runtime shapes:
+  //   - 'light' (or undefined): no dual-palette CSS, no inline script.
+  //     Site renders light-only.
+  //   - 'dark': dual-palette CSS emitted; dark-only inline script
+  //     pins data-mode='dark' before first paint; no toggle element.
+  //   - 'toggleable': dual-palette CSS emitted; toggleable inline
+  //     script reads cookie -> media query -> light default; toggle
+  //     element is auto-injected by the renderer when present.
+  const visitorTheme = (renderSnapshot as { visitorTheme?: 'light' | 'dark' | 'toggleable' })
+    .visitorTheme;
+  const themeEmitsCss = visitorTheme === 'dark' || visitorTheme === 'toggleable';
   let dualModeCss = '';
   let modeSetterScript = '';
-  if (darkModeEnabled) {
+  if (themeEmitsCss) {
     dualModeCss = emitDualModeCss(resolvedKit, renderSnapshot.styleKit);
-    modeSetterScript = getModeSetterScript(c.env);
+    modeSetterScript = visitorTheme === 'dark'
+      ? getDarkModeSetterScript()
+      : getModeSetterScript(c.env);
   }
 
   const addonScripts = await emitAddonHeadScripts(db(c.env), siteRow.id);
@@ -1016,11 +1024,11 @@ export async function handlePublicRequest<P extends string, I extends Input>(
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          ${raw(headMeta)} ${darkModeEnabled ? raw(`<script>${modeSetterScript}</script>`) : ''}
+          ${raw(headMeta)} ${themeEmitsCss ? raw(`<script>${modeSetterScript}</script>`) : ''}
           <style>
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',
-            )}${darkModeEnabled ? `\n${dualModeCss}` : ''}
+            )}${themeEmitsCss ? `\n${dualModeCss}` : ''}
             ${raw(ENTRANCE_ANIMATION_CSS)}
           </style>
           ${addonScripts ? raw(addonScripts) : ''}

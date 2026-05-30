@@ -62,7 +62,7 @@ const toggle = {
   checked: false,
   getAttribute(name: string): string | null {
     const attrs: Record<string, string> = {
-      'data-config-key': 'darkModeEnabled',
+      'data-config-key': 'siteNoIndex',
       'data-on-label': 'On',
       'data-off-label': 'Off',
     };

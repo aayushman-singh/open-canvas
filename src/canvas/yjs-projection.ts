@@ -24,7 +24,7 @@
 //   'customStyleKit'?  -> Y.Map<unknown>             (mirrors StyleKitPreset)
 //   'defaultLocale'?   -> string
 //   'siteNoIndex'?     -> boolean
-//   'darkModeEnabled'? -> boolean
+//   'visitorTheme'?    -> 'light' | 'dark' | 'toggleable' (ADR 0035)
 //   'faviconAssetId'?  -> string
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
 //
@@ -731,7 +731,7 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     }
     setIfDefined(root, 'defaultLocale', state.defaultLocale);
     setIfDefined(root, 'siteNoIndex', state.siteNoIndex);
-    setIfDefined(root, 'darkModeEnabled', state.darkModeEnabled);
+    setIfDefined(root, 'visitorTheme', state.visitorTheme);
     setIfDefined(root, 'faviconAssetId', state.faviconAssetId);
 
     const pages = new Y.Array<Y.Map<unknown>>();
@@ -1284,8 +1284,8 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
   }
   if (root.has('defaultLocale')) state.defaultLocale = root.get('defaultLocale') as string;
   if (root.has('siteNoIndex')) state.siteNoIndex = root.get('siteNoIndex') as boolean;
-  if (root.has('darkModeEnabled')) {
-    state.darkModeEnabled = root.get('darkModeEnabled') as boolean;
+  if (root.has('visitorTheme')) {
+    state.visitorTheme = root.get('visitorTheme') as 'light' | 'dark' | 'toggleable';
   }
   if (root.has('faviconAssetId')) {
     state.faviconAssetId = root.get('faviconAssetId') as string;

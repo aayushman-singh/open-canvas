@@ -1,10 +1,19 @@
 // src/themes/visitor-mode/inline-script.ts
 //
 // The early `<script>` injected at the top of `<head>` on every Published
-// Site that has `darkModeEnabled === true`. Its job is to stamp
-// `data-mode="light"` or `data-mode="dark"` on `<html>` BEFORE first paint
-// so the visitor never sees a Flash Of Unstyled Content (FOUC) when the
-// system colour scheme disagrees with the server-rendered default.
+// Site whose `visitorTheme` is 'dark' or 'toggleable' (per ADR 0035).
+// Its job is to stamp `data-mode="light"` or `data-mode="dark"` on
+// `<html>` BEFORE first paint so the visitor never sees a Flash Of
+// Unstyled Content (FOUC) when the system colour scheme disagrees with
+// the server-rendered default.
+//
+// Two forms exist:
+//   - getModeSetterScript(env): the toggleable form. Reads the cookie,
+//     falls back to prefers-color-scheme, defaults to 'light'.
+//   - getDarkModeSetterScript(): the dark-only form. Stamps
+//     data-mode="dark" unconditionally. No cookie, no media query.
+//     Used when visitorTheme === 'dark' so the visitor cannot toggle
+//     out of dark.
 //
 // Resolution order (mirrored by the toggle script in `toggle-element.ts`):
 //
@@ -48,4 +57,16 @@ import { cookieName, type HostConfigEnv } from '../../host-config.js';
 export function getModeSetterScript(env: HostConfigEnv): string {
   const name = cookieName.colorScheme(env);
   return `(function(d){var c=d.cookie.match(/${name}=(light|dark)/),m=c?c[1]:matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';d.documentElement.setAttribute('data-mode',m)})(document)`;
+}
+
+/**
+ * Get the dark-only mode-setter script. Stamps `data-mode="dark"` on
+ * `<html>` unconditionally — no cookie lookup, no media query. Used by
+ * the public renderer when `visitorTheme === 'dark'` so the dark
+ * palette applies before first paint regardless of the visitor's
+ * system preference. Returns a one-liner string for the same
+ * inline-`<script>` injection path as `getModeSetterScript`.
+ */
+export function getDarkModeSetterScript(): string {
+  return `document.documentElement.setAttribute('data-mode','dark')`;
 }

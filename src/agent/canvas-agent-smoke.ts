@@ -462,7 +462,7 @@ const toolArgsByName: Record<string, Record<string, unknown>> = {
     styleKit: 'blue-saas',
   },
   setSiteConfig: {
-    darkModeEnabled: true,
+    visitorTheme: 'toggleable',
     defaultLocale: 'en',
     siteNoIndex: true,
   },

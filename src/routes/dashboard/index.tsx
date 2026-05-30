@@ -948,7 +948,7 @@ interface SiteCard {
   updatedAt: Date;
   thumbHtml: string;
   passwordEnabled: boolean;
-  darkModeEnabled: boolean;
+  visitorTheme: 'light' | 'dark' | 'toggleable';
   searchIndexing: boolean;
 }
 
@@ -1004,7 +1004,7 @@ function buildCards(
       updatedAt: row.updatedAt,
       thumbHtml,
       passwordEnabled: row.passwordEnabled,
-      darkModeEnabled: state.darkModeEnabled ?? false,
+      visitorTheme: state.visitorTheme ?? 'light',
       searchIndexing: !(state.siteNoIndex ?? false),
     };
   });
@@ -1075,8 +1075,12 @@ function DetailsPanel({ s }: { s: SiteCard }) {
           <Pill variant={s.searchIndexing ? 'on' : 'off'}>{s.searchIndexing ? 'On' : 'Off'}</Pill>
         </DetailRow>
         <DetailRow label="Visitor dark mode" href={`${editBase}/settings#dark-mode`}>
-          <Pill variant={s.darkModeEnabled ? 'on' : 'off'}>
-            {s.darkModeEnabled ? 'Toggleable' : 'Locked'}
+          <Pill variant={s.visitorTheme === 'light' ? 'off' : 'on'}>
+            {s.visitorTheme === 'dark'
+              ? 'Dark'
+              : s.visitorTheme === 'toggleable'
+                ? 'Toggleable'
+                : 'Light'}
           </Pill>
         </DetailRow>
         <DetailRow label="Analytics" href={`${editBase}/addons`}>

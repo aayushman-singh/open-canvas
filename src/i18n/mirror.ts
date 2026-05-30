@@ -112,10 +112,10 @@ export function applyRtlMirror(snapshot: PublishedSnapshot): PublishedSnapshot {
 
   // Reconstruct the snapshot, preserving any extra fields attached via the
   // structural-probe pattern (e.g. `defaultLocale`, `siteNoIndex`,
-  // `darkModeEnabled`). `Object.assign` carries those through without us
+  // `visitorTheme`). `Object.assign` carries those through without us
   // having to name each one.
   const next: PublishedSnapshot = { ...snapshot, pages };
-  // Re-attach any non-typed properties (siteNoIndex, defaultLocale, darkModeEnabled, …).
+  // Re-attach any non-typed properties (siteNoIndex, defaultLocale, visitorTheme, …).
   const extras = snapshot as unknown as Record<string, unknown>;
   for (const key of Object.keys(extras)) {
     if (key === 'pages') continue;

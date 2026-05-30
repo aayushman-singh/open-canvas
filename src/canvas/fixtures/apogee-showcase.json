@@ -603,7 +603,7 @@
     ]
   },
   "defaultLocale": "en",
-  "darkModeEnabled": true,
+  "visitorTheme": "toggleable",
   "faviconAssetId": "seed-feature-canvas-1",
   "pages": [
     {

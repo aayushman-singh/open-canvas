@@ -472,7 +472,7 @@ interface OwnedSite {
   styleKit: string;
   publishedVersion: number;
   siteNoIndex: boolean;
-  darkModeEnabled: boolean;
+  visitorTheme: 'light' | 'dark' | 'toggleable';
   faviconAssetId: string | null;
 }
 
@@ -515,7 +515,7 @@ async function lookupOwnedSite(
     styleKit: row.styleKit,
     publishedVersion: row.publishedVersion,
     siteNoIndex: row.editableState.siteNoIndex ?? false,
-    darkModeEnabled: row.editableState.darkModeEnabled ?? false,
+    visitorTheme: row.editableState.visitorTheme ?? 'light',
     faviconAssetId: row.editableState.faviconAssetId ?? null,
   };
 }
@@ -913,31 +913,47 @@ const rev01SiteSettingsConfig = (() => {
   }
 })();
 
-// Site-config toggles (search indexing, visitor dark mode). Each toggle
-// checkbox carries data-config-key (the API field) and an optional
-// data-invert=true for the SEO case (UI shows indexable, API stores noindex).
-// Failures revert the checkbox and surface a status message.
+// Site-config controls (search indexing, visitor theme). Each control
+// input carries data-config-key (the API field).
+//   - Checkbox controls (siteNoIndex): boolean. data-invert=true for the
+//     SEO case where the UI shows indexable but the API stores noindex.
+//   - Radio-group controls (visitorTheme per ADR 0035): string enum.
+//     The selected radio's value attribute is the API value.
+// Failures revert the input and surface a status message.
 //
 // PATCH requests are serialized through a single promise chain because the
 // server's /config handler is read-modify-write: two concurrent PATCHes load
 // the same prior state, each apply their own diff, and the second write
-// silently overwrites the first. Queueing here keeps each toggle's effect.
+// silently overwrites the first. Queueing here keeps each control's effect.
 (() => {
   const queueConfigPatch = rev01SiteSettingsConfig.queueConfigPatch;
-  const toggles = document.querySelectorAll('input[data-config-key]');
-  toggles.forEach((cb) => {
+  const inputs = document.querySelectorAll('input[data-config-key]');
+  // Group radios by name so the "saved value" / revert is shared across
+  // the group rather than per-input.
+  const radioGroups = new Map();
+  inputs.forEach((cb) => {
     const key = cb.getAttribute('data-config-key');
     if (!key) return;
+    if (cb.type === 'radio') {
+      const groupName = cb.name || key;
+      if (!radioGroups.has(groupName)) {
+        radioGroups.set(groupName, { key, inputs: [], savedValue: '', stateEl: null });
+      }
+      const group = radioGroups.get(groupName);
+      group.inputs.push(cb);
+      if (cb.checked) group.savedValue = cb.value;
+      if (!group.stateEl) {
+        group.stateEl = cb.closest('.set-head')?.querySelector('[data-theme-state]');
+      }
+      return;
+    }
+    // Checkbox path (unchanged behaviour for the boolean controls).
     const inverted = cb.getAttribute('data-invert') === 'true';
     const stateEl = cb.closest('.toggle-row')?.querySelector('[data-toggle-state]');
     const stateOn = cb.getAttribute('data-on-label') ?? 'On';
     const stateOff = cb.getAttribute('data-off-label') ?? 'Off';
-    function apiValueFromChecked(checked) {
-      return inverted ? !checked : checked;
-    }
-    function checkedFromApiValue(value) {
-      return inverted ? !value : value;
-    }
+    function apiValueFromChecked(checked) { return inverted ? !checked : checked; }
+    function checkedFromApiValue(value) { return inverted ? !value : value; }
     function renderSavedState(apiValue) {
       if (stateEl) stateEl.textContent = checkedFromApiValue(apiValue) ? stateOn : stateOff;
     }
@@ -949,11 +965,6 @@ const rev01SiteSettingsConfig = (() => {
       const queueId = nextQueueId + 1;
       nextQueueId = queueId;
       latestQueueId = queueId;
-      // Do NOT disable the checkbox while the PATCH is in flight — disabled
-      // inputs don't fire 'change' on subsequent clicks, so a rapid second
-      // toggle would be silently eaten. queueConfigPatch serialises requests
-      // in this browser session, and apiValue is captured here at click time,
-      // so back-to-back toggles all land in order.
       queueConfigPatch(
         { [key]: apiValue },
         () => {
@@ -968,6 +979,43 @@ const rev01SiteSettingsConfig = (() => {
           alert(message);
         },
       );
+    });
+  });
+  // Wire each radio group's change handler once. Only the newly-selected
+  // radio fires 'change'; on failure, restore the previously-saved value
+  // and re-check the corresponding radio.
+  radioGroups.forEach((group) => {
+    function renderSavedStateRadio(value) {
+      if (!group.stateEl) return;
+      group.stateEl.textContent =
+        value === 'dark' ? 'Dark theme, no toggle.'
+        : value === 'toggleable' ? 'Toggleable by visitors, defaults to their OS preference.'
+        : 'Light theme, no toggle.';
+    }
+    let nextQueueId = 0;
+    let latestQueueId = 0;
+    group.inputs.forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        const apiValue = radio.value;
+        const queueId = nextQueueId + 1;
+        nextQueueId = queueId;
+        latestQueueId = queueId;
+        queueConfigPatch(
+          { [group.key]: apiValue },
+          () => {
+            group.savedValue = apiValue;
+            if (latestQueueId === queueId) renderSavedStateRadio(apiValue);
+          },
+          (message) => {
+            if (latestQueueId === queueId) {
+              group.inputs.forEach((r) => { r.checked = r.value === group.savedValue; });
+              renderSavedStateRadio(group.savedValue);
+            }
+            alert(message);
+          },
+        );
+      });
     });
   });
 })();
@@ -1403,22 +1451,48 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           <div class="tt">
             <h2>Visitor dark mode</h2>
             <p>
-              Give visitors a moon button to switch your site to a dark theme.{' '}
-              <span data-toggle-state>
-                {owned.darkModeEnabled ? 'Toggleable by visitors.' : 'Locked to default mode.'}
+              Choose how the site renders for visitors.{' '}
+              <span data-theme-state>
+                {owned.visitorTheme === 'dark'
+                  ? 'Dark theme, no toggle.'
+                  : owned.visitorTheme === 'toggleable'
+                    ? 'Toggleable by visitors, defaults to their OS preference.'
+                    : 'Light theme, no toggle.'}
               </span>
             </p>
           </div>
-          <label class="switch toggle-row" aria-label="Let visitors switch between light and dark">
-            <input
-              type="checkbox"
-              checked={owned.darkModeEnabled}
-              data-config-key="darkModeEnabled"
-              data-on-label="Toggleable by visitors"
-              data-off-label="Locked to default mode"
-            />
-            <span class="track" />
-          </label>
+          <div class="theme-radio-group" role="radiogroup" aria-label="Visitor theme">
+            <label class="theme-radio">
+              <input
+                type="radio"
+                name="visitorTheme"
+                value="light"
+                checked={owned.visitorTheme === 'light'}
+                data-config-key="visitorTheme"
+              />
+              <span>Light</span>
+            </label>
+            <label class="theme-radio">
+              <input
+                type="radio"
+                name="visitorTheme"
+                value="dark"
+                checked={owned.visitorTheme === 'dark'}
+                data-config-key="visitorTheme"
+              />
+              <span>Dark</span>
+            </label>
+            <label class="theme-radio">
+              <input
+                type="radio"
+                name="visitorTheme"
+                value="toggleable"
+                checked={owned.visitorTheme === 'toggleable'}
+                data-config-key="visitorTheme"
+              />
+              <span>Toggleable</span>
+            </label>
+          </div>
         </div>
         <div class="set-body">
           <p class="hint">

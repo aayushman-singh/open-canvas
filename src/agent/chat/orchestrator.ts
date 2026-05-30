@@ -516,7 +516,7 @@ export function buildSystemPrompt(state: EditableSite): string {
   lines.push(
     '  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).',
   );
-  lines.push('  setSiteConfig — toggle darkModeEnabled, defaultLocale, or siteNoIndex.');
+  lines.push("  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.");
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent IDs — call query_site or query_assets first when unsure.');

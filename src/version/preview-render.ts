@@ -100,7 +100,7 @@ export async function renderSnapshotPreview(
     ...(state.customStyleKit !== undefined ? { customStyleKit: state.customStyleKit } : {}),
     ...(state.defaultLocale !== undefined ? { defaultLocale: state.defaultLocale } : {}),
     ...(state.siteNoIndex !== undefined ? { siteNoIndex: state.siteNoIndex } : {}),
-    ...(state.darkModeEnabled !== undefined ? { darkModeEnabled: state.darkModeEnabled } : {}),
+    ...(state.visitorTheme !== undefined ? { visitorTheme: state.visitorTheme } : {}),
   };
   const html = renderCanvasSnapshot(publishedView, assetBasePath, siteId, { turnstileSiteKey });
 

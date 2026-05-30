@@ -416,10 +416,24 @@ export interface EditableSite {
    */
   siteNoIndex?: boolean;
   /**
-   * When true, public renderer emits both light and dark token blocks plus
-   * the inline mode-setter script. Owner-controlled per site.
+   * Visitor theme mode for published pages. Per ADR 0035:
+   *   - 'light' (or undefined): site renders light-only; no dual-palette
+   *     CSS, no anti-flash script, no toggle element.
+   *   - 'dark': site renders dark-only; dual-palette CSS emitted with
+   *     data-mode='dark' pinned; anti-flash script in its dark-only
+   *     form so the attribute is set before first paint; no toggle
+   *     element.
+   *   - 'toggleable': visitor sees a toggle and defaults to their OS
+   *     prefers-color-scheme; anti-flash script emitted, dual-palette
+   *     CSS emitted, toggle element auto-injected.
+   *
+   * Replaces the previous `darkModeEnabled?: boolean` field.
+   * Migration (drizzle/0010_visitor_theme_enum.sql) rewrites existing
+   * JSONB: `true → 'toggleable'`, anything else removes the key (the
+   * default is 'light'). Hard cutover — the validator rejects the old
+   * boolean field from this deploy onward per ADR 0035 decision 2.
    */
-  darkModeEnabled?: boolean;
+  visitorTheme?: 'light' | 'dark' | 'toggleable';
   /**
    * Owner-selected favicon asset (ownerAsset.id). Emitted as `<link rel="icon">`
    * across every page. The same `/assets/<id>` URL the publish route uses for

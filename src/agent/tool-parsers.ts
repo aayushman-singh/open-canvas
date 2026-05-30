@@ -539,11 +539,18 @@ export function parseSetStyleKit(args: unknown): ParseResult {
 export function parseSetSiteConfig(args: unknown): ParseResult {
   if (!isRecord(args)) return { ok: false, error: 'setSiteConfig arguments must be an object' };
   const patch: Record<string, unknown> = {};
-  if (args.darkModeEnabled !== undefined) {
-    if (typeof args.darkModeEnabled !== 'boolean') {
-      return { ok: false, error: 'setSiteConfig.darkModeEnabled must be a boolean' };
+  if (args.visitorTheme !== undefined) {
+    if (
+      args.visitorTheme !== 'light' &&
+      args.visitorTheme !== 'dark' &&
+      args.visitorTheme !== 'toggleable'
+    ) {
+      return {
+        ok: false,
+        error: "setSiteConfig.visitorTheme must be 'light', 'dark', or 'toggleable'",
+      };
     }
-    patch.darkModeEnabled = args.darkModeEnabled;
+    patch.visitorTheme = args.visitorTheme;
   }
   if (args.defaultLocale !== undefined) {
     if (typeof args.defaultLocale !== 'string') {
@@ -561,7 +568,7 @@ export function parseSetSiteConfig(args: unknown): ParseResult {
     return {
       ok: false,
       error:
-        'setSiteConfig must include at least one field (darkModeEnabled, defaultLocale, siteNoIndex)',
+        'setSiteConfig must include at least one field (visitorTheme, defaultLocale, siteNoIndex)',
     };
   }
   return { ok: true, op: { kind: 'setSiteConfig', patch } };

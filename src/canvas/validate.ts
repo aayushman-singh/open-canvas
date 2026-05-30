@@ -1249,8 +1249,17 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
   siteNoIndex: ({ state, errors }) => {
     assertOptionalBoolean(state.siteNoIndex, 'siteNoIndex', errors);
   },
-  darkModeEnabled: ({ state, errors }) => {
-    assertOptionalBoolean(state.darkModeEnabled, 'darkModeEnabled', errors);
+  visitorTheme: ({ state, errors }) => {
+    if (state.visitorTheme === undefined) return;
+    if (
+      state.visitorTheme !== 'light' &&
+      state.visitorTheme !== 'dark' &&
+      state.visitorTheme !== 'toggleable'
+    ) {
+      errors.push(
+        `visitorTheme must be 'light', 'dark', or 'toggleable' when present (got ${describe(state.visitorTheme)})`,
+      );
+    }
   },
   faviconAssetId: ({ state, errors }) => {
     if (state.faviconAssetId !== undefined && !isAssetIdLike(state.faviconAssetId)) {
@@ -1400,7 +1409,7 @@ export function validatePublishedSnapshot(snapshot: unknown): ValidationResult {
   // Re-use the editable validator on the full snapshot. Passing the snapshot
   // directly (rather than a stripped {styleKit, pages, header, footer} literal)
   // lets the site-level field validators inside validateSiteShape see
-  // customStyleKit / defaultLocale / siteNoIndex / darkModeEnabled /
+  // customStyleKit / defaultLocale / siteNoIndex / visitorTheme /
   // faviconAssetId — otherwise those fields silently round-trip onto the
   // snapshot via the spread at publish.ts:373-386.
   validateSiteShape(snapshot, errors);

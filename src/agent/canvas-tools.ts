@@ -613,9 +613,11 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
     parameters: {
       type: 'object',
       properties: {
-        darkModeEnabled: {
-          type: 'boolean',
-          description: 'Enable visitor dark/light mode toggle on published site.',
+        visitorTheme: {
+          type: 'string',
+          enum: ['light', 'dark', 'toggleable'],
+          description:
+            "Visitor theme for the published site. 'light' = light only, no toggle. 'dark' = dark only, no toggle. 'toggleable' = visitors get a moon button + dual palette + system-preference default.",
         },
         defaultLocale: {
           type: 'string',

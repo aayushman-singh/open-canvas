@@ -1,6 +1,6 @@
 # ADR 0035 — Visitor dark mode is a three-way enum (`light` / `dark` / `toggleable`)
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** beat S11.D.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md) (Maya picks a *Light / Dark / Toggleable* mode in Site Settings) against the read-only finding that the editable schema field is `darkModeEnabled: boolean` at [src/canvas/schema.ts:422](../../src/canvas/schema.ts), validated at [src/canvas/validate.ts:1152](../../src/canvas/validate.ts), and rendered as a single checkbox at [src/routes/dashboard/site-settings.tsx:1415](../../src/routes/dashboard/site-settings.tsx). Closes G8 in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.8.

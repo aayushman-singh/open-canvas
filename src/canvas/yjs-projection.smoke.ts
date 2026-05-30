@@ -292,7 +292,7 @@ const syntheticState: EditableSite = {
   },
   defaultLocale: 'en',
   siteNoIndex: false,
-  darkModeEnabled: true,
+  visitorTheme: 'toggleable',
 };
 
 {
@@ -322,10 +322,11 @@ await (async () => {
   );
 
   // Five mutations within ~10ms — well inside the debounce window.
+  const themeCycle = ['light', 'dark', 'toggleable', 'light', 'dark'] as const;
   for (let i = 0; i < 5; i += 1) {
     doc.transact(() => {
       const root = doc.getMap<unknown>('state');
-      root.set('darkModeEnabled', i % 2 === 0);
+      root.set('visitorTheme', themeCycle[i]);
     });
   }
 
@@ -340,12 +341,12 @@ await (async () => {
     throw new Error('autosave callback never received a projected state');
   }
   const persisted: EditableSite = lastState;
-  // The last mutation set darkModeEnabled = (i=4) % 2 === 0 → true. The
+  // The last mutation set visitorTheme to 'dark' (themeCycle[4]). The
   // projection should reflect that.
   assert(
-    persisted.darkModeEnabled === true,
-    `expected darkModeEnabled === true in last persist payload, got ${String(
-      persisted.darkModeEnabled,
+    persisted.visitorTheme === 'dark',
+    `expected visitorTheme === 'dark' in last persist payload, got ${String(
+      persisted.visitorTheme,
     )}`,
   );
 

@@ -287,8 +287,18 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
   if ('siteNoIndex' in body) {
     next.siteNoIndex = body.siteNoIndex as boolean;
   }
-  if ('darkModeEnabled' in body) {
-    next.darkModeEnabled = body.darkModeEnabled as boolean;
+  if ('visitorTheme' in body) {
+    const raw = body.visitorTheme;
+    if (raw === 'light' || raw === 'dark' || raw === 'toggleable') {
+      next.visitorTheme = raw;
+    } else if (raw === undefined || raw === null) {
+      delete next.visitorTheme;
+    } else {
+      return c.json(
+        { error: "visitorTheme must be 'light', 'dark', or 'toggleable'" },
+        400,
+      );
+    }
   }
   if ('faviconAssetId' in body) {
     const raw = body.faviconAssetId;
@@ -313,7 +323,7 @@ canvasApi.patch('/sites/:siteId/config', async (c) => {
   return c.json({
     ok: true,
     siteNoIndex: next.siteNoIndex ?? false,
-    darkModeEnabled: next.darkModeEnabled ?? false,
+    visitorTheme: next.visitorTheme ?? 'light',
     faviconAssetId: next.faviconAssetId ?? null,
   });
 });
