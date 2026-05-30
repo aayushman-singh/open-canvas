@@ -1,133 +1,111 @@
-# Handoff — delta-resolution sweep, starts now
+# Handoff — delta-resolution sweep (revised 2026-05-30)
 
-**Date:** 2026-05-30 (early)
-**Source-of-truth log:** [docs/demo/script-deltas-2026-05-29.md](script-deltas-2026-05-29.md) (Passes 1–5)
-**Latest Playwright trace:** [docs/demo/drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md)
-**Latest deploy:** version `59494fc8` (commit `25880ae` — 8 sidebar UX fixes), `e232278` on `origin/main`.
+**Framing — read this first.**
 
-The user wants delta resolution to start in parallel with a Pass-6 manual drive. This handoff is for the **delta-resolution agent**; the Pass-6 driver is a separate work-stream.
+The recording script is the **intended UX**. Default action for every delta is **product-fix**: the product should evolve to match the script.
+
+A delta becomes a **script-rewrite** only when the product evolution is genuinely intentional — e.g. the kit count grew, variant names were renamed in code, a guard rail was deliberately added, or the script carries an internal numbering inconsistency that's never been resolved.
+
+If you can't articulate *why* the script's UX is wrong, treat the delta as a product gap.
 
 ---
 
-## Already resolved (do NOT redo)
+**Date:** 2026-05-30 (revised, replaces earlier biased version)
+**Source-of-truth UX:** [docs/demo/act-1-script.md](act-1-script.md)
+**Evidence trail (re-verify every claim here):** [docs/demo/drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md) — Playwright per-beat table, Passes 5 + 6
+**Chronological deltas log:** [docs/demo/script-deltas-2026-05-29.md](script-deltas-2026-05-29.md) (Passes 1–6)
+**Latest deploy:** version `59494fc8` (commit `a88933a` on `origin/main`)
 
-These were live deltas in earlier passes and have been shipped via the cheap-five and Pass-5 sidebar work — script rewrite still needed but the product side is done.
+---
 
-| Was-delta | Resolved by | Script action |
+## 1. Cheap-five fixes already shipped — DO NOT redo
+
+Six product gaps closed in the May 28–29 sprint. The script needs small alignment edits to reflect the shipped state, nothing more. Do not re-open the underlying product work.
+
+| Cheap-five gap | Shipped by | Script-edit needed (intentional, small) |
 |---|---|---|
-| **S4.F** no reserved-slug check (`_404` rename succeeded) | Cheap-five Gap 1 — guard in `canvas-client.ts renamePage` | Rewrite S4.F.1: "rename flashes 'Slug 404 is reserved'; no Ctrl+Z needed". |
-| **S6.F** Save to library has only name field | Cheap-five Gap 3 + Pass-5 hex inputs | Rewrite S6.F.1 to mention description + Private/Community visibility. Live behaviour: Owner can pick Private; Community requires admin (server returns 403). |
-| **S6.G** Save as template has only name field | Cheap-five Gap 3 | S13.E.1 + S6.G can now be recorded as written (name + description + Community). |
-| **S7.G** no version badge in header | Cheap-five Gap 5 | Restore the "Version badge: v1 → v2" beat (S7.G.1 + S10.H.1 + S13.C.1). Badge text is `v0` (draft) or `v{n}` (published). |
-| **S7.H** no OG preview pill | Cheap-five Gap 5 | Restore the "click the version badge → preview pill" beat. **Caveat**: `og:image` still points to the fixture asset (Pass-4 note); the pill displays whatever the page actually publishes. Either accept that the demo's OG card is the fixture image, or do the fixture-fix below. |
-| **S11.G** no TOC chip row in /settings | Cheap-five Gap 4 | Restore S11.G.1 "TOC chip row → anchor jump". Chips: Hosting / Password / Search engines / Favicon / Dark mode / Collaborators / Delete site. |
+| Gap 1 — `_404` rename had no reserved-slug guard | guard in `canvas-client.ts renamePage` | **S4.F.1** — rewrite to "rename flashes `Slug 404 is reserved`; no Ctrl+Z needed" |
+| Gap 3 — Save to library / Save as template modals only had `name` | Pass-5 modal expansion | **S6.F.1, S6.G.1, S13.E.1** — modal shows name + description + visibility. Owner can pick Private; Community requires admin (server returns 403). |
+| Gap 4 — no TOC chip row in Settings | Pass-5 sidebar work | **S11.G.1** — rewrite "no TOC chip row" → seven chips across the top: `Hosting / Password / Search engines / Favicon / Dark mode / Collaborators / Delete site` |
+| Gap 5 (a) — no version badge in editor header | Pass-5 header chip | **S7.G.1 + S10.H.1 + S13.C.1** — restore the `v0` (draft) → `v{n}` (published) flip beat |
+| Gap 5 (b) — no OG preview pill | Pass-5 header chip | **S7.H.1** — restore "click the version badge → preview pill" beat (see caveat in §3 product backlog: OG fixture leak) |
+| Pass-5 hex inputs (kicker pinned colour) | Pass-5 SELECTION-panel work | **S3.D.1** — voiceover/wording already aligns; no further edit needed. Listed for paper trail. |
 
 ---
 
-## To do — script-only rewrites (cheap; days, not weeks)
+## 2. Script-rewrite — other intentional product evolution
 
-The product is correct; the script is wrong. These can be done in one writing sweep.
+Small list. These are deltas where the product is the canonical state and the script narrative needs to catch up. Not driven by Cheap-five.
 
-### Pass-5 batch (new since this evening's drive)
-
-1. **S3.A.2** "Four built-in kits" → "Six built-in kits": charcoal, orange-editorial, blue-saas, green-organic, **ivory-press**, **midnight-violet** (added in commit `73920d1`). Cycle through all six in the on-screen action.
-2. **S3.A.3** "Apogee shipped with a `custom` kit" — Briar runs on `blue-saas`. Either drop the beat or (alt: do the fixture fix below).
-3. **S3.E.1** "pick warm cream" → "type a warm cream hex (`#f7ede3`)". Page background is a CSS text input, not a colour swatch.
-4. **S4.E.1** "the `is 404` toggle, already on" → "there's no toggle; the slug `_404` IS the mechanism". Custom-404 is slug-based (`src/canvas/page-routing.ts CUSTOM_404_PAGE_SLUG`).
-5. **S5.A.1 / S5.S.1** motion-preset count: pick **"sixteen entrance presets + `none`"** and use it consistently in both beats. Dropdown has 17 values including `none`.
-6. **S3.F / S3.I** Assets and Theme beats: there is no Assets entry and no Theme panel in the canvas sidebar. Either drop the beats or relocate to the element-image-picker / dedicated font upload route.
-
-### Pass-6 batch (added 2026-05-30)
-
-19. **S7.A.1 button label** — script says "Run audit", live button reads **"Re-run check"**. Pick one and apply.
-20. **S7.A.1 numeric score** — audit page renders `50 / 100`. Either acknowledge in voiceover or product-hide the score line.
-
-### Pass-1–4 backlog (still un-rewritten)
-
-7. **S5.D Shape variants** — script says "rectangle / circle / triangle / line / divider / blob"; reality is **"rect / pill / circle / line / badge / blob"**. Update list.
-8. **S5.E Container variants** — script says "plain / card / bordered / glass / inset / raised / sunken"; reality is **"flat / raised / glass / outlined / sticker / editorial-frame / soft-panel"**. Update list.
-9. **S5.N Chart kinds** — order in script is `donut → pie → bar → line → area`; code's `CHART_KINDS` is `bar / line / pie / donut / area`. Update order.
-10. **S7.E.1** drop the "Confirmation modal — first publish — yes" beat. No confirm modal exists.
-11. **S7.F.1** status flow — replace per-stage "Snapshot saved → OG rendering → Search rebuilt" with the actual flip `Saved → Saving... → Published v{n}`.
-12. **S8.B Export CSV** — split into S8.A.1 (top-level inbox totals) → click into `/forms/{formId}` → S8.A.2 Export CSV link there.
-13. **S11.B password scope** — rewrite from "set scope = `/preview` page" to "Set a password — gates the **whole site**". Mirror in I5.
-14. **S11.D dark-mode picker** — rewrite from 3-way picker to single ON/OFF checkbox.
-15. **S11.M Account meters** — rewrite Free/Pro/Team tiles + meters + invoices out. Account page = display name + email (Clerk-read-only) + bio + timezone + site-count + Sign out.
-16. **S12.F Preview snapshot** — drop the "sandboxed iframe preview" beat. Each snapshot row has only Restore.
-17. **I2.D dark/light toggle on visitor site** — drop until Settings dark mode is enabled at S11.D (then move I2.D after that beat).
-18. **I4.B locale picker at + New Page** — rewrite: "+ New Page creates `Page N` instantly. She renames to `Doha launch`, opens its SEO panel, sets Locale `ar`. RTL flip on save."
+1. **S3 frontmatter + S3.A.1 + S3.A.2** — six built-in kits (charcoal, orange-editorial, blue-saas, green-organic, **ivory-press**, **midnight-violet**) per commit `73920d1`. Briar's seed kit is `blue-saas` (the Apogee Showcase fixture's actual seed), not `custom`. Cycle all six in the on-screen action.
+2. **S3.A.3** — drop entirely. There is no Custom kit any more; the "Apogee shipped with a custom kit" beat is dead narrative after the six-kit reorg.
+3. **S5.A.1 + S5.S.1** — pick **"sixteen entrance presets + `none`"** and apply consistently. Dropdown has 17 values including `none`; the script previously said "17 motion presets" in S5.A.1 and "sixteen entrance presets" in S5.S.1.
+4. **S5.D + S5.E shape and container variants** — Pass-6 verified script already matches the live variants (`rect / pill / circle / line / badge / blob` and `flat / raised / glass / outlined / sticker / editorial-frame / soft-panel`). Confirmation only; no edit required.
+5. **S5.N chart-kinds order** — borderline. Code is `bar / line / pie / donut / area`; script cycles `donut → pie → bar → line → area`. Either order cycles the same five kinds. Camera-direction call only; product not affected. **Recommendation:** leave script as-is unless the recording operator prefers code-order.
 
 ---
 
-## To do — product fixes (medium-to-large; gate the recording if not shipped)
+## 3. Product backlog — script stays; product catches up
 
-Each of these is a real product gap. The script can be recorded only if the gap is closed OR the beat is dropped.
+Each item below: the script's UX is the target. The product is currently wrong. Land the fix before the recording, or accept that beat won't record cleanly.
 
-### Big ones (Gap-list medium-five — already triaged)
+### Cosmetic / mechanical fixes (small, fast)
 
-**G6 — Section inspector fields** (S5.P / S5.Q / S5.R)
-- Surface `role` / `backgroundEffect` / `entrance` / `backgroundVideo` / `popupTrigger` in a section inspector body.
-- Pattern to mirror: `buildTextInspector` at `canvas-client.ts:2877`.
-- Without this: drop S5.P / Q / R or keep them voiceover-only.
+1. **Page background colour picker** (S3.E.1) — script wants "pick warm cream"; product currently exposes a CSS hex text input on `/blog`'s page background. Mirror the Pass-5 Gap-7 hex-input pattern on the style-row: grow a swatch picker on the page background field.
+2. **"Set as custom 404" toggle on page inspector** (S4.E.1) — script wants a visible toggle on `_404`. Currently the slug `_404` is the implicit-only mechanism (custom-404 is slug-based per `src/canvas/page-routing.ts CUSTOM_404_PAGE_SLUG`). Surface a `Set as custom 404 page` toggle in the page inspector body so the script's "toggle, already on" beat plays cleanly.
+3. **Audit button rename**: `Re-run check` → `Run audit` (S7.D.1) — script wants "Run audit"; live button reads "Re-run check". One-string rename in the a11y audit page UI.
+4. **Audit score handling** (S7.A.1) — audit page renders `50 / 100` for Briar's current state. **Decision: hide the score in the audit UI.** Rationale lives in [ADR 0031](../adr/0031-audit-numeric-score-handling.md): the rubric is broken on its own terms (1 blocker + 8 warnings scores 40, 2 blockers + 0 warnings scores 60 — second worse despite being further from publishable), the ring fill + per-finding rows already convey the trend without false precision. Script S7.A.1 stays silent about the score; no voiceover line, no on-camera narration of the number.
+5. **CSV export at top-level forms inbox** (S8.B.1) — script's flow is `S8.A.1` (top-level inbox row from I2) → `S8.A.2` (expand row, full submission) → `S8.B.1` (Export click *at top level*). Currently CSV lives only on the per-form page. Add a per-row CSV icon to the top-level inbox so the script's flow plays without re-routing through `/forms/{formId}`.
 
-~~**G9 — Editor breakpoint switcher**~~ — **demoted Pass-6**. The script already says "No editor switcher in this build; she demos it on the published site" (S6.A.1). Published-site + DevTools resize is the recording path; G9 stays in the medium-five product backlog but does not gate the recording.
+### Medium-five product gaps (already triaged, still real)
 
-**G7 — + New Page modal** (S4.A.1 surface + I4.B)
-- Currently page-create is instant. No name / slug / locale prompt.
-- Without this: I4.B has to be the rename-then-SEO flow described in script-fix #18 above.
+6. **G6 — section inspector fields** (S5.P / S5.Q / S5.R) — surface `role` / `backgroundEffect` / `entrance` / `backgroundVideo` / `popupTrigger` in a section inspector body. Pattern to mirror: `buildTextInspector` at `canvas-client.ts:2877`. Without this, S5.P/Q/R stay voiceover-only.
+7. **G7 — + New Page modal** (S4.A.1 + I4.B) — `+ New Page` currently creates `Page N` instantly. Script (and I4.B as originally written) wants name / slug / locale prompts in a modal. Without this: I4.B has to be the rename-then-SEO flow.
+8. **G8 — visitor dark-mode 3-way picker** (S11.D) — schema is `bool` today; script wants `Light / Dark / Toggleable`. Without this: S11.D stays as single ON/OFF checkbox.
+9. **G10 — per-page password gate scope** (S11.B + I5) — schema is site-wide today; script wants per-page (`/preview` only). Without this: S11.B + I5 rewrite to site-wide, and I5.A.1 visitor flow targets the site root instead of `/preview`.
 
-**G8 — Visitor dark-mode 3-way picker** (S11.D)
-- Schema is `bool` today; script wants `Light / Dark / Toggleable`.
-- Without this: keep the script-fix #14 rewrite (single checkbox).
+### Earlier-pass items still open
 
-**G10 — Per-page password gate scope** (S11.B / I5)
-- Schema is site-wide; script wants per-page.
-- Without this: keep script-fix #13 (site-wide rewrite).
-
-### Smaller ones
-
-**S7.H OG-image fixture leak**
-- Published `og:image` points to `/assets/seed-feature-canvas-1` (the Apogee fixture asset). The version-badge preview pill shows whatever is set.
-- Fix: render a real OG PNG per published page and store it as `og:image`. Or accept the demo shows the fixture image and add a voiceover line.
-
-**Canonical leak** (verified Pass 3 + 4)
-- Canonical for Briar's index emits `https://apogee.rev01.aayushman.dev/` because `apogee-showcase.json` was not updated for the apex migration.
-- Fix: search/replace canonical URLs in [src/canvas/fixtures/apogee-showcase.json](../../src/canvas/fixtures/apogee-showcase.json) to use the live apex (`opencanvas.aayushman.dev`).
-
-**A11y link from editor header** (S7 entry beat)
-- Currently only reachable from dashboard `/dashboard/sites/{id}/a11y`.
-- Fix: add an `A11y` link to `#canvas-editor-header` alongside Settings. OR rewrite S7 entry as "Maya jumps to the dashboard for a moment to open the audit".
+10. **S11.M account meters** — script wants Free/Pro/Team plan tiles + usage meters + invoices on the Account page. Product currently exposes profile-only (display name + email Clerk-managed, bio, timezone, site count, Sign out). Build the billing UI to match the script.
+11. **S12.F snapshot preview** — script wants an in-iframe sandboxed snapshot preview before Restore. Each timeline row currently shows only `Restore`. Add a per-row preview iframe so Maya can scrub before restoring.
+12. **A11y link in editor header** (S7 entry beat) — currently the audit is only reachable via `/dashboard/sites/{id}/a11y` (dashboard sidebar). Add an `A11y` link to `#canvas-editor-header` alongside Settings so S7 enters cleanly from the editor without a dashboard detour.
+13. **Canonical-URL fixture-fix** — `src/canvas/fixtures/apogee-showcase.json` still emits canonical URLs at `apogee.rev01.aayushman.dev` (pre-apex-migration). Search/replace canonicals to `opencanvas.aayushman.dev`. ~30 minutes; not a UX change but a meta-tag correctness fix that affects every published page from the Apogee Showcase template.
+14. **S7.H OG-image fixture leak** — same fixture, related symptom. Published `og:image` points to `/assets/seed-feature-canvas-1` (Apogee seed) rather than a freshly-rendered Briar OG PNG. Fix: render a real OG PNG per published page and store it as `og:image`. Without this: the preview pill demo shows the fixture image, which is acceptable but worth a voiceover line.
 
 ---
 
-## Blocked on external prereqs (cannot script-rewrite around)
+## 4. Pass-7 reset-Briar checklist
+
+Before the next drive, reset Briar so the script can record from a clean state. The agent / recording operator running Pass-7 should confirm each item is true before the drive starts.
+
+- [ ] **Hero video alt text stripped** — re-introduce the S7 blocker so the publish gate has something to flag and Maya has something to fix on camera. Target element: hero `video` on `/index`.
+- [ ] **2–3 manual snapshots saved** — so S12 restore has timeline depth and the pre-restore safety snapshot is the visible "+1" row. Label them with dates that read cleanly on camera (avoid timestamps that look like the current recording day).
+- [ ] **"Apogee" text un-rebranded on `/index`** — S2.C bulk rebrand starts from this state. Reset header, hero, pricing, customer carousel, and footer copy back to Apogee phrasings so the AI Chat rebrand has something to do on camera.
+- [ ] **Hero kicker has no pinned colour** — S3.D demos pinned-style from a clean state. Clear any pinned hex on the kicker text element so the demo of "type `#c75d3d`, then cycle kits, then watch the pin survive" plays cleanly.
+- [ ] **Second Clerk account + clean-cookie browser profile ready** — for I1 (Sam collaborator accept), I3 (visitor first visit), S9 (custom-domain on-site editing). Separate browser profile, no edit-token cookie, magic-link inbox accessible on a second monitor.
+
+---
+
+## 5. Blocked on external prereqs (no script rewrite or product fix unblocks these)
 
 - **I1 + S9 + I6** — Clerk webhook for invite acceptance, real Replicate API outputs in S3, email delivery on `noreply@opencanvas.aayushman.dev` (Resend verified). All three need their external service running; no script change unblocks them.
-- **S3.G AI image gen** — requires real Replicate calls. Use a pre-recorded clip OR delete the beat.
+- **S3.G AI image gen** — requires real Replicate calls. Pre-recorded clip OR delete the beat.
 - **S3.I custom WOFF2 font upload** — requires a font file on the recording machine + the upload route working end-to-end. Untested live this pass.
 
 ---
 
-## Recommended action order
+## 6. What NOT to do
 
-1. **Script-only rewrites (#1–#18 above)** — single writing pass on `act-1-script.md`. Half a day. Unblocks recording for everything except the product-gap beats below.
-2. **Fixture-fix the canonical leak** — 30 minutes. Avoids the wrong-URL on every published page.
-3. **Product fix #1 — G6 section inspector** — biggest unlock for S5.
-4. **Product fix #2 — G9 breakpoint switcher** — biggest unlock for S5.I + S6.
-5. **Product fix #3 — G7 + New Page modal** — needed for I4.B as originally written.
-6. **G8 / G10** — only if you want the script to read exactly as the original I4 / I5 / S11.B / S11.D beats. Otherwise the rewrites above are fine.
+- Don't re-introduce script changes for Gap-1 / Gap-3 / Gap-4 / Gap-5 — those are already resolved in product.
+- **Don't rewrite the script to match product gaps.** The script is the source of truth for intended UX. Product catches up. The exception is the §2 list — small, justified script edits where the product evolution is intentional.
+- Don't touch `apogee-showcase.json` outside the canonical URLs without checking the kicker / brand text still survives the S2.C rebrand flow. The kicker reads "Apogee AEO" because the recording rebrands it on camera; leave that string alone.
+- Don't add new beats to the script for product-backlog items above without first asking whether the product fix is landing first.
 
 ---
 
-## What NOT to do
+## 7. Companion files
 
-- Don't ship a script change that re-introduces the cheap-five resolutions (the kicker's pinned color survives kit cycle — that's Pass-5-shipped Gap 3 + verified Pass-5).
-- Don't touch `apogee-showcase.json` outside the canonical URLs without checking what else references the fixture — the kicker text still reads "Apogee AEO" because the recording flow rebrands it during S2.C, so leave that alone.
-- Don't add new beats to the script for the deltas above without first checking whether a Pass-5-resolved item already covers them.
-
----
-
-## Companion files
-
-- The **Pass-6 driver** continues from where Pass 5 stopped: S5 per-variant cycles + S8–S13. Their handoff is in `docs/demo/drive-2026-05-29-pass-5-findings.md` "Not driven this pass" section.
-- The **Pass-5 trace** is the source of evidence for the new deltas — every claim here can be re-verified by reading the per-beat table in `drive-2026-05-29-pass-5-findings.md`.
+- **Recording script** (UX source of truth): [docs/demo/act-1-script.md](act-1-script.md)
+- **Playwright Pass-5 + Pass-6 evidence** (re-verify every claim): [docs/demo/drive-2026-05-29-pass-5-findings.md](drive-2026-05-29-pass-5-findings.md)
+- **Chronological deltas log Passes 1–6**: [docs/demo/script-deltas-2026-05-29.md](script-deltas-2026-05-29.md)
+- **Pass-4 handoff** (still useful for items not yet absorbed): [docs/demo/handoff-2026-05-29-pass-4.md](handoff-2026-05-29-pass-4.md)
