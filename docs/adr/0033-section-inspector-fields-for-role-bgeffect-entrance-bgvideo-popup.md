@@ -1,6 +1,6 @@
 # ADR 0033 — Section inspector surfaces role, background effect, entrance, background video and popup trigger
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** beats S5.P.1 / S5.Q.1 / S5.R.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md) (Maya cycles section background effects, exposes role on header/footer, picks a popup trigger), against gap **G6** in [docs/demo/handoff-delta-resolution-2026-05-30.md](../demo/handoff-delta-resolution-2026-05-30.md) §3.6: five `CanvasSection` fields are persisted, validated and rendered but have no editor inspector control.

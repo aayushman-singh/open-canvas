@@ -4186,6 +4186,201 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     meta.textContent = section.name || section.recipeId;
     inspector.appendChild(meta);
 
+    // -- Section fields (ADR 0033) --------------------------------------
+    // Grouped Identity (role) -> Background (effect, video) -> Motion
+    // (entrance) -> Behaviour (trigger). All five fields previously
+    // existed in the schema (src/canvas/schema.ts:337-351) without
+    // editor UI; AI Chat was the only mutation surface. Hand-rolled
+    // groups (no spec-driven generation): the section inspector is
+    // not in INSPECTOR_DISPATCH because section is not an ElementType.
+
+    // -- Identity -------------------------------------------------------
+    var groupIdentity = document.createElement("div");
+    groupIdentity.className = "rev01-page-inspector-group";
+    var hIdentity = document.createElement("h4");
+    hIdentity.textContent = "Identity";
+    groupIdentity.appendChild(hIdentity);
+    var roleLabel = document.createElement("label");
+    roleLabel.textContent = "Role";
+    roleLabel.style.display = "block";
+    roleLabel.style.fontSize = "12px";
+    roleLabel.style.color = "var(--rev01-fg-mute)";
+    roleLabel.style.marginBottom = "4px";
+    groupIdentity.appendChild(roleLabel);
+    var roleSel = selectInput(["body", "header", "footer"], section.role || "body");
+    roleSel.addEventListener("change", function() {
+      if (roleSel.value === "body") delete section.role;
+      else section.role = roleSel.value;
+      // Re-render: role change can flip pinned/unpinned which changes
+      // the action-buttons list (Duplicate/Move up/Move down are hidden
+      // for pinned sections at line 4194).
+      captureForUndo();
+      renderAll();
+      renderSectionInspector();
+      scheduleSave();
+    });
+    groupIdentity.appendChild(roleSel);
+    inspector.appendChild(groupIdentity);
+
+    // -- Background -----------------------------------------------------
+    var groupBg = document.createElement("div");
+    groupBg.className = "rev01-page-inspector-group";
+    var hBg = document.createElement("h4");
+    hBg.textContent = "Background";
+    groupBg.appendChild(hBg);
+    var bgEffectLabel = document.createElement("label");
+    bgEffectLabel.textContent = "Effect";
+    bgEffectLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin-bottom:4px";
+    groupBg.appendChild(bgEffectLabel);
+    var bgEffectSel = selectInput(
+      ["none", "grain", "grid", "soft-light", "paper", "glass"],
+      section.backgroundEffect || "none"
+    );
+    bgEffectSel.addEventListener("change", function() {
+      if (bgEffectSel.value === "none") delete section.backgroundEffect;
+      else section.backgroundEffect = bgEffectSel.value;
+      captureForUndo();
+      renderAll();
+      scheduleSave();
+    });
+    groupBg.appendChild(bgEffectSel);
+
+    var bgVideoLabel = document.createElement("label");
+    bgVideoLabel.textContent = "Video";
+    bgVideoLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin:10px 0 4px";
+    groupBg.appendChild(bgVideoLabel);
+    var bgVideoRow = document.createElement("div");
+    bgVideoRow.style.cssText = "display:flex;gap:6px;align-items:center";
+    var bgVideoStatus = document.createElement("div");
+    bgVideoStatus.textContent = section.backgroundVideoAssetId
+      ? ("Asset " + section.backgroundVideoAssetId.slice(0, 8) + "...")
+      : "none";
+    bgVideoStatus.style.cssText = "flex:1;font-size:12px;color:var(--rev01-fg-mute);overflow:hidden;text-overflow:ellipsis";
+    var bgVideoUpload = document.createElement("button");
+    bgVideoUpload.type = "button";
+    bgVideoUpload.textContent = "Upload";
+    bgVideoUpload.className = "style-btn";
+    var bgVideoClear = document.createElement("button");
+    bgVideoClear.type = "button";
+    bgVideoClear.textContent = "x";
+    bgVideoClear.className = "style-btn-clear";
+    bgVideoClear.title = "Clear background video";
+    bgVideoClear.disabled = !section.backgroundVideoAssetId;
+    var bgVideoFileInput = document.createElement("input");
+    bgVideoFileInput.type = "file";
+    bgVideoFileInput.accept = "video/*";
+    bgVideoFileInput.style.display = "none";
+    bgVideoFileInput.addEventListener("change", function() {
+      if (!bgVideoFileInput.files || bgVideoFileInput.files.length === 0) return;
+      var file = bgVideoFileInput.files[0];
+      setStatus("Uploading background video...", "info");
+      postAssetUpload(file, "", "").then(function(result) {
+        section.backgroundVideoAssetId = result.assetId;
+        captureForUndo();
+        renderAll();
+        renderSectionInspector();
+        scheduleSave();
+        setStatus("Background video set", "ok");
+      }).catch(function(err) {
+        setStatus("Upload failed: " + err.message, "error");
+      });
+    });
+    bgVideoUpload.addEventListener("click", function() {
+      bgVideoFileInput.value = "";
+      bgVideoFileInput.click();
+    });
+    bgVideoClear.addEventListener("click", function() {
+      delete section.backgroundVideoAssetId;
+      captureForUndo();
+      renderAll();
+      renderSectionInspector();
+      scheduleSave();
+    });
+    bgVideoRow.appendChild(bgVideoStatus);
+    bgVideoRow.appendChild(bgVideoUpload);
+    bgVideoRow.appendChild(bgVideoClear);
+    bgVideoRow.appendChild(bgVideoFileInput);
+    groupBg.appendChild(bgVideoRow);
+    inspector.appendChild(groupBg);
+
+    // -- Motion ---------------------------------------------------------
+    var groupMotion = document.createElement("div");
+    groupMotion.className = "rev01-page-inspector-group";
+    var hMotion = document.createElement("h4");
+    hMotion.textContent = "Motion";
+    groupMotion.appendChild(hMotion);
+    var entranceLabel = document.createElement("label");
+    entranceLabel.textContent = "Entrance preset";
+    entranceLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin-bottom:4px";
+    groupMotion.appendChild(entranceLabel);
+    var entranceSel = selectInput(MOTION_PRESETS, section.entrance || "none");
+    entranceSel.addEventListener("change", function() {
+      if (entranceSel.value === "none") delete section.entrance;
+      else section.entrance = entranceSel.value;
+      captureForUndo();
+      renderAll();
+      scheduleSave();
+    });
+    groupMotion.appendChild(entranceSel);
+    inspector.appendChild(groupMotion);
+
+    // -- Behaviour (popup trigger) --------------------------------------
+    var groupBeh = document.createElement("div");
+    groupBeh.className = "rev01-page-inspector-group";
+    var hBeh = document.createElement("h4");
+    hBeh.textContent = "Behaviour";
+    groupBeh.appendChild(hBeh);
+    var triggerLabel = document.createElement("label");
+    triggerLabel.textContent = "Popup trigger";
+    triggerLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin-bottom:4px";
+    groupBeh.appendChild(triggerLabel);
+    var currentTriggerType = section.trigger ? section.trigger.type : "none";
+    var triggerSel = selectInput(["none", "exit-intent", "delay", "scroll"], currentTriggerType);
+    triggerSel.addEventListener("change", function() {
+      if (triggerSel.value === "none") {
+        delete section.trigger;
+      } else if (triggerSel.value === "exit-intent") {
+        section.trigger = { type: "exit-intent" };
+      } else if (triggerSel.value === "delay") {
+        var prev = section.trigger && section.trigger.type === "delay" ? section.trigger.value : 5000;
+        section.trigger = { type: "delay", value: prev };
+      } else if (triggerSel.value === "scroll") {
+        var prevS = section.trigger && section.trigger.type === "scroll" ? section.trigger.value : 50;
+        section.trigger = { type: "scroll", value: prevS };
+      }
+      captureForUndo();
+      renderAll();
+      renderSectionInspector();
+      scheduleSave();
+    });
+    groupBeh.appendChild(triggerSel);
+    if (section.trigger && (section.trigger.type === "delay" || section.trigger.type === "scroll")) {
+      var valRow = document.createElement("div");
+      valRow.style.cssText = "display:flex;gap:6px;align-items:center;margin-top:6px";
+      var valInput = document.createElement("input");
+      valInput.type = "number";
+      valInput.value = String(section.trigger.value);
+      valInput.min = "0";
+      valInput.max = section.trigger.type === "scroll" ? "100" : "60000";
+      valInput.style.cssText = "flex:1";
+      var unit = document.createElement("span");
+      unit.textContent = section.trigger.type === "scroll" ? "%" : "ms";
+      unit.style.cssText = "font-size:12px;color:var(--rev01-fg-mute)";
+      valInput.addEventListener("change", function() {
+        var v = parseInt(valInput.value, 10);
+        if (!isNaN(v) && section.trigger && (section.trigger.type === "delay" || section.trigger.type === "scroll")) {
+          section.trigger.value = v;
+          captureForUndo();
+          scheduleSave();
+        }
+      });
+      valRow.appendChild(valInput);
+      valRow.appendChild(unit);
+      groupBeh.appendChild(valRow);
+    }
+    inspector.appendChild(groupBeh);
+
+    // -- Action buttons (existing grid below the fields) ----------------
     var grid = document.createElement("div");
     grid.className = "rev01-section-inspector-grid";
 
