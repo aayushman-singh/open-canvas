@@ -218,6 +218,15 @@ body.rev01-modal-open {
 .rev01-editor-header #canvas-settings-link:hover {
   border-color: var(--ink);
 }
+/* Gear icon sits flush with the Settings label so the pill reads as one
+   token. align-items:center keeps the 14px SVG vertically centred against
+   the 13px label. */
+.rev01-editor-header #canvas-settings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.canvas-settings-gear { flex: 0 0 auto; }
 
 /* Publish: brand-red pill, the highest-affordance action in the topbar. */
 .rev01-editor-header #canvas-publish {
@@ -1224,6 +1233,31 @@ body[data-placement-active="true"] .rev01-section-slot {
   user-select: text;
   outline: 1px dashed var(--red);
   outline-offset: 2px;
+}
+
+/* Click-shield overlay. Interactive widget content (chart canvas/SVG, table
+   rows, form inputs, code highlighter, carousel scroller) consumes pointer
+   events before they bubble to the editor's root click handler, so the
+   parent .rev01-section was being selected instead of the element the Owner
+   was actually trying to pick. A transparent ::after pseudo-element on the
+   wrapper catches the click at the wrapper level — pseudo-elements report
+   their host as the event target, so the existing root handler's
+   target.closest('.rev01-element') still resolves to the right wrapper.
+   The shield disables itself once the element is selected, so a second
+   click reaches the widget (Figma / Webflow's "click-to-select,
+   click-again-to-interact" pattern). */
+.rev01-element[data-element-type="chart"]:not([data-selected="true"])::after,
+.rev01-element[data-element-type="table"]:not([data-selected="true"])::after,
+.rev01-element[data-element-type="code"]:not([data-selected="true"])::after,
+.rev01-element[data-element-type="form"]:not([data-selected="true"])::after,
+.rev01-element[data-element-type="carousel"]:not([data-selected="true"])::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
 }
 
 /* Resize handles — small white squares with red border, mirrors .selbox .h. */
@@ -2561,6 +2595,46 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 .rev01-editor-header [data-rev01-presence][hidden] {
   display: none;
+}
+
+/* Remote-cursor overlay layer. Position:fixed at the viewport so each
+   caret can be placed straight from a getBoundingClientRect result with
+   no scroll-offset math. pointer-events:none keeps the caret/label
+   ornamental — local interaction always passes through to the canvas
+   beneath. */
+.rev01-presence-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+}
+.rev01-remote-caret {
+  position: fixed;
+  width: 2px;
+  margin-left: -1px;
+  background: #ff6600;
+  border-radius: 1px;
+  animation: rev01-remote-caret-blink 1.05s steps(2, end) infinite;
+}
+.rev01-remote-caret-label {
+  position: fixed;
+  transform: translateY(-100%);
+  padding: 2px 6px;
+  background: #ff6600;
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  border-radius: var(--r-xs) var(--r-xs) var(--r-xs) 0;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@keyframes rev01-remote-caret-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0.35; }
 }
 
 /* -------------------------------------------------------------------------

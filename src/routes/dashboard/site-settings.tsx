@@ -1209,6 +1209,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         <a href="#seo">Search engines</a>
         <a href="#favicon">Favicon</a>
         <a href="#dark-mode">Dark mode</a>
+        <a href={`/dashboard/sites/${owned.id}/a11y`}>Accessibility</a>
         <a href="#collaborators">Collaborators</a>
         <a href="#danger">Delete site</a>
       </nav>

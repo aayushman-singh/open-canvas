@@ -9842,6 +9842,140 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return false;
   }
 
+  // -- Co-edit presence: local identity + remote caret rendering --------
+  // The connector only ships name/color when we call setPresence — the
+  // count pill stayed at 1 until both initialPresence and a caret-
+  // following republish loop existed. Identity is generated client-side
+  // and cached in localStorage so it's stable across reloads without a
+  // server round-trip; a future patch can plumb the real Clerk name.
+  var PRESENCE_PALETTE = [
+    "#ff6600","#0066ff","#22aa55","#cc2266","#aa44dd","#dd9900","#00aaaa","#6677aa"
+  ];
+  function loadPresenceIdentity() {
+    var id = null;
+    try { id = window.localStorage.getItem("rev01-presence-id"); } catch (_) {}
+    if (!id) {
+      id = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+        ? crypto.randomUUID()
+        : String(Math.random()).slice(2) + String(Date.now());
+      try { window.localStorage.setItem("rev01-presence-id", id); } catch (_) {}
+    }
+    var name = null;
+    try { name = window.localStorage.getItem("rev01-presence-name"); } catch (_) {}
+    if (!name) name = "Editor " + String(id).slice(0, 4);
+    var sum = 0;
+    for (var i = 0; i < id.length; i++) sum = (sum + id.charCodeAt(i)) | 0;
+    var color = PRESENCE_PALETTE[Math.abs(sum) % PRESENCE_PALETTE.length];
+    return { name: name, color: color };
+  }
+  var localPresence = loadPresenceIdentity();
+  var presenceLayer = null;
+  var remoteCursors = new Map();
+
+  function ensurePresenceLayer() {
+    if (presenceLayer && presenceLayer.isConnected) return presenceLayer;
+    presenceLayer = document.createElement("div");
+    presenceLayer.className = "rev01-presence-layer";
+    document.body.appendChild(presenceLayer);
+    return presenceLayer;
+  }
+
+  // Resolve a peer's {elementId, offset} to a viewport rect by walking
+  // the wrapper's text nodes until the cumulative length covers the
+  // offset, then collapsing a Range there. Falls back to the wrapper's
+  // bounding box when the element is non-text or the offset is stale
+  // (a common case during remote edits the peer hasn't caught up to).
+  function findCaretRect(elementId, offset) {
+    if (!elementId) return null;
+    var wrapper = document.querySelector(
+      '[data-rev01-element="' + cssEscape(elementId) + '"]'
+    );
+    if (!wrapper) return null;
+    var editable = wrapper.querySelector('[contenteditable]') || wrapper;
+    if (typeof offset === "number" && editable && editable.firstChild) {
+      try {
+        var walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT, null);
+        var node = walker.nextNode();
+        var consumed = 0;
+        while (node) {
+          var len = node.nodeValue ? node.nodeValue.length : 0;
+          if (consumed + len >= offset) {
+            var range = document.createRange();
+            range.setStart(node, Math.max(0, Math.min(len, offset - consumed)));
+            range.collapse(true);
+            var rects = range.getClientRects();
+            if (rects && rects[0] && rects[0].height > 0) {
+              return { left: rects[0].left, top: rects[0].top, height: rects[0].height };
+            }
+            break;
+          }
+          consumed += len;
+          node = walker.nextNode();
+        }
+      } catch (_) { /* fall through to bbox */ }
+    }
+    var bb = wrapper.getBoundingClientRect();
+    if (bb.height <= 0) return null;
+    return { left: bb.left, top: bb.top, height: Math.min(bb.height, 22) };
+  }
+
+  function repaintRemoteCursors() {
+    if (!presenceLayer) return;
+    remoteCursors.forEach(function(entry) {
+      var rect = entry.cursor ? findCaretRect(entry.cursor.elementId, entry.cursor.offset) : null;
+      if (!rect) {
+        entry.caret.style.display = "none";
+        entry.label.style.display = "none";
+        return;
+      }
+      entry.caret.style.display = "";
+      entry.label.style.display = "";
+      entry.caret.style.left = rect.left + "px";
+      entry.caret.style.top = rect.top + "px";
+      entry.caret.style.height = rect.height + "px";
+      entry.label.style.left = rect.left + "px";
+      entry.label.style.top = rect.top + "px";
+    });
+  }
+
+  window.addEventListener("scroll", repaintRemoteCursors, true);
+  window.addEventListener("resize", repaintRemoteCursors);
+
+  // Coalesce selectionchange (fires per keystroke and per mouse-tick
+  // during drag-select) to one publish per frame.
+  var presencePublishPending = false;
+  function schedulePublishLocalPresence() {
+    if (presencePublishPending) return;
+    presencePublishPending = true;
+    requestAnimationFrame(function() {
+      presencePublishPending = false;
+      if (!coEditConnection) return;
+      var sel = window.getSelection();
+      var cursor = null;
+      if (sel && sel.anchorNode) {
+        var anchorEl = sel.anchorNode.nodeType === 1
+          ? sel.anchorNode
+          : sel.anchorNode.parentElement;
+        var wrapper = anchorEl ? anchorEl.closest('[data-rev01-element]') : null;
+        var sectionNode = anchorEl ? anchorEl.closest('[data-rev01-section]') : null;
+        if (wrapper && sectionNode) {
+          cursor = {
+            sectionId: sectionNode.getAttribute('data-rev01-section'),
+            elementId: wrapper.getAttribute('data-rev01-element'),
+            offset: sel.anchorOffset | 0,
+          };
+        }
+      }
+      coEditConnection.setPresence({
+        name: localPresence.name,
+        color: localPresence.color,
+        cursor: cursor,
+        selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
+      });
+    });
+  }
+  document.addEventListener("selectionchange", schedulePublishLocalPresence);
+
   function attachCoEdit() {
     if (typeof window.__rev01CoEdit === "undefined" || !window.__rev01CoEdit || typeof window.__rev01CoEdit.connectCoEdit !== "function") {
       return;
@@ -9868,6 +10002,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // behaviour is self-documenting at this call site.
       reconnectDelayMs: COEDIT_RECONNECT_BASE_DELAY_MS,
       reconnectMaxDelayMs: COEDIT_RECONNECT_MAX_DELAY_MS,
+      // Without this, the awareness filter on the receive side drops every
+      // peer (name/color required) — the "N editing" pill stays at 1 and
+      // remote-cursor rendering has nothing to draw.
+      initialPresence: {
+        name: localPresence.name,
+        color: localPresence.color,
+        cursor: null,
+        selection: null,
+      },
       websocketFactory: function(url) {
         var socket = new WebSocket(url);
         socket.addEventListener("open", function() {
@@ -9919,19 +10062,54 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         mainEl.setAttribute("data-style-kit", state.styleKit);
       }
       renderAll();
+      // renderAll replaces element wrappers, invalidating cached caret
+      // rects. Re-resolve them against the fresh DOM so remote cursors
+      // don't lag a frame behind the new positions.
+      repaintRemoteCursors();
     });
 
     conn.onRemotePresence(function(peers) {
       var pill = document.querySelector("[data-rev01-presence]");
       var counter = document.querySelector("[data-rev01-presence-count]");
-      if (!pill || !counter) return;
-      // Always reveal the pill once the WS is attached and we know the
-      // count — solo edit reads "1 editing", co-edit reads "N editing".
-      // The hidden default in route.tsx covers the pre-connection moment
-      // only.
-      var count = peers.size + 1;
-      counter.textContent = String(count);
-      pill.hidden = false;
+      if (pill && counter) {
+        // Always reveal the pill once the WS is attached and we know the
+        // count — solo edit reads "1 editing", co-edit reads "N editing".
+        // The hidden default in route.tsx covers the pre-connection moment
+        // only.
+        counter.textContent = String(peers.size + 1);
+        pill.hidden = false;
+      }
+      // Diff the rendered cursor set against the active peers: add DOM
+      // for new arrivals, refresh color/name/cursor for known peers,
+      // drop nodes for departed clients.
+      ensurePresenceLayer();
+      var seen = new Set();
+      peers.forEach(function(peer, clientId) {
+        seen.add(clientId);
+        var entry = remoteCursors.get(clientId);
+        if (!entry) {
+          var caret = document.createElement("div");
+          caret.className = "rev01-remote-caret";
+          var label = document.createElement("div");
+          label.className = "rev01-remote-caret-label";
+          presenceLayer.appendChild(caret);
+          presenceLayer.appendChild(label);
+          entry = { caret: caret, label: label, cursor: null };
+          remoteCursors.set(clientId, entry);
+        }
+        entry.caret.style.background = peer.color;
+        entry.label.style.background = peer.color;
+        entry.label.textContent = peer.name;
+        entry.cursor = peer.cursor || null;
+      });
+      remoteCursors.forEach(function(entry, clientId) {
+        if (!seen.has(clientId)) {
+          entry.caret.remove();
+          entry.label.remove();
+          remoteCursors.delete(clientId);
+        }
+      });
+      repaintRemoteCursors();
     });
 
     coEditConnection = conn;
