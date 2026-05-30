@@ -10,6 +10,7 @@
 //   POST   /                       — capture a manual snapshot (label required)
 //   POST   /:snapshotId/restore    — restore a snapshot (with safety capture)
 //   GET    /:snapshotId/preview    — render snapshot HTML for the read-only view
+//   DELETE /:snapshotId             — delete a snapshot (refuses to delete the current published version)
 
 import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
@@ -20,6 +21,7 @@ import { db } from '../db/client.js';
 import { customer, site } from '../db/schema.js';
 
 import { captureManual } from './capture.js';
+import { deleteSnapshot, DeleteError } from './delete.js';
 import { listSnapshots } from './list.js';
 import { renderSnapshotPreview, PreviewRenderError } from './preview-render.js';
 import { requireTurnstileSiteKey } from '../canvas/elements/form.js';
@@ -205,6 +207,34 @@ versionRoute.get('/:snapshotId/preview', async (c) => {
       return c.json({ error: err.message }, err.status as 400);
     }
     throw err;
+  }
+});
+
+// DELETE /:snapshotId — delete a snapshot row. Refuses to delete the
+// snapshot backing the site's current published version (see delete.ts
+// for the boundary rationale).
+versionRoute.delete('/:snapshotId', async (c) => {
+  const customerId = await resolveCustomerId(c);
+  const siteId = c.req.param('siteId');
+  const snapshotId = c.req.param('snapshotId');
+  if (!customerId || !siteId || !snapshotId) {
+    return c.json({ error: 'snapshot not found' }, 404);
+  }
+  const database = db(c.env);
+  const ownedSiteId = await resolveOwnedSiteId(database, siteId, customerId);
+  if (!ownedSiteId) {
+    return c.json({ error: 'snapshot not found' }, 404);
+  }
+  try {
+    await deleteSnapshot(ownedSiteId, snapshotId, database);
+    return c.json({ ok: true });
+  } catch (err) {
+    if (err instanceof DeleteError) {
+      return c.json({ error: err.message }, err.status as 400);
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[version/delete] unexpected delete failure', { siteId, snapshotId, err });
+    return c.json({ error: 'delete failed: ' + message }, 500);
   }
 });
 

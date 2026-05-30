@@ -10079,6 +10079,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           li.appendChild(labelEl);
         }
 
+        var actions = document.createElement("div");
+        actions.style.display = "flex";
+        actions.style.gap = "6px";
+
         var restoreBtn = document.createElement("button");
         restoreBtn.type = "button";
         restoreBtn.textContent = "Restore";
@@ -10111,7 +10115,54 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             restoreBtn.textContent = "Restore";
           });
         });
-        li.appendChild(restoreBtn);
+        actions.appendChild(restoreBtn);
+
+        var deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.style.fontSize = "11px";
+        deleteBtn.style.padding = "3px 10px";
+        deleteBtn.style.borderRadius = "4px";
+        deleteBtn.style.border = "1px solid rgba(255,255,255,0.12)";
+        deleteBtn.style.background = "rgba(255,255,255,0.06)";
+        deleteBtn.style.color = "#f6f7fb";
+        deleteBtn.style.cursor = "pointer";
+        deleteBtn.style.fontFamily = "inherit";
+        deleteBtn.addEventListener("mouseenter", function() {
+          deleteBtn.style.background = "rgba(248,113,113,0.16)";
+          deleteBtn.style.borderColor = "rgba(248,113,113,0.45)";
+          deleteBtn.style.color = "#fca5a5";
+        });
+        deleteBtn.addEventListener("mouseleave", function() {
+          deleteBtn.style.background = "rgba(255,255,255,0.06)";
+          deleteBtn.style.borderColor = "rgba(255,255,255,0.12)";
+          deleteBtn.style.color = "#f6f7fb";
+        });
+        deleteBtn.addEventListener("click", async function() {
+          if (!await openConfirmModal({ title: "Delete snapshot", message: "This permanently removes the snapshot. The current state is not affected." })) return;
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = "Deleting...";
+          authFetch(API_BASE + "/sites/" + SITE_ID + "/snapshots/" + snap.id, {
+            method: "DELETE",
+          })
+          .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || "Delete failed"); });
+            return r.json();
+          })
+          .then(function() {
+            setStatus("Snapshot deleted", "ok");
+            versionsLoaded = false;
+            renderVersionsPanel();
+          })
+          .catch(function(err) {
+            setStatus("Delete failed: " + (err.message || err), "error");
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = "Delete";
+          });
+        });
+        actions.appendChild(deleteBtn);
+
+        li.appendChild(actions);
 
         list.appendChild(li);
       })(versionsList[i]);
