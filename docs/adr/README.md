@@ -37,6 +37,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Proposed | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
 | 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Proposed | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
 | 0028 | Page background uses the buildColorRow swatch+hex pattern | Accepted | [`docs/adr/0028-page-background-colour-picker-verification.md`](0028-page-background-colour-picker-verification.md) |
+| 0029 | Custom-404 toggle on the page inspector | Accepted | [`docs/adr/0029-custom-404-toggle-on-page-inspector.md`](0029-custom-404-toggle-on-page-inspector.md) |
 | 0030 | Audit re-run button reads "Run audit" | Accepted | [`docs/adr/0030-audit-button-label-run-audit.md`](0030-audit-button-label-run-audit.md) |
 | 0031 | Accessibility audit hides the numeric score | Accepted | [`docs/adr/0031-audit-numeric-score-handling.md`](0031-audit-numeric-score-handling.md) |
 | 0032 | CSV export reachable from the top-level Forms inbox | Accepted | [`docs/adr/0032-csv-export-at-top-level-forms-inbox.md`](0032-csv-export-at-top-level-forms-inbox.md) |

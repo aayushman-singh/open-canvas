@@ -4297,6 +4297,100 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     meta.textContent = page.title || page.slug;
     inspector.appendChild(meta);
 
+    // -- Custom 404 toggle ------------------------------------------------
+    // ADR 0029: the slug '_404' IS the custom-404 mechanism; this toggle
+    // is the view onto that fact (no parallel boolean field). Toggle-on
+    // sets page.slug = '_404'. If another page is already '_404' it is
+    // auto-demoted in the same write — the cardinality invariant (at
+    // most one page per site has slug '_404', enforced at
+    // src/canvas/validate.ts:1110) is never transiently violated.
+    // Always-confirm policy (user-chosen) shows a modal on toggle-on
+    // when a demotion is needed AND on toggle-off (significant change
+    // either way).
+    var group404 = document.createElement("div");
+    group404.className = "rev01-page-inspector-group";
+    var h404 = document.createElement("h4");
+    h404.textContent = "Custom 404 page";
+    group404.appendChild(h404);
+    var toggle404Row = document.createElement("label");
+    toggle404Row.style.display = "flex";
+    toggle404Row.style.alignItems = "center";
+    toggle404Row.style.gap = "8px";
+    toggle404Row.style.cursor = "pointer";
+    var toggle404Input = document.createElement("input");
+    toggle404Input.type = "checkbox";
+    toggle404Input.checked = page.slug === "_404";
+    var toggle404Text = document.createElement("span");
+    toggle404Text.textContent = "Use this page as the custom 404";
+    toggle404Row.appendChild(toggle404Input);
+    toggle404Row.appendChild(toggle404Text);
+    function nextFreeSlugFor(targetPage) {
+      var base = (targetPage.title || "page")
+        .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      if (base.length === 0 || base === "_404" || base === "404") base = "page";
+      var slug = base;
+      var counter = 2;
+      while (state.pages.some(function(p) { return p.id !== targetPage.id && p.slug === slug; })) {
+        slug = base + "-" + counter;
+        counter++;
+      }
+      return slug;
+    }
+    toggle404Input.addEventListener("change", function() {
+      if (toggle404Input.checked) {
+        var existing404 = null;
+        for (var i = 0; i < state.pages.length; i++) {
+          if (state.pages[i].id !== page.id && state.pages[i].slug === "_404") {
+            existing404 = state.pages[i];
+            break;
+          }
+        }
+        if (existing404) {
+          var demotedSlug = nextFreeSlugFor(existing404);
+          openConfirmModal({
+            title: "Demote current 404 page",
+            message: 'Page "' + (existing404.title || existing404.slug) + '" is currently your custom 404. Toggling on for this page will demote it to a regular page at slug /' + demotedSlug + '. Continue?',
+            confirmLabel: "Yes, demote and switch",
+          }).then(function(confirmed) {
+            if (!confirmed) { toggle404Input.checked = false; return; }
+            existing404.slug = demotedSlug;
+            page.slug = "_404";
+            captureForUndo();
+            renderAll();
+            updatePageSidebar();
+            renderPageInspector();
+            scheduleSave();
+            setStatus("Custom 404 page set", "ok");
+          });
+        } else {
+          page.slug = "_404";
+          captureForUndo();
+          renderAll();
+          updatePageSidebar();
+          renderPageInspector();
+          scheduleSave();
+          setStatus("Custom 404 page set", "ok");
+        }
+      } else {
+        openConfirmModal({
+          title: "Remove custom 404 status",
+          message: "This page will no longer be your custom 404. Visitors hitting unknown URLs will see the default 404 page.",
+          confirmLabel: "Remove",
+        }).then(function(confirmed) {
+          if (!confirmed) { toggle404Input.checked = true; return; }
+          page.slug = nextFreeSlugFor(page);
+          captureForUndo();
+          renderAll();
+          updatePageSidebar();
+          renderPageInspector();
+          scheduleSave();
+          setStatus("Custom 404 status removed; slug set to /" + page.slug, "ok");
+        });
+      }
+    });
+    group404.appendChild(toggle404Row);
+    inspector.appendChild(group404);
+
     // -- Entrance animation -----------------------------------------------
     var group1 = document.createElement("div");
     group1.className = "rev01-page-inspector-group";

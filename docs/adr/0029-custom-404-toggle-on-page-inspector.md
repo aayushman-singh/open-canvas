@@ -1,6 +1,6 @@
 # ADR 0029 — Custom-404 toggle on the page inspector
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-30
 **Author:** Aayushman Singh
 **Drives:** beat S4.E.1 of [docs/demo/act-1-script.md](../demo/act-1-script.md). The script wants Maya to click the `_404` row, see a "Set as custom 404 page" toggle in the page inspector, and read it as already-on. Today the page inspector renders title, slug, entrance, trigger, motion, and background fields only — no 404 toggle — and the custom-404 mechanism is implicit in the slug literal `_404`.
