@@ -665,6 +665,8 @@ body.rev01-modal-open {
   font-size: 13px;
   color: var(--rev01-fg);
   border: 1px solid transparent;
+  min-width: 0;
+  overflow: hidden;
 }
 .rev01-page-item:hover {
   background: var(--rev01-bg-raised, var(--rev01-bg-panel));
@@ -678,6 +680,7 @@ body.rev01-modal-open {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .rev01-page-item-slug {
   font-family: var(--rev01-font-mono);
@@ -688,6 +691,7 @@ body.rev01-modal-open {
   display: flex;
   gap: 4px;
   opacity: 0;
+  flex-shrink: 0;
 }
 .rev01-page-item:hover .rev01-page-item-actions {
   opacity: 1;
