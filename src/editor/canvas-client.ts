@@ -584,6 +584,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (typeof repaintRemoteCursors === "function") {
       repaintRemoteCursors();
     }
+    // Mark toolbar + link popover anchor to a canvas element via
+    // getBoundingClientRect (which already reflects the camera
+    // transform); window.scroll/resize listeners cover browser scroll
+    // but the canvas-internal pan/zoom never fires those, so the
+    // toolbar would stick to its pre-pan screen position instead of
+    // tracking its element. Re-position both whenever the camera moves.
+    if (typeof onMarkToolbarReflow === "function") {
+      onMarkToolbarReflow();
+    }
   }
 
   function setZoom(newZoom, maxClamp) {
