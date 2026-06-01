@@ -30,6 +30,7 @@ export function renderNotificationEmail<K extends NotificationKind>(
   kind: K,
   payload: PayloadByKind[K],
   ctx: RenderEmailCtx,
+  recipientCustomerId?: string,
 ): RenderedEmail {
   switch (kind) {
     case 'form_submission':
@@ -39,7 +40,7 @@ export function renderNotificationEmail<K extends NotificationKind>(
     case 'publish_event':
       return renderPublishEventEmail(payload as PublishEventPayload, ctx);
     case 'access_event':
-      return renderAccessEventEmail(payload as AccessEventPayload, ctx);
+      return renderAccessEventEmail(payload as AccessEventPayload, ctx, recipientCustomerId);
     default: {
       const _exhaustive: never = kind;
       void _exhaustive;
@@ -175,14 +176,39 @@ function renderPublishEventEmail(
 }
 
 // ----------------------------------------------------------------------------
-// access_event — emailed only to the subject (per email-policy.ts)
+// access_event uses recipient-aware copy: affected Owners get "your access"
+// wording, site onlookers get teammate wording.
 // ----------------------------------------------------------------------------
 
-function renderAccessEventEmail(p: AccessEventPayload, ctx: RenderEmailCtx): RenderedEmail {
+function renderAccessEventEmail(
+  p: AccessEventPayload,
+  ctx: RenderEmailCtx,
+  recipientCustomerId?: string,
+): RenderedEmail {
   const siteUrl = `${ctx.appOrigin}/dashboard/sites/${encodeURIComponent(p.siteId)}`;
   const actorName = p.actorDisplayName;
+  const isSubject = recipientCustomerId === undefined || recipientCustomerId === p.subjectCustomerId;
   switch (p.change) {
     case 'role_changed': {
+      if (!isSubject) {
+        const bodyHtml =
+          `<p style="margin:0 0 8px;">` +
+          `<strong style="color:#1A1917;">${escapeHtml(actorName)}</strong> changed ` +
+          `<strong style="color:#1A1917;">${escapeHtml(p.subjectDisplayName)}</strong>'s role on ` +
+          `<strong style="color:#1A1917;">${escapeHtml(p.siteName)}</strong> from ` +
+          `<strong style="color:#1A1917;">${escapeHtml(p.previousRole)}</strong> to ` +
+          `<strong style="color:#1A1917;">${escapeHtml(p.nextRole ?? 'unknown')}</strong>.` +
+          `</p>`;
+        return {
+          subject: `${p.subjectDisplayName}'s role changed on "${p.siteName}"`,
+          html: brandShell({
+            heading: 'Role changed',
+            bodyHtml,
+            appOrigin: ctx.appOrigin,
+            cta: { label: 'Open site', href: siteUrl },
+          }),
+        };
+      }
       const bodyHtml =
         `<p style="margin:0 0 8px;">` +
         `<strong style="color:#1A1917;">${escapeHtml(actorName)}</strong> changed your role on ` +
@@ -201,6 +227,23 @@ function renderAccessEventEmail(p: AccessEventPayload, ctx: RenderEmailCtx): Ren
       };
     }
     case 'revoked': {
+      if (!isSubject) {
+        const bodyHtml =
+          `<p style="margin:0;">` +
+          `<strong style="color:#1A1917;">${escapeHtml(actorName)}</strong> removed ` +
+          `<strong style="color:#1A1917;">${escapeHtml(p.subjectDisplayName)}</strong>'s access to ` +
+          `<strong style="color:#1A1917;">${escapeHtml(p.siteName)}</strong>.` +
+          `</p>`;
+        return {
+          subject: `${p.subjectDisplayName}'s access to "${p.siteName}" was revoked`,
+          html: brandShell({
+            heading: 'Access revoked',
+            bodyHtml,
+            appOrigin: ctx.appOrigin,
+            cta: { label: 'Open site', href: siteUrl },
+          }),
+        };
+      }
       const bodyHtml =
         `<p style="margin:0;">` +
         `<strong style="color:#1A1917;">${escapeHtml(actorName)}</strong> removed your access to ` +

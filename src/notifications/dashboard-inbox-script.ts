@@ -10,8 +10,7 @@
 //   2. Wire bell click → toggle panel.
 //   3. Wire outside click + Esc → close panel.
 //   4. Wire notif click → POST /:id/read + navigate to context.
-//   5. Poll every 30s for new notifs (ADR 0043 Phase D's SSE will replace
-//      polling — until then this is the live-delivery channel).
+//   5. Subscribe to /api/notifications/stream and backfill on reconnect.
 //
 // All strings rendered into the DOM via textContent — no innerHTML on payload
 // values — so a malicious payload can't surface as injection inside the panel.
@@ -158,22 +157,65 @@ export const notificationsInboxScript = `(function(){
   }
 
   var loaded = false;
-  function fetchInbox() {
-    return fetch('/api/notifications?limit=20', { credentials: 'include' })
-      .then(function(r) { return r.ok ? r.json() : null; })
-      .then(function(data) {
-        if (!data) return;
-        loaded = true;
-        render(data.notifications);
-        setBadge(data.unreadCount);
+  var lastSeenCreatedAt = null;
+  var inboxItems = [];
+  var inboxById = Object.create(null);
+
+  function reportFailure(step, err) {
+    var detail = err instanceof Error ? { message: err.message, stack: err.stack } : String(err);
+    console.error('[notifications/inbox] ' + step + ' failed', detail);
+  }
+
+  function rememberNotifications(items, replace) {
+    if (replace) {
+      inboxItems = [];
+      inboxById = Object.create(null);
+    }
+    (items || []).forEach(function(n) {
+      if (!n || typeof n.id !== 'string') return;
+      if (inboxById[n.id]) {
+        Object.assign(inboxById[n.id], n);
+      } else {
+        inboxById[n.id] = n;
+        inboxItems.push(n);
+      }
+      var created = Date.parse(n.createdAt);
+      var seen = lastSeenCreatedAt ? Date.parse(lastSeenCreatedAt) : NaN;
+      if (!isNaN(created) && (isNaN(seen) || created > seen)) {
+        lastSeenCreatedAt = n.createdAt;
+      }
+    });
+    inboxItems.sort(function(a, b) {
+      return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+    });
+  }
+
+  function fetchInbox(opts) {
+    var since = opts && opts.since ? String(opts.since) : '';
+    var url = '/api/notifications?limit=20';
+    if (since) url += '&since=' + encodeURIComponent(since);
+    return fetch(url, { credentials: 'include' })
+      .then(function(r) {
+        if (r.ok) return r.json();
+        return r.text().then(function(body) {
+          throw new Error('GET ' + url + ' failed: ' + r.status + ' ' + body);
+        });
       })
-      .catch(function() {});
+      .then(function(data) {
+        if (!data || !Array.isArray(data.notifications)) {
+          throw new Error('GET ' + url + ' returned malformed notifications payload');
+        }
+        loaded = true;
+        rememberNotifications(data.notifications, !since);
+        render(inboxItems.slice(0, 20));
+        setBadge(data.unreadCount);
+      });
   }
 
   function openPanel() {
     panel.hidden = false;
     bell.setAttribute('aria-expanded', 'true');
-    if (!loaded) fetchInbox();
+    if (!loaded) fetchInbox().catch(function(err) { reportFailure('open fetch', err); });
   }
   function closePanel() {
     panel.hidden = true;
@@ -207,15 +249,31 @@ export const notificationsInboxScript = `(function(){
     if (!a) return;
     var id = a.getAttribute('data-id');
     if (!id) return;
-    // Fire mark-read in background; let the anchor navigate.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var pendingNavigationHref = a.href;
     fetch('/api/notifications/' + encodeURIComponent(id) + '/read', {
       method: 'POST',
       credentials: 'include',
-    }).catch(function() {});
-    a.classList.remove('unread');
+    })
+      .then(function(r) {
+        if (r.ok) return r.json();
+        return r.text().then(function(body) {
+          throw new Error('POST mark-read failed: ' + r.status + ' ' + body);
+        });
+      })
+      .then(function() {
+        a.classList.remove('unread');
+        return fetchInbox();
+      })
+      .then(function() {
+        window.location.assign(pendingNavigationHref);
+      })
+      .catch(function(err) { reportFailure('mark-read', err); });
   });
 
-  fetchInbox();
+  fetchInbox().catch(function(err) { reportFailure('initial fetch', err); });
 
   // ADR 0043 Phase D live delivery. The /api/notifications/stream endpoint
   // is a long-lived SSE response backed by the per-Customer
@@ -228,7 +286,23 @@ export const notificationsInboxScript = `(function(){
   // rows that landed during the gap.
   if (typeof window.EventSource === 'function') {
     var es = new EventSource('/api/notifications/stream', { withCredentials: true });
-    es.addEventListener('notification', function() { fetchInbox(); });
-    es.addEventListener('read-state-changed', function() { fetchInbox(); });
+    var streamOpened = false;
+    es.addEventListener('open', function() {
+      if (streamOpened && lastSeenCreatedAt) {
+        fetchInbox({ since: lastSeenCreatedAt }).catch(function(err) {
+          reportFailure('stream reconnect backfill', err);
+        });
+      }
+      streamOpened = true;
+    });
+    es.addEventListener('notification', function() {
+      fetchInbox().catch(function(err) { reportFailure('notification event fetch', err); });
+    });
+    es.addEventListener('read-state-changed', function() {
+      fetchInbox().catch(function(err) { reportFailure('read-state event fetch', err); });
+    });
+    es.addEventListener('error', function() {
+      reportFailure('stream transport', new Error('EventSource reported a transport error'));
+    });
   }
 })();`;

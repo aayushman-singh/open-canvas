@@ -23,6 +23,7 @@ import { db } from '../db/client.js';
 import { notification, notificationRead } from '../db/schema.js';
 import { listInbox, unreadCount } from './inbox.js';
 import { markNotificationRead } from './writer.js';
+import type { NotificationOwnerRoomMarker } from './owner-room.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`[inbox-integration-smoke] ${message}`);
@@ -48,6 +49,25 @@ if (!DATABASE_URL || DATABASE_URL.length === 0) {
   throw new Error('DATABASE_URL is required (load .env via bunfig.toml or `bun --env-file=.env`)');
 }
 const database = db({ DATABASE_URL });
+
+function fakeOwnerRoom(): DurableObjectNamespace<NotificationOwnerRoomMarker> {
+  return {
+    idFromName: (name: string) => name,
+    get: () => ({
+      fetch: () => Promise.resolve(Response.json({ ok: true, subscriberCount: 1 })),
+    }),
+  } as unknown as DurableObjectNamespace<NotificationOwnerRoomMarker>;
+}
+
+const MARK_READ_ENV = {
+  DATABASE_URL,
+  APP_DOMAIN: 'opencanvas.aayushman.dev',
+  AUTHORIZED_PARTIES: 'https://opencanvas.aayushman.dev',
+  COOKIE_NAME_PREFIX: '__opencanvas_',
+  EMAIL_FROM: 'Open Canvas <noreply@opencanvas.aayushman.dev>',
+  RESEND_API_KEY: 'not-used-by-mark-read',
+  NOTIFICATION_OWNER_ROOM: fakeOwnerRoom(),
+};
 
 async function seed(): Promise<InsertedIds> {
   const customerUnread = await database
@@ -116,7 +136,7 @@ async function main(): Promise<void> {
     process.stdout.write('[inbox-integration-smoke] baseline OK\n');
 
     // 2. Mark customer-kind unread as read.
-    await markNotificationRead({ db: database, env: {} as never }, ids.customerUnread, CUSTOMER_ID);
+    await markNotificationRead({ db: database, env: MARK_READ_ENV }, ids.customerUnread, CUSTOMER_ID);
     const afterCustomerRead = await listInbox(database, CUSTOMER_ID, { limit: 50 });
     const afterCustomerReadMap = new Map(afterCustomerRead.map((i) => [i.id, i.isRead]));
     assert(
@@ -125,7 +145,7 @@ async function main(): Promise<void> {
     );
 
     // 3. Mark site-kind as read.
-    await markNotificationRead({ db: database, env: {} as never }, ids.siteUnread, CUSTOMER_ID);
+    await markNotificationRead({ db: database, env: MARK_READ_ENV }, ids.siteUnread, CUSTOMER_ID);
     const afterSiteRead = await listInbox(database, CUSTOMER_ID, { limit: 50 });
     const afterSiteReadMap = new Map(afterSiteRead.map((i) => [i.id, i.isRead]));
     assert(afterSiteReadMap.get(ids.siteUnread) === true, 'site-unread flipped to read');
@@ -156,7 +176,7 @@ async function main(): Promise<void> {
     let rejected = false;
     try {
       await markNotificationRead(
-        { db: database, env: {} as never },
+        { db: database, env: MARK_READ_ENV },
         otherSiteNotifId,
         OTHER_CUSTOMER_ID,
       );

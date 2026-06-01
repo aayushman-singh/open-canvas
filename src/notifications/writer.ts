@@ -6,14 +6,12 @@
 //
 //   1. Inserts the `notification` row → id is returned to the caller.
 //   2. For each fanOutCustomerId: looks up the Customer, applies the per-kind
-//      email policy, and sends the email (best-effort; failures are logged
-//      and swallowed because the row IS the contract, the email is the
-//      accelerant — same posture as the existing forms/route.ts pattern).
-//   3. Pushes a live-delivery hint to the per-Owner DO (Phase D — stubbed
-//      here as `notifyOwnerLive` no-op so writer integration can land first).
+//      email policy, and sends the email. Failures are logged with context
+//      and thrown to the caller.
+//   3. Pushes a live-delivery hint to the per-Owner DO.
 //
 // Notif row write is loud-fail: if INSERT fails, the caller sees the throw.
-// Email + live-delivery are best-effort: failures log but do not throw.
+// Email + live-delivery failures log with context and then throw.
 
 import { eq, inArray } from 'drizzle-orm';
 import { customer, notification, type NotificationKind } from '../db/schema.js';
@@ -27,12 +25,10 @@ import { renderNotificationEmail } from './render-email.js';
 import type { NotificationOwnerRoomMarker } from './owner-room.js';
 
 // `NOTIFICATION_OWNER_ROOM` is the SSE pub-sub hub (ADR 0043 Phase D). It is
-// optional in the writer's env so Phase B routes that haven't yet had their
-// Bindings updated (or smoke runtimes without a DO binding) still compile.
-// When undefined, live delivery silently no-ops — polling (Phase C) backfills.
+// required at the writer boundary so a missing binding fails loudly.
 export type WriteNotificationEnv = SendEmailEnv &
   HostConfigEnv & {
-    NOTIFICATION_OWNER_ROOM?: DurableObjectNamespace<NotificationOwnerRoomMarker>;
+    NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
   };
 
 export interface WriteNotificationCtx {
@@ -55,7 +51,7 @@ export async function writeNotification<K extends NotificationKind>(
     throw new Error('writeNotification: insert returned no row');
   }
 
-  // 2. Fan out emails. Best-effort per kind. Resolve all customers in one
+  // 2. Fan out emails. Resolve all customers in one
   // query so the worst case is one DB round-trip plus one email per
   // recipient; for a small site (<10 collaborators) this is fine.
   if (spec.fanOutCustomerIds.length > 0) {
@@ -74,11 +70,13 @@ export async function writeNotification<K extends NotificationKind>(
     for (const recipientId of spec.fanOutCustomerIds) {
       const target = byId.get(recipientId);
       if (!target) {
+        const err = new Error(`writeNotification: fanOut customer ${recipientId} not found`);
         console.error('[notifications/writer] fanOut customer not found', {
           notificationId: inserted.id,
           recipientId,
+          err: { message: err.message, stack: err.stack },
         });
-        continue;
+        throw err;
       }
       if (!shouldEmail(spec.row.kind, spec.row.payload as PayloadByKind[K], recipientId)) {
         continue;
@@ -88,6 +86,7 @@ export async function writeNotification<K extends NotificationKind>(
           spec.row.kind,
           spec.row.payload as PayloadByKind[K],
           { appOrigin: origin },
+          recipientId,
         );
         await sendEmail(ctx.env, {
           to: target.email,
@@ -95,26 +94,20 @@ export async function writeNotification<K extends NotificationKind>(
           html: rendered.html,
         });
       } catch (err) {
-        // Email failure is best-effort per ADR 0043 dec 7: the notif row IS
-        // the contract; the email is a surface on top of it. Log loudly so
-        // operator sees the failure in wrangler tail; do not surface to the
-        // upstream caller (the upstream event already committed and the
-        // user-perceived outcome is the row, not the email).
         console.error('[notifications/writer] email send failed', {
           notificationId: inserted.id,
           recipientId,
           kind: spec.row.kind,
           err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
         });
+        throw err;
       }
     }
   }
 
-  // 3. Live-delivery push (Phase D). The Owner-DO is added in the same PR
-  // that lands the SSE route; until then this is a no-op so writer
-  // integration in Phase B can land independently.
+  // 3. Live-delivery push.
   for (const recipientId of spec.fanOutCustomerIds) {
-    void notifyOwnerLive(ctx.env, recipientId, { kind: 'notification', id: inserted.id });
+    await notifyOwnerLive(ctx.env, recipientId, { kind: 'notification', id: inserted.id });
   }
 
   return { id: inserted.id };
@@ -122,29 +115,41 @@ export async function writeNotification<K extends NotificationKind>(
 
 // Push a live-delivery hint to the per-Customer NotificationOwnerRoom DO. The
 // DO fans out to every SSE stream the Customer's dashboard / editor tabs
-// have open against /api/notifications/stream. Best-effort: a DO failure or
-// missing binding logs and returns — the row in Neon is the contract, the
-// SSE push is the accelerant (ADR 0043 dec 5).
+// have open against /api/notifications/stream. A DO failure or missing
+// binding logs with context and then throws.
 async function notifyOwnerLive(
   env: WriteNotificationEnv,
   customerId: string,
   msg: { kind: 'notification' | 'read-state-changed'; id: string },
 ): Promise<void> {
-  if (env.NOTIFICATION_OWNER_ROOM === undefined) return;
+  if (env.NOTIFICATION_OWNER_ROOM === undefined) {
+    const err = new Error('NOTIFICATION_OWNER_ROOM binding is required for notification delivery');
+    console.error('[notifications/writer] notifyOwnerLive missing binding', {
+      customerId,
+      msg,
+      err: { message: err.message, stack: err.stack },
+    });
+    throw err;
+  }
   try {
     const stubId = env.NOTIFICATION_OWNER_ROOM.idFromName(customerId);
     const stub = env.NOTIFICATION_OWNER_ROOM.get(stubId);
-    await stub.fetch('https://internal/push', {
+    const response = await stub.fetch('https://internal/push', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(msg),
     });
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`NotificationOwnerRoom push failed: ${response.status} ${body}`);
+    }
   } catch (err) {
     console.error('[notifications/writer] notifyOwnerLive failed', {
       customerId,
       msg,
       err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
     });
+    throw err;
   }
 }
 
@@ -223,5 +228,5 @@ export async function markNotificationRead(
   }
 
   // Fan out read-state-changed to the customer's open SSE streams.
-  void notifyOwnerLive(ctx.env, customerId, { kind: 'read-state-changed', id: notificationId });
+  await notifyOwnerLive(ctx.env, customerId, { kind: 'read-state-changed', id: notificationId });
 }

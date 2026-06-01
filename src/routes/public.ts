@@ -12,7 +12,7 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { html, raw } from 'hono/html';
@@ -41,8 +41,8 @@ import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { customer, ownerAsset, site, siteFont } from '../db/schema';
-import { buildCustomerNotif } from '../notifications/constructors';
-import { writeNotification, type WriteNotificationEnv } from '../notifications/writer';
+import { buildCustomerNotif, buildSiteNotif } from '../notifications/constructors';
+import { writeNotification } from '../notifications/writer';
 import type { CollaboratorEventPayload } from '../notifications/kinds';
 import type { NotificationOwnerRoomMarker } from '../notifications/owner-room';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
@@ -108,9 +108,9 @@ type Bindings = HostConfigEnv & {
   // Wave 5 #23 + #24 — Gemini API key for chat agent + auto-translate.
   GEMINI_API_KEY?: string;
   // Resend API key for transactional email (collaborator invitations).
-  RESEND_API_KEY?: string;
+  RESEND_API_KEY: string;
   // ADR 0043 Phase D — SSE pub-sub hub for live notif push to dashboards.
-  NOTIFICATION_OWNER_ROOM?: DurableObjectNamespace<NotificationOwnerRoomMarker>;
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -302,6 +302,7 @@ function escapeAttr(value: string): string {
 
 interface PublicSiteRow {
   id: string;
+  customerId: string;
   name: string;
   subdomain: string;
   styleKit: string;
@@ -362,6 +363,7 @@ async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicS
   const rows = await database
     .select({
       id: site.id,
+      customerId: site.customerId,
       name: site.name,
       subdomain: site.subdomain,
       styleKit: site.styleKit,
@@ -384,6 +386,7 @@ async function loadPublicSiteById(env: Bindings, siteId: string): Promise<Public
   const rows = await database
     .select({
       id: site.id,
+      customerId: site.customerId,
       name: site.name,
       subdomain: site.subdomain,
       styleKit: site.styleKit,
@@ -601,9 +604,31 @@ async function handleAcceptInvite<P extends string, I extends Input>(
         actorDisplayName: null,
       };
       await writeNotification(
-        { db: database, env: c.env as WriteNotificationEnv },
+        { db: database, env: c.env },
         buildCustomerNotif('collaborator_event', subjectCustomerId, payload),
       );
+      const otherCollaborators = await database
+        .select({ customerId: siteCollaborator.customerId })
+        .from(siteCollaborator)
+        .where(
+          and(
+            eq(siteCollaborator.siteId, siteRow.id),
+            isNotNull(siteCollaborator.acceptedAt),
+            ne(siteCollaborator.customerId, subjectCustomerId),
+          ),
+        );
+      const onlookerIds = Array.from(
+        new Set<string>([
+          ...(siteRow.customerId !== subjectCustomerId ? [siteRow.customerId] : []),
+          ...otherCollaborators.map((row) => row.customerId),
+        ]),
+      );
+      if (onlookerIds.length > 0) {
+        await writeNotification(
+          { db: database, env: c.env },
+          buildSiteNotif('collaborator_event', siteRow.id, payload, onlookerIds),
+        );
+      }
     } catch (err) {
       console.error('[public/accept-invite] collaborator_event joined notif failed', {
         siteId: siteRow.id,
