@@ -306,7 +306,12 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   aria-labelledby="notif-bell"
                   hidden
                 >
-                  <div class="notif-panel-head">Notifications</div>
+                  <div class="notif-panel-head">
+                    <span>Notifications</span>
+                    <button type="button" class="notif-mark-all" id="notif-mark-all" hidden>
+                      Mark all read
+                    </button>
+                  </div>
                   <ul class="notif-list" id="notif-list" aria-live="polite">
                     <li class="notif-empty" data-state="loading">
                       Loading…

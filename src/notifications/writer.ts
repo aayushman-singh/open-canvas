@@ -156,7 +156,7 @@ async function notifyOwnerLive(
 // `markNotificationRead` is the read-state mutator referenced by the API
 // layer (Phase C). It lives here because it shares the same DO-notify path:
 // when a tab marks a row read, the other tabs need to update their badge.
-import { and, isNotNull } from 'drizzle-orm';
+import { and, isNotNull, isNull } from 'drizzle-orm';
 import { notificationRead, site, siteCollaborator } from '../db/schema.js';
 
 export async function markNotificationRead(
@@ -229,4 +229,93 @@ export async function markNotificationRead(
 
   // Fan out read-state-changed to the customer's open SSE streams.
   await notifyOwnerLive(ctx.env, customerId, { kind: 'read-state-changed', id: notificationId });
+}
+
+// Bulk mark-read for the calling Customer. Two writes (one per recipient
+// kind) in a single round-trip per kind. The customer-kind branch updates
+// every unread customer-recipient row addressed to the caller; the site-kind
+// branch inserts a notification_read row for every site-recipient row visible
+// to the caller that does not already have one.
+//
+// Visibility scope mirrors src/notifications/inbox.ts's `loadVisibleSiteIds`:
+// sites the caller owns or is an accepted collaborator on.
+//
+// Returns the number of rows newly marked read across both branches so the
+// API can echo it back to the caller for the confirmation modal's display
+// text.
+export async function markAllNotificationsRead(
+  ctx: WriteNotificationCtx,
+  customerId: string,
+): Promise<{ markedRead: number }> {
+  // Customer-kind: simple UPDATE.
+  const customerKindUpdate = await ctx.db
+    .update(notification)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(notification.recipientKind, 'customer'),
+        eq(notification.recipientId, customerId),
+        isNull(notification.readAt),
+      ),
+    )
+    .returning({ id: notification.id });
+
+  // Site-kind: insert notification_read rows for every visible site-recipient
+  // notif that lacks a read row for this customer. Owner-set + collaborator-
+  // set scoped sites.
+  const ownedSites = await ctx.db
+    .select({ id: site.id })
+    .from(site)
+    .where(eq(site.customerId, customerId));
+  const collabSites = await ctx.db
+    .select({ siteId: siteCollaborator.siteId })
+    .from(siteCollaborator)
+    .where(
+      and(
+        eq(siteCollaborator.customerId, customerId),
+        isNotNull(siteCollaborator.acceptedAt),
+      ),
+    );
+  const siteIds = Array.from(
+    new Set<string>([...ownedSites.map((s) => s.id), ...collabSites.map((s) => s.siteId)]),
+  );
+
+  let siteKindInserted = 0;
+  if (siteIds.length > 0) {
+    const unreadSiteRows = await ctx.db
+      .select({ id: notification.id })
+      .from(notification)
+      .leftJoin(
+        notificationRead,
+        and(
+          eq(notificationRead.notificationId, notification.id),
+          eq(notificationRead.customerId, customerId),
+        ),
+      )
+      .where(
+        and(
+          eq(notification.recipientKind, 'site'),
+          inArray(notification.recipientId, siteIds),
+          isNull(notificationRead.readAt),
+        ),
+      );
+    if (unreadSiteRows.length > 0) {
+      await ctx.db
+        .insert(notificationRead)
+        .values(unreadSiteRows.map((r) => ({ notificationId: r.id, customerId })))
+        .onConflictDoNothing();
+      siteKindInserted = unreadSiteRows.length;
+    }
+  }
+
+  const markedRead = customerKindUpdate.length + siteKindInserted;
+
+  // One DO push covers the whole bulk action; the client refetches the inbox
+  // and badge in response to a single read-state-changed event rather than
+  // N events per row.
+  if (markedRead > 0) {
+    await notifyOwnerLive(ctx.env, customerId, { kind: 'read-state-changed', id: 'bulk' });
+  }
+
+  return { markedRead };
 }

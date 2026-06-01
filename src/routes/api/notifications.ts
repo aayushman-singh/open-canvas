@@ -23,7 +23,7 @@ import { db } from '../../db/client.js';
 import { customer } from '../../db/schema.js';
 import { type HostConfigEnv } from '../../host-config.js';
 import { listInbox, unreadCount } from '../../notifications/inbox.js';
-import { markNotificationRead } from '../../notifications/writer.js';
+import { markAllNotificationsRead, markNotificationRead } from '../../notifications/writer.js';
 import type { NotificationOwnerRoomMarker } from '../../notifications/owner-room.js';
 
 type Bindings = HostConfigEnv & {
@@ -107,6 +107,20 @@ notificationsApi.post('/notifications/:id/read', async (c) => {
   }
 
   return c.json({ ok: true });
+});
+
+// Bulk mark-read per ADR 0043 dec 6 Follow-up. Two confirmations live on the
+// client (the dropdown's "Mark all read" button + a confirm modal); the
+// server endpoint is best-effort idempotent and echoes the count of rows
+// newly flipped so the client can render "{N} notifications marked read."
+notificationsApi.post('/notifications/mark-all-read', async (c) => {
+  const customerId = await resolveCustomerId(c);
+  if (!customerId) {
+    return c.json({ error: 'account not found' }, 404);
+  }
+  const database = db(c.env);
+  const { markedRead } = await markAllNotificationsRead({ db: database, env: c.env }, customerId);
+  return c.json({ ok: true, markedRead });
 });
 
 // SSE live-delivery channel per ADR 0043 dec 4. Holds a streaming Response

@@ -20,6 +20,7 @@ export const notificationsInboxScript = `(function(){
   var badge = document.getElementById('notif-badge');
   var panel = document.getElementById('notif-panel');
   var list = document.getElementById('notif-list');
+  var markAll = document.getElementById('notif-mark-all');
   if (!bell || !badge || !panel || !list) return;
 
   function fmtTime(iso) {
@@ -154,6 +155,7 @@ export const notificationsInboxScript = `(function(){
       badge.textContent = '0';
       badge.hidden = true;
     }
+    if (markAll) markAll.hidden = n === 0;
   }
 
   var loaded = false;
@@ -272,6 +274,27 @@ export const notificationsInboxScript = `(function(){
       })
       .catch(function(err) { reportFailure('mark-read', err); });
   });
+
+  if (markAll) {
+    markAll.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var unreadText = badge && !badge.hidden ? badge.textContent : '0';
+      if (!window.confirm('Mark all ' + (unreadText || '0') + ' notifications as read?')) return;
+      fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+        credentials: 'include',
+      })
+        .then(function(r) {
+          if (r.ok) return r.json();
+          return r.text().then(function(body) {
+            throw new Error('POST mark-all-read failed: ' + r.status + ' ' + body);
+          });
+        })
+        .then(function() { return fetchInbox(); })
+        .catch(function(err) { reportFailure('mark-all-read', err); });
+    });
+  }
 
   fetchInbox().catch(function(err) { reportFailure('initial fetch', err); });
 
