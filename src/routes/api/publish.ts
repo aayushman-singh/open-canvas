@@ -47,6 +47,7 @@ import { isNotNull } from 'drizzle-orm';
 import { buildSiteNotif } from '../../notifications/constructors';
 import { writeNotification } from '../../notifications/writer';
 import type { PublishEventPayload, PublishOutcome } from '../../notifications/kinds';
+import type { NotificationOwnerRoomMarker } from '../../notifications/owner-room';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -63,6 +64,8 @@ type Bindings = HostConfigEnv & {
   // ADR 0043 publish_event notif fan-out can send email via src/email/send.ts;
   // the writer requires this in env.
   RESEND_API_KEY: string;
+  // ADR 0043 Phase D — SSE pub-sub hub for live notif push to dashboards.
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };

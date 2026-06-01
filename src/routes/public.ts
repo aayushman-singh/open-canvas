@@ -44,6 +44,7 @@ import { customer, ownerAsset, site, siteFont } from '../db/schema';
 import { buildCustomerNotif } from '../notifications/constructors';
 import { writeNotification, type WriteNotificationEnv } from '../notifications/writer';
 import type { CollaboratorEventPayload } from '../notifications/kinds';
+import type { NotificationOwnerRoomMarker } from '../notifications/owner-room';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
@@ -108,6 +109,8 @@ type Bindings = HostConfigEnv & {
   GEMINI_API_KEY?: string;
   // Resend API key for transactional email (collaborator invitations).
   RESEND_API_KEY?: string;
+  // ADR 0043 Phase D — SSE pub-sub hub for live notif push to dashboards.
+  NOTIFICATION_OWNER_ROOM?: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };

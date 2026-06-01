@@ -23,6 +23,7 @@ import { type HostConfigEnv } from '../host-config.js';
 import type { FormRateLimiterMarker } from '../live/form-rate-limiter-client.js';
 import { buildSiteNotif } from '../notifications/constructors.js';
 import { writeNotification } from '../notifications/writer.js';
+import type { NotificationOwnerRoomMarker } from '../notifications/owner-room.js';
 
 import { exportFormSubmissionsCsv, listFormSubmissions } from './inbox.js';
 import { handleFormSubmit, type SubmitOutcome } from './submit.js';
@@ -37,6 +38,7 @@ type Bindings = HostConfigEnv & {
   WEBHOOK_SIGNING_SECRET: string;
   FORM_RATE_LIMITER: DurableObjectNamespace<FormRateLimiterMarker>;
   RESEND_API_KEY: string;
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };

@@ -170,6 +170,8 @@ app.route('/__api', ownerApi);
 export { SiteRoom } from './live/site-room';
 // Forms rate-limiter DurableObject. Binding lives in wrangler.toml.
 export { FormRateLimiter } from './live/form-rate-limiter';
+// ADR 0043 Phase D — per-Customer SSE pub-sub hub.
+export { NotificationOwnerRoom } from './notifications/owner-room';
 // Named export so tests can use Hono's `.request(...)` helper directly.
 // (The default export is the Worker module-object Cloudflare expects:
 // `{ fetch, scheduled }`. That shape does NOT expose `.request`.)

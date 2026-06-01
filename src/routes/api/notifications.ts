@@ -24,12 +24,14 @@ import { customer } from '../../db/schema.js';
 import { type HostConfigEnv } from '../../host-config.js';
 import { listInbox, unreadCount } from '../../notifications/inbox.js';
 import { markNotificationRead } from '../../notifications/writer.js';
+import type { NotificationOwnerRoomMarker } from '../../notifications/owner-room.js';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   RESEND_API_KEY: string;
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -105,6 +107,22 @@ notificationsApi.post('/notifications/:id/read', async (c) => {
   }
 
   return c.json({ ok: true });
+});
+
+// SSE live-delivery channel per ADR 0043 dec 4. Holds a streaming Response
+// against the per-Customer NotificationOwnerRoom DO. The client (dashboard
+// or editor IIFE) attaches via `new EventSource('/api/notifications/stream')`
+// and listens for 'notification' + 'read-state-changed' events. Each event
+// payload carries `{ id }` only — clients re-fetch /api/notifications to
+// learn the row body, per the no-buffer-in-DO contract.
+notificationsApi.get('/notifications/stream', async (c) => {
+  const customerId = await resolveCustomerId(c);
+  if (!customerId) {
+    return c.json({ error: 'account not found' }, 404);
+  }
+  const stubId = c.env.NOTIFICATION_OWNER_ROOM.idFromName(customerId);
+  const stub = c.env.NOTIFICATION_OWNER_ROOM.get(stubId);
+  return stub.fetch('https://internal/subscribe', { method: 'GET' });
 });
 
 export default notificationsApi;

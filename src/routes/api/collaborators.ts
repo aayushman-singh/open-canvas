@@ -16,6 +16,7 @@ import type {
   CollaboratorEventAction,
   CollaboratorEventPayload,
 } from '../../notifications/kinds.js';
+import type { NotificationOwnerRoomMarker } from '../../notifications/owner-room.js';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -23,6 +24,7 @@ type Bindings = HostConfigEnv & {
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
   RESEND_API_KEY: string;
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };

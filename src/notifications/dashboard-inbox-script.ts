@@ -215,7 +215,20 @@ export const notificationsInboxScript = `(function(){
     a.classList.remove('unread');
   });
 
-  // Initial load + 30s poll (replaced by SSE in ADR 0043 Phase D).
   fetchInbox();
-  setInterval(fetchInbox, 30000);
+
+  // ADR 0043 Phase D live delivery. The /api/notifications/stream endpoint
+  // is a long-lived SSE response backed by the per-Customer
+  // NotificationOwnerRoom DO. Two event kinds:
+  //   - 'notification'        — a new row landed; refetch the inbox.
+  //   - 'read-state-changed'  — another tab marked a row read; refetch so
+  //                             the badge + unread shading stay in sync.
+  // EventSource auto-reconnects on transport drops. Per ADR dec 5 there is
+  // no in-DO buffer; on reconnect the next fetchInbox call backfills any
+  // rows that landed during the gap.
+  if (typeof window.EventSource === 'function') {
+    var es = new EventSource('/api/notifications/stream', { withCredentials: true });
+    es.addEventListener('notification', function() { fetchInbox(); });
+    es.addEventListener('read-state-changed', function() { fetchInbox(); });
+  }
 })();`;

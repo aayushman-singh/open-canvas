@@ -24,8 +24,16 @@ import type { NotificationWriteSpec } from './constructors.js';
 import type { PayloadByKind } from './kinds.js';
 import { shouldEmail } from './email-policy.js';
 import { renderNotificationEmail } from './render-email.js';
+import type { NotificationOwnerRoomMarker } from './owner-room.js';
 
-export type WriteNotificationEnv = SendEmailEnv & HostConfigEnv;
+// `NOTIFICATION_OWNER_ROOM` is the SSE pub-sub hub (ADR 0043 Phase D). It is
+// optional in the writer's env so Phase B routes that haven't yet had their
+// Bindings updated (or smoke runtimes without a DO binding) still compile.
+// When undefined, live delivery silently no-ops — polling (Phase C) backfills.
+export type WriteNotificationEnv = SendEmailEnv &
+  HostConfigEnv & {
+    NOTIFICATION_OWNER_ROOM?: DurableObjectNamespace<NotificationOwnerRoomMarker>;
+  };
 
 export interface WriteNotificationCtx {
   db: Db;
@@ -112,19 +120,32 @@ export async function writeNotification<K extends NotificationKind>(
   return { id: inserted.id };
 }
 
-// Stub. Phase D replaces this with a DO RPC into NotificationOwnerRoom.
-// SSE clients receive their events through the DO; until Phase D wires it,
-// the polling path (Phase C) is the only live-delivery channel. Declared
-// async so the signature matches what Phase D will need (DO RPCs are async).
-function notifyOwnerLive(
+// Push a live-delivery hint to the per-Customer NotificationOwnerRoom DO. The
+// DO fans out to every SSE stream the Customer's dashboard / editor tabs
+// have open against /api/notifications/stream. Best-effort: a DO failure or
+// missing binding logs and returns — the row in Neon is the contract, the
+// SSE push is the accelerant (ADR 0043 dec 5).
+async function notifyOwnerLive(
   env: WriteNotificationEnv,
   customerId: string,
   msg: { kind: 'notification' | 'read-state-changed'; id: string },
 ): Promise<void> {
-  void env;
-  void customerId;
-  void msg;
-  return Promise.resolve();
+  if (env.NOTIFICATION_OWNER_ROOM === undefined) return;
+  try {
+    const stubId = env.NOTIFICATION_OWNER_ROOM.idFromName(customerId);
+    const stub = env.NOTIFICATION_OWNER_ROOM.get(stubId);
+    await stub.fetch('https://internal/push', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(msg),
+    });
+  } catch (err) {
+    console.error('[notifications/writer] notifyOwnerLive failed', {
+      customerId,
+      msg,
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+    });
+  }
 }
 
 // `markNotificationRead` is the read-state mutator referenced by the API
