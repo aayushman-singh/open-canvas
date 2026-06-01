@@ -163,6 +163,7 @@ export interface LibraryCatalogEntry {
   visibility: 'global' | 'private';
   templateId?: string;
   templateName?: string;
+  sectionId?: string;
   librarySectionId?: string;
 }
 
@@ -176,6 +177,7 @@ function seedEntryToCatalog(entry: SectionCatalogEntry): LibraryCatalogEntry {
     visibility: 'global',
     templateId: entry.templateId,
     templateName: entry.templateName,
+    sectionId: entry.sectionId,
   };
 }
 
