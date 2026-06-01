@@ -126,6 +126,11 @@ export async function readOwnerAsset(
       headers: {
         'content-type': object.httpMetadata?.contentType ?? row.mediaType,
         'cache-control': CACHE_CONTROL_IMMUTABLE,
+        // Defence-in-depth for the SVG upload deny in src/assets/upload.ts:
+        // even if a mediaType-spoofed upload survives the boundary check,
+        // nosniff prevents the browser from re-typing the response as SVG
+        // and executing inline scripts.
+        'x-content-type-options': 'nosniff',
       },
     });
   }
@@ -143,6 +148,7 @@ export async function readOwnerAsset(
   // returning the right Content-Type — we pass it through verbatim.
   const headers = new Headers(cfImageResponse.headers);
   headers.set('cache-control', CACHE_CONTROL_IMMUTABLE);
+  headers.set('x-content-type-options', 'nosniff');
   return new Response(cfImageResponse.body, {
     status: cfImageResponse.status,
     headers,

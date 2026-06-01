@@ -77,6 +77,14 @@ export interface UploadAssetDeps {
 
 const ALLOWED_MEDIA_PREFIXES = ['image/', 'video/'];
 
+// SVG carries executable script content; serving an Owner-uploaded SVG from
+// the same origin as the editor and dashboard is a stored-XSS surface. The
+// canvas renderer has no use for SVG that PNG/JPEG/AVIF cannot satisfy, so
+// reject at the upload boundary. Mirror the deny on the read path with
+// `X-Content-Type-Options: nosniff` so a mediaType-spoofed upload cannot be
+// re-typed as SVG by the browser.
+const DENIED_MEDIA_TYPES = new Set(['image/svg+xml', 'image/svg']);
+
 export class UploadAssetError extends Error {
   status: number;
   constructor(message: string, status = 400) {
@@ -103,6 +111,11 @@ export async function uploadOwnerAsset(
   if (!ALLOWED_MEDIA_PREFIXES.some((prefix) => input.mediaType.startsWith(prefix))) {
     throw new UploadAssetError(
       `unsupported media type: ${input.mediaType} (must start with image/ or video/)`,
+    );
+  }
+  if (DENIED_MEDIA_TYPES.has(input.mediaType.toLowerCase())) {
+    throw new UploadAssetError(
+      `unsupported media type: ${input.mediaType} (SVG uploads are not permitted)`,
     );
   }
   if (input.bytes.byteLength === 0) {
