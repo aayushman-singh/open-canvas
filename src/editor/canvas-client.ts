@@ -2232,7 +2232,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     undoTimer = setTimeout(function() {
       undoTimer = null;
       flushPendingUndoCapture();
-    }, 800);
+    }, 0);
   }
 
   function flushPendingUndoCapture() {
