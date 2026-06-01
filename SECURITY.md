@@ -13,7 +13,7 @@ Please do **not** open a public GitHub issue for security problems.
 Use either channel:
 
 1. GitHub's private vulnerability reporting:
-   <https://github.com/aayushman-singh/opencanvas/security/advisories/new>
+   <https://github.com/aayushman-singh/open-canvas/security/advisories/new>
 2. Email: kremzylo@gmail.com (subject line starting with `[security]`)
 
 Include: affected URL or commit SHA, reproduction steps, observed impact, and
