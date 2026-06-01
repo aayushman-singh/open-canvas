@@ -579,6 +579,60 @@ body.opencanvas-modal-open {
   border-radius: var(--r-sm);
 }
 
+/* Generic spinner pill — one CSS class, applied wherever we used to
+   render a bare "Loading…" string. Sized via font-size so callers can
+   tune it inline (status pill gets the line-height equivalent;
+   inspector buttons get a small inline glyph). Brand red by default so
+   it matches the rest of the editor without per-call-site colour
+   bookkeeping. */
+.opencanvas-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: opencanvas-spinner-spin 0.7s linear infinite;
+  color: var(--red);
+  vertical-align: -0.18em;
+}
+.opencanvas-spinner[data-size="sm"] { width: 0.9em; height: 0.9em; border-width: 1.5px; }
+.opencanvas-spinner[data-size="lg"] { width: 1.4em; height: 1.4em; }
+.opencanvas-spinner[data-tone="ink"] { color: var(--ink); }
+.opencanvas-spinner[data-tone="mute"] { color: var(--ink-3); }
+@keyframes opencanvas-spinner-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Chat "thinking" bubble shown immediately on submit, removed when the
+   first SSE event lands. Three dots bouncing in sequence so the panel
+   doesn't sit dead while the model does its first round-trip. */
+.opencanvas-chat-thinking {
+  align-self: flex-start;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  padding: 13px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.opencanvas-chat-thinking-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+  animation: opencanvas-thinking-bounce 1.1s ease-in-out infinite;
+}
+.opencanvas-chat-thinking-dot:nth-child(2) { animation-delay: 0.18s; }
+.opencanvas-chat-thinking-dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes opencanvas-thinking-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
 /* AI chat suggestion card — replaces the old "Proposed: rewriteText"
    one-liner. Each pending op gets a card with a human-readable
    description, accept/reject buttons, and a click target that focuses

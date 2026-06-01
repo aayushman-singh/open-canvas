@@ -853,13 +853,29 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function setStatus(text, tone) {
     if (!statusEl) return;
-    statusEl.textContent = text;
+    statusEl.textContent = "";
     statusEl.className = "";
+    // Auto-decorate "…" / in-progress statuses with a spinner so the
+    // owner has a visual loading cue without us threading a per-call
+    // spinner attribute through every setStatus call site. The trailing
+    // ellipsis (typed three dots or the … glyph) is the canonical
+    // marker we already use ("Asking the assistant...", "Uploading...",
+    // "Inserting section…").
+    var endsWithEllipsis = /(…|\.\.\.)$/.test(text);
+    if (endsWithEllipsis && tone !== "error") {
+      var spinner = document.createElement("span");
+      spinner.className = "opencanvas-spinner";
+      spinner.setAttribute("data-size", "sm");
+      spinner.setAttribute("aria-hidden", "true");
+      spinner.style.marginRight = "6px";
+      statusEl.appendChild(spinner);
+    }
+    statusEl.appendChild(document.createTextNode(text));
     if (tone === "error") statusEl.classList.add("error");
     if (tone === "ok") statusEl.classList.add("ok");
     if (statusTimer) clearTimeout(statusTimer);
     statusTimer = setTimeout(() => {
-      if (statusEl.textContent === text) {
+      if (statusEl.textContent === text || statusEl.textContent.endsWith(text)) {
         // Idle default is "Saved" — every mutation goes through scheduleSave,
         // so once the toast fades we're back in the synced/saved baseline.
         // The presence pill in the header carries viewer count separately.
@@ -10624,6 +10640,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (target.closest('#canvas-sidebar')) return;
       if (target.closest('.opencanvas-link-popover')) return;
       if (target.closest('.opencanvas-mark-toolbar')) return;
+      // Chat panel reads selectedElementId into its payload to give the
+      // agent context ("change this element"); dropping selection on
+      // chat focus defeats the whole "talk about my selection" flow.
+      if (target.closest('#canvas-chat-panel')) return;
       if (selectedElementId) selectElement(null);
       if (selectedSectionId) selectSection(null);
     });
@@ -12423,6 +12443,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           var submitBtn = chatForm.querySelector("button[type=submit]");
           if (submitBtn) submitBtn.disabled = true;
 
+          // Thinking bubble: bouncing-dots placeholder shown immediately so
+          // the panel does not sit dead while the model warms up. Removed
+          // as soon as the first SSE event lands (any kind) so the real
+          // streaming bubble can take its place.
+          var thinkingEl = document.createElement("div");
+          thinkingEl.className = "opencanvas-chat-thinking";
+          for (var ti = 0; ti < 3; ti++) {
+            var dot = document.createElement("span");
+            dot.className = "opencanvas-chat-thinking-dot";
+            thinkingEl.appendChild(dot);
+          }
+          chatMessages.appendChild(thinkingEl);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+          function removeThinking() {
+            if (thinkingEl && thinkingEl.parentNode) {
+              thinkingEl.parentNode.removeChild(thinkingEl);
+              thinkingEl = null;
+            }
+          }
+
           var payload = { message: msg };
           if (chatSessionId) payload.sessionId = chatSessionId;
           if (selectedElementId && !chatSelectionDropped) {
@@ -12439,6 +12479,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             body: JSON.stringify(payload),
           }).then(function(response) {
             if (!response.ok) {
+              removeThinking();
               appendChatMessage("error", "Chat request failed: " + response.status);
               chatBusy = false;
               if (submitBtn) submitBtn.disabled = false;
@@ -12448,13 +12489,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             var decoder = new TextDecoder();
             var buffer = "";
             var assistantText = "";
-            var msgDiv = document.createElement("div");
-            msgDiv.className = "opencanvas-chat-msg assistant";
-            chatMessages.appendChild(msgDiv);
+            var msgDiv = null;
+            function ensureAssistantBubble() {
+              removeThinking();
+              if (msgDiv) return msgDiv;
+              msgDiv = document.createElement("div");
+              msgDiv.className = "opencanvas-chat-msg assistant";
+              chatMessages.appendChild(msgDiv);
+              return msgDiv;
+            }
 
             function readChunk() {
               reader.read().then(function(result) {
                 if (result.done) {
+                  removeThinking();
                   chatBusy = false;
                   if (submitBtn) submitBtn.disabled = false;
                   return;
@@ -12473,9 +12521,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                         chatSessionId = data.sessionId || chatSessionId;
                       } else if (kind === "token") {
                         assistantText += data.text || data.token || "";
-                        msgDiv.textContent = assistantText;
+                        var bubble = ensureAssistantBubble();
+                        bubble.textContent = assistantText;
                         chatMessages.scrollTop = chatMessages.scrollHeight;
                       } else if (kind === "tool-call") {
+                        removeThinking();
                         appendChatMessage("assistant", "[Calling " + (data.name || "tool") + "]");
                       } else if (kind === "op-preview") {
                         // IIFE-scope the op + toolName snapshots so each
@@ -12566,9 +12616,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                           chatMessages.scrollTop = chatMessages.scrollHeight;
                           refreshAcceptAllButton();
                         })(data.op, data.toolName);
+                        removeThinking();
                       } else if (kind === "error") {
+                        removeThinking();
                         appendChatMessage("error", data.error || data.message || "Agent error");
                       } else if (kind === "done") {
+                        removeThinking();
                         chatBusy = false;
                         if (submitBtn) submitBtn.disabled = false;
                       }
@@ -12577,6 +12630,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                 }
                 readChunk();
               }).catch(function(err) {
+                removeThinking();
                 appendChatMessage("error", "Stream error: " + (err.message || String(err)));
                 chatBusy = false;
                 if (submitBtn) submitBtn.disabled = false;
