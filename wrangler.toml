@@ -91,7 +91,11 @@ bucket_name = "rev01-assets"
 #   WEBHOOK_SIGNING_SECRET — HMAC-SHA256 secret signing outbound form webhooks.
 #
 # Required by Wave 2 #9 (password publish, plan 09):
-#   UNLOCK_SIGNING_SECRET — HMAC-SHA256 secret signing visitor unlock cookies.
+#   UNLOCK_SIGNING_SECRET — HMAC-SHA256 secret. Per ADR 0044 this single
+#   secret signs THREE token classes: visitor unlock cookies, editor
+#   session tokens, and collaborator invite tokens. Rotation invalidates
+#   every issued token in every class at once — there is no partial
+#   rotation. See docs/adr/0044-single-hmac-secret-for-signed-tokens.md.
 #
 # Required by collaborator invitations:
 #   RESEND_API_KEY        — Resend.com API key for transactional email.
