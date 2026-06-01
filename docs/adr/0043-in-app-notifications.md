@@ -1,10 +1,10 @@
-# ADR 0043 — In-app notifications: persistent, recipient-tagged, delivered live over the existing site-room socket
+# ADR 0043 — In-app notifications: persistent, recipient-tagged, delivered live over SSE
 
 **Status:** Accepted
 **Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the Owner-asks-have-I-missed-anything gap. Today an Owner who steps away from the editor has no signal that a form was submitted, a collaborator joined, a publish failed, or their own access was revoked — they have to remember to check the Forms inbox, the collaborators panel, the publish history, and the Site Settings page. The events exist; the Owner-perceived signal does not.
-**Accepted-context:** shipped same day as drafted. Phase A-F all merged: Drizzle schema + writer + email policy + read API + dashboard bell + editor bell + SSE Durable Object. Implementation deviated from one Decision-4 sub-clause (unified SSE for editor + dashboard rather than splitting by surface); the deviation is named inline in dec 4 with rationale. Five real-world readiness items captured in Follow-ups before flipping Accepted, most notably H8 from `docs/discoveries-2026-06-01-codereview.md` (form_submission notif-write swallows failures) which carries into v1 and is named explicitly.
+**Accepted-context:** shipped same day as drafted. Phase A-F all merged: Drizzle schema + writer + email policy + read API + dashboard bell + editor bell + SSE Durable Object. Two implementation deviations from the draft survived into the as-built design and are documented inline: (a) dec-4 unified SSE for editor + dashboard rather than splitting by surface (cheaper second connection per tab beats two transports + two client subscribers); (b) dec-7's "send-or-fail-loudly" runs strictly inside `writeNotification` (tightened post-acceptance in `f44eacc fix(notifications): enforce ADR delivery contracts`) — the form-submission route swallows the writer throw as a deliberate visitor-facing carve-out (per `src/forms/route.ts:106-120` and discoveries dossier H8). The proper retryable-backfill fix for that carve-out lives in Follow-ups below.
 
 ## Context
 
@@ -72,6 +72,8 @@ Some of the events are addressed to *me, the person* (somebody invited me; someb
    Per-kind email policy: `form_submission` → always email. `access_event` → always email (Owner cannot recover from a silent revoke). `publish_event` → email *only on failure*; success is already visible in the editor and emailing every successful publish becomes spam. `collaborator_event` → email when *I* am the subject (invited, role changed); skip when only my teammate is the subject (site-feed only). The policy lives in `src/notifications/email-policy.ts` alongside the kind constants.
 
    This would be wrong if the Owner perceived the email as duplicative noise (the in-app + the email arriving within seconds of each other). The per-kind policy above is the mitigation: email only fires for kinds where off-app reachability is the load-bearing property. If real usage data shows email volume is still too high, the follow-up is a digest mode (still send-at-write but bundle into hourly summaries); that is a separate ADR amendment.
+
+   *Implementation note (2026-06-01):* the writer (`src/notifications/writer.ts`) honours this decision strictly — an email send failure throws to the caller; a DO push failure throws to the caller. Admin-action routes (collaborators, publish) let the throw bubble up to a 5xx so the actor sees the failure. The form-submission route catches the throw with a logged-loud `console.error` and returns visitor success regardless. That route is the deliberate path-specific carve-out: the Visitor's contract is "the form submission row landed" (which the upstream `handleFormSubmit` has already satisfied), not "the Owner notif fan-out succeeded." Surfacing the failure as a visitor 500 would loop the Visitor through a resubmit and double the `form_submission` row count without helping the Owner. The remaining gap (Owner never gets the notif if the writer throws) is named in Follow-ups as a retryable backfill from `form_submission` rows.
 
 ## Out of scope
 
