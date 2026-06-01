@@ -5177,8 +5177,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!section) {
       inspector.hidden = true;
       inspector.replaceChildren();
+      inspectorRenderSubject = null;
       return;
     }
+    preserveInspectorScrollFor('section:' + section.id);
     revokePendingPreviews();
     inspector.replaceChildren();
     inspector.hidden = false;
@@ -5485,7 +5487,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function renderPageInspector() {
     if (!inspector) return;
     var page = currentPage();
-    if (!page) { inspector.hidden = true; inspector.replaceChildren(); return; }
+    if (!page) {
+      inspector.hidden = true;
+      inspector.replaceChildren();
+      inspectorRenderSubject = null;
+      return;
+    }
+    preserveInspectorScrollFor('page:' + page.id);
     revokePendingPreviews();
     inspector.replaceChildren();
     inspector.hidden = false;
@@ -5907,12 +5915,36 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return row;
   }
 
+  // Track which "subject" the inspector is currently showing so we know
+  // whether to preserve the scroll position across a re-render. Same
+  // subject (e.g. changing a field on the selected element) keeps the
+  // scroll; selecting a different element / section / nothing resets to
+  // top because the user just navigated.
+  var inspectorRenderSubject = null;
+  function preserveInspectorScrollFor(nextSubject) {
+    if (!inspector) return;
+    if (inspectorRenderSubject !== nextSubject) {
+      inspectorRenderSubject = nextSubject;
+      return;
+    }
+    var saved = inspector.scrollTop;
+    if (saved <= 0) return;
+    // Restore after the next paint so the freshly-built field tree has
+    // settled its layout. requestAnimationFrame is enough — the rebuild
+    // is synchronous, so scrollTop is meaningful by the next frame.
+    requestAnimationFrame(function () {
+      if (!inspector) return;
+      inspector.scrollTop = saved;
+    });
+  }
+
   function renderInspector() {
     if (!inspector) return;
     if (isReelOpen) {
       inspector.hidden = true;
       revokePendingPreviews();
       inspector.replaceChildren();
+      inspectorRenderSubject = null;
       return;
     }
     if (!selectedElementId) {
@@ -5928,10 +5960,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       inspector.hidden = true;
       revokePendingPreviews();
       inspector.replaceChildren();
+      inspectorRenderSubject = null;
       return;
     }
     inspector.hidden = false;
     const { element, section } = found;
+    preserveInspectorScrollFor('element:' + element.id);
     revokePendingPreviews();
     inspector.replaceChildren();
 
@@ -6336,6 +6370,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         element.motion = next;
       }
       rebuildElement(element.id);
+      // Replace + reapply the data-motion-preset attribute on the freshly-
+      // rebuilt wrapper so the kit's CSS animation actually fires. Without
+      // this the wrapper-replacement alone landed inside the same paint as
+      // the attribute, and Chromium occasionally short-circuited the
+      // keyframe restart — owners read it as "picking a preset does
+      // nothing." replayAnimations forces a layout read so the animation
+      // restarts deterministically.
+      if (element.motion) replayAnimations(element.id);
       renderInspector();
       scheduleSave();
     });
@@ -6350,6 +6392,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (Number.isFinite(n) && n >= 0 && n <= 2000) {
           element.motion.delayMs = n;
           rebuildElement(element.id);
+          replayAnimations(element.id);
           scheduleSave();
         }
       });
