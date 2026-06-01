@@ -554,3 +554,83 @@ export const siteAddon = pgTable(
 
 export type SiteAddon = typeof siteAddon.$inferSelect;
 export type NewSiteAddon = typeof siteAddon.$inferInsert;
+
+// -- notification + notificationRead (ADR 0043) ------------------------------
+//
+// In-app notifications, hybrid recipient model: a row is either addressed to
+// one customer (recipientKind='customer') or one site (recipientKind='site').
+// Fan-out happens at write time — e.g. revoking access on a shared site writes
+// one 'customer' row for the affected person plus one 'site' row for the
+// others. The ADR uses "Owner" as the user-facing word; the DB table is
+// `customer`, so the schema follows that convention.
+//
+// `recipientId` is polymorphic and intentionally not foreign-keyed (the column
+// points at either customer.id or site.id depending on recipientKind). Orphan
+// rows after a customer/site delete are not user-visible (the inbox query
+// gates on current membership) and the 90-day TTL sweep (Follow-ups in ADR
+// 0043) collects them.
+export const NOTIFICATION_KINDS = [
+  'form_submission',
+  'collaborator_event',
+  'publish_event',
+  'access_event',
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const NOTIFICATION_RECIPIENT_KINDS = ['customer', 'site'] as const;
+export type NotificationRecipientKind = (typeof NOTIFICATION_RECIPIENT_KINDS)[number];
+
+export const notification = pgTable(
+  'notification',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    kind: text('kind').notNull().$type<NotificationKind>(),
+    recipientKind: text('recipient_kind').notNull().$type<NotificationRecipientKind>(),
+    recipientId: text('recipient_id').notNull(),
+    payload: jsonb('payload').notNull().$type<Record<string, unknown>>(),
+    // Only consulted when recipientKind='customer'. Site-kind rows track read
+    // state per collaborator in the notification_read table below.
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (t) => ({
+    recipientCreatedIdx: index('notification_recipient_created_idx').on(
+      t.recipientKind,
+      t.recipientId,
+      t.createdAt.desc(),
+    ),
+  }),
+);
+
+export type Notification = typeof notification.$inferSelect;
+export type NewNotification = typeof notification.$inferInsert;
+
+// Per-collaborator read state for site-kind notifications. Absence of a row
+// for (notification, customer) means "unread for that customer." The inbox
+// query LEFT JOINs this table for site-kind rows; customer-kind rows use
+// `notification.readAt` directly. Cascade-delete tracks the notification and
+// the customer rows.
+export const notificationRead = pgTable(
+  'notification_read',
+  {
+    notificationId: text('notification_id')
+      .notNull()
+      .references(() => notification.id, { onDelete: 'cascade' }),
+    customerId: text('customer_id')
+      .notNull()
+      .references(() => customer.id, { onDelete: 'cascade' }),
+    readAt: timestamp('read_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.notificationId, t.customerId] }),
+    customerReadAtIdx: index('notification_read_customer_read_at_idx').on(
+      t.customerId,
+      t.readAt.desc(),
+    ),
+  }),
+);
+
+export type NotificationRead = typeof notificationRead.$inferSelect;
+export type NewNotificationRead = typeof notificationRead.$inferInsert;

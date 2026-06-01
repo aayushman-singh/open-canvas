@@ -92,6 +92,13 @@
       "when": 1780300800000,
       "tag": "0012_visitor_theme_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780290025645,
+      "tag": "0013_notifications",
+      "breakpoints": true
     }
   ]
 }
