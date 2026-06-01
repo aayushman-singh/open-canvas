@@ -3205,6 +3205,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (element.motion) {
       wrapper.setAttribute("data-motion-preset", element.motion.preset);
       wrapper.setAttribute("data-motion-delay-ms", String(element.motion.delayMs || 0));
+      // Drive animation-delay via the same CSS variable the kit rules read on
+      // the published page; without this the data-motion-delay-ms attr was a
+      // dead label and every element on the page animated at t=0.
+      if (element.motion.delayMs && element.motion.delayMs > 0) {
+        wrapper.style.setProperty("--opencanvas-motion-delay", String(element.motion.delayMs) + "ms");
+      }
     }
     setBoxStyle(wrapper, element.box);
     applyElementStyle(wrapper, element);

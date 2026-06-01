@@ -103,6 +103,14 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
       entries.push([safeKey, safeValue]);
     }
   }
+  // CSS variable read by the kit's [data-motion-preset] rules to drive
+  // animation-delay. Without this, every element animation on a page started
+  // at t=0 regardless of the Owner's per-element delayMs, which made staggered
+  // entrances visually indistinguishable from a single simultaneous flash.
+  if (element.motion !== undefined) {
+    const delay = element.motion.delayMs ?? 0;
+    if (delay > 0) entries.push(['--opencanvas-motion-delay', `${String(delay)}ms`]);
+  }
   return styleFromEntries(entries);
 }
 

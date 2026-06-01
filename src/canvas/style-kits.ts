@@ -906,8 +906,16 @@ function buildMotionBlock(kitName: string): string {
   const ns = `opencanvas-${kitName}`;
   const dur = 'var(--opencanvas-kit-motion-duration)';
   const eas = 'var(--opencanvas-kit-motion-easing)';
+  // Per-element animation-delay is driven by the `--opencanvas-motion-delay`
+  // custom property the renderer sets on the wrapper from
+  // element.motion.delayMs. Without this, the `data-motion-delay-ms`
+  // attribute was set but no CSS ever consumed it, so all entrance
+  // animations on a page fired simultaneously (and the editor's
+  // "Replay all animations" looked broken because everything finished in
+  // one ~300ms flash instead of staggering across the page).
+  const dly = 'var(--opencanvas-motion-delay, 0s)';
   const entranceRule = (p: MotionPreset): string =>
-    `[data-style-kit=${sk}] [data-motion-preset="${p}"] {\n  animation: ${ns}-${p} ${dur} ${eas} both;\n}`;
+    `[data-style-kit=${sk}] [data-motion-preset="${p}"] {\n  animation: ${ns}-${p} ${dur} ${eas} ${dly} both;\n}`;
   const rules: string[] = [];
   for (const p of MOTION_PRESETS) {
     if (p === 'none') continue;
@@ -921,13 +929,13 @@ function buildMotionBlock(kitName: string): string {
   // (bounce-in, stagger-children, slow-drift, parallax-soft) so the CSS
   // cascade matches `MOTION_PRESETS` exactly.
   rules.push(
-    `[data-style-kit=${sk}] [data-motion-preset="bounce-in"] {\n  animation: ${ns}-bounce-in ${dur} ${eas} both;\n  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);\n}`,
+    `[data-style-kit=${sk}] [data-motion-preset="bounce-in"] {\n  animation: ${ns}-bounce-in ${dur} ${eas} ${dly} both;\n  animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);\n}`,
   );
   rules.push(
-    `[data-style-kit=${sk}] [data-motion-preset="stagger-children"] {\n  animation: ${ns}-fade-up ${dur} ${eas} both;\n}`,
+    `[data-style-kit=${sk}] [data-motion-preset="stagger-children"] {\n  animation: ${ns}-fade-up ${dur} ${eas} ${dly} both;\n}`,
   );
   rules.push(
-    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: ${ns}-slow-drift calc(${dur} * 4) ease-in-out infinite;\n}`,
+    `[data-style-kit=${sk}] [data-motion-preset="slow-drift"] {\n  animation: ${ns}-slow-drift calc(${dur} * 4) ease-in-out ${dly} infinite;\n}`,
   );
   rules.push(entranceRule('parallax-soft'));
   return rules.join('\n');
