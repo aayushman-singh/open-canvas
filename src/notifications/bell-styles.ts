@@ -59,6 +59,7 @@ export const bellStyles = `
   flex-direction: column;
   overflow: hidden;
 }
+.notif-panel[hidden] { display: none; }
 .notif-panel-head {
   padding: 14px 18px;
   font-weight: 700;
