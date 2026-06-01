@@ -1,6 +1,6 @@
 # ADR 0045 — SiteRoom broadcasts Yjs updates to peers before autosave persistence completes
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-01
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the broadcast-before-persist ordering as a contract that [ADR 0007](0007-yjs-revival.md)'s "750ms debounce loss window" framing under-specified. This ADR makes the ordering explicit and names its failure modes.

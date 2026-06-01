@@ -1,6 +1,6 @@
 # ADR 0048 — Chat session is last-writer-wins; concurrent tab writes are out of scope
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-01
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the chat-session UPDATE as a concurrent-write hole. The bug-fix triage deferred a schema migration for it; this ADR ratifies the deferral and names the migration shape.

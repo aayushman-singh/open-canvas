@@ -50,6 +50,11 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0040 | Apogee Showcase fixture canonical URLs derive from request host at emit time | Accepted | [`docs/adr/0040-canonical-urls-from-host-config.md`](0040-canonical-urls-from-host-config.md) |
 | 0041 | Apogee Showcase fixture og:image renders fresh per published page | Accepted | [`docs/adr/0041-og-image-fresh-render-per-page.md`](0041-og-image-fresh-render-per-page.md) |
 | 0043 | In-app notifications: persistent, recipient-tagged, delivered live over SSE | Accepted | [`docs/adr/0043-in-app-notifications.md`](0043-in-app-notifications.md) |
+| 0044 | Single HMAC secret signs invite, edit, and unlock tokens | Accepted | [`docs/adr/0044-single-hmac-secret-for-signed-tokens.md`](0044-single-hmac-secret-for-signed-tokens.md) |
+| 0045 | SiteRoom broadcasts Yjs updates before autosave persistence completes | Accepted | [`docs/adr/0045-siteroom-broadcast-precedes-persistence.md`](0045-siteroom-broadcast-precedes-persistence.md) |
+| 0046 | `addon_custom_scripts` is Owner-authored JavaScript; entitlement is the boundary | Accepted | [`docs/adr/0046-addon-custom-scripts-as-owner-code.md`](0046-addon-custom-scripts-as-owner-code.md) |
+| 0047 | Editor WebSocket bearer travels in the URL query string | Accepted | [`docs/adr/0047-ws-token-in-query-for-editor-socket.md`](0047-ws-token-in-query-for-editor-socket.md) |
+| 0048 | Chat session is last-writer-wins; concurrent tab writes out of scope | Accepted | [`docs/adr/0048-chat-session-last-writer-wins.md`](0048-chat-session-last-writer-wins.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

@@ -86,3 +86,4 @@ This ADR does not decide:
 
 - A future ADR if the `TextElement.content` representation is upgraded to a Yjs `Y.Array<Y.Map>` for per-keystroke text CRDT.
 - A future ADR if the `Y.Doc` ↔ JSON projection becomes a performance bottleneck at scale and is replaced or restructured.
+- [ADR 0045](0045-siteroom-broadcast-precedes-persistence.md) extends this ADR's "debounced projection" framing by pinning the broadcast-vs-persistence ordering and naming the failure modes peers can observe.

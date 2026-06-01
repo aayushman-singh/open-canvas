@@ -1,6 +1,6 @@
 # ADR 0047 — Editor WebSocket bearer travels in the URL query string
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-01
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the 4-hour edit-token-in-URL as "long-lived bearer in URL" without naming the constraint that makes it the only practical mechanism in browsers. This ADR pins the constraint, the exposure surface, and the supersession trigger.
@@ -70,7 +70,7 @@ Query-string bearer auth is the only mechanism that works uniformly across every
 
 ## Follow-ups
 
-- Audit the editor's error pages and disconnection flows to confirm no Referer-leaking outbound link and no `window.open` to a visitor-controlled URL exists on a `/__live` failure path. Likely already clean; pin as a smoke if not.
+- **Done (2026-06-01)** — audited the editor's outbound navigation paths. Every `window.open` in `src/editor/canvas-client.ts` uses `noopener,noreferrer` except the post-publish "view live site" button (line 11013, opens the Owner's own published site). That button's Referer would carry the editor page URL (`/?edit`), which does NOT contain `wsToken` — the token only ever exists in the WebSocket URL passed to `new WebSocket(...)` and never in `window.location`. No leak path; no smoke pinned.
 - Document the WS-URL-in-logs exposure in the operator runbook so log-rotation cadence and access controls reflect the threat model. Reference this ADR from the runbook.
 - If editor-session telemetry or a real incident shows `wsToken` values being read from logs by non-operators, mint a separate short-lived WS token via an HTTP endpoint (e.g. `POST /__api/wsToken` returning a 5-minute token bound to the editor session) and supersede this ADR. The current 4-hour TTL is fine until that signal arrives.
 - Watch for a browser API proposal that allows custom WebSocket headers — at that moment, this ADR's decision 1 supersedes.

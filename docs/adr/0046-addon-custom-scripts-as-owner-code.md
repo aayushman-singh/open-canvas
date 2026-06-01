@@ -1,6 +1,6 @@
 # ADR 0046 — `addon_custom_scripts` is Owner-authored JavaScript by design; entitlement is the security boundary
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-01
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the `addon_custom_scripts` addon as a stored-XSS surface in visitor render. This ADR resolves the framing question that audit raises — feature, not finding — and pins the security boundary the audit's reading should have used.

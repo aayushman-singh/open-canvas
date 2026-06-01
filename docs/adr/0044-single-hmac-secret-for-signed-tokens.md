@@ -1,6 +1,6 @@
 # ADR 0044 — Single HMAC secret signs invite, edit, and unlock tokens
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-01
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named `UNLOCK_SIGNING_SECRET`'s reuse across three trust domains as a senior-grade architectural concern. This ADR ratifies the reuse as a deliberate trade rather than letting it stay as undocumented operational drift.
