@@ -390,6 +390,31 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       removed: number[];
     }) => {
       if (!this.awareness) return;
+      // Bookkeep clientID → socket so webSocketClose knows which awareness
+      // entries to tombstone when this socket disconnects. Without this
+      // association, the WeakMap stays empty and the close handler skips
+      // every cleanup, leaving the disconnected tab's clientID in every
+      // peer's awareness map. On a solo refresh the next session sees the
+      // ghost as a peer and the editor pill reads "2 editing" until the
+      // y-protocols 30s outdated-state sweep finally drops it. This was
+      // the fix the comment in webSocketClose claimed shipped — the
+      // socketClientIds.set() call was missing all along.
+      const origin = this.currentOriginSocket;
+      if (origin) {
+        if (added.length > 0) {
+          let ids = this.socketClientIds.get(origin);
+          if (!ids) {
+            ids = new Set();
+            this.socketClientIds.set(origin, ids);
+          }
+          for (const id of added) ids.add(id);
+        }
+        if (removed.length > 0) {
+          const ids = this.socketClientIds.get(origin);
+          if (ids) for (const id of removed) ids.delete(id);
+        }
+      }
+
       const changed = added.concat(updated).concat(removed);
       const update = encodeAwareness(this.awareness, changed);
       const envelope: AwarenessUpdateEnvelope = {
@@ -397,7 +422,6 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
         update: encodeBytesField(update),
       };
       const message = JSON.stringify(envelope);
-      const origin = this.currentOriginSocket;
       for (const ws of this.ctx.getWebSockets()) {
         if (ws === origin) continue;
         if (!this.isEditorSocket(ws)) continue;
