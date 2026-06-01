@@ -304,6 +304,20 @@ export function connectCoEdit(
         emitRemoteState();
         return;
       }
+      case 'presence-refresh': {
+        // Server-initiated nudge: a new editor peer just joined and the
+        // server's awareness map (in-memory, dropped across DO
+        // hibernations) doesn't yet know about us. Re-publish our local
+        // presence so an awareness-update flies back through the server
+        // and lands on the joiner. setLocalState bumps the awareness
+        // clock unconditionally, so the observer fires even when the
+        // payload is byte-identical to the previous state.
+        const current = awareness.getLocalState();
+        if (current !== null) {
+          setLocalPresence(awareness, current as PresenceState);
+        }
+        return;
+      }
       default:
         // Presence pings (`{type:'presence', count: N}`) and arbitrary
         // server messages we don't care about are silently ignored.

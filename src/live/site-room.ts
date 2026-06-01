@@ -125,6 +125,7 @@ export {
 import type {
   AwarenessUpdateEnvelope,
   EditableStateReplacedEnvelope,
+  PresenceRefreshEnvelope,
   SiteRoomMessage,
   YSyncStep1Envelope,
   YSyncStep2Envelope,
@@ -279,8 +280,19 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
       this.ctx.acceptWebSocket(pair[1]);
       this.socketRoles.set(pair[1], roleParam);
       // Presence updates run inline; the count is sent on connect.
+      // When a NEW editor socket joins, nudge every OTHER editor socket to
+      // republish its current awareness. Without this, peers wait for the
+      // next y-protocols/awareness heartbeat (default 10s) before the
+      // joiner sees them — the DO hibernates between idle periods and the
+      // in-memory awareness map is dropped, so the joiner's y-sync-step1
+      // initial-awareness reply contains only the joiner itself.
+      const joinedEditor = roleParam === 'editor';
+      const newSocket = pair[1];
       queueMicrotask(() => {
         this.broadcastPresence();
+        if (joinedEditor) {
+          this.requestPresenceRefresh(newSocket);
+        }
       });
       return new Response(null, { status: 101, webSocket: pair[0] });
     }
@@ -568,6 +580,18 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
           );
           return;
         }
+        case 'presence-refresh': {
+          // Server-originated nudge only — a client→server occurrence is a
+          // protocol violation, same shape as editable-state-replaced.
+          // isSiteRoomMessage already rejects this (it's not in the
+          // accepted list), so reaching here means the validator drifted;
+          // throttle the log either way.
+          this.logThrottled(
+            '[SiteRoom] rejected client-originated presence-refresh',
+            parsed,
+          );
+          return;
+        }
         default: {
           const _exhaustive: never = parsed;
           console.error('[SiteRoom] unreachable message kind', _exhaustive);
@@ -610,6 +634,24 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
 
   private isEditorSocket(ws: WebSocket): boolean {
     return this.socketRoles.get(ws) === 'editor';
+  }
+
+  /**
+   * Send a `presence-refresh` nudge to every editor socket EXCEPT the one
+   * that just joined. Each peer responds by re-publishing its local
+   * awareness state, which fans back through this DO and lands on the new
+   * socket — collapsing the 0–10s window between connect and presence
+   * convergence. Skips visitor sockets and the joiner itself; safeSend
+   * evicts any dead socket the way every other fan-out does.
+   */
+  private requestPresenceRefresh(joinerSocket: WebSocket): void {
+    const envelope: PresenceRefreshEnvelope = { type: 'presence-refresh' };
+    const message = JSON.stringify(envelope);
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === joinerSocket) continue;
+      if (!this.isEditorSocket(ws)) continue;
+      this.safeSend(ws, message, '[SiteRoom] presence-refresh send failed');
+    }
   }
 
   private sendToEditorSockets(message: string, skip: WebSocket | null, errorMessage: string): void {

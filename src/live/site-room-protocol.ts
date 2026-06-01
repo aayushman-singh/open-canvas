@@ -83,6 +83,30 @@ export interface EditableStateReplacedEnvelope {
 }
 
 /**
+ * Server-initiated presence republish nudge. Sent to every existing editor
+ * socket when a new editor socket joins, prompting each peer to call
+ * setLocalState with its currently-cached presence so a fresh awareness-
+ * update flies over the wire and reaches the newly-connected peer.
+ *
+ * Why this exists: SiteRoom runs in a hibernating DurableObject. Between
+ * idle periods the in-memory awareness map is dropped. When a peer joins
+ * after hibernation, the server's awareness state contains only whatever
+ * has been pushed since the last wake — typically just the joining peer
+ * itself. Existing peers would otherwise have to wait for the next y-
+ * protocols/awareness heartbeat tick (default 10s) before re-publishing
+ * and reaching the joiner. This message collapses that window to one round
+ * trip so the presence pill flips to N immediately on join.
+ *
+ * Payload is empty — the message is a pure signal. The client decides
+ * what to republish (it already knows its own current presence).
+ *
+ * Direction: server → client.
+ */
+export interface PresenceRefreshEnvelope {
+  type: 'presence-refresh';
+}
+
+/**
  * Discriminated union of every message kind a WebSocket-connected editor (or
  * the server) may send.
  */
@@ -91,7 +115,8 @@ export type SiteRoomMessage =
   | YSyncStep2Envelope
   | YUpdateEnvelope
   | AwarenessUpdateEnvelope
-  | EditableStateReplacedEnvelope;
+  | EditableStateReplacedEnvelope
+  | PresenceRefreshEnvelope;
 
 // ----------------------------------------------------------------------------
 // Bytes-over-JSON helpers
