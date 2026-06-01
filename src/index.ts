@@ -44,6 +44,7 @@ import signOutRoute from './auth/sign-out-route';
 import signInRoute from './auth/sign-in-route';
 import onSiteEditRoute from './routes/api/on-site-edit';
 import collaboratorsApi from './routes/api/collaborators';
+import notificationsApi from './routes/api/notifications';
 import inviteRedirectRoute from './auth/invite-redirect-route';
 import socketRoute from './live/socket-route';
 
@@ -104,6 +105,7 @@ app.route('/api/import', importRouter);
 app.route('/api/admin/library', librarySectionsAdmin);
 app.route('/api/admin/custom-templates', customTemplatesAdmin);
 app.route('/api', collaboratorsApi);
+app.route('/api', notificationsApi);
 app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);
 app.route('/og', ogRoute);

@@ -130,8 +130,8 @@ function notifyOwnerLive(
 // `markNotificationRead` is the read-state mutator referenced by the API
 // layer (Phase C). It lives here because it shares the same DO-notify path:
 // when a tab marks a row read, the other tabs need to update their badge.
-import { and } from 'drizzle-orm';
-import { notificationRead } from '../db/schema.js';
+import { and, isNotNull } from 'drizzle-orm';
+import { notificationRead, site, siteCollaborator } from '../db/schema.js';
 
 export async function markNotificationRead(
   ctx: WriteNotificationCtx,
@@ -163,7 +163,37 @@ export async function markNotificationRead(
       .set({ readAt: new Date() })
       .where(and(eq(notification.id, notificationId), eq(notification.recipientId, customerId)));
   } else {
-    // site-kind — write a per-customer notification_read row. Idempotent via
+    // site-kind — must verify the customer can see the site before recording
+    // read state. Owner of the site OR accepted collaborator. Refusing here
+    // closes a small attack surface: a stranger could otherwise write rows
+    // into notification_read for sites they have no business knowing about.
+    const siteId = row.recipientId;
+    const ownsRows = await ctx.db
+      .select({ id: site.id })
+      .from(site)
+      .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+      .limit(1);
+    let visible = ownsRows.length > 0;
+    if (!visible) {
+      const collabRows = await ctx.db
+        .select({ id: siteCollaborator.id })
+        .from(siteCollaborator)
+        .where(
+          and(
+            eq(siteCollaborator.siteId, siteId),
+            eq(siteCollaborator.customerId, customerId),
+            isNotNull(siteCollaborator.acceptedAt),
+          ),
+        )
+        .limit(1);
+      visible = collabRows.length > 0;
+    }
+    if (!visible) {
+      throw new Error(
+        `markNotificationRead: customer ${customerId} is not the recipient of ${notificationId}`,
+      );
+    }
+    // Write a per-customer notification_read row. Idempotent via
     // ON CONFLICT DO NOTHING — re-reading should not bump the timestamp.
     await ctx.db
       .insert(notificationRead)
