@@ -105,6 +105,20 @@ html, body {
   color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
 }
 
+.opencanvas-text mark {
+  background: rgba(252, 211, 77, 0.5);
+  color: inherit;
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+.opencanvas-text code {
+  font-family: var(--opencanvas-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  background: rgba(127, 127, 127, 0.18);
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+  font-size: 0.92em;
+}
+
 .opencanvas-nav-link {
   color: inherit;
   text-decoration: none;

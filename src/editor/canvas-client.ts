@@ -8708,12 +8708,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       italic: "I",
       underline: "U",
       strike: "S",
-      code: "</>",
       highlight: "HL",
       link: "Link",
     };
+    // The inline-code mark is intentionally absent from the toolbar — owners
+    // never reach for it during normal copy editing and its glyph crowded
+    // the bar. Existing runs with code marks still render via the public-
+    // styles <code> rule, but new code wraps can only land through the
+    // canvas agent or paste from a code-formatted source.
     for (let i = 0; i < CANONICAL_MARK_ORDER.length; i++) {
       const type = CANONICAL_MARK_ORDER[i];
+      if (type === "code") continue;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = labels[type];
