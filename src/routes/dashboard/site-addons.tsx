@@ -199,6 +199,26 @@ const pageStyles = `
     color: var(--ink-2);
   }
   .not-purchased a { color: var(--red-ink); font-weight: 600; }
+
+  /* ADR 0046 — Owner-facing warning above the addon_custom_scripts config.
+     The addon ships raw Owner-authored JavaScript into the visitor's browser
+     by design; the security boundary is the entitlement check, not script
+     content. The warning is the Owner's only signal that they own the
+     consequences of what they paste. Visual treatment is intentionally loud
+     (red-tinted surface, bold label) because the consequence is real. */
+  .custom-scripts-warning {
+    margin-top: 16px;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--red-ink);
+    border-left-width: 4px;
+    border-radius: var(--r);
+    background: color-mix(in oklch, var(--red-ink) 6%, var(--surface));
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink);
+  }
+  .custom-scripts-warning strong { color: var(--red-ink); }
 `;
 
 function clientScript(siteId: string): string {
@@ -482,6 +502,15 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
                     />
                     <span>Enable on this site</span>
                   </label>
+
+                  {addon.id === 'addon_custom_scripts' && (
+                    <div class="custom-scripts-warning" role="note">
+                      <strong>Code you paste here runs in every visitor's browser on your site.</strong>{' '}
+                      Only paste code you have read and trust. A snippet from an
+                      untrusted source can compromise your visitors' privacy,
+                      steal their input, or redirect them off your site.
+                    </div>
+                  )}
 
                   {addon.configFields.map((field) => (
                     <div class="field-block">
