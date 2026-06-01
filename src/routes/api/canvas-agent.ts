@@ -52,7 +52,9 @@ type Bindings = {
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-const CANVAS_AGENT_MODEL = 'gemini-3.1-pro-preview';
+// See orchestrator.ts CHAT_DEFAULT_MODEL — 3.x requires thought_signature
+// round-trip on tool calls; reverted to 2.5-pro until the adapter handles it.
+const CANVAS_AGENT_MODEL = 'gemini-2.5-pro';
 
 const canvasAgentApi = new Hono<Env>();
 

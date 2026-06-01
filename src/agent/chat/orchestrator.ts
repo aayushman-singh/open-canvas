@@ -69,7 +69,11 @@ import type { ChatStreamWriter } from './stream.js';
 // Tunables
 // ---------------------------------------------------------------------------
 
-export const CHAT_DEFAULT_MODEL = 'gemini-3.1-pro-preview';
+// Gemini 3.x added a thought_signature round-trip requirement on tool
+// calls that our GeminiAdapter does not yet capture or replay, so 3.1
+// returns HTTP 400 on every multi-turn tool flow. Reverted to 2.5-pro
+// until the adapter is upgraded; do not bump without that work first.
+export const CHAT_DEFAULT_MODEL = 'gemini-2.5-pro';
 export const MAX_TOOL_CALL_ITERATIONS = 5;
 
 // ---------------------------------------------------------------------------
