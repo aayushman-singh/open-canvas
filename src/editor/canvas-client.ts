@@ -8427,48 +8427,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     document.execCommand(command, false, "");
   }
 
-  function wrapSelectionWith(tagName) {
-    var sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    var range = sel.getRangeAt(0);
-    if (range.collapsed) return;
-    var upper = tagName.toUpperCase();
-    var existing = findAncestor(range.commonAncestorContainer, upper);
-    if (existing) {
-      var parent = existing.parentNode;
-      if (!parent) return;
-      while (existing.firstChild) parent.insertBefore(existing.firstChild, existing);
-      parent.removeChild(existing);
-      return;
-    }
-    var el = document.createElement(tagName);
-    try {
-      range.surroundContents(el);
-    } catch (_) {
-      var fragment = range.extractContents();
-      el.appendChild(fragment);
-      range.insertNode(el);
-    }
-    sel.removeAllRanges();
-    var next = document.createRange();
-    // selectNodeContents (not selectNode) so the range lives INSIDE the wrapper:
-    // a follow-up click on the same toolbar button can detect the wrapper via
-    // findAncestor(commonAncestorContainer) and unwrap it. selectNode places the
-    // range around the element, making its parent the commonAncestor and the
-    // toggle-off path unreachable until the user reselects.
-    next.selectNodeContents(el);
-    sel.addRange(next);
-  }
-
-  function findAncestor(node, tagName) {
-    var cur = node;
-    while (cur && cur.nodeType !== 9) {
-      if (cur.nodeType === 1 && cur.tagName === tagName) return cur;
-      cur = cur.parentNode;
-    }
-    return null;
-  }
-
   function closestEditableRoot(node) {
     if (!node) return null;
     var element = node.nodeType === 1 ? node : node.parentElement;
@@ -8615,6 +8573,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
+  // Apply a link mark across the current selection via the same serialize →
+  // mutate runs → rebuild path used for highlight/strike/code. The old DOM-
+  // level Range.surroundContents path produced nested <a> when the selection
+  // overlapped an existing link (same nesting failure mode that made the
+  // highlight toggle unreliable). Setting the link mark at the run level
+  // replaces any existing link on each run in the slice — overwriting one
+  // href with another in a single click instead of nesting.
   async function applyLinkMark() {
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -8623,49 +8588,298 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       setStatus('Select some text first to add a link', 'error');
       return;
     }
-    var savedRange = range.cloneRange();
-    var selectedText = savedRange.toString();
+    var inner = closestEditableRoot(range.commonAncestorContainer);
+    if (!inner) return;
+
+    var preStart = document.createRange();
+    preStart.setStart(inner, 0);
+    preStart.setEnd(range.startContainer, range.startOffset);
+    var startOff = preStart.toString().length;
+    var preEnd = document.createRange();
+    preEnd.setStart(inner, 0);
+    preEnd.setEnd(range.endContainer, range.endOffset);
+    var endOff = preEnd.toString().length;
+    var start = Math.min(startOff, endOff);
+    var end = Math.max(startOff, endOff);
+    if (start === end) return;
+
+    // Pre-fill the modal from any existing link the selection overlaps so
+    // re-clicking Link on an already-linked span lands an Edit affordance
+    // rather than forcing the Owner to type the URL again.
+    var existingHref = 'https://';
+    var existingBlank = true;
+    var ancNode = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentNode;
+    while (ancNode && ancNode !== inner) {
+      if (ancNode.nodeType === 1 && ancNode.tagName === 'A' && ancNode.classList && ancNode.classList.contains('opencanvas-inline-link')) {
+        existingHref = ancNode.getAttribute('href') || existingHref;
+        existingBlank = ancNode.getAttribute('target') === '_blank';
+        break;
+      }
+      ancNode = ancNode.parentNode;
+    }
+
+    var selectedText = range.toString();
     var result = await openLinkModal({
       linkText: selectedText,
-      href: 'https://',
-      blank: true,
-      focusAfterClose: closestEditableRoot(range.commonAncestorContainer),
+      href: existingHref,
+      blank: existingBlank,
+      focusAfterClose: inner,
     });
     if (result === null) return;
-    sel.removeAllRanges();
-    sel.addRange(savedRange);
-    var a = document.createElement('a');
-    a.className = 'opencanvas-inline-link';
-    a.setAttribute('href', result.href);
-    if (result.target === '_blank') {
-      a.setAttribute('target', '_blank');
-      a.setAttribute('rel', 'noopener noreferrer');
-    }
+
+    var runs;
     try {
-      savedRange.surroundContents(a);
-    } catch (_) {
-      var fragment = savedRange.extractContents();
-      a.appendChild(fragment);
-      savedRange.insertNode(a);
+      runs = serializeContentToRuns(inner);
+    } catch (err) {
+      setStatus('Link failed: ' + (err && err.message ? err.message : String(err)), 'error');
+      return;
     }
+
+    var linkMark = { type: 'link', href: result.href };
+    if (result.target === '_blank') linkMark.target = '_blank';
+    var nextRuns = setLinkOnRuns(runs, start, end, linkMark);
+
+    while (inner.firstChild) inner.removeChild(inner.firstChild);
+    for (var i = 0; i < nextRuns.length; i++) {
+      inner.appendChild(buildRunNode(nextRuns[i]));
+    }
+
+    inner.focus();
+    selectByCharBounds(inner, start, end);
+  }
+
+  // Apply a single link mark to the slice [start, end) of runs, replacing
+  // any existing link mark in that slice. Mirrors toggleMarkOnRuns but with
+  // "replace" semantics specific to link attrs (href / target) — toggling a
+  // simple boolean mark doesn't apply because two different hrefs aren't
+  // interchangeable like two highlights are.
+  function setLinkOnRuns(runs, start, end, linkMark) {
+    var split = [];
+    var cum = 0;
+    for (var i = 0; i < runs.length; i++) {
+      var run = runs[i];
+      var text = typeof run.text === "string" ? run.text : "";
+      var s = cum;
+      var e = cum + text.length;
+      var bps = [0];
+      if (start > s && start < e) bps.push(start - s);
+      if (end > s && end < e) bps.push(end - s);
+      bps.push(text.length);
+      for (var j = 0; j < bps.length - 1; j++) {
+        var a = bps[j], b = bps[j + 1];
+        if (b > a) split.push({ text: text.substring(a, b), marks: cloneMarksArr(run.marks) });
+      }
+      cum = e;
+    }
+
+    cum = 0;
+    for (var k = 0; k < split.length; k++) {
+      var sr = split[k];
+      var rs = cum;
+      var re = cum + sr.text.length;
+      cum = re;
+      if (re <= start || rs >= end) continue;
+      sr.marks = sr.marks.filter(function (mm) { return mm.type !== 'link'; });
+      var fresh = { type: 'link', href: linkMark.href };
+      if (linkMark.target === '_blank') fresh.target = '_blank';
+      sr.marks.push(fresh);
+    }
+
+    var merged = [];
+    for (var p = 0; p < split.length; p++) {
+      var prev = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (prev && marksEqual(prev.marks, split[p].marks)) {
+        prev.text += split[p].text;
+      } else {
+        merged.push({ text: split[p].text, marks: split[p].marks });
+      }
+    }
+    return merged;
+  }
+
+  // Toggle a simple (no-attrs) mark across the current selection by mutating
+  // the serialized InlineRun[], not the DOM tree directly. Hand-rolled DOM
+  // surgery (Range.surroundContents + extractContents fallback) produced
+  // nested marks when the selection partially overlapped an existing mark
+  // and only unwrapped the outermost layer on toggle-off — both observed by
+  // owners as "double highlight" and "unhighlight leaves part highlighted."
+  //
+  // The new path:
+  //   1. Serialize the live contenteditable to InlineRun[] (the serializer
+  //      already dedupes nested same-type marks).
+  //   2. Convert the selection's start/end to character offsets relative to
+  //      the editable's text content using Range.toString().
+  //   3. Split runs at those offsets so the selection slice is a contiguous
+  //      subarray.
+  //   4. Decide toggle direction: if every run in the slice already carries
+  //      the mark, remove it; otherwise add it to every run in the slice.
+  //      This is the Google Docs / Notion convention — partial selections
+  //      always converge to "uniform" in one click.
+  //   5. Re-merge adjacent identical-mark runs and rebuild the editable's
+  //      inner DOM via the same buildRunNode path used at full render.
+  //   6. Restore the selection at the same character offsets.
+  //
+  // Only used for marks without per-mark attributes (highlight, strike,
+  // code). Bold/italic/underline still use execCommand because the browser-
+  // native path handles their toggle correctly. Link marks go through their
+  // own applyLinkMark flow because they need the URL modal.
+  function toggleSimpleMarkInSelection(markType) {
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+    var inner = closestEditableRoot(range.commonAncestorContainer);
+    if (!inner) return;
+
+    var preStart = document.createRange();
+    preStart.setStart(inner, 0);
+    preStart.setEnd(range.startContainer, range.startOffset);
+    var startOff = preStart.toString().length;
+    var preEnd = document.createRange();
+    preEnd.setStart(inner, 0);
+    preEnd.setEnd(range.endContainer, range.endOffset);
+    var endOff = preEnd.toString().length;
+    var start = Math.min(startOff, endOff);
+    var end = Math.max(startOff, endOff);
+    if (start === end) return;
+
+    var runs;
+    try {
+      runs = serializeContentToRuns(inner);
+    } catch (err) {
+      setStatus("Mark toggle failed: " + (err && err.message ? err.message : String(err)), "error");
+      return;
+    }
+
+    var nextRuns = toggleMarkOnRuns(runs, start, end, markType);
+
+    while (inner.firstChild) inner.removeChild(inner.firstChild);
+    for (var i = 0; i < nextRuns.length; i++) {
+      inner.appendChild(buildRunNode(nextRuns[i]));
+    }
+
+    inner.focus();
+    selectByCharBounds(inner, start, end);
+  }
+
+  // Apply a mark-set transformation on a serialized InlineRun[]. See
+  // toggleSimpleMarkInSelection for the rationale; this is the pure step.
+  function toggleMarkOnRuns(runs, start, end, markType) {
+    var split = [];
+    var cum = 0;
+    for (var i = 0; i < runs.length; i++) {
+      var run = runs[i];
+      var text = typeof run.text === "string" ? run.text : "";
+      var s = cum;
+      var e = cum + text.length;
+      var bps = [0];
+      if (start > s && start < e) bps.push(start - s);
+      if (end > s && end < e) bps.push(end - s);
+      bps.push(text.length);
+      for (var j = 0; j < bps.length - 1; j++) {
+        var a = bps[j], b = bps[j + 1];
+        if (b > a) split.push({ text: text.substring(a, b), marks: cloneMarksArr(run.marks) });
+      }
+      cum = e;
+    }
+
+    cum = 0;
+    var fullyCovered = true;
+    var anyInRange = false;
+    for (var k = 0; k < split.length; k++) {
+      var sr = split[k];
+      var rs = cum;
+      var re = cum + sr.text.length;
+      cum = re;
+      if (re <= start || rs >= end) continue;
+      anyInRange = true;
+      if (!hasMarkInArr(sr.marks, markType)) fullyCovered = false;
+    }
+    if (!anyInRange) return runs;
+
+    cum = 0;
+    for (var m = 0; m < split.length; m++) {
+      var rr = split[m];
+      var rs2 = cum;
+      var re2 = cum + rr.text.length;
+      cum = re2;
+      if (re2 <= start || rs2 >= end) continue;
+      if (fullyCovered) {
+        rr.marks = rr.marks.filter(function (mm) { return mm.type !== markType; });
+      } else if (!hasMarkInArr(rr.marks, markType)) {
+        rr.marks.push({ type: markType });
+      }
+    }
+
+    var merged = [];
+    for (var p = 0; p < split.length; p++) {
+      var prev = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (prev && marksEqual(prev.marks, split[p].marks)) {
+        prev.text += split[p].text;
+      } else {
+        merged.push({ text: split[p].text, marks: split[p].marks });
+      }
+    }
+    return merged;
+  }
+
+  function cloneMarksArr(marks) {
+    if (!Array.isArray(marks)) return [];
+    return marks.map(function (m) {
+      var c = { type: m.type };
+      if (m.type === "link") {
+        c.href = m.href;
+        if (m.target) c.target = m.target;
+      }
+      return c;
+    });
+  }
+
+  function hasMarkInArr(marks, markType) {
+    if (!Array.isArray(marks)) return false;
+    for (var i = 0; i < marks.length; i++) {
+      if (marks[i] && marks[i].type === markType) return true;
+    }
+    return false;
+  }
+
+  function selectByCharBounds(rootNode, start, end) {
+    var startNode = null, startInOff = 0;
+    var endNode = null, endInOff = 0;
+    var cum = 0;
+    var walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_TEXT, null);
+    var n = walker.nextNode();
+    while (n) {
+      var len = n.nodeValue ? n.nodeValue.length : 0;
+      if (!startNode && cum + len >= start) {
+        startNode = n;
+        startInOff = start - cum;
+      }
+      if (!endNode && cum + len >= end) {
+        endNode = n;
+        endInOff = end - cum;
+      }
+      if (startNode && endNode) break;
+      cum += len;
+      n = walker.nextNode();
+    }
+    if (!startNode || !endNode) return;
+    var sel = window.getSelection();
+    if (!sel) return;
     sel.removeAllRanges();
-    var next = document.createRange();
-    next.selectNode(a);
-    sel.addRange(next);
+    var r = document.createRange();
+    r.setStart(startNode, startInOff);
+    r.setEnd(endNode, endInOff);
+    sel.addRange(r);
   }
 
   function applyMark(type) {
     if (type === "bold") return applyExecCommand("bold");
     if (type === "italic") return applyExecCommand("italic");
     if (type === "underline") return applyExecCommand("underline");
-    // Browsers' execCommand("strikeThrough") emits the HTML4-deprecated
-    // <strike> tag (verified on Chrome 130, Firefox 132) which trips both
-    // the render-utils smoke and any consumer parsing the contenteditable
-    // back to mark-runs by tag name. Use the Range-based wrap path that
-    // already powers code / highlight to land <s> instead.
-    if (type === "strike") return wrapSelectionWith("s");
-    if (type === "code") return wrapSelectionWith("code");
-    if (type === "highlight") return wrapSelectionWith("mark");
+    if (type === "strike") return toggleSimpleMarkInSelection("strike");
+    if (type === "code") return toggleSimpleMarkInSelection("code");
+    if (type === "highlight") return toggleSimpleMarkInSelection("highlight");
     if (type === "link") {
       applyLinkMark().catch((err) => {
         setStatus("Link failed: " + (err && err.message ? err.message : String(err)), "error");
@@ -10068,6 +10282,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
     }
 
+    // Click-outside deselect. The exclusion list defines every surface that
+    // counts as "still inside the editing flow" — modal/ai-panel/reel because
+    // they're transient editor UI, inspector + sidebar because they own the
+    // selection's controls, .opencanvas-element because that's the selection
+    // itself, and the link popover + mark toolbar because they render in
+    // document.body (outside .opencanvas-element) but operate on the active
+    // selection.
     document.addEventListener("mousedown", (ev) => {
       if (!selectedElementId) return;
       const target = ev.target instanceof Element ? ev.target : null;
@@ -10078,16 +10299,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (target.closest('#canvas-reel')) return;
       if (target.closest('.opencanvas-element')) return;
       if (target.closest('#canvas-sidebar')) return;
-      selectElement(null);
-    });
-
-    document.addEventListener("mousedown", (ev) => {
-      if (!selectedElementId) return;
-      const target = ev.target instanceof Element ? ev.target : null;
-      if (!target) return;
-      if (inspector && inspector.contains(target)) return;
-      if (target.closest('.opencanvas-element')) return;
-      if (target.closest('#canvas-sidebar')) return;
+      if (target.closest('.opencanvas-link-popover')) return;
+      if (target.closest('.opencanvas-mark-toolbar')) return;
       selectElement(null);
     });
   }
