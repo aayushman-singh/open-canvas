@@ -11534,9 +11534,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var sidebarToggle = document.getElementById("sidebar-toggle");
       if (sidebarToggle && sidebar) {
         sidebarToggle.addEventListener("click", function() {
+          // The viewport's margin-left snaps between 340 and 0 when the
+          // sidebar-collapsed class flips, which jerks every artboard
+          // sideways under the user's cursor. Measure the viewport's
+          // screen position before and after the class toggle and apply
+          // the inverse delta to camera.x so the canvas content stays
+          // pinned to the same on-screen location across the toggle.
+          var beforeLeft = viewport ? viewport.getBoundingClientRect().left : 0;
           var collapsed = sidebar.classList.toggle("collapsed");
           sidebarToggle.textContent = collapsed ? "›" : "‹";
-          if (viewport) viewport.classList.toggle("sidebar-collapsed", collapsed);
+          if (viewport) {
+            viewport.classList.toggle("sidebar-collapsed", collapsed);
+            var afterLeft = viewport.getBoundingClientRect().left;
+            var delta = beforeLeft - afterLeft;
+            if (delta !== 0) {
+              camera.x += delta;
+              applyCameraTransform();
+            }
+          }
         });
       }
       var inspectorToggle = document.getElementById("inspector-toggle");
