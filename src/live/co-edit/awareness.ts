@@ -44,6 +44,15 @@ export interface PresenceState {
   name: string;
   /** CSS colour token used for cursor + selection outline. */
   color: string;
+  /**
+   * Stable identity of the editor — Clerk user id when available.
+   * Used by the editor count pill to dedupe presence by user instead of
+   * by Yjs clientID, so opening the same site in two tabs collapses to
+   * one "editing" entry. Optional so legacy peers (or any client that
+   * doesn't have a Clerk session resolved) still round-trip cleanly;
+   * absent → that peer is counted as its own identity.
+   */
+  userId?: string;
   /** Optional caret position — `null` when the peer has no active cursor. */
   cursor?: { sectionId: string; elementId: string; offset?: number } | null;
   /** Optional selection range — `null` when nothing is selected. */
@@ -112,8 +121,11 @@ export function snapshotPresence(awareness: Awareness): Map<number, PresenceStat
     const candidate = raw as Record<string, unknown>;
     if (typeof candidate.name !== 'string' || typeof candidate.color !== 'string') continue;
     const presence: PresenceState = { name: candidate.name, color: candidate.color };
-    // `cursor` and `selection` are optional; we only attach when the shape
-    // matches so a malformed peer can't poison the local map.
+    // `userId` / `cursor` / `selection` are optional; only attach when
+    // the shape matches so a malformed peer can't poison the local map.
+    if (typeof candidate.userId === 'string' && candidate.userId.length > 0) {
+      presence.userId = candidate.userId;
+    }
     if (candidate.cursor !== undefined) {
       presence.cursor = candidate.cursor as NonNullable<PresenceState['cursor']> | null;
     }

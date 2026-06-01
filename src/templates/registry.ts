@@ -1,6 +1,7 @@
 import baseSeed from '../canvas/fixtures/home.json';
 import enterpriseScaleSeed from '../canvas/fixtures/enterprise-scale.json';
 import apogeeShowcaseSeed from '../canvas/fixtures/apogee-showcase.json';
+import portfolioShowcaseSeed from '../canvas/fixtures/portfolio-showcase.json';
 import type { CanvasElement, EditableSite, InlineRun, StyleKit } from '../canvas/schema';
 
 export interface TemplateSeed {
@@ -178,6 +179,14 @@ export const apogeeShowcaseTemplate: TemplateSeed = {
   state: structuredClone(apogeeShowcaseSeed) as EditableSite,
 };
 
+export const portfolioShowcaseTemplate: TemplateSeed = {
+  id: 'portfolio-showcase',
+  name: 'Engineer Portfolio',
+  tagline:
+    'Dark warm-toned single-page engineer portfolio: hero, tech stack, selected work, and a notes blog with four mock long-form posts that exercise the page-bound collection.',
+  state: structuredClone(portfolioShowcaseSeed) as EditableSite,
+};
+
 export const pressTemplate = buildTemplate({
   id: 'press-canvas',
   name: 'Press Canvas',
@@ -231,6 +240,7 @@ export const allTemplateSeeds = [
   pressTemplate,
   violetLaunchTemplate,
   apogeeShowcaseTemplate,
+  portfolioShowcaseTemplate,
 ] as const satisfies readonly TemplateSeed[];
 
 const templatesById = new Map(allTemplateSeeds.map((template) => [template.id, template]));

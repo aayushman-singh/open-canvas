@@ -404,8 +404,6 @@ html, body {
 }
 .opencanvas-carousel-arrow {
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
   width: 40px;
   height: 40px;
   display: flex;
@@ -422,8 +420,71 @@ html, body {
   transition: background 120ms ease;
 }
 .opencanvas-carousel-arrow:hover { background: rgba(0, 0, 0, 0.78); }
-.opencanvas-carousel-arrow-prev { left: 12px; }
-.opencanvas-carousel-arrow-next { right: 12px; }
+
+/* ---- Arrow position presets --------------------------------------------
+   Each preset positions both arrows independently; the default
+   split-vertical-center keeps the historical layout (prev edge / next
+   edge, vertically centred). Vertical-direction carousels swap the axis
+   so the same preset reads naturally with up/down chevrons.            */
+.opencanvas-carousel[data-opencanvas-direction="horizontal"][data-opencanvas-arrow-position="split-vertical-center"] .opencanvas-carousel-arrow-prev {
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+}
+.opencanvas-carousel[data-opencanvas-direction="horizontal"][data-opencanvas-arrow-position="split-vertical-center"] .opencanvas-carousel-arrow-next {
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+}
+.opencanvas-carousel[data-opencanvas-direction="vertical"][data-opencanvas-arrow-position="split-vertical-center"] .opencanvas-carousel-arrow-prev {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.opencanvas-carousel[data-opencanvas-direction="vertical"][data-opencanvas-arrow-position="split-vertical-center"] .opencanvas-carousel-arrow-next {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.opencanvas-carousel[data-opencanvas-arrow-position="bunched-bottom-right"] .opencanvas-carousel-arrow-prev {
+  bottom: 12px;
+  right: 64px;
+}
+.opencanvas-carousel[data-opencanvas-arrow-position="bunched-bottom-right"] .opencanvas-carousel-arrow-next {
+  bottom: 12px;
+  right: 12px;
+}
+.opencanvas-carousel[data-opencanvas-arrow-position="split-below"] .opencanvas-carousel-arrow-prev {
+  bottom: 8px;
+  left: 12px;
+}
+.opencanvas-carousel[data-opencanvas-arrow-position="split-below"] .opencanvas-carousel-arrow-next {
+  bottom: 8px;
+  right: 12px;
+}
+
+/* ---- Arrow shape presets -----------------------------------------------
+   round is the historical default (border-radius: 50%); square reads
+   as a flat tile; pill widens to a stadium shape that pairs well with
+   the bunched-bottom-right placement.                                   */
+.opencanvas-carousel[data-opencanvas-arrow-style="round"] .opencanvas-carousel-arrow {
+  border-radius: 50%;
+  width: 40px;
+}
+.opencanvas-carousel[data-opencanvas-arrow-style="square"] .opencanvas-carousel-arrow {
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  width: 40px;
+}
+.opencanvas-carousel[data-opencanvas-arrow-style="pill"] .opencanvas-carousel-arrow {
+  border-radius: 9999px;
+  width: 56px;
+}
+/* Bunched placement needs a tighter pill spacing when arrows are pills,
+   so the two buttons don't visually overlap. */
+.opencanvas-carousel[data-opencanvas-arrow-style="pill"][data-opencanvas-arrow-position="bunched-bottom-right"] .opencanvas-carousel-arrow-prev {
+  right: 76px;
+}
+
 .opencanvas-carousel-dots {
   position: absolute;
   bottom: 12px;
@@ -433,6 +494,25 @@ html, body {
   justify-content: center;
   gap: 8px;
   z-index: 2;
+}
+/* Vertical carousel — pagination dots run down the right edge instead of
+   across the bottom so they don't fight with bottom-pinned arrows. */
+.opencanvas-carousel[data-opencanvas-direction="vertical"] .opencanvas-carousel-dots {
+  flex-direction: column;
+  bottom: auto;
+  top: 0;
+  right: 12px;
+  left: auto;
+  height: 100%;
+  padding: 12px 0;
+  justify-content: center;
+}
+/* Split-below carousels pull the dots tight to the bottom row of arrows;
+   the prev/next arrows already pin themselves at bottom-12, so the dot
+   row needs to sit at the same baseline rather than the default bottom-12
+   stacked behind them. */
+.opencanvas-carousel[data-opencanvas-arrow-position="split-below"] .opencanvas-carousel-dots {
+  bottom: 18px;
 }
 .opencanvas-carousel-dot {
   width: 10px;

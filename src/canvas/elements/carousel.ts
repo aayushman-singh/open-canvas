@@ -32,11 +32,50 @@ export interface CarouselSlide {
   href?: string;
 }
 
+/**
+ * Layout axis for the slide presentation + arrow glyphs.
+ *   - `horizontal` (default): chevrons ‹/›, arrows on left/right when split.
+ *   - `vertical`: chevrons ⌃/⌄, arrows on top/bottom when split.
+ * Slide-visibility is fade-based regardless; direction is only an arrow + axis hint.
+ */
+export const CAROUSEL_DIRECTIONS = ['horizontal', 'vertical'] as const;
+export type CarouselDirection = (typeof CAROUSEL_DIRECTIONS)[number];
+
+/**
+ * Arrow placement preset.
+ *   - `split-vertical-center` (default): prev on the leading edge, next on the
+ *     trailing edge, both vertically centred (or horizontally centred when the
+ *     carousel is vertical). The classic carousel layout.
+ *   - `bunched-bottom-right`: prev + next sit side-by-side in the trailing
+ *     corner. Modern minimalist layout you see on hero galleries.
+ *   - `split-below`: prev / next pinned outside the carousel — on the leading
+ *     and trailing edges of the row beneath, with the dot pagination centred
+ *     between them.
+ */
+export const CAROUSEL_ARROW_POSITIONS = [
+  'split-vertical-center',
+  'bunched-bottom-right',
+  'split-below',
+] as const;
+export type CarouselArrowPosition = (typeof CAROUSEL_ARROW_POSITIONS)[number];
+
+/**
+ * Arrow button shape.
+ *   - `round` (default): circle.
+ *   - `square`: rounded square.
+ *   - `pill`: wider pill.
+ */
+export const CAROUSEL_ARROW_STYLES = ['round', 'square', 'pill'] as const;
+export type CarouselArrowStyle = (typeof CAROUSEL_ARROW_STYLES)[number];
+
 export interface CarouselElement extends BaseElement {
   type: 'carousel';
   slides: CarouselSlide[];
   showArrows: boolean;
   showDots: boolean;
+  direction?: CarouselDirection;
+  arrowPosition?: CarouselArrowPosition;
+  arrowStyle?: CarouselArrowStyle;
 }
 
 export interface CarouselRenderCtx {
@@ -84,23 +123,29 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
   // consumed here — visual tokens flow via `[data-style-kit]` ancestor.
   void ctx.styleKit;
 
+  const direction: CarouselDirection = el.direction ?? 'horizontal';
+  const arrowPosition: CarouselArrowPosition = el.arrowPosition ?? 'split-vertical-center';
+  const arrowStyle: CarouselArrowStyle = el.arrowStyle ?? 'round';
+
   const total = el.slides.length;
   const slidesHtml = el.slides
     .map((slide, idx) => renderSlide(slide, idx, total, ctx.assetBasePath))
     .join('');
 
+  // Glyphs follow the carousel's primary axis so the affordance reads
+  // unambiguously regardless of position preset. Vertical carousels use
+  // up/down chevrons even when the arrows are placed in the bottom-right.
+  const prevGlyph = direction === 'vertical' ? '⌃' : '‹';
+  const nextGlyph = direction === 'vertical' ? '⌄' : '›';
   const arrowsHtml = el.showArrows
     ? [
         `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-prev" type="button" `,
         `data-opencanvas-carousel-prev aria-label="Previous slide">`,
-        // U+2039 SINGLE LEFT-POINTING ANGLE QUOTATION MARK — visual hint only;
-        // the aria-label carries the actual announcement.
-        `‹`,
+        prevGlyph,
         `</button>`,
         `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-next" type="button" `,
         `data-opencanvas-carousel-next aria-label="Next slide">`,
-        // U+203A SINGLE RIGHT-POINTING ANGLE QUOTATION MARK.
-        `›`,
+        nextGlyph,
         `</button>`,
       ].join('')
     : '';
@@ -134,6 +179,9 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
     `data-opencanvas-interactive="carousel" `,
     `data-opencanvas-slide-index="0" `,
     `data-opencanvas-slide-count="${String(total)}" `,
+    `data-opencanvas-direction="${escapeAttr(direction)}" `,
+    `data-opencanvas-arrow-position="${escapeAttr(arrowPosition)}" `,
+    `data-opencanvas-arrow-style="${escapeAttr(arrowStyle)}" `,
     `role="region" aria-roledescription="carousel">`,
     `<div class="opencanvas-carousel-track">`,
     slidesHtml,
@@ -157,6 +205,27 @@ export const carouselInspectorSpec: InspectorSpec = {
     { kind: 'custom-mount', name: 'carousel-slides' },
     { kind: 'checkbox', label: 'Show arrows', path: 'showArrows' },
     { kind: 'checkbox', label: 'Show dots', path: 'showDots' },
+    {
+      kind: 'select',
+      label: 'Direction',
+      path: 'direction',
+      options: CAROUSEL_DIRECTIONS,
+      defaultValue: 'horizontal',
+    },
+    {
+      kind: 'select',
+      label: 'Arrow position',
+      path: 'arrowPosition',
+      options: CAROUSEL_ARROW_POSITIONS,
+      defaultValue: 'split-vertical-center',
+    },
+    {
+      kind: 'select',
+      label: 'Arrow style',
+      path: 'arrowStyle',
+      options: CAROUSEL_ARROW_STYLES,
+      defaultValue: 'round',
+    },
   ],
 };
 
@@ -180,6 +249,22 @@ export const carouselAgentToolSpec: AgentToolSpec = {
     showDots: {
       type: 'boolean',
       description: 'Show dot pagination. Carousel elements only.',
+    },
+    direction: {
+      type: 'string',
+      enum: [...CAROUSEL_DIRECTIONS],
+      description: 'Carousel layout axis: horizontal (default) or vertical. Carousel elements only.',
+    },
+    arrowPosition: {
+      type: 'string',
+      enum: [...CAROUSEL_ARROW_POSITIONS],
+      description:
+        'Arrow placement preset. Carousel elements only. Defaults to split-vertical-center.',
+    },
+    arrowStyle: {
+      type: 'string',
+      enum: [...CAROUSEL_ARROW_STYLES],
+      description: 'Arrow button shape: round (default), square, or pill. Carousel elements only.',
     },
     slides: {
       type: 'array',
@@ -206,6 +291,18 @@ export const carouselAgentToolSpec: AgentToolSpec = {
     if (args.showDots !== undefined) {
       if (typeof args.showDots !== 'boolean') throw new Error('showDots must be a boolean');
       patch.showDots = args.showDots;
+    }
+    if (args.direction !== undefined) {
+      if (typeof args.direction !== 'string') throw new Error('direction must be a string');
+      patch.direction = args.direction;
+    }
+    if (args.arrowPosition !== undefined) {
+      if (typeof args.arrowPosition !== 'string') throw new Error('arrowPosition must be a string');
+      patch.arrowPosition = args.arrowPosition;
+    }
+    if (args.arrowStyle !== undefined) {
+      if (typeof args.arrowStyle !== 'string') throw new Error('arrowStyle must be a string');
+      patch.arrowStyle = args.arrowStyle;
     }
     if (args.slides !== undefined) {
       if (!Array.isArray(args.slides)) throw new Error('slides must be an array');

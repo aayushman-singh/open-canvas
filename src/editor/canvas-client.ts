@@ -35,10 +35,18 @@ export interface CanvasClientScriptParams {
    * `customer.displayName` (or `customer.email` when displayName is null).
    */
   displayName?: string;
+  /**
+   * Stable user identity (Clerk user id) used to dedupe presence in the
+   * "N editing" pill — two tabs of the same site from the same user
+   * collapse to one entry. Optional: when omitted, each tab counts as
+   * its own identity (legacy behaviour). Resolved by the editor route
+   * from `c.get('auth').userId`.
+   */
+  userId?: string;
 }
 
 export function canvasClientScript(params: CanvasClientScriptParams): string {
-  const { siteId, apiBase = '/api', wsToken = '', displayName = '' } = params;
+  const { siteId, apiBase = '/api', wsToken = '', displayName = '', userId = '' } = params;
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
     throw new Error(
       `canvasClientScript: siteId must match /^[A-Za-z0-9-]+$/ (got ${JSON.stringify(siteId)})`,
@@ -64,6 +72,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const API_BASE = ${JSON.stringify(apiBase)};
   const WS_TOKEN = ${JSON.stringify(wsToken)};
   const PRESENCE_DISPLAY_NAME = ${JSON.stringify(displayName)};
+  const PRESENCE_USER_ID = ${JSON.stringify(userId)};
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
   const INSPECTOR_DISPATCH = ${inspectorDispatchJson};
   const SIDEBAR_DISPATCH = ${sidebarDispatchJson};
@@ -2957,27 +2966,166 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  // Build the editor preview as the SAME DOM the visitor sees, then hydrate
+  // it locally so arrows + dots actually advance the slide on click. The
+  // previous static flex strip showed each slide's caption as text and gave
+  // the Owner no sense of how the carousel would behave on the published
+  // page; this gives a true preview that respects direction, arrow position,
+  // and arrow style presets.
   function buildCarouselBody(element) {
-    const node = document.createElement("div");
-    node.className = "opencanvas-carousel-preview";
-    node.style.display = "flex";
-    node.style.gap = "8px";
-    node.style.width = "100%";
-    node.style.height = "100%";
-    node.style.overflow = "hidden";
     const slides = Array.isArray(element.slides) ? element.slides : [];
-    for (let i = 0; i < slides.length; i++) {
+    const count = slides.length;
+    const direction = element.direction === "vertical" ? "vertical" : "horizontal";
+    const arrowPosition =
+      element.arrowPosition === "bunched-bottom-right" ||
+      element.arrowPosition === "split-below"
+        ? element.arrowPosition
+        : "split-vertical-center";
+    const arrowStyle =
+      element.arrowStyle === "square" || element.arrowStyle === "pill"
+        ? element.arrowStyle
+        : "round";
+
+    const wrap = document.createElement("div");
+    wrap.className = "opencanvas-carousel";
+    wrap.setAttribute("data-opencanvas-interactive", "carousel");
+    wrap.setAttribute("data-opencanvas-slide-index", "0");
+    wrap.setAttribute("data-opencanvas-slide-count", String(count));
+    wrap.setAttribute("data-opencanvas-direction", direction);
+    wrap.setAttribute("data-opencanvas-arrow-position", arrowPosition);
+    wrap.setAttribute("data-opencanvas-arrow-style", arrowStyle);
+    wrap.setAttribute("role", "region");
+    wrap.setAttribute("aria-roledescription", "carousel");
+
+    const track = document.createElement("div");
+    track.className = "opencanvas-carousel-track";
+    wrap.appendChild(track);
+
+    for (let i = 0; i < count; i++) {
       const slide = slides[i] || {};
-      const cell = document.createElement("div");
-      cell.style.flex = "0 0 70%";
-      cell.style.display = "flex";
-      cell.style.alignItems = "center";
-      cell.style.justifyContent = "center";
-      cell.style.background = "rgba(0,0,0,0.08)";
-      cell.textContent = slide.caption || slide.assetId || "Slide";
-      node.appendChild(cell);
+      const fig = document.createElement("figure");
+      fig.className = "opencanvas-carousel-slide";
+      fig.setAttribute("data-opencanvas-carousel-slide", slide.id || "slide-" + String(i));
+      fig.setAttribute("data-opencanvas-carousel-slide-index", String(i));
+      fig.setAttribute("role", "group");
+      fig.setAttribute("aria-roledescription", "slide");
+      fig.setAttribute("aria-label", String(i + 1) + " of " + String(count));
+      if (slide.assetId) {
+        const img = document.createElement("img");
+        img.className = "opencanvas-carousel-image";
+        img.src = SITE_BASE + "/assets/" + encodeURIComponent(slide.assetId);
+        img.alt = slide.caption || "";
+        img.loading = "lazy";
+        fig.appendChild(img);
+      }
+      if (typeof slide.caption === "string" && slide.caption.length > 0) {
+        const cap = document.createElement("figcaption");
+        cap.className = "opencanvas-carousel-caption";
+        cap.textContent = slide.caption;
+        fig.appendChild(cap);
+      }
+      track.appendChild(fig);
     }
-    return node;
+
+    if (element.showArrows !== false && count > 1) {
+      const prev = document.createElement("button");
+      prev.type = "button";
+      prev.className = "opencanvas-carousel-arrow opencanvas-carousel-arrow-prev";
+      prev.setAttribute("data-opencanvas-carousel-prev", "");
+      prev.setAttribute("aria-label", "Previous slide");
+      prev.textContent = direction === "vertical" ? "⌃" : "‹";
+      wrap.appendChild(prev);
+      const next = document.createElement("button");
+      next.type = "button";
+      next.className = "opencanvas-carousel-arrow opencanvas-carousel-arrow-next";
+      next.setAttribute("data-opencanvas-carousel-next", "");
+      next.setAttribute("aria-label", "Next slide");
+      next.textContent = direction === "vertical" ? "⌄" : "›";
+      wrap.appendChild(next);
+    }
+
+    if (element.showDots !== false && count > 1) {
+      const dots = document.createElement("div");
+      dots.className = "opencanvas-carousel-dots";
+      dots.setAttribute("role", "tablist");
+      dots.setAttribute("aria-label", "Slide navigation");
+      for (let i = 0; i < count; i++) {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "opencanvas-carousel-dot";
+        dot.setAttribute("data-opencanvas-carousel-dot", String(i));
+        dot.setAttribute("role", "tab");
+        dot.setAttribute("aria-selected", i === 0 ? "true" : "false");
+        dot.setAttribute("aria-label", "Go to slide " + String(i + 1));
+        dots.appendChild(dot);
+      }
+      wrap.appendChild(dots);
+    }
+
+    hydrateCarouselPreview(wrap, count);
+    return wrap;
+  }
+
+  // Local copy of the visitor-side carousel hydration (src/interactive/
+  // carousel.ts) — same index-clamp + dot aria-selected mirroring, but
+  // attached at build time so Owners can click through their slides in
+  // the editor without leaving edit mode. Stops mousedown propagating so
+  // the canvas wrapper's drag handler doesn't snatch focus the moment
+  // the Owner tries to click an arrow.
+  function hydrateCarouselPreview(root, count) {
+    if (!(count > 0)) return;
+    function readIndex() {
+      const raw = root.getAttribute("data-opencanvas-slide-index");
+      let n = raw ? parseInt(raw, 10) : 0;
+      if (isNaN(n) || n < 0) n = 0;
+      if (n > count - 1) n = count - 1;
+      return n;
+    }
+    function setIndex(next) {
+      let n = next;
+      if (n < 0) n = 0;
+      if (n > count - 1) n = count - 1;
+      root.setAttribute("data-opencanvas-slide-index", String(n));
+      const dots = root.querySelectorAll("[data-opencanvas-carousel-dot]");
+      for (let i = 0; i < dots.length; i++) {
+        const idx = parseInt(dots[i].getAttribute("data-opencanvas-carousel-dot") || "0", 10);
+        dots[i].setAttribute("aria-selected", idx === n ? "true" : "false");
+      }
+    }
+    function block(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+    const prevBtn = root.querySelector("[data-opencanvas-carousel-prev]");
+    if (prevBtn) {
+      prevBtn.addEventListener("mousedown", block);
+      prevBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setIndex(readIndex() - 1);
+      });
+    }
+    const nextBtn = root.querySelector("[data-opencanvas-carousel-next]");
+    if (nextBtn) {
+      nextBtn.addEventListener("mousedown", block);
+      nextBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        setIndex(readIndex() + 1);
+      });
+    }
+    const dotEls = root.querySelectorAll("[data-opencanvas-carousel-dot]");
+    for (let i = 0; i < dotEls.length; i++) {
+      (function (dot) {
+        dot.addEventListener("mousedown", block);
+        dot.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const target = parseInt(dot.getAttribute("data-opencanvas-carousel-dot") || "0", 10);
+          setIndex(target);
+        });
+      })(dotEls[i]);
+    }
   }
 
   function buildTableBody(element) {
@@ -11456,12 +11604,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       cursor.elementId = anchorCursor.elementId;
       if (typeof anchorCursor.offset === "number") cursor.offset = anchorCursor.offset;
     }
-    coEditConnection.setPresence({
-      name: localPresence.name,
-      color: localPresence.color,
-      cursor: cursor,
-      selection: anchorCursor ? { sectionId: anchorCursor.sectionId, elementId: anchorCursor.elementId } : null,
-    });
+    coEditConnection.setPresence(Object.assign(
+      {
+        name: localPresence.name,
+        color: localPresence.color,
+        cursor: cursor,
+        selection: anchorCursor ? { sectionId: anchorCursor.sectionId, elementId: anchorCursor.elementId } : null,
+      },
+      PRESENCE_USER_ID ? { userId: PRESENCE_USER_ID } : {},
+    ));
   }
   function schedulePointer() {
     if (pointerPublishPending) return;
@@ -11508,12 +11659,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           }
         }
       }
-      coEditConnection.setPresence({
-        name: localPresence.name,
-        color: localPresence.color,
-        cursor: cursor,
-        selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
-      });
+      coEditConnection.setPresence(Object.assign(
+        {
+          name: localPresence.name,
+          color: localPresence.color,
+          cursor: cursor,
+          selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
+        },
+        PRESENCE_USER_ID ? { userId: PRESENCE_USER_ID } : {},
+      ));
     });
   }
   document.addEventListener("selectionchange", schedulePublishLocalPresence);
@@ -11547,12 +11701,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // Without this, the awareness filter on the receive side drops every
       // peer (name/color required) — the "N editing" pill stays at 1 and
       // remote-cursor rendering has nothing to draw.
-      initialPresence: {
-        name: localPresence.name,
-        color: localPresence.color,
-        cursor: null,
-        selection: null,
-      },
+      initialPresence: Object.assign(
+        {
+          name: localPresence.name,
+          color: localPresence.color,
+          cursor: null,
+          selection: null,
+        },
+        PRESENCE_USER_ID ? { userId: PRESENCE_USER_ID } : {},
+      ),
       websocketFactory: function(url) {
         var socket = new WebSocket(url);
         socket.addEventListener("open", function() {
@@ -11614,11 +11771,30 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var pill = document.querySelector("[data-opencanvas-presence]");
       var counter = document.querySelector("[data-opencanvas-presence-count]");
       if (pill && counter) {
-        // Always reveal the pill once the WS is attached and we know the
-        // count — solo edit reads "1 editing", co-edit reads "N editing".
-        // The hidden default in route.tsx covers the pre-connection moment
-        // only.
-        counter.textContent = String(peers.size + 1);
+        // Dedupe by stable user identity instead of Yjs clientID so the
+        // same user editing in two tabs reads as "1 editing", not "2".
+        // PRESENCE_USER_ID is the local editor's Clerk user id when
+        // available; peers carry the same field on their presence
+        // state (see initialPresence / setPresence sites above). Falls
+        // back to per-client counting when the field is missing on
+        // either side so legacy / unauthenticated peers don't silently
+        // collapse to zero.
+        var seenUsers = new Set();
+        var distinctClients = 0;
+        peers.forEach(function(peer) {
+          if (peer && typeof peer.userId === "string" && peer.userId.length > 0) {
+            seenUsers.add(peer.userId);
+          } else {
+            distinctClients += 1;
+          }
+        });
+        var selfCount = 0;
+        if (PRESENCE_USER_ID && PRESENCE_USER_ID.length > 0) {
+          if (!seenUsers.has(PRESENCE_USER_ID)) selfCount = 1;
+        } else {
+          selfCount = 1;
+        }
+        counter.textContent = String(seenUsers.size + distinctClients + selfCount);
         pill.hidden = false;
       }
       // Diff the rendered cursor set against the active peers: add DOM
