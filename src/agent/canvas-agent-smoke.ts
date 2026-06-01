@@ -52,8 +52,8 @@ assert(
   'preview/apply route prompt must not mention legacy darkModeEnabled',
 );
 assert(
-  canvasAgentRouteSource.includes("const CANVAS_AGENT_MODEL = 'gemini-3.1-pro-preview'"),
-  'canvas-agent route must use the current Gemini 3.1 Pro Preview model code',
+  canvasAgentRouteSource.includes("const CANVAS_AGENT_MODEL = 'gemini-2.5-pro'"),
+  'canvas-agent route must be on gemini-2.5-pro until GeminiAdapter handles 3.x thought_signature round-trip',
 );
 
 // ---------------------------------------------------------------------------
