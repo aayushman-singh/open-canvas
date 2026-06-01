@@ -1,9 +1,10 @@
 # ADR 0027 — Yjs encode/decode dispatch stays central; per-element files do not gain yjs runtime dependencies
 
-**Status:** Proposed
-**Date:** 2026-05-30
+**Status:** Accepted
+**Date:** 2026-05-30 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the open design question after [ADR 0011](0011-canvas-element-registry.md) Step 4 (Yjs encoder/decoder dispatch) landed `Y_ENCODE_DISPATCH` + `Y_DECODE_DISPATCH` inside `src/canvas/yjs-projection.ts` rather than moving the per-element encoders into the per-element modules under `src/canvas/elements/`.
+**Accepted-context:** verified 2026-06-01 — `Y_ENCODE_DISPATCH` (line 590) and `Y_DECODE_DISPATCH` (line 1070) are both full mapped-type `Record`s in `src/canvas/yjs-projection.ts`. Grep for `from 'yjs'` across `src/canvas/elements/` returns zero matches: the carve-out (decision 1) holds. Both dispatches now exported, and `yjs-projection:smoke` asserts `Object.keys(Y_*_DISPATCH).length === ELEMENT_TYPES.length` plus that the synthetic fixture exercises every `ElementType` — the runtime safety net decision 4 names. The smoke-strengthen step caught a real gap on first run: the synthetic fixture was missing a `collection` element. That gap is now closed.
 
 ## Context
 
