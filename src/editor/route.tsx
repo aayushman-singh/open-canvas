@@ -77,6 +77,14 @@ export interface EditorPageOptions {
    * always have a real customer row.
    */
   customerDisplayName?: string;
+  /**
+   * Stable user identity (Clerk user id of whoever is editing right now)
+   * forwarded to the canvas-client as the dedup key for the "N editing"
+   * presence pill. Same Clerk user opening the site in two tabs collapses
+   * to one entry. Optional so smokes / fixture builders that don't have
+   * a real auth context still emit a working editor surface.
+   */
+  presenceUserId?: string;
   context?: 'dashboard' | 'public';
   clerkPublishableKey?: string;
   /**
@@ -155,6 +163,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
     apex,
     apexOrigin,
     customerDisplayName,
+    presenceUserId,
     context = 'dashboard',
     clerkPublishableKey,
     clerkFrontendApiHost: clerkHost,
@@ -170,6 +179,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
     apiBase,
     ...(wsToken ? { wsToken } : {}),
     ...(customerDisplayName ? { displayName: customerDisplayName } : {}),
+    ...(presenceUserId ? { userId: presenceUserId } : {}),
   });
   const publicAddress = `${subdomain}.${apex}`;
   const settingsPath = `/dashboard/sites/${encodeURIComponent(siteId)}/settings`;
@@ -597,6 +607,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       apex: appDomain(c.env),
       apexOrigin: appOrigin(c.env),
       ...(presenceName ? { customerDisplayName: presenceName } : {}),
+      ...(auth.userId ? { presenceUserId: auth.userId } : {}),
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
       clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL),

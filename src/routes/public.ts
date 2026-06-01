@@ -355,6 +355,7 @@ export async function buildOnSiteEditorOptions(
     clerkPublishableKey: publishableKey,
     clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, env.CLERK_FRONTEND_API_URL),
     wsToken,
+    presenceUserId: payload.clerkUserId,
   };
 }
 
