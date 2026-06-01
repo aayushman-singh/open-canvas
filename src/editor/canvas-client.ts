@@ -11585,6 +11585,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var chatForm = document.getElementById("canvas-chat-form");
       var chatInput = document.getElementById("canvas-chat-input");
       var chatMessages = document.getElementById("canvas-chat-messages");
+      var chatWelcome = document.getElementById("canvas-chat-welcome");
       var chatSessionId = null;
       var chatBusy = false;
 
@@ -11597,6 +11598,31 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
+      function hideChatWelcome() {
+        if (chatWelcome && !chatWelcome.hidden) chatWelcome.hidden = true;
+      }
+
+      // Suggestion chips: clicking pre-fills the input AND submits, so the
+      // chat does the work without the Owner having to retype. We rely on
+      // requestSubmit() so the existing submit listener fires its full flow
+      // (busy state, payload assembly, SSE stream) rather than re-implementing.
+      var chatChips = document.querySelectorAll(".rev01-chat-chip");
+      for (var ci = 0; ci < chatChips.length; ci++) {
+        (function(chip) {
+          chip.addEventListener("click", function() {
+            if (chatBusy || !chatInput || !chatForm) return;
+            var prompt = chip.getAttribute("data-chip-prompt") || chip.textContent || "";
+            if (!prompt) return;
+            chatInput.value = prompt;
+            if (typeof chatForm.requestSubmit === "function") {
+              chatForm.requestSubmit();
+            } else {
+              chatForm.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+            }
+          });
+        })(chatChips[ci]);
+      }
+
       if (chatForm) {
         chatForm.addEventListener("submit", function(ev) {
           ev.preventDefault();
@@ -11604,6 +11630,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           var msg = chatInput.value.trim();
           if (msg.length === 0) return;
           chatInput.value = "";
+          hideChatWelcome();
           appendChatMessage("user", msg);
           chatBusy = true;
           var submitBtn = chatForm.querySelector("button[type=submit]");

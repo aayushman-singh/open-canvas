@@ -55,7 +55,7 @@ type Bindings = {
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-const CANVAS_AGENT_MODEL = 'gemini-2.5-pro';
+const CANVAS_AGENT_MODEL = 'gemini-3.1-pro-preview';
 
 const canvasAgentApi = new Hono<Env>();
 

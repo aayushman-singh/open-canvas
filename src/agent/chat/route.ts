@@ -157,10 +157,17 @@ chatApi.post('/:siteId/chat', async (c) => {
     return c.json({ error: 'invalid json' }, 400);
   }
   if (!isRecord(body) || typeof body.message !== 'string' || body.message.length === 0) {
-    return c.json({ error: 'body must be { message: string, sessionId?: string }' }, 400);
+    return c.json(
+      { error: 'body must be { message: string, sessionId?: string, selectedElementId?: string }' },
+      400,
+    );
   }
   const userMessage = body.message;
   const requestedSessionId = typeof body.sessionId === 'string' ? body.sessionId : null;
+  const selectedElementId =
+    typeof body.selectedElementId === 'string' && body.selectedElementId.length > 0
+      ? body.selectedElementId
+      : undefined;
 
   const apiKey = c.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.length === 0) {
@@ -192,7 +199,8 @@ chatApi.post('/:siteId/chat', async (c) => {
       state: row.editableState,
       fonts: row.fonts,
       assets: row.assets,
-      systemInstruction: buildSystemPrompt(row.editableState),
+      ...(selectedElementId ? { selectedElementId } : {}),
+      systemInstruction: buildSystemPrompt(row.editableState, selectedElementId),
     };
 
     try {

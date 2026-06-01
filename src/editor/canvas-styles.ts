@@ -451,6 +451,65 @@ body.rev01-modal-open {
   flex-direction: column;
   gap: 12px;
 }
+.rev01-chat-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink);
+}
+.rev01-chat-welcome[hidden] { display: none; }
+.rev01-chat-welcome-greeting {
+  margin: 0;
+  font-weight: 650;
+}
+.rev01-chat-welcome-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink-2);
+}
+.rev01-chat-welcome-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.rev01-chat-welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.rev01-chat-chip {
+  appearance: none;
+  border: 1px solid var(--red-line);
+  background: var(--surface);
+  color: var(--red-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background-color 0.14s, color 0.14s;
+}
+.rev01-chat-chip:hover {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+.rev01-chat-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .rev01-chat-selection {
   display: flex;
   align-items: center;

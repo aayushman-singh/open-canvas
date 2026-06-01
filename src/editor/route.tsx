@@ -480,7 +480,46 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 &times;
               </button>
             </div>
-            <div id="canvas-chat-messages" class="rev01-chat-messages" />
+            <div id="canvas-chat-messages" class="rev01-chat-messages">
+              <div id="canvas-chat-welcome" class="rev01-chat-welcome">
+                <p class="rev01-chat-welcome-greeting">
+                  Hi! I'm the AI for your site. I can:
+                </p>
+                <ul class="rev01-chat-welcome-list">
+                  <li>Rewrite text or restyle elements</li>
+                  <li>Add, remove, or reorder sections and pages</li>
+                  <li>Swap images for ones you've uploaded</li>
+                  <li>Switch the whole site to a different style kit</li>
+                </ul>
+                <p class="rev01-chat-welcome-hint">
+                  Select an element on the canvas, then ask me to change it — or try one of these:
+                </p>
+                <div class="rev01-chat-welcome-chips">
+                  <button type="button" class="rev01-chat-chip" data-chip-prompt="What can you change for me on this page?">
+                    What can you change?
+                  </button>
+                  <button type="button" class="rev01-chat-chip" data-chip-prompt="Add a contact section to the bottom of this page.">
+                    Add a contact section
+                  </button>
+                  <button type="button" class="rev01-chat-chip" data-chip-prompt="Switch this site to the blue-saas style kit.">
+                    Try a different style kit
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div id="canvas-chat-selection" class="rev01-chat-selection" hidden>
+              <span class="rev01-chat-selection-label">Selected:</span>
+              <span id="canvas-chat-selection-text" class="rev01-chat-selection-text" />
+              <button
+                type="button"
+                id="canvas-chat-selection-clear"
+                class="rev01-chat-selection-clear"
+                title="Drop selection from chat context"
+                aria-label="Drop selection from chat context"
+              >
+                &times;
+              </button>
+            </div>
             <form id="canvas-chat-form" class="rev01-chat-input">
               <input
                 type="text"

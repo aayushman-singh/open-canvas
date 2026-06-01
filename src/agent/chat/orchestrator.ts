@@ -69,7 +69,7 @@ import type { ChatStreamWriter } from './stream.js';
 // Tunables
 // ---------------------------------------------------------------------------
 
-export const CHAT_DEFAULT_MODEL = 'gemini-2.5-pro';
+export const CHAT_DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 export const MAX_TOOL_CALL_ITERATIONS = 5;
 
 // ---------------------------------------------------------------------------
@@ -96,6 +96,12 @@ export interface OrchestratorContext {
    * fixture. Production passes the live builder from `systemPrompt()`.
    */
   systemInstruction?: string;
+  /**
+   * Optional. The element the Owner currently has selected on the canvas.
+   * The orchestrator injects this into the system prompt so the agent can
+   * resolve vague references ("change this to blue") without a query_site.
+   */
+  selectedElementId?: string;
   tools?: LlmTool[];
   /**
    * Optional. If provided, the orchestrator runs at most this many tool-call
@@ -128,7 +134,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const { session, userMessage, writer, ctx } = input;
   const tools = ctx.tools ?? CHAT_AGENT_TOOLS;
   const model = ctx.model ?? CHAT_DEFAULT_MODEL;
-  const systemInstruction = ctx.systemInstruction ?? buildSystemPrompt(ctx.state);
+  const systemInstruction = ctx.systemInstruction ?? buildSystemPrompt(ctx.state, ctx.selectedElementId);
   const maxIterations = ctx.maxIterations ?? MAX_TOOL_CALL_ITERATIONS;
 
   // 1. Append the user message to history.
@@ -454,7 +460,41 @@ export function toLlmMessages(history: readonly ChatMessage[]): LlmMessage[] {
  * Uses domain language from CONTEXT.md verbatim — Owner, Editable Site,
  * Canvas Page, Canvas Section, Content Element, Section Recipe, Style Kit.
  */
-export function buildSystemPrompt(state: EditableSite): string {
+function findElementSummary(
+  state: EditableSite,
+  elementId: string,
+): { type: string; sectionName: string; pageTitle: string } | null {
+  if (state.header) {
+    for (const el of state.header.elements) {
+      if (el.id === elementId) {
+        return { type: el.type, sectionName: state.header.name ?? 'header', pageTitle: '(global)' };
+      }
+    }
+  }
+  if (state.footer) {
+    for (const el of state.footer.elements) {
+      if (el.id === elementId) {
+        return { type: el.type, sectionName: state.footer.name ?? 'footer', pageTitle: '(global)' };
+      }
+    }
+  }
+  for (const page of state.pages) {
+    for (const section of page.sections) {
+      for (const el of section.elements) {
+        if (el.id === elementId) {
+          return {
+            type: el.type,
+            sectionName: section.name ?? section.id,
+            pageTitle: page.title ?? page.id,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export function buildSystemPrompt(state: EditableSite, selectedElementId?: string): string {
   const lines: string[] = [];
   lines.push(
     'You are the Agent for the rev01 site builder — an AI collaborator that changes an Editable Site only from an Owner request.',
@@ -520,6 +560,24 @@ export function buildSystemPrompt(state: EditableSite): string {
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent IDs — call query_site or query_assets first when unsure.');
+
+  if (selectedElementId) {
+    const summary = findElementSummary(state, selectedElementId);
+    lines.push('');
+    if (summary) {
+      lines.push(
+        `Owner has currently selected element id="${selectedElementId}" (type=${summary.type}, in section "${summary.sectionName}" of page "${summary.pageTitle}").`,
+      );
+      lines.push(
+        `When the Owner says "this", "it", "that", "the selected one", or otherwise omits an element id, resolve it to "${selectedElementId}" unless they clearly name another element. You may skip query_site for this id — it is already validated.`,
+      );
+    } else {
+      lines.push(
+        `Owner reports element id="${selectedElementId}" as currently selected, but it was not found in the current site state. Treat any "this/it/that" reference as ambiguous and call query_site to clarify before proposing changes.`,
+      );
+    }
+  }
+
   return lines.join('\n');
 }
 
