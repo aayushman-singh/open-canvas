@@ -36,8 +36,8 @@ function assert(condition: boolean, message: string): void {
 }
 
 assert(
-  CHAT_DEFAULT_MODEL === 'gemini-3-pro-preview',
-  `CHAT_DEFAULT_MODEL must use the official Gemini model code, got ${CHAT_DEFAULT_MODEL}`,
+  CHAT_DEFAULT_MODEL === 'gemini-3.1-pro-preview',
+  `CHAT_DEFAULT_MODEL must use the current Gemini 3.1 Pro Preview model code, got ${CHAT_DEFAULT_MODEL}`,
 );
 
 // ---------------------------------------------------------------------------

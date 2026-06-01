@@ -69,7 +69,7 @@ import type { ChatStreamWriter } from './stream.js';
 // Tunables
 // ---------------------------------------------------------------------------
 
-export const CHAT_DEFAULT_MODEL = 'gemini-3-pro-preview';
+export const CHAT_DEFAULT_MODEL = 'gemini-3.1-pro-preview';
 export const MAX_TOOL_CALL_ITERATIONS = 5;
 
 // ---------------------------------------------------------------------------
