@@ -180,8 +180,10 @@ html, body {
    message and reveals .rev01-form-error on failure.                       */
 .rev01-form {
   display: grid;
-  gap: 14px;
+  gap: var(--rev01-form-gap, 14px);
   max-width: 100%;
+  font-family: var(--rev01-form-font-family, inherit);
+  font-size: var(--rev01-form-font-size, inherit);
 }
 .rev01-form-field {
   display: grid;
@@ -196,35 +198,36 @@ html, body {
   font-size: 13px;
 }
 .rev01-form-label {
-  font-weight: 500;
-  color: var(--rev01-fg);
+  font-weight: var(--rev01-form-label-weight, 500);
+  font-size: var(--rev01-form-label-size, inherit);
+  color: var(--rev01-form-label-color, var(--rev01-fg));
   line-height: 1.4;
 }
 .rev01-form-input,
 .rev01-form select {
   width: 100%;
-  padding: 10px 12px;
+  padding: var(--rev01-form-input-pad-y, 10px) var(--rev01-form-input-pad-x, 12px);
   font-family: inherit;
   font-size: 14px;
   line-height: 1.4;
-  color: var(--rev01-fg);
-  background: var(--rev01-bg);
-  border: 1px solid var(--rev01-hairline);
-  border-radius: 6px;
+  color: var(--rev01-form-input-color, var(--rev01-fg));
+  background: var(--rev01-form-input-bg, var(--rev01-bg));
+  border: var(--rev01-form-input-border-width, 1px) solid var(--rev01-form-input-border-color, var(--rev01-hairline));
+  border-radius: var(--rev01-form-input-radius, 6px);
   transition: border-color 120ms ease, box-shadow 120ms ease;
   appearance: none;
 }
 .rev01-form-input:hover,
 .rev01-form select:hover {
-  border-color: var(--rev01-fg-mute);
+  border-color: var(--rev01-form-input-border-color, var(--rev01-fg-mute));
 }
 .rev01-form-input:focus,
 .rev01-form select:focus {
   outline: none;
-  border-color: var(--rev01-accent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--rev01-accent) 24%, transparent);
+  border-color: var(--rev01-form-focus-ring, var(--rev01-accent));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--rev01-form-focus-ring, var(--rev01-accent)) 24%, transparent);
 }
-.rev01-form-input::placeholder { color: var(--rev01-fg-mute); }
+.rev01-form-input::placeholder { color: var(--rev01-form-placeholder-color, var(--rev01-fg-mute)); }
 .rev01-form textarea.rev01-form-input {
   resize: vertical;
   min-height: 96px;
@@ -237,18 +240,26 @@ html, body {
 }
 .rev01-form-submit {
   justify-self: start;
-  padding: 10px 18px;
+  padding: var(--rev01-form-submit-pad-y, 10px) var(--rev01-form-submit-pad-x, 18px);
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--rev01-bg);
-  background: var(--rev01-accent);
-  border: 0;
-  border-radius: 6px;
+  font-size: var(--rev01-form-submit-size, 14px);
+  font-weight: var(--rev01-form-submit-weight, 600);
+  color: var(--rev01-form-submit-color, var(--rev01-bg));
+  background: var(--rev01-form-submit-bg, var(--rev01-accent));
+  border: var(--rev01-form-submit-border-width, 0) solid var(--rev01-form-submit-border-color, transparent);
+  border-radius: var(--rev01-form-submit-radius, 6px);
   cursor: pointer;
-  transition: filter 120ms ease, transform 120ms ease;
+  transition: filter 120ms ease, transform 120ms ease, background 120ms ease;
 }
-.rev01-form-submit:hover { filter: brightness(1.05); }
+.rev01-form[data-rev01-form-submit-full="1"] .rev01-form-submit {
+  justify-self: stretch;
+  width: 100%;
+  text-align: center;
+}
+.rev01-form-submit:hover {
+  background: var(--rev01-form-submit-hover-bg, var(--rev01-form-submit-bg, var(--rev01-accent)));
+  filter: brightness(1.05);
+}
 .rev01-form-submit:active { transform: translateY(1px); }
 .rev01-form-submit:disabled,
 .rev01-form-submit[data-busy="1"] {

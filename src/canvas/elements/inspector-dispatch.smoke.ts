@@ -162,6 +162,7 @@ const REGISTERED_MOUNTS = [
   'nav-links',
   'chart-data',
   'form-fields',
+  'form-style',
 ] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {

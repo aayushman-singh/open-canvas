@@ -61,7 +61,15 @@ export type { CarouselElement, CarouselSlide } from './carousel.js';
 export type { ChartElement, ChartKind, ChartSeries } from './chart.js';
 export type { CodeElement, CodeLanguage } from './code.js';
 export type { EmbedElement } from './embed.js';
-export type { FormElement, FormFieldDef, FormFieldKind } from './form.js';
+export type {
+  FormElement,
+  FormFieldDef,
+  FormFieldKind,
+  FormFontFamily,
+  FormFontWeight,
+  FormStyle,
+} from './form.js';
+export { FORM_FONT_FAMILIES, FORM_FONT_WEIGHTS } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
 export type {

@@ -113,6 +113,7 @@ import type {
   EmbedElement,
   FormElement,
   FormFieldDef,
+  FormStyle,
   NavElement,
   NavLink,
   TableColumn,
@@ -378,6 +379,86 @@ function encodeFormFieldDef(field: FormFieldDef): Y.Map<unknown> {
   return out;
 }
 
+function encodeFormStyle(fs: FormStyle): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  setIfDefined(out, 'fontFamily', fs.fontFamily);
+  setIfDefined(out, 'fontFamilyCustom', fs.fontFamilyCustom);
+  setIfDefined(out, 'fontSize', fs.fontSize);
+  setIfDefined(out, 'fieldGap', fs.fieldGap);
+  setIfDefined(out, 'labelColor', fs.labelColor);
+  setIfDefined(out, 'labelFontSize', fs.labelFontSize);
+  setIfDefined(out, 'labelFontWeight', fs.labelFontWeight);
+  setIfDefined(out, 'inputBackgroundColor', fs.inputBackgroundColor);
+  setIfDefined(out, 'inputColor', fs.inputColor);
+  setIfDefined(out, 'inputBorderColor', fs.inputBorderColor);
+  setIfDefined(out, 'inputBorderWidth', fs.inputBorderWidth);
+  setIfDefined(out, 'inputBorderRadius', fs.inputBorderRadius);
+  setIfDefined(out, 'inputPaddingX', fs.inputPaddingX);
+  setIfDefined(out, 'inputPaddingY', fs.inputPaddingY);
+  setIfDefined(out, 'inputPlaceholderColor', fs.inputPlaceholderColor);
+  setIfDefined(out, 'inputFocusRingColor', fs.inputFocusRingColor);
+  setIfDefined(out, 'submitBackgroundColor', fs.submitBackgroundColor);
+  setIfDefined(out, 'submitColor', fs.submitColor);
+  setIfDefined(out, 'submitHoverBackgroundColor', fs.submitHoverBackgroundColor);
+  setIfDefined(out, 'submitBorderColor', fs.submitBorderColor);
+  setIfDefined(out, 'submitBorderWidth', fs.submitBorderWidth);
+  setIfDefined(out, 'submitBorderRadius', fs.submitBorderRadius);
+  setIfDefined(out, 'submitPaddingX', fs.submitPaddingX);
+  setIfDefined(out, 'submitPaddingY', fs.submitPaddingY);
+  setIfDefined(out, 'submitFontSize', fs.submitFontSize);
+  setIfDefined(out, 'submitFontWeight', fs.submitFontWeight);
+  setIfDefined(out, 'submitFullWidth', fs.submitFullWidth);
+  return out;
+}
+
+const FORM_STYLE_STRING_KEYS = [
+  'fontFamily',
+  'fontFamilyCustom',
+  'labelColor',
+  'labelFontWeight',
+  'inputBackgroundColor',
+  'inputColor',
+  'inputBorderColor',
+  'inputPlaceholderColor',
+  'inputFocusRingColor',
+  'submitBackgroundColor',
+  'submitColor',
+  'submitHoverBackgroundColor',
+  'submitBorderColor',
+  'submitFontWeight',
+] as const;
+
+const FORM_STYLE_NUMBER_KEYS = [
+  'fontSize',
+  'fieldGap',
+  'labelFontSize',
+  'inputBorderWidth',
+  'inputBorderRadius',
+  'inputPaddingX',
+  'inputPaddingY',
+  'submitBorderWidth',
+  'submitBorderRadius',
+  'submitPaddingX',
+  'submitPaddingY',
+  'submitFontSize',
+] as const;
+
+function decodeFormStyle(map: Y.Map<unknown>): FormStyle {
+  const fs: FormStyle = {};
+  for (const key of FORM_STYLE_STRING_KEYS) {
+    if (map.has(key)) {
+      (fs as Record<string, unknown>)[key] = map.get(key);
+    }
+  }
+  for (const key of FORM_STYLE_NUMBER_KEYS) {
+    if (map.has(key)) {
+      (fs as Record<string, unknown>)[key] = map.get(key);
+    }
+  }
+  if (map.has('submitFullWidth')) fs.submitFullWidth = map.get('submitFullWidth') as boolean;
+  return fs;
+}
+
 function encodeFormElement(el: FormElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
@@ -387,6 +468,7 @@ function encodeFormElement(el: FormElement): Y.Map<unknown> {
   out.set('submitLabel', el.submitLabel);
   out.set('successMessage', el.successMessage);
   setIfDefined(out, 'webhookUrl', el.webhookUrl);
+  if (el.formStyle !== undefined) out.set('formStyle', encodeFormStyle(el.formStyle));
   return out;
 }
 
@@ -914,6 +996,9 @@ function decodeFormElement(map: Y.Map<unknown>, base: BaseElement): FormElement 
     successMessage: map.get('successMessage') as string,
   };
   if (map.has('webhookUrl')) el.webhookUrl = map.get('webhookUrl') as string;
+  if (map.has('formStyle')) {
+    el.formStyle = decodeFormStyle(map.get('formStyle') as Y.Map<unknown>);
+  }
   return el;
 }
 

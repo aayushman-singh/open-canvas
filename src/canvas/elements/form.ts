@@ -17,7 +17,7 @@
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
-import { escapeAttr, escapeHtml } from './render-utils.js';
+import { escapeAttr, escapeCssValue, escapeHtml } from './render-utils.js';
 import type { BaseElement } from '../schema.js';
 
 export type FormFieldKind = 'text' | 'email' | 'textarea' | 'checkbox' | 'select';
@@ -30,6 +30,54 @@ export interface FormFieldDef {
   placeholder?: string;
   /** For `kind === 'select'` only. Ignored otherwise. */
   options?: Array<{ value: string; label: string }>;
+}
+
+export const FORM_FONT_FAMILIES = [
+  'inherit',
+  'kit-display',
+  'kit-body',
+  'kit-mono',
+  'custom',
+] as const;
+export type FormFontFamily = (typeof FORM_FONT_FAMILIES)[number];
+
+export const FORM_FONT_WEIGHTS = ['normal', 'medium', 'bold'] as const;
+export type FormFontWeight = (typeof FORM_FONT_WEIGHTS)[number];
+
+/**
+ * Per-form visual overrides. Every field optional. The renderer emits CSS
+ * custom-property declarations on the form root and the public stylesheet
+ * (src/canvas/public-styles.ts) reads them with style-kit fallbacks, so
+ * unset fields inherit the active kit.
+ */
+export interface FormStyle {
+  fontFamily?: FormFontFamily;
+  fontFamilyCustom?: string;
+  fontSize?: number;
+  fieldGap?: number;
+  labelColor?: string;
+  labelFontSize?: number;
+  labelFontWeight?: FormFontWeight;
+  inputBackgroundColor?: string;
+  inputColor?: string;
+  inputBorderColor?: string;
+  inputBorderWidth?: number;
+  inputBorderRadius?: number;
+  inputPaddingX?: number;
+  inputPaddingY?: number;
+  inputPlaceholderColor?: string;
+  inputFocusRingColor?: string;
+  submitBackgroundColor?: string;
+  submitColor?: string;
+  submitHoverBackgroundColor?: string;
+  submitBorderColor?: string;
+  submitBorderWidth?: number;
+  submitBorderRadius?: number;
+  submitPaddingX?: number;
+  submitPaddingY?: number;
+  submitFontSize?: number;
+  submitFontWeight?: FormFontWeight;
+  submitFullWidth?: boolean;
 }
 
 export interface FormElement extends BaseElement {
@@ -47,6 +95,11 @@ export interface FormElement extends BaseElement {
   title?: string;
   /** Optional webhook to POST submission JSON to (signed via HMAC). */
   webhookUrl?: string;
+  /**
+   * Optional per-form visual customisation. Renders as CSS-variable
+   * overrides on the form root; absent fields fall through to the kit.
+   */
+  formStyle?: FormStyle;
 }
 
 export interface FormRenderCtx {
@@ -133,9 +186,78 @@ function renderField(field: FormFieldDef, formId: string): string {
   }
 }
 
+/**
+ * Map a FormStyle into a `style="..."` fragment of CSS-variable declarations
+ * plus a `data-rev01-form-submit-full="1"` flag when submitFullWidth is on.
+ * Returns an empty string for both when formStyle is absent — keeps the
+ * default render byte-identical to pre-formStyle output.
+ */
+function formStyleAttrs(fs: FormStyle | undefined): { styleAttr: string; flagAttr: string } {
+  if (!fs) return { styleAttr: '', flagAttr: '' };
+  const decls: string[] = [];
+  const pushString = (name: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const safe = escapeCssValue(value);
+    if (safe === '') return;
+    decls.push(`${name}:${safe}`);
+  };
+  const pushPx = (name: string, value: number | undefined) => {
+    if (value === undefined || !Number.isFinite(value)) return;
+    decls.push(`${name}:${String(value)}px`);
+  };
+  const pushRaw = (name: string, value: string) => {
+    decls.push(`${name}:${value}`);
+  };
+
+  if (fs.fontFamily !== undefined && fs.fontFamily !== 'inherit') {
+    if (fs.fontFamily === 'kit-display') pushRaw('--rev01-form-font-family', 'var(--rev01-kit-font-display, inherit)');
+    else if (fs.fontFamily === 'kit-body') pushRaw('--rev01-form-font-family', 'var(--rev01-kit-font-body, inherit)');
+    else if (fs.fontFamily === 'kit-mono') pushRaw('--rev01-form-font-family', 'var(--rev01-kit-font-mono, inherit)');
+    else if (fs.fontFamily === 'custom') pushString('--rev01-form-font-family', fs.fontFamilyCustom);
+  }
+  pushPx('--rev01-form-font-size', fs.fontSize);
+  pushPx('--rev01-form-gap', fs.fieldGap);
+
+  pushString('--rev01-form-label-color', fs.labelColor);
+  pushPx('--rev01-form-label-size', fs.labelFontSize);
+  if (fs.labelFontWeight !== undefined) {
+    const w = fs.labelFontWeight === 'normal' ? '400' : fs.labelFontWeight === 'medium' ? '500' : '700';
+    pushRaw('--rev01-form-label-weight', w);
+  }
+
+  pushString('--rev01-form-input-bg', fs.inputBackgroundColor);
+  pushString('--rev01-form-input-color', fs.inputColor);
+  pushString('--rev01-form-input-border-color', fs.inputBorderColor);
+  pushPx('--rev01-form-input-border-width', fs.inputBorderWidth);
+  pushPx('--rev01-form-input-radius', fs.inputBorderRadius);
+  pushPx('--rev01-form-input-pad-x', fs.inputPaddingX);
+  pushPx('--rev01-form-input-pad-y', fs.inputPaddingY);
+  pushString('--rev01-form-placeholder-color', fs.inputPlaceholderColor);
+  pushString('--rev01-form-focus-ring', fs.inputFocusRingColor);
+
+  pushString('--rev01-form-submit-bg', fs.submitBackgroundColor);
+  pushString('--rev01-form-submit-color', fs.submitColor);
+  pushString('--rev01-form-submit-hover-bg', fs.submitHoverBackgroundColor);
+  pushString('--rev01-form-submit-border-color', fs.submitBorderColor);
+  pushPx('--rev01-form-submit-border-width', fs.submitBorderWidth);
+  pushPx('--rev01-form-submit-radius', fs.submitBorderRadius);
+  pushPx('--rev01-form-submit-pad-x', fs.submitPaddingX);
+  pushPx('--rev01-form-submit-pad-y', fs.submitPaddingY);
+  pushPx('--rev01-form-submit-size', fs.submitFontSize);
+  if (fs.submitFontWeight !== undefined) {
+    const w = fs.submitFontWeight === 'normal' ? '400' : fs.submitFontWeight === 'medium' ? '500' : '700';
+    pushRaw('--rev01-form-submit-weight', w);
+  }
+
+  const styleAttr = decls.length === 0 ? '' : ` style="${decls.join(';')}"`;
+  const flagAttr = fs.submitFullWidth ? ' data-rev01-form-submit-full="1"' : '';
+  return { styleAttr, flagAttr };
+}
+
 export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
   const action = `/__rev01/forms/${encodeURIComponent(ctx.siteId)}/${encodeURIComponent(el.id)}`;
   const fieldsHtml = el.fields.map((field) => renderField(field, el.id)).join('');
+  const { styleAttr, flagAttr } = formStyleAttrs(el.formStyle);
 
   // Turnstile widget. The Cloudflare-managed JS loader script is emitted next
   // to the widget; the Cloudflare CDN caches it so multiple forms on the same
@@ -200,7 +322,7 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
 </script>`;
 
   return [
-    `<form class="rev01-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}">`,
+    `<form class="rev01-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}"${flagAttr}${styleAttr}>`,
     `<input type="hidden" name="pageSlug" value="${escapeAttr(ctx.pageSlug)}" />`,
     fieldsHtml,
     turnstileBlock,
@@ -242,6 +364,11 @@ export const formInspectorSpec: InspectorSpec = {
       placeholder: 'https://...',
       noRebuild: true,
     },
+    // Per-form visual customisation — typography, label, input, and submit
+    // button overrides. Custom-mount because the section contains several
+    // nested disclosure groups; expressing every nested control declaratively
+    // would balloon InspectorSpec without adding navigability.
+    { kind: 'custom-mount', name: 'form-style' },
   ],
 };
 

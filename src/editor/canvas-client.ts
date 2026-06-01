@@ -4003,6 +4003,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "nav-links": function(element, host) { mountNavLinks(element, host); },
     "chart-data": function(element, host) { mountChartData(element, host); },
     "form-fields": function(element, host) { mountFormFields(element, host); },
+    "form-style": function(element, host) { mountFormStyle(element, host); },
   };
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
@@ -4229,6 +4230,217 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     renderFieldList();
     host.appendChild(field("Fields", fieldListHost));
+  }
+
+  // Per-form visual customisation. Writes into element.formStyle and emits
+  // CSS-variable overrides at render time (see src/canvas/elements/form.ts
+  // formStyleAttrs). Sections are <details> disclosures so the inspector
+  // stays scannable when nothing is overridden.
+  function mountFormStyle(element, host) {
+    var fs = element.formStyle || {};
+
+    function ensureFs() {
+      if (!element.formStyle) element.formStyle = fs;
+    }
+    function maybeClear() {
+      var hasAny = false;
+      for (var k in fs) {
+        if (fs[k] !== undefined) { hasAny = true; break; }
+      }
+      if (!hasAny) delete element.formStyle;
+    }
+    function commit() {
+      ensureFs();
+      maybeClear();
+      rebuildElement(element.id);
+      scheduleSave();
+    }
+
+    function colorRowFor(key, swatchDefault, label) {
+      var row = buildColorRow({
+        getValue: function() { return fs[key]; },
+        setValue: function(v) { fs[key] = v; },
+        clearValue: function() { delete fs[key]; },
+        onChange: commit,
+        enabledTitle: "Enable " + label.toLowerCase(),
+        swatchDefault: swatchDefault,
+      });
+      return field(label, row);
+    }
+
+    function pxRowFor(key, label, opts) {
+      var min = opts && typeof opts.min === "number" ? opts.min : 0;
+      var max = opts && typeof opts.max === "number" ? opts.max : 200;
+      var placeholder = opts && opts.placeholder ? opts.placeholder : "auto";
+      var row = document.createElement("div");
+      row.className = "style-row";
+      var input = document.createElement("input");
+      input.type = "number";
+      input.min = String(min);
+      input.max = String(max);
+      input.placeholder = placeholder;
+      input.value = typeof fs[key] === "number" ? String(fs[key]) : "";
+      input.style.width = "72px";
+      var unit = document.createElement("span");
+      unit.className = "unit-label";
+      unit.textContent = "px";
+      input.addEventListener("change", function() {
+        var raw = input.value.trim();
+        if (raw === "") {
+          delete fs[key];
+        } else {
+          var n = Number(raw);
+          if (!Number.isFinite(n) || n < min) {
+            input.value = typeof fs[key] === "number" ? String(fs[key]) : "";
+            return;
+          }
+          fs[key] = n;
+        }
+        commit();
+      });
+      row.appendChild(input);
+      row.appendChild(unit);
+      return field(label, row);
+    }
+
+    function weightRowFor(key, label) {
+      var row = document.createElement("div");
+      row.className = "style-row";
+      var select = document.createElement("select");
+      var options = [
+        { value: "", label: "Default" },
+        { value: "normal", label: "Normal" },
+        { value: "medium", label: "Medium" },
+        { value: "bold", label: "Bold" },
+      ];
+      for (var i = 0; i < options.length; i++) {
+        var opt = document.createElement("option");
+        opt.value = options[i].value;
+        opt.textContent = options[i].label;
+        select.appendChild(opt);
+      }
+      select.value = typeof fs[key] === "string" ? fs[key] : "";
+      select.addEventListener("change", function() {
+        if (select.value === "") delete fs[key];
+        else fs[key] = select.value;
+        commit();
+      });
+      row.appendChild(select);
+      return field(label, row);
+    }
+
+    function checkboxRowFor(key, label) {
+      var row = document.createElement("div");
+      row.className = "style-row";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = !!fs[key];
+      cb.addEventListener("change", function() {
+        if (cb.checked) fs[key] = true;
+        else delete fs[key];
+        commit();
+      });
+      row.appendChild(cb);
+      return field(label, row);
+    }
+
+    function section(title, rows) {
+      var details = document.createElement("details");
+      details.className = "form-style-section";
+      var summary = document.createElement("summary");
+      summary.textContent = title;
+      details.appendChild(summary);
+      for (var i = 0; i < rows.length; i++) details.appendChild(rows[i]);
+      return details;
+    }
+
+    // -- Typography
+    var fontSelect = document.createElement("select");
+    var fontOptions = [
+      { value: "", label: "Default (inherit)" },
+      { value: "kit-display", label: "Kit display font" },
+      { value: "kit-body", label: "Kit body font" },
+      { value: "kit-mono", label: "Kit mono font" },
+      { value: "custom", label: "Custom font…" },
+    ];
+    for (var fi = 0; fi < fontOptions.length; fi++) {
+      var fOpt = document.createElement("option");
+      fOpt.value = fontOptions[fi].value;
+      fOpt.textContent = fontOptions[fi].label;
+      fontSelect.appendChild(fOpt);
+    }
+    fontSelect.value = typeof fs.fontFamily === "string" && fs.fontFamily !== "inherit" ? fs.fontFamily : "";
+    var fontCustom = document.createElement("input");
+    fontCustom.type = "text";
+    fontCustom.placeholder = "e.g. 'Inter', system-ui, sans-serif";
+    fontCustom.value = fs.fontFamilyCustom || "";
+    fontCustom.style.marginTop = "6px";
+    fontCustom.hidden = fontSelect.value !== "custom";
+    fontSelect.addEventListener("change", function() {
+      if (fontSelect.value === "") {
+        delete fs.fontFamily;
+        delete fs.fontFamilyCustom;
+        fontCustom.hidden = true;
+      } else {
+        fs.fontFamily = fontSelect.value;
+        if (fontSelect.value !== "custom") delete fs.fontFamilyCustom;
+        fontCustom.hidden = fontSelect.value !== "custom";
+      }
+      commit();
+    });
+    fontCustom.addEventListener("change", function() {
+      var v = fontCustom.value.trim();
+      if (v === "") delete fs.fontFamilyCustom;
+      else fs.fontFamilyCustom = v;
+      commit();
+    });
+    var fontRowWrap = document.createElement("div");
+    fontRowWrap.style.display = "flex";
+    fontRowWrap.style.flexDirection = "column";
+    fontRowWrap.style.gap = "4px";
+    fontRowWrap.appendChild(fontSelect);
+    fontRowWrap.appendChild(fontCustom);
+
+    host.appendChild(section("Typography", [
+      field("Font", fontRowWrap),
+      pxRowFor("fontSize", "Base size", { min: 8, max: 48, placeholder: "inherit" }),
+      pxRowFor("fieldGap", "Field gap", { min: 0, max: 64, placeholder: "14" }),
+    ]));
+
+    // -- Labels
+    host.appendChild(section("Labels", [
+      colorRowFor("labelColor", "#222222", "Color"),
+      pxRowFor("labelFontSize", "Size", { min: 8, max: 32, placeholder: "inherit" }),
+      weightRowFor("labelFontWeight", "Weight"),
+    ]));
+
+    // -- Inputs
+    host.appendChild(section("Inputs", [
+      colorRowFor("inputBackgroundColor", "#ffffff", "Background"),
+      colorRowFor("inputColor", "#222222", "Text color"),
+      colorRowFor("inputBorderColor", "#cccccc", "Border color"),
+      pxRowFor("inputBorderWidth", "Border width", { min: 0, max: 8, placeholder: "1" }),
+      pxRowFor("inputBorderRadius", "Radius", { min: 0, max: 40, placeholder: "6" }),
+      pxRowFor("inputPaddingX", "Padding X", { min: 0, max: 40, placeholder: "12" }),
+      pxRowFor("inputPaddingY", "Padding Y", { min: 0, max: 40, placeholder: "10" }),
+      colorRowFor("inputPlaceholderColor", "#999999", "Placeholder"),
+      colorRowFor("inputFocusRingColor", "#3b82f6", "Focus ring"),
+    ]));
+
+    // -- Submit
+    host.appendChild(section("Submit button", [
+      colorRowFor("submitBackgroundColor", "#3b82f6", "Background"),
+      colorRowFor("submitColor", "#ffffff", "Text color"),
+      colorRowFor("submitHoverBackgroundColor", "#2563eb", "Hover background"),
+      colorRowFor("submitBorderColor", "#3b82f6", "Border color"),
+      pxRowFor("submitBorderWidth", "Border width", { min: 0, max: 8, placeholder: "0" }),
+      pxRowFor("submitBorderRadius", "Radius", { min: 0, max: 40, placeholder: "6" }),
+      pxRowFor("submitPaddingX", "Padding X", { min: 0, max: 60, placeholder: "18" }),
+      pxRowFor("submitPaddingY", "Padding Y", { min: 0, max: 40, placeholder: "10" }),
+      pxRowFor("submitFontSize", "Font size", { min: 8, max: 32, placeholder: "14" }),
+      weightRowFor("submitFontWeight", "Font weight"),
+      checkboxRowFor("submitFullWidth", "Full width"),
+    ]));
   }
 
   // buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH

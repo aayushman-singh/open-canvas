@@ -451,6 +451,45 @@ body.rev01-modal-open {
   flex-direction: column;
   gap: 12px;
 }
+.rev01-chat-selection {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--red-soft);
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--red-ink);
+}
+.rev01-chat-selection[hidden] { display: none; }
+.rev01-chat-selection-label {
+  font-weight: 650;
+  opacity: 0.85;
+}
+.rev01-chat-selection-text {
+  flex: 1;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rev01-chat-selection-clear {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--red-ink);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--r-xs);
+}
+.rev01-chat-selection-clear:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
 .rev01-chat-msg {
   max-width: 88%;
   padding: 11px 13px;
@@ -1604,6 +1643,35 @@ body[data-placement-active="true"] .rev01-section-slot {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+#canvas-inspector .form-style-section {
+  margin: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+}
+#canvas-inspector .form-style-section > summary {
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+#canvas-inspector .form-style-section > summary::-webkit-details-marker {
+  display: none;
+}
+#canvas-inspector .form-style-section > summary::before {
+  content: "\\25B8";
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  transition: transform 120ms ease;
+}
+#canvas-inspector .form-style-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+#canvas-inspector .form-style-section > .field {
+  padding: 4px 10px 8px;
 }
 #canvas-inspector .style-row {
   display: flex;

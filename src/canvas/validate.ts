@@ -9,6 +9,12 @@ import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
 import { PAGE_METADATA_FIELDS } from './elements/collection.js';
 import { escapeCssValue } from './elements/render-utils.js';
 import { isAllowedHref } from './action-href.js';
+import {
+  FORM_FONT_FAMILIES,
+  FORM_FONT_WEIGHTS,
+  type FormFontFamily,
+  type FormFontWeight,
+} from './elements/form.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -455,6 +461,82 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   }
 }
 
+// Per-form visual customisation. Every field optional; numeric fields must be
+// finite + non-negative; string fields go through the same pinned-style safety
+// rules elementStyle uses so a malicious value cannot break out of the CSS
+// declaration the renderer emits.
+function validateFormStyle(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath}.formStyle must be an object when present`);
+    return;
+  }
+  const p = `${basePath}.formStyle`;
+
+  const nonNegativeNumber = (field: string, v: unknown): void => {
+    if (v === undefined) return;
+    if (!isFiniteNumber(v) || v < 0) {
+      errors.push(`${p}.${field} must be a non-negative finite number`);
+    }
+  };
+  const safeString = (field: string, v: unknown): void => {
+    if (v === undefined) return;
+    validateInjectionSafeString(v, field, p, errors);
+  };
+
+  if (value.fontFamily !== undefined) {
+    assertOneOf<FormFontFamily>(value.fontFamily, FORM_FONT_FAMILIES, `${p}.fontFamily`, errors);
+  }
+  safeString('fontFamilyCustom', value.fontFamilyCustom);
+  if (value.fontFamily === 'custom' && !isNonEmptyString(value.fontFamilyCustom)) {
+    errors.push(`${p}.fontFamilyCustom must be a non-empty string when fontFamily === "custom"`);
+  }
+  nonNegativeNumber('fontSize', value.fontSize);
+  nonNegativeNumber('fieldGap', value.fieldGap);
+
+  safeString('labelColor', value.labelColor);
+  nonNegativeNumber('labelFontSize', value.labelFontSize);
+  if (value.labelFontWeight !== undefined) {
+    assertOneOf<FormFontWeight>(
+      value.labelFontWeight,
+      FORM_FONT_WEIGHTS,
+      `${p}.labelFontWeight`,
+      errors,
+    );
+  }
+
+  safeString('inputBackgroundColor', value.inputBackgroundColor);
+  safeString('inputColor', value.inputColor);
+  safeString('inputBorderColor', value.inputBorderColor);
+  nonNegativeNumber('inputBorderWidth', value.inputBorderWidth);
+  nonNegativeNumber('inputBorderRadius', value.inputBorderRadius);
+  nonNegativeNumber('inputPaddingX', value.inputPaddingX);
+  nonNegativeNumber('inputPaddingY', value.inputPaddingY);
+  safeString('inputPlaceholderColor', value.inputPlaceholderColor);
+  safeString('inputFocusRingColor', value.inputFocusRingColor);
+
+  safeString('submitBackgroundColor', value.submitBackgroundColor);
+  safeString('submitColor', value.submitColor);
+  safeString('submitHoverBackgroundColor', value.submitHoverBackgroundColor);
+  safeString('submitBorderColor', value.submitBorderColor);
+  nonNegativeNumber('submitBorderWidth', value.submitBorderWidth);
+  nonNegativeNumber('submitBorderRadius', value.submitBorderRadius);
+  nonNegativeNumber('submitPaddingX', value.submitPaddingX);
+  nonNegativeNumber('submitPaddingY', value.submitPaddingY);
+  nonNegativeNumber('submitFontSize', value.submitFontSize);
+  if (value.submitFontWeight !== undefined) {
+    assertOneOf<FormFontWeight>(
+      value.submitFontWeight,
+      FORM_FONT_WEIGHTS,
+      `${p}.submitFontWeight`,
+      errors,
+    );
+  }
+  if (value.submitFullWidth !== undefined && typeof value.submitFullWidth !== 'boolean') {
+    errors.push(`${p}.submitFullWidth must be a boolean when present`);
+  }
+}
+
 function validatePageMotionLayout(
   page: Record<string, unknown>,
   basePath: string,
@@ -785,6 +867,10 @@ function validateElement(
     }
     case 'shape': {
       assertOneOf<ShapeVariant>(element.variant, SHAPE_VARIANTS, `${basePath}.variant`, errors);
+      break;
+    }
+    case 'form': {
+      validateFormStyle(element.formStyle, basePath, errors);
       break;
     }
     case 'container': {
