@@ -2,7 +2,7 @@
 
 > A desktop canvas site builder where an Owner starts from one Template Seed, edits positioned design primitives with AI help, switches deterministic Style Kits, and publishes to a real Published Address that updates open Visitor tabs immediately.
 
-[![Status](https://img.shields.io/badge/status-launching--soon-cyan)](https://github.com/aayushman-singh/opencanvas)
+[![Status](https://img.shields.io/badge/status-launching--soon-cyan)](https://github.com/aayushman-singh/open-canvas)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Live](https://img.shields.io/badge/live-opencanvas.aayushman.dev-cyan)](https://opencanvas.aayushman.dev)
 
