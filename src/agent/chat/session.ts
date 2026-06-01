@@ -24,6 +24,14 @@
 // sane; the model's own context window is the real ceiling. A bad estimate
 // fails safe: too aggressive trims a turn we could have kept, too lax sends
 // a few more tokens than budgeted — neither corrupts state.
+//
+// Concurrent-write contract: `saveMessages` is a plain UPDATE without a
+// version column. Two browser tabs racing on the same session UPDATE the
+// row last-writer-wins — the second write overwrites the first and the
+// first tab's appended message is lost. This is the explicit contract per
+// ADR 0048 (`chat session is last-writer-wins`); the migration to
+// optimistic concurrency is shaped in decision 3 of that ADR and will
+// land when telemetry justifies it.
 
 import { and, desc, eq } from 'drizzle-orm';
 import { chatSession, type ChatSession, type NewChatSession } from '../../db/schema';
@@ -207,13 +215,48 @@ export async function createSession(
   return rowToState(r);
 }
 
-/** Replace the messages array on an existing session. */
+/**
+ * Replace the messages array on an existing session.
+ *
+ * Optional `expectedBaselineLength` is the length of `messages` the caller
+ * observed when it loaded the session at the start of the turn. When
+ * provided, this function reads the row's current `messages.length` before
+ * the UPDATE and emits a structured log if the persisted length already
+ * exceeds the expected baseline — that is the ADR-0048-decision-4
+ * telemetry hook for measuring concurrent-tab race frequency.
+ *
+ * The hook does NOT change the write contract: this function still
+ * last-writer-wins per ADR 0048 decision 1. It only surfaces the race
+ * post-hoc so the rarity claim becomes a measured one. A pre-UPDATE read
+ * misses the case where two writers race past it together, but it catches
+ * the common case (one writer lands between baseline-load and the second
+ * writer's UPDATE) — sufficient to answer "does this race happen at all?"
+ */
 export async function saveMessages(
   env: DbEnv,
   sessionId: string,
   messages: ChatMessage[],
+  expectedBaselineLength?: number,
 ): Promise<void> {
   const database = db(env);
+  if (expectedBaselineLength !== undefined) {
+    const rows = await database
+      .select({ messages: chatSession.messages })
+      .from(chatSession)
+      .where(eq(chatSession.id, sessionId))
+      .limit(1);
+    const current = rows[0]?.messages;
+    const currentLength = Array.isArray(current) ? current.length : 0;
+    if (currentLength > expectedBaselineLength) {
+      console.warn('[chat/session] ADR-0048 concurrent-write race detected', {
+        sessionId,
+        expectedBaselineLength,
+        currentLength,
+        incomingLength: messages.length,
+        lostMessages: currentLength - expectedBaselineLength,
+      });
+    }
+  }
   await database
     .update(chatSession)
     .set({ messages: messages as unknown as Array<Record<string, unknown>> })

@@ -203,6 +203,11 @@ chatApi.post('/:siteId/chat', async (c) => {
       systemInstruction: buildSystemPrompt(row.editableState, selectedElementId),
     };
 
+    // Capture the baseline message count BEFORE the turn so saveMessages can
+    // detect a concurrent-tab race per ADR 0048 decision 4. If another tab's
+    // write lands between this capture and our UPDATE, the persisted length
+    // will exceed the baseline and the warn-log fires.
+    const baselineMessageLength = sessionRef.messages.length;
     try {
       const result = await runChatTurn({
         session: sessionRef,
@@ -210,7 +215,7 @@ chatApi.post('/:siteId/chat', async (c) => {
         writer,
         ctx,
       });
-      await saveMessages(env, sessionRef.id, result.messages);
+      await saveMessages(env, sessionRef.id, result.messages, baselineMessageLength);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await writer.write({ kind: 'error', error: `chat turn failed: ${message}` });
