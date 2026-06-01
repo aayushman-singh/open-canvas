@@ -7,6 +7,7 @@
 
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { loadAccessibleSite } from '../../auth/accessible-site';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { importLibrarySectionIntoSite } from '../../canvas/library-section-import';
@@ -14,7 +15,7 @@ import { importSectionIntoSite } from '../../canvas/section-import';
 import type { CanvasPage } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, librarySection, ownerAsset, site } from '../../db/schema';
+import { librarySection, ownerAsset, site } from '../../db/schema';
 import { allTemplateSeeds } from '../../templates/registry';
 import { SECTION_CATALOG } from '../../templates/section-catalog';
 import { canReadScopedLibraryRow } from './library-access';
@@ -108,27 +109,19 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
 
   const database = db(c.env);
 
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
-  if (!customerId) {
-    return c.json({ error: 'no customer row for current user' }, 409);
-  }
-
-  const siteRow = await database
-    .select({ id: site.id, editableState: site.editableState })
-    .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
-    .limit(1);
-  const siteRecord = siteRow[0];
-  if (!siteRecord) {
+  // Resolve access via the shared helper so accepted collaborators with
+  // editor rights can import sections too — matches the canvas.ts /
+  // canvas-agent.ts authorisation surface. `customerId` returned here is
+  // always the SITE OWNER's customer id (per loadAccessibleSite contract),
+  // which is what every ownerAsset / librarySection lookup below needs:
+  // a collaborator's own customer id must never leak into asset scoping.
+  const accessibleSite = await loadAccessibleSite(database, auth.userId, siteId, 'editor');
+  if (!accessibleSite) {
     return c.json({ error: 'site not found' }, 404);
   }
+  const customerId = accessibleSite.customerId;
 
-  const state = siteRecord.editableState;
+  const state = accessibleSite.editableState;
   const page = state.pages[0];
   if (!page) {
     return c.json({ error: 'site editable state has no page' }, 500);
