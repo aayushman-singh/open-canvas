@@ -107,25 +107,64 @@ export function importSectionIntoSite(input: ImportSectionInput): ImportSectionR
     return fresh;
   }
 
+  // Asset references live on more than just media.assetId / posterAssetId —
+  // the save-path validator (collectReferencedAssetIds in src/assets/site-
+  // assets.ts) also walks carousel slide assetIds, nav logoAssetId,
+  // element.elementStyle.backgroundImageAssetId, and the section-level
+  // backgroundVideoAssetId. Every reference must be materialised here, or
+  // the import "succeeds" with raw seed ids that the next save rejects as
+  // "missing assets" once the owner_asset row lookup runs.
+  if (cloned.backgroundVideoAssetId !== undefined && resolveTargetId(cloned.backgroundVideoAssetId) === null) {
+    errors.push(`unknown seed background video asset id: ${cloned.backgroundVideoAssetId}`);
+  }
   for (const element of cloned.elements) {
-    if (element.type !== 'media') continue;
-    const media = element;
-    if (resolveTargetId(media.assetId) === null) {
-      errors.push(`unknown seed asset id: ${media.assetId}`);
+    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+      if (resolveTargetId(element.elementStyle.backgroundImageAssetId) === null) {
+        errors.push(`unknown seed bg image asset id: ${element.elementStyle.backgroundImageAssetId}`);
+      }
     }
-    if (media.mediaKind === 'video' && media.posterAssetId !== undefined && resolveTargetId(media.posterAssetId) === null) {
-      errors.push(`unknown seed poster asset id: ${media.posterAssetId}`);
+    if (element.type === 'media') {
+      if (resolveTargetId(element.assetId) === null) {
+        errors.push(`unknown seed asset id: ${element.assetId}`);
+      }
+      if (element.mediaKind === 'video' && element.posterAssetId !== undefined && resolveTargetId(element.posterAssetId) === null) {
+        errors.push(`unknown seed poster asset id: ${element.posterAssetId}`);
+      }
+    } else if (element.type === 'nav') {
+      if (element.logoAssetId !== undefined && resolveTargetId(element.logoAssetId) === null) {
+        errors.push(`unknown seed nav logo asset id: ${element.logoAssetId}`);
+      }
+    } else if (element.type === 'carousel') {
+      for (const slide of element.slides) {
+        if (resolveTargetId(slide.assetId) === null) {
+          errors.push(`unknown seed carousel slide asset id: ${slide.assetId}`);
+        }
+      }
     }
   }
 
   if (errors.length > 0) return { ok: false, errors };
 
+  if (cloned.backgroundVideoAssetId !== undefined) {
+    cloned.backgroundVideoAssetId = assetIdMap.get(cloned.backgroundVideoAssetId)!;
+  }
   for (const element of cloned.elements) {
-    if (element.type !== 'media') continue;
-    const media = element;
-    media.assetId = assetIdMap.get(media.assetId)!;
-    if (media.mediaKind === 'video' && media.posterAssetId !== undefined) {
-      media.posterAssetId = assetIdMap.get(media.posterAssetId)!;
+    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+      element.elementStyle.backgroundImageAssetId = assetIdMap.get(element.elementStyle.backgroundImageAssetId)!;
+    }
+    if (element.type === 'media') {
+      element.assetId = assetIdMap.get(element.assetId)!;
+      if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+        element.posterAssetId = assetIdMap.get(element.posterAssetId)!;
+      }
+    } else if (element.type === 'nav') {
+      if (element.logoAssetId !== undefined) {
+        element.logoAssetId = assetIdMap.get(element.logoAssetId)!;
+      }
+    } else if (element.type === 'carousel') {
+      for (const slide of element.slides) {
+        slide.assetId = assetIdMap.get(slide.assetId)!;
+      }
     }
   }
 

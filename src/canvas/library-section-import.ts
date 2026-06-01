@@ -59,55 +59,90 @@ export function importLibrarySectionIntoSite(input: LibraryImportInput): Library
   const newAssetRows: ImportedAssetRow[] = [];
   const targetAssetsByHash = new Map(existingAssetsByHash);
 
-  for (const element of cloned.elements) {
-    if (element.type !== 'media') continue;
-
-    const refs = [element.assetId];
-    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
-      refs.push(element.posterAssetId);
+  // Same coverage rationale as src/canvas/section-import.ts: the save-path
+  // validator walks every asset reference the schema can carry (carousel
+  // slides, nav logoAssetId, elementStyle.backgroundImageAssetId, and the
+  // section-level backgroundVideoAssetId), not just media.assetId — every
+  // reference must be in `assetIdMap` or the next save rejects the imported
+  // section.
+  function recordRef(ref: string): void {
+    if (assetIdMap.has(ref)) return;
+    const manifest = manifestByAssetId.get(ref);
+    if (!manifest) {
+      errors.push(`asset ${ref} not found in asset manifest`);
+      return;
     }
+    const existing = targetAssetsByHash.get(manifest.contentHash);
+    if (existing) {
+      assetIdMap.set(ref, existing);
+      return;
+    }
+    const freshId = crypto.randomUUID();
+    assetIdMap.set(ref, freshId);
+    targetAssetsByHash.set(manifest.contentHash, freshId);
+    newAssetRows.push({
+      id: freshId,
+      customerId: targetCustomerId,
+      contentHash: manifest.contentHash,
+      r2Key: manifest.r2Key,
+      mediaType: manifest.mediaType,
+      kind: manifest.kind,
+      alt: manifest.alt,
+      width: manifest.width,
+      height: manifest.height,
+      byteSize: manifest.byteSize,
+    });
+  }
 
-    for (const ref of refs) {
-      if (assetIdMap.has(ref)) continue;
-
-      const manifest = manifestByAssetId.get(ref);
-      if (!manifest) {
-        errors.push(`asset ${ref} not found in asset manifest`);
-        continue;
+  if (cloned.backgroundVideoAssetId !== undefined) {
+    recordRef(cloned.backgroundVideoAssetId);
+  }
+  for (const element of cloned.elements) {
+    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+      recordRef(element.elementStyle.backgroundImageAssetId);
+    }
+    if (element.type === 'media') {
+      recordRef(element.assetId);
+      if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+        recordRef(element.posterAssetId);
       }
-
-      const existing = targetAssetsByHash.get(manifest.contentHash);
-      if (existing) {
-        assetIdMap.set(ref, existing);
-      } else {
-        const freshId = crypto.randomUUID();
-        assetIdMap.set(ref, freshId);
-        targetAssetsByHash.set(manifest.contentHash, freshId);
-        newAssetRows.push({
-          id: freshId,
-          customerId: targetCustomerId,
-          contentHash: manifest.contentHash,
-          r2Key: manifest.r2Key,
-          mediaType: manifest.mediaType,
-          kind: manifest.kind,
-          alt: manifest.alt,
-          width: manifest.width,
-          height: manifest.height,
-          byteSize: manifest.byteSize,
-        });
+    } else if (element.type === 'nav') {
+      if (element.logoAssetId !== undefined) recordRef(element.logoAssetId);
+    } else if (element.type === 'carousel') {
+      for (const slide of element.slides) {
+        recordRef(slide.assetId);
       }
     }
   }
 
   if (errors.length > 0) return { ok: false, errors };
 
+  if (cloned.backgroundVideoAssetId !== undefined) {
+    const mapped = assetIdMap.get(cloned.backgroundVideoAssetId);
+    if (mapped) cloned.backgroundVideoAssetId = mapped;
+  }
   for (const element of cloned.elements) {
-    if (element.type !== 'media') continue;
-    const mapped = assetIdMap.get(element.assetId);
-    if (mapped) element.assetId = mapped;
-    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
-      const posterMapped = assetIdMap.get(element.posterAssetId);
-      if (posterMapped) element.posterAssetId = posterMapped;
+    if (element.elementStyle !== undefined && element.elementStyle.backgroundImageAssetId !== undefined) {
+      const mapped = assetIdMap.get(element.elementStyle.backgroundImageAssetId);
+      if (mapped) element.elementStyle.backgroundImageAssetId = mapped;
+    }
+    if (element.type === 'media') {
+      const mapped = assetIdMap.get(element.assetId);
+      if (mapped) element.assetId = mapped;
+      if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+        const posterMapped = assetIdMap.get(element.posterAssetId);
+        if (posterMapped) element.posterAssetId = posterMapped;
+      }
+    } else if (element.type === 'nav') {
+      if (element.logoAssetId !== undefined) {
+        const mapped = assetIdMap.get(element.logoAssetId);
+        if (mapped) element.logoAssetId = mapped;
+      }
+    } else if (element.type === 'carousel') {
+      for (const slide of element.slides) {
+        const mapped = assetIdMap.get(slide.assetId);
+        if (mapped) slide.assetId = mapped;
+      }
     }
   }
 
