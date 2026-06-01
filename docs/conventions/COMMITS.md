@@ -1,6 +1,6 @@
 # Commit conventions
 
-rev01 uses [Conventional Commits](https://www.conventionalcommits.org/). Enforcement is by review — no git hooks, no commitlint, no Husky. Adding tooling to gate commits adds an install step to every local clone; review catches deviations without that tax.
+Open Canvas uses [Conventional Commits](https://www.conventionalcommits.org/). Enforcement is by review — no git hooks, no commitlint, no Husky. Adding tooling to gate commits adds an install step to every local clone; review catches deviations without that tax.
 
 ---
 

@@ -1,6 +1,6 @@
 # Open Canvas — Migration Guide
 
-Faithful recreation of the new visual system inside the **rev01** codebase
+Faithful recreation of the new visual system inside the **Open Canvas** codebase
 (Cloudflare Workers + Hono JSX + vanilla editor client). This is a **reskin**:
 you touch CSS tokens, component classes, fonts, markup chrome, and a theme
 toggle. **You do not touch app logic, routing, the canvas schema, Yjs, the
@@ -137,7 +137,7 @@ export const Wordmark = () => (
 );
 ```
 
-`.oc-logo` / `.oc-word` styles are in `styles.css`. Replace the current rev01
+`.oc-logo` / `.oc-word` styles are in `styles.css`. Replace the current Open Canvas
 wordmark everywhere (header, footer, auth, error pages, emails).
 
 ---

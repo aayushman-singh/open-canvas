@@ -1,4 +1,4 @@
-# Contributing to rev01
+# Contributing to Open Canvas
 
 Thanks for your interest in contributing! This project is actively developed and we welcome pull requests.
 

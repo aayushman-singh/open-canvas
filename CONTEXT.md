@@ -1,6 +1,6 @@
-# rev01 Context
+# Open Canvas Context
 
-rev01 is a live site builder where an owner starts from a template seed, edits a site directly, and publishes it to a public address visitors can open.
+Open Canvas is a live site builder where an owner starts from a template seed, edits a site directly, and publishes it to a public address visitors can open.
 
 ## Language
 

@@ -1,7 +1,7 @@
-# Handoff: Open Canvas — App Rebrand (rev01)
+# Handoff: Open Canvas — App Rebrand
 
 ## Overview
-This package redesigns the entire **app chrome** of `rev01` — a desktop canvas
+This package redesigns the entire **app chrome** of Open Canvas — a desktop canvas
 site-builder — under a new brand, **Open Canvas**, aimed at non-technical
 small-business users. It keeps every existing feature and only changes the
 visual layer: tokens, typography, components, page chrome, light/dark theming,
@@ -15,10 +15,10 @@ coral red `#E84D4A`, warm neutrals, rounded surfaces, friendly copy.
 The files in `design-references/` are **design references created in HTML** —
 working prototypes that show the intended look and behavior. **They are not
 production code to copy verbatim.** The task is to **recreate these designs
-inside the existing `rev01` codebase** (Cloudflare Workers + Hono JSX + a vanilla
+inside the existing Open Canvas codebase** (Cloudflare Workers + Hono JSX + a vanilla
 editor client) using its established patterns — server-rendered JSX for chrome,
 the existing vanilla client for the editor. Do **not** introduce React or a new
-framework; rev01 has no client framework by design.
+framework; Open Canvas has no client framework by design.
 
 `design-references/MIGRATION.md` is the authoritative, repo-specific port guide
 (file-by-file mapping, variable-name aliases, PR sequence). **Read it first.**
@@ -30,7 +30,7 @@ interactions are all specified. Recreate pixel-faithfully using the codebase's
 patterns. Exact tokens are in `design-references/theme.css` and below.
 
 ## Critical scoping rules (read before coding)
-1. **App chrome only.** Two styling systems coexist in rev01:
+1. **App chrome only.** Two styling systems coexist in Open Canvas:
    - *Chrome* = landing, dashboard, editor, account, public error pages. **This
      is what you restyle.** (`src/landing/`, `src/routes/dashboard/`,
      `src/editor/canvas-styles.ts`, `src/ui.ts`, `src/routes/public.ts`,
@@ -46,7 +46,7 @@ patterns. Exact tokens are in `design-references/theme.css` and below.
 
 ## Design Tokens
 Source of truth: `design-references/theme.css` (includes `[data-theme="dark"]`
-and alias blocks that re-point rev01's existing variable names —
+and alias blocks that re-point Open Canvas's existing variable names —
 `--bg/--panel/--accent` in `shell.tsx`, `--bg-deep/--fg/--accent/--hairline` in
 `landing/styles.ts`, `--rev01-*` in `canvas-styles.ts`).
 
@@ -143,7 +143,7 @@ All mocks are in `design-references/`. Each has light+dark and a theme toggle.
 - **Responsive:** desktop-first; sidebars collapse < ~760px; grids drop columns; editor side panels hide assistant on narrow.
 
 ## State Management
-Minimal client state (these are chrome prototypes): active tab, selected element + its style props (variant/fill/radius/label), theme, AI panel open, zoom level, toast visibility, switch states. In rev01 the editor's real state lives in the existing Yjs/vanilla client — only wire the visual controls to it; don't replace it. Dashboard/settings state is server-rendered.
+Minimal client state (these are chrome prototypes): active tab, selected element + its style props (variant/fill/radius/label), theme, AI panel open, zoom level, toast visibility, switch states. In Open Canvas the editor's real state lives in the existing Yjs/vanilla client — only wire the visual controls to it; don't replace it. Dashboard/settings state is server-rendered.
 
 ## Design Tokens / Assets
 - All tokens: `design-references/theme.css`. Components: `design-references/styles.css`.

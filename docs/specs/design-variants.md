@@ -3,7 +3,7 @@
 **Status:** Draft for selection
 **Date:** 2026-05-21
 
-Four mutually exclusive design directions for the rev01 landing page + dashboard chrome. Pick one before any UI code lands. Each is described with: identity, type system, color logic, surface, motion, hero composition, and a recruiter-readable one-liner.
+Four mutually exclusive design directions for the Open Canvas landing page + dashboard chrome. Pick one before any UI code lands. Each is described with: identity, type system, color logic, surface, motion, hero composition, and a recruiter-readable one-liner.
 
 The goal: **avoid the default-shadcn / default-tailwind aesthetic** that 90% of portfolio projects share. The first 5 seconds on the landing page must telegraph "real designer behind this."
 
@@ -35,7 +35,7 @@ The goal: **avoid the default-shadcn / default-tailwind aesthetic** that 90% of 
 - Cursor leaves a 1-frame ghost trail.
 
 **Hero:**
-- Massive type: `rev01.` filling 70% of viewport width, baseline-aligned.
+- Massive type: `Open Canvas.` filling 70% of viewport width, baseline-aligned.
 - Below it, a single live element: a real `document.json` rendering in a bordered box, with a Yjs cursor visibly editing it.
 - No video, no 3D.
 

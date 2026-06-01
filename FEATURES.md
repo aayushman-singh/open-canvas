@@ -1,4 +1,4 @@
-# rev01 — Exhaustive Feature Reference
+# Open Canvas — Exhaustive Feature Reference
 
 > **What it is:** A desktop canvas site builder where owners start from a template seed, edit positioned design primitives with AI help, switch deterministic style kits, and publish to a real public address that updates open visitor tabs immediately.
 >
@@ -23,37 +23,36 @@
 11. [Collaborator Invitations & Roles](#11-collaborator-invitations--roles)
 12. [Owner Asset Pipeline](#12-owner-asset-pipeline)
 13. [Custom Fonts](#13-custom-fonts)
-14. [~~Symbols (Reusable Components)~~ — removed](#14-symbols-removed)
-15. [Section Library & Cross-Template Import](#15-section-library--cross-template-import)
-16. [Custom Templates](#16-custom-templates)
-17. [Version History & Snapshots](#17-version-history--snapshots)
-18. [Site Import (Web Scraper)](#18-site-import-web-scraper)
-19. [Forms & Submissions](#19-forms--submissions)
-20. [Password-Protected Publishing](#20-password-protected-publishing)
-21. [Custom Domains](#21-custom-domains)
-22. [SEO & Meta Tags](#22-seo--meta-tags)
-23. [OG Image Generation](#23-og-image-generation)
-24. [Sitemap & Robots.txt](#24-sitemap--robotstxt)
-25. [Site Search (Full-Text)](#25-site-search-full-text)
-26. [Accessibility Auditing](#26-accessibility-auditing)
-27. [Light/Dark Mode Toggle](#27-lightdark-mode-toggle)
-28. [Interactive Elements](#28-interactive-elements)
-29. [Embed Support](#29-embed-support)
-30. [Charts (SVG)](#30-charts-svg)
-31. [Code Snippets (Syntax Highlighting)](#31-code-snippets-syntax-highlighting)
-32. [Collections (Dynamic Content)](#32-collections-dynamic-content)
-33. [Addon System](#33-addon-system)
-34. [Localization (per-page locale + RTL)](#34-localization-per-page-locale--rtl)
-35. [Authentication & Security](#35-authentication--security)
-36. [Dashboard](#36-dashboard)
-37. [Landing Page](#37-landing-page)
-38. [Email System](#38-email-system)
-39. [Slot History (Element Asset History)](#39-slot-history-element-asset-history)
-40. [Motion Presets](#40-motion-presets)
-41. [Database Schema (17 Tables)](#41-database-schema-17-tables)
-42. [API Surface (95+ Endpoints)](#42-api-surface-95-endpoints)
-43. [Infrastructure & DevOps](#43-infrastructure--devops)
-44. [In-app Notifications](#44-in-app-notifications)
+14. [Section Library & Cross-Template Import](#14-section-library--cross-template-import)
+15. [Custom Templates](#15-custom-templates)
+16. [Version History & Snapshots](#16-version-history--snapshots)
+17. [Site Import (Web Scraper)](#17-site-import-web-scraper)
+18. [Forms & Submissions](#18-forms--submissions)
+19. [Password-Protected Publishing](#19-password-protected-publishing)
+20. [Custom Domains](#20-custom-domains)
+21. [SEO & Meta Tags](#21-seo--meta-tags)
+22. [OG Image Generation](#22-og-image-generation)
+23. [Sitemap & Robots.txt](#23-sitemap--robotstxt)
+24. [Site Search (Full-Text)](#24-site-search-full-text)
+25. [Accessibility Auditing](#25-accessibility-auditing)
+26. [Light/Dark Mode Toggle](#26-lightdark-mode-toggle)
+27. [Interactive Elements](#27-interactive-elements)
+28. [Embed Support](#28-embed-support)
+29. [Charts (SVG)](#29-charts-svg)
+30. [Code Snippets (Syntax Highlighting)](#30-code-snippets-syntax-highlighting)
+31. [Collections (Dynamic Content)](#31-collections-dynamic-content)
+32. [Addon System](#32-addon-system)
+33. [Localization (per-page locale + RTL)](#33-localization-per-page-locale--rtl)
+34. [Authentication & Security](#34-authentication--security)
+35. [Dashboard](#35-dashboard)
+36. [Landing Page](#36-landing-page)
+37. [Email System](#37-email-system)
+38. [Slot History (Element Asset History)](#38-slot-history-element-asset-history)
+39. [Motion Presets](#39-motion-presets)
+40. [Database Schema (17 Tables)](#40-database-schema-17-tables)
+41. [API Surface (95+ Endpoints)](#41-api-surface-95-endpoints)
+42. [Infrastructure & DevOps](#42-infrastructure--devops)
+43. [In-app Notifications](#43-in-app-notifications)
 
 ---
 
@@ -78,7 +77,7 @@ Re-evaluated against commits from `80919c1..HEAD` (~278 commits). Highest-impact
 
 | Area | What changed |
 |---|---|
-| **In-app notifications (NEW §44, ADR 0043 Accepted)** | Phases A-F shipped same day as ADR drafted: `notification` + `notification_read` Drizzle tables, 4 kinds (`form_submission`, `collaborator_event`, `publish_event`, `access_event`), per-kind email policy, `/api/notifications` + `/api/notifications/stream` (SSE), `NotificationOwnerRoom` Durable Object for live fan-out, dashboard top-bar bell + inbox dropdown, editor header bell, shared bell styles. No silent fallback on the live channel — persisted row is truth, EventSource reconnect → `?since=…` backfill closes any gap |
+| **In-app notifications (NEW §43, ADR 0043 Accepted)** | Phases A-F shipped same day as ADR drafted: `notification` + `notification_read` Drizzle tables, 4 kinds (`form_submission`, `collaborator_event`, `publish_event`, `access_event`), per-kind email policy, `/api/notifications` + `/api/notifications/stream` (SSE), `NotificationOwnerRoom` Durable Object for live fan-out, dashboard top-bar bell + inbox dropdown, editor header bell, shared bell styles. No silent fallback on the live channel — persisted row is truth, EventSource reconnect → `?since=…` backfill closes any gap |
 | Forms | Operator-renamable form `title` (inspector + inbox label + CSV aria-label + agent `patchProperties` key); AJAX submit replaces full-page reload (no Turnstile re-fetch on success); designed visitor form chrome (kit-aware focus ring, accent submit, success/error blocks, textarea grow, checkbox accent-color); no-JS path keeps the 303 fallback |
 | Editor | Settings gear icon in editor header; A11y link surfaced (ADR 0039); Accessibility panel moved out of editor into site settings (ADR 0042 cascade); click-shield over the editable canvas; click anywhere on artboard activates the page; editable page title in the inspector; viewport-background click clears page deselect |
 | Co-edit / collaborators | Collaborators (not only owners) can open the editor; Figma-style mouse-follow cursors with smooth interpolation; `customer.displayName` carried into the Yjs awareness label; presence-convergence window collapsed on editor join; quiet WS reconnect race fixed; collaborator-friendly settings 403 |
@@ -90,7 +89,7 @@ Re-evaluated against commits from `80919c1..HEAD` (~278 commits). Highest-impact
 | Password gate | `/__live` WebSocket upgrade bypasses the password gate when a valid `wsToken` is presented (so the editor socket works on password-protected sites); the password gate now fails closed if the Durable Object rate limiter is unreachable (no silent dev-mode fallback in prod) |
 | Schema | 2 new tables (`notification`, `notification_read`); migrations grew from 6 to 14 (most recent: `0013_notifications.sql`, `0012_visitor_theme_enum.sql`, `0011_library_section_description.sql`, `0010_drop_legacy_template_page.sql`) — note the legacy `page` and `template` tables are dropped; site pages now live in the `site` JSONB |
 | Visitor theme (ADR 0035) | Visitor dark mode is a three-way enum (`light` / `dark` / `toggleable`), not a boolean |
-| Dead-feature cleanup | §14 Symbols, §34 translate-via-Gemini, the legacy `page`/`template` tables and the per-page-drag-handle revert have all left the codebase |
+| Dead-feature cleanup | The legacy `page`/`template` tables and the per-page-drag-handle revert have all left the codebase |
 
 ---
 
@@ -350,7 +349,7 @@ Each template provides: pre-populated sections, copy, media references, and styl
 | Account requirement | Invited email must have an existing account |
 | Collaborator removal | Owner can remove collaborators at any time |
 | Collaborator-friendly settings 403 | Settings page returns a scoped 403 (not a generic crash) when a collaborator hits owner-only controls |
-| Notification side-effects | Invite/join/leave + role-change/revoke emit notifications (ADR 0043, see §44) — affected collaborator and their teammates land in different recipient buckets |
+| Notification side-effects | Invite/join/leave + role-change/revoke emit notifications (ADR 0043, see §43) — affected collaborator and their teammates land in different recipient buckets |
 
 **Key files:** [collaborators.ts](src/routes/api/collaborators.ts), [invite-token.ts](src/auth/invite-token.ts)
 
@@ -392,21 +391,7 @@ Each template provides: pre-populated sections, copy, media references, and styl
 
 ---
 
-## 14. ~~Symbols~~ — removed
-
-Symbol Masters and Symbol Instances were nuked from the codebase. The `symbol-instance` element type, the `symbols/route.ts` API surface, the `SymbolMaster` schema, and the "Nav as symbol" propagation pattern no longer exist.
-
-Reuse paths that survive:
-
-- **Section Library** ([§15](#15-section-library--cross-template-import)) — save any section as a reusable library entry, import it into other pages.
-- **Custom Templates** ([§16](#16-custom-templates)) — save an entire site as a reusable template.
-- **Nav element** ([§6](#6-multi-page-sites--navigation)) — the Nav primitive is still a first-class element and is authored once per site, but it is *not* a symbol; per-page Nav suppression replaces the old "drop a SymbolInstance everywhere" model.
-
-This section is preserved at §14 so existing external references to "FEATURES.md §14" do not break.
-
----
-
-## 15. Section Library & Cross-Template Import
+## 14. Section Library & Cross-Template Import
 
 | Capability | Detail |
 |---|---|
@@ -421,7 +406,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 16. Custom Templates
+## 15. Custom Templates
 
 | Capability | Detail |
 |---|---|
@@ -438,7 +423,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 17. Version History & Snapshots
+## 16. Version History & Snapshots
 
 | Capability | Detail |
 |---|---|
@@ -456,7 +441,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 18. Site Import (Web Scraper)
+## 17. Site Import (Web Scraper)
 
 | Capability | Detail |
 |---|---|
@@ -473,7 +458,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 19. Forms & Submissions
+## 18. Forms & Submissions
 
 | Capability | Detail |
 |---|---|
@@ -488,7 +473,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 | Required field validation | Server-side required check, email format validation, select option validation |
 | Custom success message | Configurable message shown after successful submission |
 | Owner email notification | Resend email sent to site owner on every submission — form ID, timestamp, inbox link (fire-and-forget, non-blocking) |
-| In-app notification | Every submission also writes a `form_submission` notification row (recipient = the site, fanned out to every collaborator via `notification_read`); see [§44](#44-in-app-notifications) |
+| In-app notification | Every submission also writes a `form_submission` notification row (recipient = the site, fanned out to every collaborator via `notification_read`); see [§43](#43-in-app-notifications) |
 | AJAX visitor submit | Inline `preventDefault → fetch POST → toggle `.rev01-form-success` / populate `.rev01-form-error`` handler shared across all forms on a page via `window.__rev01FormHandlerWired`. Disabled submit + `data-busy` during the round trip; `window.turnstile.reset()` after success |
 | No-JS fallback | When JS is blocked the native POST + `303 → /{slug}?form-ok={formId}` path still works; the success block ships with `hidden` so the no-JS path's server-side query handler is the only way to unhide it |
 | Designed visitor form chrome | `.rev01-form` (14px grid gap), `.rev01-form-input` (kit-accent focus ring via `color-mix oklab`), `.rev01-form-submit` (accent background, hover brighten, disabled/`data-busy` fade), `.rev01-form-success` / `.rev01-form-error` with color-mix backgrounds so the chrome stays kit-aware across every built-in kit. Textarea grows; checkbox uses `accent-color: var(--rev01-accent)` |
@@ -497,7 +482,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 20. Password-Protected Publishing
+## 19. Password-Protected Publishing
 
 | Capability | Detail |
 |---|---|
@@ -516,7 +501,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 21. Custom Domains
+## 20. Custom Domains
 
 | Capability | Detail |
 |---|---|
@@ -536,7 +521,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 22. SEO & Meta Tags
+## 21. SEO & Meta Tags
 
 | Capability | Detail |
 |---|---|
@@ -554,7 +539,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 23. OG Image Generation
+## 22. OG Image Generation
 
 | Capability | Detail |
 |---|---|
@@ -570,7 +555,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 24. Sitemap & Robots.txt
+## 23. Sitemap & Robots.txt
 
 | Capability | Detail |
 |---|---|
@@ -583,7 +568,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 25. Site Search (Full-Text)
+## 24. Site Search (Full-Text)
 
 | Capability | Detail |
 |---|---|
@@ -598,7 +583,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 26. Accessibility Auditing
+## 25. Accessibility Auditing
 
 | Capability | Detail |
 |---|---|
@@ -613,7 +598,7 @@ This section is preserved at §14 so existing external references to "FEATURES.m
 
 ---
 
-## 27. Light/Dark Mode
+## 26. Light/Dark Mode
 
 Per [ADR 0035](docs/adr/0035-visitor-dark-mode-three-way-enum.md), visitor dark mode is a three-way enum, not a boolean.
 
@@ -629,7 +614,7 @@ Per [ADR 0035](docs/adr/0035-visitor-dark-mode-three-way-enum.md), visitor dark 
 
 ---
 
-## 28. Interactive Elements
+## 27. Interactive Elements
 
 | Capability | Detail |
 |---|---|
@@ -644,7 +629,7 @@ Per [ADR 0035](docs/adr/0035-visitor-dark-mode-three-way-enum.md), visitor dark 
 
 ---
 
-## 29. Embed Support
+## 28. Embed Support
 
 9 named providers with deterministic regex-based URL resolution (no external API calls):
 
@@ -666,7 +651,7 @@ Plus generic iframe fallback for any URL. All embeds are sandboxed with CSP, laz
 
 ---
 
-## 30. Charts (SVG)
+## 29. Charts (SVG)
 
 | Chart Type | Description |
 |---|---|
@@ -682,7 +667,7 @@ All charts are server-rendered SVG (no client JavaScript). Colors derived from k
 
 ---
 
-## 31. Code Snippets (Syntax Highlighting)
+## 30. Code Snippets (Syntax Highlighting)
 
 11 supported languages via Shiki:
 
@@ -694,7 +679,7 @@ Features: optional line numbers, kit-themed mono typeface, panel background from
 
 ---
 
-## 32. Collections (Dynamic Content)
+## 31. Collections (Dynamic Content)
 
 | Mode | Description |
 |---|---|
@@ -707,7 +692,7 @@ Features: filtering by category/tags/date range, sorting by date or title, grid 
 
 ---
 
-## 33. Addon System
+## 32. Addon System
 
 Extensible per-site capability system (ADR 0009).
 
@@ -722,9 +707,7 @@ Architecture: account-level entitlements + per-site configuration. Head and body
 
 ---
 
-## 34. Localization (per-page locale + RTL)
-
-The original auto-translate-via-Gemini scope is dead and the button has been removed; what survives is per-page locale + RTL layout direction.
+## 33. Localization (per-page locale + RTL)
 
 | Capability | Detail |
 |---|---|
@@ -738,7 +721,7 @@ The original auto-translate-via-Gemini scope is dead and the button has been rem
 
 ---
 
-## 35. Authentication & Security
+## 34. Authentication & Security
 
 ### Auth Mechanisms
 
@@ -776,13 +759,13 @@ The original auto-translate-via-Gemini scope is dead and the button has been rem
 
 ---
 
-## 36. Dashboard
+## 35. Dashboard
 
 Server-rendered Hono JSX dashboard with 14 panels, clickable site-card detail surfaces, a persistent site-level sidebar, and a top-bar notification bell (live SSE).
 
 ### Top-bar chrome
 
-Every dashboard page renders the **notification bell** with unread badge in the global top-bar. Clicking opens the inbox dropdown ([§44](#44-in-app-notifications)).
+Every dashboard page renders the **notification bell** with unread badge in the global top-bar. Clicking opens the inbox dropdown ([§43](#43-in-app-notifications)).
 
 ### Site-Level Sidebar Navigation
 
@@ -811,7 +794,7 @@ Every `/dashboard/sites/:id/*` page renders a 220px left sidebar with 9 links: E
 
 ---
 
-## 37. Landing Page
+## 36. Landing Page
 
 Public marketing page at `/` with:
 
@@ -831,7 +814,7 @@ Dark color scheme, Google Fonts integration, a JS-driven hero demo canvas, and f
 
 ---
 
-## 38. Email System
+## 37. Email System
 
 | Capability | Detail |
 |---|---|
@@ -842,15 +825,15 @@ Dark color scheme, Google Fonts integration, a JS-driven hero demo canvas, and f
 | Copyright footer | Every template renders a copyright footer line beneath the body |
 | Invite email | Collaborator invitation with branding, role details, CTA button, expiration notice |
 | Signed links | HMAC-signed acceptance URLs |
-| Form-submission email | Owner notification on every visitor submission (see [§19](#19-forms--submissions)) |
-| Notification email policy | Notifications ([§44](#44-in-app-notifications)) email per kind: `form_submission` + `access_event` always, `publish_event` only on failure, `collaborator_event` only when the recipient is the subject |
+| Form-submission email | Owner notification on every visitor submission (see [§18](#18-forms--submissions)) |
+| Notification email policy | Notifications ([§43](#43-in-app-notifications)) email per kind: `form_submission` + `access_event` always, `publish_event` only on failure, `collaborator_event` only when the recipient is the subject |
 | Fail loudly | Per [`src/email/send.ts`](src/email/send.ts) the send path raises on Resend failure — no silent retry queue, no "delivered" flag |
 
 **Key files:** [email/](src/email/)
 
 ---
 
-## 39. Slot History (Element Asset History)
+## 38. Slot History (Element Asset History)
 
 | Capability | Detail |
 |---|---|
@@ -864,7 +847,7 @@ Dark color scheme, Google Fonts integration, a JS-driven hero demo canvas, and f
 
 ---
 
-## 40. Motion Presets
+## 39. Motion Presets
 
 16 animation presets per style kit:
 
@@ -892,7 +875,7 @@ Each kit customizes the exact values (distance, scale factor, delay) to match it
 
 ---
 
-## 41. Database Schema (17 Tables)
+## 40. Database Schema (17 Tables)
 
 | # | Table | Purpose | Key Relationships |
 |---|-------|---------|-------------------|
@@ -922,7 +905,7 @@ Legacy `page` and `template` tables were dropped in `0010_drop_legacy_template_p
 
 ---
 
-## 42. API Surface (95+ Endpoints)
+## 41. API Surface (95+ Endpoints)
 
 ### Public (No Auth)
 
@@ -988,7 +971,7 @@ Proxy endpoints under `/__api/` using edit-token cookie instead of Clerk: canvas
 
 ---
 
-## 43. Infrastructure & DevOps
+## 42. Infrastructure & DevOps
 
 | Component | Technology |
 |---|---|
@@ -1023,7 +1006,7 @@ Proxy endpoints under `/__api/` using edit-token cookie instead of Clerk: canvas
 
 ---
 
-## 44. In-app Notifications
+## 43. In-app Notifications
 
 Per [ADR 0043](docs/adr/0043-in-app-notifications.md), Phases A–F shipped 2026-06-01. Persistent, recipient-tagged inbox + per-Owner SSE live delivery + per-kind email policy. Closes the "have I missed anything?" gap for Owners who step away from the editor.
 
@@ -1190,8 +1173,8 @@ SMS, Web Push, mentions (no comment model yet), notification preferences UI, bul
 - **Per-kind email policy** — `form_submission`/`access_event` always email; `publish_event` only on failure; `collaborator_event` only when *I* am the subject — policy lives in [email-policy.ts](src/notifications/email-policy.ts)
 
 ### Reusability
-- **Section Library** — save any section with its asset manifest as a reusable library entry; import into any other site page (see [§15](#15-section-library--cross-template-import))
-- **Custom Templates** — save an entire site as a reusable template (private to owner or admin-published as Community) (see [§16](#16-custom-templates))
+- **Section Library** — save any section with its asset manifest as a reusable library entry; import into any other site page (see [§14](#14-section-library--cross-template-import))
+- **Custom Templates** — save an entire site as a reusable template (private to owner or admin-published as Community) (see [§15](#15-custom-templates))
 
 ### i18n & Localization
 - **RTL language detection** — Arabic, Farsi, Hebrew, Urdu (plus region variants) trigger right-to-left rendering
