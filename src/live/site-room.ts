@@ -30,6 +30,7 @@ import {
   applyAwareness,
   createAwareness,
   encodeAwareness,
+  removeAwarenessClientIds,
 } from './co-edit/awareness.js';
 import {
   Y_SYNC_REMOTE_ORIGIN,
@@ -603,18 +604,18 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
   }
 
   override webSocketClose(ws: WebSocket): void {
-    // Remove the awareness state for this socket's clientID so peers see the
-    // disconnect immediately rather than waiting 30s for the outdated
-    // timeout.
+    // Tombstone the disconnecting socket's awareness state via y-protocols'
+    // removeAwarenessStates: it bumps the awareness clock and fires the
+    // 'update' event, so the fan-out observer encodes a removal payload that
+    // every peer applies — they drop the dead clientID from their local
+    // Awareness immediately instead of waiting ~30s for the outdated-state
+    // timeout. The old direct Map.delete() variant didn't fire the event,
+    // which left a solo refresh seeing the previous tab's ghost clientID
+    // as a "peer" and counting "2 editing".
     if (this.awareness) {
       const ids = this.socketClientIds.get(ws);
       if (ids && ids.size > 0) {
-        for (const id of ids) {
-          // We don't have a direct removeAwarenessStates wrapper exposed; the
-          // Awareness instance handles outdated timeout itself, so we just
-          // clear our local hint. Peers will see the state age out.
-          this.awareness.getStates().delete(id);
-        }
+        removeAwarenessClientIds(this.awareness, Array.from(ids), 'webSocketClose');
       }
     }
     this.broadcastPresence();

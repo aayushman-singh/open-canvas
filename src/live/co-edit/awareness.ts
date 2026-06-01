@@ -23,7 +23,12 @@
 //      timeout, so peers age out cleanly when a socket closes uncleanly.
 //   3. Version-history snapshots stay free of presence data.
 
-import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness';
+import {
+  Awareness,
+  applyAwarenessUpdate,
+  encodeAwarenessUpdate,
+  removeAwarenessStates,
+} from 'y-protocols/awareness';
 import * as Y from 'yjs';
 
 /**
@@ -77,6 +82,21 @@ export function applyAwareness(awareness: Awareness, update: Uint8Array, origin:
  */
 export function setLocalPresence(awareness: Awareness, state: PresenceState | null): void {
   awareness.setLocalState(state);
+}
+
+/**
+ * Tombstone the awareness state for one or more clientIDs and fire an
+ * 'update' event so every peer drops the same ids from its local Map. The
+ * server uses this when a socket closes — without it, a disconnected client
+ * lingers in every peer's awareness for ~30s until y-protocols' outdated-
+ * state timeout sweeps it, which surfaces as "2 editing" on a solo refresh.
+ */
+export function removeAwarenessClientIds(
+  awareness: Awareness,
+  clientIds: number[],
+  origin: unknown,
+): void {
+  removeAwarenessStates(awareness, clientIds, origin);
 }
 
 /**
