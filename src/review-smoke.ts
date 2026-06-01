@@ -638,7 +638,12 @@ assert(
   'expected public route to resolve custom font tokens and emit @font-face CSS for Published Sites',
 );
 assert(
-  publicRouteSource.includes('role=visitor') &&
+  // The public route distinguishes editor and visitor socket roles when
+  // handling the /__live upgrade; the canonical shape is a typed local
+  // `socketRole: 'editor' | 'visitor'` (see src/routes/public.ts ~L959
+  // after the H3 password-gate fix in 12ed4dc).
+  publicRouteSource.includes(`socketRole: 'editor' | 'visitor'`) &&
+    publicRouteSource.includes('verifyEditToken') &&
     indexSource.includes("app.route('/__live', socketRoute)") &&
     socketRouteSource.includes('verifyEditToken') &&
     socketRouteSource.includes('role=editor'),
