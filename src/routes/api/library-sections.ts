@@ -30,6 +30,7 @@ import {
   type AssetManifestEntry,
 } from '../../db/schema.js';
 import { SECTION_CATALOG, type SectionCatalogEntry } from '../../templates/section-catalog.js';
+import { buildSectionThumbnailSvg } from '../../templates/section-thumbnail.js';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -165,6 +166,8 @@ export interface LibraryCatalogEntry {
   templateName?: string;
   sectionId?: string;
   librarySectionId?: string;
+  /** Schematic SVG of the section's element layout. See templates/section-thumbnail.ts. */
+  thumbnail: string;
 }
 
 function seedEntryToCatalog(entry: SectionCatalogEntry): LibraryCatalogEntry {
@@ -178,6 +181,7 @@ function seedEntryToCatalog(entry: SectionCatalogEntry): LibraryCatalogEntry {
     templateId: entry.templateId,
     templateName: entry.templateName,
     sectionId: entry.sectionId,
+    thumbnail: entry.thumbnail,
   };
 }
 
@@ -209,6 +213,7 @@ librarySectionsOwner.get('/sections', async (c) => {
       recipeId: librarySection.recipeId,
       headingPreview: librarySection.headingPreview,
       visibility: librarySection.visibility,
+      sectionData: librarySection.sectionData,
     })
     .from(librarySection)
     .where(whereClause);
@@ -222,6 +227,7 @@ librarySectionsOwner.get('/sections', async (c) => {
       headingPreview: row.headingPreview,
       visibility: row.visibility,
       librarySectionId: row.id,
+      thumbnail: buildSectionThumbnailSvg(row.sectionData),
     });
   }
 

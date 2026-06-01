@@ -6,6 +6,7 @@
 
 import type { CanvasSection } from '../canvas/schema.js';
 import { allTemplateSeeds } from './registry.js';
+import { buildSectionThumbnailSvg } from './section-thumbnail.js';
 
 export interface SectionCatalogEntry {
   templateId: string;
@@ -14,6 +15,8 @@ export interface SectionCatalogEntry {
   recipeId: string;
   sectionName: string;
   headingPreview: string;
+  /** Schematic SVG showing the section's element layout — see section-thumbnail.ts. */
+  thumbnail: string;
 }
 
 function firstHeadingPreview(section: CanvasSection): string {
@@ -41,6 +44,7 @@ function buildCatalog(): SectionCatalogEntry[] {
         recipeId: section.recipeId,
         sectionName: section.name,
         headingPreview: heading.length > 0 ? heading : section.recipeId,
+        thumbnail: buildSectionThumbnailSvg(section, page.width),
       });
     }
   }

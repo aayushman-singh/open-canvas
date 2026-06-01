@@ -8043,13 +8043,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var popoverHeight = linkPopover.offsetHeight || 32;
     var spaceBelow = window.innerHeight - rect.bottom;
     var top;
+    var placement;
     if (spaceBelow >= popoverHeight + 8) {
       top = rect.bottom + 6;
+      placement = 'below';
     } else {
       top = rect.top - popoverHeight - 6;
+      placement = 'above';
     }
     linkPopover.style.top = Math.max(0, top) + 'px';
     linkPopover.style.left = Math.max(0, rect.left) + 'px';
+    linkPopover.setAttribute('data-opencanvas-link-popover-placement', placement);
   }
 
   // Classify a link anchor in the canvas. The popover's button set + preview
@@ -8259,8 +8263,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     bar.addEventListener('mouseleave', function () {
       // Pinned popovers stay until something else dismisses them (caret
       // leaves the link, element is deselected, text edit ends). Hover-
-      // triggered popovers auto-hide as before.
-      if (!linkPopoverPinned) removeLinkPopover();
+      // triggered popovers get a grace window so a glancing cursor exit
+      // doesn't tear the chip down before the Owner can come back to it.
+      if (linkPopoverPinned) return;
+      if (linkPopoverHideTimer) { clearTimeout(linkPopoverHideTimer); }
+      linkPopoverHideTimer = setTimeout(function () {
+        linkPopoverHideTimer = null;
+        removeLinkPopover();
+      }, 200);
     });
 
     linkPopover = bar;
@@ -9172,6 +9182,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       while (node && node !== inner) {
         if (node.nodeType === 1 && node.tagName === 'A') {
           onLinkMouseLeave({ target: node });
+          return;
+        }
+        node = node.parentNode;
+      }
+    });
+
+    // Clicks on an inline link inside the editable do not place the caret
+    // and do not navigate — they only pin the link popover. The Owner edits
+    // the link via the popover (Edit / Unlink / Open); editing the link's
+    // text still works by clicking before or after the link and arrow-keying
+    // into it. preventDefault on mousedown so the browser never moves focus
+    // or selection in response to the click.
+    inner.addEventListener('mousedown', function (ev) {
+      var node = ev.target;
+      while (node && node !== inner) {
+        if (node.nodeType === 1 && node.tagName === 'A' && node.classList && node.classList.contains('opencanvas-inline-link')) {
+          ev.preventDefault();
+          showLinkPopover(node, { pinned: true });
           return;
         }
         node = node.parentNode;
@@ -10518,8 +10546,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const sourceLabel = entry.source === 'seed'
         ? escapeHtml(entry.templateName || 'Built-in')
         : (entry.visibility === 'private' ? 'Your library' : 'Library');
+      // entry.thumbnail is a server-built SVG string (templates/section-thumbnail.ts).
+      // It composes only static attribute values and numeric box coords, never
+      // user content, so inlining it as innerHTML is safe; escapeHtml would
+      // double-escape and render the angle brackets as text.
+      const thumb = typeof entry.thumbnail === 'string' && entry.thumbnail.length > 0
+        ? '<div class="opencanvas-section-card-thumb">' + entry.thumbnail + '</div>'
+        : '';
       return (
         '<li class="opencanvas-section-card' + (isPending ? ' is-pending' : '') + '">' +
+          thumb +
           '<div class="opencanvas-section-card-head">' +
             '<span class="opencanvas-section-card-name">' + escapeHtml(entry.name) + '</span>' +
             '<span class="opencanvas-section-card-recipe">' + escapeHtml(entry.recipeId) + '</span>' +

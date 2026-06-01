@@ -709,7 +709,8 @@ body.opencanvas-modal-open {
 
 .opencanvas-sidebar-tabs button {
   appearance: none;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -721,6 +722,9 @@ body.opencanvas-modal-open {
   line-height: 1;
   padding: 11px 0;
   position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: color 0.14s;
 }
 .opencanvas-sidebar-tabs button:hover { color: var(--ink-2); }
@@ -782,6 +786,7 @@ body.opencanvas-modal-open {
   padding: 8px;
 }
 .opencanvas-page-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -792,7 +797,6 @@ body.opencanvas-modal-open {
   color: var(--opencanvas-fg);
   border: 1px solid transparent;
   min-width: 0;
-  overflow: hidden;
 }
 .opencanvas-page-item:hover {
   background: var(--opencanvas-bg-raised, var(--opencanvas-bg-panel));
@@ -802,25 +806,45 @@ body.opencanvas-modal-open {
   border-color: var(--opencanvas-accent);
 }
 .opencanvas-page-item-title {
-  flex: 1;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
 .opencanvas-page-item-slug {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
   font-family: var(--opencanvas-font-mono);
   font-size: 11px;
   color: var(--opencanvas-fg-mute);
 }
+/* Actions are absolute-positioned on top of the row so they never compete
+   with the title / slug for inline space — that meant Del was getting
+   clipped on narrow sidebar widths. Hidden by default; the row's hover
+   reveals them and paints a backdrop so the underlying title doesn't
+   read through. */
 .opencanvas-page-item-actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 6px;
   display: flex;
+  align-items: center;
   gap: 4px;
+  padding: 0 6px;
+  background: var(--opencanvas-bg-raised, var(--opencanvas-bg-panel));
+  border-radius: 6px;
   opacity: 0;
-  flex-shrink: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
 }
 .opencanvas-page-item:hover .opencanvas-page-item-actions {
   opacity: 1;
+  pointer-events: auto;
 }
 .opencanvas-page-item-actions button {
   appearance: none;
@@ -831,6 +855,7 @@ body.opencanvas-modal-open {
   padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
+  line-height: 1;
 }
 .opencanvas-page-item-actions button:hover {
   border-color: var(--opencanvas-accent);
@@ -842,11 +867,12 @@ body.opencanvas-modal-open {
 }
 .opencanvas-page-seo-link {
   font-size: 11px;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 4px;
   color: var(--opencanvas-fg-mute);
   text-decoration: none;
+  line-height: 1;
 }
 .opencanvas-page-seo-link:hover {
   border-color: var(--opencanvas-accent);
@@ -899,12 +925,26 @@ body.opencanvas-modal-open {
 .opencanvas-section-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding: 8px;
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 6px;
   background: var(--opencanvas-bg-panel);
   cursor: grab;
+}
+.opencanvas-section-card-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #1f2937;
+  border: 1px solid var(--opencanvas-hairline);
+}
+.opencanvas-section-card-thumb svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .opencanvas-section-card-head {
   display: flex;
@@ -2337,6 +2377,27 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   color: var(--ink);
   max-width: 420px;
   pointer-events: auto;
+}
+/* Transparent "bridge" extending the popover's hit area toward the
+   anchor link, so the cursor never travels through a dead zone that
+   would fire the link's mouseleave hide timer. Only the bridge on the
+   appropriate side activates per data-opencanvas-link-popover-placement
+   set by positionLinkPopover. */
+.opencanvas-link-popover[data-opencanvas-link-popover-placement="below"]::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+.opencanvas-link-popover[data-opencanvas-link-popover-placement="above"]::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 8px;
 }
 .opencanvas-link-popover[data-opencanvas-link-popover-pinned="true"] {
   border-color: var(--red);
