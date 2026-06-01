@@ -31,99 +31,99 @@ html, body {
   color: #f6f6f6;
 }
 
-[data-rev01-public-root] {
+[data-opencanvas-public-root] {
   display: block;
   min-height: 100vh;
 }
 
-.rev01-site {
+.opencanvas-site {
   display: block;
-  background: var(--rev01-kit-bg, var(--kit-bg, #0c0c0d));
-  color: var(--rev01-kit-text, var(--kit-fg, #f6f6f6));
-  font-family: var(--rev01-kit-font-body, 'IBM Plex Sans', system-ui, sans-serif);
-  line-height: var(--rev01-kit-line-height, 1.5);
+  background: var(--opencanvas-kit-bg, var(--kit-bg, #0c0c0d));
+  color: var(--opencanvas-kit-text, var(--kit-fg, #f6f6f6));
+  font-family: var(--opencanvas-kit-font-body, 'IBM Plex Sans', system-ui, sans-serif);
+  line-height: var(--opencanvas-kit-line-height, 1.5);
 }
 
-.rev01-page {
+.opencanvas-page {
   margin: 0 auto;
-  background: var(--rev01-kit-bg, var(--kit-bg, #0c0c0d));
-  color: var(--rev01-kit-text, var(--kit-fg, #f6f6f6));
+  background: var(--opencanvas-kit-bg, var(--kit-bg, #0c0c0d));
+  color: var(--opencanvas-kit-text, var(--kit-fg, #f6f6f6));
 }
 
-.rev01-section {
+.opencanvas-section {
   position: relative;
 }
 
-.rev01-text { color: inherit; }
+.opencanvas-text { color: inherit; }
 
-.rev01-action {
+.opencanvas-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: var(--rev01-kit-action-padding, 0 16px);
-  border-radius: var(--rev01-kit-action-radius, 8px);
-  background: var(--rev01-kit-accent, var(--kit-accent, currentColor));
-  color: var(--rev01-kit-accent-text, var(--kit-bg, #fff));
+  padding: var(--opencanvas-kit-action-padding, 0 16px);
+  border-radius: var(--opencanvas-kit-action-radius, 8px);
+  background: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+  color: var(--opencanvas-kit-accent-text, var(--kit-bg, #fff));
   text-decoration: none;
   font-weight: 600;
 }
 
-.rev01-shape {
+.opencanvas-shape {
   width: 100%;
   height: 100%;
-  background: var(--rev01-kit-shape-fill, var(--rev01-kit-accent, var(--kit-accent, currentColor)));
+  background: var(--opencanvas-kit-shape-fill, var(--opencanvas-kit-accent, var(--kit-accent, currentColor)));
   opacity: 0.85;
 }
-.rev01-shape[data-variant="circle"] { border-radius: 50%; }
-.rev01-shape[data-variant="pill"] { border-radius: 999px; }
-.rev01-shape[data-variant="blob"] { border-radius: 36% 64% 60% 40% / 45% 35% 65% 55%; }
-.rev01-shape[data-variant="line"] { height: 4px; align-self: center; }
+.opencanvas-shape[data-variant="circle"] { border-radius: 50%; }
+.opencanvas-shape[data-variant="pill"] { border-radius: 999px; }
+.opencanvas-shape[data-variant="blob"] { border-radius: 36% 64% 60% 40% / 45% 35% 65% 55%; }
+.opencanvas-shape[data-variant="line"] { height: 4px; align-self: center; }
 
-.rev01-surface {
+.opencanvas-surface {
   width: 100%;
   height: 100%;
-  background: var(--rev01-kit-panel, rgba(255, 255, 255, 0.06));
-  border-radius: var(--rev01-kit-radius, 8px);
-  box-shadow: var(--rev01-kit-shadow, none);
+  background: var(--opencanvas-kit-panel, rgba(255, 255, 255, 0.06));
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  box-shadow: var(--opencanvas-kit-shadow, none);
 }
 
-.rev01-media {
+.opencanvas-media {
   width: 100%;
   height: 100%;
   display: block;
 }
 
-.rev01-inline-link {
+.opencanvas-inline-link {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+  text-decoration-color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
 }
-.rev01-inline-link:hover {
-  color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+.opencanvas-inline-link:hover {
+  color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
 }
 
-.rev01-nav-link {
+.opencanvas-nav-link {
   color: inherit;
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
   padding: 6px 12px;
 }
-.rev01-nav-link:hover {
-  color: var(--rev01-kit-accent, var(--kit-accent, currentColor));
+.opencanvas-nav-link:hover {
+  color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
 }
-.rev01-nav {
+.opencanvas-nav {
   gap: 4px;
 }
-.rev01-nav-slot {
+.opencanvas-nav-slot {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.rev01-nav-logo {
+.opencanvas-nav-logo {
   height: 28px;
   width: auto;
 }
@@ -131,7 +131,7 @@ html, body {
 /* Presence indicator — a tiny pill that lives in the top-right of the
    published page. Hidden by default; the visitor script removes the
    [hidden] attribute when more than one socket is connected. */
-[data-rev01-presence] {
+[data-opencanvas-presence] {
   position: fixed;
   top: 12px;
   right: 12px;
@@ -145,31 +145,31 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(8px);
 }
-[data-rev01-presence][hidden] {
+[data-opencanvas-presence][hidden] {
   display: none;
 }
 
 /* ---- Element style overrides ------------------------------------------------
-   When a per-element style property is set on the wrapper (.rev01-element),
+   When a per-element style property is set on the wrapper (.opencanvas-element),
    the inner element's kit-driven value for that property must step aside so
    the wrapper's value shows through. Each data-es-* attribute resets only
    the property it controls — unrelated kit values stay intact.              */
 
-.rev01-element[data-es-bg] > .rev01-surface,
-.rev01-element[data-es-bg] > .rev01-action,
-.rev01-element[data-es-bg] > .rev01-shape { background: transparent; }
+.opencanvas-element[data-es-bg] > .opencanvas-surface,
+.opencanvas-element[data-es-bg] > .opencanvas-action,
+.opencanvas-element[data-es-bg] > .opencanvas-shape { background: transparent; }
 
-.rev01-element[data-es-radius] > .rev01-surface,
-.rev01-element[data-es-radius] > .rev01-action,
-.rev01-element[data-es-radius] > .rev01-shape { border-radius: inherit; }
+.opencanvas-element[data-es-radius] > .opencanvas-surface,
+.opencanvas-element[data-es-radius] > .opencanvas-action,
+.opencanvas-element[data-es-radius] > .opencanvas-shape { border-radius: inherit; }
 
-.rev01-element[data-es-border] > .rev01-surface,
-.rev01-element[data-es-border] > .rev01-action,
-.rev01-element[data-es-border] > .rev01-shape { border-color: transparent; border-width: 0; }
+.opencanvas-element[data-es-border] > .opencanvas-surface,
+.opencanvas-element[data-es-border] > .opencanvas-action,
+.opencanvas-element[data-es-border] > .opencanvas-shape { border-color: transparent; border-width: 0; }
 
-.rev01-element[data-es-shadow] > .rev01-surface,
-.rev01-element[data-es-shadow] > .rev01-action,
-.rev01-element[data-es-shadow] > .rev01-shape { box-shadow: none; }
+.opencanvas-element[data-es-shadow] > .opencanvas-surface,
+.opencanvas-element[data-es-shadow] > .opencanvas-action,
+.opencanvas-element[data-es-shadow] > .opencanvas-shape { box-shadow: none; }
 
 /* ---- Forms ------------------------------------------------------------
    Visitor-facing form chrome. Browsers' default form widgets look broken
@@ -177,106 +177,106 @@ html, body {
    stacked labels, generous tap targets, kit-token-aware focus ring, and
    a primary CTA that picks up the active kit accent. The AJAX handler
    (emitted inline alongside the form) flips visibility on the success
-   message and reveals .rev01-form-error on failure.                       */
-.rev01-form {
+   message and reveals .opencanvas-form-error on failure.                       */
+.opencanvas-form {
   display: grid;
-  gap: var(--rev01-form-gap, 14px);
+  gap: var(--opencanvas-form-gap, 14px);
   max-width: 100%;
-  font-family: var(--rev01-form-font-family, inherit);
-  font-size: var(--rev01-form-font-size, inherit);
+  font-family: var(--opencanvas-form-font-family, inherit);
+  font-size: var(--opencanvas-form-font-size, inherit);
 }
-.rev01-form-field {
+.opencanvas-form-field {
   display: grid;
   gap: 6px;
   font-size: 13px;
-  color: var(--rev01-fg);
+  color: var(--opencanvas-fg);
 }
-.rev01-form-field-checkbox {
+.opencanvas-form-field-checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
 }
-.rev01-form-label {
-  font-weight: var(--rev01-form-label-weight, 500);
-  font-size: var(--rev01-form-label-size, inherit);
-  color: var(--rev01-form-label-color, var(--rev01-fg));
+.opencanvas-form-label {
+  font-weight: var(--opencanvas-form-label-weight, 500);
+  font-size: var(--opencanvas-form-label-size, inherit);
+  color: var(--opencanvas-form-label-color, var(--opencanvas-fg));
   line-height: 1.4;
 }
-.rev01-form-input,
-.rev01-form select {
+.opencanvas-form-input,
+.opencanvas-form select {
   width: 100%;
-  padding: var(--rev01-form-input-pad-y, 10px) var(--rev01-form-input-pad-x, 12px);
+  padding: var(--opencanvas-form-input-pad-y, 10px) var(--opencanvas-form-input-pad-x, 12px);
   font-family: inherit;
   font-size: 14px;
   line-height: 1.4;
-  color: var(--rev01-form-input-color, var(--rev01-fg));
-  background: var(--rev01-form-input-bg, var(--rev01-bg));
-  border: var(--rev01-form-input-border-width, 1px) solid var(--rev01-form-input-border-color, var(--rev01-hairline));
-  border-radius: var(--rev01-form-input-radius, 6px);
+  color: var(--opencanvas-form-input-color, var(--opencanvas-fg));
+  background: var(--opencanvas-form-input-bg, var(--opencanvas-bg));
+  border: var(--opencanvas-form-input-border-width, 1px) solid var(--opencanvas-form-input-border-color, var(--opencanvas-hairline));
+  border-radius: var(--opencanvas-form-input-radius, 6px);
   transition: border-color 120ms ease, box-shadow 120ms ease;
   appearance: none;
 }
-.rev01-form-input:hover,
-.rev01-form select:hover {
-  border-color: var(--rev01-form-input-border-color, var(--rev01-fg-mute));
+.opencanvas-form-input:hover,
+.opencanvas-form select:hover {
+  border-color: var(--opencanvas-form-input-border-color, var(--opencanvas-fg-mute));
 }
-.rev01-form-input:focus,
-.rev01-form select:focus {
+.opencanvas-form-input:focus,
+.opencanvas-form select:focus {
   outline: none;
-  border-color: var(--rev01-form-focus-ring, var(--rev01-accent));
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--rev01-form-focus-ring, var(--rev01-accent)) 24%, transparent);
+  border-color: var(--opencanvas-form-focus-ring, var(--opencanvas-accent));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--opencanvas-form-focus-ring, var(--opencanvas-accent)) 24%, transparent);
 }
-.rev01-form-input::placeholder { color: var(--rev01-form-placeholder-color, var(--rev01-fg-mute)); }
-.rev01-form textarea.rev01-form-input {
+.opencanvas-form-input::placeholder { color: var(--opencanvas-form-placeholder-color, var(--opencanvas-fg-mute)); }
+.opencanvas-form textarea.opencanvas-form-input {
   resize: vertical;
   min-height: 96px;
   font-family: inherit;
 }
-.rev01-form-checkbox {
+.opencanvas-form-checkbox {
   width: 16px;
   height: 16px;
-  accent-color: var(--rev01-accent);
+  accent-color: var(--opencanvas-accent);
 }
-.rev01-form-submit {
+.opencanvas-form-submit {
   justify-self: start;
-  padding: var(--rev01-form-submit-pad-y, 10px) var(--rev01-form-submit-pad-x, 18px);
+  padding: var(--opencanvas-form-submit-pad-y, 10px) var(--opencanvas-form-submit-pad-x, 18px);
   font-family: inherit;
-  font-size: var(--rev01-form-submit-size, 14px);
-  font-weight: var(--rev01-form-submit-weight, 600);
-  color: var(--rev01-form-submit-color, var(--rev01-bg));
-  background: var(--rev01-form-submit-bg, var(--rev01-accent));
-  border: var(--rev01-form-submit-border-width, 0) solid var(--rev01-form-submit-border-color, transparent);
-  border-radius: var(--rev01-form-submit-radius, 6px);
+  font-size: var(--opencanvas-form-submit-size, 14px);
+  font-weight: var(--opencanvas-form-submit-weight, 600);
+  color: var(--opencanvas-form-submit-color, var(--opencanvas-bg));
+  background: var(--opencanvas-form-submit-bg, var(--opencanvas-accent));
+  border: var(--opencanvas-form-submit-border-width, 0) solid var(--opencanvas-form-submit-border-color, transparent);
+  border-radius: var(--opencanvas-form-submit-radius, 6px);
   cursor: pointer;
   transition: filter 120ms ease, transform 120ms ease, background 120ms ease;
 }
-.rev01-form[data-rev01-form-submit-full="1"] .rev01-form-submit {
+.opencanvas-form[data-opencanvas-form-submit-full="1"] .opencanvas-form-submit {
   justify-self: stretch;
   width: 100%;
   text-align: center;
 }
-.rev01-form-submit:hover {
-  background: var(--rev01-form-submit-hover-bg, var(--rev01-form-submit-bg, var(--rev01-accent)));
+.opencanvas-form-submit:hover {
+  background: var(--opencanvas-form-submit-hover-bg, var(--opencanvas-form-submit-bg, var(--opencanvas-accent)));
   filter: brightness(1.05);
 }
-.rev01-form-submit:active { transform: translateY(1px); }
-.rev01-form-submit:disabled,
-.rev01-form-submit[data-busy="1"] {
+.opencanvas-form-submit:active { transform: translateY(1px); }
+.opencanvas-form-submit:disabled,
+.opencanvas-form-submit[data-busy="1"] {
   opacity: 0.6;
   cursor: progress;
   filter: none;
 }
-.rev01-form-success {
+.opencanvas-form-success {
   margin: 0;
   padding: 12px 14px;
   font-size: 14px;
-  color: var(--rev01-accent);
-  background: color-mix(in oklab, var(--rev01-accent) 12%, transparent);
-  border: 1px solid color-mix(in oklab, var(--rev01-accent) 32%, transparent);
+  color: var(--opencanvas-accent);
+  background: color-mix(in oklab, var(--opencanvas-accent) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--opencanvas-accent) 32%, transparent);
   border-radius: 6px;
 }
-.rev01-form-error {
+.opencanvas-form-error {
   margin: 0;
   padding: 10px 12px;
   font-size: 13px;

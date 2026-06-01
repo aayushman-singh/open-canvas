@@ -46,10 +46,10 @@ assert(publishedResult.valid, publishedResult.valid ? '' : publishedResult.error
 const html = renderCanvasSnapshot(snapshot, '/assets', 'smoke-site', {
   turnstileSiteKey: TURNSTILE_TEST_KEY,
 });
-assert(html.includes('data-rev01-page="page-home"'), 'expected rendered home page marker');
-assert(html.includes('data-rev01-section="section-hero"'), 'expected rendered hero section marker');
-assert(html.includes('data-rev01-element="hero-heading"'), 'expected rendered heading marker');
-assert(html.includes('data-rev01-media-kind="image"'), 'expected rendered image media marker');
+assert(html.includes('data-opencanvas-page="page-home"'), 'expected rendered home page marker');
+assert(html.includes('data-opencanvas-section="section-hero"'), 'expected rendered hero section marker');
+assert(html.includes('data-opencanvas-element="hero-heading"'), 'expected rendered heading marker');
+assert(html.includes('data-opencanvas-media-kind="image"'), 'expected rendered image media marker');
 
 const pageMotionLayoutState: EditableSite = {
   styleKit: 'charcoal',
@@ -97,7 +97,7 @@ const pageMotionLayoutHtml = renderCanvasSnapshot(
 );
 assert(
   pageMotionLayoutHtml.includes(
-    'data-rev01-page="page-motion-layout" data-motion-preset="fade-up" data-scroll-trigger="on-load"',
+    'data-opencanvas-page="page-motion-layout" data-motion-preset="fade-up" data-scroll-trigger="on-load"',
   ),
   'expected on-load page entrance animation to reuse data-motion-preset so style-kit motion CSS runs',
 );
@@ -109,7 +109,7 @@ assert(
 );
 assert(
   pageMotionLayoutHtml.includes(
-    'data-rev01-section="section-motion-layout" data-recipe="feature-grid" data-bg-effect="none" data-entrance="none" style="position:relative;width:960px;height:240px"',
+    'data-opencanvas-section="section-motion-layout" data-recipe="feature-grid" data-bg-effect="none" data-entrance="none" style="position:relative;width:960px;height:240px"',
   ),
   'expected maxWidth to constrain rendered section width inside the page',
 );
@@ -158,7 +158,7 @@ assert(
 // Rich text: the hero heading must contain a <strong> tag (the "lived-in" run
 // in the fixture carries a `bold` mark). Anchor the search to the heading's
 // element wrapper so we don't accept a stray <strong> elsewhere.
-const headingMarker = 'data-rev01-element="hero-heading"';
+const headingMarker = 'data-opencanvas-element="hero-heading"';
 const headingIdx = html.indexOf(headingMarker);
 assert(headingIdx >= 0, 'expected hero-heading marker present in rendered HTML');
 const headingEnd = html.indexOf('</h1>', headingIdx);
@@ -170,11 +170,11 @@ assert(
 );
 
 // Rich text: somewhere in the page a link mark must render as
-// <a class="rev01-inline-link" href="https://...">. The fixture wires this
+// <a class="opencanvas-inline-link" href="https://...">. The fixture wires this
 // onto the hero-body element pointing at an external https url.
 assert(
-  /<a class="rev01-inline-link" href="https:\/\/[^"]+"/.test(html),
-  'expected at least one rev01-inline-link with an https href in rendered HTML',
+  /<a class="opencanvas-inline-link" href="https:\/\/[^"]+"/.test(html),
+  'expected at least one opencanvas-inline-link with an https href in rendered HTML',
 );
 
 // Validator: a hand-built text element whose link mark uses a javascript:
@@ -402,7 +402,7 @@ assert(
 // responsive CSS selectors which also reference section/element ids.
 const styleCloseIdx = html.lastIndexOf('</style>');
 const htmlBodyStart = styleCloseIdx >= 0 ? styleCloseIdx : 0;
-const heroSectionMarker = 'data-rev01-section="section-hero"';
+const heroSectionMarker = 'data-opencanvas-section="section-hero"';
 const heroSectionIdx = html.indexOf(heroSectionMarker, htmlBodyStart);
 assert(heroSectionIdx >= 0, 'expected section-hero marker present in rendered HTML');
 const heroSectionEnd = html.indexOf('</section>', heroSectionIdx);
@@ -415,7 +415,7 @@ assert(
 
 // The hero heading text element must NOT carry aria-hidden — text speaks for
 // itself. Find the hero-heading wrapper opening tag and check it.
-const headingWrapperIdx = html.indexOf('data-rev01-element="hero-heading"', htmlBodyStart);
+const headingWrapperIdx = html.indexOf('data-opencanvas-element="hero-heading"', htmlBodyStart);
 assert(headingWrapperIdx >= 0, 'expected hero-heading element wrapper in rendered HTML');
 const headingWrapperOpenEnd = html.indexOf('>', headingWrapperIdx);
 assert(
@@ -829,8 +829,8 @@ for (const kit of BUILT_IN_STYLE_KITS) {
   const block = extractKitTokenBlock(allKitsCss, kit);
   // Token block must declare the kit-namespaced accent.
   assert(
-    block.includes('--rev01-kit-accent:'),
-    `expected kit ${kit} token block to include --rev01-kit-accent declaration`,
+    block.includes('--opencanvas-kit-accent:'),
+    `expected kit ${kit} token block to include --opencanvas-kit-accent declaration`,
   );
   const preset = getStyleKitPreset(kit);
   assert(
@@ -840,7 +840,7 @@ for (const kit of BUILT_IN_STYLE_KITS) {
   accentByKit.set(kit, preset.accent);
   // Motion duration must match the preset's motionDurationMs.
   assert(
-    block.includes(`--rev01-kit-motion-duration: ${String(preset.motionDurationMs)}ms`),
+    block.includes(`--opencanvas-kit-motion-duration: ${String(preset.motionDurationMs)}ms`),
     `expected kit ${kit} token block to include motion duration ${String(preset.motionDurationMs)}ms`,
   );
   motionByKit.set(kit, `${String(preset.motionDurationMs)}ms`);
@@ -863,10 +863,10 @@ assert(
 
 // Each kit must emit its actionVariants.solid block — distinct background per
 // kit. The block selector is
-//   [data-style-kit="<kit>"] [data-element-type="action"][data-variant="solid"] .rev01-action
+//   [data-style-kit="<kit>"] [data-element-type="action"][data-variant="solid"] .opencanvas-action
 const solidBackgrounds = new Map<BuiltInStyleKit, string>();
 for (const kit of BUILT_IN_STYLE_KITS) {
-  const anchor = `[data-style-kit="${kit}"] [data-element-type="action"][data-variant="solid"] .rev01-action {`;
+  const anchor = `[data-style-kit="${kit}"] [data-element-type="action"][data-variant="solid"] .opencanvas-action {`;
   const start = allKitsCss.indexOf(anchor);
   assert(start >= 0, `expected solid action block for kit ${kit}`);
   const end = allKitsCss.indexOf('}', start);
@@ -901,7 +901,7 @@ assert(
 
 // Each kit must emit a surfaceVariants.raised block.
 for (const kit of BUILT_IN_STYLE_KITS) {
-  const anchor = `[data-style-kit="${kit}"] [data-element-type="container"][data-variant="raised"] .rev01-surface {`;
+  const anchor = `[data-style-kit="${kit}"] [data-element-type="container"][data-variant="raised"] .opencanvas-surface {`;
   const start = allKitsCss.indexOf(anchor);
   assert(start >= 0, `expected raised surface block for kit ${kit}`);
 }

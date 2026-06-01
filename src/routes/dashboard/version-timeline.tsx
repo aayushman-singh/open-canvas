@@ -293,7 +293,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
       }
 
       async function doRestore(id, label) {
-        if (!await __rev01Modal.confirm('Restore "' + label + '"? This overwrites your current edits. A safety snapshot of your current state will be saved automatically.', { title: 'Restore version' })) {
+        if (!await __opencanvasModal.confirm('Restore "' + label + '"? This overwrites your current edits. A safety snapshot of your current state will be saved automatically.', { title: 'Restore version' })) {
           return;
         }
         const res = await fetch(apiBase + '/' + encodeURIComponent(id) + '/restore', {
@@ -302,7 +302,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         });
         if (!res.ok) {
           const body = await res.text();
-          __rev01Modal.alert('Restore failed: ' + body, 'Error');
+          __opencanvasModal.alert('Restore failed: ' + body, 'Error');
           return;
         }
         window.location.reload();
@@ -311,7 +311,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
       async function doManualCapture(form) {
         const label = String(new FormData(form).get('label') || '').trim();
         if (label.length === 0) {
-          __rev01Modal.alert('Label is required.', 'Missing label');
+          __opencanvasModal.alert('Label is required.', 'Missing label');
           return;
         }
         const res = await fetch(apiBase, {
@@ -321,7 +321,7 @@ versionTimeline.get('/sites/:siteId/snapshots', async (c) => {
         });
         if (!res.ok) {
           const body = await res.text();
-          __rev01Modal.alert('Capture failed: ' + body, 'Error');
+          __opencanvasModal.alert('Capture failed: ' + body, 'Error');
           return;
         }
         window.location.reload();

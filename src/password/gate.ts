@@ -4,7 +4,7 @@
 // when a Visitor hits a password-protected site without a valid unlock
 // cookie. The page is intentionally plain — no JS framework, no external
 // fonts, no client-side scripting. A single `<form method="post">` posts the
-// password to `/__rev01/unlock`; the unlock handler verifies, sets the
+// password to `/__opencanvas/unlock`; the unlock handler verifies, sets the
 // cookie, and 303-redirects back to the original path.
 //
 // Why no JS:
@@ -261,11 +261,11 @@ export function renderGateHtml(options: GateOptions): string {
         <div class="lock">${LOCK_GLYPH_SVG}</div>
         <h1>${heading}</h1>
         <p class="sub">This site is password protected. Enter the password to continue.</p>
-        <form method="post" action="/__rev01/unlock">
+        <form method="post" action="/__opencanvas/unlock">
           ${rateBlock}
           ${errorBlock}
-          <label class="lbl" for="rev01-pw">Password</label>
-          <input class="field" id="rev01-pw" type="password" name="password" placeholder="Enter password" autocomplete="current-password" autofocus required />
+          <label class="lbl" for="opencanvas-pw">Password</label>
+          <input class="field" id="opencanvas-pw" type="password" name="password" placeholder="Enter password" autocomplete="current-password" autofocus required />
           <input type="hidden" name="redirect" value="${safeRedirectAttr}" />
           <button class="btn" type="submit">Unlock site</button>
         </form>

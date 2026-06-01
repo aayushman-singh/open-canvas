@@ -174,7 +174,7 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
   const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
-  return `<div class="rev01-element" data-rev01-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs} style="${wrapperStyle}">${inner}</div>`;
+  return `<div class="opencanvas-element" data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
 function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
@@ -199,13 +199,13 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
     ? (() => {
         const t = section.trigger;
         const value = t.type === 'exit-intent' ? '' : String(t.value);
-        return ` data-rev01-popup="true" data-rev01-trigger-type="${escapeAttr(t.type)}" data-rev01-trigger-value="${escapeAttr(value)}"`;
+        return ` data-opencanvas-popup="true" data-opencanvas-trigger-type="${escapeAttr(t.type)}" data-opencanvas-trigger-value="${escapeAttr(value)}"`;
       })()
     : '';
   const bgVideoHtml = section.backgroundVideoAssetId
     ? `<video autoplay loop muted playsinline aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none"><source src="${escapeAttr(`${ctx.assetBasePath}/${section.backgroundVideoAssetId}`)}" type="video/mp4"></video>`
     : '';
-  return `<section class="rev01-section" data-rev01-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
+  return `<section class="opencanvas-section" data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
 function renderPage(
@@ -249,7 +249,7 @@ function renderPage(
       ? ` data-entrance-animation="${escapeAttr(page.entranceAnimation as string)}"`
       : '';
   const triggerAttr = hasEntrance ? ` data-scroll-trigger="${escapeAttr(triggerMode)}"` : '';
-  return `<article class="rev01-page" data-rev01-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
+  return `<article class="opencanvas-page" data-opencanvas-page="${escapeAttr(page.id)}"${motionAttr}${entranceAttr}${triggerAttr} style="${style}">${headerHtml}${sectionsHtml}${footerHtml}</article>`;
 }
 
 /**
@@ -283,7 +283,7 @@ export function renderCanvasSnapshot(
   siteId: string,
   opts: RenderSnapshotOptions,
 ): string {
-  // siteId feeds form action URLs (/__rev01/forms/<siteId>/<formId>). An empty
+  // siteId feeds form action URLs (/__opencanvas/forms/<siteId>/<formId>). An empty
   // string would silently produce a broken double-slash action that POSTs to
   // a 404. Fail loudly at the boundary instead of emitting broken HTML.
   if (!siteId) {
@@ -296,7 +296,7 @@ export function renderCanvasSnapshot(
   // — there is no default. A missing token must never silently degrade.
   //
   // ADR 0012 dec 6: the preset is now resolved once and emits its accent
-  // colour as `--rev01-kit-accent` on the root `<main>`, so the lookup is
+  // colour as `--opencanvas-kit-accent` on the root `<main>`, so the lookup is
   // load-bearing in the rendered output rather than a belt-and-braces side
   // effect. The renderer still throws loudly on an unknown kit (the
   // canvas:smoke "not-a-kit" assertion), because the natural-path call to
@@ -322,6 +322,6 @@ export function renderCanvasSnapshot(
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');
   const responsiveStyle = renderResponsiveCss(snapshot);
-  const rootStyle = `--rev01-kit-accent:${preset.accent}`;
-  return `<main class="rev01-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${responsiveStyle}${pagesHtml}</main>`;
+  const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${responsiveStyle}${pagesHtml}</main>`;
 }

@@ -6,7 +6,7 @@
 //      tokens from Shiki.
 //   2. Unsupported language → plain pre/code fallback (no Shiki classes,
 //      mono font intact).
-//   3. `showLineNumbers: true` → one `.rev01-code-gutter` span per source
+//   3. `showLineNumbers: true` → one `.opencanvas-code-gutter` span per source
 //      line in the Shiki output AND in the plain fallback.
 //   4. Bundle-size sanity log (informational): reports approximate KB of
 //      the curated 11-lang + 1-theme + JS-regex-engine subset.
@@ -116,15 +116,15 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
   });
   assert(plain.startsWith('<pre'), 'plain fallback: expected <pre> wrapper');
   assert(
-    plain.includes('rev01-code-plain'),
-    'plain fallback: expected `rev01-code-plain` marker class',
+    plain.includes('opencanvas-code-plain'),
+    'plain fallback: expected `opencanvas-code-plain` marker class',
   );
   assert(
     !/<span\s+style="color:/.test(plain),
     'plain fallback: must NOT contain Shiki-style inline-coloured spans',
   );
   assert(
-    plain.includes('var(--rev01-kit-font-mono)'),
+    plain.includes('var(--opencanvas-kit-font-mono)'),
     'plain fallback: expected mono CSS variable on the <pre>',
   );
   // The source must be HTML-escaped — single quotes pass through, but
@@ -165,12 +165,12 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
   } as unknown as CodeElement;
   const out = renderCode(el, { styleKit: 'blue-saas' });
   assert(
-    out.includes('rev01-code-plain'),
+    out.includes('opencanvas-code-plain'),
     'renderCode: expected plain fallback for unsupported language at renderer boundary',
   );
   assert(
-    out.includes('rev01-code-snippet'),
-    'renderCode: expected outer rev01-code-snippet wrapper even for plain fallback',
+    out.includes('opencanvas-code-snippet'),
+    'renderCode: expected outer opencanvas-code-snippet wrapper even for plain fallback',
   );
 }
 
@@ -187,7 +187,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
     styleKit: 'charcoal',
     showLineNumbers: true,
   });
-  const shikiGutterCount = countOccurrences(withGutter, 'class="rev01-code-gutter"');
+  const shikiGutterCount = countOccurrences(withGutter, 'class="opencanvas-code-gutter"');
   assert(
     shikiGutterCount === expectedShikiLines,
     `Shiki gutter: expected ${String(expectedShikiLines)} gutter spans, got ${String(shikiGutterCount)}`,
@@ -205,7 +205,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
     showLineNumbers: false,
   });
   assert(
-    !withoutGutter.includes('rev01-code-gutter'),
+    !withoutGutter.includes('opencanvas-code-gutter'),
     'Shiki gutter: must NOT emit any gutter span when showLineNumbers is false',
   );
 
@@ -216,7 +216,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
     styleKit: 'green-organic',
     showLineNumbers: true,
   });
-  const plainGutterCount = countOccurrences(plain, 'class="rev01-code-gutter"');
+  const plainGutterCount = countOccurrences(plain, 'class="opencanvas-code-gutter"');
   assert(
     plainGutterCount === expectedPlainLines,
     `plain gutter: expected ${String(expectedPlainLines)} gutter spans, got ${String(plainGutterCount)}`,
@@ -270,7 +270,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
     showLineNumbers: true,
   };
   const out = renderCode(el, { styleKit: 'charcoal' });
-  assert(out.startsWith('<div class="rev01-code-snippet"'), 'wrapper: expected rev01-code-snippet div');
+  assert(out.startsWith('<div class="opencanvas-code-snippet"'), 'wrapper: expected opencanvas-code-snippet div');
   // Charcoal panel is #16171a — see `src/canvas/style-kits.ts`. We assert
   // the literal hex so a kit drift trips the smoke loudly.
   assert(
@@ -287,7 +287,7 @@ function makeBaseElement(): Omit<CodeElement, 'language' | 'source' | 'showLineN
   );
   assert(out.includes('data-language="typescript"'), 'wrapper: expected data-language attribute');
   assert(out.includes('data-line-numbers="true"'), 'wrapper: expected data-line-numbers="true"');
-  assert(out.includes('rev01-code-gutter'), 'wrapper: expected gutter spans in inner HTML');
+  assert(out.includes('opencanvas-code-gutter'), 'wrapper: expected gutter spans in inner HTML');
 }
 
 // --------------------------------------------------------------------------

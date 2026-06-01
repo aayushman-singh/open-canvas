@@ -192,7 +192,7 @@ a:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-rad
 }
 
 /* left sidebar — visual analogue of the real editor's #canvas-sidebar.
-   Tabs row at top mirrors .rev01-sidebar-tabs (Add / Sections / Pages /
+   Tabs row at top mirrors .opencanvas-sidebar-tabs (Add / Sections / Pages /
    Versions); the tool buttons below mirror the Add panel grid. Kept
    narrower than the real 360px sidebar because the demo width is
    constrained, but the structural layout is the same so the demo reads
@@ -771,7 +771,256 @@ a:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; border-rad
   box-shadow: var(--shadow);
 }
 
-.tpl .shot { height: 138px; }
+.tpl .shot {
+  height: 138px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---------- template thumbnail mockups ----------
+   Each .shot panel was previously an empty gradient; these primitives
+   render a tiny mock-page so the card actually previews the template
+   character (warm cafe / launch / studio / booking). */
+
+.tn-photo,
+.tn-meta,
+.tn-launch-col,
+.tn-mosaic,
+.tn-week,
+.tn-slots,
+.tn-input,
+.tn-avatars,
+.tn-slot {
+  pointer-events: none;
+}
+
+.tn-eyebrow {
+  height: 4px;
+  width: 28px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.tn-h {
+  height: 6px;
+  width: 70%;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.tn-h-wide { width: 88%; }
+.tn-h-short { width: 52%; background: rgba(0, 0, 0, 0.42); }
+
+/* Café — photo left, copy right */
+.tpl-cafe {
+  display: grid;
+  grid-template-columns: 46% 1fr;
+  gap: 8px;
+  padding: 10px;
+}
+.tpl-cafe .tn-photo {
+  position: relative;
+  border-radius: 4px;
+  background:
+    radial-gradient(120% 80% at 20% 20%, rgba(255,255,255,0.55), transparent 60%),
+    linear-gradient(150deg, #C39A6B 0%, #8C6A45 65%, #5C4326 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.tpl-cafe .tn-photo::after {
+  content: "";
+  position: absolute;
+  inset: auto 6px 6px auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.55);
+  box-shadow: -10px 0 0 rgba(255,255,255,0.35);
+}
+.tpl-cafe .tn-photo-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.45);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.tpl-cafe .tn-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+.tpl-cafe .tn-btn {
+  margin-top: auto;
+  align-self: flex-start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #1A1917;
+  color: #F4F1EC;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Launch — centered hero, waitlist input, social proof */
+.tpl-launch {
+  display: grid;
+  place-items: center;
+  padding: 10px 14px;
+}
+.tn-launch-col {
+  width: 100%;
+  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.tn-eyebrow-pink {
+  background: #C7544F;
+  width: 36px;
+}
+.tn-launch-col .tn-h { background: rgba(40, 24, 22, 0.72); }
+.tn-launch-col .tn-h-short { background: rgba(40, 24, 22, 0.5); }
+.tn-input {
+  margin-top: 4px;
+  width: 100%;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  padding: 0 3px 0 8px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06), inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.tn-input-ph {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.18);
+}
+.tn-input-btn {
+  height: 12px;
+  padding: 0 7px;
+  border-radius: 3px;
+  background: #1A1917;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+.tn-avatars {
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.tn-avatars i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid #FBEDEC;
+  margin-left: -3px;
+}
+.tn-avatars i:first-child { margin-left: 0; background: #E29A95; }
+.tn-avatars i:nth-child(2) { background: #B3625E; }
+.tn-avatars i:nth-child(3) { background: #6F4341; }
+.tn-avatars-cap {
+  margin-left: 6px;
+  width: 24px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.32);
+}
+
+/* Studio — dark, asymmetric work mosaic */
+.tpl-studio { padding: 10px; }
+.tn-mosaic {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 5px;
+  height: 100%;
+}
+.tn-tile {
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+.tn-tile-1 {
+  grid-row: span 2;
+  background: linear-gradient(150deg, #E0825B, #6F2E18);
+}
+.tn-tile-2 { background: linear-gradient(150deg, #4D4942, #2A2825); }
+.tn-tile-3 { background: linear-gradient(150deg, #BFAE92, #5C4F3B); }
+.tn-tile-4 { background: linear-gradient(150deg, #3A3530, #1A1917); }
+.tn-tile-5 { background: linear-gradient(150deg, #7C6D5B, #2F2924); }
+.tn-tile-6 { background: #F4E7A5; position: relative; }
+.tn-tile-6::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+  border: 1px solid rgba(0,0,0,0.35);
+}
+
+/* Booking — week strip + time-slot rows */
+.tpl-booking {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.tn-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.tn-week span {
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.55);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.tn-week span.on {
+  background: #2F6E4B;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18);
+}
+.tn-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tn-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 14px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.55);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.tn-slot-time {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.32);
+  max-width: 38px;
+}
+.tn-slot-pill {
+  font-size: 7.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.08);
+  color: rgba(0,0,0,0.55);
+}
+.tn-slot-pill.on { background: #2F6E4B; color: #fff; }
 
 .tpl .cap {
   padding: 12px 14px;

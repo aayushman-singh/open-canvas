@@ -18,7 +18,7 @@
               "id": "header-logo",
               "type": "text",
               "box": { "x": 80, "y": 16, "w": 200, "h": 40, "z": 2 },
-              "content": [{ "text": "rev01", "marks": [{ "type": "bold" }] }],
+              "content": [{ "text": "Open Canvas", "marks": [{ "type": "bold" }] }],
               "role": "label",
               "fontSize": 22,
               "fontWeight": 700,
@@ -80,8 +80,8 @@
               "content": [
                 { "text": "Position elements freely. Pick a style kit. " },
                 {
-                  "text": "Publish to rev01.aayushman.dev",
-                  "marks": [{ "type": "link", "href": "https://rev01.aayushman.dev" }]
+                  "text": "Publish to opencanvas.aayushman.dev",
+                  "marks": [{ "type": "link", "href": "https://opencanvas.aayushman.dev" }]
                 },
                 { "text": "." }
               ],
@@ -199,7 +199,7 @@
               "type": "action",
               "box": { "x": 540, "y": 360, "w": 220, "h": 64, "z": 3 },
               "label": "Open the editor",
-              "href": { "type": "external", "url": "https://rev01.example.com/edit" },
+              "href": { "type": "external", "url": "https://opencanvas.example.com/edit" },
               "variant": "pill"
             },
             {
@@ -207,7 +207,7 @@
               "type": "action",
               "box": { "x": 780, "y": 360, "w": 220, "h": 64, "z": 3 },
               "label": "Email us",
-              "href": { "type": "external", "url": "mailto:hello@rev01.example.com" },
+              "href": { "type": "external", "url": "mailto:hello@opencanvas.example.com" },
               "variant": "underline"
             }
           ]
@@ -223,7 +223,7 @@
               "id": "footer-brand",
               "type": "text",
               "box": { "x": 80, "y": 24, "w": 200, "h": 32, "z": 2 },
-              "content": [{ "text": "rev01" }],
+              "content": [{ "text": "Open Canvas" }],
               "role": "body",
               "fontSize": 16,
               "fontWeight": 600,
@@ -233,7 +233,7 @@
               "id": "footer-copy",
               "type": "text",
               "box": { "x": 80, "y": 64, "w": 400, "h": 28, "z": 2 },
-              "content": [{ "text": "© 2026 rev01. All rights reserved." }],
+              "content": [{ "text": "© 2026 Open Canvas. All rights reserved." }],
               "role": "label",
               "fontSize": 13,
               "fontWeight": 400,

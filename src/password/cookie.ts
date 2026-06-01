@@ -1,7 +1,7 @@
 // src/password/cookie.ts
 //
 // HS256-signed cookie JWT for the visitor unlock gate. The cookie is set by
-// the POST /__rev01/unlock handler after a successful password check; the
+// the POST /__opencanvas/unlock handler after a successful password check; the
 // middleware reads it on every subsequent visitor request to short-circuit
 // the gate.
 //

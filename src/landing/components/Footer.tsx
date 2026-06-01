@@ -72,20 +72,20 @@ export function Footer() {
           </div>
           <div class="fcol">
             <b>Project</b>
-            <a href="https://github.com/aayushman-singh/rev01" rel="noopener">
+            <a href="https://github.com/aayushman-singh/open-canvas" rel="noopener">
               GitHub
             </a>
-            <a href="https://github.com/aayushman-singh/rev01/tree/main/docs" rel="noopener">
+            <a href="https://github.com/aayushman-singh/open-canvas/tree/main/docs" rel="noopener">
               Docs
             </a>
             <span>License: MIT</span>
           </div>
           <div class="fcol">
             <b>Support</b>
-            <a href="https://github.com/aayushman-singh/rev01/issues" rel="noopener">
+            <a href="https://github.com/aayushman-singh/open-canvas/issues" rel="noopener">
               Issues
             </a>
-            <a href="https://github.com/aayushman-singh/rev01/discussions" rel="noopener">
+            <a href="https://github.com/aayushman-singh/open-canvas/discussions" rel="noopener">
               Discussions
             </a>
           </div>

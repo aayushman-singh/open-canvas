@@ -59,7 +59,7 @@ export function renderText(element: TextElement): string {
     ['margin', '0'],
   ]);
   const runsHtml = element.content.map(renderInlineRun).join('');
-  return `<${tag} class="rev01-text" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${runsHtml}</${tag}>`;
+  return `<${tag} class="opencanvas-text" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${runsHtml}</${tag}>`;
 }
 
 export const textInspectorSpec: InspectorSpec = {

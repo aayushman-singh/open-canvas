@@ -1,6 +1,6 @@
 // src/search/route.ts
 //
-// Public host router for `GET /__rev01/search?q=<q>`. Mounted on the public
+// Public host router for `GET /__opencanvas/search?q=<q>`. Mounted on the public
 // host by the main thread.
 //
 // Lifecycle:
@@ -32,7 +32,7 @@
 //      `{ q, hits: [{ pageSlug, elementId, snippet }] }`.
 //
 // The endpoint is GET so a visitor's browser can submit the search via a
-// plain `<form method="get" action="/__rev01/search">`. The opt-in section
+// plain `<form method="get" action="/__opencanvas/search">`. The opt-in section
 // recipe (see `box-recipe.ts`) emits exactly that shape.
 
 import { eq } from 'drizzle-orm';

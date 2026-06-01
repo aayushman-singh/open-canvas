@@ -117,7 +117,7 @@ export function buildApexRobotsTxt(origin: string): string {
     'Allow: /',
     'Disallow: /api/',
     'Disallow: /__api/',
-    'Disallow: /__rev01/',
+    'Disallow: /__opencanvas/',
     'Disallow: /__live/',
     'Disallow: /__invite/',
     'Disallow: /dashboard/',

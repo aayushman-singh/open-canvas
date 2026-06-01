@@ -2,7 +2,7 @@
 //
 // Forms subsystem renderer.
 //
-// Emits a real semantic <form method="post" action="/__rev01/forms/<siteId>/<id>">.
+// Emits a real semantic <form method="post" action="/__opencanvas/forms/<siteId>/<id>">.
 // Every visible field becomes an <input>/<textarea>/<select>; the field id is
 // reused as the form-data key so the submit-handler payload shape is stable
 // and deterministic.
@@ -131,7 +131,7 @@ export function requireTurnstileSiteKey(env: { TURNSTILE_SITE_KEY?: string | und
 }
 
 function renderField(field: FormFieldDef, formId: string): string {
-  const fieldId = `rev01-form-${formId}-${field.id}`;
+  const fieldId = `opencanvas-form-${formId}-${field.id}`;
   const safeName = escapeAttr(field.id);
   const safeLabel = escapeHtml(field.label);
   const requiredAttr = field.required ? ' required' : '';
@@ -145,17 +145,17 @@ function renderField(field: FormFieldDef, formId: string): string {
     case 'email': {
       const inputType = field.kind === 'email' ? 'email' : 'text';
       return [
-        `<label class="rev01-form-field" for="${escapeAttr(fieldId)}">`,
-        `<span class="rev01-form-label">${safeLabel}</span>`,
-        `<input class="rev01-form-input" type="${inputType}" id="${escapeAttr(fieldId)}" name="${safeName}"${placeholderAttr}${requiredAttr} />`,
+        `<label class="opencanvas-form-field" for="${escapeAttr(fieldId)}">`,
+        `<span class="opencanvas-form-label">${safeLabel}</span>`,
+        `<input class="opencanvas-form-input" type="${inputType}" id="${escapeAttr(fieldId)}" name="${safeName}"${placeholderAttr}${requiredAttr} />`,
         `</label>`,
       ].join('');
     }
     case 'textarea': {
       return [
-        `<label class="rev01-form-field" for="${escapeAttr(fieldId)}">`,
-        `<span class="rev01-form-label">${safeLabel}</span>`,
-        `<textarea class="rev01-form-input" id="${escapeAttr(fieldId)}" name="${safeName}"${placeholderAttr}${requiredAttr} rows="4"></textarea>`,
+        `<label class="opencanvas-form-field" for="${escapeAttr(fieldId)}">`,
+        `<span class="opencanvas-form-label">${safeLabel}</span>`,
+        `<textarea class="opencanvas-form-input" id="${escapeAttr(fieldId)}" name="${safeName}"${placeholderAttr}${requiredAttr} rows="4"></textarea>`,
         `</label>`,
       ].join('');
     }
@@ -163,9 +163,9 @@ function renderField(field: FormFieldDef, formId: string): string {
       // Checkbox label sits AFTER the input so visual + screen-reader UX both
       // read "checkbox + label". The wrapping <label> expands the click target.
       return [
-        `<label class="rev01-form-field rev01-form-field-checkbox" for="${escapeAttr(fieldId)}">`,
-        `<input class="rev01-form-checkbox" type="checkbox" id="${escapeAttr(fieldId)}" name="${safeName}" value="on"${requiredAttr} />`,
-        `<span class="rev01-form-label">${safeLabel}</span>`,
+        `<label class="opencanvas-form-field opencanvas-form-field-checkbox" for="${escapeAttr(fieldId)}">`,
+        `<input class="opencanvas-form-checkbox" type="checkbox" id="${escapeAttr(fieldId)}" name="${safeName}" value="on"${requiredAttr} />`,
+        `<span class="opencanvas-form-label">${safeLabel}</span>`,
         `</label>`,
       ].join('');
     }
@@ -175,9 +175,9 @@ function renderField(field: FormFieldDef, formId: string): string {
         .map((opt) => `<option value="${escapeAttr(opt.value)}">${escapeHtml(opt.label)}</option>`)
         .join('');
       return [
-        `<label class="rev01-form-field" for="${escapeAttr(fieldId)}">`,
-        `<span class="rev01-form-label">${safeLabel}</span>`,
-        `<select class="rev01-form-input" id="${escapeAttr(fieldId)}" name="${safeName}"${requiredAttr}>`,
+        `<label class="opencanvas-form-field" for="${escapeAttr(fieldId)}">`,
+        `<span class="opencanvas-form-label">${safeLabel}</span>`,
+        `<select class="opencanvas-form-input" id="${escapeAttr(fieldId)}" name="${safeName}"${requiredAttr}>`,
         optionsHtml,
         `</select>`,
         `</label>`,
@@ -188,7 +188,7 @@ function renderField(field: FormFieldDef, formId: string): string {
 
 /**
  * Map a FormStyle into a `style="..."` fragment of CSS-variable declarations
- * plus a `data-rev01-form-submit-full="1"` flag when submitFullWidth is on.
+ * plus a `data-opencanvas-form-submit-full="1"` flag when submitFullWidth is on.
  * Returns an empty string for both when formStyle is absent — keeps the
  * default render byte-identical to pre-formStyle output.
  */
@@ -210,52 +210,52 @@ function formStyleAttrs(fs: FormStyle | undefined): { styleAttr: string; flagAtt
   };
 
   if (fs.fontFamily !== undefined && fs.fontFamily !== 'inherit') {
-    if (fs.fontFamily === 'kit-display') pushRaw('--rev01-form-font-family', 'var(--rev01-kit-font-display, inherit)');
-    else if (fs.fontFamily === 'kit-body') pushRaw('--rev01-form-font-family', 'var(--rev01-kit-font-body, inherit)');
-    else if (fs.fontFamily === 'kit-mono') pushRaw('--rev01-form-font-family', 'var(--rev01-kit-font-mono, inherit)');
-    else if (fs.fontFamily === 'custom') pushString('--rev01-form-font-family', fs.fontFamilyCustom);
+    if (fs.fontFamily === 'kit-display') pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-display, inherit)');
+    else if (fs.fontFamily === 'kit-body') pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-body, inherit)');
+    else if (fs.fontFamily === 'kit-mono') pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-mono, inherit)');
+    else if (fs.fontFamily === 'custom') pushString('--opencanvas-form-font-family', fs.fontFamilyCustom);
   }
-  pushPx('--rev01-form-font-size', fs.fontSize);
-  pushPx('--rev01-form-gap', fs.fieldGap);
+  pushPx('--opencanvas-form-font-size', fs.fontSize);
+  pushPx('--opencanvas-form-gap', fs.fieldGap);
 
-  pushString('--rev01-form-label-color', fs.labelColor);
-  pushPx('--rev01-form-label-size', fs.labelFontSize);
+  pushString('--opencanvas-form-label-color', fs.labelColor);
+  pushPx('--opencanvas-form-label-size', fs.labelFontSize);
   if (fs.labelFontWeight !== undefined) {
     const w = fs.labelFontWeight === 'normal' ? '400' : fs.labelFontWeight === 'medium' ? '500' : '700';
-    pushRaw('--rev01-form-label-weight', w);
+    pushRaw('--opencanvas-form-label-weight', w);
   }
 
-  pushString('--rev01-form-input-bg', fs.inputBackgroundColor);
-  pushString('--rev01-form-input-color', fs.inputColor);
-  pushString('--rev01-form-input-border-color', fs.inputBorderColor);
-  pushPx('--rev01-form-input-border-width', fs.inputBorderWidth);
-  pushPx('--rev01-form-input-radius', fs.inputBorderRadius);
-  pushPx('--rev01-form-input-pad-x', fs.inputPaddingX);
-  pushPx('--rev01-form-input-pad-y', fs.inputPaddingY);
-  pushString('--rev01-form-placeholder-color', fs.inputPlaceholderColor);
-  pushString('--rev01-form-focus-ring', fs.inputFocusRingColor);
+  pushString('--opencanvas-form-input-bg', fs.inputBackgroundColor);
+  pushString('--opencanvas-form-input-color', fs.inputColor);
+  pushString('--opencanvas-form-input-border-color', fs.inputBorderColor);
+  pushPx('--opencanvas-form-input-border-width', fs.inputBorderWidth);
+  pushPx('--opencanvas-form-input-radius', fs.inputBorderRadius);
+  pushPx('--opencanvas-form-input-pad-x', fs.inputPaddingX);
+  pushPx('--opencanvas-form-input-pad-y', fs.inputPaddingY);
+  pushString('--opencanvas-form-placeholder-color', fs.inputPlaceholderColor);
+  pushString('--opencanvas-form-focus-ring', fs.inputFocusRingColor);
 
-  pushString('--rev01-form-submit-bg', fs.submitBackgroundColor);
-  pushString('--rev01-form-submit-color', fs.submitColor);
-  pushString('--rev01-form-submit-hover-bg', fs.submitHoverBackgroundColor);
-  pushString('--rev01-form-submit-border-color', fs.submitBorderColor);
-  pushPx('--rev01-form-submit-border-width', fs.submitBorderWidth);
-  pushPx('--rev01-form-submit-radius', fs.submitBorderRadius);
-  pushPx('--rev01-form-submit-pad-x', fs.submitPaddingX);
-  pushPx('--rev01-form-submit-pad-y', fs.submitPaddingY);
-  pushPx('--rev01-form-submit-size', fs.submitFontSize);
+  pushString('--opencanvas-form-submit-bg', fs.submitBackgroundColor);
+  pushString('--opencanvas-form-submit-color', fs.submitColor);
+  pushString('--opencanvas-form-submit-hover-bg', fs.submitHoverBackgroundColor);
+  pushString('--opencanvas-form-submit-border-color', fs.submitBorderColor);
+  pushPx('--opencanvas-form-submit-border-width', fs.submitBorderWidth);
+  pushPx('--opencanvas-form-submit-radius', fs.submitBorderRadius);
+  pushPx('--opencanvas-form-submit-pad-x', fs.submitPaddingX);
+  pushPx('--opencanvas-form-submit-pad-y', fs.submitPaddingY);
+  pushPx('--opencanvas-form-submit-size', fs.submitFontSize);
   if (fs.submitFontWeight !== undefined) {
     const w = fs.submitFontWeight === 'normal' ? '400' : fs.submitFontWeight === 'medium' ? '500' : '700';
-    pushRaw('--rev01-form-submit-weight', w);
+    pushRaw('--opencanvas-form-submit-weight', w);
   }
 
   const styleAttr = decls.length === 0 ? '' : ` style="${decls.join(';')}"`;
-  const flagAttr = fs.submitFullWidth ? ' data-rev01-form-submit-full="1"' : '';
+  const flagAttr = fs.submitFullWidth ? ' data-opencanvas-form-submit-full="1"' : '';
   return { styleAttr, flagAttr };
 }
 
 export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
-  const action = `/__rev01/forms/${encodeURIComponent(ctx.siteId)}/${encodeURIComponent(el.id)}`;
+  const action = `/__opencanvas/forms/${encodeURIComponent(ctx.siteId)}/${encodeURIComponent(el.id)}`;
   const fieldsHtml = el.fields.map((field) => renderField(field, el.id)).join('');
   const { styleAttr, flagAttr } = formStyleAttrs(el.formStyle);
 
@@ -269,22 +269,22 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
 
   // AJAX handler — fetch POST the form, show inline success/error without
   // a full page reload. The script is idempotent (guarded by
-  // window.__rev01FormHandlerWired) so multiple forms on one page share
+  // window.__opencanvasFormHandlerWired) so multiple forms on one page share
   // one wire-up. We progressively enhance: forms still POST normally if
   // JS is blocked (the server's 303 redirect with ?form-ok= keeps
   // working as the no-JS fallback).
   const ajaxScript = `<script>
 (function(){
-  if (window.__rev01FormHandlerWired) return;
-  window.__rev01FormHandlerWired = true;
+  if (window.__opencanvasFormHandlerWired) return;
+  window.__opencanvasFormHandlerWired = true;
   document.addEventListener('submit', async function(ev) {
     var form = ev.target;
     if (!(form instanceof HTMLFormElement)) return;
-    if (!form.classList || !form.classList.contains('rev01-form')) return;
+    if (!form.classList || !form.classList.contains('opencanvas-form')) return;
     ev.preventDefault();
-    var btn = form.querySelector('.rev01-form-submit');
-    var err = form.querySelector('.rev01-form-error');
-    var success = form.querySelector('.rev01-form-success');
+    var btn = form.querySelector('.opencanvas-form-submit');
+    var err = form.querySelector('.opencanvas-form-error');
+    var success = form.querySelector('.opencanvas-form-success');
     if (btn) { btn.disabled = true; btn.dataset.busy = '1'; }
     if (err) { err.hidden = true; err.textContent = ''; }
     try {
@@ -307,7 +307,7 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
         success.hidden = false;
         // Hide the fields so the success message reads cleanly. Fall
         // back to the form-wrapper if individual fields aren't tagged.
-        var fields = form.querySelectorAll('.rev01-form-field, .cf-turnstile, .rev01-form-submit');
+        var fields = form.querySelectorAll('.opencanvas-form-field, .cf-turnstile, .opencanvas-form-submit');
         for (var i = 0; i < fields.length; i++) fields[i].hidden = true;
       }
     } catch (e) {
@@ -322,13 +322,13 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
 </script>`;
 
   return [
-    `<form class="rev01-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}"${flagAttr}${styleAttr}>`,
+    `<form class="opencanvas-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}"${flagAttr}${styleAttr}>`,
     `<input type="hidden" name="pageSlug" value="${escapeAttr(ctx.pageSlug)}" />`,
     fieldsHtml,
     turnstileBlock,
-    `<button class="rev01-form-submit" type="submit">${escapeHtml(el.submitLabel)}</button>`,
-    `<p class="rev01-form-error" role="alert" hidden></p>`,
-    `<p class="rev01-form-success" data-success-text="${escapeAttr(el.successMessage)}" hidden>${escapeHtml(el.successMessage)}</p>`,
+    `<button class="opencanvas-form-submit" type="submit">${escapeHtml(el.submitLabel)}</button>`,
+    `<p class="opencanvas-form-error" role="alert" hidden></p>`,
+    `<p class="opencanvas-form-success" data-success-text="${escapeAttr(el.successMessage)}" hidden>${escapeHtml(el.successMessage)}</p>`,
     `</form>`,
     ajaxScript,
   ].join('');

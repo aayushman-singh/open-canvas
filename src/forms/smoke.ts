@@ -18,7 +18,7 @@
 //      including the Turnstile widget when configured.
 //   2. handleFormSubmit with stub Turnstile (always-pass) persists a row.
 //   3. Eleven submits from the same ipHash — eleventh is 429.
-//   4. Webhook stub receives a POST plus the X-Rev01-Signature header keyed
+//   4. Webhook stub receives a POST plus the X-Opencanvas-Signature header keyed
 //      by WEBHOOK_SIGNING_SECRET (signature verifies against the body bytes).
 //   5. exportFormSubmissionsCsv emits valid CSV with the expected header row.
 
@@ -563,8 +563,8 @@ function runRenderForm(): void {
     turnstileSiteKey: 'turnstile-public-key-stub',
   });
   assert(
-    html.includes(`action="/__rev01/forms/${SITE_ID}/${FORM_ID}"`),
-    '1.1 renderForm: <form action> points at /__rev01/forms/:siteId/:formId',
+    html.includes(`action="/__opencanvas/forms/${SITE_ID}/${FORM_ID}"`),
+    '1.1 renderForm: <form action> points at /__opencanvas/forms/:siteId/:formId',
   );
   assert(html.includes('method="post"'), '1.2 renderForm: method=post');
   assert(html.includes('name="name"'), '1.3 renderForm: text input present');
@@ -775,7 +775,7 @@ async function runWebhookDelivery(): Promise<void> {
   );
   assert(
     call.signature !== null && call.signature.length > 0,
-    '4.4 webhook POST carries X-Rev01-Signature header',
+    '4.4 webhook POST carries X-Opencanvas-Signature header',
   );
   // Signature must verify against the body bytes with our secret.
   const expected = await signWebhookBody(secret, new TextEncoder().encode(call.body));

@@ -40,7 +40,7 @@ const COPY: Record<InviteErrorKind, InviteErrorCopy> = {
 export function buildInviteErrorResponse(kind: InviteErrorKind): Response {
   const { title, body, status } = COPY[kind];
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-    <title>rev01 — ${title}</title>
+    <title>Open Canvas — ${title}</title>
     <style>body{margin:0;display:flex;align-items:center;justify-content:center;
     min-height:100vh;font-family:system-ui,sans-serif;background:#0d1117;color:#e6edf3;}
     .wrap{text-align:center;max-width:400px;padding:32px;}

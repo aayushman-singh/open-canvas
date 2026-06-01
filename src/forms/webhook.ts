@@ -20,7 +20,7 @@
 //   - A 5-second timeout caps the outbound call so a hostile webhook URL cannot
 //     pin a Worker invocation forever.
 
-const SIGNATURE_HEADER = 'X-Rev01-Signature';
+const SIGNATURE_HEADER = 'X-Opencanvas-Signature';
 const DEFAULT_TIMEOUT_MS = 5000;
 
 export interface WebhookPayload {

@@ -89,7 +89,7 @@ export function renderChart(el: ChartElement, ctx: ChartRenderCtx): string {
   const categorySummary =
     el.categories.length === 0 ? '' : `, ${String(el.categories.length)} categories`;
   const ariaLabel = `${el.kind} chart, ${seriesSummary}${categorySummary}`;
-  return `<svg class="rev01-chart" data-chart-kind="${escapeAttr(el.kind)}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(width)} ${String(height)}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" role="img" aria-label="${escapeAttr(ariaLabel)}">${body}</svg>`;
+  return `<svg class="opencanvas-chart" data-chart-kind="${escapeAttr(el.kind)}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${String(width)} ${String(height)}" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" role="img" aria-label="${escapeAttr(ariaLabel)}">${body}</svg>`;
 }
 
 export const CHART_RECIPE_ID = 'chart-card' as const;

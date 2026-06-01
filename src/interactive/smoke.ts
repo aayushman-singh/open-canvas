@@ -338,39 +338,39 @@ const combinedHtml = `<main>${accordionHtml}${carouselHtml}</main>`;
 const injectedHtml = injectInteractiveRuntime(combinedHtml, interactiveSnapshot);
 
 assert(
-  injectedHtml.includes('data-rev01-interactive="accordion"'),
-  'accordion wrapper missing data-rev01-interactive attribute',
+  injectedHtml.includes('data-opencanvas-interactive="accordion"'),
+  'accordion wrapper missing data-opencanvas-interactive attribute',
 );
 assert(
-  injectedHtml.includes('data-rev01-interactive="carousel"'),
-  'carousel wrapper missing data-rev01-interactive attribute',
+  injectedHtml.includes('data-opencanvas-interactive="carousel"'),
+  'carousel wrapper missing data-opencanvas-interactive attribute',
 );
 assert(
-  injectedHtml.includes('data-rev01-acc-item="a"'),
+  injectedHtml.includes('data-opencanvas-acc-item="a"'),
   'accordion item id "a" marker missing',
 );
 assert(
-  injectedHtml.includes('data-rev01-acc-toggle="a"'),
+  injectedHtml.includes('data-opencanvas-acc-toggle="a"'),
   'accordion toggle id "a" marker missing',
 );
 assert(
-  injectedHtml.includes('data-rev01-carousel-slide="s1"'),
+  injectedHtml.includes('data-opencanvas-carousel-slide="s1"'),
   'carousel slide id "s1" marker missing',
 );
 assert(
-  injectedHtml.includes('data-rev01-carousel-prev'),
+  injectedHtml.includes('data-opencanvas-carousel-prev'),
   'carousel prev arrow marker missing',
 );
 assert(
-  injectedHtml.includes('data-rev01-carousel-next'),
+  injectedHtml.includes('data-opencanvas-carousel-next'),
   'carousel next arrow marker missing',
 );
 assert(
-  injectedHtml.includes('data-rev01-carousel-dot="0"'),
+  injectedHtml.includes('data-opencanvas-carousel-dot="0"'),
   'carousel dot index 0 missing',
 );
 assert(
-  injectedHtml.includes('<script data-rev01-interactive-runtime>'),
+  injectedHtml.includes('<script data-opencanvas-interactive-runtime>'),
   'runtime <script> tag missing from injected HTML',
 );
 assert(
@@ -385,24 +385,24 @@ assert(
 // First item open by default (assertion lives here so the renderer can change
 // the default state behaviour and a single line tells you).
 assert(
-  /data-rev01-acc-item="a"[^>]*data-rev01-acc-open="true"/.test(injectedHtml),
+  /data-opencanvas-acc-item="a"[^>]*data-opencanvas-acc-open="true"/.test(injectedHtml),
   'first accordion item should be open by default in rendered HTML',
 );
 assert(
-  /<div class="rev01-accordion-body"[^>]*data-rev01-acc-body="b"[^>]*hidden/.test(injectedHtml),
+  /<div class="opencanvas-accordion-body"[^>]*data-opencanvas-acc-body="b"[^>]*hidden/.test(injectedHtml),
   'second accordion body should be hidden by default in rendered HTML',
 );
 
 // Accordion buttons must be real <button type="button"> so default focus +
 // Enter activation comes for free.
 assert(
-  /<button class="rev01-accordion-header" type="button"/.test(injectedHtml),
+  /<button class="opencanvas-accordion-header" type="button"/.test(injectedHtml),
   'accordion header should be a real <button type="button">',
 );
 
 // Carousel arrows must be real buttons too.
 assert(
-  /<button class="rev01-carousel-arrow rev01-carousel-arrow-prev"/.test(injectedHtml),
+  /<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-prev"/.test(injectedHtml),
   'carousel prev arrow should be a real <button>',
 );
 
@@ -452,7 +452,7 @@ assert(
   'snapshot without interactive elements must produce HTML untouched',
 );
 assert(
-  !bareOut.includes('<script data-rev01-interactive-runtime>'),
+  !bareOut.includes('<script data-opencanvas-interactive-runtime>'),
   'bare snapshot must NOT carry the runtime <script>',
 );
 assert(
@@ -476,25 +476,25 @@ for (const child of parsed1.children) {
 }
 runRuntimeAgainstDocument(doc1);
 
-const accRoot = doc1.querySelectorAll('[data-rev01-interactive="accordion"]')[0];
+const accRoot = doc1.querySelectorAll('[data-opencanvas-interactive="accordion"]')[0];
 assert(accRoot !== undefined, 'accordion root not found in parsed DOM');
-const itemA = accRoot.querySelector('[data-rev01-acc-item="a"]');
-const itemB = accRoot.querySelector('[data-rev01-acc-item="b"]');
-const toggleA = accRoot.querySelector('[data-rev01-acc-toggle="a"]');
-const toggleB = accRoot.querySelector('[data-rev01-acc-toggle="b"]');
-const bodyA = accRoot.querySelector('[data-rev01-acc-body="a"]');
-const bodyB = accRoot.querySelector('[data-rev01-acc-body="b"]');
+const itemA = accRoot.querySelector('[data-opencanvas-acc-item="a"]');
+const itemB = accRoot.querySelector('[data-opencanvas-acc-item="b"]');
+const toggleA = accRoot.querySelector('[data-opencanvas-acc-toggle="a"]');
+const toggleB = accRoot.querySelector('[data-opencanvas-acc-toggle="b"]');
+const bodyA = accRoot.querySelector('[data-opencanvas-acc-body="a"]');
+const bodyB = accRoot.querySelector('[data-opencanvas-acc-body="b"]');
 assert(itemA !== null && itemB !== null, 'expected items a + b in accordion DOM');
 assert(toggleA !== null && toggleB !== null, 'expected toggles a + b in accordion DOM');
 assert(bodyA !== null && bodyB !== null, 'expected bodies a + b in accordion DOM');
 
 // Initial state from render: a is open, b is closed.
 assert(
-  itemA.getAttribute('data-rev01-acc-open') === 'true',
+  itemA.getAttribute('data-opencanvas-acc-open') === 'true',
   'item a should start open',
 );
 assert(
-  itemB.getAttribute('data-rev01-acc-open') === null,
+  itemB.getAttribute('data-opencanvas-acc-open') === null,
   'item b should start closed',
 );
 assert(
@@ -505,11 +505,11 @@ assert(
 // Click toggle b → b opens, a closes (single-open mode).
 toggleB.dispatchEvent(makeEvent('click'));
 assert(
-  itemB.getAttribute('data-rev01-acc-open') === 'true',
+  itemB.getAttribute('data-opencanvas-acc-open') === 'true',
   'item b should be open after clicking toggle b',
 );
 assert(
-  itemA.getAttribute('data-rev01-acc-open') === null,
+  itemA.getAttribute('data-opencanvas-acc-open') === null,
   'item a should be closed after clicking toggle b (single-open mode)',
 );
 assert(
@@ -528,7 +528,7 @@ assert(
 // Click toggle b again → b closes.
 toggleB.dispatchEvent(makeEvent('click'));
 assert(
-  itemB.getAttribute('data-rev01-acc-open') === null,
+  itemB.getAttribute('data-opencanvas-acc-open') === null,
   'item b should be closed after second click on toggle b',
 );
 assert(
@@ -540,9 +540,9 @@ assert(
 // We invoke runRuntimeAgainstDocument again, then verify a single click still
 // produces exactly one toggle.
 runRuntimeAgainstDocument(doc1);
-const stateBeforeRehydrate = itemB.getAttribute('data-rev01-acc-open');
+const stateBeforeRehydrate = itemB.getAttribute('data-opencanvas-acc-open');
 toggleB.dispatchEvent(makeEvent('click'));
-const stateAfterOneClick = itemB.getAttribute('data-rev01-acc-open');
+const stateAfterOneClick = itemB.getAttribute('data-opencanvas-acc-open');
 assert(
   stateBeforeRehydrate !== stateAfterOneClick,
   'one click after re-hydrate should toggle item b once (not twice)',
@@ -574,22 +574,22 @@ const parsedMulti = parseHtml(multiInjected);
 for (const child of parsedMulti.children) docMulti.root.appendChild(child);
 runRuntimeAgainstDocument(docMulti);
 const multiRoot = docMulti.querySelectorAll(
-  '[data-rev01-interactive="accordion"]',
+  '[data-opencanvas-interactive="accordion"]',
 )[0] as StubElement;
-const multiItemA = multiRoot.querySelector('[data-rev01-acc-item="a"]') as StubElement;
-const multiItemB = multiRoot.querySelector('[data-rev01-acc-item="b"]') as StubElement;
-const multiToggleB = multiRoot.querySelector('[data-rev01-acc-toggle="b"]') as StubElement;
+const multiItemA = multiRoot.querySelector('[data-opencanvas-acc-item="a"]') as StubElement;
+const multiItemB = multiRoot.querySelector('[data-opencanvas-acc-item="b"]') as StubElement;
+const multiToggleB = multiRoot.querySelector('[data-opencanvas-acc-toggle="b"]') as StubElement;
 assert(
-  multiItemA.getAttribute('data-rev01-acc-open') === 'true',
+  multiItemA.getAttribute('data-opencanvas-acc-open') === 'true',
   'multi-open accordion: item a starts open',
 );
 multiToggleB.dispatchEvent(makeEvent('click'));
 assert(
-  multiItemA.getAttribute('data-rev01-acc-open') === 'true',
+  multiItemA.getAttribute('data-opencanvas-acc-open') === 'true',
   'multi-open accordion: item a should STAY open after opening b',
 );
 assert(
-  multiItemB.getAttribute('data-rev01-acc-open') === 'true',
+  multiItemB.getAttribute('data-opencanvas-acc-open') === 'true',
   'multi-open accordion: item b should be open after click',
 );
 
@@ -597,23 +597,23 @@ assert(
 // (4) Simulate carousel next/prev — slide index updates with bounds.
 // ---------------------------------------------------------------------------
 
-const carRoot = doc1.querySelectorAll('[data-rev01-interactive="carousel"]')[0];
+const carRoot = doc1.querySelectorAll('[data-opencanvas-interactive="carousel"]')[0];
 assert(carRoot !== undefined, 'carousel root not found in parsed DOM');
-const prev = carRoot.querySelector('[data-rev01-carousel-prev]');
-const next = carRoot.querySelector('[data-rev01-carousel-next]');
-const dot0 = carRoot.querySelector('[data-rev01-carousel-dot="0"]');
-const dot2 = carRoot.querySelector('[data-rev01-carousel-dot="2"]');
+const prev = carRoot.querySelector('[data-opencanvas-carousel-prev]');
+const next = carRoot.querySelector('[data-opencanvas-carousel-next]');
+const dot0 = carRoot.querySelector('[data-opencanvas-carousel-dot="0"]');
+const dot2 = carRoot.querySelector('[data-opencanvas-carousel-dot="2"]');
 assert(prev !== null && next !== null, 'expected prev + next arrow nodes');
 assert(dot0 !== null && dot2 !== null, 'expected dot 0 and dot 2 nodes');
 
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '0',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '0',
   'carousel index should start at 0',
 );
 
 next.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '1',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '1',
   'carousel index should be 1 after one next click',
 );
 assert(
@@ -623,7 +623,7 @@ assert(
 
 next.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '2',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '2',
   'carousel index should be 2 after two next clicks',
 );
 assert(
@@ -634,33 +634,33 @@ assert(
 // Upper bound: another click stays at 2 (3 slides total → max index 2).
 next.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '2',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '2',
   'carousel index should be CLAMPED to 2 (max) — no wrap-around per plan',
 );
 
 // Prev twice → 1 → 0.
 prev.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '1',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '1',
   'carousel index should be 1 after one prev from 2',
 );
 prev.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '0',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '0',
   'carousel index should be 0 after another prev',
 );
 
 // Lower bound: another click stays at 0.
 prev.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '0',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '0',
   'carousel index should be CLAMPED to 0 (min) — no wrap-around per plan',
 );
 
 // Click directly on dot 2 — index jumps to 2.
 dot2.dispatchEvent(makeEvent('click'));
 assert(
-  carRoot.getAttribute('data-rev01-slide-index') === '2',
+  carRoot.getAttribute('data-opencanvas-slide-index') === '2',
   'clicking dot 2 should set index to 2',
 );
 
@@ -674,38 +674,38 @@ const parsed5 = parseHtml(injectedHtml);
 for (const child of parsed5.children) doc5.root.appendChild(child);
 runRuntimeAgainstDocument(doc5);
 const acc5 = doc5.querySelectorAll(
-  '[data-rev01-interactive="accordion"]',
+  '[data-opencanvas-interactive="accordion"]',
 )[0] as StubElement;
-const item5b = acc5.querySelector('[data-rev01-acc-item="b"]') as StubElement;
-const toggle5b = acc5.querySelector('[data-rev01-acc-toggle="b"]') as StubElement;
+const item5b = acc5.querySelector('[data-opencanvas-acc-item="b"]') as StubElement;
+const toggle5b = acc5.querySelector('[data-opencanvas-acc-toggle="b"]') as StubElement;
 assert(
-  item5b.getAttribute('data-rev01-acc-open') === null,
+  item5b.getAttribute('data-opencanvas-acc-open') === null,
   'keyboard test: item b should start closed',
 );
 
 toggle5b.dispatchEvent(makeEvent('keydown', { key: 'Enter' }));
 assert(
-  item5b.getAttribute('data-rev01-acc-open') === 'true',
+  item5b.getAttribute('data-opencanvas-acc-open') === 'true',
   'pressing Enter on toggle b should open item b',
 );
 
 toggle5b.dispatchEvent(makeEvent('keydown', { key: 'Enter' }));
 assert(
-  item5b.getAttribute('data-rev01-acc-open') === null,
+  item5b.getAttribute('data-opencanvas-acc-open') === null,
   'pressing Enter on toggle b again should close item b',
 );
 
 // Space also toggles.
 toggle5b.dispatchEvent(makeEvent('keydown', { key: ' ' }));
 assert(
-  item5b.getAttribute('data-rev01-acc-open') === 'true',
+  item5b.getAttribute('data-opencanvas-acc-open') === 'true',
   'pressing Space on toggle b should open item b',
 );
 
 // Non-toggle keys must NOT change state.
-const before = item5b.getAttribute('data-rev01-acc-open');
+const before = item5b.getAttribute('data-opencanvas-acc-open');
 toggle5b.dispatchEvent(makeEvent('keydown', { key: 'a' }));
-const after = item5b.getAttribute('data-rev01-acc-open');
+const after = item5b.getAttribute('data-opencanvas-acc-open');
 assert(
   before === after,
   'pressing unrelated key "a" must NOT change accordion open state',
@@ -722,19 +722,19 @@ const parsedLoading = parseHtml(injectedHtml);
 for (const child of parsedLoading.children) docLoading.root.appendChild(child);
 runRuntimeAgainstDocument(docLoading);
 const accLoading = docLoading.querySelectorAll(
-  '[data-rev01-interactive="accordion"]',
+  '[data-opencanvas-interactive="accordion"]',
 )[0] as StubElement;
 const toggleLoadingB = accLoading.querySelector(
-  '[data-rev01-acc-toggle="b"]',
+  '[data-opencanvas-acc-toggle="b"]',
 ) as StubElement;
 const itemLoadingB = accLoading.querySelector(
-  '[data-rev01-acc-item="b"]',
+  '[data-opencanvas-acc-item="b"]',
 ) as StubElement;
 // Before DOMContentLoaded fires, listeners are not yet attached — a click
 // should be a no-op.
 toggleLoadingB.dispatchEvent(makeEvent('click'));
 assert(
-  itemLoadingB.getAttribute('data-rev01-acc-open') === null,
+  itemLoadingB.getAttribute('data-opencanvas-acc-open') === null,
   'click before DOMContentLoaded should NOT toggle (runtime is waiting)',
 );
 // Fire DOMContentLoaded — listeners attach now.
@@ -743,7 +743,7 @@ for (const fn of docLoading.domContentLoadedListeners) {
 }
 toggleLoadingB.dispatchEvent(makeEvent('click'));
 assert(
-  itemLoadingB.getAttribute('data-rev01-acc-open') === 'true',
+  itemLoadingB.getAttribute('data-opencanvas-acc-open') === 'true',
   'click after DOMContentLoaded should toggle (runtime hydrated)',
 );
 

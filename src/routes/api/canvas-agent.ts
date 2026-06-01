@@ -191,7 +191,7 @@ async function runOpsPipeline(
 
 function buildSystemPrompt(state: EditableSite): string {
   const lines: string[] = [];
-  lines.push('You are an editing assistant for the rev01 canvas site builder.');
+  lines.push('You are an editing assistant for the Open Canvas site builder.');
   lines.push(
     'Use only the supplied tools. Do NOT invent asset ids, element ids, section ids, or page ids; pick from the existing ones below.',
   );

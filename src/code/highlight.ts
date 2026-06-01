@@ -104,7 +104,7 @@ export function isSupportedLanguage(lang: string): lang is CodeLanguage {
 export interface HighlightCtx {
   /** Active Style Kit name. Drives theme selection via `themeForStyleKit`. */
   styleKit: string;
-  /** When true, each rendered line carries a `.rev01-code-gutter` span. */
+  /** When true, each rendered line carries a `.opencanvas-code-gutter` span. */
   showLineNumbers: boolean;
 }
 
@@ -133,7 +133,7 @@ export function highlightCode(
       ? [
           {
             // Wrap each rendered line with a leading
-            // `<span class="rev01-code-gutter" data-line="N">N</span>`.
+            // `<span class="opencanvas-code-gutter" data-line="N">N</span>`.
             // Shiki emits one `<span class="line">` per source line; the
             // `line` transformer hook lets us mutate the HAST node before
             // serialization. We prepend the gutter element so the number
@@ -143,7 +143,7 @@ export function highlightCode(
                 type: 'element',
                 tagName: 'span',
                 properties: {
-                  class: 'rev01-code-gutter',
+                  class: 'opencanvas-code-gutter',
                   'data-line': String(line),
                 },
                 children: [{ type: 'text', value: String(line) }],
@@ -176,7 +176,7 @@ export function renderPlainCodeSnippet(
   const inner = ctx.showLineNumbers ? wrapLinesWithGutter(escaped) : escaped;
   // `data-lang` lets the published snapshot carry the originally-requested
   // language even when we could not highlight it.
-  return `<pre class="rev01-code rev01-code-plain" data-lang="${escapeAttrLite(language)}" style="font-family:var(--rev01-kit-font-mono);"><code>${inner}</code></pre>`;
+  return `<pre class="opencanvas-code opencanvas-code-plain" data-lang="${escapeAttrLite(language)}" style="font-family:var(--opencanvas-kit-font-mono);"><code>${inner}</code></pre>`;
 }
 
 // --------------------------------------------------------------------------
@@ -214,7 +214,7 @@ function wrapLinesWithGutter(escaped: string): string {
   return sourceLines
     .map((lineText, idx) => {
       const lineNumber = idx + 1;
-      const gutter = `<span class="rev01-code-gutter" data-line="${String(lineNumber)}">${String(lineNumber)}</span>`;
+      const gutter = `<span class="opencanvas-code-gutter" data-line="${String(lineNumber)}">${String(lineNumber)}</span>`;
       return `<span class="line" data-line="${String(lineNumber)}">${gutter}${lineText}</span>`;
     })
     .join('\n');

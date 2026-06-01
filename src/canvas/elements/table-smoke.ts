@@ -100,8 +100,8 @@ function baseTable(): Omit<TableElement, 'columns' | 'rows' | 'zebra' | 'collaps
   // Wrapper carries the marker too so downstream consumers can detect zebra
   // mode without parsing CSS.
   assert(
-    html.includes('data-rev01-zebra="true"'),
-    'zebra: expected data-rev01-zebra="true" on the <table>',
+    html.includes('data-opencanvas-zebra="true"'),
+    'zebra: expected data-opencanvas-zebra="true" on the <table>',
   );
 
   // Cross-check: a table with zebra=false MUST NOT emit the nth-child rule.
@@ -112,8 +112,8 @@ function baseTable(): Omit<TableElement, 'columns' | 'rows' | 'zebra' | 'collaps
     'zebra: expected NO nth-child rule when zebra=false',
   );
   assert(
-    htmlNo.includes('data-rev01-zebra="false"'),
-    'zebra: expected data-rev01-zebra="false" on a non-zebra table',
+    htmlNo.includes('data-opencanvas-zebra="false"'),
+    'zebra: expected data-opencanvas-zebra="false" on a non-zebra table',
   );
 }
 

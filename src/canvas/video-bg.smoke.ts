@@ -99,7 +99,7 @@ assert(
 assert(html.includes('type="video/mp4"'), 'expected type="video/mp4" on source element');
 
 // 6. Section WITHOUT backgroundVideo does NOT render a video tag
-const noVideoSectionTag = '<section class="rev01-section" data-rev01-section="section-no-video"';
+const noVideoSectionTag = '<section class="opencanvas-section" data-opencanvas-section="section-no-video"';
 const noVideoIdx = html.indexOf(noVideoSectionTag);
 assert(noVideoIdx >= 0, 'expected section-no-video element in rendered HTML');
 const noVideoSectionEnd = html.indexOf('</section>', noVideoIdx);
@@ -110,7 +110,7 @@ assert(
 );
 
 // 7. Video appears BEFORE element divs (first child of section)
-const videoSectionTag = '<section class="rev01-section" data-rev01-section="section-video"';
+const videoSectionTag = '<section class="opencanvas-section" data-opencanvas-section="section-video"';
 const videoSectionIdx = html.indexOf(videoSectionTag);
 assert(videoSectionIdx >= 0, 'expected section-video element in rendered HTML');
 // Find the closing > of the <section> opening tag

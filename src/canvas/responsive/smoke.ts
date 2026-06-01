@@ -3,7 +3,7 @@
 // Wave 1 #1 smoke. Loads the canonical home fixture, augments it with a
 // synthetic `responsive` override on one element so the responsive CSS path
 // gets exercised, renders the full snapshot, and asserts the emitted
-// `<style data-rev01-responsive>` block carries the expected shape.
+// `<style data-opencanvas-responsive>` block carries the expected shape.
 //
 // Run with `bun.cmd run responsive:smoke`.
 
@@ -48,12 +48,12 @@ const html = renderCanvasSnapshot(snapshot, '/assets', 'smoke-site', {
   turnstileSiteKey: 'turnstile-test-key',
 });
 
-// --- Assertion 1: exactly one <style data-rev01-responsive> block ----------
-const styleOpenRegex = /<style data-rev01-responsive>/g;
+// --- Assertion 1: exactly one <style data-opencanvas-responsive> block ----------
+const styleOpenRegex = /<style data-opencanvas-responsive>/g;
 const styleOpenMatches = html.match(styleOpenRegex);
 assert(
   styleOpenMatches !== null && styleOpenMatches.length === 1,
-  `expected exactly one <style data-rev01-responsive> opening tag, got ${String(styleOpenMatches?.length ?? 0)}`,
+  `expected exactly one <style data-opencanvas-responsive> opening tag, got ${String(styleOpenMatches?.length ?? 0)}`,
 );
 const styleCloseMatches = html.match(/<\/style>/g);
 assert(
@@ -62,10 +62,10 @@ assert(
 );
 
 // Extract the style block contents for further assertions.
-const styleOpenIdx = html.indexOf('<style data-rev01-responsive>');
+const styleOpenIdx = html.indexOf('<style data-opencanvas-responsive>');
 const styleCloseIdx = html.indexOf('</style>', styleOpenIdx);
 assert(styleOpenIdx >= 0 && styleCloseIdx > styleOpenIdx, 'expected a closed style block');
-const styleBody = html.slice(styleOpenIdx + '<style data-rev01-responsive>'.length, styleCloseIdx);
+const styleBody = html.slice(styleOpenIdx + '<style data-opencanvas-responsive>'.length, styleCloseIdx);
 
 // --- Assertion 2: tablet + phone breakpoint markers ------------------------
 assert(
@@ -88,7 +88,7 @@ const phoneBlockBraceClose = styleBody.indexOf('\n}', phoneBlockStart);
 assert(phoneBlockBraceClose > phoneBlockStart, 'expected phone block to close');
 const phoneBlock = styleBody.slice(phoneBlockStart, phoneBlockBraceClose);
 assert(
-  phoneBlock.includes('[data-rev01-element="hero-orb"] { display: none !important; }'),
+  phoneBlock.includes('[data-opencanvas-element="hero-orb"] { display: none !important; }'),
   'expected hero-orb to be display:none in phone block (synthetic responsive.phone.hidden)',
 );
 
@@ -100,7 +100,7 @@ if (!heroHeading) throw new Error('[responsive:smoke] fixture must have hero-hea
 const desktopWidth = heroHeading.box.w;
 const expectedPhoneWidth = Math.round(desktopWidth * scaleFactor(page.width, 'phone'));
 const phoneHeadingRule = phoneBlock.match(
-  /\[data-rev01-element="hero-heading"\] \{[^}]*width: (\d+)px !important;[^}]*\}/,
+  /\[data-opencanvas-element="hero-heading"\] \{[^}]*width: (\d+)px !important;[^}]*\}/,
 );
 assert(phoneHeadingRule !== null, 'expected hero-heading phone rule in style block');
 const matchedWidthStr = phoneHeadingRule?.[1];
@@ -198,8 +198,8 @@ const tinyWithOverride: PublishedSnapshot = {
 };
 const tinyResult = renderResponsiveCss(tinyWithOverride);
 assert(
-  tinyResult.startsWith('<style data-rev01-responsive>') && tinyResult.endsWith('</style>'),
-  'expected a <style data-rev01-responsive> block when an override is present, even on a tiny page',
+  tinyResult.startsWith('<style data-opencanvas-responsive>') && tinyResult.endsWith('</style>'),
+  'expected a <style data-opencanvas-responsive> block when an override is present, even on a tiny page',
 );
 
 // --- Assertion 8: header-only override on a tiny page still emits a block --
@@ -248,12 +248,12 @@ const headerOnlyOverride: PublishedSnapshot = {
 };
 const headerOnlyResult = renderResponsiveCss(headerOnlyOverride);
 assert(
-  headerOnlyResult.startsWith('<style data-rev01-responsive>') &&
+  headerOnlyResult.startsWith('<style data-opencanvas-responsive>') &&
     headerOnlyResult.endsWith('</style>'),
-  'expected a <style data-rev01-responsive> block when only the site-wide header carries a responsive override',
+  'expected a <style data-opencanvas-responsive> block when only the site-wide header carries a responsive override',
 );
 assert(
-  headerOnlyResult.includes('[data-rev01-element="header-logo"] { display: none !important; }'),
+  headerOnlyResult.includes('[data-opencanvas-element="header-logo"] { display: none !important; }'),
   'expected header-logo display:none rule to appear in the emitted CSS when override lives in snapshot.header',
 );
 
@@ -298,12 +298,12 @@ const footerOnlyOverride: PublishedSnapshot = {
 };
 const footerOnlyResult = renderResponsiveCss(footerOnlyOverride);
 assert(
-  footerOnlyResult.startsWith('<style data-rev01-responsive>') &&
+  footerOnlyResult.startsWith('<style data-opencanvas-responsive>') &&
     footerOnlyResult.endsWith('</style>'),
-  'expected a <style data-rev01-responsive> block when only the site-wide footer carries a responsive override',
+  'expected a <style data-opencanvas-responsive> block when only the site-wide footer carries a responsive override',
 );
 assert(
-  footerOnlyResult.includes('[data-rev01-element="footer-credit"] { display: none !important; }'),
+  footerOnlyResult.includes('[data-opencanvas-element="footer-credit"] { display: none !important; }'),
   'expected footer-credit display:none rule to appear in the emitted CSS when override lives in snapshot.footer',
 );
 

@@ -472,7 +472,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const root = document.getElementById("canvas-root");
   const inspector = document.getElementById("canvas-inspector");
   const statusEl = document.getElementById("canvas-status");
-  const mainEl = document.querySelector("main.rev01-editor");
+  const mainEl = document.querySelector("main.opencanvas-editor");
   const sidebar = document.getElementById("canvas-sidebar");
   const sidebarSelection = document.getElementById("canvas-sidebar-selection");
   const saveButton = document.getElementById("canvas-save");
@@ -531,7 +531,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Viewport + camera --------------------------------------------------
   // The route ships #canvas-root directly inside the editor shell. We wrap
-  // it in a .rev01-viewport at boot so the viewport owns the dark
+  // it in a .opencanvas-viewport at boot so the viewport owns the dark
   // background and dock-clearing margins, while #canvas-root receives the
   // CSS transform that implements pan+zoom via the camera object. The
   // viewport has overflow:hidden — no body scroll, the camera handles
@@ -687,7 +687,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!root || !root.parentNode) return;
     const parent = root.parentNode;
     viewport = document.createElement("div");
-    viewport.className = "rev01-viewport";
+    viewport.className = "opencanvas-viewport";
     // Insert viewport in place of #canvas-root, then move #canvas-root in.
     parent.insertBefore(viewport, root);
     viewport.appendChild(root);
@@ -696,7 +696,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // so it must NOT live inside the viewport (which now uses flex
     // centering and has no scroll of its own).
     zoomToolbar = document.createElement("div");
-    zoomToolbar.className = "rev01-zoom-toolbar";
+    zoomToolbar.className = "opencanvas-zoom-toolbar";
     zoomToolbar.setAttribute("role", "toolbar");
     zoomToolbar.setAttribute("aria-label", "Zoom and interaction mode");
     var modeDefs = [
@@ -914,18 +914,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     showAccessRemovedModal();
   }
   function showAccessRemovedModal() {
-    if (document.querySelector("[data-rev01-access-removed]")) return;
+    if (document.querySelector("[data-opencanvas-access-removed]")) return;
     var backdrop = document.createElement("div");
-    backdrop.className = "rev01-modal-backdrop";
-    backdrop.setAttribute("data-rev01-access-removed", "true");
+    backdrop.className = "opencanvas-modal-backdrop";
+    backdrop.setAttribute("data-opencanvas-access-removed", "true");
     var panel = document.createElement("div");
-    panel.className = "rev01-modal";
+    panel.className = "opencanvas-modal";
     panel.setAttribute("role", "alertdialog");
     panel.setAttribute("aria-modal", "true");
-    panel.setAttribute("aria-labelledby", "rev01-access-removed-title");
+    panel.setAttribute("aria-labelledby", "opencanvas-access-removed-title");
 
     var title = document.createElement("h3");
-    title.id = "rev01-access-removed-title";
+    title.id = "opencanvas-access-removed-title";
     title.textContent = "Access removed";
     panel.appendChild(title);
 
@@ -954,7 +954,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     panel.appendChild(actions);
     backdrop.appendChild(panel);
     document.body.appendChild(backdrop);
-    document.body.classList.add("rev01-modal-open");
+    document.body.classList.add("opencanvas-modal-open");
 
     // Trap keyboard shortcuts so Ctrl+Z / Ctrl+S can't still mutate the
     // (now read-only-server) canvas while the modal is up. capture-phase
@@ -999,9 +999,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise((resolve) => {
       const backdrop = document.createElement("div");
-      backdrop.className = "rev01-modal-backdrop";
+      backdrop.className = "opencanvas-modal-backdrop";
       const panel = document.createElement("div");
-      panel.className = "rev01-modal";
+      panel.className = "opencanvas-modal";
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
       if (title) panel.setAttribute("aria-label", title);
@@ -1023,7 +1023,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       panel.appendChild(input);
 
       const actions = document.createElement("div");
-      actions.className = "rev01-modal-actions";
+      actions.className = "opencanvas-modal-actions";
       const cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = "Cancel";
@@ -1039,7 +1039,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove("rev01-modal-open");
+        document.body.classList.remove("opencanvas-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -1071,7 +1071,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ok.addEventListener("click", () => close(input.value));
       document.addEventListener("keydown", onKey, true);
 
-      document.body.classList.add("rev01-modal-open");
+      document.body.classList.add("opencanvas-modal-open");
       document.body.appendChild(backdrop);
       // Autofocus after mount so the input is ready to type.
       input.focus();
@@ -1090,9 +1090,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise((resolve) => {
       const backdrop = document.createElement("div");
-      backdrop.className = "rev01-modal-backdrop";
+      backdrop.className = "opencanvas-modal-backdrop";
       const panel = document.createElement("div");
-      panel.className = "rev01-modal";
+      panel.className = "opencanvas-modal";
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
       if (title) panel.setAttribute("aria-label", title);
@@ -1126,7 +1126,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       panel.appendChild(select);
 
       const actions = document.createElement("div");
-      actions.className = "rev01-modal-actions";
+      actions.className = "opencanvas-modal-actions";
       const cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = "Cancel";
@@ -1142,7 +1142,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove("rev01-modal-open");
+        document.body.classList.remove("opencanvas-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -1166,7 +1166,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ok.addEventListener("click", () => close(select.value));
       document.addEventListener("keydown", onKey, true);
 
-      document.body.classList.add("rev01-modal-open");
+      document.body.classList.add("opencanvas-modal-open");
       document.body.appendChild(backdrop);
       select.focus();
     });
@@ -1184,9 +1184,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise(function(resolve) {
       var backdrop = document.createElement("div");
-      backdrop.className = "rev01-modal-backdrop";
+      backdrop.className = "opencanvas-modal-backdrop";
       var panel = document.createElement("div");
-      panel.className = "rev01-modal";
+      panel.className = "opencanvas-modal";
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
       if (title) panel.setAttribute("aria-label", title);
@@ -1196,11 +1196,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         panel.appendChild(h);
       }
       var p = document.createElement("p");
-      p.style.cssText = "margin:0 0 14px;font-size:13px;color:var(--rev01-fg-mute);line-height:1.5;white-space:pre-line";
+      p.style.cssText = "margin:0 0 14px;font-size:13px;color:var(--opencanvas-fg-mute);line-height:1.5;white-space:pre-line";
       p.textContent = message;
       panel.appendChild(p);
       var actions = document.createElement("div");
-      actions.className = "rev01-modal-actions";
+      actions.className = "opencanvas-modal-actions";
       var cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = cancelLabel;
@@ -1215,7 +1215,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove("rev01-modal-open");
+        document.body.classList.remove("opencanvas-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -1227,7 +1227,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       cancel.addEventListener("click", function() { close(false); });
       ok.addEventListener("click", function() { close(true); });
       document.addEventListener("keydown", onKey, true);
-      document.body.classList.add("rev01-modal-open");
+      document.body.classList.add("opencanvas-modal-open");
       document.body.appendChild(backdrop);
       ok.focus();
     });
@@ -1262,9 +1262,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise(function(resolve) {
       var backdrop = document.createElement("div");
-      backdrop.className = "rev01-modal-backdrop";
+      backdrop.className = "opencanvas-modal-backdrop";
       var panel = document.createElement("div");
-      panel.className = "rev01-modal";
+      panel.className = "opencanvas-modal";
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
       panel.setAttribute("aria-label", title);
@@ -1461,7 +1461,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
 
       var actions = document.createElement("div");
-      actions.className = "rev01-modal-actions";
+      actions.className = "opencanvas-modal-actions";
       var cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = "Cancel";
@@ -1476,7 +1476,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         document.removeEventListener("keydown", onKey, true);
         clearGallery();
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove("rev01-modal-open");
+        document.body.classList.remove("opencanvas-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -1493,7 +1493,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       cancel.addEventListener("click", function() { close(null); });
       document.addEventListener("keydown", onKey, true);
 
-      document.body.classList.add("rev01-modal-open");
+      document.body.classList.add("opencanvas-modal-open");
       document.body.appendChild(backdrop);
       promptInput.focus();
     });
@@ -1517,9 +1517,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise(function(resolve) {
       var backdrop = document.createElement("div");
-      backdrop.className = "rev01-modal-backdrop";
+      backdrop.className = "opencanvas-modal-backdrop";
       var panel = document.createElement("div");
-      panel.className = "rev01-modal";
+      panel.className = "opencanvas-modal";
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
       panel.setAttribute("aria-label", "Create new page");
@@ -1546,7 +1546,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       slugInput.placeholder = "about-us";
       panel.appendChild(slugInput);
       var slugHint = document.createElement("div");
-      slugHint.style.cssText = "font-size:11px;color:var(--rev01-fg-mute);margin:-6px 0 8px";
+      slugHint.style.cssText = "font-size:11px;color:var(--opencanvas-fg-mute);margin:-6px 0 8px";
       slugHint.textContent = "Auto-derived from title. Edit to override; clear to re-link.";
       panel.appendChild(slugHint);
 
@@ -1592,7 +1592,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       panel.appendChild(errorLine);
 
       var actions = document.createElement("div");
-      actions.className = "rev01-modal-actions";
+      actions.className = "opencanvas-modal-actions";
       var cancel = document.createElement("button");
       cancel.type = "button";
       cancel.textContent = "Cancel";
@@ -1649,7 +1649,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove("rev01-modal-open");
+        document.body.classList.remove("opencanvas-modal-open");
         modalOpen = false;
         resolve(value);
       }
@@ -1685,7 +1685,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       ok.addEventListener("click", submit);
       document.addEventListener("keydown", onKey, true);
 
-      document.body.classList.add("rev01-modal-open");
+      document.body.classList.add("opencanvas-modal-open");
       document.body.appendChild(backdrop);
       titleInput.focus();
       // Start in disabled state; validate runs after the first input.
@@ -1703,9 +1703,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise(function(resolve) {
       var backdrop = document.createElement("div");
-      backdrop.className = "rev01-modal-backdrop";
+      backdrop.className = "opencanvas-modal-backdrop";
       var panel = document.createElement("div");
-      panel.className = "rev01-modal";
+      panel.className = "opencanvas-modal";
       panel.setAttribute("role", "alertdialog");
       panel.setAttribute("aria-modal", "true");
       if (title) panel.setAttribute("aria-label", title);
@@ -1715,11 +1715,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         panel.appendChild(h);
       }
       var p = document.createElement("p");
-      p.style.cssText = "margin:0 0 14px;font-size:13px;color:var(--rev01-fg-mute);line-height:1.5";
+      p.style.cssText = "margin:0 0 14px;font-size:13px;color:var(--opencanvas-fg-mute);line-height:1.5";
       p.textContent = message;
       panel.appendChild(p);
       var actions = document.createElement("div");
-      actions.className = "rev01-modal-actions";
+      actions.className = "opencanvas-modal-actions";
       var ok = document.createElement("button");
       ok.type = "button";
       ok.textContent = "OK";
@@ -1729,7 +1729,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close() {
         document.removeEventListener("keydown", onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove("rev01-modal-open");
+        document.body.classList.remove("opencanvas-modal-open");
         modalOpen = false;
         resolve(undefined);
       }
@@ -1739,13 +1739,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       backdrop.addEventListener("click", function(ev) { if (ev.target === backdrop) close(); });
       ok.addEventListener("click", close);
       document.addEventListener("keydown", onKey, true);
-      document.body.classList.add("rev01-modal-open");
+      document.body.classList.add("opencanvas-modal-open");
       document.body.appendChild(backdrop);
       ok.focus();
     });
   }
 
-  window.__rev01Modal = {
+  window.__opencanvasModal = {
     confirm: function(msg, opts) { var o = opts || {}; return openConfirmModal({ title: o.title || "", message: msg, confirmLabel: o.confirmLabel, danger: o.danger }); },
     alert: function(msg, title) { return openAlertModal({ title: title || "", message: msg }); },
     prompt: function(title, label, def) { return openTextModal({ title: title || "", label: label || "", defaultValue: def || "" }); }
@@ -1782,7 +1782,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     updatePageSidebar();
     if (root) {
-      var artboards = root.querySelectorAll(".rev01-artboard");
+      var artboards = root.querySelectorAll(".opencanvas-artboard");
       for (var i = 0; i < artboards.length; i++) {
         var isActive = artboards[i].getAttribute("data-page-id") === pageId;
         artboards[i].setAttribute("data-active", isActive ? "true" : "false");
@@ -1840,21 +1840,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var btn = document.getElementById("canvas-page-crumb");
     if (!btn) return;
     var menu = document.createElement("div");
-    menu.className = "rev01-crumb-menu";
+    menu.className = "opencanvas-crumb-menu";
     menu.setAttribute("role", "menu");
     menu.setAttribute("aria-label", "Pages");
     for (var i = 0; i < state.pages.length; i++) {
       (function (p) {
         var item = document.createElement("button");
         item.type = "button";
-        item.className = "rev01-crumb-menu-item";
+        item.className = "opencanvas-crumb-menu-item";
         item.setAttribute("role", "menuitem");
         if (p.id === activePageId) item.classList.add("active");
         var title = document.createElement("span");
-        title.className = "rev01-crumb-menu-title";
+        title.className = "opencanvas-crumb-menu-title";
         title.textContent = p.title || p.slug || "page";
         var slug = document.createElement("span");
-        slug.className = "rev01-crumb-menu-slug";
+        slug.className = "opencanvas-crumb-menu-slug";
         slug.textContent = "/" + (p.slug || "");
         item.appendChild(title);
         item.appendChild(slug);
@@ -1931,22 +1931,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     for (var i = 0; i < state.pages.length; i++) {
       var page = state.pages[i];
       var item = document.createElement("div");
-      item.className = "rev01-page-item";
+      item.className = "opencanvas-page-item";
       item.setAttribute("data-page-id", page.id);
       item.setAttribute("data-active", page.id === activePageId ? "true" : "false");
 
       var title = document.createElement("span");
-      title.className = "rev01-page-item-title";
+      title.className = "opencanvas-page-item-title";
       title.textContent = page.title;
       item.appendChild(title);
 
       var slug = document.createElement("span");
-      slug.className = "rev01-page-item-slug";
+      slug.className = "opencanvas-page-item-slug";
       slug.textContent = "/" + page.slug;
       item.appendChild(slug);
 
       var actions = document.createElement("span");
-      actions.className = "rev01-page-item-actions";
+      actions.className = "opencanvas-page-item-actions";
 
       var renameBtn = document.createElement("button");
       renameBtn.type = "button";
@@ -1959,7 +1959,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       seoLink.textContent = "SEO";
       seoLink.href = "/dashboard/sites/" + SITE_ID + "/pages/" + page.id + "/seo";
       seoLink.target = "_blank";
-      seoLink.className = "rev01-page-seo-link";
+      seoLink.className = "opencanvas-page-seo-link";
       actions.appendChild(seoLink);
 
       if (state.pages.length > 1) {
@@ -2388,7 +2388,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const link = findLinkMark(run);
     if (link) {
       const a = document.createElement("a");
-      a.className = "rev01-inline-link";
+      a.className = "opencanvas-inline-link";
       a.setAttribute("href", link.href);
       if (link.target === "_blank") {
         a.setAttribute("target", "_blank");
@@ -2418,7 +2418,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function buildTextBody(element) {
     const tag = element.role === "heading" ? "h1" : element.role === "body" ? "p" : "span";
     const node = document.createElement(tag);
-    node.className = "rev01-text";
+    node.className = "opencanvas-text";
     node.setAttribute("data-role", element.role);
     node.style.fontSize = element.fontSize + "px";
     node.style.fontWeight = String(element.fontWeight);
@@ -2442,8 +2442,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // drag/resize it before uploading.
   function buildMediaBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-media";
-    node.setAttribute("data-rev01-media-kind", element.mediaKind);
+    node.className = "opencanvas-media";
+    node.setAttribute("data-opencanvas-media-kind", element.mediaKind);
     const assetId = typeof element.assetId === "string" ? element.assetId : "";
     if (assetId.length === 0 || assetId === "__placeholder__") {
       node.textContent =
@@ -2516,7 +2516,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildActionBody(element) {
     var node = document.createElement("a");
-    node.className = "rev01-action";
+    node.className = "opencanvas-action";
     node.setAttribute("data-variant", element.variant);
     node.setAttribute("href", resolveActionHref(element.href));
     // Plain click selects the action element on canvas (default selection
@@ -2542,14 +2542,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildShapeBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-shape";
+    node.className = "opencanvas-shape";
     node.setAttribute("data-variant", element.variant);
     return node;
   }
 
   function buildContainerBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-surface";
+    node.className = "opencanvas-surface";
     node.setAttribute("data-variant", element.variant);
     return node;
   }
@@ -2561,7 +2561,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // data grid. The visitor-facing render is the canonical server SVG
   // (see src/canvas/elements/chart.ts) — this preview deliberately uses
   // the SAME palette algorithm by reading the kit accent off the editor
-  // wrapper's --rev01-kit-accent token, so the editor swatch order
+  // wrapper's --opencanvas-kit-accent token, so the editor swatch order
   // matches what the server emits. No client-side chart library: ~80 lines
   // of plain DOM + a fixed-format colour-rotation.
   // ----------------------------------------------------------------------
@@ -2655,13 +2655,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function currentChartPalette() {
     if (!mainEl) return ["#888", "#888", "#888", "#888", "#888"];
     const cs = window.getComputedStyle(mainEl);
-    const accent = (cs.getPropertyValue("--rev01-kit-accent") || "").trim();
+    const accent = (cs.getPropertyValue("--opencanvas-kit-accent") || "").trim();
     return previewPaletteFromAccent(accent || "#888888");
   }
 
   function buildChartBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-chart-preview";
+    node.className = "opencanvas-chart-preview";
     node.style.width = "100%";
     node.style.height = "100%";
     node.style.position = "relative";
@@ -2761,7 +2761,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildFormBody(element) {
     const node = document.createElement("form");
-    node.className = "rev01-form-preview";
+    node.className = "opencanvas-form-preview";
     node.style.display = "flex";
     node.style.flexDirection = "column";
     node.style.gap = "8px";
@@ -2795,7 +2795,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildEmbedBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-embed-preview";
+    node.className = "opencanvas-embed-preview";
     node.style.display = "flex";
     node.style.alignItems = "center";
     node.style.justifyContent = "center";
@@ -2810,7 +2810,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildCodeBody(element) {
     const pre = document.createElement("pre");
-    pre.className = "rev01-code-preview";
+    pre.className = "opencanvas-code-preview";
     pre.style.margin = "0";
     pre.style.width = "100%";
     pre.style.height = "100%";
@@ -2823,7 +2823,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildAccordionBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-accordion-preview";
+    node.className = "opencanvas-accordion-preview";
     const items = Array.isArray(element.items) ? element.items : [];
     for (let i = 0; i < items.length; i++) {
       const item = items[i] || {};
@@ -2843,7 +2843,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildCarouselBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-carousel-preview";
+    node.className = "opencanvas-carousel-preview";
     node.style.display = "flex";
     node.style.gap = "8px";
     node.style.width = "100%";
@@ -2866,7 +2866,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildTableBody(element) {
     const table = document.createElement("table");
-    table.className = "rev01-table-preview";
+    table.className = "opencanvas-table-preview";
     table.style.width = "100%";
     table.style.height = "100%";
     table.style.borderCollapse = "collapse";
@@ -2901,7 +2901,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildNavBody(element) {
     const nav = document.createElement("nav");
-    nav.className = "rev01-nav-preview";
+    nav.className = "opencanvas-nav-preview";
     nav.style.display = "flex";
     nav.style.alignItems = "center";
     nav.style.gap = "12px";
@@ -2911,9 +2911,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     for (let i = 0; i < links.length; i++) {
       const link = links[i] || {};
       const a = document.createElement("a");
-      a.className = "rev01-nav-link";
+      a.className = "opencanvas-nav-link";
       const kind = link.kind === "external" || link.kind === "anchor" ? link.kind : "internal";
-      a.setAttribute("data-rev01-nav-link-kind", kind);
+      a.setAttribute("data-opencanvas-nav-link-kind", kind);
       let resolvedHref = typeof link.href === "string" ? link.href : "";
       if (kind === "internal" && resolvedHref.length > 0 && resolvedHref.charAt(0) !== "/") {
         resolvedHref = "/" + resolvedHref;
@@ -2953,7 +2953,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildCollectionBody(element) {
     const node = document.createElement("div");
-    node.className = "rev01-collection-preview";
+    node.className = "opencanvas-collection-preview";
     node.style.display = "grid";
     node.style.gridTemplateColumns = "repeat(2, minmax(0, 1fr))";
     node.style.gap = "8px";
@@ -3002,9 +3002,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function closeElementMenu() {
     if (!openMenuElementId) return;
-    const prev = root.querySelector('[data-rev01-element="' + cssEscape(openMenuElementId) + '"] .element-menu');
+    const prev = root.querySelector('[data-opencanvas-element="' + cssEscape(openMenuElementId) + '"] .element-menu');
     if (prev) prev.remove();
-    const prevTrigger = root.querySelector('[data-rev01-element="' + cssEscape(openMenuElementId) + '"] .element-menu-trigger');
+    const prevTrigger = root.querySelector('[data-opencanvas-element="' + cssEscape(openMenuElementId) + '"] .element-menu-trigger');
     if (prevTrigger) prevTrigger.removeAttribute("data-menu-open");
     openMenuElementId = null;
   }
@@ -3096,8 +3096,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildElementNode(element) {
     const wrapper = document.createElement("div");
-    wrapper.className = "rev01-element";
-    wrapper.setAttribute("data-rev01-element", element.id);
+    wrapper.className = "opencanvas-element";
+    wrapper.setAttribute("data-opencanvas-element", element.id);
     wrapper.setAttribute("data-element-type", element.type);
     // Mirror the public renderer: stamp data-variant for action/shape/
     // container and data-role for text so kit CSS selectors of the form
@@ -3144,7 +3144,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const found = findElement(elementId);
     if (!found) return;
     const existingNodes = root.querySelectorAll(
-      '[data-rev01-element="' + cssEscape(elementId) + '"]',
+      '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
     );
     if (existingNodes.length === 0) {
       renderAll();
@@ -3156,7 +3156,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const replacement = buildElementNode(found.element);
       existing.parentNode.replaceChild(replacement, existing);
       if (found.element.type === "text") {
-        var inner = replacement.querySelector(".rev01-text");
+        var inner = replacement.querySelector(".opencanvas-text");
         if (inner) {
           var textH = inner.scrollHeight;
           if (textH > found.element.box.h) {
@@ -3227,8 +3227,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildSectionNode(section, pageWidth) {
     const node = document.createElement("section");
-    node.className = "rev01-section";
-    node.setAttribute("data-rev01-section", section.id);
+    node.className = "opencanvas-section";
+    node.setAttribute("data-opencanvas-section", section.id);
     node.setAttribute("data-recipe", section.recipeId);
     if (isPinnedSection(section)) node.setAttribute("data-section-role", section.role);
     if (section.backgroundEffect) node.setAttribute("data-bg-effect", section.backgroundEffect);
@@ -3296,20 +3296,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (!pos) continue;
 
       var artboard = document.createElement("div");
-      artboard.className = "rev01-artboard";
+      artboard.className = "opencanvas-artboard";
       artboard.setAttribute("data-page-id", page.id);
       artboard.setAttribute("data-active", page.id === (activePageId || state.pages[0].id) ? "true" : "false");
       artboard.style.transform = "translate(" + pos.x + "px, " + pos.y + "px)";
 
       var label = document.createElement("div");
-      label.className = "rev01-artboard-label";
+      label.className = "opencanvas-artboard-label";
       label.textContent = page.title || page.slug;
       label.setAttribute("data-page-id", page.id);
       artboard.appendChild(label);
 
       var article = document.createElement("article");
-      article.className = "rev01-page";
-      article.setAttribute("data-rev01-page", page.id);
+      article.className = "opencanvas-page";
+      article.setAttribute("data-opencanvas-page", page.id);
       article.style.position = "relative";
       applyPageMotionAttributes(article, page);
       applyPageStyleProperties(article, page);
@@ -3330,7 +3330,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       artboard.appendChild(article);
 
       var outline = document.createElement("div");
-      outline.className = "rev01-artboard-outline";
+      outline.className = "opencanvas-artboard-outline";
       artboard.appendChild(outline);
 
       fragment.appendChild(artboard);
@@ -3362,9 +3362,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var wrappers = root.querySelectorAll('[data-element-type="text"]');
     for (var i = 0; i < wrappers.length; i++) {
       var w = wrappers[i];
-      var inner = w.querySelector(".rev01-text");
+      var inner = w.querySelector(".opencanvas-text");
       if (!inner) continue;
-      var eid = w.getAttribute("data-rev01-element");
+      var eid = w.getAttribute("data-opencanvas-element");
       var found = findElement(eid);
       if (!found) continue;
       var textH = inner.scrollHeight;
@@ -3484,11 +3484,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildReorderGroup(section, element) {
     const group = document.createElement("div");
-    group.className = "rev01-reorder-buttons";
+    group.className = "opencanvas-reorder-buttons";
     const idx = section.elements.indexOf(element);
     const total = section.elements.length;
     const caption = document.createElement("div");
-    caption.className = "rev01-reorder-caption";
+    caption.className = "opencanvas-reorder-caption";
     caption.textContent = "Reading order: " + (idx + 1) + " of " + total;
 
     const upBtn = document.createElement("button");
@@ -3514,7 +3514,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildZOrderGroup(section, element) {
     const group = document.createElement("div");
-    group.className = "rev01-zorder-buttons";
+    group.className = "opencanvas-zorder-buttons";
     const defs = [
       { label: "Bring to front", action: "front" },
       { label: "Send to back", action: "back" },
@@ -3567,7 +3567,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function buildElementActionsGroup(section, element) {
     const group = document.createElement("div");
-    group.className = "rev01-zorder-buttons";
+    group.className = "opencanvas-zorder-buttons";
     const dup = document.createElement("button");
     dup.type = "button";
     dup.textContent = "Duplicate";
@@ -3595,7 +3595,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // categories data grid stays imperative in mountChartData below.
   function mountChartData(element, host) {
     const gridHost = document.createElement("div");
-    gridHost.className = "rev01-chart-grid-host";
+    gridHost.className = "opencanvas-chart-grid-host";
     gridHost.style.marginTop = "8px";
     host.appendChild(gridHost);
 
@@ -3605,7 +3605,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const cats = Array.isArray(element.categories) ? element.categories : (element.categories = []);
       // Header row: blank + each category name.
       const table = document.createElement("table");
-      table.className = "rev01-chart-grid";
+      table.className = "opencanvas-chart-grid";
       table.style.borderCollapse = "collapse";
       table.style.width = "100%";
       table.style.fontSize = "11px";
@@ -4544,7 +4544,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var editable = document.createElement("div");
           editable.setAttribute("contenteditable", "true");
-          editable.style.cssText = "min-height:40px;padding:4px 6px;border:1px solid var(--rev01-hairline);border-radius:4px;font-size:12px;background:var(--rev01-bg-panel);color:var(--rev01-fg);overflow-y:auto;max-height:120px;";
+          editable.style.cssText = "min-height:40px;padding:4px 6px;border:1px solid var(--opencanvas-hairline);border-radius:4px;font-size:12px;background:var(--opencanvas-bg-panel);color:var(--opencanvas-fg);overflow-y:auto;max-height:120px;";
           editable.innerHTML = runsToHtml(Array.isArray(item.body) ? item.body : []);
           bodyWrap.appendChild(editable);
 
@@ -4719,14 +4719,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var headerRow = document.createElement("tr");
       var cornerCell = document.createElement("th");
       cornerCell.textContent = "#";
-      cornerCell.style.cssText = "padding:2px 4px;border:1px solid var(--rev01-hairline);";
+      cornerCell.style.cssText = "padding:2px 4px;border:1px solid var(--opencanvas-hairline);";
       headerRow.appendChild(cornerCell);
 
       for (var ci = 0; ci < element.columns.length; ci++) {
         (function(colIdx) {
           var col = element.columns[colIdx];
           var th = document.createElement("th");
-          th.style.cssText = "padding:2px;border:1px solid var(--rev01-hairline);";
+          th.style.cssText = "padding:2px;border:1px solid var(--opencanvas-hairline);";
           var headerInput = document.createElement("input");
           headerInput.type = "text";
           headerInput.value = col.header;
@@ -4761,7 +4761,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
 
       var addColTh = document.createElement("th");
-      addColTh.style.cssText = "padding:2px;border:1px solid var(--rev01-hairline);";
+      addColTh.style.cssText = "padding:2px;border:1px solid var(--opencanvas-hairline);";
       var addColBtn = document.createElement("button");
       addColBtn.type = "button";
       addColBtn.textContent = "+ col";
@@ -4790,14 +4790,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var numCell = document.createElement("td");
           numCell.textContent = String(ri + 1);
-          numCell.style.cssText = "padding:2px 4px;border:1px solid var(--rev01-hairline);text-align:center;color:var(--rev01-fg-faint);";
+          numCell.style.cssText = "padding:2px 4px;border:1px solid var(--opencanvas-hairline);text-align:center;color:var(--opencanvas-fg-faint);";
           tr.appendChild(numCell);
 
           for (var ci2 = 0; ci2 < element.columns.length; ci2++) {
             (function(colIdx2) {
               var colId = element.columns[colIdx2].id;
               var td = document.createElement("td");
-              td.style.cssText = "padding:1px;border:1px solid var(--rev01-hairline);";
+              td.style.cssText = "padding:1px;border:1px solid var(--opencanvas-hairline);";
               var cellInput = document.createElement("input");
               cellInput.type = "text";
               cellInput.value = rowData.cells[colId] || "";
@@ -4813,7 +4813,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           }
 
           var rmCell = document.createElement("td");
-          rmCell.style.cssText = "padding:2px;border:1px solid var(--rev01-hairline);";
+          rmCell.style.cssText = "padding:2px;border:1px solid var(--opencanvas-hairline);";
           var rmRowBtn = document.createElement("button");
           rmRowBtn.type = "button";
           rmRowBtn.textContent = "x";
@@ -5036,7 +5036,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Identity -------------------------------------------------------
     var groupIdentity = document.createElement("div");
-    groupIdentity.className = "rev01-page-inspector-group";
+    groupIdentity.className = "opencanvas-page-inspector-group";
     var hIdentity = document.createElement("h4");
     hIdentity.textContent = "Identity";
     groupIdentity.appendChild(hIdentity);
@@ -5044,7 +5044,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     roleLabel.textContent = "Role";
     roleLabel.style.display = "block";
     roleLabel.style.fontSize = "12px";
-    roleLabel.style.color = "var(--rev01-fg-mute)";
+    roleLabel.style.color = "var(--opencanvas-fg-mute)";
     roleLabel.style.marginBottom = "4px";
     groupIdentity.appendChild(roleLabel);
     var roleSel = selectInput(selectableSectionRoles(section), section.role || "body");
@@ -5064,13 +5064,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Background -----------------------------------------------------
     var groupBg = document.createElement("div");
-    groupBg.className = "rev01-page-inspector-group";
+    groupBg.className = "opencanvas-page-inspector-group";
     var hBg = document.createElement("h4");
     hBg.textContent = "Background";
     groupBg.appendChild(hBg);
     var bgEffectLabel = document.createElement("label");
     bgEffectLabel.textContent = "Effect";
-    bgEffectLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin-bottom:4px";
+    bgEffectLabel.style.cssText = "display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin-bottom:4px";
     groupBg.appendChild(bgEffectLabel);
     var bgEffectSel = selectInput(
       ["none", "grain", "grid", "soft-light", "paper", "glass"],
@@ -5087,7 +5087,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     var bgVideoLabel = document.createElement("label");
     bgVideoLabel.textContent = "Video";
-    bgVideoLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin:10px 0 4px";
+    bgVideoLabel.style.cssText = "display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin:10px 0 4px";
     groupBg.appendChild(bgVideoLabel);
     var bgVideoRow = document.createElement("div");
     bgVideoRow.style.cssText = "display:flex;gap:6px;align-items:center";
@@ -5095,7 +5095,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     bgVideoStatus.textContent = section.backgroundVideoAssetId
       ? ("Asset " + section.backgroundVideoAssetId.slice(0, 8) + "...")
       : "none";
-    bgVideoStatus.style.cssText = "flex:1;font-size:12px;color:var(--rev01-fg-mute);overflow:hidden;text-overflow:ellipsis";
+    bgVideoStatus.style.cssText = "flex:1;font-size:12px;color:var(--opencanvas-fg-mute);overflow:hidden;text-overflow:ellipsis";
     var bgVideoUpload = document.createElement("button");
     bgVideoUpload.type = "button";
     bgVideoUpload.textContent = "Upload";
@@ -5145,13 +5145,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Motion ---------------------------------------------------------
     var groupMotion = document.createElement("div");
-    groupMotion.className = "rev01-page-inspector-group";
+    groupMotion.className = "opencanvas-page-inspector-group";
     var hMotion = document.createElement("h4");
     hMotion.textContent = "Motion";
     groupMotion.appendChild(hMotion);
     var entranceLabel = document.createElement("label");
     entranceLabel.textContent = "Entrance preset";
-    entranceLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin-bottom:4px";
+    entranceLabel.style.cssText = "display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin-bottom:4px";
     groupMotion.appendChild(entranceLabel);
     var entranceSel = selectInput(MOTION_PRESETS, section.entrance || "none");
     entranceSel.addEventListener("change", function() {
@@ -5166,13 +5166,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Behaviour (popup trigger) --------------------------------------
     var groupBeh = document.createElement("div");
-    groupBeh.className = "rev01-page-inspector-group";
+    groupBeh.className = "opencanvas-page-inspector-group";
     var hBeh = document.createElement("h4");
     hBeh.textContent = "Behaviour";
     groupBeh.appendChild(hBeh);
     var triggerLabel = document.createElement("label");
     triggerLabel.textContent = "Popup trigger";
-    triggerLabel.style.cssText = "display:block;font-size:12px;color:var(--rev01-fg-mute);margin-bottom:4px";
+    triggerLabel.style.cssText = "display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin-bottom:4px";
     groupBeh.appendChild(triggerLabel);
     var currentTriggerType = section.trigger ? section.trigger.type : "none";
     var triggerSel = selectInput(["none", "exit-intent", "delay", "scroll"], currentTriggerType);
@@ -5205,7 +5205,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       valInput.style.cssText = "flex:1";
       var unit = document.createElement("span");
       unit.textContent = section.trigger.type === "scroll" ? "%" : "ms";
-      unit.style.cssText = "font-size:12px;color:var(--rev01-fg-mute)";
+      unit.style.cssText = "font-size:12px;color:var(--opencanvas-fg-mute)";
       valInput.addEventListener("change", function() {
         var v = parseInt(valInput.value, 10);
         if (!isNaN(v) && section.trigger && (section.trigger.type === "delay" || section.trigger.type === "scroll")) {
@@ -5222,7 +5222,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Action buttons (existing grid below the fields) ----------------
     var grid = document.createElement("div");
-    grid.className = "rev01-section-inspector-grid";
+    grid.className = "opencanvas-section-inspector-grid";
 
     var pinned = isPinnedSection(section);
     var defs = [];
@@ -5283,7 +5283,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (!artboard) return;
       targets = artboard.querySelectorAll("[data-motion-preset], [data-entrance-animation]");
     } else {
-      var el = root.querySelector('[data-rev01-element="' + cssEscape(scope) + '"]');
+      var el = root.querySelector('[data-opencanvas-element="' + cssEscape(scope) + '"]');
       if (!el) { targets = []; } else { targets = [el]; }
     }
     for (var i = 0; i < targets.length; i++) {
@@ -5374,7 +5374,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // when a demotion is needed AND on toggle-off (significant change
     // either way).
     var group404 = document.createElement("div");
-    group404.className = "rev01-page-inspector-group";
+    group404.className = "opencanvas-page-inspector-group";
     var h404 = document.createElement("h4");
     h404.textContent = "Custom 404 page";
     group404.appendChild(h404);
@@ -5459,7 +5459,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Entrance animation -----------------------------------------------
     var group1 = document.createElement("div");
-    group1.className = "rev01-page-inspector-group";
+    group1.className = "opencanvas-page-inspector-group";
     var h4a = document.createElement("h4");
     h4a.textContent = "Entrance animation";
     group1.appendChild(h4a);
@@ -5481,7 +5481,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Scroll trigger mode ----------------------------------------------
     var group2 = document.createElement("div");
-    group2.className = "rev01-page-inspector-group";
+    group2.className = "opencanvas-page-inspector-group";
     var h4b = document.createElement("h4");
     h4b.textContent = "Animation trigger";
     group2.appendChild(h4b);
@@ -5497,7 +5497,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Default motion preset --------------------------------------------
     var group3 = document.createElement("div");
-    group3.className = "rev01-page-inspector-group";
+    group3.className = "opencanvas-page-inspector-group";
     var h4c = document.createElement("h4");
     h4c.textContent = "Default motion for new elements";
     group3.appendChild(h4c);
@@ -5516,19 +5516,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Divider ----------------------------------------------------------
     var divider1 = document.createElement("div");
-    divider1.className = "rev01-page-inspector-divider";
+    divider1.className = "opencanvas-page-inspector-divider";
     inspector.appendChild(divider1);
 
     // -- Play / replay animations -----------------------------------------
     var group4 = document.createElement("div");
-    group4.className = "rev01-page-inspector-group";
+    group4.className = "opencanvas-page-inspector-group";
     var h4d = document.createElement("h4");
     h4d.textContent = "Preview";
     group4.appendChild(h4d);
 
     var playBtn = document.createElement("button");
     playBtn.type = "button";
-    playBtn.className = "rev01-replay-btn";
+    playBtn.className = "opencanvas-replay-btn";
     var playIcon = document.createElement("span");
     playIcon.className = "play-icon";
     playBtn.appendChild(playIcon);
@@ -5544,7 +5544,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Divider ----------------------------------------------------------
     var divider2 = document.createElement("div");
-    divider2.className = "rev01-page-inspector-divider";
+    divider2.className = "opencanvas-page-inspector-divider";
     inspector.appendChild(divider2);
 
     // -- Page background --------------------------------------------------
@@ -5554,7 +5554,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // accepted 'transparent' / named colors / gradients, but the demo
     // case is swatch-picked hex and that's what the picker exposes).
     var group5 = document.createElement("div");
-    group5.className = "rev01-page-inspector-group";
+    group5.className = "opencanvas-page-inspector-group";
     var h4e = document.createElement("h4");
     h4e.textContent = "Page background";
     group5.appendChild(h4e);
@@ -5575,7 +5575,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Section gap ------------------------------------------------------
     var group6 = document.createElement("div");
-    group6.className = "rev01-page-inspector-group";
+    group6.className = "opencanvas-page-inspector-group";
     var h4f = document.createElement("h4");
     h4f.textContent = "Section gap";
     group6.appendChild(h4f);
@@ -5605,7 +5605,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Page max-width ---------------------------------------------------
     var group7 = document.createElement("div");
-    group7.className = "rev01-page-inspector-group";
+    group7.className = "opencanvas-page-inspector-group";
     var h4g = document.createElement("h4");
     h4g.textContent = "Content max-width";
     group7.appendChild(h4g);
@@ -5635,14 +5635,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     // -- Divider ----------------------------------------------------------
     var divider3 = document.createElement("div");
-    divider3.className = "rev01-page-inspector-divider";
+    divider3.className = "opencanvas-page-inspector-divider";
     inspector.appendChild(divider3);
 
     // -- SEO & metadata link ---------------------------------------------
     // Opens the dashboard SEO panel for this page in a new tab so the user
     // doesn't lose their editor scroll position.
     var seoGroup = document.createElement("div");
-    seoGroup.className = "rev01-page-inspector-group";
+    seoGroup.className = "opencanvas-page-inspector-group";
     var seoLabel = document.createElement("h4");
     seoLabel.textContent = "SEO & metadata";
     seoGroup.appendChild(seoLabel);
@@ -5650,7 +5650,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     seoLink.href = "/dashboard/sites/" + encodeURIComponent(SITE_ID) + "/pages/" + encodeURIComponent(page.id) + "/seo";
     seoLink.target = "_blank";
     seoLink.rel = "noopener";
-    seoLink.className = "rev01-page-inspector-link";
+    seoLink.className = "opencanvas-page-inspector-link";
     seoLink.textContent = "Open SEO panel →";
     seoLink.title = "Edit title, description, share-card image and search settings";
     seoGroup.appendChild(seoLink);
@@ -5661,12 +5661,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function applyPageStyles(page) {
     var artboard = root.querySelector('[data-page-id="' + cssEscape(page.id) + '"]');
     if (!artboard) return;
-    var article = artboard.querySelector(".rev01-page");
+    var article = artboard.querySelector(".opencanvas-page");
     if (article) {
       applyPageMotionAttributes(article, page);
       applyPageStyleProperties(article, page);
       var renderWidth = pageRenderWidth(page);
-      var sections = article.querySelectorAll("[data-rev01-section]");
+      var sections = article.querySelectorAll("[data-opencanvas-section]");
       for (var i = 0; i < sections.length; i++) {
         sections[i].style.width = renderWidth + "px";
       }
@@ -6193,7 +6193,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // Play/replay button for this element's animation.
     var elPlayBtn = document.createElement("button");
     elPlayBtn.type = "button";
-    elPlayBtn.className = "rev01-replay-btn";
+    elPlayBtn.className = "opencanvas-replay-btn";
     var elPlayIcon = document.createElement("span");
     elPlayIcon.className = "play-icon";
     elPlayBtn.appendChild(elPlayIcon);
@@ -6633,7 +6633,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       if (entries.length === 0) {
         const hint = document.createElement("span");
-        hint.style.cssText = "font-size:11px;color:var(--rev01-fg-faint);font-family:var(--rev01-font-mono);";
+        hint.style.cssText = "font-size:11px;color:var(--opencanvas-fg-faint);font-family:var(--opencanvas-font-mono);";
         hint.textContent = "None yet";
         historyRow.appendChild(hint);
       }
@@ -6682,7 +6682,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       if (entries.length === 0) {
         const hint = document.createElement("span");
-        hint.style.cssText = "font-size:11px;color:var(--rev01-fg-faint);font-family:var(--rev01-font-mono);grid-column:1/-1;";
+        hint.style.cssText = "font-size:11px;color:var(--opencanvas-fg-faint);font-family:var(--opencanvas-font-mono);grid-column:1/-1;";
         hint.textContent = "No assets yet";
         galleryGrid.appendChild(hint);
       }
@@ -6926,7 +6926,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const img = document.createElement("img");
     img.src = objectUrl;
     img.alt = altValue;
-    img.style.cssText = "max-width:100%;display:block;border:1px solid var(--rev01-border,#ccc);";
+    img.style.cssText = "max-width:100%;display:block;border:1px solid var(--opencanvas-border,#ccc);";
     wrap.appendChild(img);
 
     const buttons = document.createElement("div");
@@ -7150,7 +7150,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function selectElement(elementId) {
     if (selectedElementId === elementId) return;
     if (selectedElementId) {
-      const prev = root.querySelector('[data-rev01-element="' + cssEscape(selectedElementId) + '"]');
+      const prev = root.querySelector('[data-opencanvas-element="' + cssEscape(selectedElementId) + '"]');
       if (prev) prev.removeAttribute("data-selected");
     }
     selectedElementId = elementId;
@@ -7161,7 +7161,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (linkPopoverPinned) removeLinkPopover();
     if (elementId) {
       if (isReelOpen) closeReel();
-      const next = root.querySelector('[data-rev01-element="' + cssEscape(elementId) + '"]');
+      const next = root.querySelector('[data-opencanvas-element="' + cssEscape(elementId) + '"]');
       if (next) next.setAttribute("data-selected", "true");
       const found = findElement(elementId);
       if (found) selectSection(found.section.id);
@@ -7170,7 +7170,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // hunting for the inspector's href field. The wrapper's inner anchor
       // is the popover anchor.
       if (found && found.element && found.element.type === 'action' && next) {
-        var actionAnchor = next.querySelector('a.rev01-action');
+        var actionAnchor = next.querySelector('a.opencanvas-action');
         if (actionAnchor) showLinkPopover(actionAnchor, { pinned: true });
       }
     }
@@ -7182,12 +7182,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function selectSection(sectionId) {
     if (selectedSectionId === sectionId) return;
     if (selectedSectionId) {
-      const prev = root.querySelector('[data-rev01-section="' + cssEscape(selectedSectionId) + '"]');
+      const prev = root.querySelector('[data-opencanvas-section="' + cssEscape(selectedSectionId) + '"]');
       if (prev) prev.removeAttribute("data-selected");
     }
     selectedSectionId = sectionId;
     if (sectionId) {
-      const next = root.querySelector('[data-rev01-section="' + cssEscape(sectionId) + '"]');
+      const next = root.querySelector('[data-opencanvas-section="' + cssEscape(sectionId) + '"]');
       if (next) next.setAttribute("data-selected", "true");
     }
     if (!selectedElementId) renderInspector();
@@ -7582,7 +7582,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const section = page.sections[fromIdx];
     if (isPinnedSection(section)) return;
 
-    const sectionEl = root.querySelector('[data-rev01-section="' + cssEscape(sectionId) + '"]');
+    const sectionEl = root.querySelector('[data-opencanvas-section="' + cssEscape(sectionId) + '"]');
     if (sectionEl) sectionEl.style.opacity = "0.5";
 
     const ghost = buildSectionThumbnail(section, page.width, 200);
@@ -7624,7 +7624,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const rootRect = root.getBoundingClientRect();
       if (!pointInsideRect(clientX, clientY, rootRect)) return null;
 
-      const sectionNodes = Array.from(root.querySelectorAll("[data-rev01-section]"));
+      const sectionNodes = Array.from(root.querySelectorAll("[data-opencanvas-section]"));
       for (let i = 0; i < sectionNodes.length; i++) {
         const rect = sectionNodes[i].getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
@@ -7927,7 +7927,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Link hover/selection popover ---------------------------------------
   //
-  // Singleton popover shown for inline link marks (<a class="rev01-inline-link">)
+  // Singleton popover shown for inline link marks (<a class="opencanvas-inline-link">)
   // inside the text element currently in edit mode. Two trigger modes:
   //   - hover: 150ms show delay, auto-hides on mouseleave.
   //   - pinned: shown when the caret enters a link (selectionchange) and
@@ -7971,8 +7971,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // without three separate popover implementations.
   function linkPopoverKindOf(anchorEl) {
     if (!anchorEl || !anchorEl.classList) return 'inline';
-    if (anchorEl.classList.contains('rev01-action')) return 'action';
-    if (anchorEl.classList.contains('rev01-nav-link')) return 'nav';
+    if (anchorEl.classList.contains('opencanvas-action')) return 'action';
+    if (anchorEl.classList.contains('opencanvas-nav-link')) return 'nav';
     return 'inline';
   }
 
@@ -7982,8 +7982,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function parentElementIdOf(node) {
     var n = node;
     while (n && n !== document.body) {
-      if (n.nodeType === 1 && n.getAttribute && n.getAttribute('data-rev01-element')) {
-        return n.getAttribute('data-rev01-element');
+      if (n.nodeType === 1 && n.getAttribute && n.getAttribute('data-opencanvas-element')) {
+        return n.getAttribute('data-opencanvas-element');
       }
       n = n.parentNode;
     }
@@ -7996,20 +7996,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var href = anchorEl.getAttribute('href') || '';
     var kind = linkPopoverKindOf(anchorEl);
     var bar = document.createElement('div');
-    bar.className = 'rev01-link-popover';
-    bar.setAttribute('data-rev01-link-popover-kind', kind);
-    if (pinned) bar.setAttribute('data-rev01-link-popover-pinned', 'true');
+    bar.className = 'opencanvas-link-popover';
+    bar.setAttribute('data-opencanvas-link-popover-kind', kind);
+    if (pinned) bar.setAttribute('data-opencanvas-link-popover-pinned', 'true');
 
     // Top row: URL + buttons. Bottom row: visitor-view preview chip when the
     // kind has a meaningful styling mismatch (inline marks, nav links). Two
     // rows live in one column so the popover stays a single floating
     // surface anchored to the link.
     var topRow = document.createElement('div');
-    topRow.className = 'rev01-link-popover-row';
+    topRow.className = 'opencanvas-link-popover-row';
     bar.appendChild(topRow);
 
     var urlSpan = document.createElement('span');
-    urlSpan.className = 'rev01-link-popover-url';
+    urlSpan.className = 'opencanvas-link-popover-url';
     urlSpan.textContent = href.length > 40 ? href.slice(0, 37) + '...' : href;
     urlSpan.title = href;
     topRow.appendChild(urlSpan);
@@ -8148,17 +8148,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // canvas (no contenteditable override sits on them).
     if (kind === 'inline' || kind === 'nav') {
       var previewRow = document.createElement('div');
-      previewRow.className = 'rev01-link-popover-preview';
+      previewRow.className = 'opencanvas-link-popover-preview';
       var previewLabel = document.createElement('span');
-      previewLabel.className = 'rev01-link-popover-preview-label';
+      previewLabel.className = 'opencanvas-link-popover-preview-label';
       previewLabel.textContent = 'Visitors see';
       previewRow.appendChild(previewLabel);
       var previewLink = document.createElement('a');
       // Use the matching published class so the kit accent / hover colour
       // flow through unchanged. Adding the popover-specific class disables
       // pointer events so accidental clicks don't navigate.
-      var previewClass = kind === 'nav' ? 'rev01-nav-link' : 'rev01-inline-link';
-      previewLink.className = previewClass + ' rev01-link-popover-preview-link';
+      var previewClass = kind === 'nav' ? 'opencanvas-nav-link' : 'opencanvas-inline-link';
+      previewLink.className = previewClass + ' opencanvas-link-popover-preview-link';
       previewLink.setAttribute('href', href || '#');
       previewLink.setAttribute('tabindex', '-1');
       previewLink.textContent = (anchorEl.textContent || '').trim() || 'link text';
@@ -8217,7 +8217,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var n = node;
     if (n.nodeType !== 1) n = n.parentNode;
     while (n && n !== document.body) {
-      if (n.nodeType === 1 && n.tagName === 'A' && n.classList && n.classList.contains('rev01-inline-link')) {
+      if (n.nodeType === 1 && n.tagName === 'A' && n.classList && n.classList.contains('opencanvas-inline-link')) {
         return n;
       }
       n = n.parentNode;
@@ -8402,9 +8402,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     modalOpen = true;
     return new Promise(function (resolve) {
       var backdrop = document.createElement('div');
-      backdrop.className = 'rev01-modal-backdrop';
+      backdrop.className = 'opencanvas-modal-backdrop';
       var panel = document.createElement('div');
-      panel.className = 'rev01-modal';
+      panel.className = 'opencanvas-modal';
       panel.setAttribute('role', 'dialog');
       panel.setAttribute('aria-modal', 'true');
       panel.setAttribute('aria-label', 'Link');
@@ -8418,7 +8418,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         previewLabel.textContent = 'Text';
         panel.appendChild(previewLabel);
         var preview = document.createElement('div');
-        preview.className = 'rev01-link-modal-preview';
+        preview.className = 'opencanvas-link-modal-preview';
         preview.textContent = linkText;
         panel.appendChild(preview);
       }
@@ -8433,12 +8433,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       panel.appendChild(urlInput);
 
       var errorEl = document.createElement('div');
-      errorEl.className = 'rev01-link-modal-error';
+      errorEl.className = 'opencanvas-link-modal-error';
       errorEl.textContent = '';
       panel.appendChild(errorEl);
 
       var checkLabel = document.createElement('label');
-      checkLabel.className = 'rev01-link-modal-checkbox';
+      checkLabel.className = 'opencanvas-link-modal-checkbox';
       var checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = defaultBlank;
@@ -8460,7 +8460,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
 
       var actions = document.createElement('div');
-      actions.className = 'rev01-modal-actions';
+      actions.className = 'opencanvas-modal-actions';
       var cancelBtn = document.createElement('button');
       cancelBtn.type = 'button';
       cancelBtn.textContent = 'Cancel';
@@ -8476,7 +8476,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function close(value) {
         document.removeEventListener('keydown', onKey, true);
         if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
-        document.body.classList.remove('rev01-modal-open');
+        document.body.classList.remove('opencanvas-modal-open');
         modalOpen = false;
         if (focusAfterClose && document.contains(focusAfterClose)) {
           focusAfterClose.focus({ preventScroll: true });
@@ -8522,7 +8522,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       urlInput.addEventListener('input', function () { errorEl.textContent = ''; });
       document.addEventListener('keydown', onKey, true);
 
-      document.body.classList.add('rev01-modal-open');
+      document.body.classList.add('opencanvas-modal-open');
       document.body.appendChild(backdrop);
       urlInput.focus();
       urlInput.select();
@@ -8549,7 +8549,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     sel.removeAllRanges();
     sel.addRange(savedRange);
     var a = document.createElement('a');
-    a.className = 'rev01-inline-link';
+    a.className = 'opencanvas-inline-link';
     a.setAttribute('href', result.href);
     if (result.target === '_blank') {
       a.setAttribute('target', '_blank');
@@ -8589,7 +8589,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // Apply an element-level field change while a text element is in edit mode.
-  // We mutate the data model AND mirror the new value into the live .rev01-text
+  // We mutate the data model AND mirror the new value into the live .opencanvas-text
   // inline style so the change is visible immediately without a rebuild — a
   // rebuild would tear down the contenteditable and drop the caret.
   function applyAlignToEditing(direction) {
@@ -8597,8 +8597,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var found = findElement(editingElementId);
     if (!found || found.element.type !== "text") return;
     found.element.align = direction;
-    var wrapper = root.querySelector('[data-rev01-element="' + cssEscape(editingElementId) + '"]');
-    var inner = wrapper ? wrapper.querySelector(".rev01-text") : null;
+    var wrapper = root.querySelector('[data-opencanvas-element="' + cssEscape(editingElementId) + '"]');
+    var inner = wrapper ? wrapper.querySelector(".opencanvas-text") : null;
     if (inner) inner.style.textAlign = direction;
     refreshMarkToolbarAlignState();
     scheduleSave();
@@ -8624,7 +8624,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     } else {
       delete found.element.elementStyle;
     }
-    var wrapper = root.querySelector('[data-rev01-element="' + cssEscape(editingElementId) + '"]');
+    var wrapper = root.querySelector('[data-opencanvas-element="' + cssEscape(editingElementId) + '"]');
     if (wrapper) wrapper.style.color = color || "";
     scheduleSave();
   }
@@ -8650,12 +8650,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function buildMarkToolbar(anchor) {
     removeMarkToolbar();
     const bar = document.createElement("div");
-    bar.className = "rev01-mark-toolbar";
+    bar.className = "opencanvas-mark-toolbar";
     bar.setAttribute("role", "toolbar");
     bar.setAttribute("aria-label", "Inline formatting");
     const dragBtn = document.createElement("button");
     dragBtn.type = "button";
-    dragBtn.className = "rev01-mark-drag";
+    dragBtn.className = "opencanvas-mark-drag";
     dragBtn.setAttribute("data-mark-drag", "true");
     dragBtn.setAttribute("aria-label", "Drag to move");
     dragBtn.title = "Drag to move";
@@ -8672,7 +8672,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     dragBtn.addEventListener("mousedown", function(ev) {
       ev.preventDefault();
       if (!editingElementId) return;
-      var wrapper = root.querySelector('[data-rev01-element="' + cssEscape(editingElementId) + '"]');
+      var wrapper = root.querySelector('[data-opencanvas-element="' + cssEscape(editingElementId) + '"]');
       if (!wrapper) return;
       beginDrag(ev, wrapper);
     });
@@ -8707,7 +8707,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // refreshMarkToolbarAlignState — and once below after the toolbar is
     // attached, so the initial state matches element.align.
     var sep1 = document.createElement("span");
-    sep1.className = "rev01-mark-sep";
+    sep1.className = "opencanvas-mark-sep";
     sep1.setAttribute("aria-hidden", "true");
     bar.appendChild(sep1);
 
@@ -8737,7 +8737,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       (function (dir) {
         var ab = document.createElement("button");
         ab.type = "button";
-        ab.className = "rev01-mark-align";
+        ab.className = "opencanvas-mark-align";
         ab.setAttribute("data-mark-align", dir);
         ab.setAttribute("aria-label", alignTitles[dir]);
         ab.title = alignTitles[dir];
@@ -8757,7 +8757,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // browser's color picker. The swatch fill mirrors the current color so
     // the user can see the active value without opening the picker.
     var sep2 = document.createElement("span");
-    sep2.className = "rev01-mark-sep";
+    sep2.className = "opencanvas-mark-sep";
     sep2.setAttribute("aria-hidden", "true");
     bar.appendChild(sep2);
 
@@ -8768,21 +8768,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     var colorBtn = document.createElement("button");
     colorBtn.type = "button";
-    colorBtn.className = "rev01-mark-color";
+    colorBtn.className = "opencanvas-mark-color";
     colorBtn.setAttribute("aria-label", "Text color");
     colorBtn.title = "Text color";
     var colorGlyph = document.createElement("span");
-    colorGlyph.className = "rev01-mark-color-glyph";
+    colorGlyph.className = "opencanvas-mark-color-glyph";
     colorGlyph.textContent = "A";
     var colorSwatch = document.createElement("span");
-    colorSwatch.className = "rev01-mark-color-swatch";
+    colorSwatch.className = "opencanvas-mark-color-swatch";
     colorSwatch.style.background = initColor;
     colorBtn.appendChild(colorGlyph);
     colorBtn.appendChild(colorSwatch);
     var colorInput = document.createElement("input");
     colorInput.type = "color";
     colorInput.value = initColor;
-    colorInput.className = "rev01-mark-color-input";
+    colorInput.className = "opencanvas-mark-color-input";
     colorInput.setAttribute("aria-hidden", "true");
     colorInput.tabIndex = -1;
     colorBtn.appendChild(colorInput);
@@ -8808,7 +8808,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // selection — Notion/Gamma-style inline AI affordance.
     var aiBtn = document.createElement("button");
     aiBtn.type = "button";
-    aiBtn.className = "rev01-mark-ai";
+    aiBtn.className = "opencanvas-mark-ai";
     aiBtn.setAttribute("aria-label", "Rewrite with AI");
     aiBtn.title = "Rewrite with AI";
     aiBtn.textContent = "AI";
@@ -8833,9 +8833,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function beginTextEdit(elementId) {
     const found = findElement(elementId);
     if (!found || found.element.type !== "text") return;
-    const wrapper = root.querySelector('[data-rev01-element="' + cssEscape(elementId) + '"]');
+    const wrapper = root.querySelector('[data-opencanvas-element="' + cssEscape(elementId) + '"]');
     if (!wrapper) return;
-    const inner = wrapper.querySelector(".rev01-text");
+    const inner = wrapper.querySelector(".opencanvas-text");
     if (!inner) return;
     var textH = inner.scrollHeight;
     if (textH > found.element.box.h) {
@@ -9060,7 +9060,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function buildAiPanel(payload) {
     closeAiPanel();
     const panel = document.createElement("aside");
-    panel.className = "rev01-ai-panel";
+    panel.className = "opencanvas-ai-panel";
     panel.setAttribute("aria-label", "AI preview");
     const heading = document.createElement("h3");
     heading.textContent = "AI preview";
@@ -9069,7 +9069,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const ops = Array.isArray(payload.ops) ? payload.ops : [];
     if (typeof payload.text === "string" && payload.text.length > 0) {
       const note = document.createElement("p");
-      note.className = "rev01-ai-note";
+      note.className = "opencanvas-ai-note";
       note.textContent = payload.text;
       panel.appendChild(note);
     }
@@ -9088,7 +9088,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
 
     const actions = document.createElement("div");
-    actions.className = "rev01-ai-actions";
+    actions.className = "opencanvas-ai-actions";
     const accept = document.createElement("button");
     accept.type = "button";
     accept.textContent = "Accept";
@@ -9268,7 +9268,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (ev.target instanceof Element && (ev.target.closest("[data-element-menu-trigger]") || ev.target.closest("[data-element-menu]"))) return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
-        const wrapper = handle.closest('.rev01-element');
+        const wrapper = handle.closest('.opencanvas-element');
         const dir = handle.getAttribute('data-resize-dir') || 'se';
         if (wrapper) { beginResize(ev, wrapper, dir); ev.preventDefault(); }
         return;
@@ -9277,7 +9277,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ? resolveElementWrapperAtPoint(ev.target, ev.clientX, ev.clientY)
         : null;
       if (!wrapper) return;
-      const elementId = wrapper.getAttribute('data-rev01-element');
+      const elementId = wrapper.getAttribute('data-opencanvas-element');
       if (!elementId) return;
       if (editingElementId === elementId) return;
       const elType = wrapper.getAttribute('data-element-type');
@@ -9292,11 +9292,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function beginDrag(startEv, wrapper) {
-    const elementId = wrapper.getAttribute('data-rev01-element');
+    const elementId = wrapper.getAttribute('data-opencanvas-element');
     if (!elementId) return;
     const found = findElement(elementId);
     if (!found) return;
-    const sectionEl = wrapper.closest('.rev01-section');
+    const sectionEl = wrapper.closest('.opencanvas-section');
     if (!sectionEl) return;
     const start = pointerToCanvas(startEv, sectionEl);
     if (!start) return;
@@ -9334,11 +9334,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function beginResize(startEv, wrapper, dir) {
-    const elementId = wrapper.getAttribute('data-rev01-element');
+    const elementId = wrapper.getAttribute('data-opencanvas-element');
     if (!elementId) return;
     const found = findElement(elementId);
     if (!found) return;
-    const sectionEl = wrapper.closest('.rev01-section');
+    const sectionEl = wrapper.closest('.opencanvas-section');
     if (!sectionEl) return;
     const start = pointerToCanvas(startEv, sectionEl);
     if (!start) return;
@@ -9452,9 +9452,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var cy = vRect.top + vRect.height / 2;
       var hit = document.elementFromPoint(cx, cy);
       if (hit && hit instanceof Element) {
-        var secNode = hit.closest('.rev01-section');
+        var secNode = hit.closest('.opencanvas-section');
         if (secNode) {
-          var sid = secNode.getAttribute('data-rev01-section');
+          var sid = secNode.getAttribute('data-opencanvas-section');
           if (sid) {
             var hitSection = findSection(sid);
             if (hitSection) return hitSection;
@@ -9727,17 +9727,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Click → element wrapper resolution --------------------------------
   //
-  // Resolving the clicked widget is harder than ev.target.closest('.rev01-
+  // Resolving the clicked widget is harder than ev.target.closest('.opencanvas-
   // element') because three widget bodies (form / table / carousel) render
   // semantic HTML (form, table, transformed divs) whose layout/overflow
   // rules let the inner content escape the wrapper's bounding box. The CSS
-  // shield (the wrappers .rev01-element::after pseudo) catches centre
+  // shield (the wrappers .opencanvas-element::after pseudo) catches centre
   // clicks, but clicks on overflowed cells, transformed slides, or stacked
   // form rows can:
   //   (1) skip the ::after shield because the click coord is outside the
   //       wrapper's box,
   //   (2) report ev.target as the section or the canvas background — both
-  //       outside any .rev01-element subtree, so closest() returns null and
+  //       outside any .opencanvas-element subtree, so closest() returns null and
   //       the click bounces to the section / page inspector.
   // Pass-9 retest pinned this regression to table / form / carousel even
   // though Pass-8 added an elementsFromPoint() fallback.
@@ -9748,7 +9748,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //     clicks where descendants forward the event to the wrapper itself).
   //   - For every element in that stack, walk its ancestor chain so a click
   //     on overflowed content inside a section still resolves to its
-  //     .rev01-element wrapper.
+  //     .opencanvas-element wrapper.
   //   - A geometry pass over wrapper + descendant client rects, which catches
   //     visible overflow whose descendants were removed from hit-testing by
   //     pointer-events:none while the widget is unselected.
@@ -9765,7 +9765,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (
           node.nodeType === 1 &&
           node.classList &&
-          node.classList.contains('rev01-element')
+          node.classList.contains('opencanvas-element')
         ) {
           if (!seen.has(node)) {
             seen.add(node);
@@ -9790,7 +9790,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
 
     function addGeometryCandidates() {
-      const wrappers = root.querySelectorAll(".rev01-element");
+      const wrappers = root.querySelectorAll(".opencanvas-element");
       for (let i = 0; i < wrappers.length; i++) {
         const wrapper = wrappers[i];
         if (pointInsideAnyRect(wrapper, clientX, clientY)) {
@@ -9865,7 +9865,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
       // -- Artboard label click: switch active page and zoom to fit --------
-      var artboardLabel = target.closest(".rev01-artboard-label");
+      var artboardLabel = target.closest(".opencanvas-artboard-label");
       if (artboardLabel) {
         var labelPageId = artboardLabel.getAttribute("data-page-id");
         if (labelPageId && labelPageId !== activePageId) {
@@ -9876,7 +9876,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       // -- Inactive artboard click: activate it ---------------------------
-      var clickedArtboard = target.closest(".rev01-artboard");
+      var clickedArtboard = target.closest(".opencanvas-artboard");
       if (clickedArtboard && clickedArtboard.getAttribute("data-active") === "false") {
         var abPageId = clickedArtboard.getAttribute("data-page-id");
         if (abPageId) {
@@ -9888,7 +9888,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var menuTrigger = target.closest("[data-element-menu-trigger]");
       if (menuTrigger) {
         var triggerId = menuTrigger.getAttribute("data-element-menu-trigger");
-        var triggerWrapper = menuTrigger.closest(".rev01-element");
+        var triggerWrapper = menuTrigger.closest(".opencanvas-element");
         if (triggerId && triggerWrapper) toggleElementMenu(triggerId, triggerWrapper);
         ev.stopPropagation();
         return;
@@ -9908,7 +9908,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       let elementNode = resolveElementWrapperAtPoint(target, ev.clientX, ev.clientY);
       if (elementNode) {
-        const id = elementNode.getAttribute('data-rev01-element');
+        const id = elementNode.getAttribute('data-opencanvas-element');
         if (!id) return;
         const elType = elementNode.getAttribute('data-element-type');
         if (elType === "text") {
@@ -9921,9 +9921,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (id !== selectedElementId) selectElement(id);
         return;
       }
-      const sectionNode = target.closest('.rev01-section');
+      const sectionNode = target.closest('.opencanvas-section');
       if (sectionNode) {
-        const sid = sectionNode.getAttribute('data-rev01-section');
+        const sid = sectionNode.getAttribute('data-opencanvas-section');
         if (sid) { selectSection(sid); selectElement(null); }
         return;
       }
@@ -9935,13 +9935,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (selectedSectionId) selectSection(null);
       if (selectedElementId) selectElement(null);
       // Mark the canvas as page-deselected — CSS clears the .7 dim that
-      // .rev01-artboard[data-active="false"] usually carries so every page
+      // .opencanvas-artboard[data-active="false"] usually carries so every page
       // reads as neutral until the user clicks an artboard or label again.
       root.classList.add("canvas-pages-deselected");
     });
 
     root.addEventListener("dblclick", function(ev) {
-      var dblLabel = ev.target instanceof Element ? ev.target.closest(".rev01-artboard-label") : null;
+      var dblLabel = ev.target instanceof Element ? ev.target.closest(".opencanvas-artboard-label") : null;
       if (dblLabel) {
         var dblPageId = dblLabel.getAttribute("data-page-id");
         if (dblPageId) {
@@ -9956,7 +9956,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // canvas-root has zero width/height — it's a transform-anchored layout
     // sentinel whose descendants (artboards) are positioned via translate.
     // Clicks that hit the visible canvas BACKGROUND (the gutter between
-    // artboards, or anywhere inside rev01-viewport that isn't an artboard
+    // artboards, or anywhere inside opencanvas-viewport that isn't an artboard
     // child) never bubble through canvas-root, so the deselect branch
     // attached above misses them entirely. The user's mental model is:
     // "click anywhere off a page = un-grey everything," so we mirror the
@@ -9981,11 +9981,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (!selectedElementId) return;
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
-      if (target.closest('.rev01-modal-backdrop')) return;
-      if (target.closest('.rev01-ai-panel')) return;
+      if (target.closest('.opencanvas-modal-backdrop')) return;
+      if (target.closest('.opencanvas-ai-panel')) return;
       if (inspector && inspector.contains(target)) return;
       if (target.closest('#canvas-reel')) return;
-      if (target.closest('.rev01-element')) return;
+      if (target.closest('.opencanvas-element')) return;
       if (target.closest('#canvas-sidebar')) return;
       selectElement(null);
     });
@@ -9995,7 +9995,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
       if (inspector && inspector.contains(target)) return;
-      if (target.closest('.rev01-element')) return;
+      if (target.closest('.opencanvas-element')) return;
       if (target.closest('#canvas-sidebar')) return;
       selectElement(null);
     });
@@ -10009,7 +10009,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // is the source of truth at runtime.
   function buildKitSummary() {
     const wrap = document.createElement("div");
-    wrap.className = "rev01-kit-summary";
+    wrap.className = "opencanvas-kit-summary";
     if (!mainEl || !state || !state.styleKit) {
       wrap.textContent = "kit: (unknown)";
       return wrap;
@@ -10019,9 +10019,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const value = cs.getPropertyValue(name);
       return value && value.trim().length > 0 ? value.trim() : (fallback || "");
     }
-    const accent = token("--rev01-kit-accent", "(unset)");
-    const display = token("--rev01-kit-font-display", "(unset)");
-    const duration = token("--rev01-kit-motion-duration", "(unset)");
+    const accent = token("--opencanvas-kit-accent", "(unset)");
+    const display = token("--opencanvas-kit-font-display", "(unset)");
+    const duration = token("--opencanvas-kit-motion-duration", "(unset)");
     const rows = [
       ["kit", state.styleKit, null],
       ["accent", accent, accent],
@@ -10135,13 +10135,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       try {
         const response = await authFetch(API_BASE + '/library/sections');
         if (!response.ok) {
-          root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
+          root.innerHTML = '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
           return;
         }
         const body = await response.json();
         sectionsCatalog = Array.isArray(body && body.sections) ? body.sections : [];
       } catch (err) {
-        root.innerHTML = '<p class="rev01-section-picker-empty">Failed to load sections.</p>';
+        root.innerHTML = '<p class="opencanvas-section-picker-empty">Failed to load sections.</p>';
         return;
       }
     }
@@ -10172,10 +10172,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     ].join('');
 
     root.innerHTML =
-      '<div class="rev01-section-picker-controls">' +
-        '<input type="search" class="rev01-section-picker-search" placeholder="Search sections" ' +
+      '<div class="opencanvas-section-picker-controls">' +
+        '<input type="search" class="opencanvas-section-picker-search" placeholder="Search sections" ' +
           'value="' + escapeAttr(activeSearchQuery) + '" data-section-picker-search />' +
-        '<select class="rev01-section-picker-filter" data-section-picker-filter>' + filterOptions + '</select>' +
+        '<select class="opencanvas-section-picker-filter" data-section-picker-filter>' + filterOptions + '</select>' +
       '</div>' +
       '<div data-section-picker-grid-container></div>';
 
@@ -10214,15 +10214,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         ? escapeHtml(entry.templateName || 'Built-in')
         : (entry.visibility === 'private' ? 'Your library' : 'Library');
       return (
-        '<li class="rev01-section-card' + (isPending ? ' is-pending' : '') + '">' +
-          '<div class="rev01-section-card-head">' +
-            '<span class="rev01-section-card-name">' + escapeHtml(entry.name) + '</span>' +
-            '<span class="rev01-section-card-recipe">' + escapeHtml(entry.recipeId) + '</span>' +
+        '<li class="opencanvas-section-card' + (isPending ? ' is-pending' : '') + '">' +
+          '<div class="opencanvas-section-card-head">' +
+            '<span class="opencanvas-section-card-name">' + escapeHtml(entry.name) + '</span>' +
+            '<span class="opencanvas-section-card-recipe">' + escapeHtml(entry.recipeId) + '</span>' +
           '</div>' +
-          '<p class="rev01-section-card-preview">' + escapeHtml(entry.headingPreview) + '</p>' +
-          '<div class="rev01-section-card-foot">' +
-            '<span class="rev01-section-card-template">' + sourceLabel + '</span>' +
-            '<button type="button" class="rev01-section-card-use" data-section-card-use ' +
+          '<p class="opencanvas-section-card-preview">' + escapeHtml(entry.headingPreview) + '</p>' +
+          '<div class="opencanvas-section-card-foot">' +
+            '<span class="opencanvas-section-card-template">' + sourceLabel + '</span>' +
+            '<button type="button" class="opencanvas-section-card-use" data-section-card-use ' +
               'data-entry-id="' + escapeAttr(entry.id) + '" ' +
               'data-entry-source="' + escapeAttr(entry.source) + '" ' +
               'data-entry-name="' + escapeAttr(entry.name) + '"' +
@@ -10237,8 +10237,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }).join('');
 
     gridContainer.innerHTML = filtered.length === 0
-      ? '<p class="rev01-section-picker-empty">No sections match.</p>'
-      : '<ul class="rev01-section-picker-grid">' + cards + '</ul>';
+      ? '<p class="opencanvas-section-picker-empty">No sections match.</p>'
+      : '<ul class="opencanvas-section-picker-grid">' + cards + '</ul>';
 
     gridContainer.querySelectorAll('[data-section-card-use]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -10285,7 +10285,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!canvasRoot) return;
 
     // Remove any previously-drawn slots so we never double-draw.
-    canvasRoot.querySelectorAll('.rev01-section-slot').forEach((node) => node.remove());
+    canvasRoot.querySelectorAll('.opencanvas-section-slot').forEach((node) => node.remove());
 
     if (!pendingImport) {
       document.body.removeAttribute('data-placement-active');
@@ -10300,7 +10300,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     function makeSlot(insertAt) {
       const slot = document.createElement('button');
       slot.type = 'button';
-      slot.className = 'rev01-section-slot';
+      slot.className = 'opencanvas-section-slot';
       slot.setAttribute('data-slot-index', String(insertAt));
       slot.setAttribute('aria-label', 'Insert section here (position ' + insertAt + ')');
       slot.textContent = '+ Insert here';
@@ -10316,7 +10316,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
 
     const sectionNodes = Array.from(
-      canvasRoot.querySelectorAll('[data-rev01-section]:not([data-section-role])'),
+      canvasRoot.querySelectorAll('[data-opencanvas-section]:not([data-section-role])'),
     );
     for (let i = 0; i < sectionNodes.length; i += 1) {
       const node = sectionNodes[i];
@@ -10421,7 +10421,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Real-time co-edit via Yjs ------------------------------------------
   //
-  // The co-edit bundle (window.__rev01CoEdit) is loaded as a separate
+  // The co-edit bundle (window.__opencanvasCoEdit) is loaded as a separate
   // <script> tag before this IIFE. It exposes connectCoEdit which opens a
   // WebSocket to /__live, runs the Yjs sync protocol, and provides
   // applyLocalState / onRemoteState / presence APIs.
@@ -10453,7 +10453,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //   1. PRESENCE_DISPLAY_NAME — server-injected customer display name /
   //      email (resolved by the editor route from the customer row tied
   //      to the current Clerk session or invite acceptance).
-  //   2. localStorage "rev01-presence-name" — operator-overridable label
+  //   2. localStorage "opencanvas-presence-name" — operator-overridable label
   //      (no UI ships yet but the slot is reserved for a profile setting).
   //   3. "Editor " + 4-char uuid prefix — final fallback so anonymous
   //      sessions still get a stable handle.
@@ -10462,19 +10462,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   ];
   function loadPresenceIdentity() {
     var id = null;
-    try { id = window.localStorage.getItem("rev01-presence-id"); } catch (_) {}
+    try { id = window.localStorage.getItem("opencanvas-presence-id"); } catch (_) {}
     if (!id) {
       id = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
         ? crypto.randomUUID()
         : String(Math.random()).slice(2) + String(Date.now());
-      try { window.localStorage.setItem("rev01-presence-id", id); } catch (_) {}
+      try { window.localStorage.setItem("opencanvas-presence-id", id); } catch (_) {}
     }
     var name = null;
     if (typeof PRESENCE_DISPLAY_NAME === "string" && PRESENCE_DISPLAY_NAME.length > 0) {
       name = PRESENCE_DISPLAY_NAME;
     }
     if (!name) {
-      try { name = window.localStorage.getItem("rev01-presence-name"); } catch (_) {}
+      try { name = window.localStorage.getItem("opencanvas-presence-name"); } catch (_) {}
     }
     if (!name) name = "Editor " + String(id).slice(0, 4);
     var sum = 0;
@@ -10489,7 +10489,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function ensurePresenceLayer() {
     if (presenceLayer && presenceLayer.isConnected) return presenceLayer;
     presenceLayer = document.createElement("div");
-    presenceLayer.className = "rev01-presence-layer";
+    presenceLayer.className = "opencanvas-presence-layer";
     document.body.appendChild(presenceLayer);
     return presenceLayer;
   }
@@ -10502,7 +10502,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function findCaretRect(elementId, offset) {
     if (!elementId) return null;
     var wrapper = document.querySelector(
-      '[data-rev01-element="' + cssEscape(elementId) + '"]'
+      '[data-opencanvas-element="' + cssEscape(elementId) + '"]'
     );
     if (!wrapper) return null;
     var editable = wrapper.querySelector('[contenteditable]') || wrapper;
@@ -10622,11 +10622,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var anchorEl = sel.anchorNode.nodeType === 1
         ? sel.anchorNode
         : sel.anchorNode.parentElement;
-      var wrapper = anchorEl ? anchorEl.closest('[data-rev01-element]') : null;
-      var sectionNode = anchorEl ? anchorEl.closest('[data-rev01-section]') : null;
+      var wrapper = anchorEl ? anchorEl.closest('[data-opencanvas-element]') : null;
+      var sectionNode = anchorEl ? anchorEl.closest('[data-opencanvas-section]') : null;
       if (wrapper && sectionNode) {
-        var elementId = wrapper.getAttribute('data-rev01-element');
-        var sectionId = sectionNode.getAttribute('data-rev01-section');
+        var elementId = wrapper.getAttribute('data-opencanvas-element');
+        var sectionId = sectionNode.getAttribute('data-opencanvas-section');
         if (elementId && sectionId) {
           var editable = wrapper.querySelector('[contenteditable]') || wrapper;
           var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);
@@ -10676,11 +10676,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         var anchorEl = sel.anchorNode.nodeType === 1
           ? sel.anchorNode
           : sel.anchorNode.parentElement;
-        var wrapper = anchorEl ? anchorEl.closest('[data-rev01-element]') : null;
-        var sectionNode = anchorEl ? anchorEl.closest('[data-rev01-section]') : null;
+        var wrapper = anchorEl ? anchorEl.closest('[data-opencanvas-element]') : null;
+        var sectionNode = anchorEl ? anchorEl.closest('[data-opencanvas-section]') : null;
         if (wrapper && sectionNode) {
-          var elementId = wrapper.getAttribute('data-rev01-element');
-          var sectionId = sectionNode.getAttribute('data-rev01-section');
+          var elementId = wrapper.getAttribute('data-opencanvas-element');
+          var sectionId = sectionNode.getAttribute('data-opencanvas-section');
           if (elementId && sectionId) {
             var editable = wrapper.querySelector('[contenteditable]') || wrapper;
             var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);
@@ -10703,7 +10703,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   document.addEventListener("selectionchange", schedulePublishLocalPresence);
 
   function attachCoEdit() {
-    if (typeof window.__rev01CoEdit === "undefined" || !window.__rev01CoEdit || typeof window.__rev01CoEdit.connectCoEdit !== "function") {
+    if (typeof window.__opencanvasCoEdit === "undefined" || !window.__opencanvasCoEdit || typeof window.__opencanvasCoEdit.connectCoEdit !== "function") {
       return;
     }
 
@@ -10720,7 +10720,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var givenUp = false;
 
     coEditSocketOpen = false;
-    var conn = window.__rev01CoEdit.connectCoEdit(SITE_ID, state, {
+    var conn = window.__opencanvasCoEdit.connectCoEdit(SITE_ID, state, {
       websocketUrl: wsUrl,
       // Mirrors src/live/co-edit/client.ts defaults so the curve advertised
       // here matches what the connector actually applies. Passed explicitly
@@ -10795,8 +10795,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
 
     conn.onRemotePresence(function(peers) {
-      var pill = document.querySelector("[data-rev01-presence]");
-      var counter = document.querySelector("[data-rev01-presence-count]");
+      var pill = document.querySelector("[data-opencanvas-presence]");
+      var counter = document.querySelector("[data-opencanvas-presence-count]");
       if (pill && counter) {
         // Always reveal the pill once the WS is attached and we know the
         // count — solo edit reads "1 editing", co-edit reads "N editing".
@@ -10815,9 +10815,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         var entry = remoteCursors.get(clientId);
         if (!entry) {
           var caret = document.createElement("div");
-          caret.className = "rev01-remote-caret";
+          caret.className = "opencanvas-remote-caret";
           var label = document.createElement("div");
-          label.className = "rev01-remote-caret-label";
+          label.className = "opencanvas-remote-caret-label";
           presenceLayer.appendChild(caret);
           presenceLayer.appendChild(label);
           entry = { caret: caret, label: label, cursor: null };
@@ -10898,21 +10898,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var version = parseInt(versionBadge.getAttribute("data-version") || "0", 10);
     if (!Number.isFinite(version)) version = 0;
     var page = state && Array.isArray(state.pages) && state.pages.length > 0 ? state.pages[0] : null;
-    var addressEl = document.querySelector(".rev01-editor-header .address");
+    var addressEl = document.querySelector(".opencanvas-editor-header .address");
     var addressText = addressEl && addressEl.textContent ? addressEl.textContent.trim() : "";
 
     var pill = document.createElement("div");
-    pill.className = "rev01-version-pill";
+    pill.className = "opencanvas-version-pill";
     pill.setAttribute("role", "dialog");
     pill.setAttribute("aria-label", "Social preview");
 
     var head = document.createElement("div");
-    head.className = "rev01-version-pill-head";
+    head.className = "opencanvas-version-pill-head";
     var title = document.createElement("span");
-    title.className = "rev01-version-pill-title";
+    title.className = "opencanvas-version-pill-title";
     title.textContent = "Social preview";
     var chip = document.createElement("span");
-    chip.className = version > 0 ? "rev01-version-pill-chip live" : "rev01-version-pill-chip draft";
+    chip.className = version > 0 ? "opencanvas-version-pill-chip live" : "opencanvas-version-pill-chip draft";
     chip.textContent = version > 0 ? "v" + version + " live" : "Draft";
     head.appendChild(title);
     head.appendChild(chip);
@@ -10920,22 +10920,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     if (page && page.ogImageAssetId) {
       var img = document.createElement("img");
-      img.className = "rev01-version-pill-image";
+      img.className = "opencanvas-version-pill-image";
       img.alt = "";
       img.src = SITE_BASE + "/assets/" + encodeURIComponent(page.ogImageAssetId);
       pill.appendChild(img);
     }
 
     var card = document.createElement("div");
-    card.className = "rev01-version-pill-card";
+    card.className = "opencanvas-version-pill-card";
     var cardTitle = document.createElement("div");
-    cardTitle.className = "rev01-version-pill-card-title";
+    cardTitle.className = "opencanvas-version-pill-card-title";
     cardTitle.textContent = (page && page.title) ? page.title : "Untitled site";
     var cardDesc = document.createElement("div");
-    cardDesc.className = "rev01-version-pill-card-desc";
+    cardDesc.className = "opencanvas-version-pill-card-desc";
     cardDesc.textContent = (page && page.description) ? page.description : "No meta description set.";
     var cardUrl = document.createElement("div");
-    cardUrl.className = "rev01-version-pill-card-url";
+    cardUrl.className = "opencanvas-version-pill-card-url";
     cardUrl.textContent = addressText || "Not published yet";
     card.appendChild(cardTitle);
     card.appendChild(cardDesc);
@@ -10944,9 +10944,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     if (version > 0 && addressText) {
       var actions = document.createElement("div");
-      actions.className = "rev01-version-pill-actions";
+      actions.className = "opencanvas-version-pill-actions";
       var view = document.createElement("a");
-      view.className = "rev01-version-pill-view";
+      view.className = "opencanvas-version-pill-view";
       view.href = "https://" + addressText;
       view.target = "_blank";
       view.rel = "noopener";
@@ -11028,7 +11028,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // exit (opens published URL in new tab + leaves editor) and an
       // unambiguous "Continue editing" path that just dismisses. Replaces the
       // 4-second status-line flash that was easy to miss.
-      var addrEl = document.querySelector(".rev01-editor-header .address");
+      var addrEl = document.querySelector(".opencanvas-editor-header .address");
       var publishedHost = addrEl && addrEl.textContent ? addrEl.textContent.trim() : "";
       var modalTitle = "Published" + versionSuffix;
       var modalMessage = publishedHost
@@ -11194,7 +11194,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function ensureVersionsTabMounted() {
     if (!sidebar) return null;
-    var tabsRow = sidebar.querySelector(".rev01-sidebar-tabs");
+    var tabsRow = sidebar.querySelector(".opencanvas-sidebar-tabs");
     if (!tabsRow) return null;
     if (sidebar.querySelector('[data-sidebar-tab="versions"]')) {
       return sidebar.querySelector('[data-sidebar-panel="versions"]');
@@ -11209,7 +11209,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     tabsRow.appendChild(tabButton);
 
     var panel = document.createElement("div");
-    panel.className = "rev01-sidebar-panel";
+    panel.className = "opencanvas-sidebar-panel";
     panel.setAttribute("role", "tabpanel");
     panel.setAttribute("aria-label", "Versions");
     panel.setAttribute("data-sidebar-panel", "versions");
@@ -11239,7 +11239,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     panel.replaceChildren();
 
     var group = document.createElement("section");
-    group.className = "rev01-sidebar-group";
+    group.className = "opencanvas-sidebar-group";
 
     var heading = document.createElement("h2");
     heading.textContent = "Version History";
@@ -11247,7 +11247,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     var saveBtn = document.createElement("button");
     saveBtn.type = "button";
-    saveBtn.className = "rev01-sidebar-command";
+    saveBtn.className = "opencanvas-sidebar-command";
     saveBtn.textContent = "Save snapshot";
     saveBtn.style.marginBottom = "12px";
     saveBtn.addEventListener("click", async function() {
@@ -11562,7 +11562,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             else if (action === "delete") deletePage(pid);
             return;
           }
-          var pageItem = ev.target instanceof Element ? ev.target.closest(".rev01-page-item") : null;
+          var pageItem = ev.target instanceof Element ? ev.target.closest(".opencanvas-page-item") : null;
           if (pageItem) {
             var pid2 = pageItem.getAttribute("data-page-id");
             if (pid2 && pid2 !== activePageId) {
@@ -11624,7 +11624,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       function appendChatMessage(role, text) {
         if (!chatMessages) return;
         var div = document.createElement("div");
-        div.className = "rev01-chat-msg " + role;
+        div.className = "opencanvas-chat-msg " + role;
         div.textContent = text;
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -11638,7 +11638,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // chat does the work without the Owner having to retype. We rely on
       // requestSubmit() so the existing submit listener fires its full flow
       // (busy state, payload assembly, SSE stream) rather than re-implementing.
-      var chatChips = document.querySelectorAll(".rev01-chat-chip");
+      var chatChips = document.querySelectorAll(".opencanvas-chat-chip");
       for (var ci = 0; ci < chatChips.length; ci++) {
         (function(chip) {
           chip.addEventListener("click", function() {
@@ -11694,7 +11694,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             var buffer = "";
             var assistantText = "";
             var msgDiv = document.createElement("div");
-            msgDiv.className = "rev01-chat-msg assistant";
+            msgDiv.className = "opencanvas-chat-msg assistant";
             chatMessages.appendChild(msgDiv);
 
             function readChunk() {
@@ -11731,11 +11731,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                         // and the apply layer returned 400.
                         (function(opSnapshot, toolNameSnapshot) {
                           var opDiv = document.createElement("div");
-                          opDiv.className = "rev01-chat-msg assistant";
+                          opDiv.className = "opencanvas-chat-msg assistant";
                           opDiv.textContent = "Proposed: " + (toolNameSnapshot || "edit") + " ";
                           var acceptBtn = document.createElement("button");
                           acceptBtn.textContent = "Accept";
-                          acceptBtn.style.cssText = "margin-left:8px;padding:4px 10px;border:1px solid var(--rev01-accent);background:var(--rev01-accent);color:var(--rev01-bg);border-radius:4px;cursor:pointer;font-size:12px;";
+                          acceptBtn.style.cssText = "margin-left:8px;padding:4px 10px;border:1px solid var(--opencanvas-accent);background:var(--opencanvas-accent);color:var(--opencanvas-bg);border-radius:4px;cursor:pointer;font-size:12px;";
                           acceptBtn.addEventListener("click", function() {
                             acceptBtn.disabled = true;
                             acceptBtn.textContent = "Applying...";

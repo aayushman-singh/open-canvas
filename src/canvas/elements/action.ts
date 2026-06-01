@@ -35,7 +35,7 @@ export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] 
       ? { type: 'external' as const, url: element.href }
       : element.href;
   const resolvedHref = resolveActionHref(href, ctx.pages);
-  return `<a class="rev01-action" data-variant="${escapeAttr(element.variant)}" href="${escapeAttr(resolvedHref)}">${escapeHtml(element.label)}</a>`;
+  return `<a class="opencanvas-action" data-variant="${escapeAttr(element.variant)}" href="${escapeAttr(resolvedHref)}">${escapeHtml(element.label)}</a>`;
 }
 
 export const actionInspectorSpec: InspectorSpec = {

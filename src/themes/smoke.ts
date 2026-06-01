@@ -204,7 +204,7 @@ assert(
   'expected rendered HTML to carry data-style-kit="custom"',
 );
 assert(
-  html.includes('data-rev01-page="page-home"'),
+  html.includes('data-opencanvas-page="page-home"'),
   'expected rendered HTML to include the page marker',
 );
 // The custom kit's tokens are not emitted as a per-kit CSS block by the
@@ -231,8 +231,8 @@ assert(
 const customCss = buildStyleKitCss('custom', customKit);
 assert(
   customCss.includes('[data-style-kit="custom"]') &&
-    customCss.includes('--rev01-kit-bg: #102030;') &&
-    customCss.includes('--rev01-kit-accent: #ff7a59;'),
+    customCss.includes('--opencanvas-kit-bg: #102030;') &&
+    customCss.includes('--opencanvas-kit-accent: #ff7a59;'),
   'expected buildStyleKitCss to emit real custom kit tokens for the public visitor stylesheet',
 );
 

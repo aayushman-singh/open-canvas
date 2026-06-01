@@ -112,21 +112,21 @@ app.route('/dashboard', formsInboxRoute);
 app.route('/dashboard', siteSettingsRoute);
 app.route('/api/sites', themeRoute);
 app.route('/api/sites/:siteId/password', passwordAdminRoute);
-// Visitor-facing unlock POST. Lives at the public-host path `/__rev01/unlock`;
-// public.ts's handlePublicRequest explicitly returns null for `/__rev01/*` so
+// Visitor-facing unlock POST. Lives at the public-host path `/__opencanvas/unlock`;
+// public.ts's handlePublicRequest explicitly returns null for `/__opencanvas/*` so
 // the request falls through here. The handler reads the request Host to scope
 // the cookie to the right site.
-app.route('/__rev01/unlock', unlockRoute);
+app.route('/__opencanvas/unlock', unlockRoute);
 // Visitor-facing form submissions. The public-host router lets this path fall
 // through only after the password gate has passed.
-app.route('/__rev01/forms', formsRouter);
+app.route('/__opencanvas/forms', formsRouter);
 app.route('/api/sites', a11yRoute);
 app.route('/dashboard', a11yReportRoute);
 app.route('/dashboard', pageSettingsRoute);
 // Site search — visitor-facing endpoint on the public-host path. public.ts
 // lets this path fall through only after the password gate has passed. The
 // handler reads the request Host to resolve site id.
-app.route('/__rev01/search', searchRouter);
+app.route('/__opencanvas/search', searchRouter);
 // Sitemap.xml + robots.txt on public-host root paths. public.ts must fall
 // through (return null) for `/sitemap.xml` and `/robots.txt` — see the
 // fallthrough block in handlePublicRequest.

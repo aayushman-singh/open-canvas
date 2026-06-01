@@ -64,5 +64,5 @@ export function injectInteractiveRuntime(
   snapshot: PublishedSnapshot,
 ): string {
   if (!snapshotNeedsInteractiveRuntime(snapshot)) return snapshotHtml;
-  return `${snapshotHtml}<script data-rev01-interactive-runtime>${INTERACTIVE_RUNTIME_SRC}</script>`;
+  return `${snapshotHtml}<script data-opencanvas-interactive-runtime>${INTERACTIVE_RUNTIME_SRC}</script>`;
 }

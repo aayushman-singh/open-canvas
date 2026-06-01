@@ -14,7 +14,7 @@ export interface ShapeElement extends BaseElement {
 }
 
 export function renderShape(element: ShapeElement): string {
-  return `<div class="rev01-shape" data-variant="${escapeAttr(element.variant)}"></div>`;
+  return `<div class="opencanvas-shape" data-variant="${escapeAttr(element.variant)}"></div>`;
 }
 
 export const shapeInspectorSpec: InspectorSpec = {

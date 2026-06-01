@@ -502,7 +502,7 @@ function findElementSummary(
 export function buildSystemPrompt(state: EditableSite, selectedElementId?: string): string {
   const lines: string[] = [];
   lines.push(
-    'You are the Agent for the rev01 site builder — an AI collaborator that changes an Editable Site only from an Owner request.',
+    'You are the Agent for the Open Canvas site builder — an AI collaborator that changes an Editable Site only from an Owner request.',
   );
   lines.push(
     'Every change you propose is shown to the Owner as a preview; the Owner accepts or rejects before it applies to the site.',

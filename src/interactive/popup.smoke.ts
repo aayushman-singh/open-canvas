@@ -4,8 +4,8 @@
 //
 // Assertions:
 //   1. A section with `trigger` renders with `display:none` and the correct
-//      data attributes (`data-rev01-popup`, `data-rev01-trigger-type`,
-//      `data-rev01-trigger-value`).
+//      data attributes (`data-opencanvas-popup`, `data-opencanvas-trigger-type`,
+//      `data-opencanvas-trigger-value`).
 //   2. A section WITHOUT `trigger` renders normally (no `display:none`, no
 //      popup data attributes).
 //   3. The runtime source string contains the expected function name.
@@ -67,16 +67,16 @@ const popupSnapshot: PublishedSnapshot = {
 const popupHtml = renderCanvasSnapshot(popupSnapshot, '/assets', 'smoke-site', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
-  popupHtml.includes('data-rev01-popup="true"'),
-  'popup section must have data-rev01-popup="true" attribute',
+  popupHtml.includes('data-opencanvas-popup="true"'),
+  'popup section must have data-opencanvas-popup="true" attribute',
 );
 assert(
-  popupHtml.includes('data-rev01-trigger-type="exit-intent"'),
-  'popup section must have data-rev01-trigger-type attribute',
+  popupHtml.includes('data-opencanvas-trigger-type="exit-intent"'),
+  'popup section must have data-opencanvas-trigger-type attribute',
 );
 assert(
-  popupHtml.includes('data-rev01-trigger-value=""'),
-  'popup section must have data-rev01-trigger-value attribute (empty for exit-intent)',
+  popupHtml.includes('data-opencanvas-trigger-value=""'),
+  'popup section must have data-opencanvas-trigger-value attribute (empty for exit-intent)',
 );
 assert(popupHtml.includes('display:none'), 'popup section must render with display:none in style');
 
@@ -121,12 +121,12 @@ const normalSnapshot: PublishedSnapshot = {
 const normalHtml = renderCanvasSnapshot(normalSnapshot, '/assets', 'smoke-site', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
-  !normalHtml.includes('data-rev01-popup'),
-  'normal section must NOT have data-rev01-popup attribute',
+  !normalHtml.includes('data-opencanvas-popup'),
+  'normal section must NOT have data-opencanvas-popup attribute',
 );
 assert(
-  !normalHtml.includes('data-rev01-trigger-type'),
-  'normal section must NOT have data-rev01-trigger-type attribute',
+  !normalHtml.includes('data-opencanvas-trigger-type'),
+  'normal section must NOT have data-opencanvas-trigger-type attribute',
 );
 assert(!normalHtml.includes('display:none'), 'normal section must NOT have display:none');
 
@@ -203,11 +203,11 @@ const delaySnapshot: PublishedSnapshot = {
 const delayHtml = renderCanvasSnapshot(delaySnapshot, '/assets', 'smoke-site', { turnstileSiteKey: 'turnstile-test-key' });
 
 assert(
-  delayHtml.includes('data-rev01-trigger-type="delay"'),
+  delayHtml.includes('data-opencanvas-trigger-type="delay"'),
   'delay popup must have trigger-type="delay"',
 );
 assert(
-  delayHtml.includes('data-rev01-trigger-value="5000"'),
+  delayHtml.includes('data-opencanvas-trigger-value="5000"'),
   'delay popup must have trigger-value="5000"',
 );
 assert(delayHtml.includes('display:none'), 'delay popup must have display:none');
@@ -219,7 +219,7 @@ assert(delayHtml.includes('display:none'), 'delay popup must have display:none')
 const injected = injectInteractiveRuntime(popupHtml, popupSnapshot);
 
 assert(
-  injected.includes('<script data-rev01-interactive-runtime>'),
+  injected.includes('<script data-opencanvas-interactive-runtime>'),
   'popup-only snapshot must get the runtime <script> tag injected',
 );
 assert(injected.includes('initPopups'), 'injected runtime must contain initPopups');

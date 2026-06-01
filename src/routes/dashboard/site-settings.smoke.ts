@@ -111,7 +111,7 @@ const runClientScript = new Function(
   'Element',
   'HTMLButtonElement',
   'HTMLSelectElement',
-  '__rev01Modal',
+  '__opencanvasModal',
   'FormData',
   'location',
   'setTimeout',

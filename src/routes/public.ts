@@ -121,7 +121,7 @@ export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
 // (`APP_DOMAIN`) is added per-request inside `handlePublicRequest` so a fork
 // gets its own apex routed correctly without source edits.
 const APP_HOSTS = new Set([
-  'rev01.test',
+  'opencanvas.test',
   'localhost:8787',
   'localhost',
   '127.0.0.1',
@@ -131,7 +131,7 @@ const APP_HOSTS = new Set([
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/;
 
 // Visitor script: opens a WebSocket to /__live, reacts to publish broadcasts
-// by swapping the snapshot HTML inside [data-rev01-public-root]. innerHTML is
+// by swapping the snapshot HTML inside [data-opencanvas-public-root]. innerHTML is
 // safe here because the publish endpoint is the only writer and it always
 // runs the snapshot through validate + renderCanvasSnapshot before broadcast
 // — there is no path from visitor input to this innerHTML assignment.
@@ -188,7 +188,7 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   const versionLiteral = String(versionInt);
   return String.raw`
 (() => {
-  const ROOT_SELECTOR = '[data-rev01-public-root]';
+  const ROOT_SELECTOR = '[data-opencanvas-public-root]';
   const RECONNECT_BASE_MS = 1000;
   const RECONNECT_MAX_MS = 30000;
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -202,7 +202,7 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
     try {
       return decodeURIComponent(raw);
     } catch (err) {
-      console.error('[rev01-visitor] cannot decode current path for live update', err);
+      console.error('[opencanvas-visitor] cannot decode current path for live update', err);
       return null;
     }
   }
@@ -210,18 +210,18 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   function selectPayloadHtml(payload) {
     if (Object.prototype.hasOwnProperty.call(payload, 'htmlBySlug')) {
       if (!payload.htmlBySlug || typeof payload.htmlBySlug !== 'object') {
-        console.error('[rev01-visitor] broadcast htmlBySlug is invalid', payload);
+        console.error('[opencanvas-visitor] broadcast htmlBySlug is invalid', payload);
         return null;
       }
       if (typeof payload.defaultSlug !== 'string') {
-        console.error('[rev01-visitor] broadcast missing defaultSlug', payload);
+        console.error('[opencanvas-visitor] broadcast missing defaultSlug', payload);
         return null;
       }
       const slug = currentSlug(payload.defaultSlug);
       if (slug === null) return null;
       if (typeof payload.htmlBySlug[slug] === 'string') return payload.htmlBySlug[slug];
       if (typeof payload.htmlBySlug._404 === 'string') return payload.htmlBySlug._404;
-      console.error('[rev01-visitor] broadcast missing html for current path', { slug, payload });
+      console.error('[opencanvas-visitor] broadcast missing html for current path', { slug, payload });
       return null;
     }
     return typeof payload.html === 'string' ? payload.html : null;
@@ -237,7 +237,7 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
       try {
         payload = JSON.parse(event.data);
       } catch (err) {
-        console.error('[rev01-visitor] invalid live payload', err);
+        console.error('[opencanvas-visitor] invalid live payload', err);
         return;
       }
       if (payload && typeof payload === 'object') {
@@ -247,7 +247,7 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
           // also stale (the visitor has already rendered it on first load
           // or via a previous broadcast).
           if (typeof payload.version !== 'number' || !Number.isFinite(payload.version)) {
-            console.error('[rev01-visitor] broadcast missing valid version', payload);
+            console.error('[opencanvas-visitor] broadcast missing valid version', payload);
             return;
           }
           if (payload.version <= currentVersion) {
@@ -503,7 +503,7 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
     window.addEventListener("message", function(e) {
       if (e.origin !== apexOrigin) return;
       if (e.source !== popup) return;
-      if (e.data && e.data.type === "rev01:edit-ready") {
+      if (e.data && e.data.type === "opencanvas:edit-ready") {
         if (e.data.siteId !== ${siteIdJson}) return;
         if (e.data.state !== authState) return;
         if (e.data.token) {
@@ -926,7 +926,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   // Wave 2 #9 — the unlock POST must reach the app router even when the site
   // is protected, otherwise no visitor could ever set the unlock cookie.
-  if (path === '/__rev01/unlock') {
+  if (path === '/__opencanvas/unlock') {
     return null;
   }
 
@@ -1010,7 +1010,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
 
   // Internal visitor subsystem routes (search, forms, etc.) fall through only
   // after the password gate has passed. They are not snapshot pages.
-  if (path.startsWith('/__rev01/')) {
+  if (path.startsWith('/__opencanvas/')) {
     return null;
   }
 
@@ -1186,7 +1186,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           ${addonScripts ? raw(addonScripts) : ''}
         </head>
         <body>
-          <div data-rev01-public-root>${raw(snapshotHtml)}</div>
+          <div data-opencanvas-public-root>${raw(snapshotHtml)}</div>
           ${modeToggleHtml ? raw(modeToggleHtml) : ''}
           ${raw(buildPublishedFooterHtml(c.env))}
           <script type="module">

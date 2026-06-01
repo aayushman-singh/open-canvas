@@ -3,7 +3,7 @@
 // Renders a multi-page nav bar. The element is dropped onto each Canvas Page
 // so the same bar shows up across the site. Two layouts (`left-center-right`,
 // `left-right`) — both emit one slot per content group; kit CSS reads the
-// `data-rev01-nav-layout` attribute on the wrapper to differentiate.
+// `data-opencanvas-nav-layout` attribute on the wrapper to differentiate.
 //
 // LINK HREF SHAPE
 //   internal → renderer prepends `/` if missing, never emits target. Owner
@@ -77,7 +77,7 @@ function renderNavLink(link: NavLink): string {
   const href = navLinkHref(link);
   const target = link.kind === 'external' ? ' target="_blank" rel="noopener noreferrer"' : '';
   return (
-    `<a class="rev01-nav-link" data-rev01-nav-link-kind="${escapeAttr(link.kind)}" ` +
+    `<a class="opencanvas-nav-link" data-opencanvas-nav-link-kind="${escapeAttr(link.kind)}" ` +
     `href="${escapeAttr(href)}"${target}>` +
     `${escapeHtml(link.label)}` +
     `</a>`
@@ -88,7 +88,7 @@ function renderNavLink(link: NavLink): string {
 function renderNavLogo(logoAssetId: string | undefined, assetBasePath: string): string {
   if (typeof logoAssetId !== 'string' || logoAssetId.length === 0) return '';
   const src = `${assetBasePath}/${logoAssetId}`;
-  return `<img class="rev01-nav-logo" src="${escapeAttr(src)}" alt="" />`;
+  return `<img class="opencanvas-nav-logo" src="${escapeAttr(src)}" alt="" />`;
 }
 
 export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
@@ -112,12 +112,12 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
   const navStyle = styleFromEntries(navStyleEntries);
 
   const linksSlotName = el.layout === 'left-right' ? 'right' : 'center';
-  const logoSlot = `<div class="rev01-nav-slot" data-slot="left">${logoHtml}</div>`;
-  const linksSlot = `<div class="rev01-nav-slot" data-slot="${linksSlotName}">${linksHtml}</div>`;
+  const logoSlot = `<div class="opencanvas-nav-slot" data-slot="left">${logoHtml}</div>`;
+  const linksSlot = `<div class="opencanvas-nav-slot" data-slot="${linksSlotName}">${linksHtml}</div>`;
 
   return (
-    `<nav class="rev01-nav" data-rev01-nav-layout="${escapeAttr(el.layout)}" ` +
-    `data-rev01-nav-sticky="${el.sticky ? 'true' : 'false'}" ` +
+    `<nav class="opencanvas-nav" data-opencanvas-nav-layout="${escapeAttr(el.layout)}" ` +
+    `data-opencanvas-nav-sticky="${el.sticky ? 'true' : 'false'}" ` +
     `style="${navStyle}">` +
     `${logoSlot}${linksSlot}` +
     `</nav>`

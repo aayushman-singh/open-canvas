@@ -382,10 +382,10 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
 
   // 4 — no transform params → R2-original path. Content-type comes from R2.
   const originalResponse = await readOwnerAsset(
-    { db: shimDb, r2: r2Client, cfImageFetch: null, publicOrigin: 'https://rev01.test' },
+    { db: shimDb, r2: r2Client, cfImageFetch: null, publicOrigin: 'https://opencanvas.test' },
     {
       addr: expectedHash,
-      url: new URL(`https://rev01.test/assets/${expectedHash}`),
+      url: new URL(`https://opencanvas.test/assets/${expectedHash}`),
     },
   );
   assert(originalResponse !== null, 'expected original-bytes Response');
@@ -412,17 +412,17 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
   };
 
   const transformedResponse = await readOwnerAsset(
-    { db: shimDb, r2: r2Client, cfImageFetch, publicOrigin: 'https://rev01.test' },
+    { db: shimDb, r2: r2Client, cfImageFetch, publicOrigin: 'https://opencanvas.test' },
     {
       addr: expectedHash,
-      url: new URL(`https://rev01.test/assets/${expectedHash}?w=200&fit=cover`),
+      url: new URL(`https://opencanvas.test/assets/${expectedHash}?w=200&fit=cover`),
     },
   );
   assert(transformedResponse !== null, 'expected readOwnerAsset to resolve a Response');
   assert(seenCalls.length === 1, `expected one cf.image call, got ${String(seenCalls.length)}`);
   const recordedCall = seenCalls[0]!;
   assert(
-    recordedCall.url === `https://rev01.test/assets/${expectedHash}`,
+    recordedCall.url === `https://opencanvas.test/assets/${expectedHash}`,
     `expected cf.image subrequest URL to be the content-hash address, got ${recordedCall.url}`,
   );
   assert(
@@ -447,10 +447,10 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
   let invalidWidthThrew = false;
   try {
     await readOwnerAsset(
-      { db: shimDb, r2: r2Client, cfImageFetch, publicOrigin: 'https://rev01.test' },
+      { db: shimDb, r2: r2Client, cfImageFetch, publicOrigin: 'https://opencanvas.test' },
       {
         addr: expectedHash,
-        url: new URL(`https://rev01.test/assets/${expectedHash}?w=12abc`),
+        url: new URL(`https://opencanvas.test/assets/${expectedHash}?w=12abc`),
       },
     );
   } catch (err) {
@@ -465,10 +465,10 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
     }),
   } as unknown as Db;
   const missResponse = await readOwnerAsset(
-    { db: missDb, r2: r2Client, cfImageFetch: null, publicOrigin: 'https://rev01.test' },
+    { db: missDb, r2: r2Client, cfImageFetch: null, publicOrigin: 'https://opencanvas.test' },
     {
       addr: expectedHash,
-      url: new URL(`https://rev01.test/assets/${expectedHash}`),
+      url: new URL(`https://opencanvas.test/assets/${expectedHash}`),
     },
   );
   assert(missResponse === null, 'expected missing-addr lookup to return null');

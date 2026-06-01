@@ -2,7 +2,7 @@
 //
 // `ContainerElement` interface + renderer + inspector spec (ADR 0011 Step 1).
 // "Container" is the legacy schema name; conceptually this is a Surface
-// primitive (card/panel/frame). The class name `rev01-surface` is the
+// primitive (card/panel/frame). The class name `opencanvas-surface` is the
 // canonical one. Decorative-by-default: ARIA is applied on the element
 // wrapper in render.ts.
 
@@ -18,7 +18,7 @@ export interface ContainerElement extends BaseElement {
 }
 
 export function renderContainer(element: ContainerElement): string {
-  return `<div class="rev01-surface" data-variant="${escapeAttr(element.variant)}"></div>`;
+  return `<div class="opencanvas-surface" data-variant="${escapeAttr(element.variant)}"></div>`;
 }
 
 export const containerInspectorSpec: InspectorSpec = {

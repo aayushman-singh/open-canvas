@@ -163,14 +163,14 @@ const shellStyles = `
   nav.crumbs .here { color: var(--ink); }
 
   /* modal dialog — restyled with Open Canvas surface + shadow */
-  .rev01-modal-backdrop {
+  .opencanvas-modal-backdrop {
     position: fixed; inset: 0; z-index: 10000;
     background: rgba(26, 25, 23, 0.55);
     display: flex; align-items: center; justify-content: center;
-    animation: rev01-modal-in .12s ease-out;
+    animation: opencanvas-modal-in .12s ease-out;
   }
-  @keyframes rev01-modal-in { from { opacity: 0 } }
-  .rev01-modal {
+  @keyframes opencanvas-modal-in { from { opacity: 0 } }
+  .opencanvas-modal {
     width: min(440px, calc(100vw - 48px));
     background: var(--surface);
     border: 1px solid var(--line);
@@ -178,10 +178,10 @@ const shellStyles = `
     padding: 24px;
     box-shadow: var(--shadow-lg);
     color: var(--ink);
-    animation: rev01-modal-pop .12s ease-out;
+    animation: opencanvas-modal-pop .12s ease-out;
   }
-  @keyframes rev01-modal-pop { from { transform: scale(.96); opacity: 0 } }
-  .rev01-modal h3 {
+  @keyframes opencanvas-modal-pop { from { transform: scale(.96); opacity: 0 } }
+  .opencanvas-modal h3 {
     margin: 0 0 8px;
     font-family: var(--display);
     font-size: 18px;
@@ -189,14 +189,14 @@ const shellStyles = `
     letter-spacing: -0.01em;
     color: var(--ink);
   }
-  .rev01-modal p {
+  .opencanvas-modal p {
     margin: 0 0 16px;
     font-size: 14px;
     color: var(--ink-2);
     line-height: 1.55;
     white-space: pre-line;
   }
-  .rev01-modal input[type="text"] {
+  .opencanvas-modal input[type="text"] {
     width: 100%;
     background: var(--surface);
     border: 1.5px solid var(--line-2);
@@ -209,12 +209,12 @@ const shellStyles = `
     margin-bottom: 16px;
     transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .rev01-modal input[type="text"]:focus {
+  .opencanvas-modal input[type="text"]:focus {
     border-color: var(--red);
     box-shadow: var(--ring);
   }
-  .rev01-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-  .rev01-modal-actions button {
+  .opencanvas-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .opencanvas-modal-actions button {
     appearance: none;
     font: inherit;
     font-family: var(--sans);
@@ -226,24 +226,24 @@ const shellStyles = `
     border: 1.5px solid transparent;
     transition: background .15s, border-color .15s, color .15s, transform .12s;
   }
-  .rev01-modal-actions button:active { transform: translateY(1px); }
-  .rev01-modal-cancel {
+  .opencanvas-modal-actions button:active { transform: translateY(1px); }
+  .opencanvas-modal-cancel {
     background: var(--surface);
     border-color: var(--line-2);
     color: var(--ink-2);
   }
-  .rev01-modal-cancel:hover { border-color: var(--ink); color: var(--ink); }
-  .rev01-modal-ok {
+  .opencanvas-modal-cancel:hover { border-color: var(--ink); color: var(--ink); }
+  .opencanvas-modal-ok {
     background: var(--ink);
     color: var(--paper);
   }
-  .rev01-modal-ok:hover { transform: translateY(-1px); }
-  .rev01-modal-danger {
+  .opencanvas-modal-ok:hover { transform: translateY(-1px); }
+  .opencanvas-modal-danger {
     background: var(--red);
     color: #fff;
     box-shadow: var(--shadow-red);
   }
-  .rev01-modal-danger:hover { background: var(--red-strong); }
+  .opencanvas-modal-danger:hover { background: var(--red-strong); }
 
 `;
 
@@ -562,18 +562,18 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
         <script>{raw(themeToggleScript)}</script>
         <script>{raw(`(function(){
   function _build(o){return new Promise(function(resolve){
-    var bd=document.createElement('div');bd.className='rev01-modal-backdrop';
-    var m=document.createElement('div');m.className='rev01-modal';
+    var bd=document.createElement('div');bd.className='opencanvas-modal-backdrop';
+    var m=document.createElement('div');m.className='opencanvas-modal';
     m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');
     if(o.title){var h=document.createElement('h3');h.textContent=o.title;m.appendChild(h);}
     if(o.message){var p=document.createElement('p');p.textContent=o.message;m.appendChild(p);}
     var inp=null;
     if(o.type==='prompt'){inp=document.createElement('input');inp.type='text';inp.value=o.defaultValue||'';m.appendChild(inp);}
-    var acts=document.createElement('div');acts.className='rev01-modal-actions';
+    var acts=document.createElement('div');acts.className='opencanvas-modal-actions';
     var cancelBtn=null;
-    if(o.type!=='alert'){cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.className='rev01-modal-cancel';cancelBtn.textContent='Cancel';acts.appendChild(cancelBtn);}
+    if(o.type!=='alert'){cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.className='opencanvas-modal-cancel';cancelBtn.textContent='Cancel';acts.appendChild(cancelBtn);}
     var ok=document.createElement('button');ok.type='button';
-    ok.className=o.danger?'rev01-modal-danger':'rev01-modal-ok';
+    ok.className=o.danger?'opencanvas-modal-danger':'opencanvas-modal-ok';
     ok.textContent=o.confirmLabel||'OK';acts.appendChild(ok);m.appendChild(acts);bd.appendChild(m);
     function close(v){document.removeEventListener('keydown',onKey,true);if(bd.parentNode)bd.parentNode.removeChild(bd);resolve(v);}
     function onKey(e){
@@ -586,13 +586,13 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
     document.addEventListener('keydown',onKey,true);document.body.appendChild(bd);
     if(inp){inp.focus();inp.select();}else{ok.focus();}
   });}
-  window.__rev01Modal={
+  window.__opencanvasModal={
     alert:function(msg,title){return _build({type:'alert',message:msg,title:title||''});},
     confirm:function(msg,opts){var o=opts||{};return _build({type:'confirm',message:msg,title:o.title||'',confirmLabel:o.confirmLabel,danger:o.danger});},
     prompt:function(msg,def,title){return _build({type:'prompt',message:msg,defaultValue:def||'',title:title||''});}
   };
 })();`)}</script>
-        <script>{raw("window.__rev01InboxApiBase = '/api';")}</script>
+        <script>{raw("window.__opencanvasInboxApiBase = '/api';")}</script>
         <script>{raw(notificationsInboxScript)}</script>
       </body>
     </html>

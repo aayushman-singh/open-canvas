@@ -165,7 +165,7 @@ function renderPopupCloseDocument(input: PopupCloseDocumentInput): string {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>rev01 — authenticating</title>
+  <title>Open Canvas — authenticating</title>
   <style>
     body {
       margin: 0;
@@ -185,7 +185,7 @@ function renderPopupCloseDocument(input: PopupCloseDocumentInput): string {
   <script>
     if (window.opener) {
       window.opener.postMessage(
-        { type: "rev01:edit-ready", siteId: ${siteIdJson}, token: ${tokenJson}, state: ${stateJson} },
+        { type: "opencanvas:edit-ready", siteId: ${siteIdJson}, token: ${tokenJson}, state: ${stateJson} },
         ${returnOriginJson}
       );
     }

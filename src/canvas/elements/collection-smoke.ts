@@ -23,16 +23,16 @@ function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[collection:smoke] ${message}`);
 }
 
-// `renderChild` mirrors production: each cell is a fully-wrapped `rev01-element`
+// `renderChild` mirrors production: each cell is a fully-wrapped `opencanvas-element`
 // div around the body. Production threads the canonical renderElement through
 // ctx; the smoke fixtures only contain text children, so a minimal wrapper
-// that carries the same data-rev01-element attribute is enough to assert on.
+// that carries the same data-opencanvas-element attribute is enough to assert on.
 const RENDER_CTX = {
   styleKit: 'charcoal',
   assetBasePath: '/assets',
   renderChild: (element: CanvasElement): string => {
     if (element.type === 'text') {
-      return `<div class="rev01-element" data-rev01-element="${element.id}" data-element-type="text">${renderText(element)}</div>`;
+      return `<div class="opencanvas-element" data-opencanvas-element="${element.id}" data-element-type="text">${renderText(element)}</div>`;
     }
     throw new Error(`[collection:smoke] unsupported fixture child type ${element.type}`);
   },
@@ -127,13 +127,13 @@ function makeSiteState(
   );
   assert(html.includes('gap:24px'), '(1) gap matches layout.gap=24');
 
-  const entryMatches = html.match(/data-rev01-entry="/g) ?? [];
+  const entryMatches = html.match(/data-opencanvas-entry="/g) ?? [];
   assert(entryMatches.length === 3, `(1) renders 3 entries (got ${String(entryMatches.length)})`);
 
-  // 2 cells per entry × 3 entries = 6 `rev01-element` wrappers emitted by
+  // 2 cells per entry × 3 entries = 6 `opencanvas-element` wrappers emitted by
   // renderChild. The collection no longer wraps cells in a per-child layer;
   // each cell IS a full element wrapper.
-  const childMatches = html.match(/class="rev01-element"/g) ?? [];
+  const childMatches = html.match(/class="opencanvas-element"/g) ?? [];
   assert(
     childMatches.length === 6,
     `(1) renders 6 children total (2 per entry × 3 entries, got ${String(childMatches.length)})`,
@@ -156,7 +156,7 @@ function makeSiteState(
     '(2) grid-template-columns matches layout.columns=2',
   );
 
-  const entryMatches = html.match(/data-rev01-entry="/g) ?? [];
+  const entryMatches = html.match(/data-opencanvas-entry="/g) ?? [];
   assert(
     entryMatches.length === 0,
     `(2) page-bound with no entries renders 0 entries (got ${String(entryMatches.length)})`,

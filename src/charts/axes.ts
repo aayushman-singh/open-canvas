@@ -161,7 +161,7 @@ export function renderYAxis(plot: PlotArea, ticks: NiceTicks, axisTitle?: string
       `<text x="${titleX.toFixed(2)}" y="${titleY.toFixed(2)}" font-size="11" text-anchor="middle" fill="currentColor" fill-opacity="0.85" transform="rotate(-90 ${titleX.toFixed(2)} ${titleY.toFixed(2)})">${escapeHtml(axisTitle)}</text>`,
     );
   }
-  return `<g class="rev01-chart-yaxis">${lines.join('')}</g>`;
+  return `<g class="opencanvas-chart-yaxis">${lines.join('')}</g>`;
 }
 
 /**
@@ -196,7 +196,7 @@ export function renderXAxis(
       `<text x="${cx.toFixed(2)}" y="${cy.toFixed(2)}" font-size="11" text-anchor="middle" fill="currentColor" fill-opacity="0.85">${escapeHtml(axisTitle)}</text>`,
     );
   }
-  return `<g class="rev01-chart-xaxis">${lines.join('')}</g>`;
+  return `<g class="opencanvas-chart-xaxis">${lines.join('')}</g>`;
 }
 
 export interface LegendItem {
@@ -229,7 +229,7 @@ export function renderLegend(items: LegendItem[], width: number, y: number): str
     );
     cursor += estimatedItemWidth(item.label) + itemGap;
   }
-  return `<g class="rev01-chart-legend">${out.join('')}</g>`;
+  return `<g class="opencanvas-chart-legend">${out.join('')}</g>`;
 }
 
 /**

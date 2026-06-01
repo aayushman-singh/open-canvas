@@ -1,6 +1,6 @@
 // src/password/unlock-route.ts
 //
-// POST /__rev01/unlock — mounted on the **public host** path by the main
+// POST /__opencanvas/unlock — mounted on the **public host** path by the main
 // thread. Verifies the submitted password against the site row's stored
 // hash, sets the unlock cookie, and 303-redirects back to the path the
 // gate captured.
@@ -16,8 +16,8 @@
 //      back to `redirect?retry=1`. On match, sign a cookie and 303 to
 //      `redirect`.
 //
-// The route is mounted at `/__rev01/unlock` so the middleware's
-// `/__rev01/*` bypass lets it through even on a protected site.
+// The route is mounted at `/__opencanvas/unlock` so the middleware's
+// `/__opencanvas/*` bypass lets it through even on a protected site.
 
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';

@@ -41,7 +41,7 @@ assert(
   `expected YouTube iframe src "https://www.youtube.com/embed/abc123"; got: ${youTubeHtml}`,
 );
 assert(
-  youTubeHtml.includes(`data-rev01-embed-provider="youtube"`),
+  youTubeHtml.includes(`data-opencanvas-embed-provider="youtube"`),
   `expected YouTube provider data-attr; got: ${youTubeHtml}`,
 );
 assert(
@@ -129,7 +129,7 @@ const unknownEl: EmbedElement = {
 
 const unknownHtml = renderEmbed(unknownEl, { styleKit: 'charcoal' });
 assert(
-  unknownHtml.includes(`data-rev01-embed-provider="generic"`),
+  unknownHtml.includes(`data-opencanvas-embed-provider="generic"`),
   `expected generic provider data-attr; got: ${unknownHtml}`,
 );
 assert(
@@ -154,8 +154,8 @@ const invalidEl: EmbedElement = {
 };
 const invalidHtml = renderEmbed(invalidEl, { styleKit: 'charcoal' });
 assert(
-  invalidHtml.includes(`rev01-embed-invalid`),
-  `expected rev01-embed-invalid placeholder for javascript: URL`,
+  invalidHtml.includes(`opencanvas-embed-invalid`),
+  `expected opencanvas-embed-invalid placeholder for javascript: URL`,
 );
 assert(
   !invalidHtml.includes(`<iframe`),

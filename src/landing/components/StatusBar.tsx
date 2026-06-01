@@ -21,7 +21,7 @@ export function StatusBar() {
           <a href="#templates">Templates</a>
           <a href="/dashboard">Dashboard</a>
           <a
-            href="https://github.com/aayushman-singh/rev01"
+            href="https://github.com/aayushman-singh/open-canvas"
             rel="noopener"
           >
             GitHub

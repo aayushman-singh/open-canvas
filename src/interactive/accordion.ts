@@ -11,13 +11,13 @@
 // runtime is single-source-of-truth: same characters in production and test.
 //
 // Contract (DOM markers emitted by `src/canvas/elements/accordion.ts`):
-//   - Outer wrapper: `[data-rev01-interactive="accordion"]`
-//                     `[data-rev01-allow-multi-open="true"|"false"]`
-//   - Each item:    `[data-rev01-acc-item="<id>"]`
-//                     toggled via `data-rev01-acc-open="true"`
-//   - Header button: `[data-rev01-acc-toggle="<id>"]` (the `<button>`)
+//   - Outer wrapper: `[data-opencanvas-interactive="accordion"]`
+//                     `[data-opencanvas-allow-multi-open="true"|"false"]`
+//   - Each item:    `[data-opencanvas-acc-item="<id>"]`
+//                     toggled via `data-opencanvas-acc-open="true"`
+//   - Header button: `[data-opencanvas-acc-toggle="<id>"]` (the `<button>`)
 //                     aria-expanded mirrors open state
-//   - Body region:  `[data-rev01-acc-body="<id>"]` with `hidden` attr when closed
+//   - Body region:  `[data-opencanvas-acc-body="<id>"]` with `hidden` attr when closed
 
 /**
  * The JS body of the accordion hydration helper. Plain ES2017 — no optional
@@ -29,18 +29,18 @@
  */
 export const ACCORDION_RUNTIME_SRC = String.raw`
 function hydrateAccordion(root) {
-  var multi = root.getAttribute('data-rev01-allow-multi-open') === 'true';
+  var multi = root.getAttribute('data-opencanvas-allow-multi-open') === 'true';
   function setItemOpen(item, open) {
     if (open) {
-      item.setAttribute('data-rev01-acc-open', 'true');
+      item.setAttribute('data-opencanvas-acc-open', 'true');
     } else {
-      item.removeAttribute('data-rev01-acc-open');
+      item.removeAttribute('data-opencanvas-acc-open');
     }
-    var toggles = item.querySelectorAll('[data-rev01-acc-toggle]');
+    var toggles = item.querySelectorAll('[data-opencanvas-acc-toggle]');
     for (var i = 0; i < toggles.length; i++) {
       toggles[i].setAttribute('aria-expanded', open ? 'true' : 'false');
     }
-    var bodies = item.querySelectorAll('[data-rev01-acc-body]');
+    var bodies = item.querySelectorAll('[data-opencanvas-acc-body]');
     for (var j = 0; j < bodies.length; j++) {
       if (open) {
         bodies[j].removeAttribute('hidden');
@@ -50,10 +50,10 @@ function hydrateAccordion(root) {
     }
   }
   function toggleItem(item) {
-    var currentlyOpen = item.getAttribute('data-rev01-acc-open') === 'true';
+    var currentlyOpen = item.getAttribute('data-opencanvas-acc-open') === 'true';
     var willOpen = !currentlyOpen;
     if (willOpen && !multi) {
-      var siblings = root.querySelectorAll('[data-rev01-acc-item]');
+      var siblings = root.querySelectorAll('[data-opencanvas-acc-item]');
       for (var i = 0; i < siblings.length; i++) {
         if (siblings[i] !== item) {
           setItemOpen(siblings[i], false);
@@ -62,10 +62,10 @@ function hydrateAccordion(root) {
     }
     setItemOpen(item, willOpen);
   }
-  var toggles = root.querySelectorAll('[data-rev01-acc-toggle]');
+  var toggles = root.querySelectorAll('[data-opencanvas-acc-toggle]');
   for (var k = 0; k < toggles.length; k++) {
     (function (toggle) {
-      var item = toggle.closest('[data-rev01-acc-item]');
+      var item = toggle.closest('[data-opencanvas-acc-item]');
       if (!item) return;
       toggle.addEventListener('click', function (event) {
         event.preventDefault();

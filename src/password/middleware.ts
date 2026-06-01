@@ -11,9 +11,9 @@
 //
 //   1. If the site row's `passwordEnabled` is false → return `null` (continue
 //      to snapshot serve).
-//   2. If the request is the unlock POST itself (`/__rev01/unlock`) → return
+//   2. If the request is the unlock POST itself (`/__opencanvas/unlock`) → return
 //      `null` so the dedicated router handles it without the gate
-//      intercepting itself. Other `/__rev01/*` visitor endpoints are still
+//      intercepting itself. Other `/__opencanvas/*` visitor endpoints are still
 //      gated.
 //   3. Read the per-site cookie. If valid (signature good, exp > now,
 //      hashEpoch >= site.passwordSetAt.getTime()) → return `null`
@@ -47,7 +47,7 @@ export type RequireUnlockEnv = HostConfigEnv & {
   UNLOCK_SIGNING_SECRET: string;
 };
 
-const UNLOCK_PATH = '/__rev01/unlock';
+const UNLOCK_PATH = '/__opencanvas/unlock';
 
 // Anchored cookie regex: matches `oc-theme=light` or `oc-theme=dark` only
 // when the pair sits at the start of the header or after a `; ` separator.

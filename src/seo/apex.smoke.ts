@@ -119,7 +119,7 @@ assert(robotsLines.includes('Allow: /'), '3: root path is allowed');
 for (const path of [
   '/api/',
   '/__api/',
-  '/__rev01/',
+  '/__opencanvas/',
   '/__live/',
   '/__invite/',
   '/dashboard/',

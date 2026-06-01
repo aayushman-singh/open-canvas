@@ -3,7 +3,7 @@
 // Form field label presence check.
 //
 // FormElement renders each field inside a wrapping <label> whose inner
-// <span class="rev01-form-label"> reads the `FormFieldDef.label` string. An
+// <span class="opencanvas-form-label"> reads the `FormFieldDef.label` string. An
 // empty label produces an unlabelled input — screen readers announce only
 // the input role ("edit text") with no human-readable context.
 //

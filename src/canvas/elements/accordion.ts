@@ -4,7 +4,7 @@
 // header (the `title`) and a body of inline rich text that toggles open/closed
 // when the visitor clicks (or focuses + Enter/Space).
 //
-// Render output is a pure DOM tree carrying `data-rev01-*` markers consumed
+// Render output is a pure DOM tree carrying `data-opencanvas-*` markers consumed
 // by the shared interactive runtime injected once per snapshot (see
 // `src/interactive/inject.ts`). The render fn writes NO `<script>` itself —
 // the runtime hydrates every accordion on the page on `DOMContentLoaded`.
@@ -54,8 +54,8 @@ export function renderAccordion(el: AccordionElement, ctx: AccordionRenderCtx): 
 
   const itemsHtml = el.items
     .map((item, idx) => {
-      const headerId = `rev01-acc-header-${escapeAttr(el.id)}-${escapeAttr(item.id)}`;
-      const bodyId = `rev01-acc-body-${escapeAttr(el.id)}-${escapeAttr(item.id)}`;
+      const headerId = `opencanvas-acc-header-${escapeAttr(el.id)}-${escapeAttr(item.id)}`;
+      const bodyId = `opencanvas-acc-body-${escapeAttr(el.id)}-${escapeAttr(item.id)}`;
       // Initial open state: first item is open by default. This gives the
       // visitor an immediate "what is this widget?" cue without forcing them
       // to click anything; for an `allowMultipleOpen: false` accordion the
@@ -63,18 +63,18 @@ export function renderAccordion(el: AccordionElement, ctx: AccordionRenderCtx): 
       // first paint).
       const isOpen = idx === 0;
       const expandedAttr = isOpen ? 'true' : 'false';
-      const openAttr = isOpen ? ' data-rev01-acc-open="true"' : '';
+      const openAttr = isOpen ? ' data-opencanvas-acc-open="true"' : '';
       const hiddenAttr = isOpen ? '' : ' hidden';
       const bodyHtml = renderInlineRuns(item.body);
       return [
-        `<div class="rev01-accordion-item" data-rev01-acc-item="${escapeAttr(item.id)}"${openAttr}>`,
-        `<button class="rev01-accordion-header" type="button" id="${headerId}" `,
-        `data-rev01-acc-toggle="${escapeAttr(item.id)}" `,
+        `<div class="opencanvas-accordion-item" data-opencanvas-acc-item="${escapeAttr(item.id)}"${openAttr}>`,
+        `<button class="opencanvas-accordion-header" type="button" id="${headerId}" `,
+        `data-opencanvas-acc-toggle="${escapeAttr(item.id)}" `,
         `aria-expanded="${expandedAttr}" aria-controls="${bodyId}">`,
         escapeHtml(item.title),
         `</button>`,
-        `<div class="rev01-accordion-body" id="${bodyId}" role="region" `,
-        `aria-labelledby="${headerId}" data-rev01-acc-body="${escapeAttr(item.id)}"${hiddenAttr}>`,
+        `<div class="opencanvas-accordion-body" id="${bodyId}" role="region" `,
+        `aria-labelledby="${headerId}" data-opencanvas-acc-body="${escapeAttr(item.id)}"${hiddenAttr}>`,
         bodyHtml,
         `</div>`,
         `</div>`,
@@ -82,14 +82,14 @@ export function renderAccordion(el: AccordionElement, ctx: AccordionRenderCtx): 
     })
     .join('');
 
-  // `data-rev01-interactive="accordion"` is the runtime hook. `data-rev01-
+  // `data-opencanvas-interactive="accordion"` is the runtime hook. `data-opencanvas-
   // allow-multi-open` (string literal "true"/"false") tells the runtime whether
   // to close siblings on open. Group role so AT reads the items as a related
   // set.
   return [
-    `<div class="rev01-accordion" `,
-    `data-rev01-interactive="accordion" `,
-    `data-rev01-allow-multi-open="${el.allowMultipleOpen ? 'true' : 'false'}" `,
+    `<div class="opencanvas-accordion" `,
+    `data-opencanvas-interactive="accordion" `,
+    `data-opencanvas-allow-multi-open="${el.allowMultipleOpen ? 'true' : 'false'}" `,
     `role="group">`,
     itemsHtml,
     `</div>`,

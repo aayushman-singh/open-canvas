@@ -605,7 +605,7 @@ const rev01SiteSettingsConfig = (() => {
   }
   if (disableBtn) {
     disableBtn.addEventListener('click', async () => {
-      if (!await __rev01Modal.confirm('Disable password protection? Visitors will be able to view this site without a password.', { title: 'Disable protection' })) return;
+      if (!await __opencanvasModal.confirm('Disable password protection? Visitors will be able to view this site without a password.', { title: 'Disable protection' })) return;
       disableBtn.disabled = true;
       try {
         const response = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/password', {
@@ -696,7 +696,7 @@ const rev01SiteSettingsConfig = (() => {
           removeBtn.getAttribute('data-remove-collab') ||
           (item ? item.getAttribute('data-collab-id') : null);
         if (!collabId) return;
-        if (!await __rev01Modal.confirm('Remove this collaborator?', { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true })) return;
+        if (!await __opencanvasModal.confirm('Remove this collaborator?', { title: 'Remove collaborator', confirmLabel: 'Remove', danger: true })) return;
         removeBtn.disabled = true;
         clearCollabStatus();
         try {
@@ -1702,7 +1702,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           <Button
             variant="secondary"
             size="sm"
-            class="rev01-danger-cta"
+            class="opencanvas-danger-cta"
             style="color:var(--red-ink); border-color:var(--red-line);"
             data-delete-trigger
           >

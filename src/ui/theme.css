@@ -84,14 +84,14 @@
   --font-sans:var(--sans); --font-mono:var(--mono);
 }
 
-/* ---- ALIAS: editor canvas-styles.ts (--rev01-*) ---- */
+/* ---- ALIAS: editor canvas-styles.ts (--opencanvas-*) ---- */
 :root {
-  --rev01-bg:var(--paper); --rev01-bg-panel:var(--surface);
-  --rev01-bg-panel-strong:var(--surface-2); --rev01-bg-titlebar:var(--surface-2);
-  --rev01-fg:var(--ink); --rev01-fg-mute:var(--ink-2); --rev01-fg-faint:var(--ink-3);
-  --rev01-accent:var(--red); --rev01-accent-soft:var(--red-soft);
-  --rev01-warn:var(--warn); --rev01-ok:var(--ok); --rev01-danger:var(--red);
-  --rev01-hairline:var(--line); --rev01-hairline-strong:var(--line-2);
-  --rev01-radius:var(--r);
-  --rev01-font-sans:var(--sans); --rev01-font-mono:var(--mono);
+  --opencanvas-bg:var(--paper); --opencanvas-bg-panel:var(--surface);
+  --opencanvas-bg-panel-strong:var(--surface-2); --opencanvas-bg-titlebar:var(--surface-2);
+  --opencanvas-fg:var(--ink); --opencanvas-fg-mute:var(--ink-2); --opencanvas-fg-faint:var(--ink-3);
+  --opencanvas-accent:var(--red); --opencanvas-accent-soft:var(--red-soft);
+  --opencanvas-warn:var(--warn); --opencanvas-ok:var(--ok); --opencanvas-danger:var(--red);
+  --opencanvas-hairline:var(--line); --opencanvas-hairline-strong:var(--line-2);
+  --opencanvas-radius:var(--r);
+  --opencanvas-font-sans:var(--sans); --opencanvas-font-mono:var(--mono);
 }

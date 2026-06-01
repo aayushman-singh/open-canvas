@@ -154,7 +154,7 @@ function matchFigma(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   // with /file/, /proto/, /design/, or /board/.
   if (!/^\/(file|proto|design|board)\//.test(parsed.pathname)) return null;
   return {
-    embedUrl: `https://www.figma.com/embed?embed_host=rev01&url=${encodeURIComponent(parsed.raw)}`,
+    embedUrl: `https://www.figma.com/embed?embed_host=opencanvas&url=${encodeURIComponent(parsed.raw)}`,
     frameSrcOrigin: 'https://www.figma.com',
     providerName: 'figma',
   };

@@ -118,7 +118,7 @@ export interface ElementRenderCtx {
   turnstileSiteKey: string;
   /**
    * Wrapper-emitting renderer for a single element. Threaded through ctx so
-   * the collection dispatch can render children with the same `rev01-element`
+   * the collection dispatch can render children with the same `opencanvas-element`
    * wrapper, aria/variant/motion/elementStyle attrs as top-level elements —
    * a body-only child wrapper would silently strip accessibility, kit-CSS
    * variant matching, and motion. The function reference lives on the ctx

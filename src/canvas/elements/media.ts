@@ -57,7 +57,7 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
     ['display', 'block'],
   ]);
   if (element.mediaKind === 'image') {
-    return `<img class="rev01-media" data-rev01-media-kind="image" src="${escapeAttr(src)}" alt="${escapeAttr(element.alt)}" style="${baseStyle}" />`;
+    return `<img class="opencanvas-media" data-opencanvas-media-kind="image" src="${escapeAttr(src)}" alt="${escapeAttr(element.alt)}" style="${baseStyle}" />`;
   }
   // Video.
   const playback = element.playback ?? {};
@@ -71,7 +71,7 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
     element.posterAssetId !== undefined && element.posterAssetId !== '__placeholder__'
       ? ` poster="${escapeAttr(`${ctx.assetBasePath}/${element.posterAssetId}`)}"`
       : '';
-  return `<video class="rev01-media" data-rev01-media-kind="video" src="${escapeAttr(src)}" aria-label="${escapeAttr(element.alt)}"${posterAttr} style="${baseStyle}" ${attrs.join(' ')}></video>`;
+  return `<video class="opencanvas-media" data-opencanvas-media-kind="video" src="${escapeAttr(src)}" aria-label="${escapeAttr(element.alt)}"${posterAttr} style="${baseStyle}" ${attrs.join(' ')}></video>`;
 }
 
 export const mediaInspectorSpec: InspectorSpec = {

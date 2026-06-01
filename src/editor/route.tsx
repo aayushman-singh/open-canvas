@@ -239,8 +239,8 @@ export function editorPageJsx(opts: EditorPageOptions) {
 </script>`)}
       </head>
       <body>
-        <main class="rev01-editor" data-style-kit={styleKit}>
-          <header class="rev01-editor-header">
+        <main class="opencanvas-editor" data-style-kit={styleKit}>
+          <header class="opencanvas-editor-header">
             {breadcrumbs}
             <span class="address">{publicAddress}</span>
             <span class="spacer" />
@@ -326,11 +326,11 @@ export function editorPageJsx(opts: EditorPageOptions) {
             {/* Presence pill — pre-seeded with solo (1 editing) so the
                 visible state is correct from first paint. The WS callback
                 overwrites this once it attaches with the real peer count. */}
-            <span data-rev01-presence role="status" aria-live="polite" aria-label="People editing">
-              <span data-rev01-presence-count>1</span> editing
+            <span data-opencanvas-presence role="status" aria-live="polite" aria-label="People editing">
+              <span data-opencanvas-presence-count>1</span> editing
             </span>
           </header>
-          <aside id="canvas-sidebar" class="rev01-editor-sidebar" aria-label="Canvas tools">
+          <aside id="canvas-sidebar" class="opencanvas-editor-sidebar" aria-label="Canvas tools">
             <button
               type="button"
               class="sidebar-toggle"
@@ -340,7 +340,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
             >
               &#x2039;
             </button>
-            <div class="rev01-sidebar-tabs" role="tablist" aria-label="Canvas tools">
+            <div class="opencanvas-sidebar-tabs" role="tablist" aria-label="Canvas tools">
               <button
                 type="button"
                 class="active"
@@ -371,25 +371,25 @@ export function editorPageJsx(opts: EditorPageOptions) {
               </button>
             </div>
             <div
-              class="rev01-sidebar-panel"
+              class="opencanvas-sidebar-panel"
               role="tabpanel"
               aria-label="Add"
               data-sidebar-panel="add"
             >
-              <section class="rev01-sidebar-group">
+              <section class="opencanvas-sidebar-group">
                 <h2>Sections</h2>
                 <button
                   type="button"
-                  class="rev01-sidebar-command"
+                  class="opencanvas-sidebar-command"
                   data-sidebar-add-section="blank"
                   title="Add a new empty section to the page"
                 >
                   Blank section
                 </button>
               </section>
-              <section class="rev01-sidebar-group">
+              <section class="opencanvas-sidebar-group">
                 <h2>Components</h2>
-                <div class="rev01-sidebar-command-grid">
+                <div class="opencanvas-sidebar-command-grid">
                   {/* Sidebar grid is built from SIDEBAR_DISPATCH per ADR 0011
                       Step 3. Each element type contributes 0..N commands; the
                       previous 14 hardcoded <button> entries lived in lockstep
@@ -401,7 +401,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     .map((cmd) => (
                       <button
                         type="button"
-                        class="rev01-sidebar-command"
+                        class="opencanvas-sidebar-command"
                         data-sidebar-add-component={cmd.key}
                         title={cmd.sidebarTip}
                       >
@@ -410,9 +410,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
                     ))}
                 </div>
               </section>
-              <section class="rev01-sidebar-group">
+              <section class="opencanvas-sidebar-group">
                 <h2>Colors</h2>
-                <div class="rev01-sidebar-kit-grid" role="group" aria-label="Style kit">
+                <div class="opencanvas-sidebar-kit-grid" role="group" aria-label="Style kit">
                   {BUILT_IN_STYLE_KITS.map((kit) => {
                     const isActive = kit === styleKit;
                     return (
@@ -428,29 +428,29 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   })}
                 </div>
               </section>
-              <section id="canvas-sidebar-selection" class="rev01-sidebar-group" hidden />
+              <section id="canvas-sidebar-selection" class="opencanvas-sidebar-group" hidden />
             </div>
             <div
-              class="rev01-sidebar-panel"
+              class="opencanvas-sidebar-panel"
               role="tabpanel"
               aria-label="Sections"
               data-sidebar-panel="sections"
               hidden
             >
-              <div class="rev01-section-picker" data-section-picker-root>
-                <p class="rev01-section-picker-empty">Loading sections…</p>
+              <div class="opencanvas-section-picker" data-section-picker-root>
+                <p class="opencanvas-section-picker-empty">Loading sections…</p>
               </div>
             </div>
             <div
-              class="rev01-sidebar-panel"
+              class="opencanvas-sidebar-panel"
               role="tabpanel"
               aria-label="Pages"
               data-sidebar-panel="pages"
               hidden
             >
-              <div class="rev01-page-list" id="canvas-page-list"></div>
+              <div class="opencanvas-page-list" id="canvas-page-list"></div>
               <button
-                class="rev01-sidebar-action"
+                class="opencanvas-sidebar-action"
                 id="canvas-add-page"
                 type="button"
                 title="Create a new page for your site"
@@ -476,54 +476,54 @@ export function editorPageJsx(opts: EditorPageOptions) {
           >
             &#x203A;
           </button>
-          <aside id="canvas-chat-panel" class="rev01-chat-panel" hidden>
-            <div class="rev01-chat-header">
+          <aside id="canvas-chat-panel" class="opencanvas-chat-panel" hidden>
+            <div class="opencanvas-chat-header">
               <span>AI Chat</span>
               <button type="button" id="canvas-chat-close" title="Close chat">
                 &times;
               </button>
             </div>
-            <div id="canvas-chat-messages" class="rev01-chat-messages">
-              <div id="canvas-chat-welcome" class="rev01-chat-welcome">
-                <p class="rev01-chat-welcome-greeting">
+            <div id="canvas-chat-messages" class="opencanvas-chat-messages">
+              <div id="canvas-chat-welcome" class="opencanvas-chat-welcome">
+                <p class="opencanvas-chat-welcome-greeting">
                   Hi! I'm the AI for your site. I can:
                 </p>
-                <ul class="rev01-chat-welcome-list">
+                <ul class="opencanvas-chat-welcome-list">
                   <li>Rewrite text or restyle elements</li>
                   <li>Add, remove, or reorder sections and pages</li>
                   <li>Swap images for ones you've uploaded</li>
                   <li>Switch the whole site to a different style kit</li>
                 </ul>
-                <p class="rev01-chat-welcome-hint">
+                <p class="opencanvas-chat-welcome-hint">
                   Select an element on the canvas, then ask me to change it — or try one of these:
                 </p>
-                <div class="rev01-chat-welcome-chips">
-                  <button type="button" class="rev01-chat-chip" data-chip-prompt="What can you change for me on this page?">
+                <div class="opencanvas-chat-welcome-chips">
+                  <button type="button" class="opencanvas-chat-chip" data-chip-prompt="What can you change for me on this page?">
                     What can you change?
                   </button>
-                  <button type="button" class="rev01-chat-chip" data-chip-prompt="Add a contact section to the bottom of this page.">
+                  <button type="button" class="opencanvas-chat-chip" data-chip-prompt="Add a contact section to the bottom of this page.">
                     Add a contact section
                   </button>
-                  <button type="button" class="rev01-chat-chip" data-chip-prompt="Switch this site to the blue-saas style kit.">
+                  <button type="button" class="opencanvas-chat-chip" data-chip-prompt="Switch this site to the blue-saas style kit.">
                     Try a different style kit
                   </button>
                 </div>
               </div>
             </div>
-            <div id="canvas-chat-selection" class="rev01-chat-selection" hidden>
-              <span class="rev01-chat-selection-label">Selected:</span>
-              <span id="canvas-chat-selection-text" class="rev01-chat-selection-text" />
+            <div id="canvas-chat-selection" class="opencanvas-chat-selection" hidden>
+              <span class="opencanvas-chat-selection-label">Selected:</span>
+              <span id="canvas-chat-selection-text" class="opencanvas-chat-selection-text" />
               <button
                 type="button"
                 id="canvas-chat-selection-clear"
-                class="rev01-chat-selection-clear"
+                class="opencanvas-chat-selection-clear"
                 title="Drop selection from chat context"
                 aria-label="Drop selection from chat context"
               >
                 &times;
               </button>
             </div>
-            <form id="canvas-chat-form" class="rev01-chat-input">
+            <form id="canvas-chat-form" class="opencanvas-chat-input">
               <input
                 type="text"
                 id="canvas-chat-input"
@@ -533,14 +533,14 @@ export function editorPageJsx(opts: EditorPageOptions) {
               <button type="submit">Send</button>
             </form>
           </aside>
-          <footer class="rev01-editor-status">
+          <footer class="opencanvas-editor-status">
             <span id="canvas-status">Saved</span>
           </footer>
         </main>
         {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
         {raw(`<script type="module">${inlineScript}</script>`)}
         <script>{raw(themeToggleScript)}</script>
-        {raw(`<script>window.__rev01InboxApiBase = ${JSON.stringify(apiBase)};</script>`)}
+        {raw(`<script>window.__opencanvasInboxApiBase = ${JSON.stringify(apiBase)};</script>`)}
         <script>{raw(notificationsInboxScript)}</script>
       </body>
     </html>

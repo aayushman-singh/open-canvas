@@ -707,7 +707,7 @@ export { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 //
 // Output shape, per kit:
 //
-//   [data-style-kit="<kit>"] { --rev01-kit-bg: ...; --rev01-kit-accent: ...; ... }
+//   [data-style-kit="<kit>"] { --opencanvas-kit-bg: ...; --opencanvas-kit-accent: ...; ... }
 //   [data-style-kit="<kit>"] [data-element-type="action"][data-variant="X"] { ... }
 //   [data-style-kit="<kit>"] [data-element-type="container"][data-variant="X"] { ... }
 //   [data-style-kit="<kit>"] [data-element-type="shape"] { ... }
@@ -718,10 +718,10 @@ export { resolveStyleKitWithCustom } from '../themes/custom-resolve.js';
 // the wrapper. That makes the CSS purely declarative and lets pinned styles
 // override per-element via inline `style="..."` without fighting specificity.
 //
-// Custom-property prefix `--rev01-kit-*` is intentional: it sits beside the
-// editor-chrome's `--rev01-*` namespace without colliding. Chrome (header,
-// inspector, status) uses `--rev01-accent`/`--rev01-bg` for its own dark UI;
-// kit consumers read `--rev01-kit-accent`/`--rev01-kit-bg`. The legacy
+// Custom-property prefix `--opencanvas-kit-*` is intentional: it sits beside the
+// editor-chrome's `--opencanvas-*` namespace without colliding. Chrome (header,
+// inspector, status) uses `--opencanvas-accent`/`--opencanvas-bg` for its own dark UI;
+// kit consumers read `--opencanvas-kit-accent`/`--opencanvas-kit-bg`. The legacy
 // `--kit-bg`/`--kit-fg`/`--kit-accent` aliases are also emitted so the
 // existing public + editor CSS that references them keeps working.
 // --------------------------------------------------------------------------
@@ -737,37 +737,37 @@ function declaration(prop: string, value: string | number): string {
 }
 
 function buildKitTokenBlock(kitName: string, preset: StyleKitPreset): string {
-  // Kit tokens are namespaced `--rev01-kit-*` to keep them off the editor
-  // chrome's `--rev01-*` namespace. Editor chrome (src/editor/canvas-styles.ts)
-  // sets its own `--rev01-bg`/`--rev01-accent` on :root for the header,
+  // Kit tokens are namespaced `--opencanvas-kit-*` to keep them off the editor
+  // chrome's `--opencanvas-*` namespace. Editor chrome (src/editor/canvas-styles.ts)
+  // sets its own `--opencanvas-bg`/`--opencanvas-accent` on :root for the header,
   // inspector, and status bar; those are unrelated to the document being
-  // edited. Per-kit visuals live entirely behind the `--rev01-kit-*` prefix
+  // edited. Per-kit visuals live entirely behind the `--opencanvas-kit-*` prefix
   // plus the legacy `--kit-*` aliases that the existing editor / public CSS
   // still references.
   const tokens: string[] = [
-    declaration('--rev01-kit-bg', preset.bg),
-    declaration('--rev01-kit-panel', preset.panel),
-    declaration('--rev01-kit-text', preset.text),
-    declaration('--rev01-kit-muted', preset.muted),
-    declaration('--rev01-kit-accent', preset.accent),
-    declaration('--rev01-kit-accent-text', preset.accentText),
-    declaration('--rev01-kit-font-display', preset.fontFamilyDisplay),
-    declaration('--rev01-kit-font-body', preset.fontFamilyBody),
-    declaration('--rev01-kit-font-mono', preset.fontFamilyMono),
-    declaration('--rev01-kit-heading-scale', String(preset.headingScale)),
-    declaration('--rev01-kit-body-scale', String(preset.bodyScale)),
-    declaration('--rev01-kit-label-scale', String(preset.labelScale)),
-    declaration('--rev01-kit-line-height', String(preset.lineHeight)),
-    declaration('--rev01-kit-radius', preset.radius),
-    declaration('--rev01-kit-border-width', preset.borderWidth),
-    declaration('--rev01-kit-shadow', preset.shadow),
-    declaration('--rev01-kit-shape-fill', preset.shapeFill),
-    declaration('--rev01-kit-shape-stroke', preset.shapeStroke),
-    declaration('--rev01-kit-shape-stroke-width', preset.shapeStrokeWidth),
-    declaration('--rev01-kit-action-radius', preset.actionRadius),
-    declaration('--rev01-kit-action-padding', preset.actionPadding),
-    declaration('--rev01-kit-motion-duration', `${String(preset.motionDurationMs)}ms`),
-    declaration('--rev01-kit-motion-easing', preset.motionEasing),
+    declaration('--opencanvas-kit-bg', preset.bg),
+    declaration('--opencanvas-kit-panel', preset.panel),
+    declaration('--opencanvas-kit-text', preset.text),
+    declaration('--opencanvas-kit-muted', preset.muted),
+    declaration('--opencanvas-kit-accent', preset.accent),
+    declaration('--opencanvas-kit-accent-text', preset.accentText),
+    declaration('--opencanvas-kit-font-display', preset.fontFamilyDisplay),
+    declaration('--opencanvas-kit-font-body', preset.fontFamilyBody),
+    declaration('--opencanvas-kit-font-mono', preset.fontFamilyMono),
+    declaration('--opencanvas-kit-heading-scale', String(preset.headingScale)),
+    declaration('--opencanvas-kit-body-scale', String(preset.bodyScale)),
+    declaration('--opencanvas-kit-label-scale', String(preset.labelScale)),
+    declaration('--opencanvas-kit-line-height', String(preset.lineHeight)),
+    declaration('--opencanvas-kit-radius', preset.radius),
+    declaration('--opencanvas-kit-border-width', preset.borderWidth),
+    declaration('--opencanvas-kit-shadow', preset.shadow),
+    declaration('--opencanvas-kit-shape-fill', preset.shapeFill),
+    declaration('--opencanvas-kit-shape-stroke', preset.shapeStroke),
+    declaration('--opencanvas-kit-shape-stroke-width', preset.shapeStrokeWidth),
+    declaration('--opencanvas-kit-action-radius', preset.actionRadius),
+    declaration('--opencanvas-kit-action-padding', preset.actionPadding),
+    declaration('--opencanvas-kit-motion-duration', `${String(preset.motionDurationMs)}ms`),
+    declaration('--opencanvas-kit-motion-easing', preset.motionEasing),
     // Legacy `--kit-*` aliases — the editor + public CSS already references
     // these via `var(--kit-bg) / var(--kit-fg) / var(--kit-accent)`. Keeping
     // them aliased to the kit preset means we did not have to touch every
@@ -796,7 +796,7 @@ function buildActionVariantBlock(
   if (tokens.padding !== undefined) decls.push(declaration('padding', tokens.padding));
   if (tokens.letterSpacing !== undefined) decls.push(declaration('letter-spacing', tokens.letterSpacing));
   if (decls.length === 0) return '';
-  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="action"][data-variant=${quoteCssString(variant)}] .rev01-action {\n  ${decls.join('\n  ')}\n}`;
+  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="action"][data-variant=${quoteCssString(variant)}] .opencanvas-action {\n  ${decls.join('\n  ')}\n}`;
 }
 
 function buildSurfaceVariantBlock(
@@ -810,11 +810,11 @@ function buildSurfaceVariantBlock(
   if (tokens.shadow !== undefined) decls.push(declaration('box-shadow', tokens.shadow));
   if (tokens.radius !== undefined) decls.push(declaration('border-radius', tokens.radius));
   if (decls.length === 0) return '';
-  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="container"][data-variant=${quoteCssString(variant)}] .rev01-surface {\n  ${decls.join('\n  ')}\n}`;
+  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="container"][data-variant=${quoteCssString(variant)}] .opencanvas-surface {\n  ${decls.join('\n  ')}\n}`;
 }
 
 function buildShapeBlock(kitName: string, preset: StyleKitPreset): string {
-  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="shape"] .rev01-shape {
+  return `[data-style-kit=${quoteCssString(kitName)}] [data-element-type="shape"] .opencanvas-shape {
   background: ${preset.shapeFill};
   border: ${preset.shapeStrokeWidth} solid ${preset.shapeStroke};
 }`;
@@ -856,11 +856,11 @@ function buildEntranceKeyframe(ns: string, preset: MotionPreset, tokens: MotionP
 }
 
 function buildMotionKeyframes(kitName: string, preset: StyleKitPreset): string {
-  // Per-kit keyframes named `rev01-<kit>-<preset>`. Each kit's
+  // Per-kit keyframes named `opencanvas-<kit>-<preset>`. Each kit's
   // `motionPresets[p]` seeds the initial state so each kit's declared
   // amplitude (charcoal translateY(12px) vs orange translateY(16px) vs
   // green translateY(18px) …) actually takes effect.
-  const ns = `rev01-${kitName}`;
+  const ns = `opencanvas-${kitName}`;
   const blocks: string[] = [];
   for (const p of MOTION_PRESETS) {
     if (p === 'none') continue;
@@ -894,7 +894,7 @@ function buildMotionKeyframes(kitName: string, preset: StyleKitPreset): string {
 
 function buildMotionBlock(kitName: string): string {
   // Each preset attaches its kit-namespaced keyframe. Duration + easing come
-  // from `--rev01-kit-motion-*` tokens already set on the wrapper by
+  // from `--opencanvas-kit-motion-*` tokens already set on the wrapper by
   // `buildKitTokenBlock`. Three presets deviate from the kit-default cadence:
   //   - `bounce-in` overrides easing with an overshoot curve (the
   //     definition of "bounce").
@@ -903,9 +903,9 @@ function buildMotionBlock(kitName: string): string {
   //   - `stagger-children` reuses the kit's fade-up keyframe; the
   //     between-child delay is wired at the call site, not in the keyframe.
   const sk = quoteCssString(kitName);
-  const ns = `rev01-${kitName}`;
-  const dur = 'var(--rev01-kit-motion-duration)';
-  const eas = 'var(--rev01-kit-motion-easing)';
+  const ns = `opencanvas-${kitName}`;
+  const dur = 'var(--opencanvas-kit-motion-duration)';
+  const eas = 'var(--opencanvas-kit-motion-easing)';
   const entranceRule = (p: MotionPreset): string =>
     `[data-style-kit=${sk}] [data-motion-preset="${p}"] {\n  animation: ${ns}-${p} ${dur} ${eas} both;\n}`;
   const rules: string[] = [];
@@ -939,9 +939,9 @@ function buildTextRules(kitName: string): string {
   // sizes and the extra letter-spacing keeps them legible at that scale.
   const sk = quoteCssString(kitName);
   return [
-    `[data-style-kit=${sk}] [data-element-type="text"][data-role="heading"] .rev01-text {\n  font-family: var(--rev01-kit-font-display);\n}`,
-    `[data-style-kit=${sk}] [data-element-type="text"][data-role="body"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  line-height: var(--rev01-kit-line-height);\n}`,
-    `[data-style-kit=${sk}] [data-element-type="text"][data-role="label"] .rev01-text {\n  font-family: var(--rev01-kit-font-body);\n  letter-spacing: 0.04em;\n}`,
+    `[data-style-kit=${sk}] [data-element-type="text"][data-role="heading"] .opencanvas-text {\n  font-family: var(--opencanvas-kit-font-display);\n}`,
+    `[data-style-kit=${sk}] [data-element-type="text"][data-role="body"] .opencanvas-text {\n  font-family: var(--opencanvas-kit-font-body);\n  line-height: var(--opencanvas-kit-line-height);\n}`,
+    `[data-style-kit=${sk}] [data-element-type="text"][data-role="label"] .opencanvas-text {\n  font-family: var(--opencanvas-kit-font-body);\n  letter-spacing: 0.04em;\n}`,
   ].join('\n');
 }
 

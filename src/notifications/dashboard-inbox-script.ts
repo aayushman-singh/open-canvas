@@ -24,7 +24,7 @@ export const notificationsInboxScript = `(function(){
   if (!bell || !badge || !panel || !list) return;
   // Either '/api' (dashboard, Clerk session) or '/__api' (on-site editor,
   // edit-token JWT). Set inline by the surface before this IIFE runs.
-  var apiBase = (typeof window.__rev01InboxApiBase === 'string' && window.__rev01InboxApiBase) || '/api';
+  var apiBase = (typeof window.__opencanvasInboxApiBase === 'string' && window.__opencanvasInboxApiBase) || '/api';
 
   function fmtTime(iso) {
     var t = Date.parse(iso);

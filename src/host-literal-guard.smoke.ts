@@ -1,16 +1,19 @@
 // src/host-literal-guard.smoke.ts
 //
-// ADR 0013 follow-up #5 + ADR 0017 follow-up — assert no literal
-// `rev01.aayushman.dev` (apex) or `__rev01_` (cookie name prefix) remains
-// in production code outside the designated exceptions. Catches
-// regressions where a contributor adds hardcoded brand strings to a new
-// file without going through `host-config.ts`.
+// ADR 0013 follow-up #5 + ADR 0017 follow-up + post-rebrand lockdown — assert
+// no literal `rev01.*` brand string remains in production code outside the
+// designated exceptions. Catches regressions where a contributor adds
+// hardcoded brand strings to a new file without going through `host-config.ts`.
 //
 // Allowed exceptions:
 //   - `src/host-literal-guard.smoke.ts` (this file — the literals live here
 //     as the search target).
 //   - `src/canvas/fixtures/**` (seed JSON data; ADR 0013 out-of-scope #6).
 //   - `src/templates/seeds/**` (seed template content; ADR 0013 out-of-scope #6).
+//   - `src/assets/seed-script.ts` (TEMPORARY — holds the `rev01-assets` R2
+//     bucket binding name. Remove this exemption after the R2 bucket is
+//     renamed to `opencanvas-assets` out-of-band; see Tier D in the rebrand
+//     work for the wrangler command sheet).
 //
 // Files matching `*.smoke.ts` are NOT exempt — smokes must pin against an
 // injected test APP_DOMAIN / COOKIE_NAME_PREFIX per ADR 0013 decision 7
@@ -25,7 +28,20 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)));
-const FORBIDDEN_LITERALS = ['rev01.aayushman.dev', '__rev01_'] as const;
+
+// FORBIDDEN_LITERALS combines:
+//   ADR 0013 / 0017: apex hostname + cookie prefix (env-derived).
+//   Tier B (post-rebrand): CSS class / var / data-attr prefix.
+//   Tier B (post-rebrand): every window global / route / cookie carrying
+//     the legacy `__rev01` substring.
+//   Tier B (post-rebrand): legacy HTTP signature header.
+const FORBIDDEN_LITERALS = [
+  'rev01.aayushman.dev',
+  'rev01-',
+  '__rev01',
+  'X-Rev01-',
+] as const;
+
 const SELF_PATH = fileURLToPath(import.meta.url);
 
 const EXEMPT_PREFIXES = [
@@ -33,10 +49,14 @@ const EXEMPT_PREFIXES = [
   join('templates', 'seeds') + sep,
 ];
 
+const EXEMPT_FILES = [join('assets', 'seed-script.ts')];
+
 function isExempt(absPath: string): boolean {
   if (absPath === SELF_PATH) return true;
   const rel = relative(SRC_ROOT, absPath);
-  return EXEMPT_PREFIXES.some((prefix) => rel.startsWith(prefix));
+  if (EXEMPT_PREFIXES.some((prefix) => rel.startsWith(prefix))) return true;
+  if (EXEMPT_FILES.includes(rel)) return true;
+  return false;
 }
 
 function walk(dir: string, out: string[]): void {
@@ -76,7 +96,7 @@ for (const file of files) {
 
 assert(
   violations.length === 0,
-  `forbidden apex literals in production code (ADR 0013):\n  ${violations.join('\n  ')}`,
+  `forbidden brand literals in production code (ADR 0013 + Tier B rebrand):\n  ${violations.join('\n  ')}`,
 );
 
 console.log(`[host-literal-guard:smoke] OK — scanned ${files.length} files, 0 violations`);

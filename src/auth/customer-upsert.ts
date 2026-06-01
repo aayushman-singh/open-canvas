@@ -1,6 +1,6 @@
 // src/auth/customer-upsert.ts
 //
-// Centralized Clerk-user -> rev01-customer sync. Called on every authenticated
+// Centralized Clerk-user -> opencanvas-customer sync. Called on every authenticated
 // dashboard request so the local customer row stays current with Clerk's
 // primary email. Normalizes the email to lowercase here so downstream lookups
 // (collaborator invites, owner-by-email reverse lookups) don't need to worry

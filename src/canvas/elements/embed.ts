@@ -20,7 +20,7 @@
 //     on first paint.
 //
 // Failure mode:
-//   - Invalid URL → renders a labelled `<div class="rev01-embed-invalid">`
+//   - Invalid URL → renders a labelled `<div class="opencanvas-embed-invalid">`
 //     placeholder. No iframe is emitted, no CSP token is contributed; the
 //     element wrapper still sits in the layout so the page geometry doesn't
 //     collapse. This is the "fail loudly, but inside the viewport" choice:
@@ -69,7 +69,7 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
   if (resolved.providerName === 'invalid') {
     // No iframe. We still emit a tiny placeholder so the editor preview can
     // distinguish "embed with broken URL" from "no embed configured."
-    return `<div class="rev01-embed-invalid" data-rev01-embed-status="invalid" role="img" aria-label="Invalid embed URL"></div>`;
+    return `<div class="opencanvas-embed-invalid" data-opencanvas-embed-status="invalid" role="img" aria-label="Invalid embed URL"></div>`;
   }
 
   const titleAttr =
@@ -93,7 +93,7 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
   const src = escapeAttr(resolved.embedUrl);
 
   return (
-    `<div class="rev01-embed" data-rev01-embed-provider="${escapeAttr(resolved.providerName)}"${aspectAttr}>` +
+    `<div class="opencanvas-embed" data-opencanvas-embed-provider="${escapeAttr(resolved.providerName)}"${aspectAttr}>` +
     `<iframe ` +
     `src="${src}" ` +
     `width="100%" height="100%" ` +

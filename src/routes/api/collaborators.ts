@@ -283,7 +283,7 @@ export function clerkUserHasVerifiedEmail(
 // Local lookup first (cheap), then Clerk Backend API fallback (covers
 // secondary emails that Clerk knows about but we haven't denormalized).
 // Returns null only when neither source can resolve a customer row — the
-// invitee really doesn't have a rev01 account.
+// invitee really doesn't have an Open Canvas account.
 async function findCustomerByEmail(
   c: Context<Env>,
   email: string,
@@ -356,7 +356,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
   if (!targetCustomerId) {
     return c.json(
       {
-        error: 'no rev01 account found for this email — they need to sign up first',
+        error: 'no Open Canvas account found for this email — they need to sign up first',
       },
       404,
     );

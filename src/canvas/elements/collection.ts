@@ -17,9 +17,9 @@ import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 
-// The collection-child wrapper used to add `data-rev01-element`, a positioning
+// The collection-child wrapper used to add `data-opencanvas-element`, a positioning
 // style, and a class — but it was a stripped-down clone of the canonical
-// `rev01-element` wrapper, silently dropping aria, variant, motion, and
+// `opencanvas-element` wrapper, silently dropping aria, variant, motion, and
 // elementStyle data-attrs. ctx.renderChild now returns the full canonical
 // wrapper (see ElementRenderCtx.renderElement); cells emit it directly so
 // every wrapper attr that a top-level element carries is also carried for
@@ -99,11 +99,11 @@ export function renderCollection(el: CollectionElement, ctx: CollectionRenderCtx
         ['position', 'relative'],
         ['min-height', `${String(bottom)}px`],
       ]);
-      return `<div class="rev01-collection-entry" data-rev01-entry="${String(entryIdx)}" style="${escapeAttr(rowStyle)}">${cellsHtml}</div>`;
+      return `<div class="opencanvas-collection-entry" data-opencanvas-entry="${String(entryIdx)}" style="${escapeAttr(rowStyle)}">${cellsHtml}</div>`;
     })
     .join('');
 
-  return `<div class="rev01-collection" data-rev01-interactive="collection" data-collection-mode="${escapeAttr(el.mode)}" style="${escapeAttr(gridStyle)}">${entriesHtml}</div>`;
+  return `<div class="opencanvas-collection" data-opencanvas-interactive="collection" data-collection-mode="${escapeAttr(el.mode)}" style="${escapeAttr(gridStyle)}">${entriesHtml}</div>`;
 }
 
 export const COLLECTION_RECIPE_ID = 'collection-grid' as const;

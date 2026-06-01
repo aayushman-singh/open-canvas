@@ -921,7 +921,7 @@ document.addEventListener('click', function(e) {
     .catch(function(err) {
       unpubBtn.textContent = 'Failed';
       unpubBtn.style.pointerEvents = '';
-      __rev01Modal.alert(err.message || 'Unpublish failed', 'Unpublish error');
+      __opencanvasModal.alert(err.message || 'Unpublish failed', 'Unpublish error');
     });
 });
 
@@ -947,7 +947,7 @@ document.addEventListener('click', function(e) {
       pubBtn.textContent = 'Failed';
       pubBtn.title = err.message || 'Unknown error';
       pubBtn.style.pointerEvents = '';
-      __rev01Modal.alert(err.message || 'Publish failed', 'Publish error');
+      __opencanvasModal.alert(err.message || 'Publish failed', 'Publish error');
     });
 });
 </script>`);

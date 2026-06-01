@@ -32,21 +32,21 @@
 //   2. Pushing table rules into the global kit stylesheet (src/canvas/style-kits.ts)
 //      is forbidden for Wave 4 — that file is frozen.
 //   3. Per-table inline `<style>` keeps the rules co-located with the markup
-//      that needs them, scoped tightly by `[data-rev01-element="<id>"]` so two
+//      that needs them, scoped tightly by `[data-opencanvas-element="<id>"]` so two
 //      tables on the same page never collide.
 //
 // Borders / padding / zebra colour pull from the live Style Kit tokens
-// (`--rev01-kit-border-width`, `--rev01-kit-radius`, `--rev01-kit-panel`,
-// `--rev01-kit-muted`, `--rev01-kit-text`, `--rev01-kit-action-padding`).
+// (`--opencanvas-kit-border-width`, `--opencanvas-kit-radius`, `--opencanvas-kit-panel`,
+// `--opencanvas-kit-muted`, `--opencanvas-kit-text`, `--opencanvas-kit-action-padding`).
 // Those tokens are emitted onto the `[data-style-kit]` page wrapper by the
 // kit-CSS builder; we reference them via `var(...)` so the table inherits the
 // active kit's look without re-declaring per-kit selectors.
 //
 // Defaults documented at the top of `renderTable`:
-//   - border:       1px solid <muted> (via `var(--rev01-kit-muted, #ccc)`)
-//   - cell padding: var(--rev01-kit-action-padding, 8px 12px)
-//   - zebra colour: var(--rev01-kit-panel, rgba(0,0,0,0.04))
-//   - radius:       var(--rev01-kit-radius, 6px) on the wrapping table
+//   - border:       1px solid <muted> (via `var(--opencanvas-kit-muted, #ccc)`)
+//   - cell padding: var(--opencanvas-kit-action-padding, 8px 12px)
+//   - zebra colour: var(--opencanvas-kit-panel, rgba(0,0,0,0.04))
+//   - radius:       var(--opencanvas-kit-radius, 6px) on the wrapping table
 
 import type { InspectorSpec } from './inspector-spec.js';
 import type { BaseElement } from '../schema.js';
@@ -84,11 +84,11 @@ export interface TableRenderCtx {
 /**
  * CSS selector prefix used by every rule the table emits — keeps rules
  * scoped to this element only. The renderer wraps each element in
- * `<div class="rev01-element" data-rev01-element="<id>" ...>`, so this
+ * `<div class="opencanvas-element" data-opencanvas-element="<id>" ...>`, so this
  * selector matches that wrapper and only that wrapper.
  */
 function scopeSelector(elementId: string): string {
-  return `[data-rev01-element="${escapeCssAttrId(elementId)}"]`;
+  return `[data-opencanvas-element="${escapeCssAttrId(elementId)}"]`;
 }
 
 /**
@@ -105,26 +105,26 @@ function scopeSelector(elementId: string): string {
 function buildBaseCss(elementId: string): string {
   const scope = scopeSelector(elementId);
   return [
-    `${scope} table.rev01-table {`,
+    `${scope} table.opencanvas-table {`,
     `  border-collapse: collapse;`,
     `  width: 100%;`,
-    `  font-family: var(--rev01-kit-font-body, system-ui, sans-serif);`,
-    `  color: var(--rev01-kit-text, #111);`,
-    `  border: var(--rev01-kit-border-width, 1px) solid var(--rev01-kit-muted, #ccc);`,
-    `  border-radius: var(--rev01-kit-radius, 6px);`,
+    `  font-family: var(--opencanvas-kit-font-body, system-ui, sans-serif);`,
+    `  color: var(--opencanvas-kit-text, #111);`,
+    `  border: var(--opencanvas-kit-border-width, 1px) solid var(--opencanvas-kit-muted, #ccc);`,
+    `  border-radius: var(--opencanvas-kit-radius, 6px);`,
     `  overflow: hidden;`,
     `}`,
-    `${scope} table.rev01-table th,`,
-    `${scope} table.rev01-table td {`,
-    `  padding: var(--rev01-kit-action-padding, 8px 12px);`,
-    `  border-bottom: var(--rev01-kit-border-width, 1px) solid var(--rev01-kit-muted, #ccc);`,
+    `${scope} table.opencanvas-table th,`,
+    `${scope} table.opencanvas-table td {`,
+    `  padding: var(--opencanvas-kit-action-padding, 8px 12px);`,
+    `  border-bottom: var(--opencanvas-kit-border-width, 1px) solid var(--opencanvas-kit-muted, #ccc);`,
     `  text-align: left;`,
     `}`,
-    `${scope} table.rev01-table thead th {`,
-    `  background: var(--rev01-kit-panel, rgba(0, 0, 0, 0.04));`,
+    `${scope} table.opencanvas-table thead th {`,
+    `  background: var(--opencanvas-kit-panel, rgba(0, 0, 0, 0.04));`,
     `  font-weight: 600;`,
     `}`,
-    `${scope} table.rev01-table tbody tr:last-child td {`,
+    `${scope} table.opencanvas-table tbody tr:last-child td {`,
     `  border-bottom: 0;`,
     `}`,
   ].join('\n');
@@ -138,8 +138,8 @@ function buildBaseCss(elementId: string): string {
 function buildZebraCss(elementId: string): string {
   const scope = scopeSelector(elementId);
   return [
-    `${scope} table.rev01-table tbody tr:nth-child(2n+1) td {`,
-    `  background: var(--rev01-kit-panel, rgba(0, 0, 0, 0.04));`,
+    `${scope} table.opencanvas-table tbody tr:nth-child(2n+1) td {`,
+    `  background: var(--opencanvas-kit-panel, rgba(0, 0, 0, 0.04));`,
     `}`,
   ].join('\n');
 }
@@ -159,8 +159,8 @@ function buildAlignmentCss(elementId: string, columns: TableColumn[]): string {
     if (!col.align || col.align === 'left') return;
     const n = idx + 1;
     rules.push(
-      `${scope} table.rev01-table th:nth-child(${String(n)}),`,
-      `${scope} table.rev01-table td:nth-child(${String(n)}) {`,
+      `${scope} table.opencanvas-table th:nth-child(${String(n)}),`,
+      `${scope} table.opencanvas-table td:nth-child(${String(n)}) {`,
       `  text-align: ${col.align};`,
       `}`,
     );
@@ -177,7 +177,7 @@ export function renderTable(el: TableElement, ctx: TableRenderCtx): string {
   const alignmentCss = buildAlignmentCss(el.id, el.columns);
   if (alignmentCss) cssParts.push(alignmentCss);
   if (el.collapseOnPhone) cssParts.push(buildTablePhoneCollapseCss(el.id));
-  const styleBlock = `<style data-rev01-table="${escapeAttr(el.id)}">${cssParts.join('\n')}</style>`;
+  const styleBlock = `<style data-opencanvas-table="${escapeAttr(el.id)}">${cssParts.join('\n')}</style>`;
 
   // --- Build the table body ------------------------------------------------
   const theadHtml = renderThead(el.columns);
@@ -188,7 +188,7 @@ export function renderTable(el: TableElement, ctx: TableRenderCtx): string {
   // renders an empty `<table>` w/o crash."
   return (
     `${styleBlock}` +
-    `<table class="rev01-table" data-rev01-zebra="${el.zebra ? 'true' : 'false'}" data-rev01-collapse-on-phone="${el.collapseOnPhone ? 'true' : 'false'}">` +
+    `<table class="opencanvas-table" data-opencanvas-zebra="${el.zebra ? 'true' : 'false'}" data-opencanvas-collapse-on-phone="${el.collapseOnPhone ? 'true' : 'false'}">` +
     `${theadHtml}` +
     `${tbodyHtml}` +
     `</table>`

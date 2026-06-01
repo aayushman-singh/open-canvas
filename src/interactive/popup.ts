@@ -6,13 +6,13 @@
 //
 // Unlike accordion/carousel which hydrate per-element roots, the popup runtime
 // operates at the section level. It finds all sections marked with
-// `data-rev01-popup="true"` and wires trigger logic (exit-intent, delay,
+// `data-opencanvas-popup="true"` and wires trigger logic (exit-intent, delay,
 // scroll) to show them as modal overlays.
 //
 // Trigger types:
 //   - `exit-intent`: fires when mouse leaves viewport top (mouseleave on
 //     documentElement, only when clientY <= 0).
-//   - `delay`: fires after N milliseconds (value from data-rev01-trigger-value).
+//   - `delay`: fires after N milliseconds (value from data-opencanvas-trigger-value).
 //   - `scroll`: fires when scroll percentage >= value (0-100).
 //
 // Dismissal persists via localStorage so each popup shows only once per
@@ -20,12 +20,12 @@
 
 export const POPUP_RUNTIME_SRC = String.raw`
 function initPopups(){
-var els=document.querySelectorAll('[data-rev01-popup="true"]');
+var els=document.querySelectorAll('[data-opencanvas-popup="true"]');
 for(var i=0;i<els.length;i++){(function(sec){
-var id=sec.getAttribute('data-rev01-section');
-var type=sec.getAttribute('data-rev01-trigger-type');
-var val=parseInt(sec.getAttribute('data-rev01-trigger-value')||'0',10);
-var key='rev01-popup-dismissed-'+id;
+var id=sec.getAttribute('data-opencanvas-section');
+var type=sec.getAttribute('data-opencanvas-trigger-type');
+var val=parseInt(sec.getAttribute('data-opencanvas-trigger-value')||'0',10);
+var key='opencanvas-popup-dismissed-'+id;
 if(localStorage.getItem(key))return;
 var originalStyle=sec.getAttribute('style');
 var fired=false;

@@ -385,7 +385,7 @@ function clientScript(siteId: string): string {
     removeBtn.addEventListener('click', async () => {
       const hostname = card.getAttribute('data-hostname');
       if (!hostname) return;
-      if (!await __rev01Modal.confirm('Remove ' + hostname + '? This cannot be undone.', { title: 'Remove domain', confirmLabel: 'Remove', danger: true })) return;
+      if (!await __opencanvasModal.confirm('Remove ' + hostname + '? This cannot be undone.', { title: 'Remove domain', confirmLabel: 'Remove', danger: true })) return;
       removeBtn.disabled = true;
       try {
         const response = await fetch(

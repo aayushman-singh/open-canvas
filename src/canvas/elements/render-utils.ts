@@ -55,7 +55,7 @@ export function styleFromEntries(entries: ReadonlyArray<readonly [string, string
 
 /**
  * Escape an id for safe embedding inside a CSS attribute-selector string
- * of the shape `[data-rev01-element="<id>"]`. Backslash-escapes `\` and `"`
+ * of the shape `[data-opencanvas-element="<id>"]`. Backslash-escapes `\` and `"`
  * so a stray quote cannot break out of the selector. The schema validator
  * already constrains ids to a slug-like shape; this is defence-in-depth.
  */
@@ -105,7 +105,7 @@ export function renderInlineRun(run: InlineRun): string {
   if (link) {
     const targetAttr =
       link.target === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
-    inner = `<a class="rev01-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${inner}</a>`;
+    inner = `<a class="opencanvas-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${inner}</a>`;
   }
   return `<span>${inner}</span>`;
 }

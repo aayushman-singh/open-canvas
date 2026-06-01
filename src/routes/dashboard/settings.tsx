@@ -346,7 +346,7 @@ settingsRoute.get('/settings', async (c) => {
           <button
             class="btn btn-outline"
             style="color:var(--red-ink);border-color:var(--red-line)"
-            onclick="__rev01Modal.alert('Account deletion is not available in the demo.', 'Not available')"
+            onclick="__opencanvasModal.alert('Account deletion is not available in the demo.', 'Not available')"
           >
             Delete account
           </button>

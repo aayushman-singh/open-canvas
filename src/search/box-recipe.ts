@@ -5,7 +5,7 @@
 //
 // We deliberately do NOT introduce a new ElementType. We reuse the existing
 // `action` element (which the public renderer already turns into an anchor)
-// and stamp its `href` at `/__rev01/search`. A search submission is a GET to
+// and stamp its `href` at `/__opencanvas/search`. A search submission is a GET to
 // that endpoint; the Visitor's browser handles the redirect when the anchor
 // is clicked. The Owner's site styling (kit-aware action variant) applies
 // as usual.
@@ -45,7 +45,7 @@ export const SEARCH_BOX_ELEMENT_ID = 'search-box-action';
  * Endpoint the rendered anchor points at. Matches the public-host mount
  * defined in `src/search/route.ts`.
  */
-export const SEARCH_BOX_ENDPOINT = '/__rev01/search';
+export const SEARCH_BOX_ENDPOINT = '/__opencanvas/search';
 
 export interface SearchBoxRecipeOptions {
   /** Visible label on the search button. Defaults to "Search". */

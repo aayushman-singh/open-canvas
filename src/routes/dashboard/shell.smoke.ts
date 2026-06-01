@@ -8,12 +8,12 @@ function assert(condition: unknown, message: string): asserts condition {
 const source = readFileSync(join(process.cwd(), 'src', 'routes', 'dashboard', 'shell.tsx'), 'utf8');
 
 for (const className of [
-  'rev01-modal-backdrop',
-  'rev01-modal',
-  'rev01-modal-actions',
-  'rev01-modal-cancel',
-  'rev01-modal-ok',
-  'rev01-modal-danger',
+  'opencanvas-modal-backdrop',
+  'opencanvas-modal',
+  'opencanvas-modal-actions',
+  'opencanvas-modal-cancel',
+  'opencanvas-modal-ok',
+  'opencanvas-modal-danger',
 ]) {
   assert(source.includes(className), `dashboard shell must emit ${className}`);
 }

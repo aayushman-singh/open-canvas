@@ -31,7 +31,7 @@ const BUTTON_SIZE_CLASS: Record<ButtonSize, string> = {
   lg: 'btn-lg',
 };
 
-// The `rev01-ui-btn` / `rev01-ui-card` legacy class names are still
+// The `opencanvas-ui-btn` / `opencanvas-ui-card` legacy class names are still
 // referenced by per-page <style> blocks in src/routes/dashboard/templates.tsx,
 // src/routes/dashboard/site-settings.tsx, and src/landing/styles.ts — those
 // page-level overrides have not yet been migrated to the new .btn / .card
@@ -53,7 +53,7 @@ export function Button({
   href?: string;
   children?: Child;
 } & Record<string, unknown>) {
-  const cls = classes('btn', BUTTON_VARIANT_CLASS[variant], BUTTON_SIZE_CLASS[size], 'rev01-ui-btn', userClass);
+  const cls = classes('btn', BUTTON_VARIANT_CLASS[variant], BUTTON_SIZE_CLASS[size], 'opencanvas-ui-btn', userClass);
   if (href) {
     return (
       <a href={href} class={cls} {...rest}>
@@ -127,7 +127,7 @@ export function Card({
 }) {
   return (
     <section
-      class={classes('card', 'rev01-ui-card', userClass)}
+      class={classes('card', 'opencanvas-ui-card', userClass)}
       {...(id ? { id } : {})}
       {...(style ? { style } : {})}
     >

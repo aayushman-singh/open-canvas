@@ -6,7 +6,7 @@
 // Coverage:
 //   1. `emitDualModeCss(charcoal-with-dark)` contains both `:root {` and
 //      `:root[data-mode="dark"] {` blocks; the dark block carries an
-//      overridden `--rev01-kit-bg` value.
+//      overridden `--opencanvas-kit-bg` value.
 //   2. `getModeSetterScript()` is ≤200 chars, contains `data-mode`, and is
 //      syntactically valid JS (parses cleanly when evaluated in a Function
 //      constructor sandbox).
@@ -48,7 +48,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 // --------------------------------------------------------------------------
-// Test 1 — emitDualModeCss emits both blocks; dark overrides --rev01-kit-bg.
+// Test 1 — emitDualModeCss emits both blocks; dark overrides --opencanvas-kit-bg.
 // --------------------------------------------------------------------------
 
 const charcoal = getStyleKitPreset('charcoal');
@@ -63,7 +63,7 @@ assert(
 );
 // The light bg is `#0c0c0d`; the built-in dark override (built-in-darks.ts)
 // sets it to `#050507`. The dark block must therefore contain the dark
-// value as an `--rev01-kit-bg:` declaration.
+// value as an `--opencanvas-kit-bg:` declaration.
 const charcoalDarkVariant = resolveBuiltInDark('charcoal');
 assert(charcoalDarkVariant !== undefined, 'expected charcoal to have a built-in dark variant');
 assert(
@@ -75,8 +75,8 @@ const darkBlockStart = charcoalDualCss.indexOf(':root[data-mode="dark"] {');
 assert(darkBlockStart >= 0, 'expected dark block selector in dual CSS');
 const darkBlock = charcoalDualCss.slice(darkBlockStart);
 assert(
-  darkBlock.includes(`--rev01-kit-bg: ${charcoalDarkVariant.bg};`),
-  `expected dark block to declare --rev01-kit-bg with the dark override value, got:\n${darkBlock.slice(0, 400)}`,
+  darkBlock.includes(`--opencanvas-kit-bg: ${charcoalDarkVariant.bg};`),
+  `expected dark block to declare --opencanvas-kit-bg with the dark override value, got:\n${darkBlock.slice(0, 400)}`,
 );
 
 // --------------------------------------------------------------------------
@@ -135,8 +135,8 @@ assert(
   `expected toggle HTML to include aria-pressed attribute, got: ${toggleHtml.slice(0, 200)}`,
 );
 assert(
-  toggleHtml.includes('data-rev01-mode-toggle'),
-  'expected toggle HTML to expose the data-rev01-mode-toggle selector hook',
+  toggleHtml.includes('data-opencanvas-mode-toggle'),
+  'expected toggle HTML to expose the data-opencanvas-mode-toggle selector hook',
 );
 assert(
   toggleHtml.includes('aria-label='),

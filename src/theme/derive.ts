@@ -90,18 +90,18 @@ export function deriveTokens(seedHex: string): ThemeTokens {
 // ---------------------------------------------------------------------------
 
 export const TOKEN_TO_CSS_VAR: Record<ThemeTokenName, string> = {
-  bgDeep: '--rev01-bg-deep',
-  bgPanel: '--rev01-bg-panel',
-  bgPanelStrong: '--rev01-bg-panel-strong',
-  fg: '--rev01-fg',
-  fgMute: '--rev01-fg-mute',
-  accent: '--rev01-accent',
-  accentGlow: '--rev01-accent-glow',
-  warn: '--rev01-warn',
-  ok: '--rev01-ok',
-  err: '--rev01-err',
-  grid: '--rev01-grid',
-  hairline: '--rev01-hairline',
+  bgDeep: '--opencanvas-bg-deep',
+  bgPanel: '--opencanvas-bg-panel',
+  bgPanelStrong: '--opencanvas-bg-panel-strong',
+  fg: '--opencanvas-fg',
+  fgMute: '--opencanvas-fg-mute',
+  accent: '--opencanvas-accent',
+  accentGlow: '--opencanvas-accent-glow',
+  warn: '--opencanvas-warn',
+  ok: '--opencanvas-ok',
+  err: '--opencanvas-err',
+  grid: '--opencanvas-grid',
+  hairline: '--opencanvas-hairline',
 };
 
 export function tokensToCssDecls(tokens: ThemeTokens): string {

@@ -1,8 +1,8 @@
 // src/ui/styles.ts
 //
 // `uiStyles` used to be the single source of truth for the rev01 UI
-// primitive class rules (.rev01-ui-btn, .rev01-ui-badge, .rev01-ui-pill,
-// .rev01-ui-card, .rev01-ui-input, .rev01-ui-field). Every one of those
+// primitive class rules (.opencanvas-ui-btn, .opencanvas-ui-badge, .opencanvas-ui-pill,
+// .opencanvas-ui-card, .opencanvas-ui-input, .opencanvas-ui-field). Every one of those
 // rules has moved to src/ui/components.css (the Open Canvas `.btn`,
 // `.chip`, `.card`, `.field` primitives) as part of MIGRATION.md §3.
 //

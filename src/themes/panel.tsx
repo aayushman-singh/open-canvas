@@ -146,13 +146,13 @@ export const SURFACE_TREATMENTS: ReadonlyArray<SurfaceTreatmentChoice> = [
 ];
 
 // --------------------------------------------------------------------------
-// Panel CSS. Scoped under `[data-rev01-theme-panel]` to keep the editor
+// Panel CSS. Scoped under `[data-opencanvas-theme-panel]` to keep the editor
 // chrome's namespace clean. Consumed via a `<style>` block emitted by the
 // panel's container so this file stays self-contained.
 // --------------------------------------------------------------------------
 
 export const THEME_PANEL_STYLES: string = `
-  [data-rev01-theme-panel] {
+  [data-opencanvas-theme-panel] {
     display: grid;
     gap: 16px;
     padding: 16px;
@@ -162,13 +162,13 @@ export const THEME_PANEL_STYLES: string = `
     border-radius: 10px;
     font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
-  [data-rev01-theme-panel] h2 {
+  [data-opencanvas-theme-panel] h2 {
     margin: 0;
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.02em;
   }
-  [data-rev01-theme-panel] h3 {
+  [data-opencanvas-theme-panel] h3 {
     margin: 0;
     font-size: 12px;
     font-weight: 700;
@@ -176,22 +176,22 @@ export const THEME_PANEL_STYLES: string = `
     text-transform: uppercase;
     color: var(--muted, #8da3c8);
   }
-  [data-rev01-theme-panel] .rev01-theme-row {
+  [data-opencanvas-theme-panel] .opencanvas-theme-row {
     display: grid;
     gap: 8px;
   }
-  [data-rev01-theme-panel] .rev01-theme-grid {
+  [data-opencanvas-theme-panel] .opencanvas-theme-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
-  [data-rev01-theme-panel] label {
+  [data-opencanvas-theme-panel] label {
     display: grid;
     gap: 4px;
     font-size: 12px;
     color: var(--muted, #8da3c8);
   }
-  [data-rev01-theme-panel] input[type="color"] {
+  [data-opencanvas-theme-panel] input[type="color"] {
     width: 100%;
     height: 32px;
     padding: 0;
@@ -199,8 +199,8 @@ export const THEME_PANEL_STYLES: string = `
     border-radius: 6px;
     background: transparent;
   }
-  [data-rev01-theme-panel] input[type="text"],
-  [data-rev01-theme-panel] select {
+  [data-opencanvas-theme-panel] input[type="text"],
+  [data-opencanvas-theme-panel] select {
     padding: 8px 10px;
     border: 1px solid var(--line, rgba(255,255,255,0.12));
     border-radius: 6px;
@@ -208,12 +208,12 @@ export const THEME_PANEL_STYLES: string = `
     color: var(--text, #e8efff);
     font-size: 13px;
   }
-  [data-rev01-theme-panel] .rev01-theme-actions {
+  [data-opencanvas-theme-panel] .opencanvas-theme-actions {
     display: flex;
     gap: 8px;
     margin-top: 8px;
   }
-  [data-rev01-theme-panel] button {
+  [data-opencanvas-theme-panel] button {
     padding: 9px 14px;
     border-radius: 6px;
     border: 1px solid var(--line, rgba(255,255,255,0.12));
@@ -223,15 +223,15 @@ export const THEME_PANEL_STYLES: string = `
     font-weight: 600;
     cursor: pointer;
   }
-  [data-rev01-theme-panel] button[data-variant="ghost"] {
+  [data-opencanvas-theme-panel] button[data-variant="ghost"] {
     background: transparent;
     color: var(--text, #e8efff);
   }
-  [data-rev01-theme-panel] button[disabled] {
+  [data-opencanvas-theme-panel] button[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  [data-rev01-theme-panel] .rev01-theme-warnings {
+  [data-opencanvas-theme-panel] .opencanvas-theme-warnings {
     display: grid;
     gap: 8px;
     padding: 12px;
@@ -241,15 +241,15 @@ export const THEME_PANEL_STYLES: string = `
     color: #fca5a5;
     font-size: 12px;
   }
-  [data-rev01-theme-panel] .rev01-theme-warnings strong {
+  [data-opencanvas-theme-panel] .opencanvas-theme-warnings strong {
     color: #fee2e2;
   }
-  [data-rev01-theme-panel] .rev01-theme-status {
+  [data-opencanvas-theme-panel] .opencanvas-theme-status {
     font-size: 12px;
     color: var(--muted, #8da3c8);
     min-height: 16px;
   }
-  [data-rev01-theme-panel] .rev01-theme-preview {
+  [data-opencanvas-theme-panel] .opencanvas-theme-preview {
     display: flex;
     gap: 8px;
     align-items: center;
@@ -257,7 +257,7 @@ export const THEME_PANEL_STYLES: string = `
     border: 1px solid var(--line, rgba(255,255,255,0.12));
     border-radius: 6px;
   }
-  [data-rev01-theme-panel] .rev01-theme-preview .swatch {
+  [data-opencanvas-theme-panel] .opencanvas-theme-preview .swatch {
     width: 28px;
     height: 28px;
     border-radius: 6px;
@@ -291,9 +291,9 @@ export function ThemePanel(props: ThemePanelProps) {
   const warnings = checkKitContrast(props.activePreset);
   const editing = props.activeStyleKit === 'custom';
   return (
-    <section data-rev01-theme-panel data-active-kit={props.activeStyleKit}>
+    <section data-opencanvas-theme-panel data-active-kit={props.activeStyleKit}>
       <h2>Theme</h2>
-      <p class="rev01-theme-status" data-rev01-theme-status>
+      <p class="opencanvas-theme-status" data-opencanvas-theme-status>
         {editing
           ? 'Editing a custom theme. Save to apply, or reset to a built-in kit.'
           : `Built-in kit: ${props.activeStyleKit}. Edit colours to author a custom theme.`}
@@ -302,8 +302,8 @@ export function ThemePanel(props: ThemePanelProps) {
       <ResetGroup activeStyleKit={props.activeStyleKit} />
 
       <form
-        class="rev01-theme-form"
-        data-rev01-theme-form
+        class="opencanvas-theme-form"
+        data-opencanvas-theme-form
         method="post"
         action={`/api/sites/${escapeAttribute(props.siteId)}/custom-theme`}
       >
@@ -313,9 +313,9 @@ export function ThemePanel(props: ThemePanelProps) {
 
         {warnings.length > 0 ? <WarningsPanel warnings={warnings} /> : null}
 
-        <div class="rev01-theme-actions">
+        <div class="opencanvas-theme-actions">
           <button type="submit">Save custom theme</button>
-          <button type="button" data-variant="ghost" data-rev01-theme-promote>
+          <button type="button" data-variant="ghost" data-opencanvas-theme-promote>
             Start from this kit
           </button>
         </div>
@@ -355,9 +355,9 @@ export function ThemePanel(props: ThemePanelProps) {
 
 function ColorGroup({ preset }: { preset: StyleKitPreset }) {
   return (
-    <div class="rev01-theme-row">
+    <div class="opencanvas-theme-row">
       <h3>Colour</h3>
-      <div class="rev01-theme-grid">
+      <div class="opencanvas-theme-grid">
         <ColorField name="bg" label="Background" value={preset.bg} />
         <ColorField name="panel" label="Panel" value={preset.panel} />
         <ColorField name="text" label="Text" value={preset.text} />
@@ -387,13 +387,13 @@ function ColorField({
         type="color"
         name={`${name}_picker`}
         value={normaliseHexForPicker(value)}
-        data-rev01-theme-picker={name}
+        data-opencanvas-theme-picker={name}
       />
       <input
         type="text"
         name={name}
         value={value}
-        data-rev01-theme-hex={name}
+        data-opencanvas-theme-hex={name}
         inputmode="text"
         autocomplete="off"
         spellcheck={false}
@@ -405,11 +405,11 @@ function ColorField({
 function TypePairGroup({ preset }: { preset: StyleKitPreset }) {
   const activePairId = findActiveTypePairId(preset);
   return (
-    <div class="rev01-theme-row">
+    <div class="opencanvas-theme-row">
       <h3>Typography</h3>
       <label>
         <span>Display + body pair</span>
-        <select name="typePairId" data-rev01-theme-type-pair>
+        <select name="typePairId" data-opencanvas-theme-type-pair>
           {TYPE_PAIRS.map((pair) => (
             <option value={pair.id} selected={pair.id === activePairId}>
               {pair.label}
@@ -424,11 +424,11 @@ function TypePairGroup({ preset }: { preset: StyleKitPreset }) {
 function SurfaceTreatmentGroup({ preset }: { preset: StyleKitPreset }) {
   const activeId = findActiveSurfaceTreatmentId(preset);
   return (
-    <div class="rev01-theme-row">
+    <div class="opencanvas-theme-row">
       <h3>Surface</h3>
       <label>
         <span>Treatment</span>
-        <select name="surfaceTreatmentId" data-rev01-theme-surface>
+        <select name="surfaceTreatmentId" data-opencanvas-theme-surface>
           {SURFACE_TREATMENTS.map((s) => (
             <option value={s.id} selected={s.id === activeId}>
               {s.label}
@@ -442,11 +442,11 @@ function SurfaceTreatmentGroup({ preset }: { preset: StyleKitPreset }) {
 
 function ResetGroup({ activeStyleKit }: { activeStyleKit: StyleKit }) {
   return (
-    <div class="rev01-theme-row">
+    <div class="opencanvas-theme-row">
       <h3>Reset</h3>
       <label>
         <span>Pick a built-in kit</span>
-        <select data-rev01-theme-reset-target>
+        <select data-opencanvas-theme-reset-target>
           {BUILT_IN_STYLE_KITS.map((kit) => (
             <option value={kit} selected={kit === activeStyleKit}>
               {kit}
@@ -454,8 +454,8 @@ function ResetGroup({ activeStyleKit }: { activeStyleKit: StyleKit }) {
           ))}
         </select>
       </label>
-      <div class="rev01-theme-actions">
-        <button type="button" data-variant="ghost" data-rev01-theme-reset>
+      <div class="opencanvas-theme-actions">
+        <button type="button" data-variant="ghost" data-opencanvas-theme-reset>
           Reset to built-in
         </button>
       </div>
@@ -465,7 +465,7 @@ function ResetGroup({ activeStyleKit }: { activeStyleKit: StyleKit }) {
 
 function WarningsPanel({ warnings }: { warnings: ContrastWarning[] }) {
   return (
-    <div class="rev01-theme-warnings" role="status" aria-live="polite">
+    <div class="opencanvas-theme-warnings" role="status" aria-live="polite">
       <h3>Contrast warnings</h3>
       {warnings.map((w) => (
         <p>
@@ -558,16 +558,16 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
   return String.raw`
 (() => {
   const STATE = JSON.parse(${JSON.stringify(json)});
-  const root = document.querySelector('[data-rev01-theme-panel]');
+  const root = document.querySelector('[data-opencanvas-theme-panel]');
   if (!root) return;
-  const form = root.querySelector('[data-rev01-theme-form]');
-  const status = root.querySelector('[data-rev01-theme-status]');
+  const form = root.querySelector('[data-opencanvas-theme-form]');
+  const status = root.querySelector('[data-opencanvas-theme-status]');
   function setStatus(msg) { if (status) status.textContent = msg; }
   // Mirror colour picker ↔ hex text input. Either side updates the other.
-  root.querySelectorAll('[data-rev01-theme-picker]').forEach((picker) => {
-    const name = picker.getAttribute('data-rev01-theme-picker');
+  root.querySelectorAll('[data-opencanvas-theme-picker]').forEach((picker) => {
+    const name = picker.getAttribute('data-opencanvas-theme-picker');
     if (!name) return;
-    const hex = root.querySelector('[data-rev01-theme-hex="' + name + '"]');
+    const hex = root.querySelector('[data-opencanvas-theme-hex="' + name + '"]');
     if (!hex) return;
     picker.addEventListener('input', () => { hex.value = picker.value; });
     hex.addEventListener('input', () => {
@@ -579,10 +579,10 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
   function gatherKit() {
     const kit = JSON.parse(JSON.stringify(STATE.preset));
     ['bg', 'panel', 'text', 'muted', 'accent', 'accentText'].forEach((name) => {
-      const hex = root.querySelector('[data-rev01-theme-hex="' + name + '"]');
+      const hex = root.querySelector('[data-opencanvas-theme-hex="' + name + '"]');
       if (hex) kit[name] = hex.value.trim();
     });
-    const typePairSel = root.querySelector('[data-rev01-theme-type-pair]');
+    const typePairSel = root.querySelector('[data-opencanvas-theme-type-pair]');
     if (typePairSel) {
       const choice = STATE.typePairs.find((p) => p.id === typePairSel.value);
       if (choice) {
@@ -590,7 +590,7 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
         kit.fontFamilyBody = choice.body;
       }
     }
-    const surfaceSel = root.querySelector('[data-rev01-theme-surface]');
+    const surfaceSel = root.querySelector('[data-opencanvas-theme-surface]');
     if (surfaceSel) {
       const choice = STATE.surfaceTreatments.find((s) => s.id === surfaceSel.value);
       if (choice) {
@@ -635,7 +635,7 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
   // "Start from this kit" — flips selector to 'custom' with the current
   // built-in preset as the seed, then saves. Useful so the Owner doesn't
   // have to author every token from scratch.
-  const promote = root.querySelector('[data-rev01-theme-promote]');
+  const promote = root.querySelector('[data-opencanvas-theme-promote]');
   if (promote) {
     promote.addEventListener('click', async () => {
       setStatus('Promoting current kit to a custom theme…');
@@ -657,12 +657,12 @@ function themePanelClientScript(siteId: string, preset: StyleKitPreset): string 
     });
   }
   // Reset → DELETE the custom-theme + flip styleKit to the chosen built-in.
-  const reset = root.querySelector('[data-rev01-theme-reset]');
+  const reset = root.querySelector('[data-opencanvas-theme-reset]');
   if (reset) {
     reset.addEventListener('click', async () => {
-      const target = root.querySelector('[data-rev01-theme-reset-target]');
+      const target = root.querySelector('[data-opencanvas-theme-reset-target]');
       const builtIn = target ? target.value : 'charcoal';
-      if (!await window.__rev01Modal.confirm('Reset to built-in kit "' + builtIn + '"? Your custom theme will be discarded.', { title: 'Reset theme' })) return;
+      if (!await window.__opencanvasModal.confirm('Reset to built-in kit "' + builtIn + '"? Your custom theme will be discarded.', { title: 'Reset theme' })) return;
       setStatus('Resetting to ' + builtIn + '…');
       try {
         const response = await fetch(
@@ -706,13 +706,13 @@ const DARK_COLOR_TOKENS: ReadonlyArray<{ name: keyof Omit<StyleKitPreset, 'dark'
 function DarkVariantSection({ siteId, preset }: { siteId: string; preset: StyleKitPreset }) {
   const dark = preset.dark ?? {};
   return (
-    <section data-rev01-dark-variant class="rev01-theme-row">
+    <section data-opencanvas-dark-variant class="opencanvas-theme-row">
       <h3>Dark variant</h3>
-      <p class="rev01-theme-status">
+      <p class="opencanvas-theme-status">
         Optional overrides applied when the visitor's mode is dark. Empty fields fall
         through to the light value.
       </p>
-      <div class="rev01-theme-grid">
+      <div class="opencanvas-theme-grid">
         {DARK_COLOR_TOKENS.map((tok) => (
           <DarkColorField
             name={String(tok.name)}
@@ -723,15 +723,15 @@ function DarkVariantSection({ siteId, preset }: { siteId: string; preset: StyleK
           />
         ))}
       </div>
-      <div class="rev01-theme-actions">
-        <button type="button" data-rev01-dark-save>
+      <div class="opencanvas-theme-actions">
+        <button type="button" data-opencanvas-dark-save>
           Save dark variant
         </button>
-        <button type="button" data-variant="ghost" data-rev01-dark-clear>
+        <button type="button" data-variant="ghost" data-opencanvas-dark-clear>
           Clear dark variant
         </button>
       </div>
-      <p class="rev01-theme-status" data-rev01-dark-status></p>
+      <p class="opencanvas-theme-status" data-opencanvas-dark-status></p>
       <script type="module">{raw(darkVariantClientScript(siteId, preset))}</script>
     </section>
   );
@@ -756,14 +756,14 @@ function DarkColorField({
         type="color"
         name={`dark_${name}_picker`}
         value={value.length > 0 ? normaliseHexForPicker(value) : '#000000'}
-        data-rev01-dark-picker={name}
+        data-opencanvas-dark-picker={name}
       />
       <input
         type="text"
         name={`dark_${name}`}
         value={value}
         placeholder="(inherit from light)"
-        data-rev01-dark-hex={name}
+        data-opencanvas-dark-hex={name}
         inputmode="text"
         autocomplete="off"
         spellcheck={false}
@@ -783,15 +783,15 @@ function darkVariantClientScript(siteId: string, preset: StyleKitPreset): string
   return String.raw`
 (() => {
   const STATE = JSON.parse(${JSON.stringify(json)});
-  const root = document.querySelector('[data-rev01-dark-variant]');
+  const root = document.querySelector('[data-opencanvas-dark-variant]');
   if (!root) return;
-  const status = root.querySelector('[data-rev01-dark-status]');
+  const status = root.querySelector('[data-opencanvas-dark-status]');
   function setStatus(msg) { if (status) status.textContent = msg; }
   // Picker ↔ hex sync, independent from the light form's wiring.
-  root.querySelectorAll('[data-rev01-dark-picker]').forEach((picker) => {
-    const name = picker.getAttribute('data-rev01-dark-picker');
+  root.querySelectorAll('[data-opencanvas-dark-picker]').forEach((picker) => {
+    const name = picker.getAttribute('data-opencanvas-dark-picker');
     if (!name) return;
-    const hex = root.querySelector('[data-rev01-dark-hex="' + name + '"]');
+    const hex = root.querySelector('[data-opencanvas-dark-hex="' + name + '"]');
     if (!hex) return;
     picker.addEventListener('input', () => { hex.value = picker.value; });
     hex.addEventListener('input', () => {
@@ -803,7 +803,7 @@ function darkVariantClientScript(siteId: string, preset: StyleKitPreset): string
     const dark = {};
     const TOKENS = ['bg', 'panel', 'text', 'muted', 'accent', 'accentText'];
     for (const name of TOKENS) {
-      const hex = root.querySelector('[data-rev01-dark-hex="' + name + '"]');
+      const hex = root.querySelector('[data-opencanvas-dark-hex="' + name + '"]');
       if (!hex) continue;
       const v = hex.value.trim();
       if (v.length > 0) dark[name] = v;
@@ -836,7 +836,7 @@ function darkVariantClientScript(siteId: string, preset: StyleKitPreset): string
       setStatus('Network error: ' + (err && err.message ? err.message : String(err)));
     }
   }
-  const saveBtn = root.querySelector('[data-rev01-dark-save]');
+  const saveBtn = root.querySelector('[data-opencanvas-dark-save]');
   if (saveBtn) {
     saveBtn.addEventListener('click', () => {
       const nextKit = JSON.parse(JSON.stringify(STATE.preset));
@@ -849,10 +849,10 @@ function darkVariantClientScript(siteId: string, preset: StyleKitPreset): string
       putKit(nextKit);
     });
   }
-  const clearBtn = root.querySelector('[data-rev01-dark-clear]');
+  const clearBtn = root.querySelector('[data-opencanvas-dark-clear]');
   if (clearBtn) {
     clearBtn.addEventListener('click', async () => {
-      if (!await window.__rev01Modal.confirm('Clear the dark variant? Visitors in dark mode will see the light kit.', { title: 'Clear dark variant' })) return;
+      if (!await window.__opencanvasModal.confirm('Clear the dark variant? Visitors in dark mode will see the light kit.', { title: 'Clear dark variant' })) return;
       const nextKit = JSON.parse(JSON.stringify(STATE.preset));
       delete nextKit.dark;
       putKit(nextKit);
@@ -891,15 +891,15 @@ export type { ActionVariant, MotionPreset, SurfaceVariant };
 
 function CustomFontsSection({ siteId, editing }: { siteId: string; editing: boolean }) {
   return (
-    <section data-rev01-custom-fonts class="rev01-theme-row">
+    <section data-opencanvas-custom-fonts class="opencanvas-theme-row">
       <h3>Custom fonts</h3>
-      <p class="rev01-theme-status">
+      <p class="opencanvas-theme-status">
         {editing
           ? 'Upload a WOFF2 file and assign it as the display, body, or mono font for this custom theme.'
           : 'Upload fonts here; assigning one to display / body / mono is enabled once you start a custom theme.'}
       </p>
       <form
-        data-rev01-fonts-form
+        data-opencanvas-fonts-form
         method="post"
         action={`/api/sites/${escapeAttribute(siteId)}/fonts`}
         enctype="multipart/form-data"
@@ -909,7 +909,7 @@ function CustomFontsSection({ siteId, editing }: { siteId: string; editing: bool
           <input
             type="text"
             name="name"
-            data-rev01-font-name
+            data-opencanvas-font-name
             placeholder="Display"
             autocomplete="off"
             spellcheck={false}
@@ -917,20 +917,20 @@ function CustomFontsSection({ siteId, editing }: { siteId: string; editing: bool
         </label>
         <label>
           <span>Family classification</span>
-          <select name="family" data-rev01-font-family>
+          <select name="family" data-opencanvas-font-family>
             <option value="sans-serif">sans-serif</option>
             <option value="serif">serif</option>
             <option value="mono">mono</option>
             <option value="display">display</option>
           </select>
         </label>
-        <div class="rev01-theme-grid">
+        <div class="opencanvas-theme-grid">
           <label>
             <span>Weight</span>
             <input
               type="text"
               name="weight"
-              data-rev01-font-weight
+              data-opencanvas-font-weight
               value="400"
               inputmode="numeric"
               autocomplete="off"
@@ -938,7 +938,7 @@ function CustomFontsSection({ siteId, editing }: { siteId: string; editing: bool
           </label>
           <label>
             <span>Style</span>
-            <select name="style" data-rev01-font-style>
+            <select name="style" data-opencanvas-font-style>
               <option value="normal" selected>
                 normal
               </option>
@@ -948,16 +948,16 @@ function CustomFontsSection({ siteId, editing }: { siteId: string; editing: bool
         </div>
         <label>
           <span>WOFF2 file</span>
-          <input type="file" name="file" accept=".woff2,font/woff2" data-rev01-font-file />
+          <input type="file" name="file" accept=".woff2,font/woff2" data-opencanvas-font-file />
         </label>
-        <div class="rev01-theme-actions">
-          <button type="submit" data-rev01-font-upload>
+        <div class="opencanvas-theme-actions">
+          <button type="submit" data-opencanvas-font-upload>
             Upload font
           </button>
         </div>
       </form>
-      <p class="rev01-theme-status" data-rev01-font-status></p>
-      <div data-rev01-font-list></div>
+      <p class="opencanvas-theme-status" data-opencanvas-font-status></p>
+      <div data-opencanvas-font-list></div>
       <script type="module">{raw(customFontsClientScript(siteId, editing))}</script>
     </section>
   );
@@ -975,11 +975,11 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
   return String.raw`
 (() => {
   const STATE = JSON.parse(${JSON.stringify(json)});
-  const root = document.querySelector('[data-rev01-custom-fonts]');
+  const root = document.querySelector('[data-opencanvas-custom-fonts]');
   if (!root) return;
-  const listEl = root.querySelector('[data-rev01-font-list]');
-  const status = root.querySelector('[data-rev01-font-status]');
-  const form = root.querySelector('[data-rev01-fonts-form]');
+  const listEl = root.querySelector('[data-opencanvas-font-list]');
+  const status = root.querySelector('[data-opencanvas-font-status]');
+  const form = root.querySelector('[data-opencanvas-fonts-form]');
   function setStatus(msg) { if (status) status.textContent = msg; }
 
   function escapeHtml(s) {
@@ -1010,23 +1010,23 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
   function renderList(fonts) {
     if (!listEl) return;
     if (fonts.length === 0) {
-      listEl.innerHTML = '<p class="rev01-theme-status">No custom fonts uploaded yet.</p>';
+      listEl.innerHTML = '<p class="opencanvas-theme-status">No custom fonts uploaded yet.</p>';
       return;
     }
     const rows = fonts.map((font) => {
       const meta = escapeHtml(font.name) + ' · ' + escapeHtml(font.family) +
         ' · w' + String(font.weight) + ' · ' + escapeHtml(font.style);
       const assignButtons = STATE.editing
-        ? '<div class="rev01-theme-actions">' +
-          '<button type="button" data-variant="ghost" data-rev01-font-assign="display" data-rev01-font-hash="' + escapeAttr(font.contentHash) + '">Display</button>' +
-          '<button type="button" data-variant="ghost" data-rev01-font-assign="body" data-rev01-font-hash="' + escapeAttr(font.contentHash) + '">Body</button>' +
-          '<button type="button" data-variant="ghost" data-rev01-font-assign="mono" data-rev01-font-hash="' + escapeAttr(font.contentHash) + '">Mono</button>' +
-          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeAttr(font.id) + '">Delete</button>' +
+        ? '<div class="opencanvas-theme-actions">' +
+          '<button type="button" data-variant="ghost" data-opencanvas-font-assign="display" data-opencanvas-font-hash="' + escapeAttr(font.contentHash) + '">Display</button>' +
+          '<button type="button" data-variant="ghost" data-opencanvas-font-assign="body" data-opencanvas-font-hash="' + escapeAttr(font.contentHash) + '">Body</button>' +
+          '<button type="button" data-variant="ghost" data-opencanvas-font-assign="mono" data-opencanvas-font-hash="' + escapeAttr(font.contentHash) + '">Mono</button>' +
+          '<button type="button" data-variant="ghost" data-opencanvas-font-delete="' + escapeAttr(font.id) + '">Delete</button>' +
           '</div>'
-        : '<div class="rev01-theme-actions">' +
-          '<button type="button" data-variant="ghost" data-rev01-font-delete="' + escapeAttr(font.id) + '">Delete</button>' +
+        : '<div class="opencanvas-theme-actions">' +
+          '<button type="button" data-variant="ghost" data-opencanvas-font-delete="' + escapeAttr(font.id) + '">Delete</button>' +
           '</div>';
-      return '<div class="rev01-theme-row"><strong>' + meta + '</strong>' + assignButtons + '</div>';
+      return '<div class="opencanvas-theme-row"><strong>' + meta + '</strong>' + assignButtons + '</div>';
     }).join('');
     listEl.innerHTML = rows;
   }
@@ -1063,8 +1063,8 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
 
-      const assignSlot = target.getAttribute('data-rev01-font-assign');
-      const assignHash = target.getAttribute('data-rev01-font-hash');
+      const assignSlot = target.getAttribute('data-opencanvas-font-assign');
+      const assignHash = target.getAttribute('data-opencanvas-font-hash');
       if (assignSlot && assignHash) {
         if (!STATE.editing) {
           setStatus('Start a custom theme first to assign a font.');
@@ -1111,9 +1111,9 @@ function customFontsClientScript(siteId: string, editing: boolean): string {
         return;
       }
 
-      const deleteId = target.getAttribute('data-rev01-font-delete');
+      const deleteId = target.getAttribute('data-opencanvas-font-delete');
       if (deleteId) {
-        if (!await window.__rev01Modal.confirm('Delete this font? Any token that references it will stop rendering.', { title: 'Delete font', confirmLabel: 'Delete', danger: true })) return;
+        if (!await window.__opencanvasModal.confirm('Delete this font? Any token that references it will stop rendering.', { title: 'Delete font', confirmLabel: 'Delete', danger: true })) return;
         setStatus('Deleting font…');
         try {
           const response = await fetch('/api/sites/' + encodeURIComponent(STATE.siteId) + '/fonts/' + encodeURIComponent(deleteId), {

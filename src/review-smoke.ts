@@ -76,7 +76,7 @@ const smokeEnv: Record<string, string> = {
 };
 
 async function responseText(path: string): Promise<{ status: number; body: string }> {
-  const response = await app.request(`http://rev01.test${path}`, undefined, smokeEnv);
+  const response = await app.request(`http://opencanvas.test${path}`, undefined, smokeEnv);
   return { status: response.status, body: await response.text() };
 }
 
@@ -484,7 +484,7 @@ assert(
 );
 const customTemplatesSource = await readSource('./routes/api/custom-templates.ts');
 assert(
-  !customTemplatesSource.includes('rev01-preview-stage'),
+  !customTemplatesSource.includes('opencanvas-preview-stage'),
   'expected custom template previews to rely on the outer thumbnail iframe scaling',
 );
 assert(
@@ -1138,7 +1138,7 @@ assert(
   'expected style-kit click handling to bind sidebar style-kit buttons',
 );
 const inlineCanvasClient = canvasClientScript({ siteId: 'site-smoke' });
-const inlineCanvasClientParseDir = await mkdtemp(join(tmpdir(), 'rev01-canvas-client-'));
+const inlineCanvasClientParseDir = await mkdtemp(join(tmpdir(), 'opencanvas-canvas-client-'));
 const inlineCanvasClientParsePath = join(inlineCanvasClientParseDir, 'client.mjs');
 try {
   await writeFile(inlineCanvasClientParsePath, `if (false) {\n${inlineCanvasClient}\n}\n`);
@@ -1390,12 +1390,12 @@ try {
   const pubResp = await responseFromHost(SMOKE_HOST, '/');
   assert(pubResp.status === 200, `expected published site to 200, got ${pubResp.status}`);
   assert(
-    pubResp.body.includes('data-rev01-public-root'),
-    'expected published body to contain data-rev01-public-root',
+    pubResp.body.includes('data-opencanvas-public-root'),
+    'expected published body to contain data-opencanvas-public-root',
   );
   assert(
-    pubResp.body.includes('data-rev01-page="page-home"'),
-    'expected published body to contain data-rev01-page="page-home"',
+    pubResp.body.includes('data-opencanvas-page="page-home"'),
+    'expected published body to contain data-opencanvas-page="page-home"',
   );
   assert(
     pubResp.body.includes('currentVersion = 1'),
@@ -1424,7 +1424,7 @@ try {
 
   // 6. /__live with upgrade header but missing wsToken → 401.
   const liveNoToken = await app.request(
-    `http://rev01.test/__live?siteId=fake-site-id`,
+    `http://opencanvas.test/__live?siteId=fake-site-id`,
     { headers: new Headers({ upgrade: 'websocket' }) },
     smokeEnv,
   );
@@ -1435,7 +1435,7 @@ try {
 
   // 7. /__live with invalid wsToken → 401.
   const liveInvalidToken = await app.request(
-    `http://rev01.test/__live?siteId=fake-site-id&wsToken=not-a-real-token`,
+    `http://opencanvas.test/__live?siteId=fake-site-id&wsToken=not-a-real-token`,
     { headers: new Headers({ upgrade: 'websocket' }) },
     smokeEnv,
   );
@@ -1450,7 +1450,7 @@ try {
     SMOKE_UNLOCK_SIGNING_SECRET,
   );
   const liveWrongSite = await app.request(
-    `http://rev01.test/__live?siteId=fake-site-id&wsToken=${encodeURIComponent(wrongSiteToken)}`,
+    `http://opencanvas.test/__live?siteId=fake-site-id&wsToken=${encodeURIComponent(wrongSiteToken)}`,
     { headers: new Headers({ upgrade: 'websocket' }) },
     smokeEnv,
   );
@@ -1786,9 +1786,9 @@ for (const recipeId of SECTION_RECIPE_IDS as readonly SectionRecipeId[]) {
 // Route shell: hitting /api/canvas-agent/sites/:siteId/preview without auth
 // MUST redirect to the Clerk sign-in URL (clerkAuth + requireAuth gate). The
 // public host router only intercepts *.<APP_DOMAIN>; the app host
-// (rev01.test by default in review-smoke) falls through to the app routes.
+// (opencanvas.test by default in review-smoke) falls through to the app routes.
 const t7PreviewProbe = await app.request(
-  'http://rev01.test/api/canvas-agent/sites/probe/preview',
+  'http://opencanvas.test/api/canvas-agent/sites/probe/preview',
   { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"prompt":"x"}' },
   smokeEnv,
 );
@@ -1797,7 +1797,7 @@ assert(
   `expected canvas-agent preview without auth to redirect or 401, got ${t7PreviewProbe.status}`,
 );
 const t7ApplyProbe = await app.request(
-  'http://rev01.test/api/canvas-agent/sites/probe/apply',
+  'http://opencanvas.test/api/canvas-agent/sites/probe/apply',
   { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"ops":[]}' },
   smokeEnv,
 );

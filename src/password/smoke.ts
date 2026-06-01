@@ -16,8 +16,8 @@
 //        b. Site with password + no cookie → 401 + gate body.
 //        c. Site with valid cookie → null.
 //        d. Site with stale-hashEpoch cookie → 401 (rotation invalidation).
-//        e. Unlock path /__rev01/unlock → null (bypass).
-//        f. Visitor subsystem path /__rev01/search → 401 (still gated).
+//        e. Unlock path /__opencanvas/unlock → null (bypass).
+//        f. Visitor subsystem path /__opencanvas/search → 401 (still gated).
 //   4. Rate-limit: 6th failed attempt inside 60s gets 429.
 //
 // Hermetic, no network, no DB.
@@ -267,7 +267,7 @@ async function runMiddlewareSuite(): Promise<void> {
   assert(r2.status === 401, `expected 401 gate response, got ${String(r2.status)}`);
   const body = await r2.text();
   assert(body.includes('password required'), 'gate body missing title marker');
-  assert(body.includes('action="/__rev01/unlock"'), 'gate body missing form action');
+  assert(body.includes('action="/__opencanvas/unlock"'), 'gate body missing form action');
   assert(body.includes('value="/about"'), 'gate body missing redirect hidden value');
 
   // (c) Valid cookie → null.
@@ -292,14 +292,14 @@ async function runMiddlewareSuite(): Promise<void> {
   assert(r4.status === 401, 'stale cookie response should be 401');
 
   // (e) Unlock path bypasses the gate so the unlock POST can land.
-  const cReserved = makeContext('https://x.opencanvas.aayushman.dev/__rev01/unlock', null);
+  const cReserved = makeContext('https://x.opencanvas.aayushman.dev/__opencanvas/unlock', null);
   const r5 = await requireUnlock(cReserved as never, env, protectedSite);
   assert(r5 === null, 'unlock path must bypass the gate');
 
   // (f) Visitor subsystem paths are still visitor traffic and must stay
   // behind the password gate. Search results and form submissions would
   // otherwise leak protected-site state.
-  const cSearch = makeContext('https://x.opencanvas.aayushman.dev/__rev01/search?q=secret', null);
+  const cSearch = makeContext('https://x.opencanvas.aayushman.dev/__opencanvas/search?q=secret', null);
   const rSearch = await requireUnlock(cSearch as never, env, protectedSite);
   assert(rSearch !== null, 'protected visitor search must be gated without a cookie');
   assert(rSearch.status === 401, 'protected visitor search gate response should be 401');

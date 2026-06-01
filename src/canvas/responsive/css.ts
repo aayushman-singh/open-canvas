@@ -4,13 +4,13 @@
 //
 // Engine: viewport `@media` queries (NOT container queries). See
 // `SUBSYSTEM.md` for the rationale — short version: the existing renderer
-// emits inline `width: <pageWidth>px` on every `.rev01-section`, so a CSS
+// emits inline `width: <pageWidth>px` on every `.opencanvas-section`, so a CSS
 // container query on the section would always see the fixed desktop width
 // and never fire below it. Changing that would require editing
 // `src/canvas/render.ts` beyond the single injection hook the brief allows.
 // `@media` queries against the Visitor's viewport sidestep that constraint.
 //
-// Selectors target the stable `data-rev01-*` attributes the renderer already
+// Selectors target the stable `data-opencanvas-*` attributes the renderer already
 // stamps onto every page, section, and element wrapper. No selector touches
 // class names or element internals.
 //
@@ -85,23 +85,23 @@ function buildBreakpointBlock(
 }
 
 function pageRule(pageId: string, widthPx: number): string {
-  const sel = `[data-rev01-page="${escapeCssIdent(pageId)}"]`;
+  const sel = `[data-opencanvas-page="${escapeCssIdent(pageId)}"]`;
   return `${sel} { width: ${String(widthPx)}px !important; }`;
 }
 
 // Sections also emit `width !important` even though their parent page has the
 // same scaled width. The renderer stamps the desktop page-width inline on
-// every `.rev01-section` (see `renderSection` in `render.ts`), so without
+// every `.opencanvas-section` (see `renderSection` in `render.ts`), so without
 // overriding the section's own inline width the section would stay at the
 // desktop width and overflow the scaled page. Two `width` declarations on
 // the cascade is the cheapest way to override both wrappers' inline styles.
 function sectionRule(sectionId: string, widthPx: number, heightPx: number): string {
-  const sel = `[data-rev01-section="${escapeCssIdent(sectionId)}"]`;
+  const sel = `[data-opencanvas-section="${escapeCssIdent(sectionId)}"]`;
   return `${sel} { width: ${String(widthPx)}px !important; height: ${String(heightPx)}px !important; }`;
 }
 
 function elementRule(elementId: string, box: ResolvedBox): string {
-  const sel = `[data-rev01-element="${escapeCssIdent(elementId)}"]`;
+  const sel = `[data-opencanvas-element="${escapeCssIdent(elementId)}"]`;
   if (box.hidden) {
     return `${sel} { display: none !important; }`;
   }
@@ -116,11 +116,11 @@ function elementRule(elementId: string, box: ResolvedBox): string {
 }
 
 /**
- * Wraps a CSS body in `<style data-rev01-responsive>...</style>`. The
- * `data-rev01-responsive` attribute is the renderer-side marker the smoke
+ * Wraps a CSS body in `<style data-opencanvas-responsive>...</style>`. The
+ * `data-opencanvas-responsive` attribute is the renderer-side marker the smoke
  * test pins on to assert the block was injected.
  */
 export function wrapInStyleBlock(cssBody: string): string {
   if (cssBody === '') return '';
-  return `<style data-rev01-responsive>${cssBody}</style>`;
+  return `<style data-opencanvas-responsive>${cssBody}</style>`;
 }

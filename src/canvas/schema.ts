@@ -341,7 +341,7 @@ export interface CanvasSection {
    * Popup-section trigger. Discriminated by `type` so `exit-intent` cannot
    * carry a `value` and the other two arms require one. Unit of `value`
    * depends on the arm; documented inline because the persistence layer
-   * (yjs + data-rev01-trigger-value attribute) shares a single key.
+   * (yjs + data-opencanvas-trigger-value attribute) shares a single key.
    */
   trigger?:
     | { type: 'exit-intent' }
@@ -459,7 +459,7 @@ export type PublishedSnapshot = EditableSite & {
 //
 // A Style Kit is a curated visual system — colour, typography, surfaces,
 // shapes, actions, and motion — that the editor preview and the published
-// renderer translate into a block of `--rev01-*` CSS custom properties on the
+// renderer translate into a block of `--opencanvas-*` CSS custom properties on the
 // page wrapper. The actual preset DATA lives in `src/canvas/style-kits.ts`
 // (one definition shared by editor + public renderer); the schema retains
 // only the TYPE so it stays free of runtime data and Cloudflare-bundle weight.

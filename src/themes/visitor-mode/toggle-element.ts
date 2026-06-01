@@ -8,7 +8,7 @@
 //     it on every click so screen readers announce the change.
 //   - `aria-label` — describes the action in human language because the
 //     visible content is a glyph (sun / moon).
-//   - `data-rev01-mode-toggle` — selector hook for the toggle script.
+//   - `data-opencanvas-mode-toggle` — selector hook for the toggle script.
 //
 // The toggle script (also returned by this module) is small (~15 lines): it
 // reads the current `data-mode` from `<html>`, flips it, writes the cookie,
@@ -30,9 +30,9 @@ import { cookieName, type HostConfigEnv } from '../../host-config.js';
  * inert until the visitor clicks; first-paint mode is already correct
  * thanks to `getModeSetterScript(env)` running earlier.
  *
- * The returned HTML uses a wrapper `<div data-rev01-mode-toggle-mount>` so
+ * The returned HTML uses a wrapper `<div data-opencanvas-mode-toggle-mount>` so
  * the toggle script can find the button even when multiple toggles exist on
- * one page (it queries all `[data-rev01-mode-toggle]` buttons and wires
+ * one page (it queries all `[data-opencanvas-mode-toggle]` buttons and wires
  * each independently).
  */
 export function renderModeToggleHtml(env: HostConfigEnv): string {
@@ -42,14 +42,14 @@ export function renderModeToggleHtml(env: HostConfigEnv): string {
   // prefers-color-scheme — the server doesn't know which, so we sync after
   // the early script ran).
   const button =
-    `<button type="button" data-rev01-mode-toggle aria-pressed="false" aria-label="Toggle light and dark mode" class="rev01-mode-toggle">` +
+    `<button type="button" data-opencanvas-mode-toggle aria-pressed="false" aria-label="Toggle light and dark mode" class="opencanvas-mode-toggle">` +
     // Sun + moon glyphs as SVG so the toggle reads correctly regardless of
     // the kit's text colour (the SVGs use `currentColor`). The CSS in
     // `MODE_TOGGLE_STYLES` swaps which one is visible based on `aria-pressed`.
-    `<svg class="rev01-mode-toggle__sun" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>` +
-    `<svg class="rev01-mode-toggle__moon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>` +
+    `<svg class="opencanvas-mode-toggle__sun" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>` +
+    `<svg class="opencanvas-mode-toggle__moon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>` +
     `</button>`;
-  return `<div data-rev01-mode-toggle-mount>${button}<style>${MODE_TOGGLE_STYLES}</style><script>${buildModeToggleScript(env)}</script></div>`;
+  return `<div data-opencanvas-mode-toggle-mount>${button}<style>${MODE_TOGGLE_STYLES}</style><script>${buildModeToggleScript(env)}</script></div>`;
 }
 
 /**
@@ -74,10 +74,10 @@ export function buildModeToggleScript(env: HostConfigEnv): string {
     btn.addEventListener('click',function(){
       var next=read()==='dark'?'light':'dark';
       write(next);
-      document.querySelectorAll('[data-rev01-mode-toggle]').forEach(sync);
+      document.querySelectorAll('[data-opencanvas-mode-toggle]').forEach(sync);
     });
   }
-  document.querySelectorAll('[data-rev01-mode-toggle]').forEach(wire);
+  document.querySelectorAll('[data-opencanvas-mode-toggle]').forEach(wire);
 })();
 `;
 }
@@ -89,7 +89,7 @@ export function buildModeToggleScript(env: HostConfigEnv): string {
  * drift.
  */
 export const MODE_TOGGLE_STYLES: string = `
-.rev01-mode-toggle {
+.opencanvas-mode-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -97,14 +97,14 @@ export const MODE_TOGGLE_STYLES: string = `
   height: 36px;
   padding: 0;
   border-radius: 999px;
-  border: 1px solid var(--rev01-kit-accent, currentColor);
+  border: 1px solid var(--opencanvas-kit-accent, currentColor);
   background: transparent;
-  color: var(--rev01-kit-text, currentColor);
+  color: var(--opencanvas-kit-text, currentColor);
   cursor: pointer;
   transition: background-color 160ms ease, color 160ms ease;
 }
-.rev01-mode-toggle:hover { background: var(--rev01-kit-accent, currentColor); color: var(--rev01-kit-accent-text, var(--rev01-kit-bg, #000)); }
-.rev01-mode-toggle__sun, .rev01-mode-toggle__moon { display: none; }
-.rev01-mode-toggle[aria-pressed="false"] .rev01-mode-toggle__sun { display: inline-block; }
-.rev01-mode-toggle[aria-pressed="true"]  .rev01-mode-toggle__moon { display: inline-block; }
+.opencanvas-mode-toggle:hover { background: var(--opencanvas-kit-accent, currentColor); color: var(--opencanvas-kit-accent-text, var(--opencanvas-kit-bg, #000)); }
+.opencanvas-mode-toggle__sun, .opencanvas-mode-toggle__moon { display: none; }
+.opencanvas-mode-toggle[aria-pressed="false"] .opencanvas-mode-toggle__sun { display: inline-block; }
+.opencanvas-mode-toggle[aria-pressed="true"]  .opencanvas-mode-toggle__moon { display: inline-block; }
 `;

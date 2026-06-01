@@ -35,13 +35,13 @@ assert(
 );
 
 assert(
-  source.includes("querySelectorAll('[data-rev01-section]:not([data-section-role])')") &&
+  source.includes("querySelectorAll('[data-opencanvas-section]:not([data-section-role])')") &&
     source.includes('lastNode.parentNode.insertBefore(makeSlot(sections.length), afterLast);'),
   'placement mode must render body insert slots without treating header/footer as body sections',
 );
 
 assert(
-  styles.includes('.rev01-section[data-section-role="header"] .section-grip-handle'),
+  styles.includes('.opencanvas-section[data-section-role="header"] .section-grip-handle'),
   'header/footer sections must not show the canvas drag grip affordance',
 );
 
@@ -96,7 +96,7 @@ assert(replayAnimationsEnd > replayAnimationsStart, 'replayAnimations body must 
 const replayAnimationsSource = source.slice(replayAnimationsStart, replayAnimationsEnd);
 assert(
   replayAnimationsSource.includes("root.querySelector('[data-page-id=\"'") &&
-    replayAnimationsSource.includes("root.querySelector('[data-rev01-element=\"'"),
+    replayAnimationsSource.includes("root.querySelector('[data-opencanvas-element=\"'"),
   'animation replay must query the data attributes emitted by renderAll/buildElementNode',
 );
 
