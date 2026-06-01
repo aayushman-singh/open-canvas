@@ -5,7 +5,7 @@
 //
 // Math sources: Bjorn Ottosson "A perceptual color space for image
 // processing" (oklab.com, 2020) and the W3C "Relative luminance" formula.
-// Documented in SUBSYSTEM.md.
+// Grammar documented in docs/adr/0022-twelve-token-oklch-theme-grammar.md.
 
 export interface RgbColor {
   r: number; // 0..1

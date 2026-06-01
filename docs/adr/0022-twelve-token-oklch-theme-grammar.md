@@ -1,9 +1,10 @@
 # ADR 0022 — Twelve-token OKLCH theme grammar derived from a single seed
 
-**Status:** Proposed
-**Date:** 2026-05-29
+**Status:** Accepted
+**Date:** 2026-05-29 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** lifts the architectural decision from `src/theme/SUBSYSTEM.md` into canon. Per the 2026-05-29 SUBSYSTEM audit, the derivation table and accent-rotation fallback in that file encode a binding design grammar that should not live in a non-canonical doc.
+**Accepted-context:** verified 2026-06-01 — `src/theme/derive.ts` implements every row of the table at the exact OKLCH coordinates (12 tokens, `CHROMATIC_FLOOR=0.04`, accent rotation `+200° mod 360`, fixed semantic hues 70/145/25). OKLCH/sRGB math + WCAG contrast helpers in `src/theme/oklch.ts`. `src/theme/SUBSYSTEM.md` was deleted in an earlier pass; stale references in `derive.ts` and `oklch.ts` docblocks now point at this ADR.
 
 ## Context
 
