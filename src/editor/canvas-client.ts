@@ -5801,20 +5801,76 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       opacityRow.appendChild(opacityReadout);
       inspector.appendChild(field("Opacity", opacityRow));
 
-      // -- Box shadow
-      var shadowInput = document.createElement("input");
-      shadowInput.type = "text";
-      shadowInput.placeholder = "none";
-      shadowInput.value = es.boxShadow || "";
-      shadowInput.addEventListener("change", function() {
-        if (shadowInput.value.trim() === "" || shadowInput.value.trim() === "none") {
+      // -- Box shadow. Preset dropdown covers ~99% of needs; "Custom CSS…"
+      // reveals a raw text field so power users can paste arbitrary
+      // box-shadow strings (the schema stores boxShadow as a raw CSS string
+      // either way, so presets and custom values share the same code path
+      // in render.ts).
+      var SHADOW_PRESETS = [
+        { value: "", label: "None" },
+        { value: "0 1px 2px rgba(0,0,0,0.06)", label: "Subtle" },
+        { value: "0 2px 8px rgba(0,0,0,0.08)", label: "Soft" },
+        { value: "0 4px 14px rgba(0,0,0,0.10)", label: "Medium" },
+        { value: "0 10px 30px rgba(0,0,0,0.14)", label: "Large" },
+        { value: "0 20px 50px rgba(0,0,0,0.20)", label: "Dramatic" },
+      ];
+      var shadowRow = document.createElement("div");
+      shadowRow.className = "style-row";
+      shadowRow.style.flexDirection = "column";
+      shadowRow.style.alignItems = "stretch";
+      shadowRow.style.gap = "6px";
+      var shadowSelect = document.createElement("select");
+      for (var spi = 0; spi < SHADOW_PRESETS.length; spi++) {
+        var sp = SHADOW_PRESETS[spi];
+        var spOpt = document.createElement("option");
+        spOpt.value = sp.value;
+        spOpt.textContent = sp.label;
+        shadowSelect.appendChild(spOpt);
+      }
+      var customOpt = document.createElement("option");
+      customOpt.value = "__custom__";
+      customOpt.textContent = "Custom CSS…";
+      shadowSelect.appendChild(customOpt);
+      var shadowCustom = document.createElement("input");
+      shadowCustom.type = "text";
+      shadowCustom.placeholder = "e.g. 0 4px 12px rgba(0,0,0,0.15)";
+      shadowCustom.value = es.boxShadow || "";
+      var currentShadow = es.boxShadow || "";
+      var matchedPreset = SHADOW_PRESETS.find(function(p) { return p.value === currentShadow; });
+      if (matchedPreset) {
+        shadowSelect.value = matchedPreset.value;
+        shadowCustom.hidden = true;
+      } else {
+        shadowSelect.value = "__custom__";
+        shadowCustom.hidden = false;
+      }
+      shadowSelect.addEventListener("change", function() {
+        if (shadowSelect.value === "__custom__") {
+          shadowCustom.hidden = false;
+          shadowCustom.focus();
+          return;
+        }
+        shadowCustom.hidden = true;
+        if (shadowSelect.value === "") {
           delete es.boxShadow;
         } else {
-          es.boxShadow = shadowInput.value.trim();
+          es.boxShadow = shadowSelect.value;
+        }
+        shadowCustom.value = shadowSelect.value;
+        onStyleChange();
+      });
+      shadowCustom.addEventListener("change", function() {
+        var v = shadowCustom.value.trim();
+        if (v === "" || v === "none") {
+          delete es.boxShadow;
+        } else {
+          es.boxShadow = v;
         }
         onStyleChange();
       });
-      inspector.appendChild(field("Shadow", shadowInput));
+      shadowRow.appendChild(shadowSelect);
+      shadowRow.appendChild(shadowCustom);
+      inspector.appendChild(field("Shadow", shadowRow));
 
       // -- Text color
       var textColorRow = buildColorRow({
