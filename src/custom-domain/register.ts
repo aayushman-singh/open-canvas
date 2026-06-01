@@ -51,7 +51,8 @@ export type RegisterResult =
 // We require at least one dot (no apex bare-label like "localhost") and
 // reject anything containing whitespace or uppercase to keep DB storage
 // canonical.
-const HOSTNAME_RE = /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+const HOSTNAME_RE =
+  /^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
 // Always-forbidden literals — local-dev hosts that are never legitimate as
 // Owner-claimed custom domains regardless of `APP_DOMAIN`. The apex itself
@@ -181,14 +182,25 @@ export async function registerCustomDomain(
     // not just unique-violation. The unique branch additionally remaps
     // the duplicate to the caller's expected shape; other DB errors
     // re-throw so the caller surfaces a 500.
+    let rollbackErr: unknown = null;
     try {
       await deps.cf.delete(cfResult.id);
     } catch (cfErr) {
+      rollbackErr = cfErr;
       // Log loudly per the global no-silent-fallback rule — the operator
       // needs to know that a CF hostname is orphaned.
-      console.error(
-        '[custom-domain] CF rollback failed after DB error',
-        { hostname, cfHostnameId: cfResult.id, originalErr: err, cfErr },
+      console.error('[custom-domain] CF rollback failed after DB error', {
+        hostname,
+        cfHostnameId: cfResult.id,
+        originalErr: err,
+        cfErr,
+      });
+    }
+    if (rollbackErr !== null) {
+      const originalMessage = describeThrownValue(err);
+      const rollbackMessage = describeThrownValue(rollbackErr);
+      throw new Error(
+        `CF rollback failed after DB error for ${hostname} (cfHostnameId=${cfResult.id}): ${rollbackMessage}; original DB error: ${originalMessage}`,
       );
     }
     if (isUniqueViolation(err)) {
@@ -205,4 +217,22 @@ function isUniqueViolation(err: unknown): boolean {
   if (typeof e.message === 'string' && e.message.includes('duplicate key value')) return true;
   if (e.cause) return isUniqueViolation(e.cause);
   return false;
+}
+
+function describeThrownValue(value: unknown): string {
+  if (value instanceof Error) return value.message;
+  if (typeof value === 'string') return value;
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint' ||
+    typeof value === 'symbol'
+  ) {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '<unserializable thrown value>';
+  }
 }

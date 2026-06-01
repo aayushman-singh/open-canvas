@@ -14,11 +14,7 @@
 //      hitting the CF API.
 //   6. Validation: invalid hostnames are rejected.
 
-import {
-  type CfCustomHostname,
-  type CfHostnamesClient,
-  type CfHostnameStatus,
-} from './cf-api.js';
+import { type CfCustomHostname, type CfHostnamesClient, type CfHostnameStatus } from './cf-api.js';
 import { deleteCustomDomain } from './delete.js';
 import { pollOne } from './poll.js';
 import { registerCustomDomain, validateCustomHostname } from './register.js';
@@ -265,8 +261,7 @@ function makeShim(state: ShimState): {
               // delete.ts joins customDomain ↔ site and filters by siteId +
               // hostname + customerId. The shim filter combines all three.
               const matchingDomains = state.domains.filter(
-                (d) =>
-                  d.siteId === context.currentSiteId && d.hostname === context.currentHostname,
+                (d) => d.siteId === context.currentSiteId && d.hostname === context.currentHostname,
               );
               const owned = matchingDomains.filter((d) =>
                 state.sites.some(
@@ -369,7 +364,10 @@ async function runRouteRegressionChecks(): Promise<void> {
   const routeSource = await routeResponse.text();
   const getStart = routeSource.indexOf("router.get('/', async (c) => {");
   const deleteStart = routeSource.indexOf("router.delete('/:hostname'", getStart);
-  assert(getStart !== -1 && deleteStart !== -1, 'expected custom-domain route source to include GET and DELETE handlers');
+  assert(
+    getStart !== -1 && deleteStart !== -1,
+    'expected custom-domain route source to include GET and DELETE handlers',
+  );
   const getHandler = routeSource.slice(getStart, deleteStart);
   const guardIndex = getHandler.indexOf('missingCfConfig(c.env)');
   const pollDepsIndex = getHandler.indexOf('buildPollDepsFromEnv(c.env)');
@@ -419,11 +417,11 @@ async function runRegisterAndActivate(): Promise<{
   // populated correctly. We leave currentHostname set above; the site
   // lookup uses currentSiteId + currentCustomerId via selectFromSite().
 
-  const result = await registerCustomDomain(
-    { db: shim.db, cf },
-    SMOKE_HOST_ENV,
-    { siteId, customerId, hostname: 'www.acme.com' },
-  );
+  const result = await registerCustomDomain({ db: shim.db, cf }, SMOKE_HOST_ENV, {
+    siteId,
+    customerId,
+    hostname: 'www.acme.com',
+  });
   assert(result.status === 'created', `expected register status created, got ${result.status}`);
   if (result.status !== 'created') return Promise.reject(new Error('unreachable'));
 
@@ -435,24 +433,18 @@ async function runRegisterAndActivate(): Promise<{
     result.row.cfHostnameId === 'cf-stub-1',
     `expected cfHostnameId 'cf-stub-1', got ${result.row.cfHostnameId}`,
   );
-  assert(
-    cf.createCount === 1,
-    `expected one cf.create call, got ${String(cf.createCount)}`,
-  );
-  assert(
-    cf.hostnames.has(result.row.cfHostnameId),
-    'expected CF stub to hold the new hostname id',
-  );
+  assert(cf.createCount === 1, `expected one cf.create call, got ${String(cf.createCount)}`);
+  assert(cf.hostnames.has(result.row.cfHostnameId), 'expected CF stub to hold the new hostname id');
 
   // Re-registering the same hostname returns already_registered (CF not
   // called twice).
   shim.context.currentHostname = 'www.acme.com';
   shim.context.selectMode = 'one-by-hostname';
-  const dupe = await registerCustomDomain(
-    { db: shim.db, cf },
-    SMOKE_HOST_ENV,
-    { siteId, customerId, hostname: 'www.acme.com' },
-  );
+  const dupe = await registerCustomDomain({ db: shim.db, cf }, SMOKE_HOST_ENV, {
+    siteId,
+    customerId,
+    hostname: 'www.acme.com',
+  });
   assert(
     dupe.status === 'already_registered',
     `expected duplicate register to return already_registered, got ${dupe.status}`,
@@ -465,11 +457,11 @@ async function runRegisterAndActivate(): Promise<{
   // Site-not-found: a siteId that doesn't exist in the shim returns
   // site_not_found WITHOUT invoking CF.
   shim.context.currentSiteId = 'site-not-here';
-  const ghost = await registerCustomDomain(
-    { db: shim.db, cf },
-    SMOKE_HOST_ENV,
-    { siteId: 'site-not-here', customerId, hostname: 'wat.acme.com' },
-  );
+  const ghost = await registerCustomDomain({ db: shim.db, cf }, SMOKE_HOST_ENV, {
+    siteId: 'site-not-here',
+    customerId,
+    hostname: 'wat.acme.com',
+  });
   assert(
     ghost.status === 'site_not_found',
     `expected unknown-site register to return site_not_found, got ${ghost.status}`,
@@ -488,6 +480,56 @@ async function runRegisterAndActivate(): Promise<{
   assert(polledRow?.certIssuedAt !== null, 'expected certIssuedAt to be populated after poll');
 
   return { shim, state, cf, hostname: 'www.acme.com', siteId, customerId };
+}
+
+async function runRegisterRollbackFailure(): Promise<void> {
+  const uniqueErr = Object.assign(new Error('duplicate key value violates unique constraint'), {
+    code: '23505',
+  });
+  const db: Db = {
+    select: () => ({
+      from: (table: unknown) => ({
+        where: () => ({
+          limit: () => {
+            if (table === siteTable) return Promise.resolve([{ id: 'site-rollback' }]);
+            if (table === customDomainTable) return Promise.resolve([]);
+            return Promise.resolve([]);
+          },
+        }),
+      }),
+    }),
+    insert: () => ({
+      values: () => ({
+        returning: () => Promise.reject(uniqueErr),
+      }),
+    }),
+  } as unknown as Db;
+
+  class DeleteFailsCfClient extends StubCfClient {
+    override delete(id: string): Promise<void> {
+      this.deleteCount += 1;
+      return Promise.reject(new Error(`delete failed for ${id}`));
+    }
+  }
+
+  const cf = new DeleteFailsCfClient();
+  let rollbackFailureSurfaced = false;
+  try {
+    await registerCustomDomain({ db, cf }, SMOKE_HOST_ENV, {
+      siteId: 'site-rollback',
+      customerId: 'cust-rollback',
+      hostname: 'rollback.example.com',
+    });
+  } catch (err) {
+    rollbackFailureSurfaced =
+      err instanceof Error &&
+      err.message.includes('CF rollback failed after DB error') &&
+      err.message.includes('duplicate key value');
+  }
+
+  assert(rollbackFailureSurfaced, 'failed CF rollback after DB unique violation must throw');
+  assert(cf.createCount === 1, 'rollback-failure smoke should create exactly one CF hostname');
+  assert(cf.deleteCount === 1, 'rollback-failure smoke should attempt exactly one CF delete');
 }
 
 async function runPublicLookup(
@@ -540,17 +582,12 @@ async function runDelete(
   // Tee up the row id the production delete-where step will key against. The
   // shim's delete branch filters state.domains by currentRowId, so the test
   // pre-sets that to the row's id before invoking the handler.
-  const targetRow = state.domains.find(
-    (d) => d.hostname === hostname && d.siteId === siteId,
-  );
+  const targetRow = state.domains.find((d) => d.hostname === hostname && d.siteId === siteId);
   if (!targetRow) throw new Error('runDelete pre-check: no row to delete in shim state');
   shim.context.currentRowId = targetRow.id;
 
   const deleteCountBefore = cf.deleteCount;
-  const result = await deleteCustomDomain(
-    { db: shim.db, cf },
-    { siteId, customerId, hostname },
-  );
+  const result = await deleteCustomDomain({ db: shim.db, cf }, { siteId, customerId, hostname });
   assert(result.status === 'deleted', `expected delete status='deleted', got ${result.status}`);
   assert(
     cf.deleteCount === deleteCountBefore + 1,
@@ -611,14 +648,8 @@ async function runStuckPendingFlip(): Promise<void> {
 async function main(): Promise<void> {
   runValidation();
   await runRouteRegressionChecks();
-  const {
-    shim,
-    state,
-    cf,
-    hostname,
-    siteId,
-    customerId,
-  } = await runRegisterAndActivate();
+  const { shim, state, cf, hostname, siteId, customerId } = await runRegisterAndActivate();
+  await runRegisterRollbackFailure();
   await runPublicLookup(shim, hostname, siteId);
   await runDelete(shim, state, cf, hostname, siteId, customerId);
   await runStuckPendingFlip();
