@@ -549,6 +549,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       "translate(" + camera.x + "px, " + camera.y + "px) scale(" + camera.zoom + ")";
     root.style.transformOrigin = "0 0";
     if (zoomReadout) zoomReadout.textContent = Math.round(camera.zoom * 100) + "%";
+    // Camera moved → every remote pointer-cursor's world→screen mapping
+    // changed too. Skip when the layer hasn't mounted yet (very first
+    // applyCameraTransform during boot fires before any peer connects).
+    if (typeof repaintRemoteCursors === "function") {
+      repaintRemoteCursors();
+    }
   }
 
   function setZoom(newZoom, maxClamp) {
@@ -10256,6 +10262,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function repaintRemoteCursors() {
     if (!presenceLayer) return;
     remoteCursors.forEach(function(entry) {
+      // Free-floating pointer position wins when present (Figma-style
+      // mouse follow). Fall back to the text-caret resolver when the
+      // peer is editing text but the mouse isn't over the canvas — the
+      // operator still wants to see WHERE in the doc the peer is typing.
+      var point = entry.cursor && entry.cursor.point;
+      if (point && typeof point.x === "number" && typeof point.y === "number") {
+        var screen = worldToScreen(point.x, point.y);
+        entry.caret.style.display = "";
+        entry.label.style.display = "";
+        entry.caret.style.left = screen.x + "px";
+        entry.caret.style.top = screen.y + "px";
+        entry.caret.style.height = "18px";
+        entry.label.style.left = screen.x + "px";
+        entry.label.style.top = screen.y + "px";
+        return;
+      }
       var rect = entry.cursor ? findCaretRect(entry.cursor.elementId, entry.cursor.offset) : null;
       if (!rect) {
         entry.caret.style.display = "none";
@@ -10274,6 +10296,68 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   window.addEventListener("scroll", repaintRemoteCursors, true);
   window.addEventListener("resize", repaintRemoteCursors);
+
+  // Figma-style mouse-follow: every mousemove over the canvas viewport
+  // publishes the pointer's WORLD-space coordinates so remote peers see
+  // it tracking like a real cursor. World coords (not screen pixels)
+  // because each peer applies its own camera transform — the same
+  // pointer must render correctly across different zoom levels.
+  // Throttled to one publish per animation frame; the previous setup
+  // only ran on selectionchange events, so the cursor only moved when
+  // the operator clicked or selected text. The user's complaint
+  // verbatim: "stilol cant see the cursor moving around of other
+  // session like figma does."
+  var lastWorldPoint = null;
+  var pointerPublishPending = false;
+  function publishPointer() {
+    pointerPublishPending = false;
+    if (!coEditConnection || !lastWorldPoint) return;
+    // Reuse the selection-derived cursor anchor if there is one — text
+    // editors still benefit from the offset-aware caret while the
+    // pointer trail rides on top. Strictly free-floating (no anchor)
+    // is the common case for someone mousing around an inactive area.
+    var sel = window.getSelection();
+    var anchorCursor = null;
+    if (sel && sel.anchorNode) {
+      var anchorEl = sel.anchorNode.nodeType === 1
+        ? sel.anchorNode
+        : sel.anchorNode.parentElement;
+      var wrapper = anchorEl ? anchorEl.closest('[data-rev01-element]') : null;
+      var sectionNode = anchorEl ? anchorEl.closest('[data-rev01-section]') : null;
+      if (wrapper && sectionNode) {
+        var elementId = wrapper.getAttribute('data-rev01-element');
+        var sectionId = sectionNode.getAttribute('data-rev01-section');
+        if (elementId && sectionId) {
+          var editable = wrapper.querySelector('[contenteditable]') || wrapper;
+          var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);
+          anchorCursor = { sectionId: sectionId, elementId: elementId };
+          if (typeof textOffset === "number") anchorCursor.offset = textOffset;
+        }
+      }
+    }
+    var cursor = { point: { x: lastWorldPoint.x, y: lastWorldPoint.y } };
+    if (anchorCursor) {
+      cursor.sectionId = anchorCursor.sectionId;
+      cursor.elementId = anchorCursor.elementId;
+      if (typeof anchorCursor.offset === "number") cursor.offset = anchorCursor.offset;
+    }
+    coEditConnection.setPresence({
+      name: localPresence.name,
+      color: localPresence.color,
+      cursor: cursor,
+      selection: anchorCursor ? { sectionId: anchorCursor.sectionId, elementId: anchorCursor.elementId } : null,
+    });
+  }
+  function schedulePointer() {
+    if (pointerPublishPending) return;
+    pointerPublishPending = true;
+    requestAnimationFrame(publishPointer);
+  }
+  window.addEventListener("mousemove", function(ev) {
+    if (typeof ev.clientX !== "number") return;
+    lastWorldPoint = screenToWorld(ev.clientX, ev.clientY);
+    schedulePointer();
+  }, { passive: true });
 
   // Coalesce selectionchange (fires per keystroke and per mouse-tick
   // during drag-select) to one publish per frame.

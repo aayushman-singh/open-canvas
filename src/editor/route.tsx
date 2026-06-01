@@ -9,7 +9,7 @@
 // Clerk user, then the site scoped to that customer. Missing or unowned sites
 // return 404 to match the canvas API behaviour.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull, or } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, resolveClerkKeys, type ClerkAuthVariables } from '../auth/middleware';
@@ -29,7 +29,7 @@ import type { Theme } from '../ui/theme';
 import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
 import { db } from '../db/client';
-import { customer, site } from '../db/schema';
+import { customer, site, siteCollaborator } from '../db/schema';
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
 
 type Bindings = HostConfigEnv & {
@@ -110,6 +110,12 @@ async function lookupOwnedSite(
   const customerId = customerRow[0]?.id;
   if (!customerId) return null;
 
+  // Accept either the site's owner OR an accepted collaborator. The dashboard
+  // grid (routes/dashboard/index.tsx) lists both, so following Edit on a
+  // collaborator card must succeed at this route too. The wsToken downstream
+  // is signed with whichever customerId hits this lookup, and
+  // hasLiveEditorSocketAccess in src/live/editor-auth.ts already verifies
+  // the collaborator relationship at WS upgrade time.
   const siteRow = await database
     .select({
       id: site.id,
@@ -118,7 +124,20 @@ async function lookupOwnedSite(
       styleKit: site.styleKit,
     })
     .from(site)
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+    .leftJoin(
+      siteCollaborator,
+      and(
+        eq(siteCollaborator.siteId, site.id),
+        eq(siteCollaborator.customerId, customerId),
+        isNotNull(siteCollaborator.acceptedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(site.id, siteId),
+        or(eq(site.customerId, customerId), isNotNull(siteCollaborator.id)),
+      ),
+    )
     .limit(1);
   const row = siteRow[0];
   if (!row) return null;
