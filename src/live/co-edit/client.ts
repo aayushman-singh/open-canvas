@@ -130,6 +130,16 @@ export interface WebSocketLike {
     event: 'open' | 'message' | 'close' | 'error',
     handler: (ev: { data?: unknown }) => void,
   ) => void;
+  /**
+   * Numeric ready state — 0 CONNECTING, 1 OPEN, 2 CLOSING, 3 CLOSED. Optional
+   * because the smoke harness's hand-rolled WebSocketLike doesn't model it;
+   * production always supplies a real browser WebSocket. send() guards on
+   * `readyState !== 1` when the field is present to skip sending into a
+   * socket that's still completing its handshake (the InvalidStateError
+   * burst the user hit during the I1 retest was the awareness observer
+   * firing on selectionchange while a reconnect was mid-flight).
+   */
+  readonly readyState?: number;
 }
 
 /**
@@ -177,6 +187,16 @@ export function connectCoEdit(
 
   function send(envelope: SiteRoomMessage): void {
     if (!socket) return;
+    // Skip when the socket is still CONNECTING (readyState 0) or already
+    // tearing down (CLOSING/CLOSED). The browser's WebSocket throws
+    // InvalidStateError on send() outside OPEN, which our try/catch
+    // swallows but used to log every selectionchange-during-reconnect as
+    // an error — drowning the console + masking real failures. Local
+    // awareness state still updates either way; the next y-protocols
+    // heartbeat (~10s) re-publishes once the new socket opens.
+    if (typeof socket.readyState === 'number' && socket.readyState !== 1) {
+      return;
+    }
     try {
       socket.send(JSON.stringify(envelope));
     } catch (error) {

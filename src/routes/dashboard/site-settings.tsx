@@ -17,13 +17,13 @@
 // the rendered surface in sync with the DB — no client-side state
 // machine.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
-import { site, siteCollaborator } from '../../db/schema';
+import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
@@ -1151,6 +1151,97 @@ function TrashIcon() {
   );
 }
 
+/**
+ * For a customer who is NOT the owner of `siteId`, check whether they're an
+ * accepted collaborator. Returns the site name + owner's email so the
+ * "you're a collaborator, not the owner" page can name the owner the
+ * collaborator should ask. Returns null when there's no relationship.
+ *
+ * Three-way join: siteCollaborator (the access record) → site (for name +
+ * the owner's customerId) → customer (for the owner's email). All in one
+ * Neon round trip so the 403 page open doesn't pay multiple network hops.
+ */
+async function collaboratorHitForSite(
+  env: Bindings,
+  collabCustomerId: string,
+  siteId: string,
+): Promise<{ siteName: string; ownerEmail: string | null } | null> {
+  const database = db(env);
+  const rows = await database
+    .select({
+      siteName: site.name,
+      ownerEmail: customer.email,
+    })
+    .from(siteCollaborator)
+    .innerJoin(site, eq(site.id, siteCollaborator.siteId))
+    .innerJoin(customer, eq(customer.id, site.customerId))
+    .where(
+      and(
+        eq(siteCollaborator.siteId, siteId),
+        eq(siteCollaborator.customerId, collabCustomerId),
+        isNotNull(siteCollaborator.acceptedAt),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return { siteName: row.siteName, ownerEmail: row.ownerEmail };
+}
+
+/**
+ * 403 surface for an accepted collaborator who navigates to a site's
+ * Settings page. Reuses the DashboardShell so the chrome stays consistent
+ * — same nav, theme, brand mark — and gives the collaborator two ways
+ * out: back to the editor (their actual workspace) and back to the
+ * dashboard. The owner's email is surfaced so the collaborator knows
+ * who to ask if they really do need a settings change.
+ *
+ * Why a polite 403 and not a redirect: the link the collaborator
+ * followed comes from the editor chrome itself, and silently bouncing
+ * them back to the editor would feel buggy. Surfacing the constraint
+ * makes the "owner-only" boundary discoverable so they don't try
+ * again from a different entry point.
+ */
+function NotSiteOwnerPage(props: {
+  siteId: string;
+  siteName: string;
+  ownerEmail: string | null;
+  theme: ReturnType<typeof readThemeCookie>;
+}) {
+  const editorHref = `/dashboard/sites/${encodeURIComponent(props.siteId)}/edit`;
+  const ownerLine = props.ownerEmail
+    ? `Ask the site owner (${props.ownerEmail}) to change settings on your behalf.`
+    : 'Ask the site owner to change settings on your behalf.';
+  return (
+    <DashboardShell
+      title={`${props.siteName} — settings unavailable`}
+      crumbs={[
+        { href: '/dashboard', label: 'Dashboard' },
+        { href: editorHref, label: props.siteName },
+        { label: 'Settings' },
+      ]}
+      activePath="/dashboard"
+      theme={props.theme}
+    >
+      <section style="max-width: 560px; margin: 60px auto; padding: 0 24px;">
+        <h1 style="font-size: 22px; margin: 0 0 12px;">Settings are owner-only</h1>
+        <p style="color: var(--ink-2); margin: 0 0 12px; line-height: 1.5;">
+          You're a collaborator on <strong>{props.siteName}</strong>, not the
+          owner. Site settings — password protection, custom domain, favicon,
+          collaborators, and deletion — can only be changed by the owner.
+        </p>
+        <p style="color: var(--ink-2); margin: 0 0 24px; line-height: 1.5;">
+          {ownerLine}
+        </p>
+        <div style="display: flex; gap: 12px;">
+          <Button href={editorHref} variant="primary">Back to editor</Button>
+          <Button href="/dashboard" variant="ghost">All sites</Button>
+        </div>
+      </section>
+    </DashboardShell>
+  );
+}
+
 siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   const auth = c.get('auth');
   if (!auth.userId) {
@@ -1166,6 +1257,22 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   }
   const owned = await lookupOwnedSite(c.env, customerId, siteId);
   if (!owned) {
+    // Distinguish "you're a collaborator on this site, not the owner" from
+    // "this site doesn't exist for you at all" so the dashboard can show a
+    // friendly explanation instead of a bare 404 — collaborators following
+    // the Settings link in the editor chrome hit this path otherwise.
+    const collabHit = await collaboratorHitForSite(c.env, customerId, siteId);
+    if (collabHit) {
+      return c.html(
+        <NotSiteOwnerPage
+          siteId={siteId}
+          siteName={collabHit.siteName}
+          ownerEmail={collabHit.ownerEmail}
+          theme={readThemeCookie(c)}
+        />,
+        403,
+      );
+    }
     return c.text('site not found', 404);
   }
 
