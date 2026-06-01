@@ -5104,7 +5104,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         // Treat clearing the field as "revert to slug" — the artboard
         // label falls back to slug anyway. Capture for undo so this
         // counts as one operation in history.
-        page.title = "";
+        page.title = page.slug;
       } else {
         page.title = next;
       }
@@ -10355,6 +10355,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
   window.addEventListener("mousemove", function(ev) {
     if (typeof ev.clientX !== "number") return;
+    var target = ev.target;
+    if (!(target instanceof Element) || !viewport.contains(target)) return;
     lastWorldPoint = screenToWorld(ev.clientX, ev.clientY);
     schedulePointer();
   }, { passive: true });

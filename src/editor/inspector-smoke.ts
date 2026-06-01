@@ -148,6 +148,23 @@ assert(
   'new-page locale picker must use the locale grammar accepted by the router',
 );
 
+const pageInspector = sliceBetween(
+  'function renderPageInspector() {',
+  '// Live-apply page-level visual properties',
+);
+
+assert(
+  !pageInspector.includes('page.title = "";') && pageInspector.includes('page.title = page.slug;'),
+  'clearing a page title must persist the schema-valid slug fallback instead of an empty title',
+);
+
+assert(
+  source.includes('var target = ev.target;') &&
+    source.includes('target instanceof Element') &&
+    source.includes('!viewport.contains(target)'),
+  'Figma-style mouse-follow presence must only publish moves over the canvas viewport',
+);
+
 const aiMediaModal = sliceBetween(
   'function openAiMediaModal(opts) {',
   '// Modal for the "+ New Page" flow',
