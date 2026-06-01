@@ -1752,17 +1752,19 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             class="picker-head"
             style="border-top:1px solid var(--line);justify-content:flex-end;gap:8px;"
           >
-            <button type="button" class="close" data-delete-cancel>
-              Cancel
-            </button>
-            <button
-              type="button"
-              data-delete-confirm
-              disabled
-              style="padding:6px 14px;border:1px solid var(--red-line);background:var(--red-soft);color:var(--red-ink);border-radius:6px;cursor:pointer;font-weight:600;"
-            >
-              Delete site
-            </button>
+            <div class="picker-actions">
+              <button type="button" class="close" data-delete-cancel>
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-delete-confirm
+                disabled
+                style="border-color:var(--red-line);background:var(--red-soft);color:var(--red-ink);font-weight:650;"
+              >
+                Delete site
+              </button>
+            </div>
           </div>
         </div>
       </div>

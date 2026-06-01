@@ -6341,14 +6341,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
       const buttons = document.createElement("div");
       buttons.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+      const modalBtnBase =
+        "padding:8px 14px;border-radius:6px;font:600 13px system-ui,sans-serif;cursor:pointer;";
       const cancelBtn = document.createElement("button");
       cancelBtn.type = "button";
       cancelBtn.textContent = "Cancel";
-      cancelBtn.style.cssText = "padding:8px 14px;";
+      cancelBtn.style.cssText =
+        modalBtnBase + "background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.35);";
       const confirmBtn = document.createElement("button");
       confirmBtn.type = "button";
       confirmBtn.textContent = "Use this crop";
-      confirmBtn.style.cssText = "padding:8px 14px;";
+      confirmBtn.style.cssText =
+        modalBtnBase + "background:#fff;color:#111;border:1px solid #fff;";
       buttons.appendChild(cancelBtn);
       buttons.appendChild(confirmBtn);
       card.appendChild(buttons);
@@ -6946,13 +6950,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const buttons = document.createElement("div");
     buttons.style.cssText = "display:flex;gap:6px;margin-top:6px;";
 
+    const aiPreviewBtnBase =
+      "padding:6px 12px;border-radius:6px;font:600 12.5px var(--sans,system-ui,sans-serif);cursor:pointer;";
     const applyBtn = document.createElement("button");
     applyBtn.type = "button";
     applyBtn.textContent = "Apply";
+    applyBtn.style.cssText =
+      aiPreviewBtnBase +
+      "background:var(--ink,#111);color:var(--surface,#fff);border:1px solid var(--ink,#111);";
 
     const discardBtn = document.createElement("button");
     discardBtn.type = "button";
     discardBtn.textContent = "Discard";
+    discardBtn.style.cssText =
+      aiPreviewBtnBase +
+      "background:transparent;color:var(--ink-2,#555);border:1px solid var(--line,#ccc);";
 
     applyBtn.addEventListener("click", () => {
       applyGeneratePreview(element, blob, mediaType, altValue, wrap, applyBtn, discardBtn, objectUrl);
