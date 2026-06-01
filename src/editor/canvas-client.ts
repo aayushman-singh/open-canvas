@@ -4171,6 +4171,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // because the playback controls are video-only — that conditional lives
   // in the mount fn rather than the spec.
   var INSPECTOR_MOUNT_HANDLERS = {
+    "media-ai": function(element, host) { mountMediaAi(element, host); },
     "media-picker": function(element, host) { mountMediaPicker(element, host); },
     "video-playback": function(element, host) { mountVideoPlayback(element, host); },
     "accordion-items": function(element, host) { mountAccordionItems(element, host); },
@@ -4181,6 +4182,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     "form-fields": function(element, host) { mountFormFields(element, host); },
     "form-style": function(element, host) { mountFormStyle(element, host); },
   };
+
+  // AI media generation is image-only. Skip rendering for video elements
+  // entirely — the upstream model has no video synthesis endpoint, so the
+  // button used to fail with "server did not return image bytes" if owners
+  // tried it. The image branch matches the legacy button-action shape:
+  // primary inspector button wired to the replaceMedia AI handler.
+  function mountMediaAi(element, host) {
+    if (element.mediaKind === "video") return;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "AI media";
+    btn.setAttribute("data-ai-button", "replace-media");
+    if (aiBusy) btn.disabled = true;
+    var handler = INSPECTOR_ACTION_HANDLERS["replace-media"];
+    if (typeof handler !== "function") {
+      throw new Error("mountMediaAi: no action handler registered for replace-media");
+    }
+    btn.addEventListener("click", function() { handler(element.id); });
+    host.appendChild(btn);
+  }
 
   // Video-playback controls — autoplay, muted, loop, controls — with the
   // autoplay-implies-muted enforcement that the legacy buildMediaInspector
@@ -6726,8 +6747,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const form = new FormData();
     form.append("file", blob);
     form.append("alt", altValue);
-    form.append("siteId", SITE_ID);
-    if (typeof elementId === "string" && elementId.length > 0) {
+    // siteId and elementId must travel as a pair — uploadOwnerAsset
+    // rejects the half-set case ("siteId and elementId must be
+    // provided together"). Section background videos / generic site
+    // uploads pass elementId="" because they don't bind to a specific
+    // element; we drop siteId in that case so the upload lands as an
+    // unscoped owner asset.
+    var hasElementId = typeof elementId === "string" && elementId.length > 0;
+    if (hasElementId) {
+      form.append("siteId", SITE_ID);
       form.append("elementId", elementId);
     }
     const response = await authFetch(API_BASE + "/owner/assets", {

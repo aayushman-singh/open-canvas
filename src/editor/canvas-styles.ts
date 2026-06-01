@@ -961,6 +961,13 @@ body.opencanvas-modal-open {
 .sidebar-toggle:hover { background: var(--red-hover, var(--red)); }
 .opencanvas-editor-sidebar.collapsed .sidebar-toggle { left: 0; }
 .opencanvas-viewport.sidebar-collapsed { margin-left: 0; }
+/* When the sidebar collapses, the viewport reclaims the 340px gutter
+   and the zoom toolbar would otherwise float ~380px from the screen
+   edge — looking lost on the canvas. Pin it close to the new viewport
+   edge so it tracks the sidebar collapse. */
+.opencanvas-editor:has(.opencanvas-editor-sidebar.collapsed) .opencanvas-zoom-toolbar {
+  left: 16px;
+}
 /* When the inspector is collapsed or hidden, the viewport reclaims the
    320px right gutter — otherwise the body's --opencanvas-bg shows through
    that strip and reads as a persistent white panel residue against the
@@ -1416,10 +1423,14 @@ body[data-placement-active="true"] .opencanvas-section-slot {
    inside the pill, mode-action buttons fill with red when pressed. */
 .opencanvas-zoom-toolbar {
   position: fixed;
-  left: 356px;
+  /* Sidebar is 360px when open; sit ~20px past its right edge so the
+     pill doesn't clip the sidebar's vertical hairline. Collapsed
+     sidebar overrides below pull the pill back near the viewport edge. */
+  left: 380px;
   bottom: 52px;
   z-index: 160;
   width: max-content;
+  transition: left 0.15s ease;
   display: inline-flex;
   align-items: center;
   gap: 2px;

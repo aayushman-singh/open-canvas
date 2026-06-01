@@ -76,13 +76,12 @@ export function renderMedia(element: MediaElement, ctx: MediaRenderCtx): string 
 
 export const mediaInspectorSpec: InspectorSpec = {
   fields: [
-    {
-      kind: 'button-action',
-      label: 'AI media',
-      action: 'replace-media',
-      dataAttr: 'replace-media',
-      busyFlag: 'aiBusy',
-    },
+    // AI media generation is image-only — the model only emits image bytes
+    // and the upstream Gemini image endpoint has no video synthesis. A
+    // custom-mount lets the handler skip the button for video elements
+    // (mirrors the mediaKind === 'video' early-return that video-playback
+    // already uses for the inverse direction).
+    { kind: 'custom-mount', name: 'media-ai' },
     // Asset picker (image | video selection + crop). Imperative because the
     // picker manages its own internal modal + upload flow.
     { kind: 'custom-mount', name: 'media-picker' },
