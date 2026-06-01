@@ -511,7 +511,12 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
                   <span class="notif-badge" id="notif-badge" hidden aria-hidden="true">0</span>
                 </button>
                 <div class="notif-panel" id="notif-panel" role="region" aria-labelledby="notif-bell" hidden>
-                  <div class="notif-panel-head">Notifications</div>
+                  <div class="notif-panel-head">
+                    <span>Notifications</span>
+                    <button type="button" class="notif-mark-all" id="notif-mark-all" hidden>
+                      Mark all read
+                    </button>
+                  </div>
                   <ul class="notif-list" id="notif-list" aria-live="polite">
                     <li class="notif-empty" data-state="loading">Loading…</li>
                   </ul>
@@ -587,6 +592,7 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
     prompt:function(msg,def,title){return _build({type:'prompt',message:msg,defaultValue:def||'',title:title||''});}
   };
 })();`)}</script>
+        <script>{raw("window.__rev01InboxApiBase = '/api';")}</script>
         <script>{raw(notificationsInboxScript)}</script>
       </body>
     </html>

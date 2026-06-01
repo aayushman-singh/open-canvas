@@ -127,10 +127,14 @@ AUTHORIZED_PARTIES = "https://opencanvas.aayushman.dev,http://localhost:8787,htt
 COOKIE_NAME_PREFIX = "__opencanvas_"
 EMAIL_FROM = "Open Canvas <noreply@opencanvas.aayushman.dev>"
 
-# Wave 1 #5 (custom domains, plan 05). Cron tick every 5 minutes invokes
-# the `scheduled` handler exported from src/index.ts which delegates to
-# src/custom-domain/cron.ts. The handler polls Cloudflare for pending /
-# verifying custom hostnames and reconciles `status` + `certIssuedAt` on
-# each row. 30-minute-stuck rows flip to `failed` without hitting CF.
+# Cron triggers. The `scheduled` handler in src/scheduled.ts branches on
+# event.cron to dispatch per-feature work:
+#   - "*/5 * * * *"   Wave 1 #5 (custom domains, plan 05). Polls Cloudflare
+#                     for pending / verifying custom hostnames and reconciles
+#                     `status` + `certIssuedAt` per row. 30-minute-stuck
+#                     rows flip to `failed` without hitting CF.
+#   - "0 3 * * *"     ADR 0043 notification retention. Once per day at 03:00
+#                     UTC; soft-deletes notification + notification_read
+#                     rows older than NOTIFICATION_RETENTION_DAYS (90d).
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["*/5 * * * *", "0 3 * * *"]

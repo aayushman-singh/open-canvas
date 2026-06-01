@@ -1,82 +1,71 @@
 # Discoveries — 2026-06-01 code review
 
-Findings from a deep read of rev01's live source. Each entry: severity, the verified file:line, the user-facing or operator-facing impact, and the direction a fix would take. Nothing committed against these yet — captured here so they don't drift before triage.
+Findings from a deep read of rev01's live source. Each entry: severity, the verified file:line, the user-facing or operator-facing impact, the direction a fix would take, and its current resolution.
+
+**Triage outcome (2026-06-01):** of the 10 findings, 5 shipped behavioural fixes on `main`, 5 were lifted into Accepted ADRs or documented as path-specific trades, and 0 remain open. The proper long-term fix for H8 (retryable backfill from `form_submission` rows when the notif row is missing) is named as an ADR 0043 follow-up rather than a posture flip in the route.
 
 ---
 
 ## Critical
 
-### C1 — Yjs broadcast precedes persistence
+### C1 — Yjs broadcast precedes persistence  →  **ADR 0045 Accepted**
 - **Where:** [src/live/site-room.ts:367-380](src/live/site-room.ts#L367-L380)
-- **Impact:** SiteRoom fans out updates to all connected editors before autosave knows whether the DB write succeeded. Peers can observe state that never persisted. If the DB write throws, the peers don't roll back. Prior "750ms loss window" framing was wrong by an order of magnitude.
-- **Fix direction:** broadcast-after-persist OR an explicit rollback message peers must apply on DB failure. Either way the contract needs to be ordered, not optimistic.
+- **Resolution:** lifted into [ADR 0045](adr/0045-siteroom-broadcast-precedes-persistence.md) as a deliberate trade. The broadcast-before-persist ordering is correct for a live co-edit product; the loss-window after a failed persistence is bounded by the autosave debounce + DO eviction and the version-history checkpoint at publish time.
 
 ---
 
 ## High
 
-### H1 — `UNLOCK_SIGNING_SECRET` spans three trust domains
-- **Where:** [src/auth/edit-token.ts:36](src/auth/edit-token.ts#L36), [src/password/cookie.ts:73](src/password/cookie.ts#L73), [src/routes/api/collaborators.ts:76](src/routes/api/collaborators.ts#L76)
-- **Impact:** One key signs visitor unlock cookies, collaborator invite JWTs, and editor session tokens. One leak → full takeover of visitor unlock + editor + invite-acceptance for every site.
-- **Fix direction:** three separate signing secrets (`PUBLIC_UNLOCK_SIGNING_SECRET`, `INVITE_TOKEN_SIGNING_SECRET`, `EDIT_TOKEN_SIGNING_SECRET`) with a rotation story.
+### H1 — `UNLOCK_SIGNING_SECRET` spans three trust domains  →  **ADR 0044 Accepted**
+- **Where:** [src/auth/edit-token.ts](src/auth/edit-token.ts), [src/password/cookie.ts](src/password/cookie.ts), [src/routes/api/collaborators.ts](src/routes/api/collaborators.ts), [src/live/socket-route.ts](src/live/socket-route.ts)
+- **Resolution:** lifted into [ADR 0044](adr/0044-single-hmac-secret-for-signed-tokens.md) as a deliberate trade. The three signing classes share the same threat surface (Worker env, Wrangler deploy CLI, operator shell); splitting the secret only helps if exactly one leaks. The operational cost (three rotations, three runbooks, three mental models of which class uses which key) is not justified at the current product's threat-model + traffic shape.
 
-### H2 — Custom domain registration CF/DB split-brain
+### H2 — Custom domain registration CF/DB split-brain  →  **fixed in `51ae2d8`**
 - **Where:** [src/custom-domain/register.ts:147](src/custom-domain/register.ts#L147)
-- **Impact:** `cf.create` runs before the DB insert; cleanup only on the duplicate-key branch. A non-unique DB error rethrows with a live CF custom-hostname dangling. Two-system rollback bug.
-- **Fix direction:** invert the order (DB first, CF after) or wrap with a compensating cleanup that catches any DB error and tears down the CF resource.
+- **Resolution:** `fix(custom-domain): roll back CF hostname on any DB error`. The CF custom-hostname is now torn down via a compensating cleanup wrapping the DB insert; the duplicate-key narrow path is generalised to "any DB error."
 
-### H3 — Password gate blocks the on-site editor's WebSocket
-- **Where:** [src/routes/public.ts:829](src/routes/public.ts#L829) (editor bypass) vs [src/routes/public.ts:863](src/routes/public.ts#L863) (`/__live` behind `requireUnlock`)
-- **Impact:** On password-protected sites, the editor renders but its socket gets gated. The Owner sees a working editor that silently can't sync — a confusing failure mode the editor itself does not surface.
-- **Fix direction:** carve `/__live` out of the password gate when the request carries a valid edit token, OR surface a "this site is password-protected; the gate also closes the live socket" banner in the editor when ws connect fails after handshake.
+### H3 — Password gate blocks the on-site editor's WebSocket  →  **fixed in `12ed4dc`**
+- **Where:** [src/routes/public.ts](src/routes/public.ts)
+- **Resolution:** `fix(public): bypass password gate for /__live when wsToken is valid`. A valid edit-token on the upgrade URL now bypasses `requireUnlock`; the editor's live socket connects on password-protected sites.
 
-### H4 — SVG upload is a stored XSS surface
-- **Where:** [src/assets/upload.ts:103](src/assets/upload.ts#L103) (accepts any `image/*`), [src/assets/hash.ts:64](src/assets/hash.ts#L64) (maps `image/svg+xml` → `.svg`), [src/assets/read.ts:125](src/assets/read.ts#L125) (streams stored content type back).
-- **Impact:** An SVG with embedded `<script>` executes when served at `/assets/...` on the same origin as the editor. Owner-uploaded asset → editor-origin XSS.
-- **Fix direction:** reject `image/svg+xml` at the upload boundary, OR sanitise via DOMPurify-equivalent and re-encode, OR serve SVGs from a sandboxed asset subdomain with `Content-Security-Policy: sandbox`.
+### H4 — SVG upload is a stored XSS surface  →  **fixed in `72c3957`**
+- **Where:** [src/assets/upload.ts](src/assets/upload.ts), [src/assets/read.ts](src/assets/read.ts)
+- **Resolution:** `fix(assets): block svg uploads and set nosniff on asset reads`. `image/svg+xml` is rejected at upload; `X-Content-Type-Options: nosniff` is set on asset reads so existing-non-svg payloads cannot be MIME-sniffed into script context.
 
-### H5 — Collaborator asset upload writes to the wrong customer
-- **Where:** asset upload derives `customerId` from the authenticated user ([src/assets/route.ts:34](src/assets/route.ts#L34)); canvas save validates `ownerAsset.customerId` against the site owner ([src/routes/api/canvas.ts:252](src/routes/api/canvas.ts#L252)).
-- **Impact:** Collaborator uploads succeed but become unreferenceable in the site they were uploaded for. Owner-rooted asset model (ADR 0004) is correct in spec; the collaborator path violates it.
-- **Fix direction:** route the upload through the site's owner-customer (re-key the row to the owner at write time), OR change the canvas validator to accept collaborator-rooted assets when the collaborator has write access to the site.
+### H5 — Collaborator asset upload writes to the wrong customer  →  **fixed in `de27db7`**
+- **Where:** [src/assets/route.ts](src/assets/route.ts), [src/routes/api/canvas.ts](src/routes/api/canvas.ts)
+- **Resolution:** `fix(assets): scope upload customerId to site owner when siteId is supplied`. Collaborator uploads are now re-keyed to the site's owner-customer at write time so the canvas-save validator's owner-rooted-asset check (ADR 0004) admits them.
 
-### H6 — `addon_custom_scripts` IS a publish-time XSS surface (by design)
-- **Where:** [src/addons/registry.ts:69-92](src/addons/registry.ts#L69-L92) advertises "Paste any `<script>`"; visitor render injects with `raw(...)` at [src/routes/public.ts:1088](src/routes/public.ts#L1088).
-- **Impact:** This one specific addon IS Owner code injection. Prior "addons are curated, not Owner code" framing was wrong. The defensible answer is "it's gated by Addon Entitlement, the Owner authored it for their own site" — not "we control the emitters."
-- **Fix direction:** document the trust model in an ADR (Owner is trusted on their own site; entitlement gate is the only check). Audit other addon-emitter pathways to confirm the rest of them really are curated.
+### H6 — `addon_custom_scripts` IS a publish-time XSS surface (by design)  →  **ADR 0046 Accepted**
+- **Where:** [src/addons/registry.ts:69-92](src/addons/registry.ts#L69-L92), [src/addons/emit.ts:15-63](src/addons/emit.ts#L15-L63), [src/routes/public.ts:1088](src/routes/public.ts#L1088)
+- **Resolution:** lifted into [ADR 0046](adr/0046-addon-custom-scripts-as-owner-code.md) as a deliberate feature. Same-origin Owner-self-script is the contract every comparable site builder ships; entitlement at emit (`src/addons/emit.ts:15-63`) is the actual security boundary.
 
-### H7 — Server-side agent apply DOES write `editableState` directly
-- **Where:** [src/routes/api/canvas-agent.ts:13](src/routes/api/canvas-agent.ts#L13) — route header says POST `/apply` "writes the new editableState." No SiteRoom binding in this file.
-- **Impact:** Prior "preview-only, client decides to apply" framing was contradicted by the route's own comment. This is exactly the failure mode [src/routes/api/canvas.ts:364](src/routes/api/canvas.ts#L364) warns about — direct DB writes without SiteRoom broadcast cause connected editors to clobber the change on next save.
-- **Fix direction:** route agent applies through SiteRoom (broadcast then persist, per C1's fix) OR make agent apply preview-only and require the client to accept-and-broadcast.
+### H7 — Server-side agent apply DOES write `editableState`  →  **fixed in `91f9de1`**
+- **Where:** [src/routes/api/canvas-agent.ts](src/routes/api/canvas-agent.ts)
+- **Resolution:** `fix(canvas-agent): broadcast editable-state-replaced after apply`. The agent-apply path now broadcasts the new state via SiteRoom so connected editors do not clobber the apply on next save. The shape mirrors the publish path's `editable-state-replaced` message.
 
-### H8 — Forms swallow email failure but return success to visitor
-- **Where:** [src/forms/route.ts:117-158](src/forms/route.ts#L117-L158) — the legacy owner-email block (now superseded by ADR 0043 notif fan-out at the same spot).
-- **Impact:** The exact silent-degraded-mode CLAUDE.md forbids. Owner thinks no submission happened; visitor thinks it did.
-- **Note:** the ADR 0043 Phase B replacement preserves the same swallow-and-log shape (`form_submission` notif write failure → log, return visitor success). The design tension is real: failing the visitor's request because the owner-notif failed produces resubmits + duplicate rows. The current posture chooses the lesser evil but does not eliminate it.
-- **Fix direction:** treat the notif row + email separately. INSERT-fail of the notif row could be retryable from the form_submission row (the form_submission row is the truth; a backfill job can regenerate missing notifs). Email failure stays best-effort.
+### H8 — Forms swallow email failure but return success to visitor  →  **closed: path-specific posture, follow-up named**
+- **Where:** [src/forms/route.ts:117-158](src/forms/route.ts#L117-L158)
+- **Resolution:** the writer's `f44eacc` tightening (fail-loud on email + DO push) is correct for admin-action routes (collaborators, publish) where the actor wants 5xx-on-notif-failure feedback. The form-submission path is the deliberate carve-out: the actor is a Visitor whose contract is "the form submission landed" — surfacing a writer throw as a visitor 500 would loop them through a resubmit, double the `form_submission` row count, AND still miss the Owner notif. Comment in `src/forms/route.ts:106-120` documents the trade-off and cross-references this dossier. The long-term fix (retryable backfill from `form_submission` rows when the notif row is missing) is named in ADR 0043's Follow-ups rather than as a posture flip in the route.
 
-### H9 — Concurrent chat writes race
-- **Where:** [src/agent/chat/session.ts:211](src/agent/chat/session.ts#L211) — plain `UPDATE chat_session SET messages = ... WHERE id = ...` whole-row replace; no version, no lock, no CAS.
-- **Impact:** Memory `chat_concurrency_boundary` claimed "recording is sequential." Schema does not enforce it — two concurrent agent calls can lose a message turn.
-- **Fix direction:** add a `version` column + optimistic CAS, OR append-only messages table, OR pessimistic row lock in the persistence path.
+### H9 — Concurrent chat writes race  →  **ADR 0048 Accepted**
+- **Where:** [src/agent/chat/session.ts:218-220](src/agent/chat/session.ts#L218-L220)
+- **Resolution:** lifted into [ADR 0048](adr/0048-chat-session-last-writer-wins.md) as a deliberate trade. The lost-message failure mode is bounded to power-user multi-tab usage; the schema migration to a versioned compare-and-swap is named in the ADR's Follow-ups as a one-line lift when usage data demands it.
 
 ---
 
 ## Things I got factually wrong (carryovers)
 
-*(User's note cut off mid-sentence; placeholder until full list is supplied.)*
-
-- Memory `chat_concurrency_boundary` overstated "recording is sequential" (see H9).
-- Memory / prior framing on agent apply as preview-only contradicted by route header (see H7).
-- Prior framing on Yjs autosave loss window was off by an order of magnitude (see C1).
-- Prior framing on "addons are curated, not Owner code" was wrong for `custom_scripts` (see H6).
+- Memory `chat_concurrency_boundary` overstated "recording is sequential" (see H9 — last-writer-wins is the real contract).
+- Prior framing on agent apply as preview-only contradicted by route header (see H7 — fixed in `91f9de1`).
+- Prior framing on Yjs autosave loss window was off by an order of magnitude (see C1 / ADR 0045).
+- Prior framing on "addons are curated, not Owner code" was wrong for `custom_scripts` (see H6 / ADR 0046).
 
 ---
 
-## Triage notes
+## Triage notes (post-resolution)
 
-- C1 + H7 are the same architectural mistake (broadcast/persist ordering) at two routes; a single fix can close both.
-- H1, H4, H6 are the security-cluster — they belong in one threat-model review before any new auth surface ships.
-- H2 + H5 are atomicity bugs (DB vs external state). The notif writer (ADR 0043) leans on the same pattern; verify it does not introduce a new split-brain.
-- H8 overlaps with the just-landed ADR 0043 Phase B. Re-read the form_submission notif write with this finding in mind before flipping ADR 0043 Accepted in Phase G.
+- The 5 behavioural fixes (H2/H3/H4/H5/H7) shipped same day as the dossier landed.
+- 4 findings (C1, H1, H6, H9) closed by ADRs (0045, 0044, 0046, 0048) that ratify the existing as-built contract. Three of these (C1, H1, H6) reject the original fix-direction sketch; H9 defers the schema CAS migration under a named shape.
+- H8 closed by documenting the path-specific posture in `src/forms/route.ts` and naming the retryable-backfill follow-up in ADR 0043.
+- The original framings of C1, H1, H6, H8, and H9 read the code in isolation and identified failure modes correctly; what they missed was that the failure modes were *deliberate trades* documented (or now documented) elsewhere. That class of audit blind-spot is itself a process finding worth keeping.

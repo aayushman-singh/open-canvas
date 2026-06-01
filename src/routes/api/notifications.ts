@@ -17,32 +17,21 @@
 
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
-import { requireAuth } from '../../auth/require-auth.js';
 import { db } from '../../db/client.js';
 import { customer } from '../../db/schema.js';
-import { type HostConfigEnv } from '../../host-config.js';
 import { listInbox, unreadCount } from '../../notifications/inbox.js';
-import { markNotificationRead } from '../../notifications/writer.js';
-import type { NotificationOwnerRoomMarker } from '../../notifications/owner-room.js';
+import { markAllNotificationsRead, markNotificationRead } from '../../notifications/writer.js';
+import type { PublicEnv } from '../public.js';
 
-type Bindings = HostConfigEnv & {
-  CLERK_PUBLISHABLE_KEY: string;
-  CLERK_SECRET_KEY: string;
-  DATABASE_URL: string;
-  RESEND_API_KEY: string;
-  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
-};
-
-type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
-
-const notificationsApi = new Hono<Env>();
-notificationsApi.use('*', clerkAuth());
-notificationsApi.use('*', requireAuth());
+// Mounted inside `ownerApi`, which lives at `/api/*` (Clerk session) and
+// `/__api/*` (on-site editor edit-token) — both prefixes set `c.get('auth')`
+// with a `userId` claim before this sub-app runs (see src/index.ts wiring),
+// so resolveCustomerId works identically at either mount.
+const notificationsApi = new Hono<PublicEnv>();
 
 async function resolveCustomerId(c: {
   get: (k: 'auth') => { userId: string | null };
-  env: Bindings;
+  env: { DATABASE_URL: string };
 }): Promise<string | null> {
   const auth = c.get('auth');
   if (!auth.userId) return null;
@@ -109,6 +98,20 @@ notificationsApi.post('/notifications/:id/read', async (c) => {
   return c.json({ ok: true });
 });
 
+// Bulk mark-read per ADR 0043 dec 6 Follow-up. Two confirmations live on the
+// client (the dropdown's "Mark all read" button + a confirm modal); the
+// server endpoint is best-effort idempotent and echoes the count of rows
+// newly flipped so the client can render "{N} notifications marked read."
+notificationsApi.post('/notifications/mark-all-read', async (c) => {
+  const customerId = await resolveCustomerId(c);
+  if (!customerId) {
+    return c.json({ error: 'account not found' }, 404);
+  }
+  const database = db(c.env);
+  const { markedRead } = await markAllNotificationsRead({ db: database, env: c.env }, customerId);
+  return c.json({ ok: true, markedRead });
+});
+
 // SSE live-delivery channel per ADR 0043 dec 4. Holds a streaming Response
 // against the per-Customer NotificationOwnerRoom DO. The client (dashboard
 // or editor IIFE) attaches via `new EventSource('/api/notifications/stream')`
@@ -120,8 +123,12 @@ notificationsApi.get('/notifications/stream', async (c) => {
   if (!customerId) {
     return c.json({ error: 'account not found' }, 404);
   }
-  const stubId = c.env.NOTIFICATION_OWNER_ROOM.idFromName(customerId);
-  const stub = c.env.NOTIFICATION_OWNER_ROOM.get(stubId);
+  const ns = c.env.NOTIFICATION_OWNER_ROOM;
+  if (ns === undefined) {
+    return c.json({ error: 'NOTIFICATION_OWNER_ROOM binding not configured' }, 503);
+  }
+  const stubId = ns.idFromName(customerId);
+  const stub = ns.get(stubId);
   return stub.fetch('https://internal/subscribe', { method: 'GET' });
 });
 

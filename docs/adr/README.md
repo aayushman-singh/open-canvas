@@ -31,11 +31,12 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0019 | `SectionRecipeId 'custom'` is the sentinel for manually-designed sections | Accepted | [`docs/adr/0019-section-recipe-custom-sentinel.md`](0019-section-recipe-custom-sentinel.md) |
 | 0020 | Per-request CSP nonce gates the editor's inline boot blob | Proposed | [`docs/adr/0020-csp-nonce-for-editor-boot-blob.md`](0020-csp-nonce-for-editor-boot-blob.md) |
 | 0021 | Dashboard ships as one shared, browser-cached asset bundle | Proposed | [`docs/adr/0021-dashboard-shared-asset-bundle.md`](0021-dashboard-shared-asset-bundle.md) |
-| 0022 | Twelve-token OKLCH theme grammar derived from a single seed | Proposed | [`docs/adr/0022-twelve-token-oklch-theme-grammar.md`](0022-twelve-token-oklch-theme-grammar.md) |
-| 0023 | Seed asset bytes are stored as base64 text files in-repo | Proposed | [`docs/adr/0023-seed-asset-bytes-as-base64-text.md`](0023-seed-asset-bytes-as-base64-text.md) |
-| 0024 | Landing page is one locked Post-Aero surface with a checked-in preview artifact | Proposed | [`docs/adr/0024-landing-locked-post-aero-with-preview.md`](0024-landing-locked-post-aero-with-preview.md) |
-| 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Proposed | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
-| 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Proposed | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
+| 0022 | Twelve-token OKLCH theme grammar derived from a single seed | Accepted | [`docs/adr/0022-twelve-token-oklch-theme-grammar.md`](0022-twelve-token-oklch-theme-grammar.md) |
+| 0023 | Seed asset bytes are stored as base64 text files in-repo | Accepted | [`docs/adr/0023-seed-asset-bytes-as-base64-text.md`](0023-seed-asset-bytes-as-base64-text.md) |
+| 0024 | Landing page is one locked Post-Aero surface with a checked-in preview artifact | Accepted | [`docs/adr/0024-landing-locked-post-aero-with-preview.md`](0024-landing-locked-post-aero-with-preview.md) |
+| 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Accepted | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
+| 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Accepted | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
+| 0027 | Yjs encode/decode dispatch stays central; per-element files do not gain yjs runtime dependencies | Accepted | [`docs/adr/0027-yjs-projection-central-placement.md`](0027-yjs-projection-central-placement.md) |
 | 0028 | Page background uses the buildColorRow swatch+hex pattern | Accepted | [`docs/adr/0028-page-background-colour-picker-verification.md`](0028-page-background-colour-picker-verification.md) |
 | 0029 | Custom-404 toggle on the page inspector | Accepted | [`docs/adr/0029-custom-404-toggle-on-page-inspector.md`](0029-custom-404-toggle-on-page-inspector.md) |
 | 0030 | Audit re-run button reads "Run audit" | Accepted | [`docs/adr/0030-audit-button-label-run-audit.md`](0030-audit-button-label-run-audit.md) |
@@ -51,10 +52,10 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0041 | Apogee Showcase fixture og:image renders fresh per published page | Accepted | [`docs/adr/0041-og-image-fresh-render-per-page.md`](0041-og-image-fresh-render-per-page.md) |
 | 0043 | In-app notifications: persistent, recipient-tagged, delivered live over SSE | Accepted | [`docs/adr/0043-in-app-notifications.md`](0043-in-app-notifications.md) |
 | 0044 | Single HMAC secret signs invite, edit, and unlock tokens | Accepted | [`docs/adr/0044-single-hmac-secret-for-signed-tokens.md`](0044-single-hmac-secret-for-signed-tokens.md) |
-| 0045 | SiteRoom broadcasts Yjs updates before autosave persistence completes | Accepted | [`docs/adr/0045-siteroom-broadcast-precedes-persistence.md`](0045-siteroom-broadcast-precedes-persistence.md) |
-| 0046 | `addon_custom_scripts` is Owner-authored JavaScript; entitlement is the boundary | Accepted | [`docs/adr/0046-addon-custom-scripts-as-owner-code.md`](0046-addon-custom-scripts-as-owner-code.md) |
+| 0045 | SiteRoom broadcasts Yjs updates to peers before autosave persistence completes | Accepted | [`docs/adr/0045-siteroom-broadcast-precedes-persistence.md`](0045-siteroom-broadcast-precedes-persistence.md) |
+| 0046 | `addon_custom_scripts` is Owner-authored JavaScript by design; entitlement is the security boundary | Accepted | [`docs/adr/0046-addon-custom-scripts-as-owner-code.md`](0046-addon-custom-scripts-as-owner-code.md) |
 | 0047 | Editor WebSocket bearer travels in the URL query string | Accepted | [`docs/adr/0047-ws-token-in-query-for-editor-socket.md`](0047-ws-token-in-query-for-editor-socket.md) |
-| 0048 | Chat session is last-writer-wins; concurrent tab writes out of scope | Accepted | [`docs/adr/0048-chat-session-last-writer-wins.md`](0048-chat-session-last-writer-wins.md) |
+| 0048 | Chat session is last-writer-wins; concurrent tab writes are out of scope | Accepted | [`docs/adr/0048-chat-session-last-writer-wins.md`](0048-chat-session-last-writer-wins.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

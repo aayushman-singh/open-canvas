@@ -103,18 +103,23 @@ router.post('/:siteId/:formElementId', async (c) => {
     },
   );
 
-  // ADR 0043 form_submission notification.
+  // ADR 0043 form_submission notification — path-specific posture.
   //
-  // The submission row was already inserted by handleFormSubmit (above) by
-  // the time we reach this block. The visitor's outcome is determined and
-  // must NOT flip to 500 if the notification side-channel fails: the
-  // visitor would resubmit, we'd store a duplicate row, AND the owner
-  // would still miss the notif. `writeNotification` handles email failures
-  // internally per ADR dec 7 (best-effort); the outer try here catches a
-  // notif INSERT failure (the row contract per ADR dec 1/3 lives in Neon,
-  // not in the email channel — losing the row is the only thing that
-  // requires loud surfacing, and it is logged below rather than 500'd to
-  // the visitor for the same resubmit-loop reason).
+  // `writeNotification` is strict ("fail loud, no silent fallback") for every
+  // caller. That posture is correct for admin-action routes (collaborators,
+  // publish) where the actor expects the email + live push to land; a writer
+  // failure there should 5xx the request so the actor retries deliberately.
+  //
+  // This route is the carve-out. The actor is a Visitor who has no contract
+  // with the notification — their contract is "the form submission landed,"
+  // which `handleFormSubmit` already satisfied above. Surfacing a writer
+  // throw as a visitor-facing 500 would loop them through a resubmit, double
+  // the form_submission row count, AND still leave the Owner without the
+  // notif. We catch the throw and log it loudly; the operator sees the
+  // failure in wrangler tail. Discoveries dossier H8 captures this trade-off
+  // and points at the proper long-term fix (a retryable backfill from
+  // form_submission rows when the notif row is missing) as an ADR 0043
+  // follow-up rather than a posture flip here.
   if (outcome.status === 'ok') {
     phase = 'notification-fanout';
     try {

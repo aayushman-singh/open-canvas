@@ -669,7 +669,7 @@ type YEncodeDispatch = {
   [K in CanvasElement['type']]: (el: Extract<CanvasElement, { type: K }>) => Y.Map<unknown>;
 };
 
-const Y_ENCODE_DISPATCH: YEncodeDispatch = {
+export const Y_ENCODE_DISPATCH: YEncodeDispatch = {
   text: encodeTextElement,
   media: encodeMediaElement,
   action: encodeActionElement,
@@ -1152,7 +1152,7 @@ type YDecodeDispatch = {
   ) => Extract<CanvasElement, { type: K }>;
 };
 
-const Y_DECODE_DISPATCH: YDecodeDispatch = {
+export const Y_DECODE_DISPATCH: YDecodeDispatch = {
   text: decodeTextElement,
   media: decodeMediaElement,
   action: decodeActionElement,

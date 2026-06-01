@@ -4,7 +4,8 @@
 //
 // Mirrors the Variant D (Post-Aero) token archetype in
 // docs/specs/design-variants.md so a recruited site can shift palette without
-// breaking the design language. Rules are documented in SUBSYSTEM.md.
+// breaking the design language. Rules are documented in
+// docs/adr/0022-twelve-token-oklch-theme-grammar.md.
 
 import { parseHex, toCss, toHex, type OklchColor } from './oklch.js';
 

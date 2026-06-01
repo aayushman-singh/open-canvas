@@ -1,9 +1,10 @@
 # ADR 0023 — Seed asset bytes are stored as base64 text files in-repo
 
-**Status:** Proposed
-**Date:** 2026-05-29
+**Status:** Accepted
+**Date:** 2026-05-29 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** lifts the storage strategy from `src/assets/seed-source/SUBSYSTEM.md` into canon. Per the 2026-05-29 SUBSYSTEM audit, the rationale is a real "why" choice that should survive in canon.
+**Accepted-context:** verified 2026-06-01 — `src/assets/seed-source/` ships only `.b64` text files and `src/assets/seed-script.ts:29-30` decodes them via `atob`. The originating `src/assets/seed-source/SUBSYSTEM.md` was deleted in an earlier pass; the rationale now lives only here.
 
 ## Context
 

@@ -1,9 +1,10 @@
 # ADR 0026 — Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate
 
-**Status:** Proposed
-**Date:** 2026-05-29
+**Status:** Accepted
+**Date:** 2026-05-29 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** lifts the deferred-JWT-verification decision from `src/auth/SUBSYSTEM.md` (Notes section) into canon. Per the 2026-05-29 SUBSYSTEM audit, this is an explicit architectural posture ("accept the cost at this stage") that belongs in an ADR rather than a prose note.
+**Accepted-context:** verified 2026-06-01 — `CLERK_JWT_KEY` is absent from `src/`, `wrangler.toml`, and `.dev.vars.example`; the auth path uses the Clerk SDK default JWKS-fetch flow. `src/auth/SUBSYSTEM.md` was deleted in an earlier pass; the rationale now lives only here.
 
 ## Context
 

@@ -592,6 +592,7 @@ assert(
 const publicRouteSource = await readSource('./routes/public.ts');
 const publishRouteSource = await readSource('./routes/api/publish.ts');
 const indexSource = await readSource('./index.ts');
+const ownerApiSource = await readSource('./routes/api/owner-app.ts');
 const socketRouteSource = await readSource('./live/socket-route.ts');
 const siteRoomSource = await readSource('./live/site-room.ts');
 const unlockRouteSource = await readSource('./password/unlock-route.ts');
@@ -638,8 +639,13 @@ assert(
   'expected public route to resolve custom font tokens and emit @font-face CSS for Published Sites',
 );
 assert(
+  // The public route distinguishes editor and visitor socket roles when
+  // handling the /__live upgrade; the canonical shape is a typed local
+  // `socketRole: 'editor' | 'visitor'` (see src/routes/public.ts ~L959
+  // after the H3 password-gate fix in 12ed4dc).
   publicRouteSource.includes("let socketRole: 'editor' | 'visitor' = 'visitor'") &&
     publicRouteSource.includes('role=${socketRole}') &&
+    publicRouteSource.includes('verifyEditToken') &&
     indexSource.includes("app.route('/__live', socketRoute)") &&
     socketRouteSource.includes('verifyEditToken') &&
     socketRouteSource.includes('role=editor'),
@@ -650,6 +656,13 @@ assert(
     siteRoomSource.includes('isEditorSocket') &&
     siteRoomSource.includes('rejected visitor websocket message'),
   'expected SiteRoom to reject visitor-originated Yjs writes and fan out Yjs payloads only to editors',
+);
+assert(
+  indexSource.includes("app.route('/api', ownerApi)") &&
+    indexSource.includes("app.route('/__api', ownerApi)") &&
+    ownerApiSource.includes("import notificationsApi from './notifications'") &&
+    ownerApiSource.includes("ownerApi.route('/', notificationsApi)"),
+  'expected notifications API to be mounted through ownerApi so both /api and /__api inbox clients work',
 );
 assert(
   unlockRouteSource.includes('resolveCustomDomainWithRuntimeCache') &&

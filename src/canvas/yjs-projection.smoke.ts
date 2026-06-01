@@ -14,8 +14,20 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as Y from 'yjs';
 
-import { attachAutosave, decodeYDoc, encodeYDoc } from './yjs-projection.js';
-import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from './schema.js';
+import {
+  attachAutosave,
+  decodeYDoc,
+  encodeYDoc,
+  Y_DECODE_DISPATCH,
+  Y_ENCODE_DISPATCH,
+} from './yjs-projection.js';
+import {
+  ELEMENT_TYPES,
+  type CanvasElement,
+  type CanvasPage,
+  type CanvasSection,
+  type EditableSite,
+} from './schema.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
@@ -219,6 +231,39 @@ const syntheticElements: CanvasElement[] = [
     layout: 'left-center-right',
     sticky: true,
   },
+  {
+    id: 'el-collection',
+    type: 'collection',
+    box: { x: 0, y: 3040, w: 1440, h: 320, z: 6 },
+    mode: 'manual',
+    entryTemplate: [
+      {
+        id: 'el-collection-template-text',
+        type: 'text',
+        box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+        content: [{ text: 'Entry title' }],
+        role: 'body',
+        fontSize: 18,
+        fontWeight: 500,
+        align: 'left',
+      },
+    ],
+    entries: [
+      [
+        {
+          id: 'el-collection-entry-1-text',
+          type: 'text',
+          box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+          content: [{ text: 'First entry' }],
+          role: 'body',
+          fontSize: 18,
+          fontWeight: 500,
+          align: 'left',
+        },
+      ],
+    ],
+    layout: { columns: 3, gap: 24 },
+  },
 ];
 
 const syntheticSection: CanvasSection = {
@@ -302,6 +347,44 @@ const syntheticState: EditableSite = {
   process.stdout.write(
     '[yjs-projection:smoke] round-trip OK: synthetic state covering every ElementType\n',
   );
+}
+
+// ----------------------------------------------------------------------------
+// 3b. Dispatch + fixture coverage (ADR 0027 dec 4 follow-up).
+// ----------------------------------------------------------------------------
+//
+// ADR 0027 names the load-bearing property: Y_ENCODE_DISPATCH and
+// Y_DECODE_DISPATCH must each have one entry per ELEMENT_TYPES value, and
+// the synthetic fixture above must exercise every type. The mapped types
+// already enforce the dispatch side at TypeScript compile time, but those
+// errors only surface to a developer running `tsc`; the runtime smoke
+// fails sooner if someone trims either dispatch or the fixture by mistake.
+{
+  const encodeKeys = new Set(Object.keys(Y_ENCODE_DISPATCH));
+  const decodeKeys = new Set(Object.keys(Y_DECODE_DISPATCH));
+  assert(
+    encodeKeys.size === ELEMENT_TYPES.length,
+    `Y_ENCODE_DISPATCH has ${encodeKeys.size} keys, ELEMENT_TYPES has ${ELEMENT_TYPES.length}`,
+  );
+  assert(
+    decodeKeys.size === ELEMENT_TYPES.length,
+    `Y_DECODE_DISPATCH has ${decodeKeys.size} keys, ELEMENT_TYPES has ${ELEMENT_TYPES.length}`,
+  );
+  for (const t of ELEMENT_TYPES) {
+    assert(encodeKeys.has(t), `Y_ENCODE_DISPATCH missing entry for ElementType=${t}`);
+    assert(decodeKeys.has(t), `Y_DECODE_DISPATCH missing entry for ElementType=${t}`);
+  }
+  const fixtureTypes = new Set<string>();
+  const fixtureSections: CanvasSection[] = [syntheticSection];
+  if (syntheticState.header) fixtureSections.push(syntheticState.header);
+  if (syntheticState.footer) fixtureSections.push(syntheticState.footer);
+  for (const section of fixtureSections) {
+    for (const el of section.elements) fixtureTypes.add(el.type);
+  }
+  for (const t of ELEMENT_TYPES) {
+    assert(fixtureTypes.has(t), `synthetic fixture missing element of type=${t}`);
+  }
+  process.stdout.write('[yjs-projection:smoke] dispatch+fixture coverage OK\n');
 }
 
 // ----------------------------------------------------------------------------
