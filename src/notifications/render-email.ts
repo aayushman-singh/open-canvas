@@ -73,6 +73,7 @@ function renderFormSubmissionEmail(
     html: brandShell({
       heading: 'New form submission',
       bodyHtml,
+      appOrigin: ctx.appOrigin,
       cta: { label: 'View in Forms Inbox', href: inboxUrl },
     }),
   };
@@ -101,6 +102,7 @@ function renderCollaboratorEventEmail(
         html: brandShell({
           heading: 'New site invitation',
           bodyHtml,
+          appOrigin: ctx.appOrigin,
           cta: { label: 'Open site', href: siteUrl },
         }),
       };
@@ -112,6 +114,7 @@ function renderCollaboratorEventEmail(
         html: brandShell({
           heading: "You're on the team",
           bodyHtml,
+          appOrigin: ctx.appOrigin,
           cta: { label: 'Open site', href: siteUrl },
         }),
       };
@@ -123,6 +126,7 @@ function renderCollaboratorEventEmail(
         html: brandShell({
           heading: 'Access removed',
           bodyHtml,
+          appOrigin: ctx.appOrigin,
         }),
       };
     }
@@ -148,7 +152,7 @@ function renderPublishEventEmail(
     const bodyHtml = `<p style="margin:0;">Publish #${escapeHtml(String(p.publishedVersion ?? '?'))} of <strong style="color:#1A1917;">${escapeHtml(p.siteName)}</strong> is live.</p>`;
     return {
       subject: `Publish succeeded on ${p.siteName}`,
-      html: brandShell({ heading: 'Publish succeeded', bodyHtml }),
+      html: brandShell({ heading: 'Publish succeeded', bodyHtml, appOrigin: ctx.appOrigin }),
     };
   }
   const reason = p.failureReason ?? 'Unknown failure';
@@ -164,6 +168,7 @@ function renderPublishEventEmail(
     html: brandShell({
       heading: 'Publish failed',
       bodyHtml,
+      appOrigin: ctx.appOrigin,
       cta: { label: 'Open site', href: siteUrl },
     }),
   };
@@ -190,6 +195,7 @@ function renderAccessEventEmail(p: AccessEventPayload, ctx: RenderEmailCtx): Ren
         html: brandShell({
           heading: 'Role changed',
           bodyHtml,
+          appOrigin: ctx.appOrigin,
           cta: { label: 'Open site', href: siteUrl },
         }),
       };
@@ -202,7 +208,7 @@ function renderAccessEventEmail(p: AccessEventPayload, ctx: RenderEmailCtx): Ren
         `</p>`;
       return {
         subject: `Your access to "${p.siteName}" was revoked`,
-        html: brandShell({ heading: 'Access revoked', bodyHtml }),
+        html: brandShell({ heading: 'Access revoked', bodyHtml, appOrigin: ctx.appOrigin }),
       };
     }
     default: {

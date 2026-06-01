@@ -96,6 +96,7 @@ async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
       siteName: ctx.siteName,
       siteSubdomain: ctx.siteSubdomain,
       apex: appDomain(ctx.env),
+      appOrigin: appOrigin(ctx.env),
       inviterName: ctx.inviterName,
       role: ctx.role,
       acceptUrl,

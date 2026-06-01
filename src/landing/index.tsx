@@ -224,6 +224,37 @@ landing.get('/favicon.ico', (c) =>
   }),
 );
 
+// Brand mark PNG endpoint for transactional emails. The shared brandShell
+// (src/email/templates/shell.ts) references this absolute URL via <img> tag
+// so Outlook / older Gmail clients that strip inline SVG still render the
+// logo. PNG is rasterised once per isolate via resvg-wasm and cached
+// aggressively. The source SVG omits the rounded-rect background so the
+// mark sits flush on the email card's paper background.
+const BRAND_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64"><rect x="14" y="9" width="40" height="46" stroke="#1A1917" stroke-width="2.8" fill="none"/><circle cx="34" cy="32" r="11" stroke="#1A1917" stroke-width="7" fill="none"/><rect x="40" y="19" width="21" height="3.6" rx="1.8" fill="#E84D4A"/><rect x="6" y="43" width="21" height="3.6" rx="1.8" fill="#E84D4A"/></svg>`;
+let brandMarkPngBytes: Uint8Array | null = null;
+let brandMarkPromise: Promise<Uint8Array> | null = null;
+
+landing.get('/brand-mark.png', async (c) => {
+  if (brandMarkPngBytes === null) {
+    if (brandMarkPromise === null) {
+      const { rasteriseSvgToPng } = await import('../og-image/rasterise.js');
+      const env = c.env as { OG_RESVG_WASM?: WebAssembly.Module };
+      brandMarkPromise = rasteriseSvgToPng(
+        BRAND_MARK_SVG,
+        env.OG_RESVG_WASM !== undefined ? { wasmModule: env.OG_RESVG_WASM } : undefined,
+      ).then((r) => r.bytes);
+    }
+    brandMarkPngBytes = await brandMarkPromise;
+  }
+  return new Response(brandMarkPngBytes, {
+    status: 200,
+    headers: {
+      'content-type': 'image/png',
+      'cache-control': 'public, max-age=31536000, immutable',
+    },
+  });
+});
+
 // BIMI logo (RFC 9419 SVG Tiny 1.2 Portable/Secure profile). Referenced by
 // the `default._bimi.opencanvas.aayushman.dev` TXT record so Apple Mail /
 // Fastmail / (with VMC) Gmail render this as the sender avatar in recipient
