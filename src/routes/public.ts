@@ -351,6 +351,26 @@ export async function buildOnSiteEditorOptions(
   };
 }
 
+/**
+ * Resolve the editing identity's display name for the live presence cursor.
+ * Returns `customer.displayName ?? customer.email ?? undefined`. Lifted
+ * outside `buildOnSiteEditorOptions` so the token-shape smoke
+ * (`src/live/editor-auth.smoke.ts`) doesn't gain a hard DB dependency —
+ * route handlers thread the result in when constructing editor options.
+ */
+async function resolvePresenceDisplayName(
+  env: Pick<Bindings, 'DATABASE_URL'>,
+  customerId: string,
+): Promise<string | undefined> {
+  const database = db(env);
+  const rows = await database
+    .select({ displayName: customer.displayName, email: customer.email })
+    .from(customer)
+    .where(eq(customer.id, customerId))
+    .limit(1);
+  return rows[0]?.displayName ?? rows[0]?.email ?? undefined;
+}
+
 async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicSiteRow | null> {
   const database = db(env);
   const rows = await database
@@ -495,6 +515,8 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   }
 
   const opts = await buildOnSiteEditorOptions(siteRow, payload, c.env);
+  const presenceName = await resolvePresenceDisplayName(c.env, payload.customerId);
+  if (presenceName) opts.customerDisplayName = presenceName;
   const theme = readThemeCookie(c);
   if (theme) opts.theme = theme;
   return c.html(editorPageJsx(opts));

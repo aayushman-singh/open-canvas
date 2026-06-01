@@ -28,10 +28,17 @@ export interface CanvasClientScriptParams {
   siteId: string;
   apiBase?: string;
   wsToken?: string;
+  /**
+   * Display name for the local presence label rendered in remote peers'
+   * cursors. Falls back to "Editor <uuid-prefix>" when omitted — see
+   * loadPresenceIdentity() in the IIFE. Resolved by the editor route from
+   * `customer.displayName` (or `customer.email` when displayName is null).
+   */
+  displayName?: string;
 }
 
 export function canvasClientScript(params: CanvasClientScriptParams): string {
-  const { siteId, apiBase = '/api', wsToken = '' } = params;
+  const { siteId, apiBase = '/api', wsToken = '', displayName = '' } = params;
   if (typeof siteId !== 'string' || !SITE_ID_RE.test(siteId)) {
     throw new Error(
       `canvasClientScript: siteId must match /^[A-Za-z0-9-]+$/ (got ${JSON.stringify(siteId)})`,
@@ -43,17 +50,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     );
   }
 
-  // Safe interpolations: siteId, apiBase, INSPECTOR_DISPATCH, SIDEBAR_DISPATCH.
-  // siteId + apiBase are validated above; INSPECTOR_DISPATCH (ADR 0011 Step 1)
-  // and SIDEBAR_DISPATCH (ADR 0011 Step 3) are static module exports of pure
-  // data so JSON.stringify produces value-only payloads with no embedded code.
-  // Everything inside the IIFE is plain JavaScript, not TypeScript.
+  // Safe interpolations: siteId, apiBase, displayName, INSPECTOR_DISPATCH,
+  // SIDEBAR_DISPATCH. siteId + apiBase are validated above; displayName goes
+  // through JSON.stringify so any string is safely embedded as a literal.
+  // INSPECTOR_DISPATCH (ADR 0011 Step 1) and SIDEBAR_DISPATCH (ADR 0011 Step
+  // 3) are static module exports of pure data so JSON.stringify produces
+  // value-only payloads with no embedded code. Everything inside the IIFE is
+  // plain JavaScript, not TypeScript.
   const inspectorDispatchJson = JSON.stringify(INSPECTOR_DISPATCH);
   const sidebarDispatchJson = JSON.stringify(SIDEBAR_DISPATCH);
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
   const API_BASE = ${JSON.stringify(apiBase)};
   const WS_TOKEN = ${JSON.stringify(wsToken)};
+  const PRESENCE_DISPLAY_NAME = ${JSON.stringify(displayName)};
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
   const INSPECTOR_DISPATCH = ${inspectorDispatchJson};
   const SIDEBAR_DISPATCH = ${sidebarDispatchJson};
@@ -10074,9 +10084,16 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // -- Co-edit presence: local identity + remote caret rendering --------
   // The connector only ships name/color when we call setPresence — the
   // count pill stayed at 1 until both initialPresence and a caret-
-  // following republish loop existed. Identity is generated client-side
-  // and cached in localStorage so it's stable across reloads without a
-  // server round-trip; a future patch can plumb the real Clerk name.
+  // following republish loop existed.
+  //
+  // Name resolution order (first non-empty wins):
+  //   1. PRESENCE_DISPLAY_NAME — server-injected customer display name /
+  //      email (resolved by the editor route from the customer row tied
+  //      to the current Clerk session or invite acceptance).
+  //   2. localStorage "rev01-presence-name" — operator-overridable label
+  //      (no UI ships yet but the slot is reserved for a profile setting).
+  //   3. "Editor " + 4-char uuid prefix — final fallback so anonymous
+  //      sessions still get a stable handle.
   var PRESENCE_PALETTE = [
     "#ff6600","#0066ff","#22aa55","#cc2266","#aa44dd","#dd9900","#00aaaa","#6677aa"
   ];
@@ -10090,7 +10107,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       try { window.localStorage.setItem("rev01-presence-id", id); } catch (_) {}
     }
     var name = null;
-    try { name = window.localStorage.getItem("rev01-presence-name"); } catch (_) {}
+    if (typeof PRESENCE_DISPLAY_NAME === "string" && PRESENCE_DISPLAY_NAME.length > 0) {
+      name = PRESENCE_DISPLAY_NAME;
+    }
+    if (!name) {
+      try { name = window.localStorage.getItem("rev01-presence-name"); } catch (_) {}
+    }
     if (!name) name = "Editor " + String(id).slice(0, 4);
     var sum = 0;
     for (var i = 0; i < id.length; i++) sum = (sum + id.charCodeAt(i)) | 0;

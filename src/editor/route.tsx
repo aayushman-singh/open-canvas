@@ -66,6 +66,15 @@ export interface EditorPageOptions {
   apex: string;
   /** Canonical app origin (`https://<apex>`). */
   apexOrigin: string;
+  /**
+   * Display name for the local presence cursor label seen by remote peers.
+   * Resolved by callers from `customer.displayName` (fallback to
+   * `customer.email`) for whichever customer the current session represents
+   * — owner on the dashboard route, accepted collaborator on the on-site
+   * editor route. Optional because the smoke / fixture builder paths don't
+   * always have a real customer row.
+   */
+  customerDisplayName?: string;
   context?: 'dashboard' | 'public';
   clerkPublishableKey?: string;
   /**
@@ -124,6 +133,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
     styleKit,
     apex,
     apexOrigin,
+    customerDisplayName,
     context = 'dashboard',
     clerkPublishableKey,
     clerkFrontendApiHost: clerkHost,
@@ -134,7 +144,12 @@ export function editorPageJsx(opts: EditorPageOptions) {
     throw new Error('editorPageJsx requires clerkFrontendApiHost when clerkPublishableKey is set');
   }
   const apiBase = context === 'public' ? '/__api' : '/api';
-  const inlineScript = canvasClientScript({ siteId, apiBase, ...(wsToken ? { wsToken } : {}) });
+  const inlineScript = canvasClientScript({
+    siteId,
+    apiBase,
+    ...(wsToken ? { wsToken } : {}),
+    ...(customerDisplayName ? { displayName: customerDisplayName } : {}),
+  });
   const publicAddress = `${subdomain}.${apex}`;
   const settingsPath = `/dashboard/sites/${encodeURIComponent(siteId)}/settings`;
   const settingsHref =
@@ -449,6 +464,17 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
     return c.text('site not found', 404);
   }
 
+  // Pull the owner's display name (falling back to email) so the live
+  // presence cursor label seen by collaborators reads as the human, not
+  // "Editor <uuid-prefix>".
+  const database = db(c.env);
+  const ownerRow = await database
+    .select({ displayName: customer.displayName, email: customer.email })
+    .from(customer)
+    .where(eq(customer.id, owned.customerId))
+    .limit(1);
+  const presenceName = ownerRow[0]?.displayName ?? ownerRow[0]?.email ?? undefined;
+
   const wsToken = await signEditToken(
     { siteId: owned.id, customerId: owned.customerId, clerkUserId: auth.userId },
     c.env.UNLOCK_SIGNING_SECRET,
@@ -463,6 +489,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       styleKit: owned.styleKit,
       apex: appDomain(c.env),
       apexOrigin: appOrigin(c.env),
+      ...(presenceName ? { customerDisplayName: presenceName } : {}),
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
       clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL),
