@@ -499,6 +499,36 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   if (chatToggleBtn) chatToggleBtn.addEventListener("click", toggleChatPanel);
   if (chatCloseBtn) chatCloseBtn.addEventListener("click", toggleChatPanel);
 
+  // -- Chat selection chip ------------------------------------------------
+  // Mirrors selectedElementId into the chat panel so the agent can resolve
+  // vague references ("change this to blue") to the element the Owner has
+  // selected on the canvas. The X drops the hint for THIS send only; the
+  // canvas selection itself is untouched, and the next message re-arms it.
+  var chatSelectionEl = document.getElementById("canvas-chat-selection");
+  var chatSelectionTextEl = document.getElementById("canvas-chat-selection-text");
+  var chatSelectionClearBtn = document.getElementById("canvas-chat-selection-clear");
+  var chatSelectionDropped = false;
+
+  function updateChatSelectionChip() {
+    if (!chatSelectionEl || !chatSelectionTextEl) return;
+    if (!selectedElementId || chatSelectionDropped || !state) {
+      chatSelectionEl.hidden = true;
+      return;
+    }
+    var found = findElement(selectedElementId);
+    var typeLabel = found && found.element ? found.element.type : "element";
+    var shortId = selectedElementId.length > 10 ? selectedElementId.slice(0, 10) + "..." : selectedElementId;
+    chatSelectionTextEl.textContent = typeLabel + " - " + shortId;
+    chatSelectionEl.hidden = false;
+  }
+
+  if (chatSelectionClearBtn) {
+    chatSelectionClearBtn.addEventListener("click", function() {
+      chatSelectionDropped = true;
+      updateChatSelectionChip();
+    });
+  }
+
   // -- Viewport + camera --------------------------------------------------
   // The route ships #canvas-root directly inside the editor shell. We wrap
   // it in a .rev01-viewport at boot so the viewport owns the dark
@@ -7124,6 +7154,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (prev) prev.removeAttribute("data-selected");
     }
     selectedElementId = elementId;
+    chatSelectionDropped = false;
     // Dismiss any link popover anchored to the previously selected element.
     // A new selection either replaces it (action elements re-pin below) or
     // there's nothing to show for the new selection.
@@ -7145,6 +7176,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     renderInspector();
     renderSidebarSelection();
+    updateChatSelectionChip();
   }
 
   function selectSection(sectionId) {
@@ -11638,6 +11670,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var payload = { message: msg };
           if (chatSessionId) payload.sessionId = chatSessionId;
+          if (selectedElementId && !chatSelectionDropped) {
+            payload.selectedElementId = selectedElementId;
+          }
+          // The X drops selection for one send only; re-arm so the next
+          // message picks up the current canvas selection again.
+          chatSelectionDropped = false;
+          updateChatSelectionChip();
 
           authFetch(API_BASE + "/sites/" + SITE_ID + "/chat", {
             method: "POST",
