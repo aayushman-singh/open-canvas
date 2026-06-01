@@ -4,7 +4,7 @@ import { eq, count, sum } from 'drizzle-orm';
 import { siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { site, ownerAsset } from '../../db/schema';
-import { clerkAuth } from '../../auth/middleware';
+import { clerkAuth, getClerkUser } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
@@ -193,7 +193,7 @@ const tabScript = raw(`<script>
 </script>`);
 
 settingsRoute.get('/settings', async (c) => {
-  const user = c.get('user');
+  const user = await getClerkUser(c);
   if (!user) {
     throw new Error('settings page reached without a resolved user');
   }

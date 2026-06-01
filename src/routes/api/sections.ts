@@ -115,7 +115,13 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
   // always the SITE OWNER's customer id (per loadAccessibleSite contract),
   // which is what every ownerAsset / librarySection lookup below needs:
   // a collaborator's own customer id must never leak into asset scoping.
-  const accessibleSite = await loadAccessibleSite(database, auth.userId, siteId, 'editor');
+  const accessibleSite = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    'editor',
+    c.get('customer')?.id,
+  );
   if (!accessibleSite) {
     return c.json({ error: 'site not found' }, 404);
   }

@@ -3,7 +3,7 @@ import { raw } from 'hono/html';
 import { eq, count } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { site } from '../../db/schema';
-import { clerkAuth } from '../../auth/middleware';
+import { clerkAuth, getClerkUser } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
@@ -212,11 +212,11 @@ const profileScript = raw(`<script>
 </script>`);
 
 profileRoute.get('/profile', async (c) => {
-  const user = c.get('user');
+  const user = await getClerkUser(c);
   if (!user) {
     throw new Error('profile page reached without a resolved user');
   }
-  // clerkAuth() middleware already upserted + loaded the customer row.
+  // clerkAuth() middleware already loaded the customer row.
   const profile = c.get('customer');
   if (!profile) {
     throw new Error('profile page reached without a resolved customer');

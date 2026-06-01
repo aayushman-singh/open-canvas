@@ -4,7 +4,7 @@ import { and, desc, eq, isNotNull, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { site, ownerAsset, siteCollaborator } from '../../db/schema';
-import { clerkAuth, resolveClerkKeys } from '../../auth/middleware';
+import { clerkAuth, getClerkUser, resolveClerkKeys } from '../../auth/middleware';
 import { clerkFrontendApiHost, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
 import { DashboardShell } from './shell';
@@ -1111,11 +1111,11 @@ function DetailsPanel({ s }: { s: SiteCard }) {
 }
 
 dashboard.get('/', async (c) => {
-  const user = c.get('user');
+  const user = await getClerkUser(c);
   if (!user) {
     throw new Error('dashboard reached without a resolved user');
   }
-  // clerkAuth() middleware already upserted + loaded the customer row.
+  // clerkAuth() middleware already loaded the customer row.
   const customerRecord = c.get('customer');
   if (!customerRecord) {
     throw new Error('dashboard reached without a resolved customer');

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer, BILLING_PLANS, type BillingPlan } from '../../db/schema';
-import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
+import { clerkAuth, getClerkUser, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 
 type Bindings = {
@@ -20,30 +20,19 @@ profileApi.use('*', clerkAuth());
 profileApi.use('*', requireAuth());
 
 profileApi.get('/', async (c) => {
-  const auth = c.get('auth');
-  const database = db(c.env);
-
-  const rows = await database
-    .select({
-      id: customer.id,
-      email: customer.email,
-      displayName: customer.displayName,
-      bio: customer.bio,
-      timezone: customer.timezone,
-      plan: customer.plan,
-      createdAt: customer.createdAt,
-    })
-    .from(customer)
-    .where(eq(customer.clerkUserId, auth.userId!))
-    .limit(1);
-
-  if (!rows[0]) {
-    return c.json({ error: 'customer not found' }, 404);
-  }
-
-  const user = c.get('user');
+  // c.get('customer') is the row clerkAuth() already loaded — no redundant
+  // SELECT. The Clerk User is fetched lazily because the hot path skips it.
+  const customerRow = c.get('customer');
+  if (!customerRow) return c.json({ error: 'customer not found' }, 404);
+  const user = await getClerkUser(c);
   return c.json({
-    ...rows[0],
+    id: customerRow.id,
+    email: customerRow.email,
+    displayName: customerRow.displayName,
+    bio: customerRow.bio,
+    timezone: customerRow.timezone,
+    plan: customerRow.plan,
+    createdAt: customerRow.createdAt,
     clerkImageUrl: user?.imageUrl ?? null,
     clerkFirstName: user?.firstName ?? null,
     clerkLastName: user?.lastName ?? null,

@@ -52,19 +52,29 @@ type Db = ReturnType<typeof import('../db/client').db>;
  *
  * Ownership is checked first because it is the common path and because owner
  * access is always the canonical source of `customerId` for later writes.
+ *
+ * `callerCustomerId` is an optimisation: clerkAuth() middleware already loaded
+ * the calling customer's row, so passing its id skips an otherwise-mandatory
+ * SELECT against `customer` on every site-scoped request. Falls back to the
+ * SELECT when the caller doesn't have a resolved customer yet (e.g. edit-
+ * token paths where the customer-from-Clerk handshake hasn't run).
  */
 export async function loadAccessibleSite(
   database: Db,
   clerkUserId: string,
   siteId: string,
   requiredRole: SiteAccessRequirement = 'viewer',
+  callerCustomerId?: string,
 ): Promise<AccessibleSite | null> {
-  const customerRow = await database
-    .select({ id: customer.id })
-    .from(customer)
-    .where(eq(customer.clerkUserId, clerkUserId))
-    .limit(1);
-  const customerId = customerRow[0]?.id;
+  let customerId: string | undefined = callerCustomerId;
+  if (customerId === undefined) {
+    const customerRow = await database
+      .select({ id: customer.id })
+      .from(customer)
+      .where(eq(customer.clerkUserId, clerkUserId))
+      .limit(1);
+    customerId = customerRow[0]?.id;
+  }
   if (!customerId) return null;
 
   // Check ownership first (cheapest path)

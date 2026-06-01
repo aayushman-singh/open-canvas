@@ -98,7 +98,13 @@ ownerAssetsApi.post('/', async (c) => {
   const database = db(c.env);
   let customerId: string;
   if (siteId !== undefined) {
-    const accessible = await loadAccessibleSite(database, auth.userId, siteId, 'editor');
+    const accessible = await loadAccessibleSite(
+      database,
+      auth.userId,
+      siteId,
+      'editor',
+      c.get('customer')?.id,
+    );
     if (!accessible) {
       // Same contract as other site-scoped routes: missing OR not allowed
       // collapses to 404 so the route doesn't leak existence.

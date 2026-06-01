@@ -181,7 +181,13 @@ async function loadCanvasSiteAccess(
   }
 
   const database = db(c.env);
-  const accessibleSite = await loadAccessibleSite(database, auth.userId, siteId, requiredRole);
+  const accessibleSite = await loadAccessibleSite(
+    database,
+    auth.userId,
+    siteId,
+    requiredRole,
+    c.get('customer')?.id,
+  );
   if (!accessibleSite) {
     return { found: false };
   }

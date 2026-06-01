@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
-import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
+import { clerkAuth, getClerkUser, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { signInviteToken } from '../../auth/invite-token.js';
 import { db, type Db } from '../../db/client.js';
@@ -106,8 +106,8 @@ async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
   });
 }
 
-function resolveInviterName(c: Context<Env>, fallbackEmail: string): string {
-  const ownerUser = c.get('user');
+async function resolveInviterName(c: Context<Env>, fallbackEmail: string): Promise<string> {
+  const ownerUser = await getClerkUser(c);
   if (!ownerUser) return 'A user';
   const named = `${ownerUser.firstName ?? ''} ${ownerUser.lastName ?? ''}`.trim();
   return named || fallbackEmail;
@@ -420,7 +420,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
       collaboratorId,
       invitedEmail: rawEmail,
       role,
-      inviterName: resolveInviterName(c, rawEmail),
+      inviterName: await resolveInviterName(c, rawEmail),
       env: c.env,
     });
   } catch (err) {
@@ -440,7 +440,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
       subjectDisplayName: subjectDisplay.displayName,
       subjectEmail: rawEmail,
       actorCustomerId: owner.customerId,
-      actorDisplayName: resolveInviterName(c, rawEmail),
+      actorDisplayName: await resolveInviterName(c, rawEmail),
     });
   } catch (err) {
     console.error('[collaborators] collaborator_event invited notif failed', {
@@ -517,7 +517,7 @@ collaboratorsApi.patch('/sites/:siteId/collaborators/:collabId', async (c) => {
         previousRole: existing[0].role,
         nextRole: role,
         actorCustomerId: owner.customerId,
-        actorDisplayName: resolveInviterName(c, subjectDisplay.email),
+        actorDisplayName: await resolveInviterName(c, subjectDisplay.email),
       });
     } catch (err) {
       console.error('[collaborators] access_event role_changed notif failed', {
@@ -572,7 +572,7 @@ collaboratorsApi.post('/sites/:siteId/collaborators/:collabId/resend', async (c)
       collaboratorId: row.id,
       invitedEmail: row.invitedEmail,
       role: row.role,
-      inviterName: resolveInviterName(c, row.invitedEmail),
+      inviterName: await resolveInviterName(c, row.invitedEmail),
       env: c.env,
     });
   } catch (err) {
@@ -628,7 +628,7 @@ collaboratorsApi.delete('/sites/:siteId/collaborators/:collabId', async (c) => {
         previousRole: existing[0].role,
         nextRole: null,
         actorCustomerId: owner.customerId,
-        actorDisplayName: resolveInviterName(c, subjectDisplay.email),
+        actorDisplayName: await resolveInviterName(c, subjectDisplay.email),
       });
     } catch (err) {
       console.error('[collaborators] access_event revoked notif failed', {

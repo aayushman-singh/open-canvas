@@ -4,7 +4,7 @@ import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
-import { site, type Customer } from '../db/schema';
+import { customer, site, type Customer } from '../db/schema';
 import {
   authorizedParties,
   cookieName,
@@ -39,13 +39,15 @@ type ClerkBindings = HostConfigEnv &
 
 export type ClerkAuthVariables = {
   auth: AuthState;
+  // Eagerly populated only on the first-sign-up slow path. On the hot path,
+  // null — fetch via getClerkUser(c) when actually needed. Skipping the per-
+  // request clerk.users.getUser() round trip saves ~200–500ms on every
+  // authenticated request.
   user: User | null;
   clerk: ReturnType<typeof createClerkClient>;
-  // Set by clerkAuth() after upsertCustomerFromClerk; null on editTokenAuth
-  // paths (the /__api/* edit popup flow doesn't need the customer row).
-  // Routes that previously did `await db.select(...).from(customer).where(
-  // eq(customer.clerkUserId, user.id))` should read c.get('customer') instead
-  // — the row is already populated and one Neon round trip cheaper.
+  // Set by clerkAuth() after the customer SELECT (or first-sign-up upsert);
+  // null on editTokenAuth paths (the /__api/* edit popup flow doesn't need
+  // the customer row).
   customer: Customer | null;
 };
 
@@ -268,24 +270,74 @@ export function clerkAuth() {
       getToken: auth.getToken,
     });
 
-    const user = await clerk.users.getUser(auth.userId);
-    c.set('user', user);
-
-    // Sync the local customer row on every authenticated request. Previously
-    // this lived only in three dashboard handlers (index, profile, settings),
-    // so a fresh Clerk sign-up that hit any other route first wedged at
-    // requireOwnerContext (no customer row -> 403 forever). Centralising it
-    // here removes that latent lockout.
-    //
-    // The upsert RETURNs the full row; we stash it on the request context so
-    // downstream handlers can `c.get('customer')` instead of issuing a second
-    // SELECT against the same row. That removes two Neon round trips per
-    // dashboard request (the duplicate upsert and the redundant SELECT).
-    const customerRow = await upsertCustomerFromClerk(db(c.env), user);
+    // Hot path: SELECT the existing customer row. Skips the clerk.users.getUser
+    // network round trip (~200–500ms) and the upsert (~50–100ms) on every
+    // request after the first sign-up. The local row's email stays in lockstep
+    // with Clerk's whenever the Owner visits Profile (the explicit refresh
+    // path); a passive email rotation in Clerk is not propagated until the
+    // next first-sign-up-style cold path or an explicit refresh, which is
+    // acceptable for a non-transactional surface.
+    const database = db(c.env);
+    const existing = await database
+      .select()
+      .from(customer)
+      .where(eq(customer.clerkUserId, auth.userId))
+      .limit(1);
+    let customerRow = existing[0] ?? null;
+    if (customerRow === null) {
+      // First sign-up / unsynced row — fetch the Clerk user once, upsert,
+      // and stash the User on the context so downstream handlers that need
+      // it on the same request don't re-fetch.
+      const user = await clerk.users.getUser(auth.userId);
+      c.set('user', user);
+      customerRow = await upsertCustomerFromClerk(database, user);
+    } else {
+      // Fast path: user details aren't needed; routes that actually want the
+      // Clerk User must call `getClerkUser(c)` so the cost is paid per-route
+      // instead of per-request.
+      c.set('user', null);
+    }
     c.set('customer', customerRow);
 
     await next();
   });
+}
+
+/**
+ * Lazy accessor for the Clerk User on the request. Caches the resolved
+ * promise on the request context so multiple call sites in the same request
+ * share one network round trip. Returns `null` only when the request was
+ * authenticated through a non-Clerk middleware (e.g. the on-site edit-token
+ * popup) and we never had a Clerk session to begin with.
+ */
+const CLERK_USER_PROMISE = Symbol('clerk-user-promise');
+type ClerkUserAware = {
+  get(key: typeof CLERK_USER_PROMISE): Promise<User | null> | undefined;
+  set(key: typeof CLERK_USER_PROMISE, value: Promise<User | null>): void;
+};
+export async function getClerkUser(
+  c: {
+    get: (key: 'auth' | 'user' | 'clerk') => unknown;
+    set: (key: 'user', value: User | null) => void;
+  } & ClerkUserAware,
+): Promise<User | null> {
+  const cached = c.get(CLERK_USER_PROMISE);
+  if (cached !== undefined) return cached;
+  const eager = c.get('user') as User | null;
+  if (eager !== null) {
+    const resolved = Promise.resolve(eager);
+    c.set(CLERK_USER_PROMISE, resolved);
+    return resolved;
+  }
+  const auth = c.get('auth') as AuthState;
+  const clerk = c.get('clerk') as ReturnType<typeof createClerkClient>;
+  if (!auth.userId || !clerk) return null;
+  const promise = clerk.users.getUser(auth.userId).then((user) => {
+    c.set('user', user);
+    return user;
+  });
+  c.set(CLERK_USER_PROMISE, promise);
+  return promise;
 }
 
 // Middleware for /__api/* routes on published-site subdomains. Validates the
