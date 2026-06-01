@@ -1136,9 +1136,9 @@ dashboard.get('/', async (c) => {
   // invite. We surface them in the same grid as owned sites so accepted
   // collaborators can re-enter the editor from the dashboard instead of
   // re-clicking the invite email. They do NOT count toward the siteLimit
-  // gate (that's a plan quota on creation, not on access), and they're
-  // tagged with `ownedByCurrent=false` downstream so the card chrome can
-  // distinguish them when we add per-card affordances later.
+  // gate (that's a plan quota on creation, not on access), and each row is
+  // tagged with ownership before rendering so owner-only card actions stay
+  // off collaborator cards.
   const [ownedRows, collabRows, sb] = await Promise.all([
     database
       .select({
