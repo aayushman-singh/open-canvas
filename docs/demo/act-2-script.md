@@ -10,7 +10,7 @@
 
 ---
 
-## Beat index — 28 diagram-anchored blocks
+## Beat index — 29 diagram-anchored blocks
 
 | # | Block | Diagram | ADR / source | Tool |
 |---|---|---|---|---|
@@ -42,6 +42,7 @@
 | D26 | Dual rate limiter — in-process (dev) vs DO (prod), same interface | [`mermaid/D26-rate-limiter.md`](diagrams/mermaid/D26-rate-limiter.md) | `src/live/form-rate-limiter.ts` | Mermaid class |
 | D27 | CSP dynamic frame-src derived from page-used embed providers | [`mermaid/D27-csp.md`](diagrams/mermaid/D27-csp.md) | `src/embed/csp.ts` | Mermaid sequence |
 | D28 | DevEx — smoke tests, pure validators, layout engine, design section parser | [`excalidraw/D28-devex.excalidraw`](diagrams/excalidraw/D28-devex.excalidraw) | `scripts/`, `src/canvas/responsive/`, smokes | Excalidraw |
+| D29 | In-app notifications — writer at row-commit point → `NotificationOwnerRoom` DO fan-out → per-Owner SSE → dashboard + editor bell. Per-kind email policy in parallel. Reconnect backfill via `Last-Event-ID` + `?since=…`, no in-memory queue. | [`mermaid/D29-notification-sse.md`](diagrams/mermaid/D29-notification-sse.md) | ADR 0043, `src/notifications/`, `src/routes/api/notifications.ts` | Mermaid sequence |
 
 ---
 
@@ -66,8 +67,9 @@ The diagrams in their natural narrative order (not the numeric order above):
 15. **D21 addon entitlement split** — answer "how is per-site capability modeled?"
 16. **D17 custom domain state machine** — answer "how does briar.app work?"
 17. **D27 CSP frame-src + D26 dual rate limiter + D22 security poster** — answer "what stops the obvious attacks?"
-18. **D23 schema ER** — the data view of everything you just saw
-19. **D24 API surface + D25 deploy + D28 DevEx** — the operational view
+18. **D29 notification SSE pipeline** — answer "how did Maya's bell light up the moment the visitor submitted?" (pairs with D3 SiteRoom fan-out as the second live channel — D3 is per-site for visitors and co-editors; D29 is per-Owner for notifications)
+19. **D23 schema ER** — the data view of everything you just saw
+20. **D24 API surface + D25 deploy + D28 DevEx** — the operational view
 
 ---
 
