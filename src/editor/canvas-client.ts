@@ -5002,6 +5002,47 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           });
           card.appendChild(field("Kind", kindSel));
 
+          // Reorder + remove row. Nav links flow inside a slot rather than
+          // sit at individual canvas coordinates, so there's no drag handle
+          // on the page — the up/down arrows are the only way to change
+          // the on-page link order. Hidden when there's only one link.
+          var actions = document.createElement("div");
+          actions.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
+
+          if (element.links.length > 1) {
+            var upBtn = document.createElement("button");
+            upBtn.type = "button";
+            upBtn.textContent = "\\u2191";
+            upBtn.title = "Move link up";
+            upBtn.disabled = idx === 0;
+            upBtn.addEventListener("click", function() {
+              if (idx === 0) return;
+              var tmp = element.links[idx - 1];
+              element.links[idx - 1] = element.links[idx];
+              element.links[idx] = tmp;
+              renderLinkList();
+              rebuildElement(element.id);
+              scheduleSave();
+            });
+            actions.appendChild(upBtn);
+
+            var downBtn = document.createElement("button");
+            downBtn.type = "button";
+            downBtn.textContent = "\\u2193";
+            downBtn.title = "Move link down";
+            downBtn.disabled = idx === element.links.length - 1;
+            downBtn.addEventListener("click", function() {
+              if (idx === element.links.length - 1) return;
+              var tmp = element.links[idx + 1];
+              element.links[idx + 1] = element.links[idx];
+              element.links[idx] = tmp;
+              renderLinkList();
+              rebuildElement(element.id);
+              scheduleSave();
+            });
+            actions.appendChild(downBtn);
+          }
+
           var removeBtn = document.createElement("button");
           removeBtn.type = "button";
           removeBtn.textContent = "Remove link";
@@ -5011,7 +5052,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             rebuildElement(element.id);
             scheduleSave();
           });
-          card.appendChild(removeBtn);
+          actions.appendChild(removeBtn);
+          card.appendChild(actions);
 
           linkListHost.appendChild(card);
         })(li);
