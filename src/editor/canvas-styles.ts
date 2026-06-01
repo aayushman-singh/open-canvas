@@ -797,6 +797,9 @@ body.opencanvas-modal-open {
   color: var(--opencanvas-fg);
   border: 1px solid transparent;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap;
 }
 .opencanvas-page-item:hover {
   background: var(--opencanvas-bg-raised, var(--opencanvas-bg-panel));
@@ -805,19 +808,28 @@ body.opencanvas-modal-open {
   background: var(--opencanvas-bg-raised, var(--opencanvas-bg-panel));
   border-color: var(--opencanvas-accent);
 }
+/* Wrap the title across multiple lines instead of ellipsing — owners
+   with long page titles ("Enterprise solutions and pricing") used to
+   see a truncated row that gave no hint at the full title, and the
+   ellipsis sometimes clipped before the sidebar's right edge so the
+   row visibly overflowed when the slug was also present. word-break:
+   normal + overflow-wrap: anywhere keeps single long tokens from
+   pushing the row wider than the sidebar without splitting normal
+   words mid-character. */
 .opencanvas-page-item-title {
   flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.25;
 }
 .opencanvas-page-item-slug {
   flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
   font-family: var(--opencanvas-font-mono);
   font-size: 11px;
   color: var(--opencanvas-fg-mute);
