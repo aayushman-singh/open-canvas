@@ -5079,10 +5079,41 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var heading = document.createElement("h3");
     heading.textContent = "Page";
     inspector.appendChild(heading);
-    var meta = document.createElement("div");
-    meta.className = "meta";
-    meta.textContent = page.title || page.slug;
-    inspector.appendChild(meta);
+    // Editable page title. The artboard label on the canvas mirrors this
+    // value (built off page.title in renderAll), so a single edit here
+    // updates the on-canvas label too. We commit on blur AND on Enter so
+    // a quick rename doesn't require tab-out, but withhold autosaves until
+    // commit so an in-flight edit can't ship a half-typed title to peers.
+    var titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.className = "meta meta-editable";
+    titleInput.value = page.title || page.slug;
+    titleInput.placeholder = page.slug;
+    titleInput.setAttribute("aria-label", "Page title");
+    function commitTitle() {
+      var next = titleInput.value.trim();
+      var current = page.title || "";
+      if (next === current) return;
+      if (next.length === 0) {
+        // Treat clearing the field as "revert to slug" — the artboard
+        // label falls back to slug anyway. Capture for undo so this
+        // counts as one operation in history.
+        page.title = "";
+      } else {
+        page.title = next;
+      }
+      captureForUndo();
+      renderAll();
+      updatePageSidebar();
+      scheduleSave();
+      setStatus("Page renamed", "ok");
+    }
+    titleInput.addEventListener("blur", commitTitle);
+    titleInput.addEventListener("keydown", function(ev) {
+      if (ev.key === "Enter") { ev.preventDefault(); titleInput.blur(); }
+      else if (ev.key === "Escape") { titleInput.value = page.title || page.slug; titleInput.blur(); }
+    });
+    inspector.appendChild(titleInput);
 
     // -- Custom 404 toggle ------------------------------------------------
     // ADR 0029: the slug '_404' IS the custom-404 mechanism; this toggle

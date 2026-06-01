@@ -1083,7 +1083,14 @@ body[data-placement-active="true"] .rev01-section-slot {
 }
 .rev01-artboard[data-active="false"] {
   opacity: 0.7;
-  pointer-events: none;
+  /* pointer-events stay enabled so a click ANYWHERE on an inactive
+     artboard activates it via attachRootEvents → setActivePage. The
+     click handler intercepts inactive-artboard clicks before any
+     element/section resolution, so this never accidentally selects
+     a widget on a backgrounded page. Previously this rule set
+     pointer-events to none and the only way to activate an inactive
+     page was to click its small label — the body of the page swallowed
+     clicks straight to the canvas background. */
 }
 .rev01-artboard[data-active="true"] {
   opacity: 1;
@@ -1094,7 +1101,6 @@ body[data-placement-active="true"] .rev01-section-slot {
    is clicked again. */
 #canvas-root.canvas-pages-deselected .rev01-artboard[data-active="false"] {
   opacity: 1;
-  pointer-events: auto;
 }
 .rev01-artboard-label {
   position: absolute;
@@ -1562,6 +1568,30 @@ body[data-placement-active="true"] .rev01-section-slot {
   color: var(--ink-3);
   margin-bottom: 12px;
   word-break: break-all;
+}
+/* Page-title rename input lives in the page inspector where the
+   read-only .meta line used to sit. It picks up the same mono +
+   muted treatment so the inspector silhouette stays consistent;
+   focus brightens the text to the body ink so the operator sees
+   the field is "live". */
+#canvas-inspector input.meta-editable {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 4px 6px;
+  margin: -4px 0 12px -6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+#canvas-inspector input.meta-editable:hover {
+  border-color: var(--line);
+}
+#canvas-inspector input.meta-editable:focus {
+  border-color: var(--accent);
+  color: var(--ink);
+  outline: none;
 }
 #canvas-inspector .inspector-list-card {
   border: 1px solid var(--line);
