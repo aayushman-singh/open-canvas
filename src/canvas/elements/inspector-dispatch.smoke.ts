@@ -138,6 +138,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     id: 'fx-form',
     type: 'form',
     box: { x: 0, y: 0, w: 360, h: 240, z: 0 },
+    title: 'Contact form',
     fields: [{ id: 'fx-field-1', label: 'Name', kind: 'text', required: false }],
     submitLabel: 'Submit',
     successMessage: 'Thanks!',
