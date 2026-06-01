@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { desc, eq, sum } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
-import { site, ownerAsset } from '../../db/schema';
+import { site, ownerAsset, siteCollaborator } from '../../db/schema';
 import { clerkAuth, resolveClerkKeys } from '../../auth/middleware';
 import { clerkFrontendApiHost, requireAuth } from '../../auth/require-auth';
 import type { ClerkAuthVariables } from '../../auth/middleware';
@@ -1112,9 +1112,17 @@ dashboard.get('/', async (c) => {
   const origin = new URL(c.req.url).origin;
   const apex = appDomain(c.env);
 
-  // Site rows and storage sum are independent — parallelize so the page open
-  // pays one Neon round trip's worth of latency instead of two.
-  const [rows, sb] = await Promise.all([
+  // Site rows + collaborator sites + storage sum are independent — parallelize
+  // so the page open pays one Neon round trip's worth of latency.
+  //
+  // Collaborator sites: rows where the current customer has accepted an
+  // invite. We surface them in the same grid as owned sites so accepted
+  // collaborators can re-enter the editor from the dashboard instead of
+  // re-clicking the invite email. They do NOT count toward the siteLimit
+  // gate (that's a plan quota on creation, not on access), and they're
+  // tagged with `ownedByCurrent=false` downstream so the card chrome can
+  // distinguish them when we add per-card affordances later.
+  const [ownedRows, collabRows, sb] = await Promise.all([
     database
       .select({
         id: site.id,
@@ -1130,17 +1138,45 @@ dashboard.get('/', async (c) => {
       .where(eq(site.customerId, customerId))
       .orderBy(desc(site.createdAt)),
     database
+      .select({
+        id: site.id,
+        name: site.name,
+        subdomain: site.subdomain,
+        styleKit: site.styleKit,
+        publishedVersion: site.publishedVersion,
+        updatedAt: site.updatedAt,
+        editableState: site.editableState,
+        passwordEnabled: site.passwordEnabled,
+      })
+      .from(site)
+      .innerJoin(siteCollaborator, eq(siteCollaborator.siteId, site.id))
+      .where(
+        and(
+          eq(siteCollaborator.customerId, customerId),
+          isNotNull(siteCollaborator.acceptedAt),
+        ),
+      )
+      .orderBy(desc(site.createdAt)),
+    database
       .select({ total: sum(ownerAsset.byteSize) })
       .from(ownerAsset)
       .where(eq(ownerAsset.customerId, customerId)),
   ]);
 
+  // Belt-and-suspenders dedupe: in theory the WHERE on ownedRows excludes
+  // collab rows because a site is owned by exactly one customer, but a
+  // future change that lets owners self-collaborate would silently double
+  // the row. Filter on the merge instead of trusting the schema invariant.
+  const ownedIds = new Set(ownedRows.map((r) => r.id));
+  const rows = ownedRows.concat(collabRows.filter((r) => !ownedIds.has(r.id)));
   const cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));
   const publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
   const storageBytes = Number(sb[0]?.total ?? 0);
 
   const siteLimit = siteLimitForPlan(customerPlan);
-  const atSiteLimit = siteLimit !== null && cards.length >= siteLimit;
+  // siteLimit gates CREATION, so it counts only owned sites — collaborator
+  // access doesn't consume the inviter's plan quota.
+  const atSiteLimit = siteLimit !== null && ownedRows.length >= siteLimit;
   const planName = billingPlanLabel(customerPlan);
   const siteLimitLabel = siteLimit === null ? 'Unlimited' : String(siteLimit);
   const storageLimitLabel = formatBytes(storageLimitForPlan(customerPlan));
