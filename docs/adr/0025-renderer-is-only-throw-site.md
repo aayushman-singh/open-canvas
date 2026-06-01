@@ -1,9 +1,10 @@
 # ADR 0025 — The renderer is the only throw site in the canvas subsystem; the validator never throws
 
-**Status:** Proposed
-**Date:** 2026-05-29
+**Status:** Accepted
+**Date:** 2026-05-29 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** lifts the renderer-throws / validator-collects contract from `src/canvas/SUBSYSTEM.md` into canon. Reinforces and extends [ADR 0012](0012-validation-write-gate.md)'s "trust the gate" stance with the symmetric statement about what the *renderer* is allowed to do.
+**Accepted-context:** the original draft of Decision 1 read "every other file in `src/canvas/` returns errors or sentinels" and audited against 30+ `throw` statements in `src/canvas/elements/*.ts` (action / accordion / chart / code / embed / form / …). Those throws are agent-tool parser entry points (`parsePatch`, type-narrowed argument validators) called from `src/agent/canvas-tools.ts`, not from the renderer or the validator. Decision 1 is tightened to **renderer + validator only**; per-element agent parsers are explicitly carved out because their failure mode (the LLM produced a malformed patch payload) flows back to the agent loop as a retryable error, not to the visitor as broken HTML — a different failure-mode contract than the one this ADR governs. The carve-out is named inline in Decision 1.
 
 ## Context
 
@@ -17,11 +18,13 @@ That is a real architectural decision: a thrown error from the renderer signals 
 
 ## Decisions
 
-1. **`src/canvas/render.ts` is the only file in the canvas subsystem allowed to `throw`. Every other file in `src/canvas/` returns errors (via `ValidationResult` or equivalent) or returns sentinel values.** A `throw` in the renderer is an explicit "this should be unreachable — the validator should have caught it" signal.
+1. **`src/canvas/render.ts` is the only renderer-path file in the canvas subsystem allowed to `throw` on Owner-content shape violations.** `validate.ts`, `style-kits.ts`, `recipes.ts`, and every other file the renderer-path consumes operates on validated input by contract; if they encounter something unexpected, the right response is to return an error description, not to throw — because the caller (the validator, the renderer, the agent) is the one with the context to decide what to do. A `throw` in the renderer is an explicit "this should be unreachable — the validator should have caught it" signal.
 
-   **Why:** the renderer is the last gate before HTML reaches the visitor. A malformed snapshot that reaches the renderer cannot produce valid HTML; emitting partial HTML or silently substituting defaults would hide a real failure. Throwing surfaces the failure to the request handler, which can return a 5xx with a useful error message rather than serving broken HTML. Every other canvas file (`validate.ts`, `style-kits.ts`, `recipes.ts`, etc.) operates on validated input by contract; if they encounter something unexpected, the right response is to return an error description, not to throw — because the caller (the validator, the renderer, the agent) is the one with the context to decide what to do.
+   **Why:** the renderer is the last gate before HTML reaches the visitor. A malformed snapshot that reaches the renderer cannot produce valid HTML; emitting partial HTML or silently substituting defaults would hide a real failure. Throwing surfaces the failure to the request handler, which can return a 5xx with a useful error message rather than serving broken HTML.
 
-   This would be wrong if any canvas file legitimately needed to short-circuit beyond its caller's knowledge. None of them do today; if one does in the future, the decision is "add a controlled throw with an explicit comment citing this ADR" rather than "loosen the rule."
+   This would be wrong if any canvas file legitimately needed to short-circuit beyond its caller's knowledge. None of the renderer-path files do today; if one does in the future, the decision is "add a controlled throw with an explicit comment citing this ADR" rather than "loosen the rule."
+
+   **Per-element agent-parser carve-out.** The `parsePatch` entrypoints inside `src/canvas/elements/*.ts` (action, accordion, chart, code, embed, form, table, carousel, text, container, shape, media, nav, collection) DO `throw` on malformed inputs. They are not renderer-path files — they are agent-tool argument validators called from `src/agent/canvas-tools.ts` to type-narrow the LLM-produced patch payload before it lands in `editableState`. A throw there flows back to the agent loop as a retryable tool error ("your patch was malformed; here is why"), never to the visitor as broken HTML. That failure-mode contract is materially different from the renderer's — the renderer's throw is a 5xx to the visitor; the agent parser's throw is a re-prompt to the LLM. The carve-out is therefore deliberate. If a future contributor wants to move per-element parsers to result-typed (e.g. as part of [ADR 0011](0011-canvas-element-registry.md) Step 5), nothing in this ADR forbids it — but neither does this ADR demand it.
 
 2. **`src/canvas/validate.ts` (and any sibling validator) collects every error in a single pass and returns `{ valid: true } | { valid: false, errors: string[] }`. It never throws, never short-circuits on the first error.** The full picture matters more than fail-fast.
 

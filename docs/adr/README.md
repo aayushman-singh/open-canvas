@@ -34,7 +34,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0022 | Twelve-token OKLCH theme grammar derived from a single seed | Accepted | [`docs/adr/0022-twelve-token-oklch-theme-grammar.md`](0022-twelve-token-oklch-theme-grammar.md) |
 | 0023 | Seed asset bytes are stored as base64 text files in-repo | Accepted | [`docs/adr/0023-seed-asset-bytes-as-base64-text.md`](0023-seed-asset-bytes-as-base64-text.md) |
 | 0024 | Landing page is one locked Post-Aero surface with a checked-in preview artifact | Accepted | [`docs/adr/0024-landing-locked-post-aero-with-preview.md`](0024-landing-locked-post-aero-with-preview.md) |
-| 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Proposed | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
+| 0025 | The renderer is the only throw site in the canvas subsystem; the validator never throws | Accepted | [`docs/adr/0025-renderer-is-only-throw-site.md`](0025-renderer-is-only-throw-site.md) |
 | 0026 | Defer Clerk networkless JWT verification; accept the JWKS fetch per isolate | Accepted | [`docs/adr/0026-defer-clerk-networkless-jwt.md`](0026-defer-clerk-networkless-jwt.md) |
 | 0027 | Yjs encode/decode dispatch stays central; per-element files do not gain yjs runtime dependencies | Accepted | [`docs/adr/0027-yjs-projection-central-placement.md`](0027-yjs-projection-central-placement.md) |
 | 0028 | Page background uses the buildColorRow swatch+hex pattern | Accepted | [`docs/adr/0028-page-background-colour-picker-verification.md`](0028-page-background-colour-picker-verification.md) |
