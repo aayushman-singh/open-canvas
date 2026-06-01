@@ -22,6 +22,9 @@ export const notificationsInboxScript = `(function(){
   var list = document.getElementById('notif-list');
   var markAll = document.getElementById('notif-mark-all');
   if (!bell || !badge || !panel || !list) return;
+  // Either '/api' (dashboard, Clerk session) or '/__api' (on-site editor,
+  // edit-token JWT). Set inline by the surface before this IIFE runs.
+  var apiBase = (typeof window.__rev01InboxApiBase === 'string' && window.__rev01InboxApiBase) || '/api';
 
   function fmtTime(iso) {
     var t = Date.parse(iso);
@@ -194,7 +197,7 @@ export const notificationsInboxScript = `(function(){
 
   function fetchInbox(opts) {
     var since = opts && opts.since ? String(opts.since) : '';
-    var url = '/api/notifications?limit=20';
+    var url = apiBase + '/notifications?limit=20';
     if (since) url += '&since=' + encodeURIComponent(since);
     return fetch(url, { credentials: 'include' })
       .then(function(r) {
@@ -255,7 +258,7 @@ export const notificationsInboxScript = `(function(){
     e.preventDefault();
     e.stopPropagation();
     var pendingNavigationHref = a.href;
-    fetch('/api/notifications/' + encodeURIComponent(id) + '/read', {
+    fetch(apiBase + '/notifications/' + encodeURIComponent(id) + '/read', {
       method: 'POST',
       credentials: 'include',
     })
@@ -281,7 +284,7 @@ export const notificationsInboxScript = `(function(){
       e.stopPropagation();
       var unreadText = badge && !badge.hidden ? badge.textContent : '0';
       if (!window.confirm('Mark all ' + (unreadText || '0') + ' notifications as read?')) return;
-      fetch('/api/notifications/mark-all-read', {
+      fetch(apiBase + '/notifications/mark-all-read', {
         method: 'POST',
         credentials: 'include',
       })
@@ -308,7 +311,7 @@ export const notificationsInboxScript = `(function(){
   // no in-DO buffer; on reconnect the next fetchInbox call backfills any
   // rows that landed during the gap.
   if (typeof window.EventSource === 'function') {
-    var es = new EventSource('/api/notifications/stream', { withCredentials: true });
+    var es = new EventSource(apiBase + '/notifications/stream', { withCredentials: true });
     var streamOpened = false;
     es.addEventListener('open', function() {
       if (streamOpened && lastSeenCreatedAt) {

@@ -592,6 +592,7 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
     prompt:function(msg,def,title){return _build({type:'prompt',message:msg,defaultValue:def||'',title:title||''});}
   };
 })();`)}</script>
+        <script>{raw("window.__rev01InboxApiBase = '/api';")}</script>
         <script>{raw(notificationsInboxScript)}</script>
       </body>
     </html>
