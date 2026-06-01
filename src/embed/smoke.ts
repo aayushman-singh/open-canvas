@@ -49,8 +49,8 @@ assert(
   `expected sandbox attr on YouTube iframe; got: ${youTubeHtml}`,
 );
 assert(
-  youTubeHtml.includes(`referrerpolicy="no-referrer"`),
-  `expected referrerpolicy=no-referrer on YouTube iframe`,
+  youTubeHtml.includes(`referrerpolicy="strict-origin-when-cross-origin"`),
+  `expected referrerpolicy=strict-origin-when-cross-origin on YouTube iframe`,
 );
 assert(youTubeHtml.includes(`loading="lazy"`), `expected loading=lazy on YouTube iframe`);
 

@@ -13,8 +13,12 @@
 //     is the broadest sandbox that still lets third-party players render
 //     interactively; the snapshot's CSP `frame-src` allowlist (built by
 //     `src/embed/csp.ts`) is the real isolation, not the sandbox alone.
-//   - `referrerpolicy="no-referrer"` so the visitor's Published-Site URL
-//     never leaks into platform analytics dashboards.
+//   - `referrerpolicy="strict-origin-when-cross-origin"` so the visitor's
+//     full Published-Site URL never leaks into platform analytics — only
+//     the scheme+host is sent. YouTube and most providers refuse to play
+//     when no Referer is sent at all (player error 153, "Video player
+//     configuration error"), so a strict-origin compromise unblocks the
+//     player while still hiding the page path / query.
 //   - `loading="lazy"` defers off-screen embeds — the editor's snapshot can
 //     contain dozens of YouTube cards without each one fetching player JS
 //     on first paint.
@@ -98,7 +102,7 @@ export function renderEmbed(el: EmbedElement, ctx: EmbedRenderCtx): string {
     `src="${src}" ` +
     `width="100%" height="100%" ` +
     `sandbox="${EMBED_IFRAME_SANDBOX}" ` +
-    `referrerpolicy="no-referrer" ` +
+    `referrerpolicy="strict-origin-when-cross-origin" ` +
     `loading="lazy" ` +
     `title="${titleAttr}" ` +
     `allowfullscreen` +
