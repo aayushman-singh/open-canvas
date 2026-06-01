@@ -10612,7 +10612,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // document.body (outside .opencanvas-element) but operate on the active
     // selection.
     document.addEventListener("mousedown", (ev) => {
-      if (!selectedElementId) return;
+      if (!selectedElementId && !selectedSectionId) return;
       const target = ev.target instanceof Element ? ev.target : null;
       if (!target) return;
       if (target.closest('.opencanvas-modal-backdrop')) return;
@@ -10620,10 +10620,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (inspector && inspector.contains(target)) return;
       if (target.closest('#canvas-reel')) return;
       if (target.closest('.opencanvas-element')) return;
+      if (target.closest('.opencanvas-section')) return;
       if (target.closest('#canvas-sidebar')) return;
       if (target.closest('.opencanvas-link-popover')) return;
       if (target.closest('.opencanvas-mark-toolbar')) return;
-      selectElement(null);
+      if (selectedElementId) selectElement(null);
+      if (selectedSectionId) selectSection(null);
     });
   }
 

@@ -880,25 +880,31 @@ body.opencanvas-modal-open {
    when the sidebar collapses. */
 .sidebar-toggle {
   position: fixed;
-  top: 66px;
+  /* Centred vertically between the 58px header and the 36px status bar.
+     Translate compensates for the toggle's own height so the visible arrow
+     sits on the geometric midline rather than top-aligned to 50%. */
+  top: calc(50% + 11px);
+  transform: translateY(-50%);
   left: 360px;
-  width: 20px;
-  height: 32px;
+  width: 22px;
+  height: 44px;
   z-index: 152;
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
+  background: var(--red);
+  border: 1px solid var(--red);
   border-left: none;
-  border-radius: 0 var(--r-xs) var(--r-xs) 0;
-  color: var(--ink);
-  font-size: 14px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: left 0.15s ease, color 0.14s, background-color 0.14s;
+  box-shadow: var(--shadow-red);
+  transition: left 0.15s ease, background-color 0.14s, transform 0.14s;
 }
-.sidebar-toggle:hover { color: var(--ink); background: var(--surface-3); }
+.sidebar-toggle:hover { background: var(--red-hover, var(--red)); }
 .opencanvas-editor-sidebar.collapsed .sidebar-toggle { left: 0; }
 .opencanvas-viewport.sidebar-collapsed { margin-left: 0; }
 /* When the inspector is collapsed or hidden, the viewport reclaims the
@@ -1858,25 +1864,29 @@ body[data-placement-active="true"] .opencanvas-section-slot {
    the inspector collapses. */
 .inspector-toggle {
   position: fixed;
-  top: 66px;
+  /* Vertically centred in the viewport gutter; matches .sidebar-toggle. */
+  top: calc(50% + 11px);
+  transform: translateY(-50%);
   right: 320px;
-  width: 20px;
-  height: 32px;
+  width: 22px;
+  height: 44px;
   z-index: 152;
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
+  background: var(--red);
+  border: 1px solid var(--red);
   border-right: none;
-  border-radius: var(--r-xs) 0 0 var(--r-xs);
-  color: var(--ink);
-  font-size: 14px;
+  border-radius: var(--r-sm) 0 0 var(--r-sm);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: right 0.15s ease, color 0.14s, background-color 0.14s;
+  box-shadow: var(--shadow-red);
+  transition: right 0.15s ease, background-color 0.14s, transform 0.14s;
 }
-.inspector-toggle:hover { color: var(--ink); background: var(--surface-3); }
+.inspector-toggle:hover { background: var(--red-hover, var(--red)); }
 #canvas-inspector.collapsed ~ .inspector-toggle,
 #canvas-inspector[hidden] ~ .inspector-toggle {
   right: 0;
