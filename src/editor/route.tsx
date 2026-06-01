@@ -428,7 +428,6 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   })}
                 </div>
               </section>
-              <section id="canvas-sidebar-selection" class="opencanvas-sidebar-group" hidden />
             </div>
             <div
               class="opencanvas-sidebar-panel"
@@ -523,6 +522,15 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 &times;
               </button>
             </div>
+            <button
+              type="button"
+              id="canvas-chat-accept-all"
+              class="opencanvas-chat-accept-all"
+              hidden
+            >
+              <span data-accept-all-label>Accept all changes</span>
+              <span data-accept-all-count class="opencanvas-chat-accept-all-count">0</span>
+            </button>
             <form id="canvas-chat-form" class="opencanvas-chat-input">
               <input
                 type="text"

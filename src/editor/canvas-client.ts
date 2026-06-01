@@ -474,7 +474,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const statusEl = document.getElementById("canvas-status");
   const mainEl = document.querySelector("main.opencanvas-editor");
   const sidebar = document.getElementById("canvas-sidebar");
-  const sidebarSelection = document.getElementById("canvas-sidebar-selection");
   const saveButton = document.getElementById("canvas-save");
   const publishButton = document.getElementById("canvas-publish");
   const versionBadge = document.getElementById("canvas-version");
@@ -1778,7 +1777,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     selectedElementId = null;
     renderInspector();
     renderReel();
-    renderSidebarSelection();
 
     updatePageSidebar();
     if (root) {
@@ -3447,7 +3445,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     applyCameraTransform();
     renderInspector();
-    renderSidebarSelection();
 
     renderReel();
     autoGrowTextElements();
@@ -7301,60 +7298,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(wrap);
   }
 
-  function buildPinnedColorField(element) {
-    // Curated colour pinning. Restricted to safe property names and values
-    // without ';' or ':' (defence-in-depth — validator also enforces this).
-    const wrap = document.createElement("div");
-    wrap.className = "field";
-    const label = document.createElement("label");
-    label.textContent = "Text colour (hex)";
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = "#ffffff";
-    const current = element.pinnedStyle && element.pinnedStyle.color ? element.pinnedStyle.color : "";
-    input.value = current;
-    input.addEventListener("change", () => {
-      const value = input.value.trim();
-      if (value === "") {
-        if (element.pinnedStyle) { delete element.pinnedStyle.color; }
-        rebuildElement(element.id);
-        scheduleSave();
-        return;
-      }
-      if (!/^#[0-9a-fA-F]{3,8}$/.test(value)) {
-        setStatus("Colour must look like #rrggbb", "error");
-        input.value = current;
-        return;
-      }
-      if (!element.pinnedStyle) element.pinnedStyle = {};
-      element.pinnedStyle.color = value;
-      rebuildElement(element.id);
-      scheduleSave();
-    });
-    wrap.appendChild(label);
-    wrap.appendChild(input);
-    return wrap;
-  }
-
-  function renderSidebarSelection() {
-    if (!sidebarSelection) return;
-    sidebarSelection.replaceChildren();
-    if (!selectedElementId) {
-      sidebarSelection.hidden = true;
-      return;
-    }
-    const found = findElement(selectedElementId);
-    if (!found || found.element.type !== "text") {
-      sidebarSelection.hidden = true;
-      return;
-    }
-    sidebarSelection.hidden = false;
-    const heading = document.createElement("h2");
-    heading.textContent = "Selection";
-    sidebarSelection.appendChild(heading);
-    sidebarSelection.appendChild(buildPinnedColorField(found.element));
-  }
-
   // -- Selection & inline edit -------------------------------------------
 
   // Force-open the right inspector. Called by user-initiated selection
@@ -7399,7 +7342,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     }
     renderInspector();
-    renderSidebarSelection();
     updateChatSelectionChip();
   }
 
@@ -9508,7 +9450,177 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const name = op.input && typeof op.input.sectionName === "string" ? op.input.sectionName : "Custom section";
       return "Design section " + JSON.stringify(name) + after;
     }
+    if (op.kind === "deleteElement") return "Delete element " + op.elementId;
+    if (op.kind === "updateElement") return "Update element " + op.elementId;
+    if (op.kind === "addElement") return "Add " + (op.element && op.element.type ? op.element.type : "element") + " to section " + op.sectionId;
+    if (op.kind === "updateSection") return "Update section " + op.sectionId;
+    if (op.kind === "deleteSection") return "Delete section " + op.sectionId;
+    if (op.kind === "moveSection") return "Move section " + op.sectionId + (op.afterSectionId ? " after " + op.afterSectionId : " to top");
+    if (op.kind === "duplicateSection") return "Duplicate section " + op.sectionId;
+    if (op.kind === "addPage") return "Add page " + JSON.stringify(op.title || op.slug || "");
+    if (op.kind === "updatePage") return "Update page " + op.pageId;
+    if (op.kind === "deletePage") return "Delete page " + op.pageId;
+    if (op.kind === "setStyleKit") return "Switch style kit to " + JSON.stringify(op.styleKit);
     return "Unknown op";
+  }
+
+  // Resolve the canvas node the op points at so the chat suggestion
+  // card can paint an overlay around it and a click on the suggestion
+  // can pan the camera there. Tries the op's elementId first, then any
+  // sectionId / afterSectionId fallback. Returns the wrapper DOM node
+  // or null when nothing on the canvas matches.
+  function findCanvasNodeForOp(op) {
+    if (!root || !op) return null;
+    var elementId = op.elementId || (op.element && op.element.id) || null;
+    if (elementId) {
+      var elNode = root.querySelector('[data-opencanvas-element="' + cssEscape(elementId) + '"]');
+      if (elNode) return elNode;
+    }
+    var sectionId = op.sectionId || op.afterSectionId || null;
+    if (sectionId) {
+      var secNode = root.querySelector('[data-opencanvas-section="' + cssEscape(sectionId) + '"]');
+      if (secNode) return secNode;
+    }
+    return null;
+  }
+
+  // Pan the camera so the target node sits in the middle of the
+  // viewport, then pulse a soft ring around it so the eye finds the
+  // jump. Used by chat-suggestion click handlers — the suggestion text
+  // is the call site, the target node is whatever findCanvasNodeForOp
+  // resolved.
+  function focusCanvasOnNode(node) {
+    if (!node || !viewport) return;
+    var nodeRect = node.getBoundingClientRect();
+    var viewRect = viewport.getBoundingClientRect();
+    var nodeCenterX = nodeRect.left + nodeRect.width / 2;
+    var nodeCenterY = nodeRect.top + nodeRect.height / 2;
+    var viewCenterX = viewRect.left + viewRect.width / 2;
+    var viewCenterY = viewRect.top + viewRect.height / 2;
+    camera.x += viewCenterX - nodeCenterX;
+    camera.y += viewCenterY - nodeCenterY;
+    applyCameraTransform();
+    node.classList.remove("opencanvas-ai-focus-pulse");
+    // Force a reflow so the keyframe restarts on repeated clicks.
+    void node.offsetWidth;
+    node.classList.add("opencanvas-ai-focus-pulse");
+  }
+
+  // Pending AI suggestion tracker. Each entry mirrors one op-preview
+  // event the agent emitted on this turn; the array is drained as the
+  // owner accepts / rejects individual cards or hits "Accept all".
+  var pendingAiSuggestions = [];
+  var chatAcceptAllBtn = null;
+
+  function refreshAcceptAllButton() {
+    if (!chatAcceptAllBtn) return;
+    var live = pendingAiSuggestions.filter(function (s) { return s.status === "pending"; });
+    if (live.length === 0) {
+      chatAcceptAllBtn.hidden = true;
+      return;
+    }
+    chatAcceptAllBtn.hidden = false;
+    var label = chatAcceptAllBtn.querySelector("[data-accept-all-label]");
+    var count = chatAcceptAllBtn.querySelector("[data-accept-all-count]");
+    if (label) label.textContent = "Accept all " + (live.length === 1 ? "change" : "changes");
+    if (count) count.textContent = String(live.length);
+  }
+
+  // Apply the given op list through /canvas-agent/.../apply and mark
+  // the matching suggestion entries as accepted on success. Status
+  // flip stays in lockstep with the server commit — a rejected apply
+  // leaves the cards in their pending state so the owner can retry.
+  function applyAgentOps(ops, suggestions) {
+    if (!ops || ops.length === 0) return Promise.resolve(false);
+    return flushPendingSave().then(function (saved) {
+      if (!saved) return false;
+      return authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ops: ops }),
+      }).then(function (r) {
+        return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+      }).then(function (res) {
+        if (!res.ok || !res.body || !res.body.editableState) {
+          var detail = (res.body && (res.body.errors && res.body.errors[0] || res.body.error)) || "apply failed";
+          setStatus("Apply failed: " + detail, "error");
+          return false;
+        }
+        state = res.body.editableState;
+        if (state) state = migrateState(state);
+        selectedSectionId = null;
+        selectedElementId = null;
+        if (mainEl && state && state.styleKit) {
+          mainEl.setAttribute("data-style-kit", state.styleKit);
+        }
+        renderAll();
+        if (suggestions) {
+          for (var i = 0; i < suggestions.length; i++) {
+            var s = suggestions[i];
+            s.status = "accepted";
+            if (s.cardEl) s.cardEl.setAttribute("data-status", "accepted");
+            if (s.acceptBtn) s.acceptBtn.disabled = true;
+            if (s.rejectBtn) s.rejectBtn.disabled = true;
+            // renderAll() blew away the old wrappers; the stale attr is
+            // gone with them. Clear the back-reference so a future
+            // Reject can't poke a detached node.
+            s.targetNode = null;
+          }
+        }
+        setStatus("AI edit applied", "ok");
+        refreshAcceptAllButton();
+        return true;
+      });
+    }).catch(function (err) {
+      setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      return false;
+    });
+  }
+
+  // Modal overlay listing every still-pending op as a single ordered
+  // list. Clicking Apply all routes through applyAgentOps with the same
+  // suggestion array so the chat-side cards flip status in lockstep
+  // with the canvas mutation.
+  function showAcceptAllSummary() {
+    var live = pendingAiSuggestions.filter(function (s) { return s.status === "pending"; });
+    if (live.length === 0) return;
+    var modal = document.createElement("div");
+    modal.className = "opencanvas-ai-summary-modal";
+    var card = document.createElement("div");
+    card.className = "opencanvas-ai-summary-modal-card";
+    var h = document.createElement("h3");
+    h.textContent = "Apply " + live.length + " change" + (live.length === 1 ? "" : "s") + "?";
+    card.appendChild(h);
+    var ol = document.createElement("ol");
+    for (var i = 0; i < live.length; i++) {
+      var li = document.createElement("li");
+      li.textContent = describeOp(live[i].op);
+      ol.appendChild(li);
+    }
+    card.appendChild(ol);
+    var actions = document.createElement("div");
+    actions.className = "opencanvas-ai-summary-modal-actions";
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", function () { modal.remove(); });
+    var go = document.createElement("button");
+    go.type = "button";
+    go.className = "primary";
+    go.textContent = "Apply all";
+    go.addEventListener("click", function () {
+      go.disabled = true;
+      cancel.disabled = true;
+      go.textContent = "Applying…";
+      applyAgentOps(live.map(function (s) { return s.op; }), live).then(function () {
+        modal.remove();
+      });
+    });
+    actions.appendChild(cancel);
+    actions.appendChild(go);
+    card.appendChild(actions);
+    modal.appendChild(card);
+    document.body.appendChild(modal);
   }
 
   async function applyPreview(ops) {
@@ -12251,6 +12363,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var chatInput = document.getElementById("canvas-chat-input");
       var chatMessages = document.getElementById("canvas-chat-messages");
       var chatWelcome = document.getElementById("canvas-chat-welcome");
+      // Bind the Accept-all banner to the module-scope handle so the
+      // suggestion tracker can hide/show it as ops drain.
+      chatAcceptAllBtn = document.getElementById("canvas-chat-accept-all");
+      if (chatAcceptAllBtn) {
+        chatAcceptAllBtn.addEventListener("click", function () {
+          showAcceptAllSummary();
+        });
+      }
       var chatSessionId = null;
       var chatBusy = false;
 
@@ -12356,41 +12476,93 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                       } else if (kind === "tool-call") {
                         appendChatMessage("assistant", "[Calling " + (data.name || "tool") + "]");
                       } else if (kind === "op-preview") {
-                        // IIFE-scope the op + toolName snapshots so the Accept
-                        // handler captures THIS event's op, not whatever the
-                        // function-scoped data happens to hold at click time.
-                        // Without this, accepting any preview after another
-                        // SSE event arrived sent the wrong (or empty) op body
-                        // and the apply layer returned 400.
+                        // IIFE-scope the op + toolName snapshots so each
+                        // suggestion card captures THIS event's op, not
+                        // whatever the function-scoped data happens to
+                        // hold at click time (the SSE callback re-fires
+                        // and would otherwise alias the same reference).
                         (function(opSnapshot, toolNameSnapshot) {
-                          var opDiv = document.createElement("div");
-                          opDiv.className = "opencanvas-chat-msg assistant";
-                          opDiv.textContent = "Proposed: " + (toolNameSnapshot || "edit") + " ";
-                          var acceptBtn = document.createElement("button");
-                          acceptBtn.textContent = "Accept";
-                          acceptBtn.style.cssText = "margin-left:8px;padding:4px 10px;border:1px solid var(--opencanvas-accent);background:var(--opencanvas-accent);color:var(--opencanvas-bg);border-radius:4px;cursor:pointer;font-size:12px;";
-                          acceptBtn.addEventListener("click", function() {
-                            acceptBtn.disabled = true;
-                            acceptBtn.textContent = "Applying...";
-                            authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
-                              method: "POST",
-                              headers: { "content-type": "application/json" },
-                              body: JSON.stringify({ ops: [opSnapshot] }),
-                            }).then(function(r) { return r.json(); }).then(function(body) {
-                              if (body && body.editableState) {
-                                state = body.editableState;
-                                renderAll();
-                                scheduleSave();
-                                setStatus("Agent changes applied", "ok");
-                                acceptBtn.textContent = "Applied";
-                              } else {
-                                acceptBtn.textContent = "Failed";
-                              }
-                            }).catch(function() { acceptBtn.textContent = "Failed"; });
+                          var card = document.createElement("div");
+                          card.className = "opencanvas-chat-msg opencanvas-chat-suggestion";
+                          card.setAttribute("data-status", "pending");
+
+                          var titleSpan = document.createElement("div");
+                          titleSpan.className = "opencanvas-chat-suggestion-title";
+                          titleSpan.textContent = "Proposed " + (toolNameSnapshot || "edit");
+                          card.appendChild(titleSpan);
+
+                          var body = document.createElement("div");
+                          body.className = "opencanvas-chat-suggestion-body";
+                          body.textContent = describeOp(opSnapshot);
+                          card.appendChild(body);
+
+                          // Resolve + paint an overlay on the target canvas
+                          // node so the owner sees which block the change
+                          // affects. The node reference is kept on the
+                          // suggestion entry so the focus click + the
+                          // reject button can clear it later.
+                          var targetNode = findCanvasNodeForOp(opSnapshot);
+                          if (targetNode) {
+                            targetNode.setAttribute("data-ai-overlay-status", "proposed");
+                          }
+
+                          var entry = {
+                            op: opSnapshot,
+                            toolName: toolNameSnapshot,
+                            status: "pending",
+                            cardEl: card,
+                            targetNode: targetNode,
+                          };
+                          pendingAiSuggestions.push(entry);
+
+                          // Click the description to pan the camera onto
+                          // the target node and pulse-ring it. If the op
+                          // has no resolvable target (e.g. addPage), the
+                          // click is a no-op but still safe.
+                          body.addEventListener("click", function () {
+                            if (entry.status !== "pending") return;
+                            if (!entry.targetNode) {
+                              entry.targetNode = findCanvasNodeForOp(entry.op);
+                            }
+                            if (entry.targetNode) focusCanvasOnNode(entry.targetNode);
                           });
-                          opDiv.appendChild(acceptBtn);
-                          chatMessages.appendChild(opDiv);
+
+                          var actions = document.createElement("div");
+                          actions.className = "opencanvas-chat-suggestion-actions";
+                          var acceptBtn = document.createElement("button");
+                          acceptBtn.type = "button";
+                          acceptBtn.className = "accept";
+                          acceptBtn.textContent = "Accept";
+                          acceptBtn.addEventListener("click", function () {
+                            if (entry.status !== "pending") return;
+                            acceptBtn.disabled = true;
+                            rejectBtn.disabled = true;
+                            applyAgentOps([entry.op], [entry]);
+                          });
+                          var rejectBtn = document.createElement("button");
+                          rejectBtn.type = "button";
+                          rejectBtn.className = "reject";
+                          rejectBtn.textContent = "Reject";
+                          rejectBtn.addEventListener("click", function () {
+                            if (entry.status !== "pending") return;
+                            entry.status = "rejected";
+                            card.setAttribute("data-status", "rejected");
+                            acceptBtn.disabled = true;
+                            rejectBtn.disabled = true;
+                            if (entry.targetNode) {
+                              entry.targetNode.removeAttribute("data-ai-overlay-status");
+                            }
+                            refreshAcceptAllButton();
+                          });
+                          entry.acceptBtn = acceptBtn;
+                          entry.rejectBtn = rejectBtn;
+                          actions.appendChild(acceptBtn);
+                          actions.appendChild(rejectBtn);
+                          card.appendChild(actions);
+
+                          chatMessages.appendChild(card);
                           chatMessages.scrollTop = chatMessages.scrollHeight;
+                          refreshAcceptAllButton();
                         })(data.op, data.toolName);
                       } else if (kind === "error") {
                         appendChatMessage("error", data.error || data.message || "Agent error");

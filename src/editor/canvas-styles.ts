@@ -578,6 +578,220 @@ body.opencanvas-modal-open {
   font-size: 12px;
   border-radius: var(--r-sm);
 }
+
+/* AI chat suggestion card — replaces the old "Proposed: rewriteText"
+   one-liner. Each pending op gets a card with a human-readable
+   description, accept/reject buttons, and a click target that focuses
+   the canvas on the affected element. The card sticks to its accepted
+   / rejected state visually so an owner scanning the chat history can
+   tell what they already actioned. */
+.opencanvas-chat-suggestion {
+  align-self: stretch;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  white-space: normal;
+}
+.opencanvas-chat-suggestion-title {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.opencanvas-chat-suggestion-body {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  border-radius: 4px;
+  padding: 2px 0;
+}
+.opencanvas-chat-suggestion-body:hover {
+  color: var(--accent, var(--red));
+}
+.opencanvas-chat-suggestion-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.opencanvas-chat-suggestion-actions button {
+  appearance: none;
+  padding: 4px 10px;
+  font: 600 12px var(--sans);
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  transition: border-color .12s, color .12s, background-color .12s;
+}
+.opencanvas-chat-suggestion-actions button.accept {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.opencanvas-chat-suggestion-actions button.accept:hover {
+  background: var(--accent, var(--red));
+  border-color: var(--accent, var(--red));
+}
+.opencanvas-chat-suggestion-actions button.reject:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+.opencanvas-chat-suggestion-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.opencanvas-chat-suggestion[data-status="accepted"] {
+  opacity: 0.6;
+}
+.opencanvas-chat-suggestion[data-status="accepted"] .opencanvas-chat-suggestion-body {
+  text-decoration: line-through;
+  cursor: default;
+}
+.opencanvas-chat-suggestion[data-status="rejected"] {
+  opacity: 0.5;
+}
+.opencanvas-chat-suggestion[data-status="rejected"] .opencanvas-chat-suggestion-body {
+  text-decoration: line-through;
+  cursor: default;
+}
+
+/* Accept-all banner pinned to the chat panel bottom (above the input)
+   when ≥1 suggestion is still pending. One-click drops every pending op
+   onto the canvas through a single /apply round-trip after the owner
+   confirms via the summary overlay. */
+.opencanvas-chat-accept-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  font: 700 12.5px var(--sans);
+  cursor: pointer;
+  border: none;
+}
+.opencanvas-chat-accept-all:hover {
+  background: var(--accent, var(--red));
+}
+.opencanvas-chat-accept-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.opencanvas-chat-accept-all-count {
+  font-weight: 600;
+  font-size: 11px;
+  background: rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Canvas overlay drawn around an element with a pending AI proposal.
+   Dashed outline + soft pulse so the owner sees exactly which block on
+   the page the chat suggestion targets without obscuring its content. */
+.opencanvas-element[data-ai-overlay-status],
+.opencanvas-section[data-ai-overlay-status] {
+  outline: 2px dashed var(--accent, var(--red));
+  outline-offset: 4px;
+  border-radius: 4px;
+  animation: opencanvas-ai-overlay-pulse 1.8s ease-in-out infinite;
+}
+.opencanvas-element[data-ai-overlay-status="accepted"],
+.opencanvas-section[data-ai-overlay-status="accepted"] {
+  animation: none;
+  outline-style: solid;
+  outline-color: rgba(16, 185, 129, 0.7);
+}
+@keyframes opencanvas-ai-overlay-pulse {
+  0%, 100% { outline-color: var(--accent, var(--red)); }
+  50% { outline-color: rgba(124, 58, 237, 0.35); }
+}
+
+/* Pulse fired by focusCanvasOnId when the owner clicks a chat
+   suggestion — flashes a soft ring around the focused element so the
+   eye finds it after the camera pan. */
+.opencanvas-element.opencanvas-ai-focus-pulse,
+.opencanvas-section.opencanvas-ai-focus-pulse {
+  animation: opencanvas-ai-focus-pulse 1.4s ease-out;
+}
+@keyframes opencanvas-ai-focus-pulse {
+  0% { box-shadow: 0 0 0 6px rgba(124, 58, 237, 0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
+}
+
+/* Accept-all confirmation overlay — modal dialog listing every pending
+   op as a single bullet list so the owner can re-read what they're
+   about to land before committing. Reuses the existing modal-backdrop
+   pattern from the link / confirm modals. */
+.opencanvas-ai-summary-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.opencanvas-ai-summary-modal[hidden] { display: none; }
+.opencanvas-ai-summary-modal-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 22px;
+  max-width: 480px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--ink);
+}
+.opencanvas-ai-summary-modal-card h3 {
+  margin: 0;
+  font-family: var(--display, var(--sans));
+  font-size: 17px;
+}
+.opencanvas-ai-summary-modal-card ol {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.opencanvas-ai-summary-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.opencanvas-ai-summary-modal-actions button {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 13px var(--sans);
+  cursor: pointer;
+}
+.opencanvas-ai-summary-modal-actions button.primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
 .opencanvas-chat-input {
   display: flex;
   gap: 8px;
