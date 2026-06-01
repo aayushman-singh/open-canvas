@@ -71,6 +71,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     fontSize: 32,
     fontWeight: 600,
     align: 'left',
+    lineHeight: 1.2,
   },
   action: {
     id: 'fx-action',
@@ -103,6 +104,9 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     slides: [{ id: 'fx-slide-1', assetId: '__placeholder__', caption: '' }],
     showArrows: true,
     showDots: true,
+    direction: 'horizontal',
+    arrowPosition: 'split-vertical-center',
+    arrowStyle: 'round',
   },
   table: {
     id: 'fx-table',
@@ -155,6 +159,7 @@ const REGISTERED_ACTIONS = ['rewrite-text', 'replace-media'] as const;
 const REGISTERED_BUSY_FLAGS = ['aiBusy'] as const;
 const REGISTERED_MOUNTS = [
   'media-picker',
+  'media-ai',
   'video-playback',
   'accordion-items',
   'carousel-slides',

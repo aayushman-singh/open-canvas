@@ -8,7 +8,7 @@ import type { JsonSchema } from '../../agent/llm.js';
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
-import { escapeAttr, renderInlineRun, styleFromEntries } from './render-utils.js';
+import { escapeAttr, escapeCssValue, renderInlineRun, styleFromEntries } from './render-utils.js';
 import {
   INLINE_MARK_TYPES,
   TEXT_ROLES,
@@ -38,6 +38,48 @@ export type TextFontWeight = (typeof TEXT_FONT_WEIGHTS)[number];
 export const TEXT_ALIGNS = ['left', 'center', 'right'] as const;
 export type TextAlign = (typeof TEXT_ALIGNS)[number];
 
+/**
+ * Optional `textWrap`. `'pretty'` avoids body-text orphans;
+ * `'balance'` distributes heading lines evenly (best on ≤6 lines).
+ * Absence leaves wrap behaviour at the browser default.
+ */
+export const TEXT_WRAPS = ['pretty', 'balance'] as const;
+export type TextWrap = (typeof TEXT_WRAPS)[number];
+
+/**
+ * Optional `textTransform`. Absence = no transform — the enum intentionally
+ * omits `'none'` because field-present-but-none is indistinguishable from
+ * field-absent for the renderer.
+ */
+export const TEXT_TRANSFORMS = ['uppercase', 'lowercase', 'capitalize'] as const;
+export type TextTransform = (typeof TEXT_TRANSFORMS)[number];
+
+/** Bounds on `lineHeight`. Anything outside collapses lines (low) or
+ * blows them apart past usable rhythm (high). */
+export const TEXT_LINE_HEIGHT_MIN = 0.5;
+export const TEXT_LINE_HEIGHT_MAX = 3.0;
+
+/** Bounds on `fluidSize.vw`. Below 1vw the slope is invisible (clamp acts
+ * as static); above 30vw heading text grows faster than the viewport on
+ * ultra-wide displays and breaks layout. ADR 0050 dec 1. */
+export const TEXT_FLUID_VW_MIN = 1;
+export const TEXT_FLUID_VW_MAX = 30;
+
+/**
+ * Opt-in fluid font sizing via CSS `clamp()`. When set, the renderer emits
+ * `font-size: clamp(<min>px, <vw>vw, <max>px)` and ignores the static
+ * `fontSize`. `fontSize` remains required as the structured-fallback contract
+ * (inspector px input, agent default, validator bound). ADR 0050 dec 1.
+ */
+export interface FluidSize {
+  /** Minimum px size — the lower clamp() rail. */
+  min: number;
+  /** Maximum px size — the upper clamp() rail. */
+  max: number;
+  /** Viewport-width factor in vw units. Bounded by TEXT_FLUID_VW_MIN/MAX. */
+  vw: number;
+}
+
 export interface TextElement extends BaseElement {
   type: 'text';
   // 1..N inline runs; the concatenation of run.text is the plain-text
@@ -48,16 +90,50 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   fontWeight: TextFontWeight;
   align: TextAlign;
+  /** CSS `letter-spacing` value — '-0.02em', '0.18em', 'normal'. Escape-validated. */
+  letterSpacing?: string;
+  /** CSS `text-wrap` — 'pretty' for body, 'balance' for headings. */
+  textWrap?: TextWrap;
+  /** Unitless `line-height` multiplier, bounded [0.5, 3.0]. */
+  lineHeight?: number;
+  /** CSS `text-transform`. Absence = no transform. */
+  textTransform?: TextTransform;
+  /**
+   * Opt-in fluid font sizing via CSS `clamp()`. ADR 0050 dec 1. When present,
+   * the renderer emits `clamp(min px, vw vw, max px)` and `fontSize` becomes
+   * the structured fallback only.
+   */
+  fluidSize?: FluidSize;
 }
 
 export function renderText(element: TextElement): string {
   const tag = element.role === 'heading' ? 'h1' : element.role === 'body' ? 'p' : 'span';
-  const innerStyle = styleFromEntries([
-    ['font-size', `${String(element.fontSize)}px`],
+  // ADR 0050 dec 1 — fluid font sizing takes precedence over the static
+  // fontSize when present. fontSize remains the structured-fallback contract
+  // for consumers that don't see the fluidSize triple.
+  const fontSizeValue =
+    element.fluidSize !== undefined
+      ? `clamp(${String(element.fluidSize.min)}px, ${String(element.fluidSize.vw)}vw, ${String(element.fluidSize.max)}px)`
+      : `${String(element.fontSize)}px`;
+  const entries: [string, string][] = [
+    ['font-size', fontSizeValue],
     ['font-weight', String(element.fontWeight)],
     ['text-align', element.align],
     ['margin', '0'],
-  ]);
+  ];
+  if (element.letterSpacing !== undefined) {
+    entries.push(['letter-spacing', escapeCssValue(element.letterSpacing)]);
+  }
+  if (element.textWrap !== undefined) {
+    entries.push(['text-wrap', element.textWrap]);
+  }
+  if (element.lineHeight !== undefined) {
+    entries.push(['line-height', String(element.lineHeight)]);
+  }
+  if (element.textTransform !== undefined) {
+    entries.push(['text-transform', element.textTransform]);
+  }
+  const innerStyle = styleFromEntries(entries);
   const runsHtml = element.content.map(renderInlineRun).join('');
   return `<${tag} class="opencanvas-text" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${runsHtml}</${tag}>`;
 }
@@ -87,6 +163,34 @@ export const textInspectorSpec: InspectorSpec = {
       defaultValue: 400,
     },
     { kind: 'select', label: 'Align', path: 'align', options: TEXT_ALIGNS },
+    {
+      kind: 'text',
+      label: 'Letter spacing',
+      path: 'letterSpacing',
+      placeholder: '-0.02em',
+      emptyOmits: true,
+    },
+    {
+      kind: 'text',
+      label: 'Text wrap',
+      path: 'textWrap',
+      placeholder: 'pretty | balance',
+      emptyOmits: true,
+    },
+    {
+      kind: 'number',
+      label: 'Line height',
+      path: 'lineHeight',
+      min: TEXT_LINE_HEIGHT_MIN,
+      max: TEXT_LINE_HEIGHT_MAX,
+    },
+    {
+      kind: 'text',
+      label: 'Transform',
+      path: 'textTransform',
+      placeholder: 'uppercase | lowercase | capitalize',
+      emptyOmits: true,
+    },
   ],
 };
 
@@ -242,6 +346,26 @@ export const textAgentToolSpec: AgentToolSpec = {
       description:
         'Replacement inline content as InlineRun[]. Text elements only. Prefer the `rewriteText` standalone tool.',
     },
+    letterSpacing: {
+      type: 'string',
+      description:
+        "CSS `letter-spacing` value — '-0.02em', '0.18em', 'normal'. Text elements only.",
+    },
+    textWrap: {
+      type: 'string',
+      enum: [...TEXT_WRAPS],
+      description: "CSS `text-wrap` — 'pretty' (body) or 'balance' (headings). Text elements only.",
+    },
+    lineHeight: {
+      type: 'number',
+      description: `Unitless line-height multiplier, ${String(TEXT_LINE_HEIGHT_MIN)}-${String(TEXT_LINE_HEIGHT_MAX)}. Text elements only.`,
+    },
+    textTransform: {
+      type: 'string',
+      enum: [...TEXT_TRANSFORMS],
+      description:
+        "CSS `text-transform` — 'uppercase', 'lowercase', or 'capitalize'. Text elements only.",
+    },
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -269,6 +393,31 @@ export const textAgentToolSpec: AgentToolSpec = {
       const parsed = parseTextInlineRuns(args.content);
       if (!parsed.ok) throw new Error(parsed.error);
       patch.content = parsed.runs;
+    }
+    if (args.letterSpacing !== undefined) {
+      if (typeof args.letterSpacing !== 'string') {
+        throw new Error('letterSpacing must be a string');
+      }
+      patch.letterSpacing = args.letterSpacing;
+    }
+    if (args.textWrap !== undefined) {
+      if (typeof args.textWrap !== 'string') throw new Error('textWrap must be a string');
+      patch.textWrap = args.textWrap;
+    }
+    if (args.lineHeight !== undefined) {
+      if (typeof args.lineHeight !== 'number' || !Number.isFinite(args.lineHeight)) {
+        throw new Error('lineHeight must be a number');
+      }
+      if (args.lineHeight < TEXT_LINE_HEIGHT_MIN || args.lineHeight > TEXT_LINE_HEIGHT_MAX) {
+        throw new Error(
+          `lineHeight must be between ${String(TEXT_LINE_HEIGHT_MIN)} and ${String(TEXT_LINE_HEIGHT_MAX)}`,
+        );
+      }
+      patch.lineHeight = args.lineHeight;
+    }
+    if (args.textTransform !== undefined) {
+      if (typeof args.textTransform !== 'string') throw new Error('textTransform must be a string');
+      patch.textTransform = args.textTransform;
     }
     return patch;
   },

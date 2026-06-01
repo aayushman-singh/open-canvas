@@ -82,6 +82,8 @@
     "apex-seo:smoke": "bun run src/seo/apex.smoke.ts",
     "collection:smoke": "bun run src/canvas/elements/collection-smoke.ts",
     "table:smoke": "bun run src/canvas/elements/table-smoke.ts",
+    "text-typography:smoke": "bun run src/canvas/elements/text-typography.smoke.ts",
+    "layout-primitives:smoke": "bun run src/canvas/layout-primitives.smoke.ts",
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",
     "chat:smoke": "bun run src/agent/chat/smoke.ts",
     "i18n:smoke": "bun run src/i18n/smoke.ts",
@@ -97,13 +99,14 @@
     "google-maps:smoke": "bun run src/embed/google-maps.smoke.ts",
     "editor-auth:smoke": "bun run src/live/editor-auth.smoke.ts",
     "theme:smoke": "bun run src/theme/smoke.ts",
+    "ci:smoke": "bun run host-config:smoke && bun run host-literal-guard:smoke && bun run canvas:smoke && bun run validate-parity:smoke && bun run canvas-state-gate:smoke && bun run inspector-dispatch:smoke && bun run agent-tool-dispatch:smoke && bun run sidebar-dispatch:smoke && bun run yjs-projection:smoke && bun run canvas-agent:smoke",
     "e2e": "npx playwright test",
     "e2e:headed": "npx playwright test --headed",
     "e2e:ui": "npx playwright test --ui",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "bunx lint-staged --no-stash && bun run typecheck"
+    "pre-commit": "bunx lint-staged --no-stash && bun run typecheck && bun run ci:smoke"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx}": "eslint --fix"
