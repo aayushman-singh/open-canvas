@@ -62,8 +62,25 @@ export interface SubmitInput {
   userAgent: string;
 }
 
+// `notificationContext` carries the fields the route layer needs to write
+// the ADR 0043 form_submission notification after this pipeline returns. It
+// is populated only when the submission committed (status === 'ok'); the
+// route resolves collaborator customer IDs separately.
+export interface FormSubmitNotificationContext {
+  siteName: string;
+  siteOwnerCustomerId: string;
+  pageSlug: string;
+  formElementLabel: string;
+  submittedAt: string;
+}
+
 export type SubmitOutcome =
-  | { status: 'ok'; submissionId: string; webhookDelivery?: WebhookDeliveryResult }
+  | {
+      status: 'ok';
+      submissionId: string;
+      notificationContext: FormSubmitNotificationContext;
+      webhookDelivery?: WebhookDeliveryResult;
+    }
   | { status: 'site-not-found' }
   | { status: 'form-not-found' }
   | { status: 'form-not-published' }
@@ -189,9 +206,15 @@ export async function handleFormSubmit(
   const now = deps.now ?? (() => new Date());
   const database = deps.db;
 
-  // 1. Load published snapshot for the site.
+  // 1. Load published snapshot for the site. We also pick site `name` and
+  // `customerId` here so the notification step (see step 9 below) has the
+  // context it needs without re-querying.
   const siteRows = await database
-    .select({ publishedSnapshot: siteTable.publishedSnapshot })
+    .select({
+      publishedSnapshot: siteTable.publishedSnapshot,
+      name: siteTable.name,
+      customerId: siteTable.customerId,
+    })
     .from(siteTable)
     .where(eq(siteTable.id, input.siteId))
     .limit(1);
@@ -296,9 +319,15 @@ export async function handleFormSubmit(
     );
   }
 
-  const result: SubmitOutcome = { status: 'ok', submissionId };
+  const notificationContext: FormSubmitNotificationContext = {
+    siteName: row.name,
+    siteOwnerCustomerId: row.customerId,
+    pageSlug,
+    formElementLabel: form.submitLabel,
+    submittedAt: submittedAt.toISOString(),
+  };
   if (webhookDelivery !== undefined) {
-    return { status: 'ok', submissionId, webhookDelivery };
+    return { status: 'ok', submissionId, notificationContext, webhookDelivery };
   }
-  return result;
+  return { status: 'ok', submissionId, notificationContext };
 }

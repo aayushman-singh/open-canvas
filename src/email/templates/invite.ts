@@ -10,13 +10,15 @@ export interface InviteEmailParams {
   siteSubdomain: string;
   /** Apex host (ADR 0013) — combines with siteSubdomain into the public address. */
   apex: string;
+  /** Absolute origin of the app (e.g. https://opencanvas.aayushman.dev). */
+  appOrigin: string;
   inviterName: string;
   role: string;
   acceptUrl: string;
 }
 
 export function inviteEmailHtml(params: InviteEmailParams): string {
-  const { siteName, siteSubdomain, apex, inviterName, role, acceptUrl } = params;
+  const { siteName, siteSubdomain, apex, appOrigin, inviterName, role, acceptUrl } = params;
   const publicAddress = `${siteSubdomain}.${apex}`;
 
   const bodyHtml =
@@ -32,6 +34,7 @@ export function inviteEmailHtml(params: InviteEmailParams): string {
   return brandShell({
     heading: "You've been invited to collaborate",
     bodyHtml,
+    appOrigin,
     cta: { label: 'Accept invitation', href: acceptUrl },
     footnoteHtml:
       "This link expires in 7 days. If you didn't expect this invitation, you can ignore this email.",

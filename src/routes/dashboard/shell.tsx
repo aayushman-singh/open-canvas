@@ -10,6 +10,8 @@ import {
   OcLogo,
 } from '../../ui';
 import type { Theme } from '../../ui';
+import { notificationsInboxScript } from '../../notifications/dashboard-inbox-script';
+import { bellStyles } from '../../notifications/bell-styles';
 
 // MIGRATION.md §4 — dashboard chrome wears the Open Canvas skin.
 //
@@ -242,6 +244,7 @@ const shellStyles = `
     box-shadow: var(--shadow-red);
   }
   .rev01-modal-danger:hover { background: var(--red-strong); }
+
 `;
 
 export type Crumb = { href?: string; label: string };
@@ -413,8 +416,8 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
   // chrome rule reads them. Per-page <style> blocks (pageStyles) win last
   // so route-specific overrides still take effect.
   const css = pageStyles
-    ? `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}\n${pageStyles}`
-    : `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}`;
+    ? `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}\n${bellStyles}\n${pageStyles}`
+    : `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}\n${bellStyles}`;
   const showCrumbs = crumbs.length > 1;
 
   const initial = (userMeta?.displayName ?? userMeta?.email ?? '?').charAt(0).toUpperCase();
@@ -502,9 +505,18 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
               <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
                 <ThemeToggleIcons />
               </button>
-              <button class="iconbtn" aria-label="Notifications">
-                <NotificationIcon />
-              </button>
+              <div class="notif-wrap">
+                <button class="notif-bell" id="notif-bell" aria-label="Notifications" aria-expanded="false" aria-controls="notif-panel">
+                  <NotificationIcon />
+                  <span class="notif-badge" id="notif-badge" hidden aria-hidden="true">0</span>
+                </button>
+                <div class="notif-panel" id="notif-panel" role="region" aria-labelledby="notif-bell" hidden>
+                  <div class="notif-panel-head">Notifications</div>
+                  <ul class="notif-list" id="notif-list" aria-live="polite">
+                    <li class="notif-empty" data-state="loading">Loading…</li>
+                  </ul>
+                </div>
+              </div>
               <a href="/dashboard/templates" class="btn btn-primary btn-sm">
                 <PlusIcon />
                 New site
@@ -575,6 +587,7 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
     prompt:function(msg,def,title){return _build({type:'prompt',message:msg,defaultValue:def||'',title:title||''});}
   };
 })();`)}</script>
+        <script>{raw(notificationsInboxScript)}</script>
       </body>
     </html>
   );

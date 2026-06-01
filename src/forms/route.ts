@@ -10,7 +10,7 @@
 // per-IP/per-form rate limiter. Owner routes are Clerk-gated and check
 // site ownership through the customer→site join.
 
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
@@ -18,14 +18,12 @@ import { requireAuth } from '../auth/require-auth.js';
 import type { FormElement } from '../canvas/elements/form.js';
 import type { CanvasPage } from '../canvas/schema.js';
 import { db } from '../db/client.js';
-import { customer, site as siteTable } from '../db/schema.js';
-import { sendEmail } from '../email/send.js';
-import {
-  formSubmissionEmailHtml,
-  formSubmissionEmailSubject,
-} from '../email/templates/form-submission.js';
-import { appOrigin, type HostConfigEnv } from '../host-config.js';
+import { customer, site as siteTable, siteCollaborator } from '../db/schema.js';
+import { type HostConfigEnv } from '../host-config.js';
 import type { FormRateLimiterMarker } from '../live/form-rate-limiter-client.js';
+import { buildSiteNotif } from '../notifications/constructors.js';
+import { writeNotification } from '../notifications/writer.js';
+import type { NotificationOwnerRoomMarker } from '../notifications/owner-room.js';
 
 import { exportFormSubmissionsCsv, listFormSubmissions } from './inbox.js';
 import { handleFormSubmit, type SubmitOutcome } from './submit.js';
@@ -40,6 +38,7 @@ type Bindings = HostConfigEnv & {
   WEBHOOK_SIGNING_SECRET: string;
   FORM_RATE_LIMITER: DurableObjectNamespace<FormRateLimiterMarker>;
   RESEND_API_KEY: string;
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -104,49 +103,49 @@ router.post('/:siteId/:formElementId', async (c) => {
     },
   );
 
-  // Notify site owner by email on successful submission.
+  // ADR 0043 form_submission notification.
   //
   // The submission row was already inserted by handleFormSubmit (above) by
-  // the time we reach this block. The visitor's outcome is therefore
-  // already determined and must NOT be flipped to 500 because the side-
-  // channel email notification later failed: the visitor would resubmit,
-  // we'd store a duplicate row, AND the owner would still miss the
-  // email. Pass-7 retest's "Internal Server Error" with a valid Turnstile
-  // token traced to this path — likely an unset/expired RESEND_API_KEY
-  // in the deploy. We log loud with full context (so the owner can find
-  // the failure in logs) but return the visitor's success outcome
-  // regardless. The submission is in the inbox; the email is best-
-  // effort. Per CLAUDE.md "fail loud, not silently": the loud log IS
-  // the fail-loud; swallowing here is not a fallback because there's
-  // no alternative behaviour being substituted — the email simply
-  // didn't go out, which is the truth.
+  // the time we reach this block. The visitor's outcome is determined and
+  // must NOT flip to 500 if the notification side-channel fails: the
+  // visitor would resubmit, we'd store a duplicate row, AND the owner
+  // would still miss the notif. `writeNotification` handles email failures
+  // internally per ADR dec 7 (best-effort); the outer try here catches a
+  // notif INSERT failure (the row contract per ADR dec 1/3 lives in Neon,
+  // not in the email channel — losing the row is the only thing that
+  // requires loud surfacing, and it is logged below rather than 500'd to
+  // the visitor for the same resubmit-loop reason).
   if (outcome.status === 'ok') {
-    phase = 'owner-email-notify';
+    phase = 'notification-fanout';
     try {
       const database = db(c.env);
-      const ownerRow = await database
-        .select({ email: customer.email })
-        .from(siteTable)
-        .innerJoin(customer, eq(siteTable.customerId, customer.id))
-        .where(eq(siteTable.id, siteId))
-        .limit(1);
-      const ownerEmail = ownerRow[0]?.email;
-      if (!ownerEmail) {
-        console.error('[forms/route] form-notify skipped — owner email missing', {
+      const collaboratorRows = await database
+        .select({ customerId: siteCollaborator.customerId })
+        .from(siteCollaborator)
+        .where(
+          and(eq(siteCollaborator.siteId, siteId), isNotNull(siteCollaborator.acceptedAt)),
+        );
+      const collaboratorIds = collaboratorRows.map((r) => r.customerId);
+      const recipientIds = Array.from(
+        new Set<string>([outcome.notificationContext.siteOwnerCustomerId, ...collaboratorIds]),
+      );
+      const spec = buildSiteNotif(
+        'form_submission',
+        siteId,
+        {
           siteId,
+          siteName: outcome.notificationContext.siteName,
           formElementId,
-        });
-      } else {
-        const submittedAt = new Date().toISOString();
-        const inboxUrl = `${appOrigin(c.env)}/dashboard/sites/${encodeURIComponent(siteId)}/forms/${encodeURIComponent(formElementId)}`;
-        await sendEmail(c.env, {
-          to: ownerEmail,
-          subject: formSubmissionEmailSubject(),
-          html: formSubmissionEmailHtml({ formElementId, submittedAt, inboxUrl }),
-        });
-      }
+          formElementLabel: outcome.notificationContext.formElementLabel,
+          pageSlug: outcome.notificationContext.pageSlug,
+          submissionId: outcome.submissionId,
+          submittedAt: outcome.notificationContext.submittedAt,
+        },
+        recipientIds,
+      );
+      await writeNotification({ db: database, env: c.env }, spec);
     } catch (err) {
-      console.error('[forms/route] form-notify email failed', {
+      console.error('[forms/route] form_submission notif write failed', {
         siteId,
         formElementId,
         err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),

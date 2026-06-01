@@ -1,0 +1,119 @@
+# ADR 0043 — In-app notifications: persistent, recipient-tagged, delivered live over the existing site-room socket
+
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
+**Author:** Aayushman Singh
+**Drives:** the Owner-asks-have-I-missed-anything gap. Today an Owner who steps away from the editor has no signal that a form was submitted, a collaborator joined, a publish failed, or their own access was revoked — they have to remember to check the Forms inbox, the collaborators panel, the publish history, and the Site Settings page. The events exist; the Owner-perceived signal does not.
+**Accepted-context:** shipped same day as drafted. Phase A-F all merged: Drizzle schema + writer + email policy + read API + dashboard bell + editor bell + SSE Durable Object. Implementation deviated from one Decision-4 sub-clause (unified SSE for editor + dashboard rather than splitting by surface); the deviation is named inline in dec 4 with rationale. Five real-world readiness items captured in Follow-ups before flipping Accepted, most notably H8 from `docs/discoveries-2026-06-01-codereview.md` (form_submission notif-write swallows failures) which carries into v1 and is named explicitly.
+
+## Context
+
+A rev01 Owner today juggles four classes of async events that land on their site or account while they are not actively looking:
+
+1. **Form submissions.** A Visitor fills out a contact/lead form; the row lands in the Forms inbox. The Owner has to remember to open `Dashboard → Forms` to find it. There is no in-app prompt.
+2. **Collaborator events.** Another Owner accepts a co-edit invite, leaves a site, or has their role changed. The collaborators panel updates only when the page is refreshed.
+3. **Publish events.** A publish completes or fails (sync today; potentially async if background retry is added). The in-editor toast is the only signal and it disappears in 5 seconds — the Owner who looks away misses it.
+4. **Their own access changing.** Another Owner revokes their role on a shared site, or changes them from `editor` to `viewer`. Today the next attempt to open the editor 403s out of nowhere; the affected Owner has zero pre-event signal.
+
+In all four cases the underlying event already commits to Neon (forms inbox row, role row, publish history row). What is missing is a write-once, read-many, per-recipient inbox the Owner can scan and act on.
+
+The Owner-perceived "done" looks like: a bell with an unread count, visible from both the dashboard and the canvas editor; clicking it opens a list of recent events with a one-line summary and a "go here" link; the badge clears as items are read; the Owner can lose their place, close the tab, return the next day, and still see what happened. When the Owner is *fully* away from the app — tab closed, asleep — they still want a signal for the events that can't wait (a form lead landed, their access just got revoked); an email to their account address is the channel that reaches them there.
+
+Some of the events are addressed to *me, the person* (somebody invited me; somebody revoked my access). Others are addressed to *the site I share with two other collaborators* (a form landed on our site; a publish completed; somebody else joined our site). Both classes need to coexist, and a single event sometimes generates both — `revokeAccess(meTrue, themFalse, siteS)` is "personal notif to me + site notif to the others on S who lost a teammate."
+
+## Decisions
+
+1. **Notifications are persisted in a single Neon table with a tagged-union recipient (`recipient_kind ∈ {owner, site}`). One row never crosses recipient classes; fan-out happens at write time.**
+
+   **Why:** the Owner needs to see their full history regardless of which event class produced it; one inbox query has to surface both personal and site notifs the Owner can act on. A tagged-union row tagged at write time lets the inbox query stay shape-uniform: `SELECT … WHERE (recipient_kind='owner' AND recipient_id=$me) OR (recipient_kind='site' AND recipient_id = ANY($mySites))`. Splitting personal and site into two tables forces every reader to `UNION` them at read time and forces every "mark read" call to know which table it targets — both costs scale with every place we add a notification surface (dashboard, editor, future mobile).
+
+   This would be wrong if personal and site notifs developed truly different shapes (different lifecycle, different retention policy, different access-control rules). Today they don't: both are bounded blobs the recipient reads then dismisses; both retain for the same period; both are gated by "the recipient is the addressed Owner, or a collaborator on the addressed site." If a future kind diverges (e.g. a long-lived "task" with sub-states), it gets its own table; this one stays focused on notifications.
+
+2. **The `notifications` row shape is `(id, created_at, kind, recipient_kind, recipient_id, payload jsonb, read_at nullable)`.** `kind` is a string enum drawn from a closed `NOTIFICATION_KINDS` constant; `payload` is type-tagged jsonb specific to the kind; `read_at` is the single source of truth for "is this in the unread badge."
+
+   **Why:** the Owner reads notifs as a flat list — date, summary, action link. Hoisting `kind` to a column rather than burying it inside `payload` lets the inbox query filter (`WHERE kind IN (…)` for type-specific views) and lets indexes target the unread-count hot path (`(recipient_kind, recipient_id) WHERE read_at IS NULL`). Putting `read_at` on the row (rather than a separate `notification_read` join table) means marking-read is a one-row update with no contention; the cost is that "this notif was read by collaborator A but not B" is not modeled — which is exactly correct for the *site*-tagged subset, because per decision 1, every collaborator gets their own row for personal events and the site-tagged events are intentionally shared-read.
+
+   Wait — that last sentence is wrong on its face: site-tagged events are *one row* per site, so two collaborators marking-read would race. The decision: site-tagged read state is *per-collaborator*, modeled as a small `notification_reads (notification_id, owner_id, read_at)` join table that only site-kind notifs use. Personal notifs use the `read_at` column on the main row (since recipient is unique). The cost of one extra table is paid only for the site-kind read path; the inbox query becomes `LEFT JOIN notification_reads nr ON …` and treats the absence of a row as "unread for me." This is a real complexity; the alternative (every Owner gets their own row for site events too, fanning out on write) doubles the write cost per site event and makes "3 collaborators read the same form-submission notif" hit 3 rows instead of 1. We accept the join.
+
+   This would be wrong if the payload shape stopped being kind-tagged (every notif having the same set of fields would obviate the jsonb), or if the site-collaborator count grew past low single digits (the join becomes expensive). Neither holds today.
+
+3. **The four v1 kinds are `form_submission`, `collaborator_event` (invited/joined/left), `publish_event` (succeeded/failed), and `access_event` (role-changed/revoked).** Each kind has a typed payload defined in `src/notifications/kinds.ts` and a constructor (`buildFormSubmissionNotif`, etc.) that the upstream event handler calls inside the same transaction (or immediately after) that commits the underlying event.
+
+   **Why:** the Owner experiences each kind as a different sentence (`"A new submission to the Contact form on apogee.example landed at 2:34pm"` vs `"Alice accepted your invite to apogee.example as an editor"`); coupling the payload shape to the kind makes that sentence a pure function of the row, not a per-place string-template chase. Building the notif at the same commit point as the underlying event means there is exactly one place per kind that needs to know how to spell the event; if a new kind is added, the compiler enforces that its payload shape, its constructor, and its renderer all land in the same PR. Decoupling write from event (e.g. via a background outbox poller) would buy retry resilience at the cost of "the publish landed but the notif hasn't been delivered yet" race, which is exactly the Owner-perceived inconsistency this ADR exists to fix.
+
+   This would be wrong if the underlying event had a meaningfully different transactional boundary than the notification write — e.g. if form-submissions were processed by a worker that couldn't reach the notifications table. Today they can; if they ever can't, the outbox pattern lands then as an explicit ADR amendment with the user-facing trade-off named.
+
+4. **Live delivery uses a per-Owner SSE stream (`GET /api/notifications/stream`) for every dashboard or editor tab. A new `NotificationOwnerRoom` Durable Object per Owner is the pub-sub hub; the writer pushes to it at the same point it inserts the row.**
+
+   **Why:** the Owner in the dashboard with a form-submission email about to land on their phone perceives the gap between "the form submitted" and "the bell lit up" as latency that matters; polling at 30s makes that window visible. SSE delivers in the millisecond range with a single long-lived HTTP response, costs one connection per Owner-tab (bounded), and has native reconnect-and-resume semantics via `Last-Event-ID`. Cloudflare Workers stream SSE responses freely; the choke point is cross-isolate fan-out, which a per-Owner DO solves: the row writer calls `ownerDO.notify({ kind: 'notification', id })` (and for site notifs, once per collaborator on the affected site, in the same loop that writes the `notification_reads` rows); the DO broadcasts to every SSE response it currently holds. Read-state changes (one tab marks a notif read; the others need to update their badge) ride the same channel as a `read-state-changed` event.
+
+   The DO holds no subscription state; it only fans out pushes the writer hands it. The Owner's site-membership is not the DO's concern (the writer already knows the recipient list at row-write time and addresses the right Owner-DOs). On a cold Owner-DO (first SSE connect after isolate recycle) there is nothing to replay — `Last-Event-ID` covers the connection's own gap by re-querying `/api/notifications?since=…` once on reconnect; events older than the reconnect window are picked up by that backfill rather than buffered in the DO.
+
+   This would be wrong if SSE were not stable on Cloudflare Workers (it is; tested in adjacent codepaths), or if Owners routinely opened many dashboard tabs such that the long-lived-connection count scaled badly (current real users: low single digits per Owner; revisit if that changes). Push notifications (cross-device, tab-closed, OS-surface) are still out of scope — that is Web Push, a separate ADR.
+
+   *Implementation note (2026-06-01):* an earlier draft of this decision split the channel by surface — site-room ws for collaborators in open editors, SSE for everyone else — to "save one connection per editor tab." The as-shipped design unifies on SSE for both surfaces because (a) the second connection per editor tab is cheap and (b) one transport + one client subscriber is materially simpler than two. The on-site public editor (`/?edit` on a subdomain, edit-token-JWT auth via `/__api`) does **not** open SSE in v1 — `/api/notifications/stream` is Clerk-only. Exposing the inbox at `/__api` with edit-token auth is a follow-up.
+
+5. **No silent fallback on the live channel.** If the SSE broadcast fails (DO restart, transient network), the row already sits in Neon; the next EventSource reconnect surfaces it via the backfill fetch. There is no retry, no in-memory queue, no "delivered-flag" column.
+
+   **Why:** per the no-fallback rule (CLAUDE.md), the system either delivers correctly or fails loudly. The persistent row is the truth; the SSE channel is a UX nicety on top. A retry layer would add a separate failure mode (the queue itself dropping) without changing the correctness story. EventSource's native reconnect-with-`Last-Event-ID` plus the IIFE's reconnect-triggered `/api/notifications?since=…` backfill close the gap; the Owner perceives at most one SSE round-trip of latency on resume, which is sub-second.
+
+   This would be wrong if there was no fallback read path at all — e.g. if dashboards relied purely on the live channel and the channel-drop path produced no observable signal. Decision 4 + the backfill behaviour close that gap.
+
+6. **Marking-read is per-row, idempotent, and triggered by the Owner opening the notification in the inbox (or clicking its "go here" link).** No "mark all read" button in v1.
+
+   **Why:** the Owner uses unread-count as a "did I deal with this?" signal; a "mark all read" button trains them to dismiss the count without engaging, which makes the signal lie. Forcing per-row read means the Owner who quickly skims the inbox to look for one specific notif does not accidentally lose track of the others. The cost is friction; the benefit is the signal remains honest. If usage data shows Owners routinely have 50+ unread (i.e. the friction outweighs the signal), the follow-up adds a bulk-read with an explicit confirmation step.
+
+   This would be wrong if Owners habitually accumulated decorative notifs they had no obligation to act on (e.g. "Alice joined" three months ago) — in which case bulk-clear is the natural escape valve. v1's four kinds are all actionable; we ship without bulk-read and revisit.
+
+7. **Every notification also dispatches an email to the recipient Owner, from `${EMAIL_FROM}`, at the same point the row is written.** Site-kind notifs email every collaborator on the affected site (the same loop that writes the `notification_reads` rows also calls `sendEmail` per Owner). The send-or-fail-loudly contract from `src/email/send.ts` applies — no outbox, no retry, no "delivered" flag on the row.
+
+   **Why:** the Owner who is fully away from the app (laptop closed, phone in pocket) only learns about a form lead, an access revoke, or a publish failure if the system pushes a channel that reaches them off-app. Email is the channel they already trust (they signed up with one); the infrastructure exists in `src/email/send.ts` and is already used for form-lead-to-owner notifications today. Sending at write time, inside the same handler, means the email-or-not decision lives next to the row-write — one place to read, one place to change, no async layer to debug. The in-app notif and the email are two surfaces of the same persisted row; whichever the Owner reaches first does the job. The send-or-fail-loudly posture (already enforced by `sendEmail`) means a transient Resend failure surfaces immediately in the request log instead of accumulating as a silent backlog.
+
+   Per-kind email policy: `form_submission` → always email. `access_event` → always email (Owner cannot recover from a silent revoke). `publish_event` → email *only on failure*; success is already visible in the editor and emailing every successful publish becomes spam. `collaborator_event` → email when *I* am the subject (invited, role changed); skip when only my teammate is the subject (site-feed only). The policy lives in `src/notifications/email-policy.ts` alongside the kind constants.
+
+   This would be wrong if the Owner perceived the email as duplicative noise (the in-app + the email arriving within seconds of each other). The per-kind policy above is the mitigation: email only fires for kinds where off-app reachability is the load-bearing property. If real usage data shows email volume is still too high, the follow-up is a digest mode (still send-at-write but bundle into hourly summaries); that is a separate ADR amendment.
+
+## Out of scope
+
+- **SMS notifications.** Different channel, different consent story, different opt-in UX. Email covers off-app reachability today.
+- **Web Push API + service worker for cross-device, tab-closed notifs.** Real cost (SW lifecycle, endpoint registry, permissions UX); separate ADR if a real Owner asks. Email already covers the tab-closed case for v1.
+- **Email digest mode.** v1 sends one email per notif (subject to the per-kind policy in decision 7). If volume becomes noise, a digest amendment lands; see Follow-ups.
+- **Mentions (`@user` inside editor content or comments).** Requires a comment/discussion model that does not yet exist; out until that lands.
+- **Notification preferences (turn off a kind).** Defer until usage data shows real opt-out demand. Today the four kinds are all actionable; opt-out before evidence risks letting Owners silence the signal they need.
+- **Visitor-facing notifications.** The page Visitor is anonymous; nothing about this ADR applies to them.
+- **Cross-fork notifications.** Each fork is a separate deployment; cross-fork is meaningless.
+- **Retention beyond 90 days.** A `created_at < now() - interval '90 days'` soft-delete is sketched in Follow-ups; the exact policy is a separate decision once real volume is observable.
+- **A "Notifications" route in the editor sidebar.** v1 puts the bell + inbox in the dashboard top-bar and the editor's top-right header cluster; no full-page route, no sidebar entry.
+
+## Consequences
+
+**Positive:**
+
+- The Owner gets a single, persistent surface for the four async event classes they care about. Form submissions, collaborator changes, publish outcomes, and access changes all surface without the Owner having to check four different panels.
+- The hybrid recipient model means personal asks (someone invited me, my role changed) sit alongside site events (forms landed on our site, we published) in the same inbox query — the Owner doesn't have to know which kind they're looking for.
+- Live delivery for editing collaborators is free (one new message type on the existing site-room ws). Live delivery for dashboard sitters is sub-second (SSE via the per-Owner `NotificationOwnerRoom` DO), close enough to instant that the Owner does not perceive lag.
+- The notification row in Neon is the source of truth; the ws and the SSE are both accelerants. A DO restart, a transient network drop, or a tab refresh all converge on the same persisted state via the `Last-Event-ID`-driven reconnect → backfill loop — no half-delivered queue to debug.
+- Owners who are fully away from the app still get a signal for the kinds where off-app reachability matters (form lead landed, access revoked, publish failed) — the email channel piggybacks on the existing `src/email/send.ts` infrastructure with no new vendor or send pipeline.
+- The row shape supports growth: new kinds are a new enum value + new payload shape + new constructor + new renderer; the inbox query stays unchanged.
+
+**Negative:**
+
+- The `notification_reads` join table for site-kind read state is a real complexity. The alternative (per-collaborator row on every site event) saves the join but trades it for write fan-out cost — we picked the join. A future refactor may revisit if the join shows up in slow-query analytics.
+- The constructor pattern means every upstream event handler now writes one extra row inside its transaction. For form submissions (~rare) and collab events (~rare), this is invisible. For publish events on a high-frequency republish setup, the cost is one row per publish.
+- SSE per Owner-tab is a long-lived HTTP response held open against the Worker; under high open-tab counts the Owner-DO holds many response refs. Bounded today (real users: low single digits of open dashboard tabs each); revisit if the count explodes.
+- Email at every notif means a high-frequency event class (publish-on-each-keypress, were it ever to ship that way) would email per occurrence. The per-kind policy in decision 7 confines this to kinds with off-app value; the digest follow-up is the escape valve if a kind turns noisy.
+- No bulk-read means an Owner who comes back from vacation faces 50+ unread items they have to click through. The follow-up names the escape valve.
+- The four kinds are hard-coded; a fork wanting a fifth has to land an ADR + a constructor + a renderer. This is intentional — drift is expensive — but it does mean v1 is a deliberate commitment, not a pluggable framework.
+
+## Follow-ups
+
+- **Retention.** A nightly job soft-deletes `notifications` and `notification_read` rows older than 90 days. Either the existing scheduler or a `cron` trigger; ADR amendment if 90 days is wrong for a compliance reason.
+- **Bulk-mark-read.** If usage shows Owners routinely accumulate 50+ unread, ship "mark all as read" as an action with a 2-step confirm (modal: "this clears N notifs, are you sure?"). Triggered by a separate small ADR or amendment if it lands during this release cycle.
+- **Email digest mode.** If real volume of any kind turns the email channel into noise, bundle into hourly/daily summaries (still send-at-write but combined). Amendment or superseding ADR; depends on usage data.
+- **Mentions / comments-in-editor.** Out until the comment model lands; that ADR will then name how mentions become personal notifs of a new kind.
+- **Notification preferences UI.** Defer until evidence; if a kind becomes "noise" we surface opt-out at that point.
+- **Cross-tab dedup.** An Owner with two dashboard tabs open holds two SSE streams; each renders the same unread badge update on receipt. No correctness problem (writes are idempotent); consider a `BroadcastChannel`-based dedup if duplicate-DOM-update CPU becomes visible.
+- **On-site public editor inbox.** v1's `/api/notifications/stream` is Clerk-only. The on-site public editor (`/?edit` on a Published Address, edit-token-JWT auth via `/__api`) does not see the bell. Exposing the inbox at `/__api` requires the read-side queries to consume `editTokenPayload.customerId` instead of the Clerk session; a small auth-middleware swap, not a schema change.
+- **H8 carryover from `docs/discoveries-2026-06-01-codereview.md`.** The form_submission notif-write swallows INSERT failures and returns visitor success. The trade-off is named in `src/forms/route.ts` and matches the pre-existing legacy email block's posture: failing the visitor's submit because the owner-notif failed produces resubmit loops. A retryable backfill from form_submission rows is the right long-term fix. Out of v1 scope.
+- **Migration snapshot rebase.** Drizzle's generator emitted a stale `library_section.description` ALTER alongside `0013_notifications.sql` because snapshots 0004-0009 + 0011-0012 are missing from `drizzle/meta/`. Hand-trimmed for this PR; a separate cleanup should rebase the snapshot dir so the next `drizzle-kit generate` produces clean diffs.
+- **Audit `notification` query plans against real volume.** The inbox query gates on `(recipient_kind, recipient_id, created_at DESC)` and the unread-count query LEFT JOINs `notification_read`. Both indexed; both should land sub-millisecond at low volume. Re-check at 100k notifs / Owner.

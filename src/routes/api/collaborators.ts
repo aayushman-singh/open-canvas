@@ -1,13 +1,22 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { signInviteToken } from '../../auth/invite-token.js';
-import { db } from '../../db/client.js';
+import { db, type Db } from '../../db/client.js';
 import { customer, site, siteCollaborator, type CollaboratorRole } from '../../db/schema.js';
 import { sendEmail } from '../../email/send.js';
 import { inviteEmailHtml, inviteEmailSubject } from '../../email/templates/invite.js';
 import { appDomain, appOrigin, type HostConfigEnv } from '../../host-config.js';
+import { buildCustomerNotif, buildSiteNotif } from '../../notifications/constructors.js';
+import { writeNotification, type WriteNotificationEnv } from '../../notifications/writer.js';
+import type {
+  AccessChange,
+  AccessEventPayload,
+  CollaboratorEventAction,
+  CollaboratorEventPayload,
+} from '../../notifications/kinds.js';
+import type { NotificationOwnerRoomMarker } from '../../notifications/owner-room.js';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -15,6 +24,7 @@ type Bindings = HostConfigEnv & {
   DATABASE_URL: string;
   UNLOCK_SIGNING_SECRET: string;
   RESEND_API_KEY: string;
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -88,6 +98,7 @@ async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
       siteName: ctx.siteName,
       siteSubdomain: ctx.siteSubdomain,
       apex: appDomain(ctx.env),
+      appOrigin: appOrigin(ctx.env),
       inviterName: ctx.inviterName,
       role: ctx.role,
       acceptUrl,
@@ -100,6 +111,152 @@ function resolveInviterName(c: Context<Env>, fallbackEmail: string): string {
   if (!ownerUser) return 'A user';
   const named = `${ownerUser.firstName ?? ''} ${ownerUser.lastName ?? ''}`.trim();
   return named || fallbackEmail;
+}
+
+// ---------------------------------------------------------------------------
+// ADR 0043 notification helpers
+// ---------------------------------------------------------------------------
+//
+// Each upstream collaborator/access mutation calls one of these helpers after
+// the row commits. Failures are caught and logged at the route level so a
+// notification fan-out failure does not 5xx the underlying collaborator API.
+
+async function loadCustomerDisplay(
+  database: Db,
+  customerId: string,
+): Promise<{ displayName: string; email: string }> {
+  const rows = await database
+    .select({ displayName: customer.displayName, email: customer.email })
+    .from(customer)
+    .where(eq(customer.id, customerId))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return { displayName: 'A teammate', email: '' };
+  return { displayName: row.displayName ?? row.email, email: row.email };
+}
+
+// Site collaborators excluding `excludeCustomerId`. Only `acceptedAt IS NOT
+// NULL` rows are returned — pending invitees do not see fan-out notifs.
+// The site owner (site.customerId) is always included because they are not
+// represented in `siteCollaborator`.
+async function loadOtherSiteCollaborators(
+  database: Db,
+  siteId: string,
+  excludeCustomerId: string,
+): Promise<string[]> {
+  const ownerRow = await database
+    .select({ customerId: site.customerId })
+    .from(site)
+    .where(eq(site.id, siteId))
+    .limit(1);
+  const collabRows = await database
+    .select({ customerId: siteCollaborator.customerId })
+    .from(siteCollaborator)
+    .where(
+      and(
+        eq(siteCollaborator.siteId, siteId),
+        isNotNull(siteCollaborator.acceptedAt),
+        ne(siteCollaborator.customerId, excludeCustomerId),
+      ),
+    );
+  const ids = new Set<string>();
+  if (ownerRow[0] && ownerRow[0].customerId !== excludeCustomerId) {
+    ids.add(ownerRow[0].customerId);
+  }
+  for (const r of collabRows) ids.add(r.customerId);
+  return [...ids];
+}
+
+interface CollaboratorEventEmitParams {
+  action: CollaboratorEventAction;
+  siteId: string;
+  siteName: string;
+  subjectCustomerId: string;
+  subjectDisplayName: string;
+  subjectEmail: string;
+  actorCustomerId: string | null;
+  actorDisplayName: string | null;
+}
+
+async function emitCollaboratorEvent(
+  c: Context<Env>,
+  params: CollaboratorEventEmitParams,
+): Promise<void> {
+  const database = db(c.env);
+  const otherIds = await loadOtherSiteCollaborators(
+    database,
+    params.siteId,
+    params.subjectCustomerId,
+  );
+  const payload: CollaboratorEventPayload = {
+    siteId: params.siteId,
+    siteName: params.siteName,
+    action: params.action,
+    subjectCustomerId: params.subjectCustomerId,
+    subjectDisplayName: params.subjectDisplayName,
+    subjectEmail: params.subjectEmail,
+    actorCustomerId: params.actorCustomerId,
+    actorDisplayName: params.actorDisplayName,
+  };
+  const env = c.env as WriteNotificationEnv;
+  // Subject-addressed personal row first (email policy targets the subject).
+  await writeNotification(
+    { db: database, env },
+    buildCustomerNotif('collaborator_event', params.subjectCustomerId, payload),
+  );
+  // Site-addressed row for onlookers (the rest of the site collaborators).
+  if (otherIds.length > 0) {
+    await writeNotification(
+      { db: database, env },
+      buildSiteNotif('collaborator_event', params.siteId, payload, otherIds),
+    );
+  }
+}
+
+interface AccessEventEmitParams {
+  change: AccessChange;
+  siteId: string;
+  siteName: string;
+  subjectCustomerId: string;
+  subjectDisplayName: string;
+  previousRole: string;
+  nextRole: string | null;
+  actorCustomerId: string;
+  actorDisplayName: string;
+}
+
+async function emitAccessEvent(
+  c: Context<Env>,
+  params: AccessEventEmitParams,
+): Promise<void> {
+  const database = db(c.env);
+  const otherIds = await loadOtherSiteCollaborators(
+    database,
+    params.siteId,
+    params.subjectCustomerId,
+  );
+  const payload: AccessEventPayload = {
+    siteId: params.siteId,
+    siteName: params.siteName,
+    change: params.change,
+    subjectCustomerId: params.subjectCustomerId,
+    subjectDisplayName: params.subjectDisplayName,
+    previousRole: params.previousRole,
+    nextRole: params.nextRole,
+    actorCustomerId: params.actorCustomerId,
+    actorDisplayName: params.actorDisplayName,
+  };
+  const env = c.env as WriteNotificationEnv;
+  await writeNotification(
+    { db: database, env },
+    buildCustomerNotif('access_event', params.subjectCustomerId, payload),
+  );
+  if (otherIds.length > 0) {
+    await writeNotification(
+      { db: database, env },
+      buildSiteNotif('access_event', params.siteId, payload, otherIds),
+    );
+  }
 }
 
 interface ClerkEmailForInviteLookup {
@@ -272,6 +429,27 @@ collaboratorsApi.post('/sites/:siteId/collaborators', async (c) => {
     return c.json({ error: `invitation email failed to send: ${message}` }, 502);
   }
 
+  // ADR 0043: emit collaborator_event 'invited' (best-effort).
+  try {
+    const subjectDisplay = await loadCustomerDisplay(database, targetCustomerId);
+    await emitCollaboratorEvent(c, {
+      action: 'invited',
+      siteId,
+      siteName: owner.siteName,
+      subjectCustomerId: targetCustomerId,
+      subjectDisplayName: subjectDisplay.displayName,
+      subjectEmail: rawEmail,
+      actorCustomerId: owner.customerId,
+      actorDisplayName: resolveInviterName(c, rawEmail),
+    });
+  } catch (err) {
+    console.error('[collaborators] collaborator_event invited notif failed', {
+      siteId,
+      collaboratorId,
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+    });
+  }
+
   return c.json(
     {
       ok: true,
@@ -299,6 +477,22 @@ collaboratorsApi.patch('/sites/:siteId/collaborators/:collabId', async (c) => {
   }
 
   const database = db(c.env);
+
+  // Snapshot the previous row first so the access_event notif knows the
+  // previousRole + subjectCustomerId without re-querying after the UPDATE.
+  const existing = await database
+    .select({
+      id: siteCollaborator.id,
+      customerId: siteCollaborator.customerId,
+      role: siteCollaborator.role,
+    })
+    .from(siteCollaborator)
+    .where(and(eq(siteCollaborator.id, collabId), eq(siteCollaborator.siteId, siteId)))
+    .limit(1);
+  if (!existing[0]) {
+    return c.json({ error: 'collaborator not found' }, 404);
+  }
+
   const updated = await database
     .update(siteCollaborator)
     .set({ role })
@@ -308,6 +502,32 @@ collaboratorsApi.patch('/sites/:siteId/collaborators/:collabId', async (c) => {
   if (!updated[0]) {
     return c.json({ error: 'collaborator not found' }, 404);
   }
+
+  // ADR 0043: emit access_event 'role_changed' only when the role actually
+  // changed. A no-op PATCH (same role) should not generate a notif.
+  if (existing[0].role !== role) {
+    try {
+      const subjectDisplay = await loadCustomerDisplay(database, existing[0].customerId);
+      await emitAccessEvent(c, {
+        change: 'role_changed',
+        siteId,
+        siteName: owner.siteName,
+        subjectCustomerId: existing[0].customerId,
+        subjectDisplayName: subjectDisplay.displayName,
+        previousRole: existing[0].role,
+        nextRole: role,
+        actorCustomerId: owner.customerId,
+        actorDisplayName: resolveInviterName(c, subjectDisplay.email),
+      });
+    } catch (err) {
+      console.error('[collaborators] access_event role_changed notif failed', {
+        siteId,
+        collabId,
+        err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+      });
+    }
+  }
+
   return c.json({ ok: true, collaborator: updated[0] });
 });
 
@@ -370,6 +590,22 @@ collaboratorsApi.delete('/sites/:siteId/collaborators/:collabId', async (c) => {
   if (!owner) return c.json({ error: 'site not found' }, 404);
 
   const database = db(c.env);
+
+  // Snapshot the row before deleting so the access_event notif knows the
+  // subjectCustomerId, previousRole, and acceptedAt status. We only emit
+  // the access_event notif when the row had actually accepted — pending
+  // rows revoke silently because the invitee never saw the site.
+  const existing = await database
+    .select({
+      id: siteCollaborator.id,
+      customerId: siteCollaborator.customerId,
+      role: siteCollaborator.role,
+      acceptedAt: siteCollaborator.acceptedAt,
+    })
+    .from(siteCollaborator)
+    .where(and(eq(siteCollaborator.id, collabId), eq(siteCollaborator.siteId, siteId)))
+    .limit(1);
+
   const deleted = await database
     .delete(siteCollaborator)
     .where(and(eq(siteCollaborator.id, collabId), eq(siteCollaborator.siteId, siteId)))
@@ -377,6 +613,30 @@ collaboratorsApi.delete('/sites/:siteId/collaborators/:collabId', async (c) => {
 
   if (deleted.length === 0) {
     return c.json({ error: 'collaborator not found' }, 404);
+  }
+
+  // ADR 0043: emit access_event 'revoked' for accepted collaborators only.
+  if (existing[0] && existing[0].acceptedAt) {
+    try {
+      const subjectDisplay = await loadCustomerDisplay(database, existing[0].customerId);
+      await emitAccessEvent(c, {
+        change: 'revoked',
+        siteId,
+        siteName: owner.siteName,
+        subjectCustomerId: existing[0].customerId,
+        subjectDisplayName: subjectDisplay.displayName,
+        previousRole: existing[0].role,
+        nextRole: null,
+        actorCustomerId: owner.customerId,
+        actorDisplayName: resolveInviterName(c, subjectDisplay.email),
+      });
+    } catch (err) {
+      console.error('[collaborators] access_event revoked notif failed', {
+        siteId,
+        collabId,
+        err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+      });
+    }
   }
 
   return c.json({ ok: true });

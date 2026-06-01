@@ -12,7 +12,7 @@
 // Owner-gated `/api/publish/sites/:siteId` endpoint is the only writer; this
 // router is read-only.
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import { type Context, type Input } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { html, raw } from 'hono/html';
@@ -41,6 +41,10 @@ import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { customer, ownerAsset, site, siteFont } from '../db/schema';
+import { buildCustomerNotif, buildSiteNotif } from '../notifications/constructors';
+import { writeNotification } from '../notifications/writer';
+import type { CollaboratorEventPayload } from '../notifications/kinds';
+import type { NotificationOwnerRoomMarker } from '../notifications/owner-room';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
@@ -104,7 +108,9 @@ type Bindings = HostConfigEnv & {
   // Wave 5 #23 + #24 — Gemini API key for chat agent + auto-translate.
   GEMINI_API_KEY?: string;
   // Resend API key for transactional email (collaborator invitations).
-  RESEND_API_KEY?: string;
+  RESEND_API_KEY: string;
+  // ADR 0043 Phase D — SSE pub-sub hub for live notif push to dashboards.
+  NOTIFICATION_OWNER_ROOM: DurableObjectNamespace<NotificationOwnerRoomMarker>;
 }
 
 export type PublicEnv = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -296,6 +302,7 @@ function escapeAttr(value: string): string {
 
 interface PublicSiteRow {
   id: string;
+  customerId: string;
   name: string;
   subdomain: string;
   styleKit: string;
@@ -376,6 +383,7 @@ async function loadPublicSite(env: Bindings, subdomain: string): Promise<PublicS
   const rows = await database
     .select({
       id: site.id,
+      customerId: site.customerId,
       name: site.name,
       subdomain: site.subdomain,
       styleKit: site.styleKit,
@@ -398,6 +406,7 @@ async function loadPublicSiteById(env: Bindings, siteId: string): Promise<Public
   const rows = await database
     .select({
       id: site.id,
+      customerId: site.customerId,
       name: site.name,
       subdomain: site.subdomain,
       styleKit: site.styleKit,
@@ -538,6 +547,22 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   }
 
   const database = db(c.env);
+  // Snapshot acceptedAt before the COALESCE-UPDATE so we can tell first-time
+  // acceptance apart from re-clicking the link (only first acceptance emits
+  // the ADR 0043 collaborator_event 'joined' notif).
+  const previousRows = await database
+    .select({ acceptedAt: siteCollaborator.acceptedAt })
+    .from(siteCollaborator)
+    .where(
+      and(
+        eq(siteCollaborator.id, result.payload.collaboratorId),
+        eq(siteCollaborator.siteId, siteRow.id),
+        eq(siteCollaborator.invitedEmail, result.payload.invitedEmail),
+      ),
+    )
+    .limit(1);
+  const wasAlreadyAccepted = previousRows[0]?.acceptedAt != null;
+
   // COALESCE keeps the original acceptedAt timestamp if the invitee re-clicks
   // an old link after already accepting — preserves audit data and lets the
   // same handler serve both first-accept and re-visit flows.
@@ -565,10 +590,16 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     return buildInviteErrorResponse('cancelled');
   }
 
+  const subjectCustomerId = updated[0].customerId;
+
   const collabCustomer = await database
-    .select({ clerkUserId: customer.clerkUserId })
+    .select({
+      clerkUserId: customer.clerkUserId,
+      displayName: customer.displayName,
+      email: customer.email,
+    })
     .from(customer)
-    .where(eq(customer.id, updated[0].customerId))
+    .where(eq(customer.id, subjectCustomerId))
     .limit(1);
 
   const clerkUserId = collabCustomer[0]?.clerkUserId;
@@ -576,8 +607,61 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     return c.text('account not found', 404);
   }
 
+  // ADR 0043: emit collaborator_event 'joined' notification on first
+  // acceptance only. actor = null (self-action). Best-effort; failures
+  // surface in logs but do not block the editor redirect.
+  if (!wasAlreadyAccepted) {
+    try {
+      const subjectDisplayName =
+        collabCustomer[0]?.displayName ?? collabCustomer[0]?.email ?? 'A new collaborator';
+      const subjectEmail = collabCustomer[0]?.email ?? result.payload.invitedEmail;
+      const payload: CollaboratorEventPayload = {
+        siteId: siteRow.id,
+        siteName: siteRow.name,
+        action: 'joined',
+        subjectCustomerId,
+        subjectDisplayName,
+        subjectEmail,
+        actorCustomerId: null,
+        actorDisplayName: null,
+      };
+      await writeNotification(
+        { db: database, env: c.env },
+        buildCustomerNotif('collaborator_event', subjectCustomerId, payload),
+      );
+      const otherCollaborators = await database
+        .select({ customerId: siteCollaborator.customerId })
+        .from(siteCollaborator)
+        .where(
+          and(
+            eq(siteCollaborator.siteId, siteRow.id),
+            isNotNull(siteCollaborator.acceptedAt),
+            ne(siteCollaborator.customerId, subjectCustomerId),
+          ),
+        );
+      const onlookerIds = Array.from(
+        new Set<string>([
+          ...(siteRow.customerId !== subjectCustomerId ? [siteRow.customerId] : []),
+          ...otherCollaborators.map((row) => row.customerId),
+        ]),
+      );
+      if (onlookerIds.length > 0) {
+        await writeNotification(
+          { db: database, env: c.env },
+          buildSiteNotif('collaborator_event', siteRow.id, payload, onlookerIds),
+        );
+      }
+    } catch (err) {
+      console.error('[public/accept-invite] collaborator_event joined notif failed', {
+        siteId: siteRow.id,
+        subjectCustomerId,
+        err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+      });
+    }
+  }
+
   const editToken = await signEditToken(
-    { siteId: siteRow.id, customerId: updated[0].customerId, clerkUserId },
+    { siteId: siteRow.id, customerId: subjectCustomerId, clerkUserId },
     c.env.UNLOCK_SIGNING_SECRET,
   );
 

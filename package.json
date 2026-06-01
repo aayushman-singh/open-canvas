@@ -36,6 +36,8 @@
     "sidebar-dispatch:smoke": "bun run src/canvas/elements/sidebar-dispatch.smoke.ts",
     "canvas-agent:smoke": "bun run src/agent/canvas-agent-smoke.ts",
     "yjs-projection:smoke": "bun run src/canvas/yjs-projection.smoke.ts",
+    "notifications:smoke": "bun run src/notifications/smoke.ts",
+    "notifications:integration-smoke": "bun --env-file=.env run src/notifications/inbox.integration-smoke.ts",
     "applylocalstate-repro:smoke": "bun run src/canvas/applylocalstate-repro.smoke.ts",
     "section-import:smoke": "bun run src/canvas/section-import-smoke.ts",
     "import:smoke": "bun run src/routes/api/import-smoke.ts",

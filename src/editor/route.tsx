@@ -28,6 +28,8 @@ import {
 import type { Theme } from '../ui/theme';
 import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
+import { notificationsInboxScript } from '../notifications/dashboard-inbox-script';
+import { bellStyles } from '../notifications/bell-styles';
 import { db } from '../db/client';
 import { customer, site, siteCollaborator } from '../db/schema';
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
@@ -221,6 +223,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
         <style>{raw(canvasEditorStyles)}</style>
+        {context === 'dashboard' && <style>{raw(bellStyles)}</style>}
         {clerkPublishableKey &&
           raw(`<script>
 (function(){
@@ -279,6 +282,39 @@ export function editorPageJsx(opts: EditorPageOptions) {
             <button id="canvas-save-template" type="button">
               Save as template
             </button>
+            {context === 'dashboard' && (
+              <div class="notif-wrap">
+                <button
+                  class="notif-bell"
+                  id="notif-bell"
+                  type="button"
+                  aria-label="Notifications"
+                  aria-expanded="false"
+                  aria-controls="notif-panel"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span class="notif-badge" id="notif-badge" hidden aria-hidden="true">
+                    0
+                  </span>
+                </button>
+                <div
+                  class="notif-panel"
+                  id="notif-panel"
+                  role="region"
+                  aria-labelledby="notif-bell"
+                  hidden
+                >
+                  <div class="notif-panel-head">Notifications</div>
+                  <ul class="notif-list" id="notif-list" aria-live="polite">
+                    <li class="notif-empty" data-state="loading">
+                      Loading…
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            )}
             {/* Presence indicator — visible only when count > 1. The DO
                 broadcasts `{ type: "presence", count }` over the same /__live
                 WebSocket used by the visitor live-update path. The client
@@ -462,6 +498,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
         {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
         {raw(`<script type="module">${inlineScript}</script>`)}
         <script>{raw(themeToggleScript)}</script>
+        {context === 'dashboard' && (
+          <script>{raw(notificationsInboxScript)}</script>
+        )}
       </body>
     </html>
   );

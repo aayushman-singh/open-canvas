@@ -44,6 +44,7 @@ import signOutRoute from './auth/sign-out-route';
 import signInRoute from './auth/sign-in-route';
 import onSiteEditRoute from './routes/api/on-site-edit';
 import collaboratorsApi from './routes/api/collaborators';
+import notificationsApi from './routes/api/notifications';
 import inviteRedirectRoute from './auth/invite-redirect-route';
 import socketRoute from './live/socket-route';
 
@@ -104,6 +105,7 @@ app.route('/api/import', importRouter);
 app.route('/api/admin/library', librarySectionsAdmin);
 app.route('/api/admin/custom-templates', customTemplatesAdmin);
 app.route('/api', collaboratorsApi);
+app.route('/api', notificationsApi);
 app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);
 app.route('/og', ogRoute);
@@ -168,6 +170,8 @@ app.route('/__api', ownerApi);
 export { SiteRoom } from './live/site-room';
 // Forms rate-limiter DurableObject. Binding lives in wrangler.toml.
 export { FormRateLimiter } from './live/form-rate-limiter';
+// ADR 0043 Phase D — per-Customer SSE pub-sub hub.
+export { NotificationOwnerRoom } from './notifications/owner-room';
 // Named export so tests can use Hono's `.request(...)` helper directly.
 // (The default export is the Worker module-object Cloudflare expects:
 // `{ fetch, scheduled }`. That shape does NOT expose `.request`.)

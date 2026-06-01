@@ -35,6 +35,14 @@ class_name = "SiteRoom"
 name = "FORM_RATE_LIMITER"
 class_name = "FormRateLimiter"
 
+# ADR 0043 Phase D — per-Customer SSE pub-sub hub for live notification
+# delivery. One DO instance per Customer (key = customer id); holds open
+# SSE response streams from the Customer's dashboard / editor tabs and
+# broadcasts pushes from the row writer.
+[[durable_objects.bindings]]
+name = "NOTIFICATION_OWNER_ROOM"
+class_name = "NotificationOwnerRoom"
+
 # v1 introduced the legacy per-page PageDocument DO. v3 drops it after the
 # canvas-first POC (T9) replaced the live-collab surface with SiteRoom. The
 # v1 tag must remain so the migration ledger stays linear; v3's
@@ -55,6 +63,11 @@ deleted_classes = ["PageDocument"]
 [[migrations]]
 tag = "v4"
 new_sqlite_classes = ["FormRateLimiter"]
+
+# ADR 0043 Phase D — register the per-Customer notification SSE hub DO class.
+[[migrations]]
+tag = "v5"
+new_sqlite_classes = ["NotificationOwnerRoom"]
 
 # Phase 0 scaffold — Owner Asset originals (ADR 0006 + plan #2). The bucket
 # itself is created out-of-band (`wrangler r2 bucket create rev01-assets`);
