@@ -20,6 +20,7 @@ import slotHistoryApi from './slot-history';
 import ownerAssetsApi from '../../assets/route';
 import { librarySectionsOwner } from './library-sections';
 import { customTemplatesOwner } from './custom-templates';
+import notificationsApi from './notifications';
 import chatApi from '../../agent/chat/route';
 import type { PublicEnv } from '../public';
 
@@ -33,6 +34,7 @@ ownerApi.route('/', slotHistoryApi);
 ownerApi.route('/', sectionsApi);
 ownerApi.route('/library', librarySectionsOwner);
 ownerApi.route('/custom-templates', customTemplatesOwner);
+ownerApi.route('/', notificationsApi);
 ownerApi.route('/sites', chatApi);
 
 export default ownerApi;
