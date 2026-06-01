@@ -12,6 +12,7 @@ import { deleteOwnerAsset, type AssetReference } from './delete.js';
 import { listOwnerAssets } from './list.js';
 import { createR2Client } from './r2-client.js';
 import { uploadOwnerAsset, UploadAssetError } from './upload.js';
+import { loadAccessibleSite } from '../auth/accessible-site.js';
 import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import { db } from '../db/client.js';
@@ -59,13 +60,6 @@ ownerAssetsApi.get('/', async (c) => {
 });
 
 ownerAssetsApi.post('/', async (c) => {
-  const customerId = await resolveCustomerId(c);
-  if (!customerId) {
-    return c.json(
-      { error: 'no customer row for current user - visit /dashboard first to materialise it' },
-      409,
-    );
-  }
   let formData: FormData;
   try {
     formData = await c.req.formData();
@@ -89,13 +83,45 @@ ownerAssetsApi.post('/', async (c) => {
   const elementId =
     typeof elementIdRaw === 'string' && elementIdRaw.length > 0 ? elementIdRaw : undefined;
 
+  // When the upload is bound to a site (editor flow), the asset row's
+  // customerId MUST be the site owner's, not the uploader's. A collaborator
+  // editing an owner's site would otherwise write the row under their own
+  // customerId — the canvas save path then rejects every reference because
+  // ownerAsset.customerId does not match site.customerId. loadAccessibleSite
+  // returns site.customerId for both owner and collaborator paths.
+  // Without a siteId, fall back to the uploader's customerId (dashboard
+  // library upload, no site context).
+  const auth = c.get('auth');
+  if (!auth.userId) {
+    throw new Error('owner-assets api reached without an authenticated user');
+  }
+  const database = db(c.env);
+  let customerId: string;
+  if (siteId !== undefined) {
+    const accessible = await loadAccessibleSite(database, auth.userId, siteId, 'editor');
+    if (!accessible) {
+      // Same contract as other site-scoped routes: missing OR not allowed
+      // collapses to 404 so the route doesn't leak existence.
+      return c.json({ error: 'site not found' }, 404);
+    }
+    customerId = accessible.customerId;
+  } else {
+    const ownCustomerId = await resolveCustomerId(c);
+    if (!ownCustomerId) {
+      return c.json(
+        { error: 'no customer row for current user - visit /dashboard first to materialise it' },
+        409,
+      );
+    }
+    customerId = ownCustomerId;
+  }
+
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const mediaType = blob.type;
   if (!mediaType) {
     return c.json({ error: 'file must carry a content type (multipart Content-Type header)' }, 400);
   }
 
-  const database = db(c.env);
   const r2 = createR2Client(c.env.ASSETS_BUCKET);
   try {
     // `siteId` / `elementId` are explicitly omitted when absent so the
