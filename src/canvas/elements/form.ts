@@ -131,12 +131,65 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
 
   // Turnstile widget. The Cloudflare-managed JS loader script is emitted next
   // to the widget; the Cloudflare CDN caches it so multiple forms on the same
-  // page share a single network fetch. Renderer pure-HTML output only — no
-  // JS-side handlers.
+  // page share a single network fetch.
   const turnstileBlock = [
     `<div class="cf-turnstile" data-sitekey="${escapeAttr(ctx.turnstileSiteKey)}"></div>`,
     `<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>`,
   ].join('');
+
+  // AJAX handler — fetch POST the form, show inline success/error without
+  // a full page reload. The script is idempotent (guarded by
+  // window.__rev01FormHandlerWired) so multiple forms on one page share
+  // one wire-up. We progressively enhance: forms still POST normally if
+  // JS is blocked (the server's 303 redirect with ?form-ok= keeps
+  // working as the no-JS fallback).
+  const ajaxScript = `<script>
+(function(){
+  if (window.__rev01FormHandlerWired) return;
+  window.__rev01FormHandlerWired = true;
+  document.addEventListener('submit', async function(ev) {
+    var form = ev.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!form.classList || !form.classList.contains('rev01-form')) return;
+    ev.preventDefault();
+    var btn = form.querySelector('.rev01-form-submit');
+    var err = form.querySelector('.rev01-form-error');
+    var success = form.querySelector('.rev01-form-success');
+    if (btn) { btn.disabled = true; btn.dataset.busy = '1'; }
+    if (err) { err.hidden = true; err.textContent = ''; }
+    try {
+      var data = new FormData(form);
+      var res = await fetch(form.action, { method: 'POST', body: data, redirect: 'manual', credentials: 'same-origin' });
+      var ok = res.status === 200 || res.status === 302 || res.status === 303 || res.type === 'opaqueredirect';
+      if (!ok) {
+        var detail = 'Something went wrong. Please try again.';
+        try {
+          var body = await res.json();
+          if (body && body.error === 'turnstile-failed') detail = 'Bot check failed. Please refresh and try again.';
+          else if (body && body.error === 'rate-limited') detail = 'Too many submissions. Wait a minute and try again.';
+          else if (body && body.error === 'validation-failed') detail = 'Some fields need attention.';
+          else if (body && body.detail) detail = body.detail;
+        } catch (_) {}
+        if (err) { err.textContent = detail; err.hidden = false; }
+        return;
+      }
+      if (success) {
+        success.hidden = false;
+        // Hide the fields so the success message reads cleanly. Fall
+        // back to the form-wrapper if individual fields aren't tagged.
+        var fields = form.querySelectorAll('.rev01-form-field, .cf-turnstile, .rev01-form-submit');
+        for (var i = 0; i < fields.length; i++) fields[i].hidden = true;
+      }
+    } catch (e) {
+      if (err) { err.textContent = 'Network error. Please try again.'; err.hidden = false; }
+    } finally {
+      if (btn) { btn.disabled = false; delete btn.dataset.busy; }
+      // Re-render Turnstile so the next submit gets a fresh token.
+      try { if (window.turnstile && typeof window.turnstile.reset === 'function') window.turnstile.reset(); } catch (_) {}
+    }
+  });
+})();
+</script>`;
 
   return [
     `<form class="rev01-form" method="post" action="${escapeAttr(action)}" data-form-id="${escapeAttr(el.id)}">`,
@@ -144,8 +197,10 @@ export function renderForm(el: FormElement, ctx: FormRenderCtx): string {
     fieldsHtml,
     turnstileBlock,
     `<button class="rev01-form-submit" type="submit">${escapeHtml(el.submitLabel)}</button>`,
-    `<p class="rev01-form-success" data-success-text="${escapeAttr(el.successMessage)}">${escapeHtml(el.successMessage)}</p>`,
+    `<p class="rev01-form-error" role="alert" hidden></p>`,
+    `<p class="rev01-form-success" data-success-text="${escapeAttr(el.successMessage)}" hidden>${escapeHtml(el.successMessage)}</p>`,
     `</form>`,
+    ajaxScript,
   ].join('');
 }
 

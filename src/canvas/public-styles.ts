@@ -170,6 +170,110 @@ html, body {
 .rev01-element[data-es-shadow] > .rev01-surface,
 .rev01-element[data-es-shadow] > .rev01-action,
 .rev01-element[data-es-shadow] > .rev01-shape { box-shadow: none; }
+
+/* ---- Forms ------------------------------------------------------------
+   Visitor-facing form chrome. Browsers' default form widgets look broken
+   next to a designed canvas, so we ship a small, opinionated reset:
+   stacked labels, generous tap targets, kit-token-aware focus ring, and
+   a primary CTA that picks up the active kit accent. The AJAX handler
+   (emitted inline alongside the form) flips visibility on the success
+   message and reveals .rev01-form-error on failure.                       */
+.rev01-form {
+  display: grid;
+  gap: 14px;
+  max-width: 100%;
+}
+.rev01-form-field {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--rev01-fg);
+}
+.rev01-form-field-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.rev01-form-label {
+  font-weight: 500;
+  color: var(--rev01-fg);
+  line-height: 1.4;
+}
+.rev01-form-input,
+.rev01-form select {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--rev01-fg);
+  background: var(--rev01-bg);
+  border: 1px solid var(--rev01-hairline);
+  border-radius: 6px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  appearance: none;
+}
+.rev01-form-input:hover,
+.rev01-form select:hover {
+  border-color: var(--rev01-fg-mute);
+}
+.rev01-form-input:focus,
+.rev01-form select:focus {
+  outline: none;
+  border-color: var(--rev01-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--rev01-accent) 24%, transparent);
+}
+.rev01-form-input::placeholder { color: var(--rev01-fg-mute); }
+.rev01-form textarea.rev01-form-input {
+  resize: vertical;
+  min-height: 96px;
+  font-family: inherit;
+}
+.rev01-form-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--rev01-accent);
+}
+.rev01-form-submit {
+  justify-self: start;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rev01-bg);
+  background: var(--rev01-accent);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.rev01-form-submit:hover { filter: brightness(1.05); }
+.rev01-form-submit:active { transform: translateY(1px); }
+.rev01-form-submit:disabled,
+.rev01-form-submit[data-busy="1"] {
+  opacity: 0.6;
+  cursor: progress;
+  filter: none;
+}
+.rev01-form-success {
+  margin: 0;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--rev01-accent);
+  background: color-mix(in oklab, var(--rev01-accent) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--rev01-accent) 32%, transparent);
+  border-radius: 6px;
+}
+.rev01-form-error {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #d44;
+  background: color-mix(in oklab, #d44 12%, transparent);
+  border: 1px solid color-mix(in oklab, #d44 36%, transparent);
+  border-radius: 6px;
+}
 `;
 
 export const canvasPublishedStyles = `${baseCss}\n${kitCss}`;
