@@ -232,7 +232,10 @@ function runReferenceWalkTests(): void {
   const siteIds = collectReferencedAssetIds(siteRoot);
   assert(siteIds.has('favicon-id'), 'expected site favicon asset to be reachable');
   assert(siteIds.has('logo-id'), 'expected header nav logo asset to be reachable');
-  assert(siteIds.has('footer-bg-video-id'), 'expected footer background video asset to be reachable');
+  assert(
+    siteIds.has('footer-bg-video-id'),
+    'expected footer background video asset to be reachable',
+  );
   assert(siteIds.has('slide-image-id'), 'expected footer carousel slide asset to be reachable');
 }
 
@@ -451,8 +454,7 @@ async function runReadTests(png32: Uint8Array, expectedHash: string): Promise<vo
       },
     );
   } catch (err) {
-    invalidWidthThrew =
-      err instanceof Error && err.message.includes('invalid w=12abc');
+    invalidWidthThrew = err instanceof Error && err.message.includes('invalid w=12abc');
   }
   assert(invalidWidthThrew, 'transform width must reject partial numeric garbage');
 
@@ -499,7 +501,11 @@ class UploadScopeDb {
     };
   }
 
-  insert(table: unknown): { values: (row: Record<string, unknown>) => Promise<void> | { onConflictDoUpdate: () => Promise<void> } } {
+  insert(table: unknown): {
+    values: (
+      row: Record<string, unknown>,
+    ) => Promise<void> | { onConflictDoUpdate: () => Promise<void> };
+  } {
     if (table === ownerAsset) {
       return {
         values: (row) => {
@@ -566,6 +572,38 @@ async function runSlotHistoryScopeTests(png32: Uint8Array): Promise<void> {
   }
   assert(partialThrew, 'slot history metadata must be all-or-nothing');
   assert(partialDb.slotRows.length === 0, 'partial slot history must not be inserted');
+}
+
+async function runUploadMediaTypeGuardTests(): Promise<void> {
+  const svgBytes = new TextEncoder().encode('<svg><script>alert(1)</script></svg>');
+  const dbThatMustNotBeTouched = {
+    select: () => {
+      throw new Error('[assets:smoke] SVG media-type guard reached the database');
+    },
+  } as unknown as Db;
+  const r2 = new MockR2();
+
+  let parameterisedSvgRejected = false;
+  try {
+    await uploadOwnerAsset(
+      { db: dbThatMustNotBeTouched, r2: createR2Client(r2) },
+      {
+        customerId: 'cust-svg',
+        bytes: svgBytes,
+        mediaType: 'image/svg+xml; charset=utf-8',
+        alt: 'svg xss probe',
+      },
+    );
+  } catch (err) {
+    parameterisedSvgRejected =
+      err instanceof UploadAssetError && err.message.includes('SVG uploads are not permitted');
+  }
+
+  assert(
+    parameterisedSvgRejected,
+    'SVG media types with parameters must be rejected before DB/R2 writes',
+  );
+  assert(r2.putCount === 0, 'rejected SVG upload must not write to R2');
 }
 
 // ---------------------------------------------------------------------------
@@ -781,6 +819,7 @@ runReferenceWalkTests();
 await runUploadTests(png32, expectedHash);
 await runReadTests(png32, expectedHash);
 await runSlotHistoryScopeTests(png32);
+await runUploadMediaTypeGuardTests();
 await runDeleteTests(png32, expectedHash);
 
 console.log('[assets:smoke] OK');

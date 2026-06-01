@@ -94,6 +94,14 @@ export class UploadAssetError extends Error {
   }
 }
 
+function normaliseMediaType(mediaType: string): string {
+  const base = mediaType.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  if (base.length === 0) {
+    throw new UploadAssetError('media type must include a concrete image/* or video/* type');
+  }
+  return base;
+}
+
 /**
  * Core upload implementation. The route wrapper does the multipart parsing
  * and Clerk-auth gating; the function below is the pure business logic so
@@ -108,12 +116,13 @@ export async function uploadOwnerAsset(
   if (hasSiteId !== hasElementId) {
     throw new UploadAssetError('siteId and elementId must be provided together');
   }
-  if (!ALLOWED_MEDIA_PREFIXES.some((prefix) => input.mediaType.startsWith(prefix))) {
+  const mediaType = normaliseMediaType(input.mediaType);
+  if (!ALLOWED_MEDIA_PREFIXES.some((prefix) => mediaType.startsWith(prefix))) {
     throw new UploadAssetError(
       `unsupported media type: ${input.mediaType} (must start with image/ or video/)`,
     );
   }
-  if (DENIED_MEDIA_TYPES.has(input.mediaType.toLowerCase())) {
+  if (DENIED_MEDIA_TYPES.has(mediaType)) {
     throw new UploadAssetError(
       `unsupported media type: ${input.mediaType} (SVG uploads are not permitted)`,
     );
@@ -121,10 +130,10 @@ export async function uploadOwnerAsset(
   if (input.bytes.byteLength === 0) {
     throw new UploadAssetError('upload bytes must not be empty');
   }
-  const kind: 'image' | 'video' = input.mediaType.startsWith('image/') ? 'image' : 'video';
+  const kind: 'image' | 'video' = mediaType.startsWith('image/') ? 'image' : 'video';
 
   const contentHash = await sha256Hex(input.bytes);
-  const r2Key = contentHashToR2Key(contentHash, extFromMediaType(input.mediaType));
+  const r2Key = contentHashToR2Key(contentHash, extFromMediaType(mediaType));
 
   // Dedup probe — per Owner. Two Owners uploading the same bytes share the
   // R2 object but get distinct ownerAsset rows; the same Owner re-uploading
@@ -173,7 +182,7 @@ export async function uploadOwnerAsset(
   const existingObject = await deps.r2.head(r2Key);
   let r2Uploaded = false;
   if (existingObject === null) {
-    const result = await deps.r2.put(r2Key, input.bytes, input.mediaType, { ifMissing: true });
+    const result = await deps.r2.put(r2Key, input.bytes, mediaType, { ifMissing: true });
     r2Uploaded = result.uploaded;
   }
 
@@ -183,7 +192,7 @@ export async function uploadOwnerAsset(
     customerId: input.customerId,
     contentHash,
     r2Key,
-    mediaType: input.mediaType,
+    mediaType,
     kind,
     alt: input.alt,
     width: dimensions.width,
@@ -199,7 +208,7 @@ export async function uploadOwnerAsset(
     id,
     contentHash,
     r2Key,
-    mediaType: input.mediaType,
+    mediaType,
     kind,
     alt: input.alt,
     width: dimensions.width,
