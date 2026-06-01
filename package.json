@@ -1,11 +1,11 @@
 {
-  "name": "rev01",
-  "description": "A desktop canvas site builder — start from a template, edit positioned design primitives with AI, switch style kits, and publish instantly.",
+  "name": "opencanvas",
+  "description": "Open Canvas — a desktop canvas site builder — start from a template, edit positioned design primitives with AI, switch style kits, and publish instantly.",
   "author": "Aayushman Singh",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aayushman-singh/rev01.git"
+    "url": "git+https://github.com/aayushman-singh/opencanvas.git"
   },
   "keywords": [
     "site-builder",

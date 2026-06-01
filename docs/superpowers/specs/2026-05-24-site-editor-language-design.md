@@ -42,13 +42,13 @@ The owner-facing page name is **Site Editor**. This matches what the owner came 
 Recommended browser title:
 
 ```text
-rev01 - {siteName} Site Editor
+Open Canvas - {siteName} Site Editor
 ```
 
 Recommended breadcrumb:
 
 ```text
-rev01 / dashboard / {siteName} / edit
+Open Canvas / dashboard / {siteName} / edit
 ```
 
 ### Work Surface

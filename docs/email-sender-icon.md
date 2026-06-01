@@ -23,7 +23,7 @@ domain on outbound mail is `opencanvas.aayushman.dev` (set by
 that Gmail consults is at `_dmarc.opencanvas.aayushman.dev`. DMARC inherits
 from the org domain when the subdomain has no record, so a record at
 `_dmarc.aayushman.dev` also works — but an explicit subdomain record makes
-the policy obvious and isolates rev01's reputation.
+the policy obvious and isolates Open Canvas's reputation.
 
 Check current state:
 

@@ -1,14 +1,14 @@
-# rev01
+# Open Canvas
 
 > A desktop canvas site builder where an Owner starts from one Template Seed, edits positioned design primitives with AI help, switches deterministic Style Kits, and publishes to a real Published Address that updates open Visitor tabs immediately.
 
-[![Status](https://img.shields.io/badge/status-canvas--first--poc-orange)](https://github.com/aayushman-singh/rev01)
+[![Status](https://img.shields.io/badge/status-launching--soon-cyan)](https://github.com/aayushman-singh/opencanvas)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Live](https://img.shields.io/badge/live-rev01.aayushman.dev-cyan)](https://rev01.aayushman.dev)
+[![Live](https://img.shields.io/badge/live-opencanvas.aayushman.dev-cyan)](https://opencanvas.aayushman.dev)
 
 ## What it is
 
-Open the dashboard, name a site, and drop into a canvas pre-populated from one Template Seed. Drag positioned design primitives, ask the AI agent for a previewed edit, swap deterministic Style Kits live, and click Publish — the Published Address (`<subdomain>.rev01.aayushman.dev`) updates in every open Visitor tab within a few hundred milliseconds. One Cloudflare Worker hosts the dashboard, the editor, the canvas API, the AI agent endpoint, the publish snapshot store, and the public host that serves Visitors.
+Open the dashboard, name a site, and drop into a canvas pre-populated from one Template Seed. Drag positioned design primitives, ask the AI agent for a previewed edit, swap deterministic Style Kits live, and click Publish — the Published Address (`<subdomain>.opencanvas.aayushman.dev`) updates in every open Visitor tab within a few hundred milliseconds. One Cloudflare Worker hosts the dashboard, the editor, the canvas API, the AI agent endpoint, the publish snapshot store, and the public host that serves Visitors.
 
 ## Stack
 
@@ -41,7 +41,7 @@ bun.cmd run build           # wrangler deploy --dry-run
 
 ## Status
 
-Canvas-first POC — actively developed.
+Launching soon.
 
 ## License
 

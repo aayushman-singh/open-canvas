@@ -116,7 +116,7 @@ router.post('/:siteId/:formElementId', async (c) => {
   // throw as a visitor-facing 500 would loop them through a resubmit, double
   // the form_submission row count, AND still leave the Owner without the
   // notif. We catch the throw and log it loudly; the operator sees the
-  // failure in wrangler tail. Discoveries dossier H8 captures this trade-off
+  // failure in wrangler tail. ADR 0043's H8 follow-up captures this trade-off
   // and points at the proper long-term fix (a retryable backfill from
   // form_submission rows when the notif row is missing) as an ADR 0043
   // follow-up rather than a posture flip here.

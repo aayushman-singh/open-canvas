@@ -1,6 +1,6 @@
 # Production E2E Test Flows
 
-Target: `https://rev01.aayushman.dev` (main) + `*.rev01.aayushman.dev` (published)
+Target: `https://opencanvas.aayushman.dev` (main) + `*.opencanvas.aayushman.dev` (published)
 
 ## Flow 1 — Landing Page
 
@@ -26,7 +26,7 @@ Target: `https://rev01.aayushman.dev` (main) + `*.rev01.aayushman.dev` (publishe
 7. Click "+ New site" → navigates to `/dashboard/templates`
 8. Verify 5 template seeds with live iframe previews: Starter Canvas, Launch Page, Enterprise Scale, Studio Portfolio, Local Business
 9. Verify each template card shows description and style kit badge
-10. Verify site creation form: site name input, subdomain input with `.rev01.aayushman.dev` suffix, validation hint
+10. Verify site creation form: site name input, subdomain input with `.opencanvas.aayushman.dev` suffix, validation hint
 11. Create a site: fill name + subdomain, select template, click "Create site" → redirects to editor
 12. Check console for errors
 
@@ -34,7 +34,7 @@ Target: `https://rev01.aayushman.dev` (main) + `*.rev01.aayushman.dev` (publishe
 
 ### Layout
 1. Navigate to `/dashboard/sites/:siteId/edit`
-2. Verify editor header: breadcrumb (rev01 / dashboard / {name}), published-address display, Save, Publish, Save as template
+2. Verify editor header: breadcrumb (Open Canvas / dashboard / {name}), published-address display, Save, Publish, Save as template
 3. Verify left sidebar: Add / Sections / Symbols tabs
 4. Verify Add panel: Blank section, Components (Text/Image/Video/Button/Shape/Container), Style Kit buttons
 5. Verify canvas renders all sections with positioned elements
@@ -112,7 +112,7 @@ Target: `https://rev01.aayushman.dev` (main) + `*.rev01.aayushman.dev` (publishe
 
 1. In editor, click "Publish"
 2. Verify publish completes (status feedback)
-3. Navigate to `{subdomain}.rev01.aayushman.dev`
+3. Navigate to `{subdomain}.opencanvas.aayushman.dev`
 4. Verify published site renders all sections matching editor state
 5. Verify style kit applied correctly
 6. Verify images/media load
