@@ -299,6 +299,208 @@ html, body {
   border: 1px solid color-mix(in oklab, #d44 36%, transparent);
   border-radius: 6px;
 }
+
+/* ---- Accordion --------------------------------------------------------
+   Wrapper is a vertical stack of bordered items. Body visibility is
+   driven by the [hidden] attribute that the interactive runtime
+   (src/interactive/accordion.ts) mirrors on toggle. The header's open
+   state is mirrored on aria-expanded — we use that to flip the +/− glyph
+   so visitors get a click affordance even before they interact.            */
+.opencanvas-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+.opencanvas-accordion-item {
+  border: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  overflow: hidden;
+}
+.opencanvas-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.opencanvas-accordion-header::after {
+  content: "+";
+  margin-left: 12px;
+  font-size: 1.25em;
+  line-height: 1;
+  opacity: 0.7;
+}
+.opencanvas-accordion-header[aria-expanded="true"]::after { content: "−"; }
+.opencanvas-accordion-header:hover { background: rgba(127, 127, 127, 0.08); }
+.opencanvas-accordion-body {
+  padding: 0 16px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.opencanvas-accordion-body[hidden] { display: none; }
+
+/* ---- Carousel ---------------------------------------------------------
+   Slides occupy the same absolute box; only the slide whose
+   data-opencanvas-carousel-slide-index matches the wrapper's
+   data-opencanvas-slide-index is visible. The runtime
+   (src/interactive/carousel.ts) mutates the wrapper attribute on
+   prev/next/dot clicks; CSS handles the crossfade. Active-slide
+   selectors are enumerated up to MAX_CAROUSEL_SLIDES below.                 */
+.opencanvas-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  background: var(--opencanvas-kit-panel, rgba(0, 0, 0, 0.25));
+}
+.opencanvas-carousel-track {
+  position: absolute;
+  inset: 0;
+}
+.opencanvas-carousel-slide {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 240ms ease;
+}
+.opencanvas-carousel-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.opencanvas-carousel-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.opencanvas-carousel-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 14px 24px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.opencanvas-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: 0;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+  transition: background 120ms ease;
+}
+.opencanvas-carousel-arrow:hover { background: rgba(0, 0, 0, 0.78); }
+.opencanvas-carousel-arrow-prev { left: 12px; }
+.opencanvas-carousel-arrow-next { right: 12px; }
+.opencanvas-carousel-dots {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  z-index: 2;
+}
+.opencanvas-carousel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+.opencanvas-carousel-dot[aria-selected="true"] {
+  background: #fff;
+  transform: scale(1.2);
+}
+
+/* ---- Embed -------------------------------------------------------------
+   The wrapper sets the box; the iframe stretches to 100%/100% (percentage
+   heights collapse without an explicit parent height). The invalid-URL
+   placeholder is an empty div by design (the render fn has no caption),
+   so we paint a dashed border + label glyph so visitors see a real
+   "broken embed" affordance instead of an invisible hole.                   */
+.opencanvas-embed {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  background: var(--opencanvas-kit-panel, rgba(0, 0, 0, 0.2));
+}
+.opencanvas-embed > iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.opencanvas-embed-invalid {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.4));
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  background: var(--opencanvas-kit-panel, rgba(127, 127, 127, 0.06));
+  color: var(--opencanvas-kit-text, currentColor);
+  opacity: 0.7;
+  font-size: 13px;
+}
+.opencanvas-embed-invalid::after {
+  content: "Invalid embed URL";
+}
 `;
 
-export const canvasPublishedStyles = `${baseCss}\n${kitCss}`;
+// Active-slide selectors. CSS cannot compare two attribute values across
+// elements, so we enumerate index pairs: when the wrapper carries
+// data-opencanvas-slide-index="N", the descendant slide whose own
+// data-opencanvas-carousel-slide-index="N" becomes visible. 50 covers any
+// realistic carousel; bump if a future use case exceeds it.
+const MAX_CAROUSEL_SLIDES = 50;
+const carouselActiveCss = (() => {
+  const selectors: string[] = [];
+  for (let i = 0; i < MAX_CAROUSEL_SLIDES; i++) {
+    selectors.push(
+      `.opencanvas-carousel[data-opencanvas-slide-index="${String(i)}"] [data-opencanvas-carousel-slide-index="${String(i)}"]`,
+    );
+  }
+  return `${selectors.join(',\n')} {\n  opacity: 1;\n  visibility: visible;\n}\n`;
+})();
+
+export const canvasPublishedStyles = `${baseCss}\n${carouselActiveCss}\n${kitCss}`;
