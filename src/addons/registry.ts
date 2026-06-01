@@ -1,4 +1,13 @@
 // src/addons/registry.ts
+//
+// The addon registry is the single source of truth for what addons exist
+// and how each one emits into the published render. `addon_custom_scripts`
+// in particular accepts arbitrary <script> bytes from the Owner; that is a
+// deliberate feature, NOT an XSS surface in the platform's threat model —
+// see ADR 0046 (`addon_custom_scripts is Owner-authored JavaScript`). The
+// security boundary is the entitlement check in src/addons/emit.ts, which
+// re-verifies on every visitor render. Do not add script-content sanitation
+// here without superseding that ADR.
 
 export interface AddonConfigField {
   key: string;
