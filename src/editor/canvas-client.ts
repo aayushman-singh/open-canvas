@@ -11448,6 +11448,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   var localPresence = loadPresenceIdentity();
   var presenceLayer = null;
   var remoteCursors = new Map();
+  // Authoritative count of remote awareness peers, refreshed inside
+  // onRemotePresence. The pointer-publish path consults this to suppress
+  // outbound updates when nobody else can see the cursor — local self
+  // renders straight from window.mousemove, not from awareness, so the
+  // skip is invisible to the operator.
+  var remotePeerCount = 0;
 
   function ensurePresenceLayer() {
     if (presenceLayer && presenceLayer.isConnected) return presenceLayer;
@@ -11614,10 +11620,38 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       PRESENCE_USER_ID ? { userId: PRESENCE_USER_ID } : {},
     ));
   }
+  // Mousemove fires up to ~120 Hz on a modern trackpad. The previous code
+  // coalesced to rAF (~60 Hz) which still meant every editing session
+  // pushed ~3.5k awareness updates per minute of cursor movement — each
+  // one a billable Durable Object request. Cap to 10 Hz instead; that's
+  // smooth enough for remote-cursor tracking (Figma is similar) and a
+  // 6× cut to DO request volume during normal editing. Also short-
+  // circuits entirely when no remote peer is in the room — local
+  // pointer publishes have nowhere to go.
+  var POINTER_PUBLISH_INTERVAL_MS = 100;
+  var pointerPublishLastAtMs = 0;
+  var pointerPublishTimerId = null;
+  function flushPointer() {
+    pointerPublishTimerId = null;
+    pointerPublishPending = false;
+    pointerPublishLastAtMs = Date.now();
+    publishPointer();
+  }
   function schedulePointer() {
     if (pointerPublishPending) return;
+    // Skip outbound publishes when nobody else can see the cursor. Local
+    // self-cursor is rendered straight from the live mouse position, not
+    // from awareness, so suppressing this round-trip costs nothing
+    // visible to the operator. remotePeerCount is set inside the
+    // onRemotePresence callback below.
+    if (remotePeerCount === 0) return;
     pointerPublishPending = true;
-    requestAnimationFrame(publishPointer);
+    var now = Date.now();
+    var elapsed = now - pointerPublishLastAtMs;
+    var delay = elapsed >= POINTER_PUBLISH_INTERVAL_MS
+      ? 0
+      : POINTER_PUBLISH_INTERVAL_MS - elapsed;
+    pointerPublishTimerId = setTimeout(flushPointer, delay);
   }
   window.addEventListener("mousemove", function(ev) {
     if (typeof ev.clientX !== "number") return;
@@ -11629,46 +11663,57 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }, { passive: true });
 
   // Coalesce selectionchange (fires per keystroke and per mouse-tick
-  // during drag-select) to one publish per frame.
+  // during drag-select). Same throttle + no-peer skip as the pointer
+  // publish above — keystroke typing alone fires this 5-10×/sec, and
+  // each publish is a billable DO request.
   var presencePublishPending = false;
-  function schedulePublishLocalPresence() {
-    if (presencePublishPending) return;
-    presencePublishPending = true;
-    requestAnimationFrame(function() {
-      presencePublishPending = false;
-      if (!coEditConnection) return;
-      var sel = window.getSelection();
-      var cursor = null;
-      if (sel && sel.anchorNode) {
-        var anchorEl = sel.anchorNode.nodeType === 1
-          ? sel.anchorNode
-          : sel.anchorNode.parentElement;
-        var wrapper = anchorEl ? anchorEl.closest('[data-opencanvas-element]') : null;
-        var sectionNode = anchorEl ? anchorEl.closest('[data-opencanvas-section]') : null;
-        if (wrapper && sectionNode) {
-          var elementId = wrapper.getAttribute('data-opencanvas-element');
-          var sectionId = sectionNode.getAttribute('data-opencanvas-section');
-          if (elementId && sectionId) {
-            var editable = wrapper.querySelector('[contenteditable]') || wrapper;
-            var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);
-            cursor = {
-              sectionId: sectionId,
-              elementId: elementId,
-            };
-            if (typeof textOffset === "number") cursor.offset = textOffset;
-          }
+  var presencePublishLastAtMs = 0;
+  function flushPublishLocalPresence() {
+    presencePublishPending = false;
+    presencePublishLastAtMs = Date.now();
+    if (!coEditConnection) return;
+    var sel = window.getSelection();
+    var cursor = null;
+    if (sel && sel.anchorNode) {
+      var anchorEl = sel.anchorNode.nodeType === 1
+        ? sel.anchorNode
+        : sel.anchorNode.parentElement;
+      var wrapper = anchorEl ? anchorEl.closest('[data-opencanvas-element]') : null;
+      var sectionNode = anchorEl ? anchorEl.closest('[data-opencanvas-section]') : null;
+      if (wrapper && sectionNode) {
+        var elementId = wrapper.getAttribute('data-opencanvas-element');
+        var sectionId = sectionNode.getAttribute('data-opencanvas-section');
+        if (elementId && sectionId) {
+          var editable = wrapper.querySelector('[contenteditable]') || wrapper;
+          var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);
+          cursor = {
+            sectionId: sectionId,
+            elementId: elementId,
+          };
+          if (typeof textOffset === "number") cursor.offset = textOffset;
         }
       }
-      coEditConnection.setPresence(Object.assign(
-        {
-          name: localPresence.name,
-          color: localPresence.color,
-          cursor: cursor,
-          selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
-        },
-        PRESENCE_USER_ID ? { userId: PRESENCE_USER_ID } : {},
-      ));
-    });
+    }
+    coEditConnection.setPresence(Object.assign(
+      {
+        name: localPresence.name,
+        color: localPresence.color,
+        cursor: cursor,
+        selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
+      },
+      PRESENCE_USER_ID ? { userId: PRESENCE_USER_ID } : {},
+    ));
+  }
+  function schedulePublishLocalPresence() {
+    if (presencePublishPending) return;
+    if (remotePeerCount === 0) return;
+    presencePublishPending = true;
+    var now = Date.now();
+    var elapsed = now - presencePublishLastAtMs;
+    var delay = elapsed >= POINTER_PUBLISH_INTERVAL_MS
+      ? 0
+      : POINTER_PUBLISH_INTERVAL_MS - elapsed;
+    setTimeout(flushPublishLocalPresence, delay);
   }
   document.addEventListener("selectionchange", schedulePublishLocalPresence);
 
@@ -11768,6 +11813,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
 
     conn.onRemotePresence(function(peers) {
+      // Refresh the pointer-publish gate. peers is the Yjs awareness map
+      // minus the local clientID, so .size > 0 means there's at least one
+      // remote eyeball that would see our cursor.
+      remotePeerCount = peers.size;
       var pill = document.querySelector("[data-opencanvas-presence]");
       var counter = document.querySelector("[data-opencanvas-presence-count]");
       if (pill && counter) {

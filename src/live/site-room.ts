@@ -415,6 +415,24 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
         }
       }
 
+      // Skip the encode + fan-out when no peer would receive it. Awareness
+      // updates fire on every cursor move / selection change from the
+      // origin editor — when they're solo in the room every one of those
+      // events used to encode an awareness payload and walk the socket
+      // list to find zero targets. Short-circuit when the targetable
+      // editor count is zero so the per-update cost drops to the
+      // bookkeeping above and one socket-roster scan.
+      let targetableEditorCount = 0;
+      const sockets = this.ctx.getWebSockets();
+      for (const ws of sockets) {
+        if (ws === origin) continue;
+        if (this.isEditorSocket(ws)) {
+          targetableEditorCount += 1;
+          break;
+        }
+      }
+      if (targetableEditorCount === 0) return;
+
       const changed = added.concat(updated).concat(removed);
       const update = encodeAwareness(this.awareness, changed);
       const envelope: AwarenessUpdateEnvelope = {
@@ -422,7 +440,7 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
         update: encodeBytesField(update),
       };
       const message = JSON.stringify(envelope);
-      for (const ws of this.ctx.getWebSockets()) {
+      for (const ws of sockets) {
         if (ws === origin) continue;
         if (!this.isEditorSocket(ws)) continue;
         this.safeSend(ws, message, '[SiteRoom] awareness fan-out failed');
@@ -649,10 +667,20 @@ export class SiteRoom extends DurableObject<SiteRoomEnv> {
     this.broadcastPresence();
   }
 
+  private lastPresenceCount: number | null = null;
+
   private broadcastPresence(): void {
-    const count = this.ctx.getWebSockets().length;
+    const sockets = this.ctx.getWebSockets();
+    const count = sockets.length;
+    // Skip the fan-out when nothing actually changed. broadcastPresence
+    // fires on every connect / close / role-bound broadcast — including
+    // the publish path that touches no socket roster — so the count is
+    // unchanged on most calls. Each skipped iteration is one Durable
+    // Object request × N peers we no longer bill.
+    if (count === this.lastPresenceCount) return;
+    this.lastPresenceCount = count;
     const message = JSON.stringify({ type: 'presence', count });
-    for (const ws of this.ctx.getWebSockets()) {
+    for (const ws of sockets) {
       this.safeSend(ws, message, '[SiteRoom] presence send failed');
     }
   }
