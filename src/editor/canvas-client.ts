@@ -9645,6 +9645,32 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     });
 
+    // Viewport-level deselect.
+    //
+    // canvas-root has zero width/height — it's a transform-anchored layout
+    // sentinel whose descendants (artboards) are positioned via translate.
+    // Clicks that hit the visible canvas BACKGROUND (the gutter between
+    // artboards, or anywhere inside rev01-viewport that isn't an artboard
+    // child) never bubble through canvas-root, so the deselect branch
+    // attached above misses them entirely. The user's mental model is:
+    // "click anywhere off a page = un-grey everything," so we mirror the
+    // same deselect logic at the viewport level. Filtered to skip clicks
+    // that land on artboard descendants (those are handled by root's
+    // listener above) and on the side-chrome buttons (zoom controls etc.)
+    // that the route renders inside the viewport.
+    if (viewport) {
+      viewport.addEventListener("click", function(ev) {
+        if (interactionMode === "pan") return;
+        const target = ev.target instanceof Element ? ev.target : null;
+        if (!target) return;
+        if (root && root.contains(target) && target !== root) return;
+        if (target.closest("[data-zoom-action], [data-mode-action]")) return;
+        if (selectedSectionId) selectSection(null);
+        if (selectedElementId) selectElement(null);
+        root.classList.add("canvas-pages-deselected");
+      });
+    }
+
     document.addEventListener("mousedown", (ev) => {
       if (!selectedElementId) return;
       const target = ev.target instanceof Element ? ev.target : null;
