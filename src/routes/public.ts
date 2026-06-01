@@ -941,6 +941,61 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return null;
   }
 
+  // /__live WebSocket. Must run BEFORE the password gate so that the on-site
+  // editor (`/?edit`) — which bypasses the gate at the HTML layer above —
+  // can also open its socket on a password-protected site. A valid wsToken
+  // (edit-token, scoped to siteId, owner or accepted collaborator) is the
+  // proof of editor access; visitors without a token still hit the gate
+  // below, so editableState updates never leak to anonymous WS subscribers.
+  //
+  // The token is signed by the apex; access checks (collaborator removal,
+  // ownership transfer) flow through hasLiveEditorSocketAccess so a
+  // revoked collaborator's stale token can't keep editing.
+  if (path === '/__live') {
+    const upgrade = c.req.header('upgrade');
+    if (upgrade !== 'websocket') {
+      return c.text('expected websocket upgrade', 426);
+    }
+    let socketRole: 'editor' | 'visitor' = 'visitor';
+    const wsToken = requestUrl.searchParams.get('wsToken');
+    if (wsToken) {
+      const payload = await verifyEditToken(wsToken, c.env.UNLOCK_SIGNING_SECRET);
+      if (payload && payload.siteId === siteRow.id) {
+        const hasAccess = await hasLiveEditorSocketAccess(
+          db(c.env),
+          siteRow.id,
+          payload.customerId,
+        );
+        if (hasAccess) socketRole = 'editor';
+      }
+    }
+    // Visitors must still satisfy the password gate before they can subscribe
+    // to live updates — otherwise an anonymous WS would observe Y.Doc
+    // updates carrying editableState content for a gated site. The gate
+    // honours the unlock cookie, so a visitor who already unlocked retains
+    // presence. Editors with a valid wsToken bypass the gate entirely.
+    if (socketRole !== 'editor') {
+      const wsGateResponse = await requireUnlock(c, c.env, {
+        id: siteRow.id,
+        name: siteRow.name,
+        passwordEnabled: siteRow.passwordEnabled,
+        passwordHash: siteRow.passwordHash,
+        passwordSetAt: siteRow.passwordSetAt,
+      });
+      if (wsGateResponse) return wsGateResponse;
+    }
+    const id = c.env.SITE_ROOM.idFromName(siteRow.id);
+    const stub = c.env.SITE_ROOM.get(id);
+    const doRequest = new Request(
+      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}&role=${socketRole}`,
+      {
+        method: 'GET',
+        headers: c.req.raw.headers,
+      },
+    );
+    return stub.fetch(doRequest);
+  }
+
   // Wave 2 #9 — password gate. Intercepts visitor traffic before snapshot
   // serve. Returns null when the gate is disabled or the cookie is valid;
   // returns a gate Response (401 + HTML) otherwise.
@@ -957,47 +1012,6 @@ export async function handlePublicRequest<P extends string, I extends Input>(
   // after the password gate has passed. They are not snapshot pages.
   if (path.startsWith('/__rev01/')) {
     return null;
-  }
-
-  if (path === '/__live') {
-    const upgrade = c.req.header('upgrade');
-    if (upgrade !== 'websocket') {
-      return c.text('expected websocket upgrade', 426);
-    }
-    // The on-site editor (`/?edit`) opens its WebSocket to /__live on the
-    // published subdomain — same path visitors hit, because canvas-client
-    // computes the URL from `location.host`. If we hardcoded role=visitor
-    // here, on-site editors would never receive the editable-state-replaced
-    // broadcast fan-out (SiteRoom.sendToEditorSockets() filters by role) and
-    // their tab would silently miss every dashboard write — the B3 retest
-    // symptom. The fix: when a valid edit-token is presented as wsToken,
-    // upgrade the socket to role=editor; otherwise fall back to visitor.
-    // The token is signed by the apex; access checks (collaborator removal,
-    // ownership transfer) flow through hasLiveEditorSocketAccess so a
-    // revoked collaborator's stale token can't keep editing.
-    let socketRole: 'editor' | 'visitor' = 'visitor';
-    const wsToken = requestUrl.searchParams.get('wsToken');
-    if (wsToken) {
-      const payload = await verifyEditToken(wsToken, c.env.UNLOCK_SIGNING_SECRET);
-      if (payload && payload.siteId === siteRow.id) {
-        const hasAccess = await hasLiveEditorSocketAccess(
-          db(c.env),
-          siteRow.id,
-          payload.customerId,
-        );
-        if (hasAccess) socketRole = 'editor';
-      }
-    }
-    const id = c.env.SITE_ROOM.idFromName(siteRow.id);
-    const stub = c.env.SITE_ROOM.get(id);
-    const doRequest = new Request(
-      `https://do.invalid/socket?siteId=${encodeURIComponent(siteRow.id)}&role=${socketRole}`,
-      {
-        method: 'GET',
-        headers: c.req.raw.headers,
-      },
-    );
-    return stub.fetch(doRequest);
   }
 
   if (path.startsWith('/assets/')) {
