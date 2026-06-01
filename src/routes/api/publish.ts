@@ -42,6 +42,11 @@ import { runAudit } from '../../a11y/audit';
 import { rebuildSearchIndex } from '../../search/indexer';
 import { injectInteractiveRuntime } from '../../interactive/inject';
 import { appDomain, type HostConfigEnv } from '../../host-config';
+import { siteCollaborator } from '../../db/schema';
+import { isNotNull } from 'drizzle-orm';
+import { buildSiteNotif } from '../../notifications/constructors';
+import { writeNotification } from '../../notifications/writer';
+import type { PublishEventPayload, PublishOutcome } from '../../notifications/kinds';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -55,6 +60,9 @@ type Bindings = HostConfigEnv & {
   // Cloudflare Turnstile public site key — required at the render boundary
   // when any page in the snapshot contains a form element.
   TURNSTILE_SITE_KEY?: string;
+  // ADR 0043 publish_event notif fan-out can send email via src/email/send.ts;
+  // the writer requires this in env.
+  RESEND_API_KEY: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -71,6 +79,61 @@ interface PublishBroadcastPayload {
 interface PreviousPublishState {
   snapshot: PublishedSnapshot | null;
   version: number;
+}
+
+// ADR 0043 publish_event helper. Best-effort fan-out — the underlying publish
+// outcome (whether the site row updated or not) is already determined by the
+// time this is called; a notif write failure logs but does not flip the
+// caller's response. Fires for succeeded (every commit) and for failed
+// post-commit (runPublishedSideEffects threw after the row UPDATE landed).
+// Pre-commit failures (validation, audit, asset checks) do not emit a notif —
+// the Owner sees the structured error response in the editor and onlookers
+// did not perceive a publish attempt.
+async function emitPublishNotif(params: {
+  database: Db;
+  env: Bindings;
+  siteId: string;
+  siteName: string;
+  outcome: PublishOutcome;
+  publishedVersion: number | null;
+  failureReason: string | null;
+  actorCustomerId: string;
+  actorDisplayName: string;
+}): Promise<void> {
+  try {
+    const collabRows = await params.database
+      .select({ customerId: siteCollaborator.customerId })
+      .from(siteCollaborator)
+      .where(
+        and(
+          eq(siteCollaborator.siteId, params.siteId),
+          isNotNull(siteCollaborator.acceptedAt),
+        ),
+      );
+    const recipientIds = Array.from(
+      new Set<string>([params.actorCustomerId, ...collabRows.map((r) => r.customerId)]),
+    );
+    const payload: PublishEventPayload = {
+      siteId: params.siteId,
+      siteName: params.siteName,
+      outcome: params.outcome,
+      publishedVersion: params.publishedVersion,
+      failureReason: params.failureReason,
+      actorCustomerId: params.actorCustomerId,
+      actorDisplayName: params.actorDisplayName,
+      occurredAt: new Date().toISOString(),
+    };
+    await writeNotification(
+      { db: params.database, env: params.env },
+      buildSiteNotif('publish_event', params.siteId, payload, recipientIds),
+    );
+  } catch (err) {
+    console.error('[publish] publish_event notif write failed', {
+      siteId: params.siteId,
+      outcome: params.outcome,
+      err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+    });
+  }
 }
 
 // Short, response-safe failure description. Stack traces stay in the raw
@@ -342,7 +405,7 @@ publishApi.post('/sites/:siteId', async (c) => {
 
   timeline.begin('db.customerLookup');
   const customerRow = await database
-    .select({ id: customer.id })
+    .select({ id: customer.id, displayName: customer.displayName, email: customer.email })
     .from(customer)
     .where(eq(customer.clerkUserId, auth.userId))
     .limit(1);
@@ -351,6 +414,8 @@ publishApi.post('/sites/:siteId', async (c) => {
   if (!customerId) {
     return attachTimings(c.json({ error: 'site not found' }, 404));
   }
+  const actorDisplayName =
+    customerRow[0]?.displayName ?? customerRow[0]?.email ?? 'A teammate';
 
   timeline.begin('db.siteSelect');
   const siteRow = await database
@@ -553,11 +618,38 @@ publishApi.post('/sites/:siteId', async (c) => {
     });
   } catch (error) {
     timeline.end('runPublishedSideEffects');
+    // ADR 0043: publish_event failed. The row UPDATE already landed, so this
+    // is a post-commit side-effect failure. Notif fan-out before responding.
+    await emitPublishNotif({
+      database,
+      env: c.env,
+      siteId: row.id,
+      siteName: row.name,
+      outcome: 'failed',
+      publishedVersion: snapshot.version,
+      failureReason: describeError(error),
+      actorCustomerId: customerId,
+      actorDisplayName,
+    });
     return attachTimings(
       c.json({ error: 'publish side effects failed', detail: describeError(error) }, 500),
     );
   }
   timeline.end('runPublishedSideEffects');
+
+  // ADR 0043: publish_event succeeded. Fan-out to owner + accepted
+  // collaborators. Best-effort; failures do not block the response.
+  await emitPublishNotif({
+    database,
+    env: c.env,
+    siteId: row.id,
+    siteName: row.name,
+    outcome: 'succeeded',
+    publishedVersion: snapshot.version,
+    failureReason: null,
+    actorCustomerId: customerId,
+    actorDisplayName,
+  });
 
   return attachTimings(
     c.json({

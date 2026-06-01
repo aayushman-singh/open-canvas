@@ -41,6 +41,9 @@ import { buildStyleKitCss } from '../canvas/style-kits';
 import { resolveCustomDomainWithRuntimeCache } from '../custom-domain/router';
 import { db } from '../db/client';
 import { customer, ownerAsset, site, siteFont } from '../db/schema';
+import { buildCustomerNotif } from '../notifications/constructors';
+import { writeNotification, type WriteNotificationEnv } from '../notifications/writer';
+import type { CollaboratorEventPayload } from '../notifications/kinds';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
 import { buildEmbedCsp } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
@@ -516,6 +519,22 @@ async function handleAcceptInvite<P extends string, I extends Input>(
   }
 
   const database = db(c.env);
+  // Snapshot acceptedAt before the COALESCE-UPDATE so we can tell first-time
+  // acceptance apart from re-clicking the link (only first acceptance emits
+  // the ADR 0043 collaborator_event 'joined' notif).
+  const previousRows = await database
+    .select({ acceptedAt: siteCollaborator.acceptedAt })
+    .from(siteCollaborator)
+    .where(
+      and(
+        eq(siteCollaborator.id, result.payload.collaboratorId),
+        eq(siteCollaborator.siteId, siteRow.id),
+        eq(siteCollaborator.invitedEmail, result.payload.invitedEmail),
+      ),
+    )
+    .limit(1);
+  const wasAlreadyAccepted = previousRows[0]?.acceptedAt != null;
+
   // COALESCE keeps the original acceptedAt timestamp if the invitee re-clicks
   // an old link after already accepting — preserves audit data and lets the
   // same handler serve both first-accept and re-visit flows.
@@ -543,10 +562,16 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     return buildInviteErrorResponse('cancelled');
   }
 
+  const subjectCustomerId = updated[0].customerId;
+
   const collabCustomer = await database
-    .select({ clerkUserId: customer.clerkUserId })
+    .select({
+      clerkUserId: customer.clerkUserId,
+      displayName: customer.displayName,
+      email: customer.email,
+    })
     .from(customer)
-    .where(eq(customer.id, updated[0].customerId))
+    .where(eq(customer.id, subjectCustomerId))
     .limit(1);
 
   const clerkUserId = collabCustomer[0]?.clerkUserId;
@@ -554,8 +579,39 @@ async function handleAcceptInvite<P extends string, I extends Input>(
     return c.text('account not found', 404);
   }
 
+  // ADR 0043: emit collaborator_event 'joined' notification on first
+  // acceptance only. actor = null (self-action). Best-effort; failures
+  // surface in logs but do not block the editor redirect.
+  if (!wasAlreadyAccepted) {
+    try {
+      const subjectDisplayName =
+        collabCustomer[0]?.displayName ?? collabCustomer[0]?.email ?? 'A new collaborator';
+      const subjectEmail = collabCustomer[0]?.email ?? result.payload.invitedEmail;
+      const payload: CollaboratorEventPayload = {
+        siteId: siteRow.id,
+        siteName: siteRow.name,
+        action: 'joined',
+        subjectCustomerId,
+        subjectDisplayName,
+        subjectEmail,
+        actorCustomerId: null,
+        actorDisplayName: null,
+      };
+      await writeNotification(
+        { db: database, env: c.env as WriteNotificationEnv },
+        buildCustomerNotif('collaborator_event', subjectCustomerId, payload),
+      );
+    } catch (err) {
+      console.error('[public/accept-invite] collaborator_event joined notif failed', {
+        siteId: siteRow.id,
+        subjectCustomerId,
+        err: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+      });
+    }
+  }
+
   const editToken = await signEditToken(
-    { siteId: siteRow.id, customerId: updated[0].customerId, clerkUserId },
+    { siteId: siteRow.id, customerId: subjectCustomerId, clerkUserId },
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
