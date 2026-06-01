@@ -36,8 +36,8 @@ function assert(condition: boolean, message: string): void {
 }
 
 assert(
-  CHAT_DEFAULT_MODEL === 'gemini-3.1-pro-preview',
-  `CHAT_DEFAULT_MODEL must use the current Gemini 3.1 Pro Preview model code, got ${CHAT_DEFAULT_MODEL}`,
+  CHAT_DEFAULT_MODEL === 'gemini-2.5-pro',
+  `CHAT_DEFAULT_MODEL must be gemini-2.5-pro until the GeminiAdapter handles 3.x thought_signature round-trip, got ${CHAT_DEFAULT_MODEL}`,
 );
 
 // ---------------------------------------------------------------------------
