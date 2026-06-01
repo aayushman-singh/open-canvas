@@ -39,12 +39,18 @@ import {
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
+import { broadcastEditableStateReplaced } from './canvas';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   GEMINI_API_KEY: string;
+  // Apply writes to `editable_state` must broadcast `editable-state-replaced`
+  // to SiteRoom; otherwise a connected editor's autosave will encode its
+  // stale Y.Doc back to Postgres and silently revert the agent's write.
+  // Mirror of the binding canvas.ts uses for the same reason (canvas.ts:127).
+  SITE_ROOM: DurableObjectNamespace;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -459,6 +465,21 @@ canvasAgentApi.post('/sites/:siteId/apply', async (c) => {
       updatedAt: sql`now()`,
     })
     .where(and(eq(site.id, row.id), eq(site.customerId, row.customerId)));
+
+  // Without this broadcast, a connected editor's autosave path would encode
+  // its hot Y.Doc back into editableState and silently revert the agent's
+  // apply — visible to the Owner as a chat-driven edit that vanishes after
+  // the next keystroke. Same contract as the canvas.ts PATCH broadcasts.
+  try {
+    await broadcastEditableStateReplaced(c.env, row.id, pipeline.next);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[canvas-agent/apply] editable-state-replaced broadcast failed', {
+      siteId: row.id,
+      err,
+    });
+    return c.json({ error: `apply saved but broadcast failed: ${message}` }, 502);
+  }
 
   return c.json({ ok: true, editableState: pipeline.next });
 });

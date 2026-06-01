@@ -124,8 +124,8 @@ async function persistEditableState(
  * caller treats broadcast failure as a 502 so the Owner sees that the
  * change may not survive an autosave from a connected editor.
  */
-async function broadcastEditableStateReplaced(
-  env: Bindings,
+export async function broadcastEditableStateReplaced(
+  env: { SITE_ROOM: DurableObjectNamespace },
   siteId: string,
   newState: EditableSite,
 ): Promise<void> {
