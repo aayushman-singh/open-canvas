@@ -2484,18 +2484,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         a.setAttribute("target", "_blank");
         a.setAttribute("rel", "noopener noreferrer");
       }
-      // Owner click semantics:
-      //  - While the parent text element is in edit mode, the click places the
-      //    caret as normal; the link popover surfaces an explicit "Go" button
-      //    so navigation never fights with text editing.
-      //  - Otherwise, navigate on the canvas: internal hrefs swap the active
-      //    page, external hrefs open in a new tab. Alt-click suppresses
-      //    navigation so the Owner can still select the parent element.
+      // Owner click semantics for inline link marks:
+      //  - In edit mode, beginTextEdit's mousedown interceptor pins the link
+      //    popover and preventDefault()s the caret jump; we just defuse the
+      //    native navigation here too.
+      //  - Out of edit mode, a click on the link used to navigate the canvas
+      //    (or open a new tab) inline with the click handler. Owners read
+      //    that as the editor "yanking them somewhere" the moment they try
+      //    to inspect a link-marked word, so it now only pins the link
+      //    popover — the popover's Go button is the explicit "actually
+      //    navigate now" affordance. Alt-click still falls through so the
+      //    parent text element gets selected by the canvas click handler.
       a.addEventListener("click", function (ev) {
         ev.preventDefault();
-        if (editingElementId) return;
         if (ev.altKey) return;
-        goToHrefOnCanvas(a.getAttribute("href") || "");
+        showLinkPopover(a, { pinned: true });
       });
       a.appendChild(inner);
       inner = a;
@@ -9298,6 +9301,43 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
     });
 
+    // Intercept paste so HTML pasted from Google Docs / Notion / other web
+    // sources keeps its bold / italic / underline / link formatting. The
+    // browser would otherwise drop the formatting on the next save: many
+    // tools emit <span style="font-weight:700"> instead of <strong>, and
+    // serializeContentToRuns only recognises the canonical mark tags
+    // listed in MARK_TAGS. We normalise on paste so the DOM the serializer
+    // walks always uses those canonical tags.
+    inner.addEventListener('paste', function (ev) {
+      ev.preventDefault();
+      var cd = ev.clipboardData;
+      if (!cd) return;
+      var html = cd.getData('text/html');
+      var fragmentHtml;
+      if (html && html.length > 0) {
+        fragmentHtml = normalizePastedHtml(html);
+      } else {
+        var plain = cd.getData('text/plain') || '';
+        fragmentHtml = escapeHtml(plain).replace(/\\n/g, '<br>');
+      }
+      var sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      var range = sel.getRangeAt(0);
+      range.deleteContents();
+      var template = document.createElement('template');
+      template.innerHTML = fragmentHtml;
+      var frag = template.content;
+      var lastNode = frag.lastChild;
+      range.insertNode(frag);
+      if (lastNode) {
+        var after = document.createRange();
+        after.setStartAfter(lastNode);
+        after.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(after);
+      }
+    });
+
     // selectionchange is a document-level event; register it for the
     // duration of text edit and remove it in finish(). The handler
     // short-circuits when editingElementId is cleared, but removing keeps
@@ -10558,6 +10598,100 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // matches src/canvas/render.ts ATTR_ESCAPES.
   function escapeAttr(value) {
     return escapeHtml(value);
+  }
+
+  // Convert arbitrary pasted HTML (Google Docs, Notion, web pages, …) into
+  // a minimal markup string that uses only the canonical mark tags
+  // serializeContentToRuns recognises (B / I / U / S / MARK / CODE / A).
+  // The serializer walks the live DOM after paste; if we let raw pasted
+  // HTML through, span[style="font-weight:700"]-style formatting silently
+  // disappears on the next save because those spans aren't in MARK_TAGS.
+  function normalizePastedHtml(html) {
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    } catch (_) {
+      return '';
+    }
+    function styleOf(el) {
+      return (el && el.getAttribute && el.getAttribute('style')) || '';
+    }
+    function isBold(el) {
+      if (!el || el.nodeType !== 1) return false;
+      var t = el.tagName;
+      if (t === 'B' || t === 'STRONG') return true;
+      return /font-weight\s*:\s*(bold|bolder|[6-9]\d\d)/i.test(styleOf(el));
+    }
+    function isItalic(el) {
+      if (!el || el.nodeType !== 1) return false;
+      var t = el.tagName;
+      if (t === 'I' || t === 'EM') return true;
+      return /font-style\s*:\s*italic/i.test(styleOf(el));
+    }
+    function isUnderline(el) {
+      if (!el || el.nodeType !== 1) return false;
+      if (el.tagName === 'U') return true;
+      return /text-decoration[^;]*underline/i.test(styleOf(el));
+    }
+    function isStrike(el) {
+      if (!el || el.nodeType !== 1) return false;
+      var t = el.tagName;
+      if (t === 'S' || t === 'STRIKE' || t === 'DEL') return true;
+      return /text-decoration[^;]*line-through/i.test(styleOf(el));
+    }
+    function isCode(el) {
+      return !!el && el.nodeType === 1 && (el.tagName === 'CODE' || el.tagName === 'KBD' || el.tagName === 'SAMP');
+    }
+    function isHighlight(el) {
+      return !!el && el.nodeType === 1 && el.tagName === 'MARK';
+    }
+    var BLOCK_TAGS = { P: 1, DIV: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, LI: 1, BLOCKQUOTE: 1, TR: 1, PRE: 1 };
+    var out = [];
+    function walk(node) {
+      if (node.nodeType === 3) {
+        var text = node.nodeValue || '';
+        if (text.length === 0) return;
+        var bold = false, italic = false, underline = false, strike = false, code = false, mark = false;
+        var linkHref = null;
+        var cur = node.parentNode;
+        while (cur && cur.nodeType === 1 && cur !== doc.body) {
+          if (!linkHref && cur.tagName === 'A') {
+            var href = cur.getAttribute('href');
+            if (typeof href === 'string' && href.length > 0) linkHref = href;
+          }
+          if (isBold(cur)) bold = true;
+          if (isItalic(cur)) italic = true;
+          if (isUnderline(cur)) underline = true;
+          if (isStrike(cur)) strike = true;
+          if (isCode(cur)) code = true;
+          if (isHighlight(cur)) mark = true;
+          cur = cur.parentNode;
+        }
+        var content = escapeHtml(text);
+        if (linkHref) content = '<a href="' + escapeAttr(linkHref) + '">' + content + '</a>';
+        if (code) content = '<code>' + content + '</code>';
+        if (mark) content = '<mark>' + content + '</mark>';
+        if (strike) content = '<s>' + content + '</s>';
+        if (underline) content = '<u>' + content + '</u>';
+        if (italic) content = '<em>' + content + '</em>';
+        if (bold) content = '<strong>' + content + '</strong>';
+        out.push(content);
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      var tag = node.tagName;
+      if (tag === 'BR') { out.push('<br>'); return; }
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'META' || tag === 'LINK' || tag === 'HEAD') return;
+      // Preserve a visual paragraph break for block-level containers — many
+      // sources (Docs, Notion) wrap each line in its own <p>/<div>.
+      var leadingBreak = !!BLOCK_TAGS[tag] && out.length > 0 && out[out.length - 1] !== '<br>';
+      if (leadingBreak) out.push('<br>');
+      var children = node.childNodes;
+      for (var i = 0; i < children.length; i++) walk(children[i]);
+    }
+    var bodyChildren = doc.body ? doc.body.childNodes : [];
+    for (var i = 0; i < bodyChildren.length; i++) walk(bodyChildren[i]);
+    return out.join('');
   }
 
   async function ensureSectionsPanelLoaded() {
