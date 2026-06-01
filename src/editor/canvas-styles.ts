@@ -1708,6 +1708,69 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   padding: 0;
   accent-color: var(--red);
 }
+/* Boolean settings rendered as a toggle pill instead of a stacked
+   label+checkbox. The native input stays in the DOM (semantics + focus
+   ring) but is visually replaced by a 32x18 track + 14x14 thumb that
+   slides on change. Whole row is the click target.
+   The inspector default :where(#canvas-inspector) button rule would
+   otherwise inherit through, but this is a <label>, not a <button>. */
+#canvas-inspector .field--toggle {
+  margin-bottom: 11px;
+}
+#canvas-inspector .opencanvas-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+#canvas-inspector .opencanvas-toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+}
+#canvas-inspector .opencanvas-toggle-track {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  background: var(--line-2);
+  border-radius: 999px;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+}
+#canvas-inspector .opencanvas-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+#canvas-inspector .opencanvas-toggle-input:checked + .opencanvas-toggle-track {
+  background: var(--red);
+}
+#canvas-inspector .opencanvas-toggle-input:checked + .opencanvas-toggle-track::after {
+  transform: translateX(14px);
+}
+#canvas-inspector .opencanvas-toggle-input:focus-visible + .opencanvas-toggle-track {
+  box-shadow: var(--ring);
+}
+#canvas-inspector .opencanvas-toggle-text {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
 /* Default styling for any <button> that lives inside the inspector dock
    without its own class. The mount* functions (carousel slides, form
    fields, table rows, accordion items, links list, …) create their

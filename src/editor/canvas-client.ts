@@ -3933,15 +3933,36 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       if (f.kind === "checkbox") {
-        var cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = !!element[f.path];
-        cb.addEventListener("change", function() {
-          element[f.path] = cb.checked;
+        // Render as a toggle switch instead of a stacked native checkbox.
+        // The default field() layout puts the label above the input, which
+        // turns a one-bit setting like "Show legend" into a label sitting
+        // above a tiny disconnected checkmark — owners read this as "what
+        // even is this control." A toggle pill makes the on/off semantic
+        // obvious and clickable across the whole row.
+        var toggleField = document.createElement("div");
+        toggleField.className = "field field--toggle";
+        var toggleLabel = document.createElement("label");
+        toggleLabel.className = "opencanvas-toggle";
+        var toggleInput = document.createElement("input");
+        toggleInput.type = "checkbox";
+        toggleInput.className = "opencanvas-toggle-input";
+        toggleInput.checked = !!element[f.path];
+        var toggleTrack = document.createElement("span");
+        toggleTrack.className = "opencanvas-toggle-track";
+        toggleTrack.setAttribute("aria-hidden", "true");
+        var toggleText = document.createElement("span");
+        toggleText.className = "opencanvas-toggle-text";
+        toggleText.textContent = f.label;
+        toggleInput.addEventListener("change", function() {
+          element[f.path] = toggleInput.checked;
           rebuildElement(element.id);
           scheduleSave();
         });
-        inspector.appendChild(field(f.label, cb));
+        toggleLabel.appendChild(toggleInput);
+        toggleLabel.appendChild(toggleTrack);
+        toggleLabel.appendChild(toggleText);
+        toggleField.appendChild(toggleLabel);
+        inspector.appendChild(toggleField);
         return;
       }
       if (f.kind === "number") {
