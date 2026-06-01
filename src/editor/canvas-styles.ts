@@ -1668,6 +1668,37 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   padding: 0;
   accent-color: var(--red);
 }
+/* Default styling for any <button> that lives inside the inspector dock
+   without its own class. The mount* functions (carousel slides, form
+   fields, table rows, accordion items, links list, …) create their
+   action buttons with createElement("button") and never set a class —
+   browser-default chrome looked broken against the rest of the panel.
+   :where() strips the ID's specificity so every existing class-based
+   button selector inside the inspector (.opencanvas-section-inspector-grid
+   button, .picker-current-actions button, .inspector-close, …) still
+   wins via normal cascade. */
+:where(#canvas-inspector) button {
+  appearance: none;
+  background: var(--surface);
+  border: 1.5px solid var(--line-2);
+  color: var(--ink);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+:where(#canvas-inspector) button:hover {
+  border-color: var(--ink);
+  background: var(--surface-2);
+}
+:where(#canvas-inspector) button:focus-visible {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: var(--ring);
+}
 #canvas-inspector .row {
   display: flex;
   gap: 8px;
