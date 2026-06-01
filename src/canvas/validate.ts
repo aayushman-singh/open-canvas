@@ -512,23 +512,41 @@ function validatePageMotionLayout(
   }
 }
 
-// Assert that `element.id` has not been seen before in this page/scope and
-// register it as seen. The seen-set (`pageIds`) is mutated as a side effect
-// so the caller can keep walking the tree without re-passing the set; the
-// "assert" framing names the failure mode (duplicate) since that is the only
-// observable outcome to a reader of the call site.
+// Assert a value has not been seen before in the caller's `seen` set and
+// register it as seen if not. The set is mutated as a side effect so the
+// caller can keep walking the tree without re-passing it; the "assert"
+// framing names the failure mode (duplicate) since that is the only
+// observable outcome to a reader of the call site. `scope` is the trailing
+// fragment of the error string (e.g. "within page", "across pages",
+// "within the same run") so the Owner's error reads naturally.
+function assertUnique<T extends string>(
+  value: T | undefined | null,
+  seen: Set<T>,
+  path: string,
+  scope: string,
+  errors: string[],
+): void {
+  if (typeof value !== 'string' || value.length === 0) return;
+  if (seen.has(value)) {
+    errors.push(`${path} "${value}" is duplicated ${scope}`);
+  } else {
+    seen.add(value);
+  }
+}
+
+// Element-specific shim that pulls .id off the value first; kept as a thin
+// wrapper because every element-loop currently calls into it and the
+// inline shape `assertUnique(element?.id, ...)` would force every caller to
+// re-derive the path-with-".id" suffix.
 function assertUniqueElementId(
   element: unknown,
   elementPath: string,
   pageIds: Set<string>,
   errors: string[],
 ): void {
-  if (!isRecord(element) || !isNonEmptyString(element.id)) return;
-  if (pageIds.has(element.id)) {
-    errors.push(`${elementPath}.id "${element.id}" is duplicated within page`);
-  } else {
-    pageIds.add(element.id);
-  }
+  if (!isRecord(element)) return;
+  const id = typeof element.id === 'string' ? element.id : undefined;
+  assertUnique(id, pageIds, `${elementPath}.id`, 'within page', errors);
 }
 
 /**
@@ -537,82 +555,69 @@ function assertUniqueElementId(
  * empty. Errors are appended to `errors` — never short-circuit, the Owner
  * wants every issue listed at once.
  *
- * `idLabel` is the textual element id used in error messages so the Owner can
- * find the broken element by id. If the element has no usable id we pass
- * `'<unknown>'` so the message still reads.
+ * `basePath` is the dotted path to the text element itself (e.g.
+ * `pages[0].sections[1].elements[3]`). All error strings hang off
+ * `${basePath}.content[…]` so the Owner gets a uniform path-shape error and
+ * the previous "text element <id>." prose prefix goes away (ADR 0012 dec 4).
  */
-function validateTextContent(content: unknown, idLabel: string, errors: string[]): void {
+function validateTextContent(content: unknown, basePath: string, errors: string[]): void {
+  const contentPath = `${basePath}.content`;
   if (!Array.isArray(content) || content.length === 0) {
-    errors.push(`text element ${idLabel}.content must be a non-empty array`);
+    errors.push(`${contentPath} must be a non-empty array`);
     return;
   }
   let concatenated = '';
   content.forEach((run, runIdx) => {
+    const runPath = `${contentPath}[${String(runIdx)}]`;
     if (!isRecord(run)) {
-      errors.push(`text element ${idLabel}.content[${String(runIdx)}] must be an object`);
+      errors.push(`${runPath} must be an object`);
       return;
     }
     if (typeof run.text !== 'string') {
-      errors.push(
-        `text element ${idLabel}.content[${String(runIdx)}].text must be a string (got ${describe(run.text)})`,
-      );
+      errors.push(`${runPath}.text must be a string (got ${describe(run.text)})`);
     } else {
       concatenated += run.text;
     }
     if (run.marks === undefined) return;
     if (!Array.isArray(run.marks)) {
-      errors.push(
-        `text element ${idLabel}.content[${String(runIdx)}].marks must be an array when present`,
-      );
+      errors.push(`${runPath}.marks must be an array when present`);
       return;
     }
     const seenTypes = new Set<string>();
     run.marks.forEach((mark, markIdx) => {
+      const markPath = `${runPath}.marks[${String(markIdx)}]`;
       if (!isRecord(mark)) {
-        errors.push(
-          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}] must be an object`,
-        );
+        errors.push(`${markPath} must be an object`);
         return;
       }
       if (
-        !assertOneOf<InlineMarkType>(
-          mark.type,
-          INLINE_MARK_TYPES,
-          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type`,
-          errors,
-        )
+        !assertOneOf<InlineMarkType>(mark.type, INLINE_MARK_TYPES, `${markPath}.type`, errors)
       ) {
         return;
       }
-      if (seenTypes.has(mark.type)) {
-        errors.push(
-          `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].type "${mark.type}" is duplicated within the same run`,
-        );
-      } else {
-        seenTypes.add(mark.type);
-      }
+      assertUnique(mark.type, seenTypes, `${markPath}.type`, 'within the same run', errors);
       if (mark.type === 'link') {
         if (typeof mark.href !== 'string' || mark.href.length === 0) {
           errors.push(
-            `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].href must be a non-empty string for link marks (got ${describe(mark.href)})`,
+            `${markPath}.href must be a non-empty string for link marks (got ${describe(mark.href)})`,
           );
           return;
         }
         if (!isAllowedHref(mark.href)) {
           errors.push(
-            `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].href "${mark.href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
+            `${markPath}.href "${mark.href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
           );
         }
         if (mark.target !== undefined && mark.target !== '_blank') {
           errors.push(
-            `text element ${idLabel}.content[${String(runIdx)}].marks[${String(markIdx)}].target must be "_blank" when present (got ${describe(mark.target)})`,
+            `${markPath}.target must be "_blank" when present (got ${describe(mark.target)})`,
           );
         }
       }
     });
   });
   if (concatenated.length === 0) {
-    errors.push(`text element ${idLabel} has empty concatenated plain text`);
+    errors.push(`${basePath} has empty concatenated plain text`);
   }
 }
 
@@ -698,8 +703,7 @@ function validateElement(
 
   switch (element.type) {
     case 'text': {
-      const idLabel = isNonEmptyString(element.id) ? element.id : '<unknown>';
-      validateTextContent(element.content, idLabel, errors);
+      validateTextContent(element.content, basePath, errors);
       assertOneOf(element.role, ['heading', 'body', 'label'] as const, `${basePath}.role`, errors);
       if (!isFiniteNumber(element.fontSize) || element.fontSize <= 0) {
         errors.push(`${basePath}.fontSize must be a positive number`);
@@ -937,10 +941,8 @@ function validateSection(
   }
   if (!isNonEmptyString(section.id)) {
     errors.push(`${basePath}.id must be a non-empty string`);
-  } else if (localIds.has(section.id)) {
-    errors.push(`${basePath}.id "${section.id}" is duplicated within page`);
   } else {
-    localIds.add(section.id);
+    assertUnique(section.id, localIds, `${basePath}.id`, 'within page', errors);
   }
   assertOneOf<SectionRecipeId>(
     section.recipeId,
@@ -1292,18 +1294,10 @@ function validateSiteShape(state: unknown, errors: string[]): void {
   state.pages.forEach((page, idx) => {
     if (!isRecord(page)) return;
     if (isNonEmptyString(page.id)) {
-      if (validPageIds.has(page.id)) {
-        errors.push(`pages[${String(idx)}].id "${page.id}" is duplicated across pages`);
-      } else {
-        validPageIds.add(page.id);
-      }
+      assertUnique(page.id, validPageIds, `pages[${String(idx)}].id`, 'across pages', errors);
     }
     if (isNonEmptyString(page.slug)) {
-      if (pageSlugs.has(page.slug)) {
-        errors.push(`pages[${String(idx)}].slug "${page.slug}" is duplicated across pages`);
-      } else {
-        pageSlugs.add(page.slug);
-      }
+      assertUnique(page.slug, pageSlugs, `pages[${String(idx)}].slug`, 'across pages', errors);
     }
   });
   state.pages.forEach((page, idx) => {
