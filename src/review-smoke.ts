@@ -854,6 +854,23 @@ const siteSettingsSource = await readSource('./routes/dashboard/site-settings.ts
 const pageSettingsSource = await readSource('./routes/dashboard/page-settings.tsx');
 const yjsProjectionSource = await readSource('./canvas/yjs-projection.ts');
 const coEditAutosaveSource = await readSource('./live/co-edit/autosave.ts');
+const activeContractDocs = [
+  ['FEATURES.md', await readSource('../FEATURES.md')],
+  ['docs/demo/act-1-script.md', await readSource('../docs/demo/act-1-script.md')],
+  ['docs/demo/feature-coverage.md', await readSource('../docs/demo/feature-coverage.md')],
+  [
+    'docs/demo/diagrams/live-draw-reference.md',
+    await readSource('../docs/demo/diagrams/live-draw-reference.md'),
+  ],
+  [
+    'docs/demo/diagrams/excalidraw/SPECS.md',
+    await readSource('../docs/demo/diagrams/excalidraw/SPECS.md'),
+  ],
+] as const;
+const legacyBrandToken = 'rev' + '01';
+const legacySignatureHeader = ['X', 'Rev' + '01', 'Signature'].join('-');
+const legacyVisitorPrefix = '/__' + legacyBrandToken;
+const legacyFormHandlerGlobal = '__' + legacyBrandToken + 'FormHandlerWired';
 assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
@@ -862,6 +879,19 @@ assert(
   canvasClientSource.includes('const publishButton = document.getElementById("canvas-publish")'),
   'expected canvas client to look up #canvas-publish',
 );
+assert(
+  canvasClientSource.includes("console.error('[opencanvas-undo] persist failed'") &&
+    canvasClientSource.includes('Undo history could not be saved across reloads'),
+  'expected undo persistence failure to log and surface a status instead of silently degrading',
+);
+for (const [docPath, docSource] of activeContractDocs) {
+  assert(
+    !docSource.includes(legacySignatureHeader) &&
+      !docSource.includes(legacyVisitorPrefix) &&
+      !docSource.includes(legacyFormHandlerGlobal),
+    `expected ${docPath} to use the current Open Canvas public contract strings`,
+  );
+}
 assert(
   signInRouteSource.includes('resolveLocalSignInRedirect') &&
     !signInRouteSource.includes('new URLSearchParams(window.location.search).get("redirect_url")'),

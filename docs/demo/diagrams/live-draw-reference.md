@@ -795,7 +795,7 @@ Source: [src/forms/](../../../src/forms/)
 - Turnstile server-verified with `TURNSTILE_SECRET`.
 - FormRateLimiter DO: per-IP, 10 submissions/minute.
 - `formSubmission` insert is source of truth; webhook + Resend are fire-and-forget.
-- Webhook signed HMAC-SHA256 (`X-Rev01-Signature`).
+- Webhook signed HMAC-SHA256 (`X-Opencanvas-Signature`).
 - ⚠ Specifically Turnstile, not generic CF bot manager.
 - ⚠ This is the prod (DO) limiter — dev uses the in-process variant (D26).
 
@@ -808,11 +808,11 @@ sequenceDiagram
   participant DB as Neon
   participant Hook as Owner webhook
   participant RS as Resend
-  V->>W: POST /__rev01/forms/...
+  V->>W: POST /__opencanvas/forms/...
   W->>TS: verify token
   W->>RL: increment(ip)
   W->>DB: INSERT formSubmission
-  W->>Hook: POST with X-Rev01-Signature
+  W->>Hook: POST with X-Opencanvas-Signature
   W->>RS: send notification
   W-->>V: 200
 ```
@@ -838,7 +838,7 @@ sequenceDiagram
   participant V as Visitor
   participant W as Worker
   participant DB as Neon
-  V->>W: POST /__rev01/unlock
+  V->>W: POST /__opencanvas/unlock
   W->>W: rate-limit 5/min
   W->>DB: load passwordHash + salt
   W->>W: PBKDF2 verify (timing-safe)
@@ -966,7 +966,7 @@ Source: various — see each box
 - **Hashing:** PBKDF2-SHA256 100k + 32B salt (pw); timing-safe XOR everywhere; SHA-256 IP truncation.
 - **Input:** Drizzle parameterised queries; `escapeHtml` / `escapeAttr` / `escapeCssValue` / `sanitiseCssKey`; SMTP header guard; GA measurement ID regex.
 - **Output:** CSP dynamic `frame-src`; chart SVG attr escape; element selector escape; version-preview meta XSS; inline-link XSS guard.
-- **Network:** Turnstile; rate limits (5/min unlock, 10/min form); webhook `X-Rev01-Signature`; redirect path validation.
+- **Network:** Turnstile; rate limits (5/min unlock, 10/min form); webhook `X-Opencanvas-Signature`; redirect path validation.
 - **Operations:** admin null-safety; loud failures (no silent retries); custom-domain ownership; asset unlink logging.
 - ⚠ It's a glossary, not a flow. Don't try to draw arrows between groups.
 
@@ -1040,7 +1040,7 @@ Source: [src/routes/](../../../src/routes/), [src/index.ts](../../../src/index.t
 
 **Three auth tiers. Surface groups by *who can call it*.**
 
-- **Public:** landing, `/health`, sitemap, robots, favicon, `/og/...`, `/assets/...`, `/fonts/...`, `/__rev01/forms`, `/__rev01/search`, `/__rev01/unlock`, `/__live` WS.
+- **Public:** landing, `/health`, sitemap, robots, favicon, `/og/...`, `/assets/...`, `/fonts/...`, `/__opencanvas/forms`, `/__opencanvas/search`, `/__opencanvas/unlock`, `/__live` WS.
 - **`/api/*` (Clerk JWT):** sites, publishing, canvas-agent, chat, assets, fonts, collaborators, sections, library, custom-templates, version, domains, password, forms, search, a11y, addons, slot-history, profile, import, on-site-edit.
 - **`/__api/*` (edit cookie):** canvas, canvas-agent, publish, owner/assets, sections/import, library/sections, custom-templates, chat.
 - ⚠ Verify endpoint counts before recording. Don't list every route at 1080p.
@@ -1051,7 +1051,7 @@ flowchart TB
     P1["landing /"]
     P2["/health /favicon /sitemap /robots"]
     P3["/og /assets /fonts"]
-    P4["/__rev01/forms / search / unlock"]
+    P4["/__opencanvas/forms / search / unlock"]
     P5["/__live (WS)"]
   end
   subgraph Clerk["/api/* (Clerk JWT)"]

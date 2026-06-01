@@ -241,7 +241,7 @@ Each spec gives:
 - **Hashing** — PBKDF2-SHA256 100k iterations + 32-byte salt (passwords); timing-safe XOR compare for every signature; SHA-256 IP truncation
 - **Input** — Drizzle parameterized queries; `escapeHtml`/`escapeAttr`/`escapeCssValue`/`sanitiseCssKey`; SMTP header injection guard; GA measurement ID regex
 - **Output** — CSP dynamic `frame-src`; chart SVG attribute escaping; element selector escaping; version-preview metadata XSS hardening; inline-link XSS guard
-- **Network** — Turnstile bot challenge; per-IP rate limits (5/min unlock, 10/min form); webhook HMAC-SHA256 `X-Rev01-Signature`; redirect path validation
+- **Network** — Turnstile bot challenge; per-IP rate limits (5/min unlock, 10/min form); webhook HMAC-SHA256 `X-Opencanvas-Signature`; redirect path validation
 - **Operations** — Admin null-safety; loud failures; custom domain ownership checks; asset unlink logging
 
 **Annotations:**
@@ -259,7 +259,7 @@ Each spec gives:
 
 **Columns:**
 
-- **Public (no auth)** — landing, `/health`, `/favicon.ico`, `/sitemap.xml`, `/robots.txt`, `/og/:siteId/:pageSlug.png`, `/fonts/:contentHash`, `/assets/:contentHash`, `/__rev01/forms/:siteId/:formId`, `/__rev01/search`, `/__rev01/unlock`, `/__live?siteId=&role=`
+- **Public (no auth)** — landing, `/health`, `/favicon.ico`, `/sitemap.xml`, `/robots.txt`, `/og/:siteId/:pageSlug.png`, `/fonts/:contentHash`, `/assets/:contentHash`, `/__opencanvas/forms/:siteId/:formId`, `/__opencanvas/search`, `/__opencanvas/unlock`, `/__live?siteId=&role=`
 - **Clerk-authed `/api/*`** — sites (6), publishing (2), canvas-agent (2), chat (2), assets (5), fonts (3), collaborators (3), sections (2), library (3), custom-templates (3), version (4), domains (3), password (2), forms (2), search (1), a11y (1), addons (4), slot-history (3), profile (2), import (1), on-site-edit (1)
 - **Edit-token cookie `/__api/*`** — canvas, canvas-agent, publish, owner/assets, sections/import, library/sections, custom-templates, chat
 

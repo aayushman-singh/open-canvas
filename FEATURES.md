@@ -467,16 +467,16 @@ Each template provides: pre-populated sections, copy, media references, and styl
 | Turnstile bot protection | Cloudflare Turnstile invisible challenge on every submission |
 | Rate limiting | Per-IP (10/min) and per-form (100/hour) via Durable Objects |
 | IP hashing | SHA-256 truncated to 32 chars — raw IP never stored |
-| Webhook delivery | HMAC-SHA256 signed POST to owner-configured URL; `X-Rev01-Signature` header |
+| Webhook delivery | HMAC-SHA256 signed POST to owner-configured URL; `X-Opencanvas-Signature` header |
 | Submissions inbox | Dashboard panel with paginated submission list |
 | CSV export | Export all submissions as CSV |
 | Required field validation | Server-side required check, email format validation, select option validation |
 | Custom success message | Configurable message shown after successful submission |
 | Owner email notification | Resend email sent to site owner on every submission — form ID, timestamp, inbox link (fire-and-forget, non-blocking) |
 | In-app notification | Every submission also writes a `form_submission` notification row (recipient = the site, fanned out to every collaborator via `notification_read`); see [§43](#43-in-app-notifications) |
-| AJAX visitor submit | Inline `preventDefault → fetch POST → toggle `.rev01-form-success` / populate `.rev01-form-error`` handler shared across all forms on a page via `window.__rev01FormHandlerWired`. Disabled submit + `data-busy` during the round trip; `window.turnstile.reset()` after success |
+| AJAX visitor submit | Inline `preventDefault → fetch POST → toggle `.opencanvas-form-success` / populate `.opencanvas-form-error`` handler shared across all forms on a page via `window.__opencanvasFormHandlerWired`. Disabled submit + `data-busy` during the round trip; `window.turnstile.reset()` after success |
 | No-JS fallback | When JS is blocked the native POST + `303 → /{slug}?form-ok={formId}` path still works; the success block ships with `hidden` so the no-JS path's server-side query handler is the only way to unhide it |
-| Designed visitor form chrome | `.rev01-form` (14px grid gap), `.rev01-form-input` (kit-accent focus ring via `color-mix oklab`), `.rev01-form-submit` (accent background, hover brighten, disabled/`data-busy` fade), `.rev01-form-success` / `.rev01-form-error` with color-mix backgrounds so the chrome stays kit-aware across every built-in kit. Textarea grows; checkbox uses `accent-color: var(--rev01-accent)` |
+| Designed visitor form chrome | `.opencanvas-form` (14px grid gap), `.opencanvas-form-input` (kit-accent focus ring via `color-mix oklab`), `.opencanvas-form-submit` (accent background, hover brighten, disabled/`data-busy` fade), `.opencanvas-form-success` / `.opencanvas-form-error` with color-mix backgrounds so the chrome stays kit-aware across every built-in kit. Textarea grows; checkbox uses `accent-color: var(--opencanvas-accent)` |
 
 **Key files:** [forms/](src/forms/), [form.ts](src/canvas/elements/form.ts), [forms-inbox.tsx](src/routes/dashboard/forms-inbox.tsx)
 
@@ -576,7 +576,7 @@ Each template provides: pre-populated sections, copy, media references, and styl
 | Auto-indexing | Search index rebuilt on every publish |
 | Multi-page search | Search across all pages of a site |
 | Snippet extraction | Return matching text snippets |
-| Public endpoint | `GET /__rev01/search?q=<query>` — no auth required |
+| Public endpoint | `GET /__opencanvas/search?q=<query>` — no auth required |
 | Password-gate aware | Respects password protection |
 
 **Key files:** [search/](src/search/)
@@ -745,7 +745,7 @@ Architecture: account-level entitlements + per-site configuration. Head and body
 | IP hashing | SHA-256 truncated — raw IPs never stored |
 | Redirect sanitization | Validates paths start with `/`, rejects `//` and control chars |
 | SQL injection prevention | Drizzle ORM parameterized queries throughout |
-| Webhook signatures | HMAC-SHA256 via `X-Rev01-Signature` header |
+| Webhook signatures | HMAC-SHA256 via `X-Opencanvas-Signature` header |
 | Domain verification | Cloudflare CNAME/HTTP DCV |
 | SMTP header injection guard | Form notification emails strip unsafe header material from owner-controlled values |
 | Addon config validation | GA4 measurement IDs are validated server-side before script emission |
@@ -919,9 +919,9 @@ Legacy `page` and `template` tables were dropped in `0010_drop_legacy_template_p
 | GET | `/og/:siteId/:pageSlug.png` | OG image |
 | GET | `/fonts/:contentHash` | Public font file |
 | GET | `/assets/:contentHash` | Public asset file |
-| POST | `/__rev01/forms/:siteId/:formId` | Form submission |
-| GET | `/__rev01/search?q=` | Site search |
-| POST | `/__rev01/unlock` | Password unlock |
+| POST | `/__opencanvas/forms/:siteId/:formId` | Form submission |
+| GET | `/__opencanvas/search?q=` | Site search |
+| POST | `/__opencanvas/unlock` | Password unlock |
 | GET | `/__live?siteId=&role=` | WebSocket upgrade |
 
 ### Authenticated API (Clerk Auth)
@@ -942,7 +942,7 @@ Legacy `page` and `template` tables were dropped in `0010_drop_legacy_template_p
 | Custom Domains | 3 | `POST .../domains`, `GET ...`, `DELETE ...` |
 | Password | 2 | `PUT .../password`, `DELETE .../password` |
 | Forms | 2 | `GET .../submissions`, `GET .../export.csv` |
-| Search | 1 | `GET /__rev01/search` |
+| Search | 1 | `GET /__opencanvas/search` |
 | A11y | 1 | `GET .../a11y` |
 | Addons | 4 | `POST .../acquire`, `DELETE ...`, `PUT .../config`, `GET .../sites/:id` |
 | Slot History | 3 | `GET .../history`, `PUT .../history/:id`, `DELETE .../history` |
@@ -1130,7 +1130,7 @@ SMS, Web Push, mentions (no comment model yet), notification preferences UI, bul
 - **Contrast resolution against innermost container** — the contrast checker resolves computed background from the innermost wrapping surface by area, then z-index, before falling back to page kit background
 - **Heading level derived from font size** — the heading-order check converts absolute pixel fontSize into H-level via per-kit headingScale multiplier rather than hardcoding
 - **Atomic search index rebuild** — batch DELETE+INSERT inside a single Drizzle call so concurrent readers see either old or new index, never an empty intermediate state
-- **Form webhook HMAC-SHA256 signing** — `X-Rev01-Signature` header on every webhook POST; owner can verify payloads server-side
+- **Form webhook HMAC-SHA256 signing** — `X-Opencanvas-Signature` header on every webhook POST; owner can verify payloads server-side
 - **SMTP header injection hardening** — form email fields are sanitized before Resend payload construction
 - **Inline-link XSS hardening** — editor link marks and theme-panel attribute output escape unsafe values before DOM/HTML insertion
 - **Version timeline XSS hardening** — version-preview metadata avoids unsafe `innerHTML` insertion for owner-controlled values

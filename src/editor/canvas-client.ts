@@ -2220,6 +2220,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   var redoStack = [];
   var undoTimer = null;
   var undoRedoing = false;
+  var undoPersistenceFailed = false;
   var UNDO_MAX = 60;
   // Cap how many snapshots we serialise to localStorage so a busy session
   // doesn't blow the per-origin storage quota. The in-memory cap is 60,
@@ -2227,12 +2228,25 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   var UNDO_PERSIST_MAX = 20;
   var UNDO_STORAGE_KEY = "oc:undo:" + SITE_ID;
 
+  function disableUndoPersistence(reason, error) {
+    if (undoPersistenceFailed) return;
+    undoPersistenceFailed = true;
+    console.error('[opencanvas-undo] persist failed', {
+      siteId: SITE_ID,
+      storageKey: UNDO_STORAGE_KEY,
+      reason: reason,
+      error: error,
+    });
+    setStatus("Undo history could not be saved across reloads", "error");
+  }
+
   function persistUndo() {
-    // localStorage might be unavailable (Safari private mode, iframe sandbox,
-    // disabled storage). Wrap everything so a storage error never wedges
-    // the editor — the in-memory stacks stay correct regardless.
+    if (undoPersistenceFailed) return;
     try {
-      if (typeof localStorage === "undefined") return;
+      if (typeof localStorage === "undefined") {
+        disableUndoPersistence("localStorage unavailable", null);
+        return;
+      }
       var truncStack = undoStack.length > UNDO_PERSIST_MAX
         ? undoStack.slice(undoStack.length - UNDO_PERSIST_MAX)
         : undoStack;
@@ -2241,11 +2255,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         : redoStack;
       var payload = JSON.stringify({ stack: truncStack, redo: truncRedo });
       localStorage.setItem(UNDO_STORAGE_KEY, payload);
-    } catch (e) {
-      // Quota exceeded or storage disabled — drop the persisted history
-      // for this site so we don't keep retrying a doomed write. The
-      // in-memory stacks are unaffected.
-      try { localStorage.removeItem(UNDO_STORAGE_KEY); } catch (_) { /* ignore */ }
+    } catch (err) {
+      disableUndoPersistence("localStorage write failed", err);
+      try {
+        localStorage.removeItem(UNDO_STORAGE_KEY);
+      } catch (cleanupErr) {
+        console.error('[opencanvas-undo] cleanup failed', {
+          siteId: SITE_ID,
+          storageKey: UNDO_STORAGE_KEY,
+          error: cleanupErr,
+        });
+      }
     }
   }
 
