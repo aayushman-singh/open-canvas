@@ -146,7 +146,7 @@ function roundPx(value: number): number {
  * resolved box dimensions become irrelevant.
  */
 export function resolveElementBox(
-  element: BaseElement,
+  element: Pick<BaseElement, 'box' | 'responsive'>,
   pageWidth: number,
   breakpoint: 'tablet' | 'phone',
 ): ResolvedBox {

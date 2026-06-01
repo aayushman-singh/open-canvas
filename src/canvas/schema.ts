@@ -46,6 +46,7 @@ export const ELEMENT_TYPES = [
   'code',
   'nav',
   'collection',
+  'tabs',
 ] as const;
 export type ElementType = (typeof ELEMENT_TYPES)[number];
 
@@ -74,7 +75,7 @@ export const SURFACE_VARIANTS = [
 ] as const;
 export type SurfaceVariant = (typeof SURFACE_VARIANTS)[number];
 
-export const SHAPE_VARIANTS = ['rect', 'pill', 'circle', 'line', 'badge', 'blob'] as const;
+export const SHAPE_VARIANTS = ['rect', 'pill', 'circle', 'line', 'badge', 'blob', 'icon'] as const;
 export type ShapeVariant = (typeof SHAPE_VARIANTS)[number];
 
 export const MOTION_PRESETS = [
@@ -233,6 +234,25 @@ export interface BaseElement {
    * element's root, untouched by the renderer's element-style serializer.
    * Reserved for one-off visual tweaks the structured `elementStyle` graph
    * cannot express; persists across style-kit changes ("pinned").
+   *
+   * Endorsed pinnedStyle key families — these intentionally stay here rather
+   * than being promoted to structured `elementStyle` fields, because each
+   * one is a single-property visual-effect knob with no design-system
+   * relationship to the rest of the structured surface:
+   *
+   *   - Visual effects:        `backdrop-filter`, `filter`, `mix-blend-mode`,
+   *                            `mask`, `mask-image`, `clip-path`
+   *   - One-off color tweaks:  raw `color`, `background`, `border-color`
+   *                            (when overriding a kit-derived value at a
+   *                            single element; otherwise use elementStyle)
+   *   - Typography ornaments:  `font-family`, `font-feature-settings`,
+   *                            `text-shadow` (typography STRUCTURE — font
+   *                            size/weight/wrap/transform/line-height/letter-
+   *                            spacing — lives on TextElement directly)
+   *
+   * If a pinnedStyle key family starts appearing in >3 fixtures in the same
+   * shape, that is the signal to promote it to a structured field — not a
+   * single appearance.
    */
   pinnedStyle?: Record<string, string>;
   elementStyle?: ElementStyle;
@@ -241,6 +261,27 @@ export interface BaseElement {
    * "scale proportionally from desktop box at the smaller breakpoints."
    */
   responsive?: ResponsiveOverrides;
+  /**
+   * Optional public DOM anchor target. When set, the renderer emits
+   * `id="<anchorId>"` on the element wrapper so an in-page link
+   * `href="#<anchorId>"` resolves to it. ADR 0050 dec 2: strict charset
+   * (`/^[a-z][a-z0-9-]*$/`), unique within a page across sections + elements.
+   * Storage-key `id` stays private to the document model.
+   */
+  anchorId?: string;
+  /**
+   * Optional sticky-scroll offset in px (ADR 0054 dec 1). When set, the
+   * renderer switches the element wrapper from `position: absolute` to
+   * `position: sticky`, uses `margin-left` / `margin-top` for the initial
+   * position from `box.x` / `box.y`, and emits this value as the CSS `top`
+   * for the sticky offset. v1 ships top-only; bottom/left/right land as
+   * separate fields if a template needs them.
+   *
+   * NavElement carries its own boolean `sticky` flag (a higher-level
+   * "this nav stays pinned to its section" toggle), so the more granular
+   * pixel offset lives under a distinct name here to avoid type collision.
+   */
+  stickyOffset?: number;
 }
 
 export const TEXT_ROLES = ['heading', 'body', 'label'] as const;
@@ -258,7 +299,7 @@ export type TextRole = (typeof TEXT_ROLES)[number];
 // '../canvas/schema'` consumers continue to resolve without change.
 import type { TextElement } from './elements/text.js';
 import type { MediaElement, ImageMediaElement, VideoMediaElement } from './elements/media.js';
-import type { ActionElement, ActionHref } from './elements/action.js';
+import type { ActionElement, ActionHref, ActionBehavior } from './elements/action.js';
 import type { ShapeElement } from './elements/shape.js';
 import type { ContainerElement } from './elements/container.js';
 import type { AccordionElement } from './elements/accordion.js';
@@ -270,6 +311,7 @@ import type { FormElement } from './elements/form.js';
 import type { NavElement } from './elements/nav.js';
 import type { TableElement } from './elements/table.js';
 import type { CollectionElement } from './elements/collection.js';
+import type { TabsElement } from './elements/tabs.js';
 
 // Re-export so callers can keep importing element types from schema. Adding
 // a new element type only requires updating the import block above + the
@@ -281,8 +323,10 @@ export type {
   VideoMediaElement,
   ActionElement,
   ActionHref,
+  ActionBehavior,
   ShapeElement,
   ContainerElement,
+  TabsElement,
 };
 
 export type CanvasElement =
@@ -299,7 +343,8 @@ export type CanvasElement =
   | TableElement
   | CodeElement
   | NavElement
-  | CollectionElement;
+  | CollectionElement
+  | TabsElement;
 
 // Compile-time invariants: ELEMENT_TYPES and CanvasElement['type'] must
 // stay bidirectionally exhaustive — adding a new element interface without
@@ -337,6 +382,11 @@ export interface CanvasSection {
   role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
   entrance?: MotionPreset;
+  /**
+   * Optional public DOM anchor target for the section wrapper. Same contract
+   * as `BaseElement.anchorId`. ADR 0050 dec 2.
+   */
+  anchorId?: string;
   /**
    * Popup-section trigger. Discriminated by `type` so `exit-intent` cannot
    * carry a `value` and the other two arms require one. Unit of `value`
@@ -440,6 +490,16 @@ export interface EditableSite {
    * any other asset reference — no special handling.
    */
   faviconAssetId?: string;
+  /**
+   * Site-level page-scroll behaviour. When set, the renderer emits a single
+   * `<style>` block at the head of `<main>` that targets
+   * `html { scroll-behavior; scroll-padding-top }` per the fields present.
+   * ADR 0050 dec 3. Both fields are independent; absence = browser default.
+   */
+  scrollBehavior?: {
+    smooth?: boolean;
+    paddingTop?: number;
+  };
 }
 
 /**
@@ -502,6 +562,17 @@ export interface StyleKitPreset {
   muted: string;
   accent: string;
   accentText: string;
+  /**
+   * Optional semantic tint tokens — names resolved by `ContainerElement.tint`.
+   * Each value is a CSS colour. Authors set `tint: 'forest'` on a container
+   * and the kit's `tintTokens.forest` provides the actual colour. Falls back
+   * to the literal `tint` value when the lookup misses (so raw CSS colours
+   * still work without registering a token first).
+   *
+   * Keys: any non-empty identifier (`/^[a-z][a-z0-9-]*$/`). Values: any CSS
+   * colour expression that passes `escapeCssValue`.
+   */
+  tintTokens?: Record<string, string>;
   // Typography
   fontFamilyDisplay: string;
   fontFamilyBody: string;

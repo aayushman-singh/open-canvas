@@ -113,7 +113,7 @@ export function renderText(element: TextElement): string {
   // for consumers that don't see the fluidSize triple.
   const fontSizeValue =
     element.fluidSize !== undefined
-      ? `clamp(${String(element.fluidSize.min)}px, ${String(element.fluidSize.vw)}vw, ${String(element.fluidSize.max)}px)`
+      ? `clamp(${String(element.fluidSize.min)}px,${String(element.fluidSize.vw)}vw,${String(element.fluidSize.max)}px)`
       : `${String(element.fontSize)}px`;
   const entries: [string, string][] = [
     ['font-size', fontSizeValue],
@@ -277,6 +277,32 @@ export function parseTextInlineRuns(
   return { ok: true, runs };
 }
 
+function parseFluidSize(value: unknown): FluidSize | undefined {
+  if (value === null || value === '') return undefined;
+  if (!isRecordLocal(value)) {
+    throw new Error('fluidSize must be an object with numeric min, max, vw');
+  }
+  const { min, max, vw } = value;
+  if (
+    typeof min !== 'number' ||
+    typeof max !== 'number' ||
+    typeof vw !== 'number' ||
+    !Number.isFinite(min) ||
+    !Number.isFinite(max) ||
+    !Number.isFinite(vw)
+  ) {
+    throw new Error('fluidSize.min, fluidSize.max, and fluidSize.vw must be finite numbers');
+  }
+  if (min <= 0) throw new Error('fluidSize.min must be > 0');
+  if (max <= min) throw new Error('fluidSize.max must be > min');
+  if (vw < TEXT_FLUID_VW_MIN || vw > TEXT_FLUID_VW_MAX) {
+    throw new Error(
+      `fluidSize.vw must be between ${String(TEXT_FLUID_VW_MIN)} and ${String(TEXT_FLUID_VW_MAX)}`,
+    );
+  }
+  return { min, max, vw };
+}
+
 const inlineMarkSchema: JsonSchema = {
   type: 'object',
   description:
@@ -300,7 +326,7 @@ const inlineMarkSchema: JsonSchema = {
   required: ['type'],
 };
 
-const inlineRunSchema: JsonSchema = {
+export const inlineRunSchema: JsonSchema = {
   type: 'object',
   description:
     'One inline run of text. `text` is the raw run text (no HTML). `marks` carries 0..N InlineMark objects.',
@@ -366,6 +392,30 @@ export const textAgentToolSpec: AgentToolSpec = {
       description:
         "CSS `text-transform` — 'uppercase', 'lowercase', or 'capitalize'. Text elements only.",
     },
+    fluidSize: {
+      type: 'object',
+      description:
+        'Optional fluid font sizing as { min, max, vw }. min/max are px rails, vw is the viewport-width factor. Pass null or empty to clear. Text elements only.',
+      properties: {
+        min: {
+          type: 'number',
+          minimum: TEXT_FONT_SIZE_MIN,
+          description: 'Minimum clamp rail in px.',
+        },
+        max: {
+          type: 'number',
+          maximum: TEXT_FONT_SIZE_MAX,
+          description: 'Maximum clamp rail in px.',
+        },
+        vw: {
+          type: 'number',
+          minimum: TEXT_FLUID_VW_MIN,
+          maximum: TEXT_FLUID_VW_MAX,
+          description: 'Viewport-width factor in vw units.',
+        },
+      },
+      required: ['min', 'max', 'vw'],
+    },
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -418,6 +468,9 @@ export const textAgentToolSpec: AgentToolSpec = {
     if (args.textTransform !== undefined) {
       if (typeof args.textTransform !== 'string') throw new Error('textTransform must be a string');
       patch.textTransform = args.textTransform;
+    }
+    if (args.fluidSize !== undefined) {
+      patch.fluidSize = parseFluidSize(args.fluidSize);
     }
     return patch;
   },

@@ -47,7 +47,7 @@ export interface NavLink {
 
 export type NavLayout = 'left-center-right' | 'left-right';
 
-export interface NavElement extends BaseElement {
+export interface NavElement extends Omit<BaseElement, 'sticky'> {
   type: 'nav';
   logoAssetId?: string;
   links: NavLink[];

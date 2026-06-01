@@ -444,7 +444,7 @@ const toolArgsByName: Record<string, Record<string, unknown>> = {
     elementType: 'action',
     box: { x: 40, y: 80, w: 180, h: 48 },
     label: 'Start',
-    href: '/start',
+    href: { type: 'external', url: '/start' },
     variant: 'solid',
   },
   updateSection: {
@@ -519,7 +519,7 @@ const addActionToolCall = translateToolCall({
     sectionId: baseSection.id,
     elementType: 'action',
     label: 'Start',
-    href: '/start',
+    href: { type: 'external', url: '/start' },
     variant: 'solid',
   },
 });
@@ -552,7 +552,7 @@ if (acceptedAddAction?.ok) {
       typeof addedAction.href === 'object' &&
       addedAction.href.type === 'external' &&
       addedAction.href.url === '/start',
-    'expected addElement action to normalize string href into an ActionHref object',
+    'expected addElement action to preserve an ActionHref object',
   );
 }
 
@@ -689,7 +689,7 @@ const designInput: DesignSectionInput = {
                 element: {
                   type: 'action',
                   action: {
-                    label: 'Get Started',
+                    label: [{ text: 'Get Started' }],
                     variant: 'outline',
                     href: { type: 'external', url: '#' },
                   },
@@ -725,7 +725,7 @@ const designInput: DesignSectionInput = {
                 element: {
                   type: 'action',
                   action: {
-                    label: 'Go Pro',
+                    label: [{ text: 'Go Pro' }],
                     variant: 'solid',
                     href: { type: 'external', url: '#' },
                   },
@@ -761,7 +761,7 @@ const designInput: DesignSectionInput = {
                 element: {
                   type: 'action',
                   action: {
-                    label: 'Contact us',
+                    label: [{ text: 'Contact us' }],
                     variant: 'ghost',
                     href: { type: 'external', url: '#' },
                   },

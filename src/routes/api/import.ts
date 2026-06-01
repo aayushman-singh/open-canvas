@@ -716,7 +716,7 @@ function convertElement(el: ScraperElement, assetIdMap: Map<string, string>): Ca
         id: baseId,
         type: 'action',
         box,
-        label: d.label || 'Click',
+        label: [{ text: d.label || 'Click' }],
         href: { type: 'external', url: d.href || '#' },
         variant,
         ...(motion ? { motion } : {}),

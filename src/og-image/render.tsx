@@ -348,7 +348,7 @@ function elementToSatoriNode(
             fontWeight: 600,
           },
         },
-        el.label,
+        el.label.map((run) => run.text).join(''),
       );
     default:
       return null;

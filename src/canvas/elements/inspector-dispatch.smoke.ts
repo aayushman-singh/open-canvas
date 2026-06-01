@@ -77,7 +77,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     id: 'fx-action',
     type: 'action',
     box: { x: 0, y: 0, w: 120, h: 40, z: 0 },
-    label: 'Click me',
+    label: [{ text: 'Click me' }],
     variant: 'solid',
     href: { type: 'external', url: 'https://example.com' },
   },

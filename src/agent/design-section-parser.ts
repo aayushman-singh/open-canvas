@@ -299,7 +299,7 @@ function parseActionProps(
     return `${path}.element.action.href ${JSON.stringify(value.href)} is not allowed`;
   }
   return {
-    label: value.label,
+    label: [{ text: value.label }],
     variant: value.variant,
     href: { type: 'external', url: value.href },
   };

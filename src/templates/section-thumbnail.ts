@@ -43,6 +43,7 @@ const ELEMENT_TYPE_FILL: Record<ElementType, string> = {
   code: '#1f2937',
   nav: '#e5e7eb',
   collection: '#fde68a',
+  tabs: '#f0abfc',
 };
 
 /**

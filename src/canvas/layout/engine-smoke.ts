@@ -71,7 +71,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): EditableSit
           element: {
             type: 'action',
             action: {
-              label: 'Get started',
+              label: [{ text: 'Get started' }],
               variant: 'solid',
               href: { type: 'external', url: '#' },
             },
@@ -430,7 +430,7 @@ function wrapInState(section: import('../schema.js').CanvasSection): EditableSit
         element: {
           type: 'action',
           action: {
-            label: 'Get Started',
+            label: [{ text: 'Get Started' }],
             variant: 'outline',
             href: { type: 'external', url: '#' },
           },

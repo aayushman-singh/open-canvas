@@ -75,6 +75,19 @@ assert(
   'browser bundle preserves visitorTheme through Yjs projection',
 );
 assert(
+  CO_EDIT_BUNDLE.includes('anchorId') &&
+    CO_EDIT_BUNDLE.includes('fluidSize') &&
+    CO_EDIT_BUNDLE.includes('stickyOffset') &&
+    CO_EDIT_BUNDLE.includes('scrollBehavior'),
+  'browser bundle preserves layout primitive fields through Yjs projection',
+);
+assert(
+  CO_EDIT_BUNDLE.includes('behavior') &&
+    CO_EDIT_BUNDLE.includes('iconKind') &&
+    CO_EDIT_BUNDLE.includes('linkHref'),
+  'browser bundle preserves action expressiveness fields through Yjs projection',
+);
+assert(
   !CO_EDIT_BUNDLE.includes('darkModeEnabled'),
   'browser bundle no longer references legacy darkModeEnabled',
 );

@@ -97,7 +97,7 @@ function makeHeroAction(): ActionElement {
     id: 'hero-cta',
     type: 'action',
     box: { x: 0, y: 200, w: 200, h: 56, z: 1 },
-    label: 'Reserve your seat',
+    label: [{ text: 'Reserve your seat' }],
     href: { type: 'external', url: '/contact' },
     variant: 'solid',
   };
@@ -630,7 +630,9 @@ ok('recipe contains exactly one action element');
 const actionElement = firstElement;
 assert(actionElement.id === SEARCH_BOX_ELEMENT_ID, 'action element uses the namespaced id');
 assert(
-  actionElement.href.type === 'external' && actionElement.href.url === SEARCH_BOX_ENDPOINT,
+  actionElement.href !== undefined &&
+    actionElement.href.type === 'external' &&
+    actionElement.href.url === SEARCH_BOX_ENDPOINT,
   'action href points at the search endpoint',
 );
 assert(actionElement.variant === 'solid', 'action defaults to the solid variant');
@@ -643,7 +645,9 @@ const customised = buildSearchBoxSection({
 });
 assert(
   customised.height === 120 &&
-    (customised.elements[0] as ActionElement).label === 'Find on site' &&
+    (customised.elements[0] as ActionElement).label
+      .map((r) => r.text)
+      .join('') === 'Find on site' &&
     (customised.elements[0] as ActionElement).variant === 'pill' &&
     (customised.elements[0] as ActionElement).box.w === 240,
   'recipe respects override options',

@@ -10,6 +10,7 @@ import type {
   ActionVariant,
   ActionHref,
   BackgroundEffect,
+  InlineRun,
   MotionPreset,
   ShapeVariant,
   SurfaceVariant,
@@ -56,7 +57,7 @@ export interface MediaProps {
 }
 
 export interface ActionProps {
-  label: string;
+  label: InlineRun[];
   variant: ActionVariant;
   href: ActionHref;
 }

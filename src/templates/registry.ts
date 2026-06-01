@@ -46,7 +46,7 @@ function setActionLabel(state: EditableSite, id: string, label: string): void {
   if (element.type !== 'action') {
     throw new Error(`template registry element ${id} must be action`);
   }
-  element.label = label;
+  element.label = [{ text: label }];
 }
 
 function buildTemplate(options: {

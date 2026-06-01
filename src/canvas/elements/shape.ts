@@ -7,13 +7,26 @@ import { SHAPE_VARIANTS, type BaseElement, type ShapeVariant } from '../schema.j
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
+import { ICON_NAMES, type IconName, renderIconSvg } from '../icons.js';
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
   variant: ShapeVariant;
+  /**
+   * Icon glyph. Required when `variant === 'icon'`; ignored otherwise.
+   * One of the registered names in `ICON_NAMES` (see src/canvas/icons.ts).
+   * ADR 0051 dec 2.
+   */
+  iconKind?: IconName;
 }
 
 export function renderShape(element: ShapeElement): string {
+  if (element.variant === 'icon' && element.iconKind !== undefined) {
+    // ADR 0051 dec 2 — variant 'icon' fills the element box with the inline
+    // SVG. inline=false sizes the SVG at 100%×100% so the absolute-positioned
+    // wrapper drives the dimensions.
+    return `<div class="opencanvas-shape" data-variant="icon" data-icon-kind="${escapeAttr(element.iconKind)}">${renderIconSvg(element.iconKind, { inline: false })}</div>`;
+  }
   return `<div class="opencanvas-shape" data-variant="${escapeAttr(element.variant)}"></div>`;
 }
 
@@ -41,12 +54,25 @@ export const shapeAgentToolSpec: AgentToolSpec = {
       enum: [...SHAPE_VARIANTS],
       description: 'Shape variant. Shape elements only.',
     },
+    iconKind: {
+      type: 'string',
+      enum: [...ICON_NAMES],
+      description: `Icon glyph; required when variant === 'icon'. One of [${ICON_NAMES.join(', ')}]. Shape elements only.`,
+    },
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
     if (args.variant !== undefined) {
       if (typeof args.variant !== 'string') throw new Error('variant must be a string');
       patch.variant = args.variant;
+    }
+    if (args.iconKind !== undefined) {
+      if (args.iconKind === null || args.iconKind === '') {
+        patch.iconKind = undefined;
+      } else {
+        if (typeof args.iconKind !== 'string') throw new Error('iconKind must be a string');
+        patch.iconKind = args.iconKind;
+      }
     }
     return patch;
   },

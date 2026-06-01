@@ -15,6 +15,8 @@ import {
   type FormFontFamily,
   type FormFontWeight,
 } from './elements/form.js';
+import { ICON_NAMES, isIconName } from './icons.js';
+import { TABS_DEFAULT_BAR_HEIGHT } from './elements/tabs.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -386,6 +388,30 @@ function validateCustomStyleKit(value: unknown, basePath: string, errors: string
   if (value.dark !== undefined && !isRecord(value.dark)) {
     errors.push(`${basePath}.dark must be an object when present (got ${describe(value.dark)})`);
   }
+  // Optional tint tokens (gap #17) — semantic accent map. Keys must be
+  // identifier-shaped so they can't collide with raw CSS colour values when
+  // the resolver disambiguates token references from literals.
+  if (value.tintTokens !== undefined) {
+    if (!isRecord(value.tintTokens)) {
+      errors.push(
+        `${basePath}.tintTokens must be an object when present (got ${describe(value.tintTokens)})`,
+      );
+    } else {
+      for (const [tokenName, colour] of Object.entries(value.tintTokens)) {
+        if (!/^[a-z][a-z0-9-]*$/.test(tokenName)) {
+          errors.push(
+            `${basePath}.tintTokens key ${JSON.stringify(tokenName)} must match /^[a-z][a-z0-9-]*$/`,
+          );
+        }
+        validateInjectionSafeString(
+          colour,
+          `tintTokens.${tokenName}`,
+          basePath,
+          errors,
+        );
+      }
+    }
+  }
 }
 
 // Validate one user-controlled string field by the pinned-style safety rules
@@ -750,6 +776,22 @@ function validateCollectionEntries(
   });
 }
 
+/**
+ * Strict format for `anchorId` per ADR 0050 dec 2: ASCII lowercase, digits,
+ * hyphens; must start with a letter. Stricter than HTML's id contract but
+ * keeps anchor URLs reader-friendly + escape-free at every consumer.
+ */
+const ANCHOR_ID_RE = /^[a-z][a-z0-9-]*$/;
+
+function validateAnchorId(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (typeof value !== 'string' || !ANCHOR_ID_RE.test(value)) {
+    errors.push(
+      `${basePath}.anchorId must match /^[a-z][a-z0-9-]*$/ (lowercase ASCII letters, digits, hyphens; must start with a letter) (got ${describe(value)})`,
+    );
+  }
+}
+
 function validateElement(
   element: unknown,
   pageWidth: number,
@@ -780,6 +822,15 @@ function validateElement(
   validateMotion(element.motion, basePath, errors);
   validatePinnedStyle(element.pinnedStyle, basePath, errors);
   validateElementStyle(element.elementStyle, basePath, errors);
+  validateAnchorId(element.anchorId, basePath, errors);
+  // ADR 0054 dec 1 - optional sticky positioning.
+  if (element.stickyOffset !== undefined) {
+    if (!isFiniteNumber(element.stickyOffset) || element.stickyOffset < 0) {
+      errors.push(
+        `${basePath}.stickyOffset must be a finite number >= 0 when present (got ${describe(element.stickyOffset)})`,
+      );
+    }
+  }
 
   if (!knownType) return;
 
@@ -804,6 +855,74 @@ function validateElement(
         );
       }
       assertOneOf(element.align, ['left', 'center', 'right'] as const, `${basePath}.align`, errors);
+      // Optional typography fields — bundle A. Each is delete-on-empty for the
+      // editor; absence means "use the renderer default", a present value is
+      // emitted verbatim. Bounds match TEXT_LINE_HEIGHT_MIN/MAX in elements/text.ts.
+      if (element.letterSpacing !== undefined) {
+        if (typeof element.letterSpacing !== 'string' || element.letterSpacing.length === 0) {
+          errors.push(
+            `${basePath}.letterSpacing must be a non-empty string when present (got ${describe(element.letterSpacing)})`,
+          );
+        } else if (escapeCssValue(element.letterSpacing) !== element.letterSpacing) {
+          errors.push(
+            `${basePath}.letterSpacing contains characters disallowed by CSS value escaping`,
+          );
+        }
+      }
+      if (element.textWrap !== undefined) {
+        assertOneOf(
+          element.textWrap,
+          ['pretty', 'balance'] as const,
+          `${basePath}.textWrap`,
+          errors,
+        );
+      }
+      if (element.lineHeight !== undefined) {
+        if (!isFiniteNumber(element.lineHeight)) {
+          errors.push(
+            `${basePath}.lineHeight must be a finite number when present (got ${describe(element.lineHeight)})`,
+          );
+        } else if (element.lineHeight < 0.5 || element.lineHeight > 3.0) {
+          errors.push(
+            `${basePath}.lineHeight must be between 0.5 and 3.0 (got ${String(element.lineHeight)})`,
+          );
+        }
+      }
+      if (element.textTransform !== undefined) {
+        assertOneOf(
+          element.textTransform,
+          ['uppercase', 'lowercase', 'capitalize'] as const,
+          `${basePath}.textTransform`,
+          errors,
+        );
+      }
+      // ADR 0050 dec 1 — fluid font sizing. All three knobs must be finite
+      // and positive; min < max ensures clamp() produces a non-empty range;
+      // vw bounded so an ultra-wide viewport doesn't blow heading text past
+      // the layout (TEXT_FLUID_VW_MIN/MAX live in elements/text.ts).
+      if (element.fluidSize !== undefined) {
+        const fsPath = `${basePath}.fluidSize`;
+        if (!isRecord(element.fluidSize)) {
+          errors.push(`${fsPath} must be an object when present (got ${describe(element.fluidSize)})`);
+        } else {
+          const rawMin = element.fluidSize.min;
+          const rawMax = element.fluidSize.max;
+          const rawVw = element.fluidSize.vw;
+          if (!isFiniteNumber(rawMin) || !isFiniteNumber(rawMax) || !isFiniteNumber(rawVw)) {
+            errors.push(`${fsPath} must carry finite numeric min, max, vw`);
+          } else {
+            if (rawMin <= 0) errors.push(`${fsPath}.min must be > 0 (got ${String(rawMin)})`);
+            if (rawMax <= rawMin) {
+              errors.push(
+                `${fsPath}.max must be > min (got min=${String(rawMin)}, max=${String(rawMax)})`,
+              );
+            }
+            if (rawVw < 1 || rawVw > 30) {
+              errors.push(`${fsPath}.vw must be in [1, 30] (got ${String(rawVw)})`);
+            }
+          }
+        }
+      }
       break;
     }
     case 'media': {
@@ -862,15 +981,60 @@ function validateElement(
       break;
     }
     case 'action': {
-      if (!isNonEmptyString(element.label)) {
-        errors.push(`${basePath}.label must be a non-empty string`);
+      // ADR 0051 dec 1 — label is InlineRun[], same shape as TextElement.content.
+      validateTextContent(element.label, basePath + '.label', errors);
+      // ADR 0051 dec 2 — optional icon glyph.
+      if (element.iconKind !== undefined) {
+        if (!isIconName(element.iconKind)) {
+          errors.push(
+            `${basePath}.iconKind must be one of [${ICON_NAMES.join(', ')}] when present (got ${describe(element.iconKind)})`,
+          );
+        }
       }
-      validateActionHref(element.href, basePath + '.href', errors, validPageIds);
+      // ADR 0051 dec 3 — discriminated union over href vs behavior. Exactly
+      // one must be set on a well-formed action; neither (no destination) and
+      // both (ambiguous click target) are equally invalid.
+      const hasHref = element.href !== undefined;
+      const hasBehavior = element.behavior !== undefined;
+      if (!hasHref && !hasBehavior) {
+        errors.push(
+          `${basePath} must set exactly one of href or behavior (got neither)`,
+        );
+      } else if (hasHref && hasBehavior) {
+        errors.push(
+          `${basePath} must set exactly one of href or behavior (got both)`,
+        );
+      } else if (hasHref) {
+        validateActionHref(element.href, basePath + '.href', errors, validPageIds);
+      } else {
+        const bPath = `${basePath}.behavior`;
+        if (!isRecord(element.behavior)) {
+          errors.push(`${bPath} must be an object`);
+        } else if (element.behavior.type !== 'copy') {
+          errors.push(`${bPath}.type must be "copy" (got ${describe(element.behavior.type)})`);
+        } else if (typeof element.behavior.value !== 'string' || element.behavior.value.length === 0) {
+          errors.push(`${bPath}.value must be a non-empty string`);
+        }
+      }
       assertOneOf<ActionVariant>(element.variant, ACTION_VARIANTS, `${basePath}.variant`, errors);
       break;
     }
     case 'shape': {
       assertOneOf<ShapeVariant>(element.variant, SHAPE_VARIANTS, `${basePath}.variant`, errors);
+      // ADR 0051 dec 2 — variant 'icon' requires a valid iconKind. Other
+      // variants ignore iconKind; the renderer never reads it for non-icon
+      // shapes, so absence is fine.
+      if (element.variant === 'icon') {
+        if (!isIconName(element.iconKind)) {
+          errors.push(
+            `${basePath}.iconKind is required when variant === 'icon' and must be one of [${ICON_NAMES.join(', ')}] (got ${describe(element.iconKind)})`,
+          );
+        }
+      } else if (element.iconKind !== undefined && !isIconName(element.iconKind)) {
+        errors.push(
+          `${basePath}.iconKind must be one of [${ICON_NAMES.join(', ')}] when present (got ${describe(element.iconKind)})`,
+        );
+      }
       break;
     }
     case 'form': {
@@ -879,6 +1043,21 @@ function validateElement(
     }
     case 'container': {
       assertOneOf<SurfaceVariant>(element.variant, SURFACE_VARIANTS, `${basePath}.variant`, errors);
+      // ADR 0051 dec 5 — optional linkHref makes the container wrapper an <a>.
+      if (element.linkHref !== undefined) {
+        validateActionHref(element.linkHref, basePath + '.linkHref', errors, validPageIds);
+        if (!isNonEmptyString(element.linkLabel)) {
+          errors.push(`${basePath}.linkLabel must be a non-empty string when linkHref is set`);
+        }
+      } else if (element.linkLabel !== undefined && !isNonEmptyString(element.linkLabel)) {
+        errors.push(`${basePath}.linkLabel must be a non-empty string when present`);
+      }
+      // Gap #17 — optional tint. Either an identifier (resolved against
+      // StyleKitPreset.tintTokens) or a raw CSS colour; both share the
+      // pinned-style safety rules.
+      if (element.tint !== undefined) {
+        validateInjectionSafeString(element.tint, 'tint', basePath, errors);
+      }
       break;
     }
     case 'collection': {
@@ -1006,6 +1185,79 @@ function validateElement(
       }
       break;
     }
+    case 'tabs': {
+      // ADR 0052 — `tabs.length >= 2`, each tab.id matches anchor-id charset
+      // and is unique within the TabsElement, `activeTabId` references one of
+      // them, each tab.label is a non-empty InlineRun[], each tab.elements
+      // recurses through validateElement with panel-local dimensions.
+      if (!Array.isArray(element.tabs) || element.tabs.length < 2) {
+        errors.push(`${basePath}.tabs must be an array with length >= 2`);
+        break;
+      }
+      const barHeight =
+        isFiniteNumber(element.tabBarHeight) && element.tabBarHeight > 0
+          ? element.tabBarHeight
+          : TABS_DEFAULT_BAR_HEIGHT;
+      if (element.tabBarHeight !== undefined) {
+        if (!isFiniteNumber(element.tabBarHeight) || element.tabBarHeight <= 0) {
+          errors.push(
+            `${basePath}.tabBarHeight must be a positive finite number when present (got ${describe(element.tabBarHeight)})`,
+          );
+        }
+      }
+      const childWidth =
+        isRecord(element.box) && isFiniteNumber(element.box.w) && element.box.w > 0
+          ? element.box.w
+          : pageWidth;
+      const rawHeight =
+        isRecord(element.box) && isFiniteNumber(element.box.h) && element.box.h > 0
+          ? element.box.h
+          : sectionHeight;
+      const childHeight = Math.max(0, rawHeight - barHeight);
+      const tabIds = new Set<string>();
+      element.tabs.forEach((tab, tabIdx) => {
+        const tabPath = `${basePath}.tabs[${String(tabIdx)}]`;
+        if (!isRecord(tab)) {
+          errors.push(`${tabPath} must be an object`);
+          return;
+        }
+        if (typeof tab.id !== 'string' || !ANCHOR_ID_RE.test(tab.id)) {
+          errors.push(
+            `${tabPath}.id must match /^[a-z][a-z0-9-]*$/ (got ${describe(tab.id)})`,
+          );
+        } else if (tabIds.has(tab.id)) {
+          errors.push(`${tabPath}.id "${tab.id}" is already used by another tab in this TabsElement`);
+        } else {
+          tabIds.add(tab.id);
+        }
+        validateTextContent(tab.label, `${tabPath}.label`, errors);
+        if (!Array.isArray(tab.elements)) {
+          errors.push(`${tabPath}.elements must be an array`);
+        } else {
+          tab.elements.forEach((child, childIdx) => {
+            const childPath = `${tabPath}.elements[${String(childIdx)}]`;
+            assertUniqueElementId(child, childPath, pageIds, errors);
+            validateElement(
+              child,
+              childWidth,
+              childHeight,
+              childPath,
+              errors,
+              validPageIds,
+              pageIds,
+            );
+          });
+        }
+      });
+      if (typeof element.activeTabId !== 'string' || element.activeTabId.length === 0) {
+        errors.push(`${basePath}.activeTabId must be a non-empty string`);
+      } else if (!tabIds.has(element.activeTabId)) {
+        errors.push(
+          `${basePath}.activeTabId "${element.activeTabId}" must reference one of tabs[].id (known: [${Array.from(tabIds).join(', ')}])`,
+        );
+      }
+      break;
+    }
     default: {
       // Unknown discriminant — already reported above.
       break;
@@ -1072,6 +1324,7 @@ function validateSection(
     pathJoin(basePath, 'backgroundVideoAssetId'),
     errors,
   );
+  validateAnchorId(section.anchorId, basePath, errors);
   if (!Array.isArray(section.elements)) {
     errors.push(`${basePath}.elements must be an array`);
     return;
@@ -1242,6 +1495,47 @@ function validatePage(
     const path = pathJoin(pathJoin(basePath, 'sections'), idx);
     validateSection(section, effectiveWidth, path, errors, ids, validPageIds);
   });
+  // ADR 0050 dec 2 — anchor ids must be unique across the rendered page
+  // (state.header + page.sections + state.footer). The check is run by the
+  // site-level validator since header/footer live there, not on the page.
+}
+
+function validatePageAnchorIdUniqueness(
+  page: Record<string, unknown>,
+  basePath: string,
+  header: unknown,
+  footer: unknown,
+  errors: string[],
+): void {
+  if (!Array.isArray(page.sections)) return;
+  const seen = new Map<string, string>(); // anchorId -> first-path
+  const visit = (anchor: unknown, path: string): void => {
+    if (typeof anchor !== 'string' || !ANCHOR_ID_RE.test(anchor)) return;
+    const first = seen.get(anchor);
+    if (first === undefined) {
+      seen.set(anchor, path);
+      return;
+    }
+    errors.push(
+      `${path}.anchorId "${anchor}" is already used at ${first} on the rendered page; anchor ids must be unique within a rendered page (ADR 0050 dec 2)`,
+    );
+  };
+  const visitSection = (section: unknown, sectionPath: string): void => {
+    if (!isRecord(section)) return;
+    visit(section.anchorId, sectionPath);
+    if (!Array.isArray(section.elements)) return;
+    section.elements.forEach((el, eIdx) => {
+      if (!isRecord(el)) return;
+      const elementPath = pathJoin(pathJoin(sectionPath, 'elements'), eIdx);
+      visit(el.anchorId, elementPath);
+    });
+  };
+  visitSection(header, 'state.header');
+  page.sections.forEach((section, sIdx) => {
+    const sectionPath = pathJoin(pathJoin(basePath, 'sections'), sIdx);
+    visitSection(section, sectionPath);
+  });
+  visitSection(footer, 'state.footer');
 }
 
 function validatePageCardinality(pages: unknown[], errors: string[]): void {
@@ -1356,6 +1650,30 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
       );
     }
   },
+  // ADR 0050 dec 3 — site-level page-scroll behaviour. Both fields are
+  // independent optionals; the renderer emits only the rules whose fields
+  // are set. Bounds on paddingTop kept loose (finite, >= 0) — there is no
+  // upper rail because legitimate use cases include very tall fixed banners.
+  scrollBehavior: ({ state, errors }) => {
+    if (state.scrollBehavior === undefined) return;
+    if (!isRecord(state.scrollBehavior)) {
+      errors.push(
+        `scrollBehavior must be an object when present (got ${describe(state.scrollBehavior)})`,
+      );
+      return;
+    }
+    const sb = state.scrollBehavior;
+    if (sb.smooth !== undefined && typeof sb.smooth !== 'boolean') {
+      errors.push(`scrollBehavior.smooth must be a boolean when present (got ${describe(sb.smooth)})`);
+    }
+    if (sb.paddingTop !== undefined) {
+      if (!isFiniteNumber(sb.paddingTop) || sb.paddingTop < 0) {
+        errors.push(
+          `scrollBehavior.paddingTop must be a finite number >= 0 when present (got ${describe(sb.paddingTop)})`,
+        );
+      }
+    }
+  },
 };
 
 function validateSiteShape(state: unknown, errors: string[]): void {
@@ -1403,6 +1721,19 @@ function validateSiteShape(state: unknown, errors: string[]): void {
   if (isRecord(state.footer)) {
     const footerIds = new Set<string>();
     validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds);
+  }
+  // ADR 0050 dec 2 — per-page anchor uniqueness across (header + sections + footer).
+  if (Array.isArray(state.pages)) {
+    state.pages.forEach((page, idx) => {
+      if (!isRecord(page)) return;
+      validatePageAnchorIdUniqueness(
+        page,
+        `pages[${String(idx)}]`,
+        state.header,
+        state.footer,
+        errors,
+      );
+    });
   }
 }
 

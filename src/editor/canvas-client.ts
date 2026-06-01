@@ -144,8 +144,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         defaultSize: { w: 160, h: 48 },
         payload: {
           type: "action",
-          label: "Action",
-          href: "#",
+          label: [{ text: "Action" }],
+          href: { type: "external", url: "#" },
           variant: "solid",
         },
       };
@@ -286,6 +286,50 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           ],
           layout: "left-right",
           sticky: false,
+        },
+      };
+    },
+    tabs: function() {
+      return {
+        defaultSize: { w: 640, h: 360 },
+        payload: {
+          type: "tabs",
+          tabs: [
+            {
+              id: "overview",
+              label: [{ text: "Overview" }],
+              elements: [
+                {
+                  id: newElementId(),
+                  type: "text",
+                  box: { x: 24, y: 24, w: 360, h: 48, z: 1 },
+                  content: [{ text: "Overview panel" }],
+                  role: "heading",
+                  fontSize: 24,
+                  fontWeight: 600,
+                  align: "left",
+                },
+              ],
+            },
+            {
+              id: "details",
+              label: [{ text: "Details" }],
+              elements: [
+                {
+                  id: newElementId(),
+                  type: "text",
+                  box: { x: 24, y: 24, w: 360, h: 48, z: 1 },
+                  content: [{ text: "Details panel" }],
+                  role: "body",
+                  fontSize: 16,
+                  fontWeight: 400,
+                  align: "left",
+                },
+              ],
+            },
+          ],
+          activeTabId: "overview",
+          tabBarHeight: 56,
         },
       };
     },

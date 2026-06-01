@@ -44,6 +44,7 @@ import { mediaAgentToolSpec, mediaInspectorSpec, mediaSidebarSpec, renderMedia }
 import { navAgentToolSpec, navInspectorSpec, navSidebarSpec, renderNav } from './nav.js';
 import { renderShape, shapeAgentToolSpec, shapeInspectorSpec, shapeSidebarSpec } from './shape.js';
 import { renderTable, tableAgentToolSpec, tableInspectorSpec, tableSidebarSpec } from './table.js';
+import { renderTabs, tabsAgentToolSpec, tabsSidebarSpec } from './tabs.js';
 import { renderText, textAgentToolSpec, textInspectorSpec, textSidebarSpec } from './text.js';
 
 // Re-export every element interface so downstream code has a single import
@@ -80,6 +81,8 @@ export type {
   CollectionSort,
   PageMetadataField,
 } from './collection.js';
+export type { Tab, TabsElement } from './tabs.js';
+export { TABS_DEFAULT_BAR_HEIGHT } from './tabs.js';
 
 // Re-export recipe id constants so the recipes module + smoke tests can
 // reference them without depending directly on individual element files.
@@ -92,6 +95,7 @@ export { FORM_RECIPE_ID } from './form.js';
 export { NAV_RECIPE_ID } from './nav.js';
 export { TABLE_RECIPE_ID } from './table.js';
 export { COLLECTION_RECIPE_ID } from './collection.js';
+export { TABS_RECIPE_ID } from './tabs.js';
 
 /**
  * Single shared context shape passed to every render function. Element files
@@ -207,6 +211,11 @@ export const RENDER_DISPATCH: RenderDispatch = {
       assetBasePath: ctx.assetBasePath,
       renderChild: (child) => ctx.renderElement(child, ctx),
     }),
+  tabs: (el, ctx) =>
+    renderTabs(el, {
+      styleKit: ctx.styleKit,
+      renderChild: (child) => ctx.renderElement(child, ctx),
+    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -227,7 +236,10 @@ export const RENDER_DISPATCH: RenderDispatch = {
 // than a runtime no-op, matching the failure mode RENDER_DISPATCH catches.
 // A future element type that legitimately wants no inspector adds itself
 // to the Exclude<...> list as an explicit opt-out.
-export type InspectorDispatch = Record<Exclude<CanvasElement['type'], 'collection'>, InspectorSpec>;
+export type InspectorDispatch = Record<
+  Exclude<CanvasElement['type'], 'collection' | 'tabs'>,
+  InspectorSpec
+>;
 
 export const INSPECTOR_DISPATCH: InspectorDispatch = {
   shape: shapeInspectorSpec,
@@ -298,6 +310,7 @@ export const SIDEBAR_DISPATCH: SidebarDispatch = {
   table: tableSidebarSpec,
   nav: navSidebarSpec,
   collection: collectionSidebarSpec,
+  tabs: tabsSidebarSpec,
 };
 
 export const AGENT_TOOL_DISPATCH: AgentToolDispatch = {
@@ -315,4 +328,5 @@ export const AGENT_TOOL_DISPATCH: AgentToolDispatch = {
   nav: navAgentToolSpec,
   form: formAgentToolSpec,
   chart: chartAgentToolSpec,
+  tabs: tabsAgentToolSpec,
 };

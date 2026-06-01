@@ -206,7 +206,7 @@ function mkAction(id: string): ActionElement {
     id,
     type: 'action',
     box: { x: 0, y: 0, w: 160, h: 48, z: 0 },
-    label: 'Click',
+    label: [{ text: 'Click' }],
     href: { type: 'external', url: 'mailto:hello@example.com' },
     variant: 'solid',
   };

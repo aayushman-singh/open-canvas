@@ -17,8 +17,23 @@
             {
               "id": "header-logo",
               "type": "text",
-              "box": { "x": 80, "y": 16, "w": 200, "h": 40, "z": 2 },
-              "content": [{ "text": "Open Canvas", "marks": [{ "type": "bold" }] }],
+              "box": {
+                "x": 80,
+                "y": 16,
+                "w": 200,
+                "h": 40,
+                "z": 2
+              },
+              "content": [
+                {
+                  "text": "Open Canvas",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ],
               "role": "label",
               "fontSize": 22,
               "fontWeight": 700,
@@ -27,25 +42,64 @@
             {
               "id": "header-nav-1",
               "type": "action",
-              "box": { "x": 1020, "y": 18, "w": 100, "h": 36, "z": 2 },
-              "label": "Features",
-              "href": { "type": "external", "url": "#features" },
+              "box": {
+                "x": 1020,
+                "y": 18,
+                "w": 100,
+                "h": 36,
+                "z": 2
+              },
+              "label": [
+                {
+                  "text": "Features"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "#features"
+              },
               "variant": "ghost"
             },
             {
               "id": "header-nav-2",
               "type": "action",
-              "box": { "x": 1130, "y": 18, "w": 100, "h": 36, "z": 2 },
-              "label": "Pricing",
-              "href": { "type": "external", "url": "#pricing" },
+              "box": {
+                "x": 1130,
+                "y": 18,
+                "w": 100,
+                "h": 36,
+                "z": 2
+              },
+              "label": [
+                {
+                  "text": "Pricing"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "#pricing"
+              },
               "variant": "ghost"
             },
             {
               "id": "header-cta",
               "type": "action",
-              "box": { "x": 1260, "y": 18, "w": 120, "h": 36, "z": 2 },
-              "label": "Get started",
-              "href": { "type": "external", "url": "/edit" },
+              "box": {
+                "x": 1260,
+                "y": 18,
+                "w": 120,
+                "h": 36,
+                "z": 2
+              },
+              "label": [
+                {
+                  "text": "Get started"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "/edit"
+              },
               "variant": "solid"
             }
           ]
@@ -61,29 +115,64 @@
             {
               "id": "hero-heading",
               "type": "text",
-              "box": { "x": 80, "y": 120, "w": 600, "h": 180, "z": 3 },
+              "box": {
+                "x": 80,
+                "y": 120,
+                "w": 600,
+                "h": 180,
+                "z": 3
+              },
               "content": [
-                { "text": "Ship a site that feels " },
-                { "text": "lived-in", "marks": [{ "type": "bold" }] },
-                { "text": "." }
+                {
+                  "text": "Ship a site that feels "
+                },
+                {
+                  "text": "lived-in",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
               ],
               "role": "heading",
               "fontSize": 64,
               "fontWeight": 700,
               "align": "left",
-              "motion": { "preset": "fade-up", "delayMs": 50 }
+              "motion": {
+                "preset": "fade-up",
+                "delayMs": 50
+              }
             },
             {
               "id": "hero-body",
               "type": "text",
-              "box": { "x": 80, "y": 320, "w": 540, "h": 120, "z": 3 },
+              "box": {
+                "x": 80,
+                "y": 320,
+                "w": 540,
+                "h": 120,
+                "z": 3
+              },
               "content": [
-                { "text": "Position elements freely. Pick a style kit. " },
+                {
+                  "text": "Position elements freely. Pick a style kit. "
+                },
                 {
                   "text": "Publish to opencanvas.aayushman.dev",
-                  "marks": [{ "type": "link", "href": "https://opencanvas.aayushman.dev" }]
+                  "marks": [
+                    {
+                      "type": "link",
+                      "href": "https://opencanvas.aayushman.dev"
+                    }
+                  ]
                 },
-                { "text": "." }
+                {
+                  "text": "."
+                }
               ],
               "role": "body",
               "fontSize": 20,
@@ -93,15 +182,34 @@
             {
               "id": "hero-action",
               "type": "action",
-              "box": { "x": 80, "y": 480, "w": 200, "h": 56, "z": 3 },
-              "label": "Start editing",
-              "href": { "type": "external", "url": "/edit" },
+              "box": {
+                "x": 80,
+                "y": 480,
+                "w": 200,
+                "h": 56,
+                "z": 3
+              },
+              "label": [
+                {
+                  "text": "Start editing"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "/edit"
+              },
               "variant": "solid"
             },
             {
               "id": "hero-media",
               "type": "media",
-              "box": { "x": 760, "y": 80, "w": 600, "h": 600, "z": 2 },
+              "box": {
+                "x": 760,
+                "y": 80,
+                "w": 600,
+                "h": 600,
+                "z": 2
+              },
               "mediaKind": "image",
               "assetId": "seed-hero-poster-1",
               "alt": "Editable site loop",
@@ -110,13 +218,26 @@
             {
               "id": "hero-orb",
               "type": "shape",
-              "box": { "x": 700, "y": 40, "w": 120, "h": 120, "z": 4, "rotation": 12 },
+              "box": {
+                "x": 700,
+                "y": 40,
+                "w": 120,
+                "h": 120,
+                "z": 4,
+                "rotation": 12
+              },
               "variant": "circle"
             },
             {
               "id": "hero-card",
               "type": "container",
-              "box": { "x": 60, "y": 100, "w": 640, "h": 460, "z": 1 },
+              "box": {
+                "x": 60,
+                "y": 100,
+                "w": 640,
+                "h": 460,
+                "z": 1
+              },
               "variant": "soft-panel"
             }
           ]
@@ -132,11 +253,28 @@
             {
               "id": "features-heading",
               "type": "text",
-              "box": { "x": 80, "y": 80, "w": 800, "h": 90, "z": 2 },
+              "box": {
+                "x": 80,
+                "y": 80,
+                "w": 800,
+                "h": 90,
+                "z": 2
+              },
               "content": [
-                { "text": "Everything an Owner needs, " },
-                { "text": "nothing they do not", "marks": [{ "type": "italic" }] },
-                { "text": "." }
+                {
+                  "text": "Everything an Owner needs, "
+                },
+                {
+                  "text": "nothing they do not",
+                  "marks": [
+                    {
+                      "type": "italic"
+                    }
+                  ]
+                },
+                {
+                  "text": "."
+                }
               ],
               "role": "heading",
               "fontSize": 44,
@@ -146,7 +284,13 @@
             {
               "id": "feature-1-image",
               "type": "media",
-              "box": { "x": 80, "y": 220, "w": 380, "h": 280, "z": 2 },
+              "box": {
+                "x": 80,
+                "y": 220,
+                "w": 380,
+                "h": 280,
+                "z": 2
+              },
               "mediaKind": "image",
               "assetId": "seed-feature-canvas-1",
               "alt": "Canvas editing surface",
@@ -155,8 +299,18 @@
             {
               "id": "feature-1-label",
               "type": "text",
-              "box": { "x": 80, "y": 520, "w": 380, "h": 60, "z": 2 },
-              "content": [{ "text": "Position freely" }],
+              "box": {
+                "x": 80,
+                "y": 520,
+                "w": 380,
+                "h": 60,
+                "z": 2
+              },
+              "content": [
+                {
+                  "text": "Position freely"
+                }
+              ],
               "role": "label",
               "fontSize": 16,
               "fontWeight": 500,
@@ -165,13 +319,25 @@
             {
               "id": "feature-2-frame",
               "type": "container",
-              "box": { "x": 520, "y": 220, "w": 380, "h": 360, "z": 1 },
+              "box": {
+                "x": 520,
+                "y": 220,
+                "w": 380,
+                "h": 360,
+                "z": 1
+              },
               "variant": "editorial-frame"
             },
             {
               "id": "feature-3-shape",
               "type": "shape",
-              "box": { "x": 960, "y": 240, "w": 360, "h": 320, "z": 2 },
+              "box": {
+                "x": 960,
+                "y": 240,
+                "w": 360,
+                "h": 320,
+                "z": 2
+              },
               "variant": "blob"
             }
           ]
@@ -187,8 +353,18 @@
             {
               "id": "cta-heading",
               "type": "text",
-              "box": { "x": 220, "y": 160, "w": 1000, "h": 160, "z": 2 },
-              "content": [{ "text": "Publish when it feels right." }],
+              "box": {
+                "x": 220,
+                "y": 160,
+                "w": 1000,
+                "h": 160,
+                "z": 2
+              },
+              "content": [
+                {
+                  "text": "Publish when it feels right."
+                }
+              ],
               "role": "heading",
               "fontSize": 56,
               "fontWeight": 700,
@@ -197,17 +373,43 @@
             {
               "id": "cta-primary",
               "type": "action",
-              "box": { "x": 540, "y": 360, "w": 220, "h": 64, "z": 3 },
-              "label": "Open the editor",
-              "href": { "type": "external", "url": "https://opencanvas.example.com/edit" },
+              "box": {
+                "x": 540,
+                "y": 360,
+                "w": 220,
+                "h": 64,
+                "z": 3
+              },
+              "label": [
+                {
+                  "text": "Open the editor"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "https://opencanvas.example.com/edit"
+              },
               "variant": "pill"
             },
             {
               "id": "cta-secondary",
               "type": "action",
-              "box": { "x": 780, "y": 360, "w": 220, "h": 64, "z": 3 },
-              "label": "Email us",
-              "href": { "type": "external", "url": "mailto:hello@opencanvas.example.com" },
+              "box": {
+                "x": 780,
+                "y": 360,
+                "w": 220,
+                "h": 64,
+                "z": 3
+              },
+              "label": [
+                {
+                  "text": "Email us"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "mailto:hello@opencanvas.example.com"
+              },
               "variant": "underline"
             }
           ]
@@ -222,8 +424,18 @@
             {
               "id": "footer-brand",
               "type": "text",
-              "box": { "x": 80, "y": 24, "w": 200, "h": 32, "z": 2 },
-              "content": [{ "text": "Open Canvas" }],
+              "box": {
+                "x": 80,
+                "y": 24,
+                "w": 200,
+                "h": 32,
+                "z": 2
+              },
+              "content": [
+                {
+                  "text": "Open Canvas"
+                }
+              ],
               "role": "body",
               "fontSize": 16,
               "fontWeight": 600,
@@ -232,8 +444,18 @@
             {
               "id": "footer-copy",
               "type": "text",
-              "box": { "x": 80, "y": 64, "w": 400, "h": 28, "z": 2 },
-              "content": [{ "text": "© 2026 Open Canvas. All rights reserved." }],
+              "box": {
+                "x": 80,
+                "y": 64,
+                "w": 400,
+                "h": 28,
+                "z": 2
+              },
+              "content": [
+                {
+                  "text": "© 2026 Open Canvas. All rights reserved."
+                }
+              ],
               "role": "label",
               "fontSize": 13,
               "fontWeight": 400,
@@ -242,17 +464,43 @@
             {
               "id": "footer-link-1",
               "type": "action",
-              "box": { "x": 1100, "y": 24, "w": 100, "h": 32, "z": 2 },
-              "label": "Privacy",
-              "href": { "type": "external", "url": "/privacy" },
+              "box": {
+                "x": 1100,
+                "y": 24,
+                "w": 100,
+                "h": 32,
+                "z": 2
+              },
+              "label": [
+                {
+                  "text": "Privacy"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "/privacy"
+              },
               "variant": "ghost"
             },
             {
               "id": "footer-link-2",
               "type": "action",
-              "box": { "x": 1220, "y": 24, "w": 100, "h": 32, "z": 2 },
-              "label": "Terms",
-              "href": { "type": "external", "url": "/terms" },
+              "box": {
+                "x": 1220,
+                "y": 24,
+                "w": 100,
+                "h": 32,
+                "z": 2
+              },
+              "label": [
+                {
+                  "text": "Terms"
+                }
+              ],
+              "href": {
+                "type": "external",
+                "url": "/terms"
+              },
               "variant": "ghost"
             }
           ]

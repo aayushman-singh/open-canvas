@@ -78,6 +78,33 @@ const TRANSPARENT_PNG = {
   sourcePath: 'transparent.png.b64',
 };
 
+// Portfolio template seeds (Bundle F). Two abstract SVGs that ship as default
+// imagery for the engineer portfolio template (and any other template that
+// wants a stylised placeholder portrait or a neutral 16:9 project thumbnail).
+// SVG bytes are stable — re-rendering the same XML byte-for-byte yields the
+// same contentHash, so do not reformat the source. To replace, add a NEW id.
+const PORTRAIT_PLACEHOLDER_SVG = {
+  contentHash: 'bef738e250e2bc98bf724a984f617e24c18f579bd9addd196d8cf7f81d6af8bc',
+  r2Key: 'assets/bef738e250e2bc98bf724a984f617e24.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 480,
+  height: 640,
+  byteSize: 610,
+  sourcePath: 'portrait-placeholder.svg.b64',
+};
+
+const PROJECT_THUMB_NEUTRAL_SVG = {
+  contentHash: '5839975c71a6830ab051da26a02a9a56aba08680fc5f46bd49c19dfa9fe640aa',
+  r2Key: 'assets/5839975c71a6830ab051da26a02a9a56.svg',
+  mediaType: 'image/svg+xml',
+  kind: 'image' as const,
+  width: 800,
+  height: 450,
+  byteSize: 761,
+  sourcePath: 'project-thumb-neutral.svg.b64',
+};
+
 export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
   'seed-hero-poster-1': {
     ...TRANSPARENT_PNG,
@@ -86,6 +113,14 @@ export const SEED_ASSET_REGISTRY: Record<string, SeedAsset> = {
   'seed-feature-canvas-1': {
     ...TRANSPARENT_PNG,
     alt: 'Canvas editing surface',
+  },
+  'seed-portrait-placeholder': {
+    ...PORTRAIT_PLACEHOLDER_SVG,
+    alt: 'Stylised figure portrait placeholder',
+  },
+  'seed-project-thumb-neutral': {
+    ...PROJECT_THUMB_NEUTRAL_SVG,
+    alt: 'Neutral project thumbnail',
   },
 };
 

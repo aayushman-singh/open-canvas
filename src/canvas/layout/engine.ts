@@ -192,7 +192,8 @@ function requireMediaProps(node: ElementNode): NonNullable<ElementNode['element'
 function requireActionProps(node: ElementNode): NonNullable<ElementNode['element']['action']> {
   const props = node.element.action;
   if (!props) throw new Error('action element requires action props');
-  if (props.label.trim().length === 0) throw new Error('action element label must be non-empty');
+  const labelText = props.label.map((r) => r.text).join('').trim();
+  if (labelText.length === 0) throw new Error('action element label must be non-empty');
   if (props.href.type === 'external') {
     if (props.href.url.trim().length === 0) {
       throw new Error('action element external href url must be non-empty');

@@ -68,6 +68,17 @@ export type CarouselArrowPosition = (typeof CAROUSEL_ARROW_POSITIONS)[number];
 export const CAROUSEL_ARROW_STYLES = ['round', 'square', 'pill'] as const;
 export type CarouselArrowStyle = (typeof CAROUSEL_ARROW_STYLES)[number];
 
+/**
+ * Carousel presentation mode (ADR 0054 dec 2).
+ *   - `paginate` (default): classic carousel — one slide visible, arrows + dots
+ *     swap to siblings on click.
+ *   - `scroll-snap`: native CSS scroll-snap rail. Slides flow horizontally,
+ *     the visitor swipes / scrolls, and the browser snaps each slide to start.
+ *     Arrows + dots are suppressed in this mode.
+ */
+export const CAROUSEL_MODES = ['paginate', 'scroll-snap'] as const;
+export type CarouselMode = (typeof CAROUSEL_MODES)[number];
+
 export interface CarouselElement extends BaseElement {
   type: 'carousel';
   slides: CarouselSlide[];
@@ -76,6 +87,8 @@ export interface CarouselElement extends BaseElement {
   direction?: CarouselDirection;
   arrowPosition?: CarouselArrowPosition;
   arrowStyle?: CarouselArrowStyle;
+  /** Presentation mode. Absent defaults to `'paginate'` for back-compat. */
+  mode?: CarouselMode;
 }
 
 export interface CarouselRenderCtx {
@@ -126,6 +139,8 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
   const direction: CarouselDirection = el.direction ?? 'horizontal';
   const arrowPosition: CarouselArrowPosition = el.arrowPosition ?? 'split-vertical-center';
   const arrowStyle: CarouselArrowStyle = el.arrowStyle ?? 'round';
+  const mode: CarouselMode = el.mode ?? 'paginate';
+  const isScrollSnap = mode === 'scroll-snap';
 
   const total = el.slides.length;
   const slidesHtml = el.slides
@@ -137,7 +152,9 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
   // up/down chevrons even when the arrows are placed in the bottom-right.
   const prevGlyph = direction === 'vertical' ? '⌃' : '‹';
   const nextGlyph = direction === 'vertical' ? '⌄' : '›';
-  const arrowsHtml = el.showArrows
+  // ADR 0054 dec 2 — scroll-snap mode suppresses arrows + dots; the visitor
+  // scrolls the track natively, the browser snaps each slide.
+  const arrowsHtml = el.showArrows && !isScrollSnap
     ? [
         `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-prev" type="button" `,
         `data-opencanvas-carousel-prev aria-label="Previous slide">`,
@@ -150,7 +167,7 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
       ].join('')
     : '';
 
-  const dotsHtml = el.showDots
+  const dotsHtml = el.showDots && !isScrollSnap
     ? [
         `<div class="opencanvas-carousel-dots" role="tablist" aria-label="Slide navigation">`,
         el.slides
@@ -182,6 +199,7 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
     `data-opencanvas-direction="${escapeAttr(direction)}" `,
     `data-opencanvas-arrow-position="${escapeAttr(arrowPosition)}" `,
     `data-opencanvas-arrow-style="${escapeAttr(arrowStyle)}" `,
+    `data-opencanvas-carousel-mode="${escapeAttr(mode)}" `,
     `role="region" aria-roledescription="carousel">`,
     `<div class="opencanvas-carousel-track">`,
     slidesHtml,

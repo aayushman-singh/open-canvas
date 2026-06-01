@@ -20,6 +20,7 @@ import {
   styleFromEntries,
 } from './elements/render-utils.js';
 import { renderResponsiveCss } from './responsive/index.js';
+import { resolveActionHref } from './action-href.js';
 import { getStyleKitPreset, resolveStyleKitWithCustom } from './style-kits.js';
 import type { CanvasElement, CanvasPage, CanvasSection, ElementStyle, PublishedSnapshot, StyleKitPreset } from './schema.js';
 
@@ -79,14 +80,31 @@ function buildElementStyleDataAttrs(es: ElementStyle | undefined): string {
 
 function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string): string {
   const { box } = element;
-  const entries: Array<[string, string]> = [
-    ['position', 'absolute'],
-    ['left', `${String(box.x)}px`],
-    ['top', `${String(box.y)}px`],
-    ['width', `${String(box.w)}px`],
-    ['height', `${String(box.h)}px`],
-    ['z-index', String(box.z)],
-  ];
+  const stickyOffset =
+    element.stickyOffset !== undefined && Number.isFinite(element.stickyOffset)
+      ? element.stickyOffset
+      : null;
+  // ADR 0054 dec 1 — sticky elements drop out of absolute layout and use
+  // margins for the authored initial offset, reserving `top` for the sticky
+  // viewport offset. Non-sticky elements continue to use absolute layout.
+  const entries: Array<[string, string]> = stickyOffset !== null
+    ? [
+        ['position', 'sticky'],
+        ['margin-left', `${String(box.x)}px`],
+        ['margin-top', `${String(box.y)}px`],
+        ['top', `${String(stickyOffset)}px`],
+        ['width', `${String(box.w)}px`],
+        ['height', `${String(box.h)}px`],
+        ['z-index', String(box.z)],
+      ]
+    : [
+        ['position', 'absolute'],
+        ['left', `${String(box.x)}px`],
+        ['top', `${String(box.y)}px`],
+        ['width', `${String(box.w)}px`],
+        ['height', `${String(box.h)}px`],
+        ['z-index', String(box.z)],
+      ];
   if (typeof box.rotation === 'number' && box.rotation !== 0) {
     entries.push(['transform', `rotate(${String(box.rotation)}deg)`]);
   }
@@ -116,7 +134,9 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
 
 // Decorative-by-default invariant: shape and surface (container) wrappers are
 // always emitted with `aria-hidden="true" role="presentation"` so assistive
-// tech skips them. Media gets `aria-hidden="true"` only when `alt === ''`
+// tech skips them, except linked containers: the wrapper is the interactive
+// link and must stay exposed with an accessible name. Media gets
+// `aria-hidden="true"` only when `alt === ''`
 // (the canonical decorative-image signal); when alt is non-empty, the native
 // `<img alt>` attribute does the work and we do NOT also hide the wrapper.
 // Text and action elements never get ARIA overrides — their defaults are
@@ -125,8 +145,9 @@ function buildElementWrapperStyle(element: CanvasElement, assetBasePath: string)
 function buildAriaWrapperAttrs(element: CanvasElement): string {
   switch (element.type) {
     case 'shape':
-    case 'container':
       return ' aria-hidden="true" role="presentation"';
+    case 'container':
+      return element.linkHref === undefined ? ' aria-hidden="true" role="presentation"' : '';
     case 'media':
       return element.alt === '' ? ' aria-hidden="true"' : '';
     case 'text':
@@ -140,6 +161,7 @@ function buildAriaWrapperAttrs(element: CanvasElement): string {
     case 'code':
     case 'nav':
     case 'collection':
+    case 'tabs':
       return '';
   }
 }
@@ -168,13 +190,51 @@ function variantAttr(element: CanvasElement): string {
     case 'table':
     case 'nav':
     case 'collection':
+    case 'tabs':
       return '';
   }
 }
 
+/**
+ * Gap #17 — resolve `ContainerElement.tint` against `StyleKitPreset.tintTokens`
+ * when the value is a token identifier; otherwise treat it as a raw CSS colour.
+ * Returns null when the tint cannot be safely emitted (escape rejection).
+ */
+function resolveTintColour(
+  tint: string,
+  customPreset: StyleKitPreset | null | undefined,
+): string | null {
+  if (/^[a-z][a-z0-9-]*$/.test(tint)) {
+    const token = customPreset?.tintTokens?.[tint];
+    if (typeof token === 'string' && token.length > 0) {
+      const safe = escapeCssValue(token);
+      return safe === '' ? null : safe;
+    }
+    // Unknown token — fall through to literal interpretation so authors who
+    // typo a token don't render a broken style silently. escapeCssValue
+    // catches the literal at the next gate.
+  }
+  const safe = escapeCssValue(tint);
+  return safe === '' ? null : safe;
+}
+
 function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   const inner = renderElementBody(element, ctx);
-  const wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
+  let wrapperStyle = buildElementWrapperStyle(element, ctx.assetBasePath);
+  let tintAttr = '';
+  // Gap #17 — tint emits --opencanvas-tint + a subtle gradient overlay on
+  // the container wrapper. Authors can override via pinnedStyle when they
+  // want a different intensity / direction; pinnedStyle is applied LAST in
+  // buildElementWrapperStyle, so the override wins.
+  if (element.type === 'container' && typeof element.tint === 'string' && element.tint.length > 0) {
+    const colour = resolveTintColour(element.tint, ctx.customPreset);
+    if (colour !== null) {
+      wrapperStyle +=
+        `;--opencanvas-tint:${colour}` +
+        `;background-image:linear-gradient(135deg,color-mix(in oklab,var(--opencanvas-tint) 25%,transparent) 0%,transparent 70%)`;
+      tintAttr = ` data-tint="${escapeAttr(element.tint)}"`;
+    }
+  }
   const motionAttrs =
     element.motion !== undefined
       ? ` data-motion-preset="${escapeAttr(element.motion.preset)}" data-motion-delay-ms="${escapeAttr(String(element.motion.delayMs ?? 0))}"`
@@ -182,7 +242,27 @@ function renderElement(element: CanvasElement, ctx: ElementRenderCtx): string {
   const ariaAttrs = buildAriaWrapperAttrs(element);
   const variant = variantAttr(element);
   const esAttrs = buildElementStyleDataAttrs(element.elementStyle);
-  return `<div class="opencanvas-element" data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs} style="${wrapperStyle}">${inner}</div>`;
+  // ADR 0050 dec 2 — anchor ids emit as DOM id="..." on the wrapper.
+  // Validator enforces the strict charset, so escapeAttr is belt-and-braces.
+  const idAttr =
+    typeof element.anchorId === 'string' && element.anchorId.length > 0
+      ? ` id="${escapeAttr(element.anchorId)}"`
+      : '';
+  const commonAttrs = `${idAttr}${tintAttr} data-opencanvas-element="${escapeAttr(element.id)}" data-element-type="${escapeAttr(element.type)}"${variant}${motionAttrs}${ariaAttrs}${esAttrs}`;
+
+  // ADR 0051 dec 5 — container with linkHref emits the outer wrapper as
+  // <a href="…"> instead of <div>. Every other attribute, the inner body
+  // (renderContainer's <div class="opencanvas-surface">), the wrapperStyle,
+  // motion, anchorId, elementStyle — all unchanged.
+  if (element.type === 'container' && element.linkHref !== undefined) {
+    const resolved = resolveActionHref(element.linkHref, ctx.pages);
+    const ariaLabelAttr =
+      typeof element.linkLabel === 'string' && element.linkLabel.length > 0
+        ? ` aria-label="${escapeAttr(element.linkLabel)}"`
+        : '';
+    return `<a class="opencanvas-element" href="${escapeAttr(resolved)}"${ariaLabelAttr}${commonAttrs} style="${wrapperStyle}">${inner}</a>`;
+  }
+  return `<div class="opencanvas-element"${commonAttrs} style="${wrapperStyle}">${inner}</div>`;
 }
 
 function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRenderCtx): string {
@@ -213,7 +293,12 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   const bgVideoHtml = section.backgroundVideoAssetId
     ? `<video autoplay loop muted playsinline aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none"><source src="${escapeAttr(`${ctx.assetBasePath}/${section.backgroundVideoAssetId}`)}" type="video/mp4"></video>`
     : '';
-  return `<section class="opencanvas-section" data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
+  // ADR 0050 dec 2 — anchor ids emit as DOM id="..." on the section wrapper.
+  const idAttr =
+    typeof section.anchorId === 'string' && section.anchorId.length > 0
+      ? ` id="${escapeAttr(section.anchorId)}"`
+      : '';
+  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
 function renderPage(
@@ -330,6 +415,116 @@ export function renderCanvasSnapshot(
     .map((page) => renderPage(page, baseCtx, snapshot.header, snapshot.footer))
     .join('');
   const responsiveStyle = renderResponsiveCss(snapshot);
+  const scrollStyle = renderScrollBehaviourCss(snapshot.scrollBehavior);
+  const copyScript = renderCopyHandlerScript(snapshot);
+  const tabsScript = renderTabsHandlerScript(snapshot);
   const rootStyle = `--opencanvas-kit-accent:${preset.accent}`;
-  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${responsiveStyle}${pagesHtml}</main>`;
+  return `<main class="opencanvas-site" data-style-kit="${escapeAttr(snapshot.styleKit)}" style="${escapeAttr(rootStyle)}">${scrollStyle}${responsiveStyle}${pagesHtml}${copyScript}${tabsScript}</main>`;
+}
+
+/**
+ * ADR 0051 dec 4 — emit a tiny delegated copy-to-clipboard handler at the
+ * end of `<main>` IFF at least one action element in the snapshot uses the
+ * `copy` behaviour. Zero-cost when unused (no script tag), one script when
+ * needed. The handler reads the copy value from the `data-opencanvas-copy`
+ * attribute at click time — values never get baked into JS source, so HTML
+ * attribute escaping is the entire safety story.
+ */
+function renderCopyHandlerScript(snapshot: PublishedSnapshot): string {
+  if (!snapshotHasCopyAction(snapshot)) return '';
+  const script =
+    "document.addEventListener('click',function(e){var n=e.target;if(!n||typeof n.closest!=='function')return;var t=n.closest('[data-opencanvas-copy]');if(!t)return;var v=t.getAttribute('data-opencanvas-copy');if(v===null)return;var w=t.closest('[data-opencanvas-element]');var id=w?w.getAttribute('data-opencanvas-element'):null;if(!navigator.clipboard||typeof navigator.clipboard.writeText!=='function'){console.error('[opencanvas-copy] clipboard API unavailable',{elementId:id});t.setAttribute('data-opencanvas-copy-failed','');return;}navigator.clipboard.writeText(v).then(function(){t.removeAttribute('data-opencanvas-copy-failed');t.setAttribute('data-opencanvas-copied','');setTimeout(function(){t.removeAttribute('data-opencanvas-copied')},2000)}).catch(function(err){console.error('[opencanvas-copy] clipboard write failed',{error:err,elementId:id});t.setAttribute('data-opencanvas-copy-failed','')})});";
+  return `<script data-opencanvas-copy-handler>${script}</script>`;
+}
+
+function snapshotHasCopyAction(snapshot: PublishedSnapshot): boolean {
+  return walkElements(snapshot, (el) => el.type === 'action' && el.behavior !== undefined);
+}
+
+/**
+ * ADR 0052 dec 4 — emit a tiny delegated tab-switch handler at the end of
+ * `<main>` IFF at least one TabsElement exists in the snapshot. Same pattern
+ * as `renderCopyHandlerScript`. The handler toggles `data-tab-active` on the
+ * matching bar button and panel; the style kit's CSS (or default) hides
+ * `[data-opencanvas-tab-panel-id]:not([data-tab-active])`. Graceful
+ * degradation per ADR 0052 dec 5: no JS means all panels visible, not none.
+ */
+function renderTabsHandlerScript(snapshot: PublishedSnapshot): string {
+  if (!snapshotHasTabsElement(snapshot)) return '';
+  const script =
+    "document.addEventListener('click',function(e){var btn=e.target.closest('[data-opencanvas-tab-id]');if(!btn||btn.tagName!=='BUTTON')return;var root=btn.closest('[data-opencanvas-tabs]');if(!root)return;var id=btn.getAttribute('data-opencanvas-tab-id');root.querySelectorAll('[data-opencanvas-tab-id]').forEach(function(b){if(b.closest('[data-opencanvas-tabs]')!==root)return;b.toggleAttribute('data-tab-active',b.getAttribute('data-opencanvas-tab-id')===id)});root.querySelectorAll('[data-opencanvas-tab-panel-id]').forEach(function(p){if(p.closest('[data-opencanvas-tabs]')!==root)return;p.toggleAttribute('data-tab-active',p.getAttribute('data-opencanvas-tab-panel-id')===id)})});";
+  return `<script data-opencanvas-tabs-handler>${script}</script>`;
+}
+
+function snapshotHasTabsElement(snapshot: PublishedSnapshot): boolean {
+  return walkElements(snapshot, (el) => el.type === 'tabs');
+}
+
+/**
+ * Walk every element in the snapshot (header, footer, each page's sections,
+ * plus nested children inside collection entries and tabs panels) and
+ * short-circuit when `pred` returns true. Handles the recursion both ADR
+ * 0052 dec 4 (tabs nesting tabs is allowed) and the existing collection
+ * nesting need without a per-call-site bespoke walk.
+ */
+function walkElements(
+  snapshot: PublishedSnapshot,
+  pred: (el: CanvasElement) => boolean,
+): boolean {
+  const sections: CanvasSection[] = [];
+  if (snapshot.header) sections.push(snapshot.header);
+  if (snapshot.footer) sections.push(snapshot.footer);
+  for (const page of snapshot.pages) {
+    sections.push(...page.sections);
+  }
+  const visit = (el: CanvasElement): boolean => {
+    if (pred(el)) return true;
+    if (el.type === 'tabs') {
+      for (const tab of el.tabs) {
+        for (const child of tab.elements) {
+          if (visit(child)) return true;
+        }
+      }
+    } else if (el.type === 'collection') {
+      for (const child of el.entryTemplate) {
+        if (visit(child)) return true;
+      }
+      for (const entry of el.entries) {
+        for (const child of entry) {
+          if (visit(child)) return true;
+        }
+      }
+      if (el.cardTemplate !== undefined) {
+        for (const child of el.cardTemplate) {
+          if (visit(child)) return true;
+        }
+      }
+    }
+    return false;
+  };
+  for (const section of sections) {
+    for (const element of section.elements) {
+      if (visit(element)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * ADR 0050 dec 3 — emit a single global `<style>` block when the site sets
+ * `scrollBehavior`. The rule targets `html` so anchor jumps land below a
+ * sticky header instead of under it. Absence (or all-fields-absent) emits
+ * nothing — there is no zero-padding default.
+ */
+function renderScrollBehaviourCss(
+  scrollBehavior: PublishedSnapshot['scrollBehavior'],
+): string {
+  if (!scrollBehavior) return '';
+  const rules: string[] = [];
+  if (scrollBehavior.smooth === true) rules.push('scroll-behavior:smooth');
+  if (typeof scrollBehavior.paddingTop === 'number' && scrollBehavior.paddingTop >= 0) {
+    rules.push(`scroll-padding-top:${String(scrollBehavior.paddingTop)}px`);
+  }
+  if (rules.length === 0) return '';
+  return `<style data-opencanvas-scroll-behavior>html{${rules.join(';')}}</style>`;
 }

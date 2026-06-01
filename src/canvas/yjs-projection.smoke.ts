@@ -63,7 +63,7 @@ function stableStringify(value: unknown): string {
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(thisDir, 'fixtures');
-for (const fixtureFile of ['home.json', 'enterprise-scale.json']) {
+for (const fixtureFile of ['home.json', 'enterprise-scale.json', 'portfolio-showcase.json']) {
   const filePath = path.join(fixturesDir, fixtureFile);
   const raw = fs.readFileSync(filePath, 'utf8');
   const state = JSON.parse(raw) as EditableSite;
@@ -82,6 +82,7 @@ const syntheticElements: CanvasElement[] = [
     id: 'el-text',
     type: 'text',
     box: { x: 0, y: 0, w: 100, h: 40, z: 1 },
+    anchorId: 'intro-copy',
     content: [
       { text: 'Hello ' },
       { text: 'world', marks: [{ type: 'bold' }, { type: 'link', href: 'https://example.com' }] },
@@ -90,6 +91,11 @@ const syntheticElements: CanvasElement[] = [
     fontSize: 16,
     fontWeight: 400,
     align: 'left',
+    letterSpacing: '0.02em',
+    textWrap: 'pretty',
+    lineHeight: 1.35,
+    textTransform: 'capitalize',
+    fluidSize: { min: 14, max: 22, vw: 1.6 },
     motion: { preset: 'fade-up', delayMs: 100 },
     pinnedStyle: { color: '#fff', 'font-size': '16px' },
     responsive: {
@@ -112,21 +118,34 @@ const syntheticElements: CanvasElement[] = [
     id: 'el-action',
     type: 'action',
     box: { x: 0, y: 220, w: 120, h: 40, z: 1 },
-    label: 'Go',
+    label: [{ text: 'Go' }],
     href: { type: 'page', pageId: 'syn-page', anchor: 'details' },
     variant: 'solid',
+    iconKind: 'arrow-up-right',
+  },
+  {
+    id: 'el-copy-action',
+    type: 'action',
+    box: { x: 140, y: 220, w: 160, h: 40, z: 1 },
+    label: [{ text: 'Copy' }],
+    behavior: { type: 'copy', value: 'hello@example.com' },
+    variant: 'ghost',
+    iconKind: 'copy',
   },
   {
     id: 'el-shape',
     type: 'shape',
     box: { x: 0, y: 270, w: 60, h: 60, z: 1 },
-    variant: 'circle',
+    variant: 'icon',
+    iconKind: 'search',
   },
   {
     id: 'el-container',
     type: 'container',
     box: { x: 0, y: 340, w: 300, h: 200, z: 1 },
     variant: 'glass',
+    linkHref: { type: 'external', url: '/synthetic-card' },
+    linkLabel: 'Synthetic project',
   },
   {
     id: 'el-form',
@@ -264,6 +283,36 @@ const syntheticElements: CanvasElement[] = [
     ],
     layout: { columns: 3, gap: 24 },
   },
+  {
+    id: 'el-tabs',
+    type: 'tabs',
+    box: { x: 0, y: 2950, w: 800, h: 600, z: 1 },
+    activeTabId: 'b',
+    tabBarHeight: 64,
+    tabs: [
+      {
+        id: 'a',
+        label: [{ text: 'Alpha' }],
+        elements: [
+          {
+            id: 'el-tabs-a-text',
+            type: 'text',
+            box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+            content: [{ text: 'Alpha panel' }],
+            role: 'body',
+            fontSize: 16,
+            fontWeight: 400,
+            align: 'left',
+          },
+        ],
+      },
+      {
+        id: 'b',
+        label: [{ text: 'Beta', marks: [{ type: 'bold' }] }],
+        elements: [],
+      },
+    ],
+  },
 ];
 
 const syntheticSection: CanvasSection = {
@@ -304,13 +353,14 @@ const syntheticState: EditableSite = {
     recipeId: 'custom',
     name: 'Site Header',
     role: 'header',
+    anchorId: 'site-header',
     height: 96,
     elements: [
       {
         id: 'site-header-action',
         type: 'action',
         box: { x: 24, y: 24, w: 160, h: 44, z: 1 },
-        label: 'Synthetic',
+        label: [{ text: 'Synthetic' }],
         href: { type: 'page', pageId: 'syn-page' },
         variant: 'ghost',
       },
@@ -321,6 +371,7 @@ const syntheticState: EditableSite = {
     recipeId: 'custom',
     name: 'Site Footer',
     role: 'footer',
+    anchorId: 'site-footer',
     height: 96,
     elements: [
       {
@@ -338,6 +389,7 @@ const syntheticState: EditableSite = {
   defaultLocale: 'en',
   siteNoIndex: false,
   visitorTheme: 'toggleable',
+  scrollBehavior: { smooth: true, paddingTop: 72 },
 };
 
 {

@@ -119,7 +119,7 @@ export function extractElementText(el: CanvasElement): string | null {
       raw = extractTextElement(el);
       break;
     case 'action':
-      raw = el.label;
+      raw = el.label.map((run) => run.text).join('');
       break;
     case 'embed':
       raw = extractEmbedElement(el);

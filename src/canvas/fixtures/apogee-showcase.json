@@ -11,7 +11,7 @@
     "fontFamilyBody": "'Inter', system-ui, -apple-system, sans-serif",
     "fontFamilyMono": "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
     "headingScale": 1.12,
-    "bodyScale": 1.0,
+    "bodyScale": 1,
     "labelScale": 0.82,
     "lineHeight": 1.55,
     "radius": "4px",
@@ -345,7 +345,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Designer",
+        "label": [
+          {
+            "text": "Designer"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "#"
@@ -362,7 +366,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "CMS",
+        "label": [
+          {
+            "text": "CMS"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "#"
@@ -379,7 +387,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Hosting",
+        "label": [
+          {
+            "text": "Hosting"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "#"
@@ -416,7 +428,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Blog",
+        "label": [
+          {
+            "text": "Blog"
+          }
+        ],
         "href": {
           "type": "page",
           "pageId": "page-wf-blog"
@@ -433,7 +449,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "University",
+        "label": [
+          {
+            "text": "University"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "#"
@@ -450,7 +470,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Community",
+        "label": [
+          {
+            "text": "Community"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "#"
@@ -487,7 +511,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Customers",
+        "label": [
+          {
+            "text": "Customers"
+          }
+        ],
         "href": {
           "type": "page",
           "pageId": "page-wf-customers"
@@ -504,7 +532,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Enterprise",
+        "label": [
+          {
+            "text": "Enterprise"
+          }
+        ],
         "href": {
           "type": "page",
           "pageId": "page-wf-enterprise"
@@ -521,7 +553,11 @@
           "h": 28,
           "z": 2
         },
-        "label": "Pricing",
+        "label": [
+          {
+            "text": "Pricing"
+          }
+        ],
         "href": {
           "type": "page",
           "pageId": "page-wf-pricing"
@@ -561,7 +597,11 @@
           "h": 24,
           "z": 2
         },
-        "label": "Privacy",
+        "label": [
+          {
+            "text": "Privacy"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "/privacy"
@@ -578,7 +618,11 @@
           "h": 24,
           "z": 2
         },
-        "label": "Terms",
+        "label": [
+          {
+            "text": "Terms"
+          }
+        ],
         "href": {
           "type": "external",
           "url": "/terms"
@@ -744,7 +788,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Get started free",
+              "label": [
+                {
+                  "text": "Get started free"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -765,7 +813,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Contact sales",
+              "label": [
+                {
+                  "text": "Contact sales"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "mailto:hello@example.com"
@@ -1163,7 +1215,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "Start building →",
+              "label": [
+                {
+                  "text": "Start building →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -1255,7 +1311,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "Start publishing →",
+              "label": [
+                {
+                  "text": "Start publishing →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -1347,7 +1407,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "Start optimizing →",
+              "label": [
+                {
+                  "text": "Start optimizing →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -1515,7 +1579,11 @@
                 "h": 32,
                 "z": 3
               },
-              "label": "Read customer story →",
+              "label": [
+                {
+                  "text": "Read customer story →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -1623,7 +1691,11 @@
                 "h": 32,
                 "z": 3
               },
-              "label": "Read customer story →",
+              "label": [
+                {
+                  "text": "Read customer story →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -1928,7 +2000,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "Discover Apogee AI →",
+              "label": [
+                {
+                  "text": "Discover Apogee AI →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -2035,7 +2111,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "Explore CMS →",
+              "label": [
+                {
+                  "text": "Explore CMS →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -2142,7 +2222,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "See analytics →",
+              "label": [
+                {
+                  "text": "See analytics →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -2235,7 +2319,11 @@
                 "h": 56,
                 "z": 3
               },
-              "label": "Get started - it's free",
+              "label": [
+                {
+                  "text": "Get started - it's free"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -2252,7 +2340,11 @@
                 "h": 56,
                 "z": 3
               },
-              "label": "Talk to sales",
+              "label": [
+                {
+                  "text": "Talk to sales"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "mailto:hello@example.com"
@@ -2627,7 +2719,11 @@
                 "h": 40,
                 "z": 3
               },
-              "label": "Read more →",
+              "label": [
+                {
+                  "text": "Read more →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -3322,7 +3418,11 @@
                 "h": 44,
                 "z": 2
               },
-              "label": "Read the docs →",
+              "label": [
+                {
+                  "text": "Read the docs →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "https://developers.apogee.dev"
@@ -3429,7 +3529,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Subscribe to the blog",
+              "label": [
+                {
+                  "text": "Subscribe to the blog"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#subscribe"
@@ -3639,7 +3743,11 @@
                 "h": 44,
                 "z": 3
               },
-              "label": "Start for free",
+              "label": [
+                {
+                  "text": "Start for free"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -3860,7 +3968,11 @@
                 "h": 44,
                 "z": 3
               },
-              "label": "Add plan",
+              "label": [
+                {
+                  "text": "Add plan"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -4108,7 +4220,11 @@
                 "h": 44,
                 "z": 3
               },
-              "label": "Add plan",
+              "label": [
+                {
+                  "text": "Add plan"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -4304,7 +4420,11 @@
                 "h": 44,
                 "z": 3
               },
-              "label": "Talk to us",
+              "label": [
+                {
+                  "text": "Talk to us"
+                }
+              ],
               "href": {
                 "type": "page",
                 "pageId": "page-wf-enterprise"
@@ -4908,7 +5028,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Get started - it's free",
+              "label": [
+                {
+                  "text": "Get started - it's free"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -4925,7 +5049,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Watch demo",
+              "label": [
+                {
+                  "text": "Watch demo"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#demo"
@@ -5066,7 +5194,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Contact sales",
+              "label": [
+                {
+                  "text": "Contact sales"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "mailto:hello@example.com"
@@ -5083,7 +5215,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Watch demo",
+              "label": [
+                {
+                  "text": "Watch demo"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#demo"
@@ -6323,7 +6459,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Contact sales",
+              "label": [
+                {
+                  "text": "Contact sales"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "mailto:hello@example.com"
@@ -6340,7 +6480,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Watch demo",
+              "label": [
+                {
+                  "text": "Watch demo"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#demo"
@@ -6684,7 +6828,11 @@
                 "h": 32,
                 "z": 3
               },
-              "label": "Read story →",
+              "label": [
+                {
+                  "text": "Read story →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -6822,7 +6970,11 @@
                 "h": 32,
                 "z": 3
               },
-              "label": "Read story →",
+              "label": [
+                {
+                  "text": "Read story →"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "#"
@@ -7200,7 +7352,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Get started - it's free",
+              "label": [
+                {
+                  "text": "Get started - it's free"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "/signup"
@@ -7217,7 +7373,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Contact sales",
+              "label": [
+                {
+                  "text": "Contact sales"
+                }
+              ],
               "href": {
                 "type": "external",
                 "url": "mailto:hello@example.com"
@@ -7375,7 +7535,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Back to home",
+              "label": [
+                {
+                  "text": "Back to home"
+                }
+              ],
               "href": {
                 "type": "page",
                 "pageId": "page-wf-home"
@@ -7392,7 +7556,11 @@
                 "h": 52,
                 "z": 3
               },
-              "label": "Read the blog",
+              "label": [
+                {
+                  "text": "Read the blog"
+                }
+              ],
               "href": {
                 "type": "page",
                 "pageId": "page-wf-blog"

@@ -26,6 +26,7 @@
 //   'siteNoIndex'?     -> boolean
 //   'visitorTheme'?    -> 'light' | 'dark' | 'toggleable' (ADR 0035)
 //   'faviconAssetId'?  -> string
+//   'scrollBehavior'?  -> Y.Map<unknown>
 //   'pages'            -> Y.Array<Y.Map<unknown>>    (CanvasPage[])
 //
 // Each CanvasPage Y.Map:
@@ -46,6 +47,7 @@
 //   'name'              -> string
 //   'height'            -> number
 //   'role'?             -> string
+//   'anchorId'?         -> string
 //   'backgroundEffect'? -> string
 //   'entrance'?         -> string
 //   'trigger'?          -> Y.Map<unknown>
@@ -82,7 +84,10 @@
 import * as Y from 'yjs';
 
 import type {
+  ActionBehavior,
   ActionElement,
+  ActionHref,
+  ActionVariant,
   BaseElement,
   CanvasElement,
   CanvasPage,
@@ -119,7 +124,10 @@ import type {
   TableColumn,
   TableElement,
   TableRow,
+  Tab,
+  TabsElement,
 } from './elements/index.js';
+import type { IconName } from './icons.js';
 
 // ----------------------------------------------------------------------------
 // encode helpers
@@ -227,6 +235,7 @@ function encodeInlineMark(mark: InlineMark): Y.Map<unknown> {
   out.set('type', mark.type);
   if (mark.type === 'link') {
     out.set('href', mark.href);
+    if (mark.target !== undefined) out.set('target', mark.target);
   }
   return out;
 }
@@ -290,6 +299,8 @@ function encodeBaseElementFields(target: Y.Map<unknown>, el: BaseElement): void 
   if (el.elementStyle !== undefined)
     target.set('elementStyle', encodeElementStyle(el.elementStyle));
   if (el.responsive !== undefined) target.set('responsive', encodeResponsive(el.responsive));
+  setIfDefined(target, 'anchorId', el.anchorId);
+  setIfDefined(target, 'stickyOffset', el.stickyOffset);
 }
 
 function encodeTextElement(el: TextElement): Y.Map<unknown> {
@@ -300,6 +311,17 @@ function encodeTextElement(el: TextElement): Y.Map<unknown> {
   out.set('fontSize', el.fontSize);
   out.set('fontWeight', el.fontWeight);
   out.set('align', el.align);
+  setIfDefined(out, 'letterSpacing', el.letterSpacing);
+  setIfDefined(out, 'textWrap', el.textWrap);
+  setIfDefined(out, 'lineHeight', el.lineHeight);
+  setIfDefined(out, 'textTransform', el.textTransform);
+  if (el.fluidSize !== undefined) {
+    const fluid = new Y.Map<unknown>();
+    fluid.set('min', el.fluidSize.min);
+    fluid.set('max', el.fluidSize.max);
+    fluid.set('vw', el.fluidSize.vw);
+    out.set('fluidSize', fluid);
+  }
   return out;
 }
 
@@ -324,7 +346,7 @@ function encodeMediaElement(el: MediaElement): Y.Map<unknown> {
   return out;
 }
 
-function encodeActionHref(href: ActionElement['href']): Y.Map<unknown> {
+function encodeActionHref(href: ActionHref): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   out.set('type', href.type);
   if (href.type === 'external') {
@@ -336,12 +358,30 @@ function encodeActionHref(href: ActionElement['href']): Y.Map<unknown> {
   return out;
 }
 
+function encodeActionBehavior(behavior: ActionBehavior): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  out.set('type', behavior.type);
+  out.set('value', behavior.value);
+  return out;
+}
+
 function encodeActionElement(el: ActionElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
-  out.set('label', el.label);
-  out.set('href', encodeActionHref(el.href));
+  // ADR 0051 dec 1 — label is InlineRun[]; encode via the shared helper so
+  // text + action go through one code path.
+  out.set('label', encodeInlineRuns(el.label));
   out.set('variant', el.variant);
+  // ADR 0051 dec 2 — optional icon glyph.
+  setIfDefined(out, 'iconKind', el.iconKind);
+  // ADR 0051 dec 3 — discriminated union: exactly one of href / behavior is
+  // set. Encode whichever is present; validation guarantees one-and-only-one
+  // at write time, so the encoder doesn't need to defend against both.
+  if (el.href !== undefined) {
+    out.set('href', encodeActionHref(el.href));
+  } else {
+    out.set('behavior', encodeActionBehavior(el.behavior));
+  }
   return out;
 }
 
@@ -349,6 +389,8 @@ function encodeShapeElement(el: ShapeElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
   out.set('variant', el.variant);
+  // ADR 0051 dec 2 — variant 'icon' carries an iconKind glyph name.
+  setIfDefined(out, 'iconKind', el.iconKind);
   return out;
 }
 
@@ -356,6 +398,11 @@ function encodeContainerElement(el: ContainerElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
   out.set('variant', el.variant);
+  // ADR 0051 dec 5 — optional link target. Outer wrapper becomes <a> when set.
+  if (el.linkHref !== undefined) out.set('linkHref', encodeActionHref(el.linkHref));
+  setIfDefined(out, 'linkLabel', el.linkLabel);
+  // Gap #17 — optional accent.
+  setIfDefined(out, 'tint', el.tint);
   return out;
 }
 
@@ -602,6 +649,25 @@ function encodeNavElement(el: NavElement): Y.Map<unknown> {
   return out;
 }
 
+function encodeTabsElement(el: TabsElement): Y.Map<unknown> {
+  const out = new Y.Map<unknown>();
+  encodeBaseElementFields(out, el);
+  out.set('activeTabId', el.activeTabId);
+  setIfDefined(out, 'tabBarHeight', el.tabBarHeight);
+  const tabsArr = new Y.Array<Y.Map<unknown>>();
+  for (const tab of el.tabs) {
+    const tabMap = new Y.Map<unknown>();
+    tabMap.set('id', tab.id);
+    tabMap.set('label', encodeInlineRuns(tab.label));
+    const elements = new Y.Array<Y.Map<unknown>>();
+    for (const child of tab.elements) elements.push([encodeElement(child)]);
+    tabMap.set('elements', elements);
+    tabsArr.push([tabMap]);
+  }
+  out.set('tabs', tabsArr);
+  return out;
+}
+
 function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
@@ -684,6 +750,7 @@ export const Y_ENCODE_DISPATCH: YEncodeDispatch = {
   code: encodeCodeElement,
   nav: encodeNavElement,
   collection: encodeCollectionElement,
+  tabs: encodeTabsElement,
 };
 
 function encodeElement(el: CanvasElement): Y.Map<unknown> {
@@ -706,6 +773,7 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   out.set('name', section.name);
   out.set('height', section.height);
   setIfDefined(out, 'role', section.role);
+  setIfDefined(out, 'anchorId', section.anchorId);
   setIfDefined(out, 'backgroundEffect', section.backgroundEffect);
   setIfDefined(out, 'entrance', section.entrance);
   if (section.trigger !== undefined) {
@@ -815,6 +883,12 @@ export function encodeYDoc(state: EditableSite): Y.Doc {
     setIfDefined(root, 'siteNoIndex', state.siteNoIndex);
     setIfDefined(root, 'visitorTheme', state.visitorTheme);
     setIfDefined(root, 'faviconAssetId', state.faviconAssetId);
+    if (state.scrollBehavior !== undefined) {
+      const scroll = new Y.Map<unknown>();
+      setIfDefined(scroll, 'smooth', state.scrollBehavior.smooth);
+      setIfDefined(scroll, 'paddingTop', state.scrollBehavior.paddingTop);
+      root.set('scrollBehavior', scroll);
+    }
 
     const pages = new Y.Array<Y.Map<unknown>>();
     for (const page of state.pages) pages.push([encodePage(page)]);
@@ -875,7 +949,12 @@ function decodeResponsive(map: Y.Map<unknown>): ResponsiveOverrides {
 function decodeInlineMark(map: Y.Map<unknown>): InlineMark {
   const type = map.get('type') as InlineMark['type'];
   if (type === 'link') {
-    return { type, href: map.get('href') as string };
+    const mark: { type: 'link'; href: string; target?: '_blank' } = {
+      type,
+      href: map.get('href') as string,
+    };
+    if (map.has('target')) mark.target = map.get('target') as '_blank';
+    return mark;
   }
   return { type };
 }
@@ -909,11 +988,13 @@ function decodeBaseElement(map: Y.Map<unknown>): BaseElement {
   if (map.has('responsive')) {
     out.responsive = decodeResponsive(map.get('responsive') as Y.Map<unknown>);
   }
+  if (map.has('anchorId')) out.anchorId = map.get('anchorId') as string;
+  if (map.has('stickyOffset')) out.stickyOffset = map.get('stickyOffset') as number;
   return out;
 }
 
 function decodeTextElement(map: Y.Map<unknown>, base: BaseElement): TextElement {
-  return {
+  const out: TextElement = {
     ...base,
     type: 'text',
     content: decodeInlineRuns(map.get('content') as Y.Array<Y.Map<unknown>>),
@@ -922,6 +1003,23 @@ function decodeTextElement(map: Y.Map<unknown>, base: BaseElement): TextElement 
     fontWeight: map.get('fontWeight') as TextElement['fontWeight'],
     align: map.get('align') as TextElement['align'],
   };
+  if (map.has('letterSpacing')) out.letterSpacing = map.get('letterSpacing') as string;
+  if (map.has('textWrap')) {
+    out.textWrap = map.get('textWrap') as NonNullable<TextElement['textWrap']>;
+  }
+  if (map.has('lineHeight')) out.lineHeight = map.get('lineHeight') as number;
+  if (map.has('textTransform')) {
+    out.textTransform = map.get('textTransform') as NonNullable<TextElement['textTransform']>;
+  }
+  if (map.has('fluidSize')) {
+    const fluid = map.get('fluidSize') as Y.Map<unknown>;
+    out.fluidSize = {
+      min: fluid.get('min') as number,
+      max: fluid.get('max') as number,
+      vw: fluid.get('vw') as number,
+    };
+  }
+  return out;
 }
 
 function decodeMediaElement(map: Y.Map<unknown>, base: BaseElement): MediaElement {
@@ -951,9 +1049,31 @@ function decodeMediaElement(map: Y.Map<unknown>, base: BaseElement): MediaElemen
 }
 
 function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElement {
+  // ADR 0051 dec 1 — label is InlineRun[].
+  const label = decodeInlineRuns(map.get('label') as Y.Array<Y.Map<unknown>>);
+  const variant = map.get('variant') as ActionVariant;
+  const iconKind = map.has('iconKind') ? (map.get('iconKind') as IconName) : undefined;
+
+  // ADR 0051 dec 3 — exactly one of href or behavior is encoded.
+  if (map.has('behavior')) {
+    const bMap = map.get('behavior') as Y.Map<unknown>;
+    const behavior: ActionBehavior = {
+      type: 'copy',
+      value: bMap.get('value') as string,
+    };
+    return {
+      ...base,
+      type: 'action',
+      label,
+      variant,
+      behavior,
+      ...(iconKind !== undefined ? { iconKind } : {}),
+    };
+  }
+
   const hrefMap = map.get('href') as Y.Map<unknown>;
   const hrefType = hrefMap.get('type') as string;
-  const href: ActionElement['href'] =
+  const href: ActionHref =
     hrefType === 'page'
       ? {
           type: 'page',
@@ -964,26 +1084,44 @@ function decodeActionElement(map: Y.Map<unknown>, base: BaseElement): ActionElem
   return {
     ...base,
     type: 'action',
-    label: map.get('label') as string,
+    label,
+    variant,
     href,
-    variant: map.get('variant') as ActionElement['variant'],
+    ...(iconKind !== undefined ? { iconKind } : {}),
   };
 }
 
 function decodeShapeElement(map: Y.Map<unknown>, base: BaseElement): ShapeElement {
-  return {
+  const out: ShapeElement = {
     ...base,
     type: 'shape',
     variant: map.get('variant') as ShapeElement['variant'],
   };
+  if (map.has('iconKind')) out.iconKind = map.get('iconKind') as IconName;
+  return out;
 }
 
 function decodeContainerElement(map: Y.Map<unknown>, base: BaseElement): ContainerElement {
-  return {
+  const out: ContainerElement = {
     ...base,
     type: 'container',
     variant: map.get('variant') as ContainerElement['variant'],
   };
+  if (map.has('linkHref')) {
+    const hrefMap = map.get('linkHref') as Y.Map<unknown>;
+    const hrefType = hrefMap.get('type') as string;
+    out.linkHref =
+      hrefType === 'page'
+        ? {
+            type: 'page',
+            pageId: hrefMap.get('pageId') as string,
+            ...(hrefMap.has('anchor') ? { anchor: hrefMap.get('anchor') as string } : {}),
+          }
+        : { type: 'external', url: hrefMap.get('url') as string };
+  }
+  if (map.has('linkLabel')) out.linkLabel = map.get('linkLabel') as string;
+  if (map.has('tint')) out.tint = map.get('tint') as string;
+  return out;
 }
 
 function decodeFormElement(map: Y.Map<unknown>, base: BaseElement): FormElement {
@@ -1086,6 +1224,23 @@ function decodeNavElement(map: Y.Map<unknown>, base: BaseElement): NavElement {
   return el;
 }
 
+function decodeTabsElement(map: Y.Map<unknown>, base: BaseElement): TabsElement {
+  const tabsArr = map.get('tabs') as Y.Array<Y.Map<unknown>>;
+  const tabs: Tab[] = tabsArr.map((tabMap) => ({
+    id: tabMap.get('id') as string,
+    label: decodeInlineRuns(tabMap.get('label') as Y.Array<Y.Map<unknown>>),
+    elements: (tabMap.get('elements') as Y.Array<Y.Map<unknown>>).map(decodeElement),
+  }));
+  const out: TabsElement = {
+    ...base,
+    type: 'tabs',
+    tabs,
+    activeTabId: map.get('activeTabId') as string,
+  };
+  if (map.has('tabBarHeight')) out.tabBarHeight = map.get('tabBarHeight') as number;
+  return out;
+}
+
 function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): CollectionElement {
   const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
   const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
@@ -1167,6 +1322,7 @@ export const Y_DECODE_DISPATCH: YDecodeDispatch = {
   code: decodeCodeElement,
   nav: decodeNavElement,
   collection: decodeCollectionElement,
+  tabs: decodeTabsElement,
 };
 
 function decodeElement(map: Y.Map<unknown>): CanvasElement {
@@ -1259,6 +1415,9 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   };
   if (map.has('role')) {
     section.role = map.get('role') as NonNullable<CanvasSection['role']>;
+  }
+  if (map.has('anchorId')) {
+    section.anchorId = map.get('anchorId') as string;
   }
   if (map.has('backgroundEffect')) {
     section.backgroundEffect = map.get('backgroundEffect') as NonNullable<
@@ -1374,6 +1533,13 @@ export function decodeYDoc(doc: Y.Doc): EditableSite {
   }
   if (root.has('faviconAssetId')) {
     state.faviconAssetId = root.get('faviconAssetId') as string;
+  }
+  if (root.has('scrollBehavior')) {
+    const scroll = root.get('scrollBehavior') as Y.Map<unknown>;
+    const scrollBehavior: NonNullable<EditableSite['scrollBehavior']> = {};
+    if (scroll.has('smooth')) scrollBehavior.smooth = scroll.get('smooth') as boolean;
+    if (scroll.has('paddingTop')) scrollBehavior.paddingTop = scroll.get('paddingTop') as number;
+    state.scrollBehavior = scrollBehavior;
   }
   if (root.has('header')) {
     state.header = decodeSection(root.get('header') as Y.Map<unknown>);

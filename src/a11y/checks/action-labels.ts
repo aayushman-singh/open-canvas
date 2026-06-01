@@ -15,7 +15,10 @@ export function checkActionLabels(page: CanvasPage): AuditIssue[] {
   for (const section of page.sections) {
     for (const element of section.elements) {
       if (element.type !== 'action') continue;
-      if (typeof element.label !== 'string' || element.label.trim() === '') {
+      const concatenated = Array.isArray(element.label)
+        ? element.label.map((r) => r.text).join('')
+        : '';
+      if (concatenated.trim() === '') {
         issues.push({
           kind: 'missing-action-label',
           severity: DEFAULT_SEVERITY_BY_KIND['missing-action-label'],

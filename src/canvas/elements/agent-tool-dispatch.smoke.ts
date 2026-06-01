@@ -31,6 +31,7 @@
 
 import { AGENT_TOOL_DISPATCH } from './index.js';
 import { ELEMENT_TYPES } from '../schema.js';
+import type { JsonSchema } from '../../agent/llm.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[agent-tool-dispatch:smoke] ${message}`);
@@ -62,8 +63,10 @@ for (const [type, spec] of dispatchEntries) {
       `${type}.patchProperties.${propName}: schema must be an object`,
     );
     assert(
-      typeof schema.type === 'string' && schema.type.length > 0,
-      `${type}.patchProperties.${propName}: schema.type must be a non-empty string`,
+      (typeof schema.type === 'string' && schema.type.length > 0) ||
+        (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) ||
+        (Array.isArray(schema.anyOf) && schema.anyOf.length > 0),
+      `${type}.patchProperties.${propName}: schema must declare type, oneOf, or anyOf`,
     );
     assert(
       typeof schema.description === 'string' && schema.description.length > 0,
@@ -131,7 +134,20 @@ for (const [type, spec] of dispatchEntries) {
   }
 }
 
-function probeValueForSchema(propName: string, schema: { type?: string }): unknown {
+function probeValueForSchema(propName: string, schema: JsonSchema): unknown {
+  if (propName === 'href' || propName === 'linkHref') {
+    return { type: 'external', url: 'https://example.com' };
+  }
+  if (propName === 'behavior') return { type: 'copy', value: 'probe' };
+  if (propName === 'fluidSize') return { min: 16, max: 32, vw: 2 };
+  if (propName === 'label') return 'Probe';
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum[0];
+  if (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) {
+    return probeValueForSchema(propName, schema.oneOf[0] ?? {});
+  }
+  if (Array.isArray(schema.anyOf) && schema.anyOf.length > 0) {
+    return probeValueForSchema(propName, schema.anyOf[0] ?? {});
+  }
   switch (schema.type) {
     case 'array':
       if (propName === 'content') return [{ text: 'probe' }];
@@ -164,6 +180,25 @@ for (const t of ELEMENT_TYPES) {
     `ELEMENT_TYPES literal "${t}" has no AGENT_TOOL_DISPATCH entry — every element type must register a spec (collection's spec is intentionally empty).`,
   );
 }
+
+const actionSpec = AGENT_TOOL_DISPATCH.action;
+assert(actionSpec !== undefined, 'action dispatch entry must exist');
+const hrefPatch = actionSpec.parsePatch({
+  href: { type: 'external', url: 'https://example.com' },
+});
+assert(hrefPatch.href !== undefined, 'action href patch must set href');
+assert(
+  Object.prototype.hasOwnProperty.call(hrefPatch, 'behavior') && hrefPatch.behavior === undefined,
+  'action href patch must explicitly clear behavior',
+);
+const behaviorPatch = actionSpec.parsePatch({
+  behavior: { type: 'copy', value: 'hello@example.com' },
+});
+assert(behaviorPatch.behavior !== undefined, 'action behavior patch must set behavior');
+assert(
+  Object.prototype.hasOwnProperty.call(behaviorPatch, 'href') && behaviorPatch.href === undefined,
+  'action behavior patch must explicitly clear href',
+);
 
 console.log(
   `[agent-tool-dispatch:smoke] OK — ${String(dispatchEntries.length)}/${String(ELEMENT_TYPES.length)} dispatch entries verified (all element types registered)`,

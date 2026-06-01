@@ -45,6 +45,7 @@ const REGISTERED_FACTORIES = [
   'carousel',
   'table',
   'nav',
+  'tabs',
 ] as const;
 
 const validTypeSet = new Set<string>(ELEMENT_TYPES);

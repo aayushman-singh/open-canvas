@@ -70,7 +70,7 @@ const actionEl: ActionElement = {
   id: 'el-action',
   type: 'action',
   box: { x: 100, y: 440, w: 200, h: 56, z: 4 },
-  label: 'Get Started',
+  label: [{ text: 'Get Started' }],
   href: { type: 'external', url: '/signup' },
   variant: 'solid',
 };

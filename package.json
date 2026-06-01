@@ -84,6 +84,8 @@
     "table:smoke": "bun run src/canvas/elements/table-smoke.ts",
     "text-typography:smoke": "bun run src/canvas/elements/text-typography.smoke.ts",
     "layout-primitives:smoke": "bun run src/canvas/layout-primitives.smoke.ts",
+    "action-expressiveness:smoke": "bun run src/canvas/action-expressiveness.smoke.ts",
+    "tabs-element:smoke": "bun run src/canvas/tabs-element.smoke.ts",
     "visitor-mode:smoke": "bun run src/themes/visitor-mode/smoke.ts",
     "chat:smoke": "bun run src/agent/chat/smoke.ts",
     "i18n:smoke": "bun run src/i18n/smoke.ts",
