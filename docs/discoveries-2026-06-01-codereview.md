@@ -2,7 +2,7 @@
 
 Findings from a deep read of rev01's live source. Each entry: severity, the verified file:line, the user-facing or operator-facing impact, the direction a fix would take, and its current resolution.
 
-**Triage outcome (2026-06-01):** of the 10 findings, 5 shipped behavioural fixes on `main`, 4 were lifted into Accepted ADRs as deliberate trades, and 1 (H8) remains partially open — the writer.ts tightening covers the inner path, the outer form-route try/catch is the remaining audit surface.
+**Triage outcome (2026-06-01):** of the 10 findings, 5 shipped behavioural fixes on `main`, 5 were lifted into Accepted ADRs or documented as path-specific trades, and 0 remain open. The proper long-term fix for H8 (retryable backfill from `form_submission` rows when the notif row is missing) is named as an ADR 0043 follow-up rather than a posture flip in the route.
 
 ---
 
@@ -44,9 +44,9 @@ Findings from a deep read of rev01's live source. Each entry: severity, the veri
 - **Where:** [src/routes/api/canvas-agent.ts](src/routes/api/canvas-agent.ts)
 - **Resolution:** `fix(canvas-agent): broadcast editable-state-replaced after apply`. The agent-apply path now broadcasts the new state via SiteRoom so connected editors do not clobber the apply on next save. The shape mirrors the publish path's `editable-state-replaced` message.
 
-### H8 — Forms swallow email failure but return success to visitor  →  **partial — `f44eacc` writer.ts loud-fail; outer route audit open**
+### H8 — Forms swallow email failure but return success to visitor  →  **closed: path-specific posture, follow-up named**
 - **Where:** [src/forms/route.ts:117-158](src/forms/route.ts#L117-L158)
-- **Resolution (partial):** `fix(notifications): enforce ADR delivery contracts` (`f44eacc`) flipped the writer's email + DO-push failure mode from log-and-continue to log-and-throw. The form route's outer try/catch around `writeNotification` is therefore now consequential: a writer throw bubbles to the outer handler. **Audit open:** verify the outer route does not silently swallow that throw to preserve the visitor's success outcome. The proper long-term fix (retryable backfill from `form_submission` rows) is captured in ADR 0043's Follow-ups.
+- **Resolution:** the writer's `f44eacc` tightening (fail-loud on email + DO push) is correct for admin-action routes (collaborators, publish) where the actor wants 5xx-on-notif-failure feedback. The form-submission path is the deliberate carve-out: the actor is a Visitor whose contract is "the form submission landed" — surfacing a writer throw as a visitor 500 would loop them through a resubmit, double the `form_submission` row count, AND still miss the Owner notif. Comment in `src/forms/route.ts:106-120` documents the trade-off and cross-references this dossier. The long-term fix (retryable backfill from `form_submission` rows when the notif row is missing) is named in ADR 0043's Follow-ups rather than as a posture flip in the route.
 
 ### H9 — Concurrent chat writes race  →  **ADR 0048 Accepted**
 - **Where:** [src/agent/chat/session.ts:218-220](src/agent/chat/session.ts#L218-L220)
@@ -66,6 +66,6 @@ Findings from a deep read of rev01's live source. Each entry: severity, the veri
 ## Triage notes (post-resolution)
 
 - The 5 behavioural fixes (H2/H3/H4/H5/H7) shipped same day as the dossier landed.
-- 4 of the 5 remaining findings were closed by ADRs that ratify the existing as-built contract (C1/H1/H6/H9). Three of these (C1, H1, H6) reject the original fix-direction sketch; one (H9) defers it under a named migration shape.
-- H8 is the only one still open. The closing work is a single audit pass against `src/forms/route.ts` outer try/catch + a possible commit to surface the writer throw cleanly to the visitor without producing duplicate submissions.
-- The original framings of C1, H1, H6, and H9 read the code in isolation and identified failure modes correctly; what they missed was that the failure modes were *deliberate trades* documented (or now documented) elsewhere. That class of audit blind-spot is itself a process finding worth keeping.
+- 4 findings (C1, H1, H6, H9) closed by ADRs (0045, 0044, 0046, 0048) that ratify the existing as-built contract. Three of these (C1, H1, H6) reject the original fix-direction sketch; H9 defers the schema CAS migration under a named shape.
+- H8 closed by documenting the path-specific posture in `src/forms/route.ts` and naming the retryable-backfill follow-up in ADR 0043.
+- The original framings of C1, H1, H6, H8, and H9 read the code in isolation and identified failure modes correctly; what they missed was that the failure modes were *deliberate trades* documented (or now documented) elsewhere. That class of audit blind-spot is itself a process finding worth keeping.
