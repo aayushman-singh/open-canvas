@@ -482,6 +482,20 @@ const cardStyles = `
     margin-right: 6px;
   }
 
+  .site-card-collab-chip {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    border: 1.5px solid var(--line-2);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
   .btn-dots {
     width: 38px;
     min-width: 38px;
@@ -940,6 +954,7 @@ document.addEventListener('click', function(e) {
 
 interface SiteCard {
   siteId: string;
+  ownedByCurrent: boolean;
   siteName: string;
   subdomain: string;
   styleKit: string;
@@ -971,6 +986,7 @@ const THUMB_FAILED_HTML =
 function buildCards(
   rows: Array<{
     id: string;
+    ownedByCurrent: boolean;
     name: string;
     subdomain: string;
     styleKit: string;
@@ -996,6 +1012,7 @@ function buildCards(
     }
     return {
       siteId: row.id,
+      ownedByCurrent: row.ownedByCurrent,
       siteName: row.name,
       subdomain: row.subdomain,
       styleKit: row.styleKit,
@@ -1168,15 +1185,22 @@ dashboard.get('/', async (c) => {
   // future change that lets owners self-collaborate would silently double
   // the row. Filter on the merge instead of trusting the schema invariant.
   const ownedIds = new Set(ownedRows.map((r) => r.id));
-  const rows = ownedRows.concat(collabRows.filter((r) => !ownedIds.has(r.id)));
+  type DashboardSiteRow = (typeof ownedRows)[number] & { ownedByCurrent: boolean };
+  const rows: DashboardSiteRow[] = [
+    ...ownedRows.map((row) => ({ ...row, ownedByCurrent: true })),
+    ...collabRows
+      .filter((row) => !ownedIds.has(row.id))
+      .map((row) => ({ ...row, ownedByCurrent: false })),
+  ];
   const cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));
   const publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
   const storageBytes = Number(sb[0]?.total ?? 0);
 
   const siteLimit = siteLimitForPlan(customerPlan);
+  const ownedSiteCount = ownedRows.length;
   // siteLimit gates CREATION, so it counts only owned sites — collaborator
   // access doesn't consume the inviter's plan quota.
-  const atSiteLimit = siteLimit !== null && ownedRows.length >= siteLimit;
+  const atSiteLimit = siteLimit !== null && ownedSiteCount >= siteLimit;
   const planName = billingPlanLabel(customerPlan);
   const siteLimitLabel = siteLimit === null ? 'Unlimited' : String(siteLimit);
   const storageLimitLabel = formatBytes(storageLimitForPlan(customerPlan));
@@ -1230,8 +1254,8 @@ dashboard.get('/', async (c) => {
 
       <div class="dash-stats">
         <div class="dash-stat-card">
-          <div class="stat-label">Total sites</div>
-          <div class="stat-value">{String(cards.length)}</div>
+          <div class="stat-label">Owned sites</div>
+          <div class="stat-value">{String(ownedSiteCount)}</div>
           <div class="stat-sub">of {siteLimitLabel} on {planName}</div>
         </div>
         <div class="dash-stat-card">
@@ -1361,20 +1385,26 @@ dashboard.get('/', async (c) => {
                   >
                     Edit
                   </Button>
-                  {s.publishedVersion > 0 ? (
-                    <Button
-                      variant="secondary"
-                      class="btn-unpublish"
-                      data-site-id={s.siteId}
-                      data-action="unpublish"
-                    >
-                      <span class="dot" />
-                      Live &middot; Make draft
-                    </Button>
+                  {s.ownedByCurrent ? (
+                    s.publishedVersion > 0 ? (
+                      <Button
+                        variant="secondary"
+                        class="btn-unpublish"
+                        data-site-id={s.siteId}
+                        data-action="unpublish"
+                      >
+                        <span class="dot" />
+                        Live &middot; Make draft
+                      </Button>
+                    ) : (
+                      <Button variant="secondary" class="btn-publish" data-site-id={s.siteId}>
+                        Publish
+                      </Button>
+                    )
                   ) : (
-                    <Button variant="secondary" class="btn-publish" data-site-id={s.siteId}>
-                      Publish
-                    </Button>
+                    <span class="site-card-collab-chip" title="Collaborator access">
+                      Collaborator
+                    </span>
                   )}
                   <Button
                     variant="secondary"

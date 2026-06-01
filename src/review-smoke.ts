@@ -547,6 +547,18 @@ assert(
   'expected dashboard to render every owned site card in a list/grid',
 );
 assert(
+  dashboardSource.includes('ownedByCurrent: boolean') &&
+    dashboardSource.includes('ownedByCurrent: row.ownedByCurrent') &&
+    dashboardSource.includes('{s.ownedByCurrent ? ('),
+  'expected dashboard site cards to carry ownership and hide owner-only publish controls from collaborator cards',
+);
+assert(
+  dashboardSource.includes('const ownedSiteCount = ownedRows.length') &&
+    dashboardSource.includes('<div class="stat-label">Owned sites</div>') &&
+    dashboardSource.includes('<div class="stat-value">{String(ownedSiteCount)}</div>'),
+  'expected dashboard quota meter to count owned sites, not collaborator-accessible cards',
+);
+assert(
   !dashboardSource.includes('const latestSite'),
   'expected dashboard not to query only the latest site',
 );
