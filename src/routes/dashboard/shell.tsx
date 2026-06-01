@@ -11,6 +11,7 @@ import {
 } from '../../ui';
 import type { Theme } from '../../ui';
 import { notificationsInboxScript } from '../../notifications/dashboard-inbox-script';
+import { bellStyles } from '../../notifications/bell-styles';
 
 // MIGRATION.md §4 — dashboard chrome wears the Open Canvas skin.
 //
@@ -244,95 +245,6 @@ const shellStyles = `
   }
   .rev01-modal-danger:hover { background: var(--red-strong); }
 
-  /* ADR 0043 — notification bell + inbox dropdown */
-  .notif-wrap { position: relative; display: inline-flex; }
-  .notif-bell { position: relative; }
-  .notif-badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 999px;
-    background: var(--red);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 18px;
-    text-align: center;
-    box-shadow: 0 0 0 2px var(--surface);
-  }
-  .notif-panel {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    width: 360px;
-    max-height: 480px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--r);
-    box-shadow: var(--shadow-lg);
-    z-index: 9000;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  .notif-panel-head {
-    padding: 14px 18px;
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--ink);
-    border-bottom: 1px solid var(--line);
-    background: var(--paper);
-  }
-  .notif-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    overflow-y: auto;
-    flex: 1;
-  }
-  .notif-list li {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--line);
-    font-size: 13px;
-    line-height: 1.5;
-  }
-  .notif-list li:last-child { border-bottom: none; }
-  .notif-list .notif-empty {
-    color: var(--ink-3);
-    text-align: center;
-    padding: 28px 18px;
-    font-style: italic;
-  }
-  .notif-item {
-    display: block;
-    color: inherit;
-    text-decoration: none;
-    cursor: pointer;
-    background: var(--surface);
-    transition: background 0.12s;
-  }
-  .notif-item:hover { background: var(--paper); }
-  .notif-item.unread { background: var(--red-tint); }
-  .notif-item.unread:hover { background: var(--red-soft); }
-  .notif-item-title {
-    font-weight: 600;
-    color: var(--ink);
-    margin: 0 0 2px;
-  }
-  .notif-item-detail {
-    color: var(--ink-2);
-    font-size: 12.5px;
-    margin: 0;
-  }
-  .notif-item-time {
-    display: block;
-    color: var(--ink-3);
-    font-size: 11px;
-    margin-top: 4px;
-  }
 `;
 
 export type Crumb = { href?: string; label: string };
@@ -504,8 +416,8 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
   // chrome rule reads them. Per-page <style> blocks (pageStyles) win last
   // so route-specific overrides still take effect.
   const css = pageStyles
-    ? `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}\n${pageStyles}`
-    : `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}`;
+    ? `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}\n${bellStyles}\n${pageStyles}`
+    : `${themeCss}\n${componentsCss}\n${uiStyles}\n${shellStyles}\n${bellStyles}`;
   const showCrumbs = crumbs.length > 1;
 
   const initial = (userMeta?.displayName ?? userMeta?.email ?? '?').charAt(0).toUpperCase();
@@ -594,7 +506,7 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
                 <ThemeToggleIcons />
               </button>
               <div class="notif-wrap">
-                <button class="iconbtn notif-bell" id="notif-bell" aria-label="Notifications" aria-expanded="false" aria-controls="notif-panel">
+                <button class="notif-bell" id="notif-bell" aria-label="Notifications" aria-expanded="false" aria-controls="notif-panel">
                   <NotificationIcon />
                   <span class="notif-badge" id="notif-badge" hidden aria-hidden="true">0</span>
                 </button>
