@@ -2221,9 +2221,66 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   var undoTimer = null;
   var undoRedoing = false;
   var UNDO_MAX = 60;
+  // Cap how many snapshots we serialise to localStorage so a busy session
+  // doesn't blow the per-origin storage quota. The in-memory cap is 60,
+  // but we keep at most this many persisted across reloads.
+  var UNDO_PERSIST_MAX = 20;
+  var UNDO_STORAGE_KEY = "oc:undo:" + SITE_ID;
+
+  function persistUndo() {
+    // localStorage might be unavailable (Safari private mode, iframe sandbox,
+    // disabled storage). Wrap everything so a storage error never wedges
+    // the editor — the in-memory stacks stay correct regardless.
+    try {
+      if (typeof localStorage === "undefined") return;
+      var truncStack = undoStack.length > UNDO_PERSIST_MAX
+        ? undoStack.slice(undoStack.length - UNDO_PERSIST_MAX)
+        : undoStack;
+      var truncRedo = redoStack.length > UNDO_PERSIST_MAX
+        ? redoStack.slice(redoStack.length - UNDO_PERSIST_MAX)
+        : redoStack;
+      var payload = JSON.stringify({ stack: truncStack, redo: truncRedo });
+      localStorage.setItem(UNDO_STORAGE_KEY, payload);
+    } catch (e) {
+      // Quota exceeded or storage disabled — drop the persisted history
+      // for this site so we don't keep retrying a doomed write. The
+      // in-memory stacks are unaffected.
+      try { localStorage.removeItem(UNDO_STORAGE_KEY); } catch (_) { /* ignore */ }
+    }
+  }
 
   function initUndo() {
-    if (state) undoStack.push(structuredClone(state));
+    if (!state) return;
+    var restored = false;
+    try {
+      if (typeof localStorage !== "undefined") {
+        var raw = localStorage.getItem(UNDO_STORAGE_KEY);
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.stack) && Array.isArray(parsed.redo)) {
+            // Only restore if the persisted top-of-stack equals the
+            // server-loaded state. Any divergence (someone edited from
+            // another device, server backfilled a migration, etc.) means
+            // our stored history is stale and would let undo destroy
+            // content the user can't see.
+            var top = parsed.stack[parsed.stack.length - 1];
+            if (top && JSON.stringify(top) === JSON.stringify(state)) {
+              undoStack = parsed.stack;
+              redoStack = parsed.redo;
+              restored = true;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Corrupted JSON or storage error — fall back to a fresh seed.
+      restored = false;
+    }
+    if (!restored) {
+      undoStack = [structuredClone(state)];
+      redoStack = [];
+      persistUndo();
+    }
   }
 
   function captureForUndo() {
@@ -2242,6 +2299,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     undoStack.push(snap);
     if (undoStack.length > UNDO_MAX) undoStack.shift();
     redoStack = [];
+    persistUndo();
   }
 
   function undo() {
@@ -2261,6 +2319,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     state = structuredClone(undoStack[undoStack.length - 1]);
     renderAll();
     scheduleSave();
+    persistUndo();
     undoRedoing = false;
     setStatus("Undo", "ok");
   }
@@ -2274,6 +2333,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     state = structuredClone(redoStack.pop());
     renderAll();
     scheduleSave();
+    persistUndo();
     undoRedoing = false;
     setStatus("Redo", "ok");
   }
