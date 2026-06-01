@@ -4352,7 +4352,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                   optRow.appendChild(optInput);
                   var rmOpt = document.createElement("button");
                   rmOpt.type = "button";
-                  rmOpt.textContent = "x";
+                  rmOpt.className = "opencanvas-inspector-remove";
+                  rmOpt.textContent = "\\u00d7";
+                  rmOpt.title = "Remove option";
+                  rmOpt.setAttribute("aria-label", "Remove option");
                   rmOpt.addEventListener("click", function() {
                     f.options.splice(optIdx, 1);
                     renderOpts();
@@ -4365,7 +4368,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
               }
               var addOpt = document.createElement("button");
               addOpt.type = "button";
-              addOpt.textContent = "+ option";
+              addOpt.className = "opencanvas-inspector-add";
+              addOpt.textContent = "Add option";
               addOpt.addEventListener("click", function() {
                 f.options.push(formOption("Option " + (f.options.length + 1)));
                 renderOpts();
@@ -4380,7 +4384,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var removeBtn = document.createElement("button");
           removeBtn.type = "button";
-          removeBtn.textContent = "Remove field";
+          removeBtn.className = "opencanvas-inspector-remove";
+          removeBtn.textContent = "\\u00d7";
+          removeBtn.title = "Remove field";
+          removeBtn.setAttribute("aria-label", "Remove field");
           removeBtn.addEventListener("click", function() {
             element.fields.splice(idx, 1);
             renderFieldList();
@@ -4395,7 +4402,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
       var addFieldBtn = document.createElement("button");
       addFieldBtn.type = "button";
-      addFieldBtn.textContent = "+ field";
+      addFieldBtn.className = "opencanvas-inspector-add";
+      addFieldBtn.textContent = "Add field";
       addFieldBtn.addEventListener("click", function() {
         element.fields.push({ id: newElementId(), label: "New field", kind: "text", required: false, placeholder: "" });
         renderFieldList();
@@ -4718,7 +4726,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var removeBtn = document.createElement("button");
           removeBtn.type = "button";
-          removeBtn.textContent = "Remove item";
+          removeBtn.className = "opencanvas-inspector-remove";
+          removeBtn.textContent = "\\u00d7";
+          removeBtn.title = "Remove item";
+          removeBtn.setAttribute("aria-label", "Remove item");
           removeBtn.addEventListener("click", function() {
             element.items.splice(idx, 1);
             renderItemList();
@@ -4733,7 +4744,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
       var addBtn = document.createElement("button");
       addBtn.type = "button";
-      addBtn.textContent = "+ item";
+      addBtn.className = "opencanvas-inspector-add";
+      addBtn.textContent = "Add item";
       addBtn.addEventListener("click", function() {
         element.items.push({ id: newElementId(), title: "New item", body: [{ text: "Content" }] });
         renderItemList();
@@ -4820,7 +4832,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var removeBtn = document.createElement("button");
           removeBtn.type = "button";
-          removeBtn.textContent = "Remove slide";
+          removeBtn.className = "opencanvas-inspector-remove";
+          removeBtn.textContent = "\\u00d7";
+          removeBtn.title = "Remove slide";
+          removeBtn.setAttribute("aria-label", "Remove slide");
           removeBtn.addEventListener("click", function() {
             element.slides.splice(idx, 1);
             renderSlideList();
@@ -4835,7 +4850,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
       var addBtn = document.createElement("button");
       addBtn.type = "button";
-      addBtn.textContent = "+ slide";
+      addBtn.className = "opencanvas-inspector-add";
+      addBtn.textContent = "Add slide";
       addBtn.addEventListener("click", function() {
         element.slides.push({ id: newElementId(), assetId: "__placeholder__", caption: "" });
         renderSlideList();
@@ -4886,9 +4902,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var rmColBtn = document.createElement("button");
           rmColBtn.type = "button";
-          rmColBtn.textContent = "x";
+          rmColBtn.textContent = "\\u00d7";
           rmColBtn.title = "Remove column";
-          rmColBtn.style.cssText = "font-size:9px;padding:0 3px;margin-left:2px;";
+          rmColBtn.setAttribute("aria-label", "Remove column");
+          rmColBtn.style.cssText = "font-size:13px;line-height:1;padding:1px 5px;margin-left:2px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;background:transparent;cursor:pointer;";
           rmColBtn.addEventListener("click", function() {
             var removedId = element.columns[colIdx].id;
             element.columns.splice(colIdx, 1);
@@ -4911,6 +4928,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var addColBtn = document.createElement("button");
       addColBtn.type = "button";
       addColBtn.textContent = "+ col";
+      addColBtn.title = "Add column";
+      addColBtn.style.cssText = "font-size:11px;padding:2px 8px;color:var(--ink-2);border:1px dashed var(--line-2);border-radius:4px;background:transparent;cursor:pointer;font-weight:650;";
       addColBtn.addEventListener("click", function() {
         var newColId = newElementId();
         element.columns.push({ id: newColId, header: "Column " + (element.columns.length + 1) });
@@ -4962,8 +4981,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           rmCell.style.cssText = "padding:2px;border:1px solid var(--opencanvas-hairline);";
           var rmRowBtn = document.createElement("button");
           rmRowBtn.type = "button";
-          rmRowBtn.textContent = "x";
+          rmRowBtn.textContent = "\\u00d7";
           rmRowBtn.title = "Remove row";
+          rmRowBtn.setAttribute("aria-label", "Remove row");
+          rmRowBtn.style.cssText = "font-size:13px;line-height:1;padding:1px 5px;color:var(--ink-3);border:1px solid var(--line-2);border-radius:4px;background:transparent;cursor:pointer;";
           rmRowBtn.addEventListener("click", function() {
             element.rows.splice(ri, 1);
             renderTableGrid();
@@ -4982,6 +5003,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var addRowBtn = document.createElement("button");
       addRowBtn.type = "button";
       addRowBtn.textContent = "+ row";
+      addRowBtn.title = "Add row";
+      addRowBtn.style.cssText = "font-size:11px;padding:3px 10px;color:var(--ink-2);border:1px dashed var(--line-2);border-radius:4px;background:transparent;cursor:pointer;font-weight:650;width:100%;";
       addRowBtn.addEventListener("click", function() {
         var cells = {};
         for (var ci3 = 0; ci3 < element.columns.length; ci3++) {
@@ -5117,7 +5140,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
           var removeBtn = document.createElement("button");
           removeBtn.type = "button";
-          removeBtn.textContent = "Remove link";
+          removeBtn.className = "opencanvas-inspector-remove";
+          removeBtn.textContent = "\\u00d7";
+          removeBtn.title = "Remove link";
+          removeBtn.setAttribute("aria-label", "Remove link");
           removeBtn.addEventListener("click", function() {
             element.links.splice(idx, 1);
             renderLinkList();
@@ -5133,7 +5159,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
       var addBtn = document.createElement("button");
       addBtn.type = "button";
-      addBtn.textContent = "+ link";
+      addBtn.className = "opencanvas-inspector-add";
+      addBtn.textContent = "Add link";
       addBtn.addEventListener("click", function() {
         element.links.push({ label: "New link", href: "/", kind: "internal" });
         renderLinkList();

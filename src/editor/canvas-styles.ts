@@ -2092,6 +2092,75 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   border-color: var(--red);
   box-shadow: var(--ring);
 }
+
+/* Add / remove affordances for compound element inspectors (nav links,
+   carousel slides, accordion items, form fields, table rows/cols).
+   Default buttons read as "field actions" — too quiet to invite the
+   owner to add a new sibling, and the per-item Remove button was the
+   same shape as the field below it. These two classes give those
+   actions a louder, more discoverable shape. */
+:where(#canvas-inspector) button.opencanvas-inspector-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1.5px dashed var(--line-2);
+  color: var(--ink-2);
+  font-weight: 650;
+}
+:where(#canvas-inspector) button.opencanvas-inspector-add::before {
+  content: "+";
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+  font-size: 13px;
+}
+:where(#canvas-inspector) button.opencanvas-inspector-add:hover {
+  border-color: var(--red);
+  color: var(--red);
+  border-style: solid;
+  background: var(--surface-2);
+}
+:where(#canvas-inspector) button.opencanvas-inspector-add:hover::before {
+  background: var(--red);
+}
+
+:where(#canvas-inspector) button.opencanvas-inspector-remove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+}
+:where(#canvas-inspector) button.opencanvas-inspector-remove:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: var(--red-soft, rgba(229, 62, 62, 0.08));
+}
+:where(#canvas-inspector) button.opencanvas-inspector-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 #canvas-inspector .row {
   display: flex;
   gap: 8px;
