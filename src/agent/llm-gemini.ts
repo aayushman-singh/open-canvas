@@ -1,4 +1,4 @@
-// Gemini 2.5 Pro implementation of LlmAdapter.
+// Gemini API implementation of LlmAdapter.
 //
 // Wraps @google/genai's generateContentStream. The streaming API yields a
 // sequence of GenerateContentResponse chunks; each chunk's
@@ -131,7 +131,9 @@ function translateMessagesToContents(messages: LlmMessage[]): Content[] {
   for (const msg of messages) {
     switch (msg.role) {
       case 'system':
-        throw new Error('GeminiAdapter: system messages must be passed via systemInstruction, not in the messages array');
+        throw new Error(
+          'GeminiAdapter: system messages must be passed via systemInstruction, not in the messages array',
+        );
       case 'user':
         out.push({ role: 'user', parts: [{ text: msg.content }] });
         break;

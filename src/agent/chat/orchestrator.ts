@@ -69,7 +69,7 @@ import type { ChatStreamWriter } from './stream.js';
 // Tunables
 // ---------------------------------------------------------------------------
 
-export const CHAT_DEFAULT_MODEL = 'gemini-3.1-pro-preview';
+export const CHAT_DEFAULT_MODEL = 'gemini-3-pro-preview';
 export const MAX_TOOL_CALL_ITERATIONS = 5;
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,8 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const { session, userMessage, writer, ctx } = input;
   const tools = ctx.tools ?? CHAT_AGENT_TOOLS;
   const model = ctx.model ?? CHAT_DEFAULT_MODEL;
-  const systemInstruction = ctx.systemInstruction ?? buildSystemPrompt(ctx.state, ctx.selectedElementId);
+  const systemInstruction =
+    ctx.systemInstruction ?? buildSystemPrompt(ctx.state, ctx.selectedElementId);
   const maxIterations = ctx.maxIterations ?? MAX_TOOL_CALL_ITERATIONS;
 
   // 1. Append the user message to history.
@@ -556,7 +557,9 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   lines.push(
     '  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).',
   );
-  lines.push("  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.");
+  lines.push(
+    "  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.",
+  );
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent IDs — call query_site or query_assets first when unsure.');

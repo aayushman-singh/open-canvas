@@ -32,10 +32,7 @@ import { translateToolCall, parseApplyOp, isRecord } from '../../agent/tool-pars
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
-import {
-  type EditableSite,
-  type StyleKit,
-} from '../../canvas/schema';
+import { type EditableSite, type StyleKit } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { customer, ownerAsset, site } from '../../db/schema';
@@ -55,7 +52,7 @@ type Bindings = {
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-const CANVAS_AGENT_MODEL = 'gemini-3.1-pro-preview';
+const CANVAS_AGENT_MODEL = 'gemini-3-pro-preview';
 
 const canvasAgentApi = new Hono<Env>();
 
@@ -200,7 +197,9 @@ function buildSystemPrompt(state: EditableSite): string {
 
   // Enumerate header
   if (state.header) {
-    lines.push(`Header section ${state.header.id} (name=${JSON.stringify(state.header.name)}, height=${String(state.header.height)}):`);
+    lines.push(
+      `Header section ${state.header.id} (name=${JSON.stringify(state.header.name)}, height=${String(state.header.height)}):`,
+    );
     for (const element of state.header.elements) {
       lines.push(`  - element ${element.id} type=${element.type}`);
     }
@@ -223,7 +222,9 @@ function buildSystemPrompt(state: EditableSite): string {
 
   // Enumerate footer
   if (state.footer) {
-    lines.push(`Footer section ${state.footer.id} (name=${JSON.stringify(state.footer.name)}, height=${String(state.footer.height)}):`);
+    lines.push(
+      `Footer section ${state.footer.id} (name=${JSON.stringify(state.footer.name)}, height=${String(state.footer.height)}):`,
+    );
     for (const element of state.footer.elements) {
       lines.push(`  - element ${element.id} type=${element.type}`);
     }
@@ -231,21 +232,41 @@ function buildSystemPrompt(state: EditableSite): string {
 
   lines.push('');
   lines.push('Tools:');
-  lines.push('  rewriteText — rewrite text element content. content must be InlineRun[] (never a plain string).');
+  lines.push(
+    '  rewriteText — rewrite text element content. content must be InlineRun[] (never a plain string).',
+  );
   lines.push('  replaceMedia — swap a media element to an existing uploaded asset.');
-  lines.push('  designSection — create a new section from a semantic layout tree (stack/grid/split nodes with element leaves).');
-  lines.push('  updateElement — change properties of an existing element. Pass elementType matching the actual type.');
+  lines.push(
+    '  designSection — create a new section from a semantic layout tree (stack/grid/split nodes with element leaves).',
+  );
+  lines.push(
+    '  updateElement — change properties of an existing element. Pass elementType matching the actual type.',
+  );
   lines.push('  deleteElement — remove an element from its section.');
-  lines.push('  addElement — add a new element to a section. Auto-placed below existing content unless box is specified.');
-  lines.push('  updateSection — change section name, height, background effect, or entrance animation.');
-  lines.push('  deleteSection — remove a section. Can delete header/footer (removes site-wide). Cannot delete the last section on a page.');
-  lines.push('  moveSection — move a body section. Pass afterSectionId (empty string = move to top). Cannot move header/footer.');
+  lines.push(
+    '  addElement — add a new element to a section. Auto-placed below existing content unless box is specified.',
+  );
+  lines.push(
+    '  updateSection — change section name, height, background effect, or entrance animation.',
+  );
+  lines.push(
+    '  deleteSection — remove a section. Can delete header/footer (removes site-wide). Cannot delete the last section on a page.',
+  );
+  lines.push(
+    '  moveSection — move a body section. Pass afterSectionId (empty string = move to top). Cannot move header/footer.',
+  );
   lines.push('  duplicateSection — clone a body section with new IDs.');
   lines.push('  addPage — create a new page with title and slug.');
-  lines.push('  updatePage — update page title, slug, SEO description, noIndex, locale, and other metadata.');
+  lines.push(
+    '  updatePage — update page title, slug, SEO description, noIndex, locale, and other metadata.',
+  );
   lines.push('  deletePage — remove a page. Cannot delete the last page.');
-  lines.push('  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).');
-  lines.push("  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.");
+  lines.push(
+    '  setStyleKit — switch to a built-in style kit (charcoal, orange-editorial, blue-saas, green-organic).',
+  );
+  lines.push(
+    "  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.",
+  );
 
   return lines.join('\n');
 }
@@ -429,15 +450,13 @@ canvasAgentApi.post('/sites/:siteId/apply', async (c) => {
   for (let i = 0; i < opsCandidate.length; i++) {
     const candidate = normalisePageRef(opsCandidate[i]);
     const isLegacyToolShape =
-      isRecord(candidate) &&
-      typeof candidate.tool === 'string' &&
-      candidate.kind === undefined;
+      isRecord(candidate) && typeof candidate.tool === 'string' && candidate.kind === undefined;
     const parsed = isLegacyToolShape
       ? translateToolCall({
           id: '',
           name: (candidate as { tool: string }).tool,
           arguments: isRecord((candidate as { params?: unknown }).params)
-            ? ((candidate as { params: Record<string, unknown> }).params)
+            ? (candidate as { params: Record<string, unknown> }).params
             : {},
         })
       : parseApplyOp(candidate, row.styleKit);

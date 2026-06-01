@@ -7,7 +7,7 @@
 //      correct order: tool-call → tool-result → tool-call → op-preview → done.
 //   2. Session persistence: messages array grows across calls; same sessionId
 //      returns the same history.
-//   3. Token budget: query_site output capped at 2k tokens (truncate large sites).
+//   3. Token budget: query_site output capped at QUERY_SITE_TOKEN_CAP.
 //   4. Op preview NOT applied automatically (state unchanged).
 //
 // All paths run without GEMINI_API_KEY / DATABASE_URL — the mock LlmAdapter
@@ -20,9 +20,10 @@ import { SECTION_RECIPE_IDS } from '../../canvas/schema.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../../canvas/recipes.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 
-import { runChatTurn, type OrchestratorContext } from './orchestrator.js';
+import { CHAT_DEFAULT_MODEL, runChatTurn, type OrchestratorContext } from './orchestrator.js';
 import {
   InMemorySessionStore,
+  QUERY_SITE_TOKEN_CAP,
   estimateTokens,
   type ChatMessage,
   type ChatSessionState,
@@ -33,6 +34,11 @@ import { buildQuerySiteSummary } from './tools.js';
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(message);
 }
+
+assert(
+  CHAT_DEFAULT_MODEL === 'gemini-3-pro-preview',
+  `CHAT_DEFAULT_MODEL must use the official Gemini model code, got ${CHAT_DEFAULT_MODEL}`,
+);
 
 // ---------------------------------------------------------------------------
 // Fixture site state — single page, hero-split + feature-grid.
@@ -320,7 +326,7 @@ console.log('[chat:smoke] 2/4 Session persistence — OK');
 const summarySmall = buildQuerySiteSummary({ state: fixtureState, detail: 'full' });
 const smallTokens = estimateTokens(JSON.stringify(summarySmall));
 assert(
-  smallTokens <= 2000,
+  smallTokens <= QUERY_SITE_TOKEN_CAP,
   `small site summary should fit budget (got ${String(smallTokens)} tokens)`,
 );
 assert(summarySmall.truncated === false, 'small site summary should not be truncated');
@@ -329,8 +335,8 @@ const largeState = buildLargeState();
 const summaryLarge = buildQuerySiteSummary({ state: largeState, detail: 'full' });
 const largeTokens = estimateTokens(JSON.stringify(summaryLarge));
 assert(
-  largeTokens <= 2000,
-  `large site summary must be trimmed to <= 2000 tokens (got ${String(largeTokens)} tokens)`,
+  largeTokens <= QUERY_SITE_TOKEN_CAP,
+  `large site summary must be trimmed to <= ${String(QUERY_SITE_TOKEN_CAP)} tokens (got ${String(largeTokens)} tokens)`,
 );
 assert(
   summaryLarge.truncated === true,

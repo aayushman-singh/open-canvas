@@ -42,12 +42,18 @@ const canvasAgentRouteSource = readFileSync(
   'utf8',
 );
 assert(
-  canvasAgentRouteSource.includes("setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable')"),
+  canvasAgentRouteSource.includes(
+    "setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable')",
+  ),
   'preview/apply route prompt must tell the model to use visitorTheme',
 );
 assert(
   !canvasAgentRouteSource.includes('setSiteConfig — toggle darkModeEnabled'),
   'preview/apply route prompt must not mention legacy darkModeEnabled',
+);
+assert(
+  canvasAgentRouteSource.includes("const CANVAS_AGENT_MODEL = 'gemini-3-pro-preview'"),
+  'canvas-agent route must use the official Gemini 3 Pro Preview model code',
 );
 
 // ---------------------------------------------------------------------------

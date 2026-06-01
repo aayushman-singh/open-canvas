@@ -638,7 +638,8 @@ assert(
   'expected public route to resolve custom font tokens and emit @font-face CSS for Published Sites',
 );
 assert(
-  publicRouteSource.includes('role=visitor') &&
+  publicRouteSource.includes("let socketRole: 'editor' | 'visitor' = 'visitor'") &&
+    publicRouteSource.includes('role=${socketRole}') &&
     indexSource.includes("app.route('/__live', socketRoute)") &&
     socketRouteSource.includes('verifyEditToken') &&
     socketRouteSource.includes('role=editor'),
@@ -1155,6 +1156,16 @@ assert(
 assert(
   inlineCanvasClient.includes('mbtn.setAttribute("aria-label"'),
   'expected icon-only interaction-mode toolbar buttons to expose accessible labels',
+);
+assert(
+  canvasClientSource.includes('payload.selectedElementId = selectedElementId'),
+  'expected chat POST payload to include the currently selected element id',
+);
+assert(
+  canvasClientSource.includes('function updateChatSelectionChip()') &&
+    canvasClientSource.includes('chatSelectionClearBtn.addEventListener("click"') &&
+    canvasClientSource.includes('chatSelectionDropped = false;'),
+  'expected chat selected-element pill to render and clear the same selection context sent to chat',
 );
 
 // -- File-input discipline -----------------------------------------------
