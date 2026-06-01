@@ -1,9 +1,10 @@
 # ADR 0044 — Single HMAC secret signs invite, edit, and unlock tokens
 
-**Status:** Proposed
-**Date:** 2026-06-01
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named `UNLOCK_SIGNING_SECRET`'s reuse across three trust domains as a senior-grade architectural concern. This ADR ratifies the reuse as a deliberate trade rather than letting it stay as undocumented operational drift.
+**Accepted-context:** verified 2026-06-01 — `UNLOCK_SIGNING_SECRET` is the single signing key referenced by `src/password/cookie.ts`, `src/auth/edit-token.ts`, `src/routes/api/collaborators.ts` (via `buildAndSendInviteEmail`), and `src/live/socket-route.ts`. No per-class signing secret exists in `wrangler.toml` or `.dev.vars.example`. The single-rotation, single-blast-radius trade is the as-built contract.
 
 ## Context
 

@@ -1,9 +1,10 @@
 # ADR 0047 — Editor WebSocket bearer travels in the URL query string
 
-**Status:** Proposed
-**Date:** 2026-06-01
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the 4-hour edit-token-in-URL as "long-lived bearer in URL" without naming the constraint that makes it the only practical mechanism in browsers. This ADR pins the constraint, the exposure surface, and the supersession trigger.
+**Accepted-context:** verified 2026-06-01 — `src/live/socket-route.ts:36-37` reads `?wsToken=` from the upgrade URL and `verifyEditToken` gates the socket role assignment. `canvas-client.ts` opens the WS with the token in the query string. No alternative path (subprotocol, custom header) is wired. The as-built contract matches the ADR.
 
 ## Context
 

@@ -1,9 +1,10 @@
 # ADR 0048 — Chat session is last-writer-wins; concurrent tab writes are out of scope
 
-**Status:** Proposed
-**Date:** 2026-06-01
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the chat-session UPDATE as a concurrent-write hole. The bug-fix triage deferred a schema migration for it; this ADR ratifies the deferral and names the migration shape.
+**Accepted-context:** verified 2026-06-01 — `src/agent/chat/session.ts:218-220` is a plain whole-row UPDATE of the `messages` jsonb column; no version, lock, or CAS. The last-writer-wins behaviour the ADR ratifies is the as-built contract.
 
 ## Context
 

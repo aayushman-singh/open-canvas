@@ -1,9 +1,10 @@
 # ADR 0046 — `addon_custom_scripts` is Owner-authored JavaScript by design; entitlement is the security boundary
 
-**Status:** Proposed
-**Date:** 2026-06-01
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the `addon_custom_scripts` addon as a stored-XSS surface in visitor render. This ADR resolves the framing question that audit raises — feature, not finding — and pins the security boundary the audit's reading should have used.
+**Accepted-context:** verified 2026-06-01 — `src/addons/registry.ts` declares the addon with raw `headScripts` / `bodyScripts` config fields; `src/addons/emit.ts` re-verifies `addonEntitlement` + the `siteAddon` row on every render, with un-entitled emits returning empty strings. The trust model documented here is the as-built contract.
 
 ## Context
 

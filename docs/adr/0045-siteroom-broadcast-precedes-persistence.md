@@ -1,9 +1,10 @@
 # ADR 0045 — SiteRoom broadcasts Yjs updates to peers before autosave persistence completes
 
-**Status:** Proposed
-**Date:** 2026-06-01
+**Status:** Accepted
+**Date:** 2026-06-01 (proposed); 2026-06-01 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the 2026-06-01 second-opinion audit pass named the broadcast-before-persist ordering as a contract that [ADR 0007](0007-yjs-revival.md)'s "750ms debounce loss window" framing under-specified. This ADR makes the ordering explicit and names its failure modes.
+**Accepted-context:** verified 2026-06-01 — `src/live/site-room.ts` runs the doc-observer broadcast pathway separately from `attachAutosaveToDO`; updates fan out to peers synchronously, persistence runs through the debounced autosave observer. No await-persist gate sits between the two. The trade ratified here is the as-built behaviour.
 
 ## Context
 
