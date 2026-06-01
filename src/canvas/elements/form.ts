@@ -37,6 +37,14 @@ export interface FormElement extends BaseElement {
   fields: FormFieldDef[];
   submitLabel: string;
   successMessage: string;
+  /**
+   * Optional operator-facing name for this form. Used by the dashboard
+   * forms inbox row label and the export.csv filename so the owner sees
+   * "Contact form" / "Newsletter signup" instead of the auto-generated
+   * element id (el-form-xxxx). Renderer ignores it — it never shows on
+   * the visitor page.
+   */
+  title?: string;
   /** Optional webhook to POST submission JSON to (signed via HMAC). */
   webhookUrl?: string;
 }
@@ -211,6 +219,13 @@ export const FORM_RECIPE_ID = 'contact-form' as const;
 
 export const formInspectorSpec: InspectorSpec = {
   fields: [
+    {
+      kind: 'text',
+      label: 'Name',
+      path: 'title',
+      placeholder: 'Contact form',
+      noRebuild: true,
+    },
     // Per-field editor with per-kind discriminated sub-fields: every field
     // has label + kind + required, but placeholder is hidden when kind is
     // checkbox, and an options-list editor appears when kind is select.
@@ -243,6 +258,11 @@ export const formSidebarSpec: SidebarSpec = {
 
 export const formAgentToolSpec: AgentToolSpec = {
   patchProperties: {
+    title: {
+      type: 'string',
+      description:
+        'Owner-facing name for this form (e.g. "Contact form", "Newsletter signup"). Used by the dashboard inbox and CSV export filename; never shown on the visitor page. Form elements only.',
+    },
     submitLabel: {
       type: 'string',
       description: 'Submit button text. Form elements only.',
@@ -273,6 +293,10 @@ export const formAgentToolSpec: AgentToolSpec = {
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
+    if (args.title !== undefined) {
+      if (typeof args.title !== 'string') throw new Error('title must be a string');
+      patch.title = args.title;
+    }
     if (args.submitLabel !== undefined) {
       if (typeof args.submitLabel !== 'string') throw new Error('submitLabel must be a string');
       patch.submitLabel = args.submitLabel;

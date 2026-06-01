@@ -458,7 +458,7 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
                 href={`/dashboard/sites/${esc(siteId)}/forms/${esc(entry.form.id)}`}
               >
                 <div class="who">
-                  <b>{entry.form.id}</b>
+                  <b>{entry.form.title && entry.form.title.length > 0 ? entry.form.title : entry.form.id}</b>
                   <small>{String(entry.form.fields.length)} fields</small>
                 </div>
                 <div class="msg">on /{entry.pageSlug}</div>
@@ -468,7 +468,7 @@ formsInboxRoute.get('/sites/:siteId/forms', async (c) => {
                 class="row-csv"
                 href={`/api/forms/${esc(siteId)}/${esc(entry.form.id)}/export.csv`}
                 title="Download CSV of this form's submissions"
-                aria-label={`Download CSV for ${entry.form.id}`}
+                aria-label={`Download CSV for ${entry.form.title && entry.form.title.length > 0 ? entry.form.title : entry.form.id}`}
               >
                 <ExportIcon />
               </a>
