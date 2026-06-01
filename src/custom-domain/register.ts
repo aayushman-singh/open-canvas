@@ -172,22 +172,26 @@ export async function registerCustomDomain(
     }
     return { status: 'created', row };
   } catch (err) {
-    // The DB unique constraint MIGHT fire between our pre-check and the
-    // insert (two concurrent registrations of the same hostname). When that
-    // happens we have to roll back the CF side or we leak a CF hostname
-    // record that this rev01 instance no longer tracks. Roll back, then
-    // surface the duplicate error.
+    // ANY DB error after a successful CF create leaves an orphan custom
+    // hostname on Cloudflare that this rev01 instance no longer tracks.
+    // That is a two-system split-brain (CF says the hostname exists, our
+    // DB does not), and a subsequent retry from the Owner will fail with
+    // CF's "hostname already exists" error — at which point the operator
+    // has to clean up by hand. Roll back the CF side for every DB error,
+    // not just unique-violation. The unique branch additionally remaps
+    // the duplicate to the caller's expected shape; other DB errors
+    // re-throw so the caller surfaces a 500.
+    try {
+      await deps.cf.delete(cfResult.id);
+    } catch (cfErr) {
+      // Log loudly per the global no-silent-fallback rule — the operator
+      // needs to know that a CF hostname is orphaned.
+      console.error(
+        '[custom-domain] CF rollback failed after DB error',
+        { hostname, cfHostnameId: cfResult.id, originalErr: err, cfErr },
+      );
+    }
     if (isUniqueViolation(err)) {
-      try {
-        await deps.cf.delete(cfResult.id);
-      } catch (cfErr) {
-        // Log loudly per the global no-silent-fallback rule — the operator
-        // needs to know that a CF hostname is orphaned.
-        console.error(
-          '[custom-domain] CF rollback failed after DB unique violation',
-          { hostname, cfHostnameId: cfResult.id, cfErr },
-        );
-      }
       return { status: 'already_registered' };
     }
     throw err;
