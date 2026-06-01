@@ -2231,12 +2231,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (undoTimer) clearTimeout(undoTimer);
     undoTimer = setTimeout(function() {
       undoTimer = null;
-      if (!state) return;
-      var snap = structuredClone(state);
-      undoStack.push(snap);
-      if (undoStack.length > UNDO_MAX) undoStack.shift();
-      redoStack = [];
+      flushPendingUndoCapture();
     }, 800);
+  }
+
+  function flushPendingUndoCapture() {
+    if (undoTimer) { clearTimeout(undoTimer); undoTimer = null; }
+    if (!state) return;
+    var snap = structuredClone(state);
+    undoStack.push(snap);
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    redoStack = [];
   }
 
   function undo() {
@@ -2245,6 +2250,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // status flash, a no-op undo looks identical to a non-firing shortcut,
     // which reads as "Ctrl+Z only works when something is selected."
     if (!state) { setStatus("Nothing to undo"); return; }
+    // Flush any pending debounced capture so a fast Ctrl+Z (e.g. delete →
+    // immediate undo) sees the post-mutation state on the stack and can
+    // pop back to the snapshot the next undo expects.
+    if (undoTimer) flushPendingUndoCapture();
     if (undoStack.length <= 1) { setStatus("Nothing to undo"); return; }
     undoRedoing = true;
     redoStack.push(structuredClone(state));
@@ -2258,6 +2267,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   function redo() {
     if (!state) { setStatus("Nothing to redo"); return; }
+    if (undoTimer) flushPendingUndoCapture();
     if (redoStack.length === 0) { setStatus("Nothing to redo"); return; }
     undoRedoing = true;
     undoStack.push(structuredClone(state));
@@ -3341,6 +3351,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (mainEl && state.styleKit) {
       mainEl.setAttribute("data-style-kit", state.styleKit);
     }
+    // Keep the sidebar style-kit chips in sync with state.styleKit so that
+    // undo/redo (or any non-sidebar kit change) reflects in the chip row.
+    var sidebarKitButtons = document.querySelectorAll('[data-sidebar-style-kit]');
+    if (sidebarKitButtons.length > 0) syncSidebarStyleKitButtons(sidebarKitButtons);
 
     applyCameraTransform();
     renderInspector();
@@ -10069,6 +10083,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         setStatus(detail, "error");
         return;
       }
+      captureForUndo();
       state.styleKit = kit;
       if (mainEl) mainEl.setAttribute("data-style-kit", kit);
       syncSidebarStyleKitButtons(buttons);
