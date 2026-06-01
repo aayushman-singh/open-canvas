@@ -7041,49 +7041,52 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     inspector.appendChild(wrap);
   }
 
+  // Core upload-and-bind step shared by both AI-generate flows: the
+  // single-shot path (which still shows an inspector preview with Apply /
+  // Discard because there is no in-modal preview) and the 4-up tile picker
+  // (where picking a tile IS the apply — the modal is already the preview).
+  // Throws on failure so the caller decides how to surface it.
+  async function uploadGeneratedBlobToElement(element, blob, mediaType, altValue) {
+    const dotIdx = mediaType.indexOf("/");
+    const ext = dotIdx > 0 ? mediaType.slice(dotIdx + 1) : "webp";
+    const form = new FormData();
+    form.append("file", new File([blob], "generated." + ext, { type: mediaType }));
+    form.append("alt", altValue);
+    form.append("siteId", SITE_ID);
+    form.append("elementId", element.id);
+
+    const response = await authFetch(API_BASE + "/owner/assets", {
+      method: "POST",
+      body: form,
+    });
+    if (!response.ok) {
+      let detail = response.statusText;
+      try {
+        const errBody = await response.json();
+        if (errBody && errBody.error) detail = errBody.error;
+      } catch (_) { /* ignore */ }
+      throw new Error(detail);
+    }
+    const body = await response.json();
+    if (!body || typeof body.id !== "string" || typeof body.kind !== "string") {
+      throw new Error("malformed server response");
+    }
+    element.assetId = body.id;
+    element.mediaKind = body.kind;
+    element.alt = altValue;
+    rebuildElement(element.id);
+    renderInspector();
+    scheduleSave();
+  }
+
   async function applyGeneratePreview(element, blob, mediaType, altValue, wrap, applyBtn, discardBtn, objectUrl) {
     applyBtn.disabled = true;
     discardBtn.disabled = true;
     setStatus("Saving…");
     try {
-      const dotIdx = mediaType.indexOf("/");
-      const ext = dotIdx > 0 ? mediaType.slice(dotIdx + 1) : "webp";
-      const form = new FormData();
-      form.append("file", new File([blob], "generated." + ext, { type: mediaType }));
-      form.append("alt", altValue);
-      form.append("siteId", SITE_ID);
-      form.append("elementId", element.id);
-
-      const response = await authFetch(API_BASE + "/owner/assets", {
-        method: "POST",
-        body: form,
-      });
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = await response.json();
-          if (body && body.error) detail = body.error;
-        } catch (_) { /* ignore */ }
-        setStatus("Apply failed: " + detail, "error");
-        applyBtn.disabled = false;
-        discardBtn.disabled = false;
-        return;
-      }
-      const body = await response.json();
-      if (!body || typeof body.id !== "string" || typeof body.kind !== "string") {
-        setStatus("Apply failed: malformed server response", "error");
-        applyBtn.disabled = false;
-        discardBtn.disabled = false;
-        return;
-      }
-      element.assetId = body.id;
-      element.mediaKind = body.kind;
-      element.alt = altValue;
+      await uploadGeneratedBlobToElement(element, blob, mediaType, altValue);
       URL.revokeObjectURL(objectUrl);
       wrap.remove();
-      rebuildElement(element.id);
-      renderInspector();
-      scheduleSave();
       setStatus("Applied", "ok");
     } catch (err) {
       setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
@@ -9562,10 +9565,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       requestFn: requestOne,
     });
     if (!picked) return;
-    // Reuse the existing preview-in-inspector flow so the chosen image
-    // follows the same Apply / Discard path as the single-shot generator.
-    showGeneratePreview(element, picked.blob, picked.mediaType, readAltValue());
-    setStatus("Preview ready — Apply to save", "ok");
+    // Picking a tile in the 4-up modal IS the apply — the modal is already
+    // the preview, so the inspector-preview confirmation that the single-
+    // shot path uses would just be a redundant second click hidden at the
+    // bottom of the inspector.
+    setStatus("Saving…");
+    try {
+      await uploadGeneratedBlobToElement(element, picked.blob, picked.mediaType, readAltValue());
+      setStatus("Applied", "ok");
+    } catch (err) {
+      setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
   }
 
   async function aiCreateSection(afterSectionId) {
@@ -10996,6 +11006,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
   window.addEventListener("mousemove", function(ev) {
     if (typeof ev.clientX !== "number") return;
+    if (!viewport) return;
     var target = ev.target;
     if (!(target instanceof Element) || !viewport.contains(target)) return;
     lastWorldPoint = screenToWorld(ev.clientX, ev.clientY);
