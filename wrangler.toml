@@ -3,6 +3,20 @@ main = "src/index.ts"
 compatibility_date = "2026-05-25"
 compatibility_flags = ["nodejs_compat"]
 
+# Workers Logs — persists every invocation's logs (console.* output, thrown
+# exceptions with stack traces, request metadata) so we can post-mortem a
+# 500 hours after the fact via the Cloudflare dashboard or
+# `wrangler tail --since <ts>`. Without this block only live `wrangler tail`
+# works, and once the request is gone there is no historical record.
+#
+# head_sampling_rate = 1 means every request is logged. Free plan retention
+# is 3 days and includes 200K invocation logs / day; well above current
+# volume. Drop the sampling rate or move to logpush if traffic crosses the
+# free-tier cap.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [[routes]]
 pattern = "opencanvas.aayushman.dev"
 custom_domain = true
