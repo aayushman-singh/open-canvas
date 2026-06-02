@@ -2389,6 +2389,27 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   border-radius: var(--r-xs);
   text-transform: lowercase;
 }
+/* "Follow theme" reset link rendered at the end of a buildColorRow when the
+   row owns an override-vs-theme value. Looks like inline link text, not a
+   button, so it reads as "undo override" rather than another value-setter. */
+#canvas-inspector .color-reset {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line);
+}
+#canvas-inspector .color-reset:hover {
+  color: var(--ink);
+  text-decoration-color: currentColor;
+}
 #canvas-inspector .color-hex:focus {
   outline: none;
   border-color: var(--ink-3);
@@ -2734,18 +2755,48 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   color: var(--ok);
 }
 
-/* Inline links inside contenteditable — accent underline + text cursor so
-   the Owner sees linked text at a glance without losing the ability to
-   click-to-place-caret. Mirrors public-styles.ts .opencanvas-inline-link. */
-[contenteditable="true"] a.opencanvas-inline-link {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
-  text-underline-offset: 2px;
-  cursor: text;
+/* Editor-only link affordance. Public visitor view (public-styles.ts plus
+   the .opencanvas-inline-link rule below) keeps the default underline so
+   visitors still recognise links beyond colour. Inside the editor we drop
+   that underline and surface a small chain-link glyph at the top-left of
+   the link instead, so the underlined look stays reserved for an explicit
+   <u> mark the author chose to apply via the inline RTE.
+
+   Scope is .opencanvas-editor (not [contenteditable="true"]) so the
+   affordance shows whether or not text editing is currently active. The
+   glyph is muted by default and lights up on hover so it reads as a
+   "this is a link" hint without taking over the text. */
+.opencanvas-editor a.opencanvas-inline-link {
+  position: relative;
+  text-decoration: none;
 }
-[contenteditable="true"] a.opencanvas-inline-link:hover {
+.opencanvas-editor a.opencanvas-inline-link::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -12px;
+  width: 10px;
+  height: 10px;
+  background-color: currentColor;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M13.5 10.5a4 4 0 0 0-5.66 0l-3 3a4 4 0 1 0 5.66 5.66l1-1'/><path d='M10.5 13.5a4 4 0 0 0 5.66 0l3-3a4 4 0 1 0-5.66-5.66l-1 1'/></svg>");
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M13.5 10.5a4 4 0 0 0-5.66 0l-3 3a4 4 0 1 0 5.66 5.66l1-1'/><path d='M10.5 13.5a4 4 0 0 0 5.66 0l3-3a4 4 0 1 0-5.66-5.66l-1 1'/></svg>");
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.opencanvas-editor a.opencanvas-inline-link:hover::before {
+  opacity: 0.95;
+}
+.opencanvas-editor a.opencanvas-inline-link:hover {
   color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+}
+/* Active text edit keeps the I-beam so click-to-place-caret still works. */
+.opencanvas-editor [contenteditable="true"] a.opencanvas-inline-link {
+  cursor: text;
 }
 
 /* Inline mark toolbar — only present in the DOM while a text element is in
