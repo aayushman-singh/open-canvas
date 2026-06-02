@@ -31,7 +31,10 @@ export type ChatStreamEvent =
   | { kind: 'tool-result'; id: string; name: string; output: unknown }
   | { kind: 'op-preview'; id: string; toolName: string; op: CanvasAgentOp }
   | { kind: 'error'; error: string }
-  | { kind: 'done'; reason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' | 'cap' };
+  | {
+      kind: 'done';
+      reason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' | 'cap' | 'summarise-failed';
+    };
 
 /** Encode an event as one SSE frame (`data: <json>\n\n`). */
 export function encodeSseFrame(event: ChatStreamEvent): string {

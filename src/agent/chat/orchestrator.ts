@@ -127,7 +127,7 @@ export interface RunTurnResult {
   /** Ops emitted as op-preview events during this turn. */
   previewOps: Array<{ id: string; toolName: string; op: CanvasAgentOp }>;
   /** Reason the loop stopped — mirrors the `done` event. */
-  doneReason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' | 'cap';
+  doneReason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' | 'cap' | 'summarise-failed';
 }
 
 /**
@@ -147,9 +147,24 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
 
   // 2. Compact when we've crossed the summarise threshold. Summarisation
   //    runs only on the older pre-cutoff slice so the active turn stays
-  //    intact.
+  //    intact. Per ADR 0055 decision 5, summarisation failure is loud: the
+  //    turn ends with an `error` event followed by `done` (reason
+  //    `summarise-failed`). The Owner's appended message is preserved in
+  //    `history` so the caller can persist it; the assistant turn simply
+  //    does not run.
   if (countTurns(history) >= SUMMARIZE_AFTER_TURNS) {
-    history = await summariseIfNeeded(history, ctx.adapter, model);
+    try {
+      history = await summariseIfNeeded(history, ctx.adapter, model);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await writer.write({ kind: 'error', error: message });
+      await writer.write({ kind: 'done', reason: 'summarise-failed' });
+      return {
+        messages: history,
+        previewOps: [],
+        doneReason: 'summarise-failed',
+      };
+    }
   }
   history = trimToBudget(history, CHAT_TOKEN_BUDGET);
 
@@ -619,17 +634,20 @@ async function summariseIfNeeded(
   ];
 
   let summary = '';
-  for await (const chunk of adapter.chatWithTools(summarisePrompt, {
-    model,
-    tools: [],
-    temperature: 0,
-  })) {
-    if (chunk.type === 'text') summary += chunk.text;
+  try {
+    for await (const chunk of adapter.chatWithTools(summarisePrompt, {
+      model,
+      tools: [],
+      temperature: 0,
+    })) {
+      if (chunk.type === 'text') summary += chunk.text;
+    }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(`summarisation failed: ${reason}`);
   }
   if (summary.length === 0) {
-    // Loud-fail-safe: summarisation produced nothing. Skip compaction;
-    // budget trim will still keep things sane.
-    return history;
+    throw new Error('summarisation failed: model returned empty output');
   }
   return [
     { role: 'summary', content: `Earlier in this session: ${summary}` },
