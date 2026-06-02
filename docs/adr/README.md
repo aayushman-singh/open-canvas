@@ -20,7 +20,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0008 | Site import architecture | Accepted | [`docs/adr/0008-site-import-architecture.md`](0008-site-import-architecture.md) |
 | 0009 | Addon entitlement model: account-scoped purchase, site-scoped configuration | Accepted | [`docs/adr/0009-addon-entitlement-model.md`](0009-addon-entitlement-model.md) |
 | 0010 | Collaboration invite link is a bearer credential | Accepted | [`docs/adr/0010-invite-link-bearer-auth.md`](0010-invite-link-bearer-auth.md) |
-| 0011 | Canvas element registry as the single source of truth per element type | Proposed | [`docs/adr/0011-canvas-element-registry.md`](0011-canvas-element-registry.md) |
+| 0011 | Canvas element registry as the single source of truth per element type | Accepted | [`docs/adr/0011-canvas-element-registry.md`](0011-canvas-element-registry.md) |
 | 0012 | `canvas/validate.ts` is the only write gate; consumers trust its output | Proposed | [`docs/adr/0012-validation-write-gate.md`](0012-validation-write-gate.md) |
 | 0013 | Apex host is environment-driven; production code reads it through one helper | Accepted | [`docs/adr/0013-host-config-from-environment.md`](0013-host-config-from-environment.md) |
 | 0014 | Compile-time data substitution for template-literal-bound client scripts | Proposed | [`docs/adr/0014-template-literal-data-substitution.md`](0014-template-literal-data-substitution.md) |
@@ -59,6 +59,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0048 | Chat session is last-writer-wins; concurrent tab writes are out of scope | Accepted | [`docs/adr/0048-chat-session-last-writer-wins.md`](0048-chat-session-last-writer-wins.md) |
 | 0055 | Agent runs until budget exhausts, not until a fixed iteration count | Accepted | [`docs/adr/0055-agent-runs-until-budget-exhausts.md`](0055-agent-runs-until-budget-exhausts.md) |
 | 0056 | Summarisation and read-only inspection iterations run on Flash; planning iterations run on Pro | Accepted | [`docs/adr/0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md`](0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md) |
+| 0057 | Every canvas element dispatch shares one shape: mapped-type record, typed dispatcher, runtime guard | Accepted | [`docs/adr/0057-canvas-element-dispatch-shape.md`](0057-canvas-element-dispatch-shape.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

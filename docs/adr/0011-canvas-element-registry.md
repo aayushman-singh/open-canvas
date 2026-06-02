@@ -1,9 +1,18 @@
 # ADR 0011 — Canvas element registry as the single source of truth per element type
 
-**Status:** Proposed
-**Date:** 2026-05-28
+**Status:** Accepted
+**Date:** 2026-05-28 (proposed); 2026-06-02 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the systemic per-element-drift finding from the rev01 OSS code review (handoff-rev01-batch-27 §"THE SYSTEMIC FINDING").
+**Accepted-context:** verified 2026-06-02 — Decisions 1, 2, and 4 are as-built. Decision 3's migration is complete through Step 4 of the named order; Step 5 (client renderer dispatch) remains intentionally deferred pending ADR-γ / ADR-δ. Six mapped-type dispatches are in place as `Record<CanvasElement['type'], …>` (or `Record<Exclude<…>, …>` where the type-level exclusion is itself a documented opt-out), each indexed via an `Object.hasOwn` + `typeof === 'function'` runtime guard that surfaces "unknown element type at the JSONB boundary" with the element id rather than letting the implicit `undefined()` minify to "fn is not a function":
+- `RENDER_DISPATCH` — [`src/canvas/elements/index.ts:172`](../../src/canvas/elements/index.ts) (consumed via `renderElementBody` at line 153, guard at 158–168)
+- `INSPECTOR_DISPATCH` — [`src/canvas/elements/index.ts:241`](../../src/canvas/elements/index.ts) (`collection` excluded at the type level as a documented opt-out; see comment at 231–238)
+- `SIDEBAR_DISPATCH` — [`src/canvas/elements/index.ts:296`](../../src/canvas/elements/index.ts) (order is load-bearing for the editor sidebar grid)
+- `AGENT_TOOL_DISPATCH` — [`src/canvas/elements/index.ts:314`](../../src/canvas/elements/index.ts)
+- `Y_ENCODE_DISPATCH` — [`src/canvas/yjs-projection.ts:747`](../../src/canvas/yjs-projection.ts) (consumed via `encodeElement` at 765, guard at 769–775)
+- `Y_DECODE_DISPATCH` — [`src/canvas/yjs-projection.ts:1328`](../../src/canvas/yjs-projection.ts) (consumed via `decodeElement` at 1346, guard at 1348–1356)
+
+The leftover non-numbered switches in `validate.ts`, `render.ts`, and `routes/api/import.ts` are intentionally not migrated; see "Out of scope" for the per-switch reasoning.
 
 ## Context
 
@@ -71,6 +80,9 @@ A partial registry exists: `RENDER_DISPATCH` (`src/canvas/elements/index.ts:137`
 - Inspector UI redesign — only the *dispatch* of "given element X, here is its inspector spec" moves. The UI that renders that spec stays put.
 - Adding new element types — this ADR makes adding them cheaper; it does not propose any.
 - The five "legacy original" element types (text, media, action, shape, container) keeping their type defs in `schema.ts` rather than per-element files — that is a separate cleanup, orthogonal to dispatch structure.
+- **`validateElement` in [`src/canvas/validate.ts:858`](../../src/canvas/validate.ts) does not become a `VALIDATE_DISPATCH`.** Per-element validation isn't local: the function takes page-level and section-level context (allowed motion presets per page, recipe-specific child rules per section) and pushes shared error strings into the surrounding `validateEditableSite` walk. A dispatch entry would have to absorb that context shape, leaving the per-element validator nearly as wide as the surrounding validator. The deletion test argues against the dispatch: removing the switch concentrates no complexity that's currently scattered, because the cross-element invariants (page anchor uniqueness, section role placement, recipe rules, published-media reference checks) stay where they are anyway. Per-element validate stays a switch inside `validateEditableSite`.
+- **The `variantAttr` / `buildAriaWrapperAttrs` switches in [`src/canvas/render.ts:150–201`](../../src/canvas/render.ts) do not become dispatches.** Each per-type case is on the order of one to ten lines. Moving them into per-element modules adds more import + export boilerplate than the switch itself spans, and the leverage is near zero — no consumer outside `render.ts` indexes these by element type. They stay as switches.
+- **`convertElement` in [`src/routes/api/import.ts:622`](../../src/routes/api/import.ts) (scraper → `CanvasElement` mapping) does not join `AGENT_TOOL_DISPATCH` or a sibling dispatch.** The scraper response shape is one-to-many: a `<button>` may map to an `action`, a `nav` link, or stay inline text depending on surrounding context. The natural dispatch key is the *scraped hint*, not the produced `ElementType`. If a registry is wanted for the import path, it is a separate ADR keyed off scraper hints, not an extension of this one.
 
 ## Consequences
 
@@ -90,7 +102,7 @@ A partial registry exists: `RENDER_DISPATCH` (`src/canvas/elements/index.ts:137`
 
 ## Follow-ups
 
-- ADR-γ (cross-server enum / dispatch sharing) — required before step 5 (client renderer dispatch) of the migration can land.
-- ADR-δ (inline-asset build pipeline) — required by ADR-γ; transitively required by step 5.
-- A small follow-up ADR or in-code policy doc once the first dispatch ships, fixing the dispatch-entry shape convention (what each entry returns, how it gets its context, how errors surface). That convention is implicit in the first migration step and worth lifting into an explicit contract before three more dispatches inherit it by imitation.
-- A smoke that asserts every `ElementType` literal has a per-element module file at `src/canvas/elements/<type>.ts` (or is one of the five legacy types in `schema.ts`). Catches "added the type to the union, forgot the file" in CI.
+- ~~ADR-δ (inline-asset build pipeline)~~ — collapsed into [ADR 0015](0015-editor-client-asset-pipeline.md), which already names step 5 as a thing it unblocks: "the dispatch can ship as normal TS, imported by the client like any other module, without ADR 0014's substitution plugin or any new tooling." No separate ADR needed.
+- ADR-γ (cross-server dispatch sharing) — partially collapsed into [ADR 0015](0015-editor-client-asset-pipeline.md): once the editor ships as a real TS module tree under `src/editor-client/`, "sharing a dispatch with the server" is just `import`. A small open design question remains — **does the per-element file own both the server renderer and the client renderer side by side (e.g. `text.ts` exports both `renderText` and `renderTextEditor`), or do they stay split with a shared per-element spec coupling them?** — but its right shape depends on what [ADR 0015](0015-editor-client-asset-pipeline.md) actually delivers (the file tree, the import paths, what the editor-side dispatch needs to do that the server-side doesn't). Defer until [ADR 0015](0015-editor-client-asset-pipeline.md) is Accepted and at least the initial migration PRs land; revisit then.
+- ~~A small follow-up ADR or in-code policy doc once the first dispatch ships, fixing the dispatch-entry shape convention~~ — landed 2026-06-02 as [ADR 0057](0057-canvas-element-dispatch-shape.md).
+- ~~A smoke that asserts every `ElementType` literal has a per-element module file at `src/canvas/elements/<type>.ts`~~ — landed 2026-06-02 as [`src/canvas/elements/element-files.smoke.ts`](../../src/canvas/elements/element-files.smoke.ts) (wired into `package.json` as `element-files:smoke`).
