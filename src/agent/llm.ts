@@ -53,6 +53,12 @@ export interface ChatWithToolsOptions {
   systemInstruction?: string;
   temperature?: number;
   maxTokens?: number;
+  /**
+   * Optional. Aborts the in-flight stream. Per ADR 0055 decision 6, the
+   * orchestrator threads a deadline-driven signal here so a runaway turn
+   * cannot consume the worker's wall-clock budget.
+   */
+  signal?: AbortSignal;
 }
 
 export interface LlmAdapter {

@@ -76,6 +76,14 @@ import type { ChatStreamWriter } from './stream.js';
 export const CHAT_DEFAULT_MODEL = 'gemini-2.5-pro';
 export const MAX_TOOL_CALL_ITERATIONS = 5;
 
+// Wall-clock budget per turn, per ADR 0055 decision 6. When the deadline
+// fires the orchestrator aborts the in-flight Gemini stream, discards any
+// partial tool-call buffer, and emits `done` with reason `wallclock-exceeded`.
+// Initial value picked so a long sitewide revamp can complete but a runaway
+// model cannot eat the full 600s Cloudflare worker invocation. Revisit once
+// budget-exhaustion telemetry (ADR 0055 follow-up) lands.
+export const DEFAULT_WALL_CLOCK_MS = 120_000;
+
 // ---------------------------------------------------------------------------
 // Public entrypoint
 // ---------------------------------------------------------------------------
@@ -112,6 +120,12 @@ export interface OrchestratorContext {
    * iterations before forcing a `done` event. Defaults to MAX_TOOL_CALL_ITERATIONS.
    */
   maxIterations?: number;
+  /**
+   * Optional. Per-turn wall-clock budget in milliseconds (ADR 0055 decision 6).
+   * When the deadline fires the in-flight Gemini stream is aborted and the turn
+   * ends with `done` reason `wallclock-exceeded`. Defaults to DEFAULT_WALL_CLOCK_MS.
+   */
+  wallClockMs?: number;
 }
 
 export interface RunTurnInput {
@@ -127,7 +141,15 @@ export interface RunTurnResult {
   /** Ops emitted as op-preview events during this turn. */
   previewOps: Array<{ id: string; toolName: string; op: CanvasAgentOp }>;
   /** Reason the loop stopped — mirrors the `done` event. */
-  doneReason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' | 'cap' | 'summarise-failed';
+  doneReason:
+    | 'stop'
+    | 'length'
+    | 'tool_use'
+    | 'safety'
+    | 'other'
+    | 'cap'
+    | 'summarise-failed'
+    | 'wallclock-exceeded';
 }
 
 /**
@@ -141,119 +163,136 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const systemInstruction =
     ctx.systemInstruction ?? buildSystemPrompt(ctx.state, ctx.selectedElementId);
   const maxIterations = ctx.maxIterations ?? MAX_TOOL_CALL_ITERATIONS;
+  const wallClockMs = ctx.wallClockMs ?? DEFAULT_WALL_CLOCK_MS;
 
   // 1. Append the user message to history.
   let history: ChatMessage[] = [...session.messages, { role: 'user', content: userMessage }];
 
-  // 2. Compact when we've crossed the summarise threshold. Summarisation
-  //    runs only on the older pre-cutoff slice so the active turn stays
-  //    intact. Per ADR 0055 decision 5, summarisation failure is loud: the
-  //    turn ends with an `error` event followed by `done` (reason
-  //    `summarise-failed`). The Owner's appended message is preserved in
-  //    `history` so the caller can persist it; the assistant turn simply
-  //    does not run.
-  if (countTurns(history) >= SUMMARIZE_AFTER_TURNS) {
-    try {
-      history = await summariseIfNeeded(history, ctx.adapter, model);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await writer.write({ kind: 'error', error: message });
-      await writer.write({ kind: 'done', reason: 'summarise-failed' });
-      return {
-        messages: history,
-        previewOps: [],
-        doneReason: 'summarise-failed',
-      };
-    }
-  }
-  history = trimToBudget(history, CHAT_TOKEN_BUDGET);
+  // 2. Per ADR 0055 decision 6, every Gemini call in this turn shares one
+  //    AbortController. The deadline timer fires once; if it trips during the
+  //    summarise call OR any iteration, the adapter's stream throws and the
+  //    nearest catch maps it to `wallclock-exceeded`. The Owner's appended
+  //    message is preserved in `history` so the caller still persists it.
+  const controller = new AbortController();
+  const deadlineTimer = setTimeout(() => controller.abort(), wallClockMs);
 
   const previewOps: Array<{ id: string; toolName: string; op: CanvasAgentOp }> = [];
   let doneReason: RunTurnResult['doneReason'] = 'stop';
   let iteration = 0;
 
-  while (iteration < maxIterations) {
-    iteration++;
-
-    const llmMessages = toLlmMessages(history);
-    const opts: ChatWithToolsOptions = {
-      model,
-      tools,
-      systemInstruction,
-      temperature: 0.3,
-    };
-
-    const { text, toolCalls, finishReason } = await streamOnePass(
-      ctx.adapter,
-      llmMessages,
-      opts,
-      writer,
-    );
-
-    // Append the assistant turn even when it produced no tool calls — the
-    // user's history needs to mirror what the model said.
-    const assistantMessage: ChatMessage = { role: 'assistant', content: text };
-    if (toolCalls.length > 0) {
-      assistantMessage.toolCalls = toolCalls.map<ChatToolCall>((c) => ({
-        id: c.id,
-        name: c.name,
-        arguments: c.arguments,
-      }));
-    }
-    history.push(assistantMessage);
-
-    if (toolCalls.length === 0) {
-      doneReason = finishReason ?? 'stop';
-      break;
-    }
-
-    // Dispatch every tool call from this turn before looping. We feed the
-    // results back as `tool` messages so the next pass sees them.
-    let sawMutating = false;
-    for (const call of toolCalls) {
-      if (READ_ONLY_TOOL_NAMES.has(call.name)) {
-        await dispatchReadOnlyTool({ call, writer, ctx, history });
-      } else if (MUTATING_TOOL_NAMES.has(call.name)) {
-        sawMutating = true;
-        const dispatched = dispatchMutatingTool({ call, history });
-        if (dispatched.preview) {
-          await writer.write({
-            kind: 'op-preview',
-            id: call.id,
-            toolName: call.name,
-            op: dispatched.preview.op,
-          });
-          previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
+  try {
+    // 3. Compact when we've crossed the summarise threshold. Summarisation
+    //    runs only on the older pre-cutoff slice so the active turn stays
+    //    intact. Per ADR 0055 decision 5 summarisation failure is loud; per
+    //    ADR 0055 decision 6 a wall-clock abort during summarisation is
+    //    surfaced as `wallclock-exceeded`, not `summarise-failed`.
+    if (countTurns(history) >= SUMMARIZE_AFTER_TURNS) {
+      try {
+        history = await summariseIfNeeded(history, ctx.adapter, model, controller.signal);
+      } catch (err) {
+        if (controller.signal.aborted) {
+          await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
+          return { messages: history, previewOps, doneReason: 'wallclock-exceeded' };
         }
-      } else {
-        const errMsg = `unknown tool name: ${call.name}`;
-        await writer.write({ kind: 'error', error: errMsg });
-        history.push({
-          role: 'tool',
-          toolCallId: call.id,
-          toolName: call.name,
-          content: JSON.stringify({ error: errMsg }),
-        });
+        const message = err instanceof Error ? err.message : String(err);
+        await writer.write({ kind: 'error', error: message });
+        await writer.write({ kind: 'done', reason: 'summarise-failed' });
+        return { messages: history, previewOps, doneReason: 'summarise-failed' };
       }
     }
+    history = trimToBudget(history, CHAT_TOKEN_BUDGET);
 
-    // After mutating tools we still loop back so the model can either
-    // confirm, propose the next op, or finish. Cap protects us from runaway
-    // loops.
-    if (iteration >= maxIterations) {
-      doneReason = 'cap';
-      break;
+    while (iteration < maxIterations) {
+      iteration++;
+
+      const llmMessages = toLlmMessages(history);
+      const opts: ChatWithToolsOptions = {
+        model,
+        tools,
+        systemInstruction,
+        temperature: 0.3,
+        signal: controller.signal,
+      };
+
+      let pass: PassResult;
+      try {
+        pass = await streamOnePass(ctx.adapter, llmMessages, opts, writer);
+      } catch (err) {
+        if (controller.signal.aborted) {
+          await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
+          return { messages: history, previewOps, doneReason: 'wallclock-exceeded' };
+        }
+        throw err;
+      }
+      const { text, toolCalls, finishReason } = pass;
+
+      // Append the assistant turn even when it produced no tool calls — the
+      // user's history needs to mirror what the model said.
+      const assistantMessage: ChatMessage = { role: 'assistant', content: text };
+      if (toolCalls.length > 0) {
+        assistantMessage.toolCalls = toolCalls.map<ChatToolCall>((c) => ({
+          id: c.id,
+          name: c.name,
+          arguments: c.arguments,
+        }));
+      }
+      history.push(assistantMessage);
+
+      if (toolCalls.length === 0) {
+        doneReason = finishReason ?? 'stop';
+        break;
+      }
+
+      // Dispatch every tool call from this turn before looping. We feed the
+      // results back as `tool` messages so the next pass sees them.
+      let sawMutating = false;
+      for (const call of toolCalls) {
+        if (READ_ONLY_TOOL_NAMES.has(call.name)) {
+          await dispatchReadOnlyTool({ call, writer, ctx, history });
+        } else if (MUTATING_TOOL_NAMES.has(call.name)) {
+          sawMutating = true;
+          const dispatched = dispatchMutatingTool({ call, history });
+          if (dispatched.preview) {
+            await writer.write({
+              kind: 'op-preview',
+              id: call.id,
+              toolName: call.name,
+              op: dispatched.preview.op,
+            });
+            previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
+          }
+        } else {
+          const errMsg = `unknown tool name: ${call.name}`;
+          await writer.write({ kind: 'error', error: errMsg });
+          history.push({
+            role: 'tool',
+            toolCallId: call.id,
+            toolName: call.name,
+            content: JSON.stringify({ error: errMsg }),
+          });
+        }
+      }
+
+      // After mutating tools we still loop back so the model can either
+      // confirm, propose the next op, or finish. Cap protects us from runaway
+      // loops.
+      if (iteration >= maxIterations) {
+        doneReason = 'cap';
+        break;
+      }
+      void sawMutating;
     }
-    void sawMutating;
+
+    await writer.write({ kind: 'done', reason: doneReason });
+
+    return {
+      messages: history,
+      previewOps,
+      doneReason,
+    };
+  } finally {
+    clearTimeout(deadlineTimer);
   }
-
-  await writer.write({ kind: 'done', reason: doneReason });
-
-  return {
-    messages: history,
-    previewOps,
-    doneReason,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -612,6 +651,7 @@ async function summariseIfNeeded(
   history: ChatMessage[],
   adapter: LlmAdapter,
   model: string,
+  signal?: AbortSignal,
 ): Promise<ChatMessage[]> {
   // Already summarised? The leading message is a `summary` row — skip.
   const head = history[0];
@@ -635,11 +675,13 @@ async function summariseIfNeeded(
 
   let summary = '';
   try {
-    for await (const chunk of adapter.chatWithTools(summarisePrompt, {
+    const summariseOpts: ChatWithToolsOptions = {
       model,
       tools: [],
       temperature: 0,
-    })) {
+    };
+    if (signal) summariseOpts.signal = signal;
+    for await (const chunk of adapter.chatWithTools(summarisePrompt, summariseOpts)) {
       if (chunk.type === 'text') summary += chunk.text;
     }
   } catch (err) {

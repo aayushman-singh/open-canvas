@@ -33,7 +33,15 @@ export type ChatStreamEvent =
   | { kind: 'error'; error: string }
   | {
       kind: 'done';
-      reason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' | 'cap' | 'summarise-failed';
+      reason:
+        | 'stop'
+        | 'length'
+        | 'tool_use'
+        | 'safety'
+        | 'other'
+        | 'cap'
+        | 'summarise-failed'
+        | 'wallclock-exceeded';
     };
 
 /** Encode an event as one SSE frame (`data: <json>\n\n`). */

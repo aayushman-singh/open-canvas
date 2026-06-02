@@ -51,6 +51,7 @@ export class GeminiAdapter implements LlmAdapter {
     if (opts.systemInstruction) config.systemInstruction = opts.systemInstruction;
     if (opts.temperature !== undefined) config.temperature = opts.temperature;
     if (opts.maxTokens !== undefined) config.maxOutputTokens = opts.maxTokens;
+    if (opts.signal) config.abortSignal = opts.signal;
     if (functionDeclarations.length > 0) {
       const tools: ToolListUnion = [{ functionDeclarations }];
       config.tools = tools;
