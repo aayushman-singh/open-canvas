@@ -4,6 +4,14 @@
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** the dashboard side of the inline-template-literal problem ([handoff-rev01-batch-27](../../) §"Theme E"). Follows the same delivery model as [ADR 0015](0015-editor-client-asset-pipeline.md). Flagged as a follow-up in 0015's out-of-scope.
+**Verified-state:** verified 2026-06-03 — **none of the four decisions are as-built, and none can be while [ADR 0015](0015-editor-client-asset-pipeline.md) remains unimplemented.**
+- `src/dashboard-client/` directory does not exist; the shared TS module tree has no files.
+- `scripts/build-dashboard-client.ts` does not exist; the build script is unwritten.
+- No `[assets]` binding is configured in `wrangler.toml` (this ADR shares the binding with ADR 0015).
+- Dashboard TSX surfaces ([`src/routes/dashboard/`](../../src/routes/dashboard/)) still embed per-page inline scripts; no `window.__rev01DashboardBoot` named-globals pattern exists.
+- This ADR's Follow-ups already name the dependency explicitly: *"Land after [ADR 0015] ships; the build infrastructure ... is the foundation this ADR builds on."*
+
+Status stays **Proposed, blocked on [ADR 0015](0015-editor-client-asset-pipeline.md)**. The build-infrastructure dependency is shared, not duplicated — once 0015's `scripts/build-editor-client.ts` and `[assets]` binding land, this ADR's analogue (`scripts/build-dashboard-client.ts`) becomes mechanical to add. The hard work is 0015's; this ADR is the second consumer of the same mechanism.
 
 ## Context
 

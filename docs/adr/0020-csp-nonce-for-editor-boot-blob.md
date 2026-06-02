@@ -4,6 +4,12 @@
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** Content-Security-Policy tightening on the editor route. Surfaced as a follow-up in [ADR 0015](0015-editor-client-asset-pipeline.md)'s out-of-scope. Depends on ADR 0015 landing first.
+**Verified-state:** verified 2026-06-03 — **none of the three decisions are as-built, and none can be while [ADR 0015](0015-editor-client-asset-pipeline.md) remains unimplemented.**
+- The "minimal HTML shell with exactly one inline `<script>` boot blob" that this ADR would nonce does not exist yet — the editor route still ships the entire `canvas-client.ts` body inline (14,352 lines, see [ADR 0015's Verified-state](0015-editor-client-asset-pipeline.md)). Generating a per-request nonce against a multi-thousand-line inline body would either nonce the whole thing (defeating the CSP point) or require pre-extracting the shell-vs-bundle split that ADR 0015 owns.
+- No `Content-Security-Policy` response header is emitted by the editor route today.
+- This ADR's Follow-ups already name the dependency explicitly: *"Land after [ADR 0015]. Generating a nonce makes sense only once there is exactly one inline `<script>` to nonce."*
+
+Status stays **Proposed, blocked on [ADR 0015](0015-editor-client-asset-pipeline.md)**. The dependency is hard, not soft — there is no incremental version of this ADR that ships standalone.
 
 ## Context
 

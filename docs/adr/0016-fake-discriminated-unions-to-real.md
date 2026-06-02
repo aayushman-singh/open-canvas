@@ -4,6 +4,13 @@
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** Theme C of the rev01 OSS code review (handoff-rev01-batch-27 §"Theme C — Fake discriminated unions everywhere"), narrowed to the two patterns that actually fit the fake-DU shape.
+**Verified-state:** verified 2026-06-03 — **none of the five decisions are as-built; the type-level refactor has not begun.**
+- Decision 1 (EditableSiteStyleKit DU): not landed. [`src/canvas/schema.ts:480`](../../src/canvas/schema.ts) still carries `customStyleKit?: StyleKitPreset` as an optional sibling on `EditableSite`; no `EditableSiteStyleKit` discriminated-union type exists in `schema.ts`.
+- Decision 2 (ElementNodeBody DU) + Decision 4 (delete `requireXProps`): not landed. All five guards remain at [`src/canvas/layout/engine.ts:177–219`](../../src/canvas/layout/engine.ts) — `requireTextProps`, `requireMediaProps`, `requireActionProps`, `requireShapeProps`, `requireContainerProps` — and their callers at lines 246, 274, 290, 301, 310 still go through them.
+- Decision 3 (wire-format unchanged): definitional — not actionable until 1 or 2 is.
+- Follow-up audit query against production rows (whether any pre-validator data violates the contract) has not been run.
+
+Status stays **Proposed**. The pre-merge audit query is a prerequisite to landing Decisions 1 and 2 — running it is the first executable step. This ADR is tactically smaller than [ADR 0015](0015-editor-client-asset-pipeline.md) and has no infrastructure dependency, so it could ship in any order relative to 0015; the blockers are scheduling, not dependencies. The reinforcement with [ADR 0012](0012-validation-write-gate.md) (Accepted 2026-06-03) is unchanged — the gate enforces at the JSONB boundary, this ADR would make the same contract type-level.
 
 ## Context
 

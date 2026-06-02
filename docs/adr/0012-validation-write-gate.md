@@ -1,9 +1,10 @@
 # ADR 0012 — `canvas/validate.ts` is the only write gate; consumers trust its output
 
-**Status:** Proposed
-**Date:** 2026-05-28
+**Status:** Accepted
+**Date:** 2026-05-28 (proposed); 2026-06-03 (accepted)
 **Author:** Aayushman Singh
 **Drives:** the validation-coverage theme from the rev01 OSS code review (handoff-rev01-batch-27 §"Theme B"), and consolidates findings from batches 4, 9, 10, 11, 22, and 24.
+**Accepted-context:** verified 2026-06-03 — five of six decisions are as-built per the §Audit / Accepted-context section below (Decisions 2, 3, 5, and 6.1 fully Done; Decisions 1 and 4 Done modulo named follow-ups). Three Decision-adjacent items remain as scoped Follow-ups rather than Decision-level violations: the `styleKit` denorm column (DEFERRED — perf cost on read sites), the `canvas-client.ts` editor pre-flight (BLOCKED on [ADR 0015](0015-editor-client-asset-pipeline.md) backtick discipline), and the agent-parser policy (DEFERRED per [ADR 0025](0025-renderer-is-only-throw-site.md)'s parse-time-throw carve-out). None of these are Decision violations — each is the explicit "this is scoped out of the gate, here's why" record the Decisions section relies on. See the §Audit / Accepted-context section below for the per-decision table.
 
 ## Context
 
@@ -79,9 +80,9 @@ The Owner-perceived risk is concrete: a field accepted by the editor but rejecte
 - The single error format constrains how validators express constraints — a field with a genuinely novel constraint shape has to fit the `<path> <verb> <constraint> (got X)` mold or extend the helper set. Most constraints fit; complex cross-field constraints sometimes don't (e.g. "field A must equal field B's length"). Those will need new shared helpers, not bespoke error strings.
 - Id-class predicates may live separately from the things that produce ids (the route that mints a new site id needs to import `isSiteId`). One more import; modest cost.
 
-## Audit (2026-05-30)
+## Audit / Accepted-context (verified 2026-06-03)
 
-Audited against the `adr-quick-wins` worktree (branched off `adr-0011-element-registry` at commit `e7a107d`).
+Originally audited 2026-05-30 against the `adr-quick-wins` worktree (branched off `adr-0011-element-registry` at commit `e7a107d`). Re-verified 2026-06-03 against `main`: the per-decision verdicts below stand, the Decision 4 follow-up closed out 2026-06-01, and the Decision 6.1 render.ts kit-preset flow landed 2026-06-01. This block now serves as the Accepted-context proof; the table below is the source-of-truth for which Decisions are as-built vs. which carry scoped follow-ups.
 
 | Decision | Status | Evidence | Gap |
 |---|---|---|---|

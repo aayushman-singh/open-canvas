@@ -1,9 +1,24 @@
 # ADR 0014 — Compile-time data substitution for template-literal-bound client scripts
 
-**Status:** Proposed
-**Date:** 2026-05-29
+**Status:** Rejected — superseded-without-implementation by [ADR 0015](0015-editor-client-asset-pipeline.md)
+**Date:** 2026-05-29 (proposed); 2026-06-03 (rejected)
 **Author:** Aayushman Singh
 **Drives:** Theme A of the rev01 OSS code review (handoff-rev01-batch-27 §"Theme A — Cross-file enum + helper mirrors") for the subset bound inside template-literal-emitted client scripts.
+
+## Rejected (2026-06-03)
+
+This ADR was Proposed as a tactical bridge while [ADR 0015](0015-editor-client-asset-pipeline.md) (editor client asset pipeline) remained out of reach. Decision 1's own "Why" explicitly named the rejection condition: *"This would be wrong if the build pipeline (ADR 0015) eliminated the template-literal constraint entirely — at which point client-side code would import TS modules normally and substitution would be obsolete."*
+
+Verified 2026-06-03 against current `main`:
+- `tools/` directory does not exist; the substitution plugin was never written.
+- No `__INJECT_*__` tokens exist anywhere in [`src/editor/canvas-client.ts`](../../src/editor/canvas-client.ts).
+- The twelve mirrored constants this ADR was meant to derive remain hand-maintained inline literals in [`src/editor/canvas-client.ts`](../../src/editor/canvas-client.ts).
+
+None of this ADR's six decisions were implemented. The path of record is [ADR 0015](0015-editor-client-asset-pipeline.md), which solves the underlying constraint (the template-literal binding itself) rather than ergonomically working around it. ADR 0015's Decision 8 explicitly names ADR 0014 as superseded on completion of its migration — but since this ADR was never implemented, "supersession on completion" reduces to **rejection before implementation**. This `Rejected` status records that outcome cleanly: the substitution mechanism is not built and will not be built, because the alternative is the canonical fix.
+
+If [ADR 0015](0015-editor-client-asset-pipeline.md) stalls indefinitely and the twelve mirror constants become a persistent drift surface, this ADR can be re-Proposed under a fresh number — Rejected is a record, not a permanent block. But re-Proposal requires fresh consideration of whether the substitution work would beat just landing ADR 0015's first phase, which is a cheaper question to keep asking than implementing the substitution plugin.
+
+The decisions and consequences below remain as the record of what was considered.
 
 ## Context
 
