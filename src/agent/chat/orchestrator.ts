@@ -76,6 +76,12 @@ import type { ChatStreamWriter } from './stream.js';
 // until the adapter is upgraded; do not bump without that work first.
 export const CHAT_DEFAULT_MODEL = 'gemini-2.5-pro';
 
+// Flash tier for summarisation + read-only inspection sub-loops per ADR 0056.
+// Pinned to 2.5-flash (same family as 2.5-pro) so the wire-shape from
+// @google/genai matches. Bumping past 2.5 needs the same thought_signature
+// adapter work the primary model is waiting on.
+export const CHAT_FLASH_MODEL = 'gemini-2.5-flash';
+
 // Tool-call safety net per ADR 0055 decision 2. The cap is intentionally
 // high — it is NOT the primary stop condition (wall-clock and token budgets
 // are). It exists to break a degenerate loop where the model calls the same
@@ -194,6 +200,10 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const previewOps: Array<{ id: string; toolName: string; op: CanvasAgentOp }> = [];
   let doneReason: RunTurnResult['doneReason'] = 'stop';
   let iteration = 0;
+  // ADR 0056 decision 2: reactive Flash routing. After iteration N's tool
+  // calls land, if every call was read-only, iteration N+1 runs on Flash.
+  // Iteration 1 always starts on Pro — the planning decision belongs there.
+  let lastIterationWasReadOnlyOnly = false;
 
   try {
     // 3. Compact when we've crossed the summarise threshold. Summarisation
@@ -203,7 +213,15 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
     //    surfaced as `wallclock-exceeded`, not `summarise-failed`.
     if (countTurns(history) >= SUMMARIZE_AFTER_TURNS) {
       try {
-        history = await summariseIfNeeded(history, ctx.adapter, model, controller.signal);
+        // ADR 0056 decision 1: summarisation always runs on Flash regardless
+        // of the orchestrator's primary model. Constrained synthesis, no
+        // tools, no chained reasoning — Pro is wasted here.
+        history = await summariseIfNeeded(
+          history,
+          ctx.adapter,
+          CHAT_FLASH_MODEL,
+          controller.signal,
+        );
       } catch (err) {
         if (controller.signal.aborted) {
           await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
@@ -221,8 +239,9 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       iteration++;
 
       const llmMessages = toLlmMessages(history);
+      const iterationModel = lastIterationWasReadOnlyOnly ? CHAT_FLASH_MODEL : model;
       const opts: ChatWithToolsOptions = {
-        model,
+        model: iterationModel,
         tools,
         systemInstruction,
         temperature,
@@ -260,12 +279,10 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
 
       // Dispatch every tool call from this turn before looping. We feed the
       // results back as `tool` messages so the next pass sees them.
-      let sawMutating = false;
       for (const call of toolCalls) {
         if (READ_ONLY_TOOL_NAMES.has(call.name)) {
           await dispatchReadOnlyTool({ call, writer, ctx, history });
         } else if (MUTATING_TOOL_NAMES.has(call.name)) {
-          sawMutating = true;
           const dispatched = dispatchMutatingTool({ call, history });
           if (dispatched.preview) {
             await writer.write({
@@ -288,7 +305,12 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         }
       }
 
-      void sawMutating;
+      // ADR 0056 decision 2: classify this iteration for next-iteration
+      // routing. Read-only-only → next iteration runs on Flash; anything
+      // else (mutating, mixed, unknown) → next iteration stays on Pro.
+      lastIterationWasReadOnlyOnly = toolCalls.every((call) =>
+        READ_ONLY_TOOL_NAMES.has(call.name),
+      );
 
       // Per ADR 0055 decision 4, re-trim after every tool dispatch — a large
       // query_site / query_assets result can land mid-iteration and blow the
