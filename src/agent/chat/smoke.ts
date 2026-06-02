@@ -9,6 +9,9 @@
 //      returns the same history.
 //   3. Token budget: query_site output capped at QUERY_SITE_TOKEN_CAP.
 //   4. Op preview NOT applied automatically (state unchanged).
+//   5. Loud summarisation failure: empty model output ends the turn with
+//      `error` + `done(summarise-failed)`, never silently. Owner message is
+//      preserved in history (ADR 0055 dec 5 + ADR 0056 follow-up).
 //
 // All paths run without GEMINI_API_KEY / DATABASE_URL — the mock LlmAdapter
 // + InMemorySessionStore stand in.
@@ -276,7 +279,7 @@ if (previewOp.op.kind === 'rewriteText') {
   );
 }
 
-console.log('[chat:smoke] 1/4 SSE event order — OK');
+console.log('[chat:smoke] 1/5 SSE event order — OK');
 
 // ---------------------------------------------------------------------------
 // Test 2 — Session persistence: history grows across send-message calls
@@ -325,7 +328,7 @@ assert(
   'expected the new user message to be persisted',
 );
 
-console.log('[chat:smoke] 2/4 Session persistence — OK');
+console.log('[chat:smoke] 2/5 Session persistence — OK');
 
 // ---------------------------------------------------------------------------
 // Test 3 — Token budget on query_site output (≤ 2k tokens, truncated).
@@ -350,7 +353,7 @@ assert(
   summaryLarge.truncated === true,
   'large site summary must flip truncated=true after trimming',
 );
-console.log('[chat:smoke] 3/4 Token budget cap — OK');
+console.log('[chat:smoke] 3/5 Token budget cap — OK');
 
 // ---------------------------------------------------------------------------
 // Test 4 — Op preview is NOT applied automatically; the live editable state
@@ -413,7 +416,68 @@ assert(
 // The source must STILL be unchanged after the clone-apply.
 assert(JSON.stringify(fixtureState) === beforeJson, 'apply-clone must not mutate source');
 
-console.log('[chat:smoke] 4/4 Op preview not auto-applied — OK');
+console.log('[chat:smoke] 4/5 Op preview not auto-applied — OK');
+
+// ---------------------------------------------------------------------------
+// Test 5 — Loud summarisation failure (ADR 0055 dec 5 + ADR 0056 follow-up).
+// When summarisation produces no text the orchestrator must end the turn
+// with `error` + `done(summarise-failed)`. No silent skip.
+// ---------------------------------------------------------------------------
+
+const tenTurnHistory: ChatMessage[] = [];
+for (let i = 0; i < 10; i++) {
+  tenTurnHistory.push({ role: 'user', content: `Owner message ${String(i)}` });
+  tenTurnHistory.push({ role: 'assistant', content: `Agent reply ${String(i)}` });
+}
+
+const summariseEmptyAdapter = new MockLlmAdapter([
+  // Summarisation call: stream emits zero text chunks then `done`. Per ADR
+  // 0055 dec 5 the orchestrator must treat this as a loud failure.
+  () => yieldChunks({ type: 'done', reason: 'stop' }),
+]);
+
+const writer5 = new BufferedStreamWriter();
+const store5 = new InMemorySessionStore();
+const session5 = await store5.create('site-smoke-summ', 'customer-smoke-summ', tenTurnHistory);
+const ctx5: OrchestratorContext = {
+  adapter: summariseEmptyAdapter,
+  state: fixtureState,
+  systemInstruction: '[smoke] system prompt',
+};
+const result5 = await runChatTurn({
+  session: session5,
+  userMessage: 'Trigger summarisation.',
+  writer: writer5,
+  ctx: ctx5,
+});
+
+assert(
+  result5.doneReason === 'summarise-failed',
+  `expected doneReason summarise-failed, got ${result5.doneReason}`,
+);
+const events5 = writer5.events();
+const lastTwo = events5.slice(-2);
+assert(
+  lastTwo[0]?.kind === 'error',
+  `expected penultimate event to be error, got ${lastTwo[0]?.kind ?? 'none'}`,
+);
+assert(
+  lastTwo[1]?.kind === 'done' && lastTwo[1].reason === 'summarise-failed',
+  `expected final event done(summarise-failed), got ${lastTwo[1]?.kind ?? 'none'}`,
+);
+assert(
+  result5.previewOps.length === 0,
+  'failed-summarise turn must produce zero preview ops',
+);
+// The Owner's appended user message must still be in the returned history so
+// the caller can persist it.
+const lastMessage5 = result5.messages[result5.messages.length - 1];
+assert(
+  lastMessage5?.role === 'user' && lastMessage5.content === 'Trigger summarisation.',
+  'failed-summarise turn must preserve the Owner appended message',
+);
+
+console.log('[chat:smoke] 5/5 Loud summarisation failure — OK');
 
 // ---------------------------------------------------------------------------
 // Done.
