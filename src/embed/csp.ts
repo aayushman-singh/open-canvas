@@ -59,12 +59,35 @@ export function collectEmbedFrameSrcOrigins(snapshot: PublishedSnapshot): string
         if (element.type !== 'embed') continue;
         const resolved = resolveEmbed(element.url);
         if (resolved.providerName === 'invalid') continue;
-        if (resolved.frameSrcOrigin === '' || resolved.frameSrcOrigin === 'none') continue;
-        origins.add(resolved.frameSrcOrigin);
+        for (const origin of resolved.frameSrcOrigins) {
+          if (origin === '' || origin === 'none') continue;
+          origins.add(origin);
+        }
       }
     }
   }
   return Array.from(origins).sort();
+}
+
+/**
+ * True when any inline run inside a TextElement carries a `math` field.
+ * The public renderer ships KaTeX HTML for those runs and the page links
+ * `cdn.jsdelivr.net`'s KaTeX stylesheet to make it look right; CSP
+ * `style-src` has to include that origin or the stylesheet is blocked and
+ * the equation renders as raw boxes.
+ */
+function snapshotHasMathRun(snapshot: PublishedSnapshot): boolean {
+  for (const page of snapshot.pages) {
+    for (const section of page.sections) {
+      for (const element of section.elements) {
+        if (element.type !== 'text') continue;
+        for (const run of element.content) {
+          if (run.math) return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -83,14 +106,22 @@ export function buildEmbedCsp(snapshot: PublishedSnapshot): string {
   // CSP by element presence adds inspection cost for no payoff. We do not
   // allow 'none' because that would mask `'self'` per CSP semantics.
   const frameSrc = ["'self'", 'https://challenges.cloudflare.com', ...frameOrigins].join(' ');
+
+  // KaTeX stylesheet + (font fallback) load from jsDelivr only when the
+  // snapshot actually has a math run. Always-on would broaden style-src
+  // unconditionally; gating on presence keeps the surface tight per snapshot.
+  const hasMath = snapshotHasMathRun(snapshot);
+  const styleExtras = hasMath ? ' https://cdn.jsdelivr.net' : '';
+  const fontExtras = hasMath ? ' https://cdn.jsdelivr.net' : '';
+
   return [
     `default-src 'self'`,
     `img-src 'self' data: blob:`,
-    `style-src 'self' 'unsafe-inline'`,
+    `style-src 'self' 'unsafe-inline'${styleExtras}`,
     // Turnstile widget loader is the only third-party script the public
     // renderer emits. Cloudflare Insights is allowed for Workers analytics.
     `script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://challenges.cloudflare.com`,
-    `font-src 'self' data:`,
+    `font-src 'self' data:${fontExtras}`,
     // Turnstile's challenge JS posts back to challenges.cloudflare.com.
     `connect-src 'self' wss: ws: https://challenges.cloudflare.com`,
     `frame-src ${frameSrc}`,

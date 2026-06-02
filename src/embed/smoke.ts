@@ -112,8 +112,9 @@ assert(
 const twitterResolved = resolveEmbed('https://x.com/jack/status/20000000000000');
 assert(twitterResolved.providerName === 'twitter', 'twitter: provider mismatch');
 assert(
-  twitterResolved.frameSrcOrigin === 'https://platform.twitter.com',
-  `twitter: frameSrcOrigin mismatch; got ${twitterResolved.frameSrcOrigin}`,
+  twitterResolved.frameSrcOrigins[0] === 'https://platform.twitter.com' &&
+    twitterResolved.frameSrcOrigins.length === 1,
+  `twitter: frameSrcOrigins mismatch; got ${twitterResolved.frameSrcOrigins.join(', ')}`,
 );
 
 // ---------------------------------------------------------------------------
@@ -298,8 +299,8 @@ assert(cache.putCount === 1, `first lookup must put once; got ${cache.putCount}`
 const second = await resolveEmbedCached(TEST_URL, { cache });
 assert(second.embedUrl === first.embedUrl, `second lookup must return same embedUrl`);
 assert(
-  second.frameSrcOrigin === first.frameSrcOrigin,
-  `second lookup must return same frameSrcOrigin`,
+  JSON.stringify(second.frameSrcOrigins) === JSON.stringify(first.frameSrcOrigins),
+  `second lookup must return same frameSrcOrigins`,
 );
 assert(second.providerName === first.providerName, `second lookup must return same providerName`);
 // The critical assertion: no second put. The cache served the second

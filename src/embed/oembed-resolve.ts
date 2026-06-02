@@ -58,11 +58,15 @@ export interface ResolvedEmbed {
   /** The URL to drop into `<iframe src>`. Empty string when provider === 'invalid'. */
   embedUrl: string;
   /**
-   * The CSP `frame-src` origin (`https://www.youtube.com`). Set to `'none'`
-   * for invalid URLs so the CSP builder knows to skip them — the renderer
-   * will not emit an iframe at all in that case.
+   * The CSP `frame-src` origins. Usually one host (`https://www.youtube.com`)
+   * but providers that ship as shortened URLs (Google Maps `maps.app.goo.gl`,
+   * `goo.gl/maps/...`) need every redirect target the browser will walk
+   * through, since CSP `frame-src` is checked against EACH navigation in
+   * the iframe — not just the initial src. Set to `['none']` for invalid
+   * URLs so the CSP builder knows to skip them; the renderer will not emit
+   * an iframe in that case either.
    */
-  frameSrcOrigin: string;
+  frameSrcOrigins: string[];
   /** Which provider matched (or 'generic' / 'invalid'). */
   providerName: EmbedProvider;
 }
@@ -114,7 +118,7 @@ function matchYouTube(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (videoId === null) return null;
   return {
     embedUrl: `https://www.youtube.com/embed/${videoId}`,
-    frameSrcOrigin: 'https://www.youtube.com',
+    frameSrcOrigins: ['https://www.youtube.com'],
     providerName: 'youtube',
   };
 }
@@ -127,7 +131,7 @@ function matchVimeo(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (videoId === null) return null;
   return {
     embedUrl: `https://player.vimeo.com/video/${videoId}`,
-    frameSrcOrigin: 'https://player.vimeo.com',
+    frameSrcOrigins: ['https://player.vimeo.com'],
     providerName: 'vimeo',
   };
 }
@@ -142,7 +146,7 @@ function matchLoom(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (id === null) return null;
   return {
     embedUrl: `https://www.loom.com/embed/${id}`,
-    frameSrcOrigin: 'https://www.loom.com',
+    frameSrcOrigins: ['https://www.loom.com'],
     providerName: 'loom',
   };
 }
@@ -155,7 +159,7 @@ function matchFigma(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (!/^\/(file|proto|design|board)\//.test(parsed.pathname)) return null;
   return {
     embedUrl: `https://www.figma.com/embed?embed_host=opencanvas&url=${encodeURIComponent(parsed.raw)}`,
-    frameSrcOrigin: 'https://www.figma.com',
+    frameSrcOrigins: ['https://www.figma.com'],
     providerName: 'figma',
   };
 }
@@ -171,7 +175,7 @@ function matchSpotify(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (typeof kind !== 'string' || typeof id !== 'string') return null;
   return {
     embedUrl: `https://open.spotify.com/embed/${kind}/${id}`,
-    frameSrcOrigin: 'https://open.spotify.com',
+    frameSrcOrigins: ['https://open.spotify.com'],
     providerName: 'spotify',
   };
 }
@@ -184,7 +188,7 @@ function matchSoundCloud(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (parsed.pathname === '/' || parsed.pathname === '') return null;
   return {
     embedUrl: `https://w.soundcloud.com/player/?url=${encodeURIComponent(parsed.raw)}`,
-    frameSrcOrigin: 'https://w.soundcloud.com',
+    frameSrcOrigins: ['https://w.soundcloud.com'],
     providerName: 'soundcloud',
   };
 }
@@ -200,7 +204,7 @@ function matchCodePen(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   if (typeof user !== 'string' || typeof penId !== 'string') return null;
   return {
     embedUrl: `https://codepen.io/${user}/embed/${penId}`,
-    frameSrcOrigin: 'https://codepen.io',
+    frameSrcOrigins: ['https://codepen.io'],
     providerName: 'codepen',
   };
 }
@@ -223,13 +227,26 @@ function matchTwitter(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   // hood; we encode the same shape statically.
   return {
     embedUrl: `https://platform.twitter.com/embed/Tweet.html?url=${encodeURIComponent(parsed.raw)}`,
-    frameSrcOrigin: 'https://platform.twitter.com',
+    frameSrcOrigins: ['https://platform.twitter.com'],
     providerName: 'twitter',
   };
 }
 
 const GOOGLE_MAPS_PLACE = /^\/maps\/place\/([^/]+)/;
 const GOOGLE_MAPS_AT = /^\/maps\/@(-?[\d.]+),(-?[\d.]+)/;
+
+// Canonical embed-iframe origins for Google Maps. www.google.com is the
+// host the long /maps?q=...&output=embed and /maps/embed?pb=... URLs serve;
+// maps.google.com used to but now redirects to www.google.com, and we keep
+// it allow-listed for legacy embeds and for any future direction reversal.
+// Short-link hosts (maps.app.goo.gl, goo.gl) are added on top of this base
+// when the URL the visitor actually loads is one of those - the browser
+// follows the 30x to www.google.com and CSP frame-src is checked at every
+// hop.
+const GOOGLE_MAPS_CANONICAL_ORIGINS = [
+  'https://www.google.com',
+  'https://maps.google.com',
+] as const;
 
 function matchGoogleMaps(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
   const isGoogleMaps =
@@ -238,10 +255,27 @@ function matchGoogleMaps(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
     ((parsed.host === 'google.com' || parsed.host === 'www.google.com') &&
       parsed.pathname.startsWith('/maps'));
   const isGooGl = parsed.host === 'goo.gl' && parsed.pathname.startsWith('/maps');
+  // maps.app.goo.gl is the modern Share-sheet short-link host. Path detail
+  // is opaque (the link redirects to a full /maps URL on www.google.com),
+  // so there's nothing to parse — pass the raw URL through and let the
+  // browser follow the redirect chain.
+  const isMapsAppGoogl = parsed.host === 'maps.app.goo.gl';
 
-  if (!isGoogleMaps && !isGooGl) return null;
+  if (!isGoogleMaps && !isGooGl && !isMapsAppGoogl) return null;
 
-  // Extract query from various URL formats.
+  // Short-link forms can't be expanded without an HTTP fetch, so the iframe
+  // src is the raw URL and we add the short-link host to the frame-src
+  // allowlist alongside the canonical destinations.
+  if (isGooGl || isMapsAppGoogl) {
+    const shortLinkOrigin = isMapsAppGoogl ? 'https://maps.app.goo.gl' : 'https://goo.gl';
+    return {
+      embedUrl: parsed.raw,
+      frameSrcOrigins: [shortLinkOrigin, ...GOOGLE_MAPS_CANONICAL_ORIGINS],
+      providerName: 'google-maps',
+    };
+  }
+
+  // Long URL: extract a query and rebuild against the canonical embed shape.
   let query: string | null = null;
 
   // /maps/place/PLACE_NAME/...
@@ -265,14 +299,25 @@ function matchGoogleMaps(parsed: ParsedEmbedUrl): ResolvedEmbed | null {
     if (q) query = q;
   }
 
-  // For goo.gl short links or unrecognized formats, use the raw URL.
+  // /maps/embed?pb=... is the canonical Google-Maps-issued embed URL. Pass
+  // it through unchanged so the host's pre-built map (with markers, layers,
+  // etc.) renders identically to what the author saw on Google Maps.
+  if (parsed.pathname.startsWith('/maps/embed') && parsed.search.length > 0) {
+    return {
+      embedUrl: parsed.raw,
+      frameSrcOrigins: [...GOOGLE_MAPS_CANONICAL_ORIGINS],
+      providerName: 'google-maps',
+    };
+  }
+
+  // Fall back to the raw URL when no query is extractable.
   if (!query) {
     query = parsed.raw;
   }
 
   return {
-    embedUrl: `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`,
-    frameSrcOrigin: 'https://maps.google.com',
+    embedUrl: `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`,
+    frameSrcOrigins: [...GOOGLE_MAPS_CANONICAL_ORIGINS],
     providerName: 'google-maps',
   };
 }
@@ -302,7 +347,7 @@ const PROVIDER_MATCHERS: ProviderMatcher[] = [
 export function resolveEmbed(url: string): ResolvedEmbed {
   const parsed = parseEmbedUrl(url);
   if (parsed === null) {
-    return { embedUrl: '', frameSrcOrigin: 'none', providerName: 'invalid' };
+    return { embedUrl: '', frameSrcOrigins: ['none'], providerName: 'invalid' };
   }
   for (const matcher of PROVIDER_MATCHERS) {
     const result = matcher(parsed);
@@ -310,7 +355,7 @@ export function resolveEmbed(url: string): ResolvedEmbed {
   }
   return {
     embedUrl: parsed.raw,
-    frameSrcOrigin: parsed.origin,
+    frameSrcOrigins: [parsed.origin],
     providerName: 'generic',
   };
 }
