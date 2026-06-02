@@ -2800,29 +2800,21 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   background: var(--surface-2);
   color: var(--ink);
 }
-/* Text color swatch — glyph "A" with a tiny color bar beneath, native
-   <input type="color"> hidden behind the button so the swatch click opens
-   the OS color picker. */
+/* Text color — color-wheel SVG with a centered dot showing the active color.
+   Native <input type="color"> is hidden behind the button so clicking the
+   wheel opens the OS color picker. The wheel's six colored segments make
+   "change text colour" obvious at a glance; the center dot fill mirrors the
+   currently picked colour. */
 .opencanvas-mark-toolbar .opencanvas-mark-color {
   position: relative;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  padding: 3px 8px 4px;
-  line-height: 1;
+  justify-content: center;
+  padding: 4px;
+  line-height: 0;
 }
-.opencanvas-mark-toolbar .opencanvas-mark-color-glyph {
-  font-weight: 700;
-  font-size: 12px;
-  line-height: 14px;
-}
-.opencanvas-mark-toolbar .opencanvas-mark-color-swatch {
+.opencanvas-mark-toolbar .opencanvas-mark-color-wheel {
   display: block;
-  width: 14px;
-  height: 3px;
-  margin-top: 2px;
-  border-radius: 1px;
-  background: currentColor;
 }
 .opencanvas-mark-toolbar .opencanvas-mark-color-input {
   position: absolute;

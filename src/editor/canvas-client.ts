@@ -9536,14 +9536,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     colorBtn.className = "opencanvas-mark-color";
     colorBtn.setAttribute("aria-label", "Text color");
     colorBtn.title = "Text color";
-    var colorGlyph = document.createElement("span");
-    colorGlyph.className = "opencanvas-mark-color-glyph";
-    colorGlyph.textContent = "A";
-    var colorSwatch = document.createElement("span");
-    colorSwatch.className = "opencanvas-mark-color-swatch";
-    colorSwatch.style.background = initColor;
-    colorBtn.appendChild(colorGlyph);
-    colorBtn.appendChild(colorSwatch);
+    // Color-wheel SVG: six pie segments + a centered circle whose fill mirrors
+    // the active color. The wheel reads as "change color" at a glance; the
+    // center dot tells you what's currently picked. Replaces the previous "A"
+    // + underline-swatch that authors found ambiguous.
+    colorBtn.innerHTML =
+      '<svg class="opencanvas-mark-color-wheel" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">' +
+      '<path d="M8 8 L8 2 A6 6 0 0 1 13.196 5 Z" fill="#ef4444"/>' +
+      '<path d="M8 8 L13.196 5 A6 6 0 0 1 13.196 11 Z" fill="#f59e0b"/>' +
+      '<path d="M8 8 L13.196 11 A6 6 0 0 1 8 14 Z" fill="#10b981"/>' +
+      '<path d="M8 8 L8 14 A6 6 0 0 1 2.804 11 Z" fill="#06b6d4"/>' +
+      '<path d="M8 8 L2.804 11 A6 6 0 0 1 2.804 5 Z" fill="#3b82f6"/>' +
+      '<path d="M8 8 L2.804 5 A6 6 0 0 1 8 2 Z" fill="#8b5cf6"/>' +
+      '<circle class="opencanvas-mark-color-dot" cx="8" cy="8" r="3" stroke="#ffffff" stroke-width="1.2"/>' +
+      '</svg>';
+    var colorDot = colorBtn.querySelector(".opencanvas-mark-color-dot");
+    if (colorDot) colorDot.setAttribute("fill", initColor);
     var colorInput = document.createElement("input");
     colorInput.type = "color";
     colorInput.value = initColor;
@@ -9562,7 +9570,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
     colorInput.addEventListener("input", function () {
       var v = colorInput.value;
-      colorSwatch.style.background = v;
+      if (colorDot) colorDot.setAttribute("fill", v);
       applyTextColorToEditing(v);
     });
     bar.appendChild(colorBtn);
