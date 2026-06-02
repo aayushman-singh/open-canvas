@@ -134,6 +134,11 @@ export interface OrchestratorContext {
    * ends with `done` reason `wallclock-exceeded`. Defaults to DEFAULT_WALL_CLOCK_MS.
    */
   wallClockMs?: number;
+  /**
+   * Optional. Per-iteration sampling temperature. Defaults to 0.3 (chat).
+   * The canvas-agent preview endpoint pins 0.2 for slightly tighter output.
+   */
+  temperature?: number;
 }
 
 export interface RunTurnInput {
@@ -173,6 +178,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
     ctx.systemInstruction ?? buildSystemPrompt(ctx.state, ctx.selectedElementId);
   const toolCallBudget = ctx.toolCallBudget ?? TOOL_CALL_SAFETY_NET;
   const wallClockMs = ctx.wallClockMs ?? DEFAULT_WALL_CLOCK_MS;
+  const temperature = ctx.temperature ?? 0.3;
 
   // 1. Append the user message to history.
   let history: ChatMessage[] = [...session.messages, { role: 'user', content: userMessage }];
@@ -219,7 +225,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         model,
         tools,
         systemInstruction,
-        temperature: 0.3,
+        temperature,
         signal: controller.signal,
       };
 

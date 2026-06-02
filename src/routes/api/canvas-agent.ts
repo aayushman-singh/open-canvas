@@ -25,10 +25,16 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { GeminiAdapter } from '../../agent/llm-gemini';
-import type { LlmAssistantToolCall, LlmMessage, LlmTool } from '../../agent/llm';
 import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
-import { translateToolCall, parseApplyOp, isRecord } from '../../agent/tool-parsers';
+import { parseApplyOp, translateToolCall, isRecord } from '../../agent/tool-parsers';
+import {
+  runChatTurn,
+  type OrchestratorContext,
+  type RunTurnResult,
+} from '../../agent/chat/orchestrator';
+import { BufferedStreamWriter, type ChatStreamEvent } from '../../agent/chat/stream';
+import type { ChatSessionState } from '../../agent/chat/session';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
@@ -297,44 +303,40 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
     return c.json({ error: 'GEMINI_API_KEY not configured' }, 503);
   }
 
-  const messages: LlmMessage[] = [{ role: 'user', content: body.prompt }];
-  const tools: LlmTool[] = CANVAS_AGENT_TOOLS;
+  // Per ADR 0055 decision 7 the preview endpoint runs the same multi-turn
+  // loop as chat instead of single-shot. We wire a stateless ChatSessionState
+  // (no DB row, no cross-request memory) plus a BufferedStreamWriter so the
+  // SSE events stay in-memory and we drain them into the JSON wire shape the
+  // editor still consumes.
   const adapter = new GeminiAdapter({ apiKey });
+  const session: ChatSessionState = {
+    id: `canvas-agent-preview-${crypto.randomUUID()}`,
+    siteId: row.id,
+    customerId: row.customerId,
+    startedAt: new Date().toISOString(),
+    endedAt: null,
+    messages: [],
+  };
+  const writer = new BufferedStreamWriter();
+  const ctx: OrchestratorContext = {
+    adapter,
+    model: CANVAS_AGENT_MODEL,
+    state: row.editableState,
+    systemInstruction: buildSystemPrompt(row.editableState),
+    tools: CANVAS_AGENT_TOOLS,
+    temperature: 0.2,
+  };
 
-  // Drain the stream into a flat list of tool calls. The preview path doesn't
-  // need the LLM to think across multiple turns — every op the LLM emits in
-  // one call gets dry-run together. If the model returns text only and no
-  // tool calls, we surface that as a no-op preview (the editor can decide
-  // whether to show the text or just dismiss).
-  const toolCalls: LlmAssistantToolCall[] = [];
-  let assistantText = '';
+  let result: RunTurnResult;
   try {
-    for await (const chunk of adapter.chatWithTools(messages, {
-      model: CANVAS_AGENT_MODEL,
-      tools,
-      systemInstruction: buildSystemPrompt(row.editableState),
-      temperature: 0.2,
-    })) {
-      if (chunk.type === 'text') {
-        assistantText += chunk.text;
-      } else if (chunk.type === 'tool_call') {
-        toolCalls.push({ id: chunk.id, name: chunk.name, arguments: chunk.arguments });
-      }
-    }
+    result = await runChatTurn({ session, userMessage: body.prompt, writer, ctx });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return c.json({ error: `LLM call failed: ${message}` }, 500);
   }
 
-  // Translate each tool call into a CanvasAgentOp.
-  const ops: CanvasAgentOp[] = [];
-  for (const call of toolCalls) {
-    const parsed = translateToolCall(call);
-    if (!parsed.ok) {
-      return c.json({ error: parsed.error }, 400);
-    }
-    ops.push(parsed.op);
-  }
+  const assistantText = collectAssistantText(writer.events());
+  const ops = result.previewOps.map((p) => p.op);
 
   // No tool calls — surface the model's text response so the editor can show
   // it. previewState mirrors current editableState (no changes).
@@ -344,6 +346,7 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
       ops: [],
       previewState: row.editableState,
       text: assistantText,
+      ...maybeTruncated(result.doneReason),
     });
   }
 
@@ -362,8 +365,33 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
     ops,
     previewState: pipeline.next,
     text: assistantText,
+    ...maybeTruncated(result.doneReason),
   });
 });
+
+function collectAssistantText(events: readonly ChatStreamEvent[]): string {
+  let text = '';
+  for (const ev of events) {
+    if (ev.kind === 'token') text += ev.text;
+  }
+  return text;
+}
+
+// Truncation is informational: the Owner still sees whatever ops the model
+// produced before the budget tripped. The editor decides whether to display
+// the partial-revamp warning.
+function maybeTruncated(reason: RunTurnResult['doneReason']): { truncated?: string } {
+  if (
+    reason === 'wallclock-exceeded' ||
+    reason === 'tokens-exceeded' ||
+    reason === 'tool-call-cap' ||
+    reason === 'safety' ||
+    reason === 'summarise-failed'
+  ) {
+    return { truncated: reason };
+  }
+  return {};
+}
 
 // ---------------------------------------------------------------------------
 // POST /sites/:siteId/apply
