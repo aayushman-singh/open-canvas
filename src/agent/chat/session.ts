@@ -215,15 +215,53 @@ export async function createSession(
   return rowToState(r);
 }
 
+export const CHAT_RACE_WARN_MARKER = '[chat/session] ADR-0048 concurrent-write race detected';
+
+export interface ChatRacePayload {
+  sessionId: string;
+  expectedBaselineLength: number;
+  currentLength: number;
+  incomingLength: number;
+  lostMessages: number;
+}
+
+/**
+ * Pure-arithmetic check for the ADR 0048 telemetry hook. Returns the structured
+ * warn payload when the persisted row's message count already exceeds the
+ * caller's expected baseline (i.e. another writer landed between baseline-load
+ * and this call); returns `null` otherwise.
+ *
+ * Extracted as a pure function so the regression smoke can pin the contract
+ * (`src/agent/chat/session-race.smoke.ts`) without mocking a DB.
+ */
+export function computeChatRacePayload(args: {
+  sessionId: string;
+  currentLength: number;
+  expectedBaselineLength: number;
+  incomingLength: number;
+}): ChatRacePayload | null {
+  if (args.currentLength > args.expectedBaselineLength) {
+    return {
+      sessionId: args.sessionId,
+      expectedBaselineLength: args.expectedBaselineLength,
+      currentLength: args.currentLength,
+      incomingLength: args.incomingLength,
+      lostMessages: args.currentLength - args.expectedBaselineLength,
+    };
+  }
+  return null;
+}
+
 /**
  * Replace the messages array on an existing session.
  *
  * Optional `expectedBaselineLength` is the length of `messages` the caller
  * observed when it loaded the session at the start of the turn. When
  * provided, this function reads the row's current `messages.length` before
- * the UPDATE and emits a structured log if the persisted length already
- * exceeds the expected baseline — that is the ADR-0048-decision-4
- * telemetry hook for measuring concurrent-tab race frequency.
+ * the UPDATE and emits a structured log via `computeChatRacePayload` when
+ * the persisted length already exceeds the expected baseline — that is the
+ * ADR-0048-decision-4 telemetry hook for measuring concurrent-tab race
+ * frequency.
  *
  * The hook does NOT change the write contract: this function still
  * last-writer-wins per ADR 0048 decision 1. It only surfaces the race
@@ -247,14 +285,14 @@ export async function saveMessages(
       .limit(1);
     const current = rows[0]?.messages;
     const currentLength = Array.isArray(current) ? current.length : 0;
-    if (currentLength > expectedBaselineLength) {
-      console.warn('[chat/session] ADR-0048 concurrent-write race detected', {
-        sessionId,
-        expectedBaselineLength,
-        currentLength,
-        incomingLength: messages.length,
-        lostMessages: currentLength - expectedBaselineLength,
-      });
+    const payload = computeChatRacePayload({
+      sessionId,
+      currentLength,
+      expectedBaselineLength,
+      incomingLength: messages.length,
+    });
+    if (payload !== null) {
+      console.warn(CHAT_RACE_WARN_MARKER, payload);
     }
   }
   await database
