@@ -68,6 +68,10 @@ _Avoid_: Chatbot, assistant, generator
 An owner-requested change made by the agent to the Editable Site. The owner previews every Agent Edit before it takes effect.
 _Avoid_: Prompt response, AI output, background automation
 
+**Agent Turn**:
+One bounded unit of work in which the Agent processes one Owner ask — from the moment the Owner submits a message to the moment the Agent emits a done signal. A turn may propose zero or many Agent Edits and is bounded by named budgets the Owner can observe when they exhaust.
+_Avoid_: Iteration, conversation round, message exchange, prompt cycle
+
 **Section Recipe**:
 A constrained canvas section shape the agent may use when creating a new section.
 _Avoid_: Freeform layout, arbitrary generation, template
@@ -149,6 +153,8 @@ _Avoid_: Undo stack, version history, asset trail
 - A **Slot History** is removed when its **Media Element** is deleted
 - A **Media Element** may display an image or a video
 - An **Owner** requests an **Agent Edit**
+- An **Owner** ask drives exactly one **Agent Turn**
+- An **Agent Turn** may propose zero or more **Agent Edits**
 - An **Agent Edit** changes the **Editable Site**, not the **Published Site**
 - An **Agent Edit** is previewed by the **Owner** before it takes effect
 - A media-producing **Agent Edit** creates an **Owner Asset** only when the owner applies the previewed media to a media element
@@ -165,6 +171,7 @@ _Avoid_: Undo stack, version history, asset trail
 - The POC proves desktop editing and desktop visitor viewing only
 - The POC uses a small deterministic set of style kits
 - The POC treats full multiplayer collaboration as out of scope unless it is already trivial to expose
+- Every **Agent Turn** is bounded by three named budgets — wall-clock, accumulated tokens, and a tool-call safety net. When any budget exhausts the turn ends and the **Owner** sees which budget tripped (see ADR 0055 + ADR 0056)
 
 ## Example dialogue
 
