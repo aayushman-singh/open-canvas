@@ -41,6 +41,8 @@ import { appOrigin, type HostConfigEnv } from '../host-config';
 import { resolveClerkKeys, type ClerkKeyEnv } from '../auth/middleware';
 import { clerkFrontendApiHost } from '../auth/require-auth';
 import { APEX_OG_DESCRIPTION, APEX_OG_HEADLINE, APEX_OG_SITE_NAME } from '../seo/apex';
+// @ts-expect-error Wrangler bundles .wasm as WebAssembly.Module via [[rules]] type=CompiledWasm
+import resvgWasmModule from '@resvg/resvg-wasm/index_bg.wasm';
 
 // The marketing page reads APP_DOMAIN to compose canonical / og:url. Typing
 // the binding here lets `c.env.APP_DOMAIN` flow into `appOrigin()` without a
@@ -234,15 +236,13 @@ const BRAND_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="128" heig
 let brandMarkPngBytes: Uint8Array | null = null;
 let brandMarkPromise: Promise<Uint8Array> | null = null;
 
-landing.get('/brand-mark.png', async (c) => {
+landing.get('/brand-mark.png', async () => {
   if (brandMarkPngBytes === null) {
     if (brandMarkPromise === null) {
       const { rasteriseSvgToPng } = await import('../og-image/rasterise.js');
-      const env = c.env as { OG_RESVG_WASM?: WebAssembly.Module };
-      brandMarkPromise = rasteriseSvgToPng(
-        BRAND_MARK_SVG,
-        env.OG_RESVG_WASM !== undefined ? { wasmModule: env.OG_RESVG_WASM } : undefined,
-      ).then((r) => r.bytes);
+      brandMarkPromise = rasteriseSvgToPng(BRAND_MARK_SVG, {
+        wasmModule: resvgWasmModule as WebAssembly.Module,
+      }).then((r) => r.bytes);
     }
     brandMarkPngBytes = await brandMarkPromise;
   }

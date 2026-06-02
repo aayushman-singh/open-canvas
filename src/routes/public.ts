@@ -191,10 +191,15 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   const ROOT_SELECTOR = '[data-opencanvas-public-root]';
   const RECONNECT_BASE_MS = 1000;
   const RECONNECT_MAX_MS = 30000;
+  // Jitter so N visitors don't all retry on the same tick after a transport
+  // blip — without it, a SiteRoom restart triggers a thundering-herd of
+  // simultaneous reconnects, each counted as one DO request.
+  const RECONNECT_JITTER_MS = 500;
   const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = scheme + '//' + location.host + '/__live';
   let currentVersion = ${versionLiteral};
   let retryCount = 0;
+  let pendingReconnect = false;
 
   function currentSlug(defaultSlug) {
     const raw = location.pathname.replace(/^\/+|\/+$/g, '');
@@ -228,6 +233,15 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
   }
 
   function connect() {
+    // Hidden tabs don't need live publish updates — they aren't painting.
+    // Skip the WebSocket entirely; visibilitychange will reconnect when the
+    // tab comes back into the foreground. Each suppressed reconnect saves
+    // one SITE_ROOM DO request per visitor per drop.
+    if (document.visibilityState === 'hidden') {
+      pendingReconnect = true;
+      return;
+    }
+    pendingReconnect = false;
     const ws = new WebSocket(url);
     ws.addEventListener('open', () => {
       retryCount = 0;
@@ -273,7 +287,12 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
       }
     });
     ws.addEventListener('close', () => {
-      var delay = Math.min(RECONNECT_BASE_MS * Math.pow(2, retryCount), RECONNECT_MAX_MS);
+      if (document.visibilityState === 'hidden') {
+        pendingReconnect = true;
+        return;
+      }
+      var base = Math.min(RECONNECT_BASE_MS * Math.pow(2, retryCount), RECONNECT_MAX_MS);
+      var delay = base + Math.random() * RECONNECT_JITTER_MS;
       retryCount++;
       setTimeout(connect, delay);
     });
@@ -282,6 +301,16 @@ function buildVisitorLiveScript(snapshotVersion: number): string {
       try { ws.close(); } catch (_) { /* noop */ }
     });
   }
+
+  // Reconnect immediately when the tab becomes visible again. retryCount
+  // resets so the user doesn't wait the full backoff after switching back
+  // to a long-hidden tab.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && pendingReconnect) {
+      retryCount = 0;
+      connect();
+    }
+  });
 
   connect();
 })();

@@ -325,7 +325,7 @@ function clientScript(siteId: string): string {
           }
           throw new Error(serverHint || serverError);
         }
-        if (msgEl) { msgEl.textContent = 'Saved. Publish your site to apply changes.'; msgEl.className = 'addon-msg msg-ok'; }
+        if (msgEl) { msgEl.textContent = 'Saved. Changes are live on your published site.'; msgEl.className = 'addon-msg msg-ok'; }
       })
       .catch(function(err) {
         saveBtn.disabled = false;

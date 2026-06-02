@@ -31,11 +31,15 @@ export interface OwnerRoomPushBody {
 
 import { DurableObject } from 'cloudflare:workers';
 
-const HEARTBEAT_MS = 25_000;
+// 60s heartbeat is well under typical SSE proxy idle culls (~90-120s) and
+// halves the per-subscriber tick rate vs the old 25s value. One shared
+// interval iterates all subscribers per tick; previously each subscriber
+// armed its own setInterval, so N tabs = N timers firing in parallel.
+const HEARTBEAT_MS = 60_000;
 
 export class NotificationOwnerRoom extends DurableObject<unknown> {
   private subscribers: Map<string, ReadableStreamDefaultController<Uint8Array>> = new Map();
-  private heartbeats: Map<string, ReturnType<typeof setInterval>> = new Map();
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private encoder = new TextEncoder();
 
   override async fetch(request: Request): Promise<Response> {
@@ -58,14 +62,7 @@ export class NotificationOwnerRoom extends DurableObject<unknown> {
         this.subscribers.set(clientId, controller);
         // Opening comment line so the client knows the stream is alive.
         controller.enqueue(this.encoder.encode(`: connected ${clientId}\n\n`));
-        const interval = setInterval(() => {
-          try {
-            controller.enqueue(this.encoder.encode(`: heartbeat\n\n`));
-          } catch {
-            this.removeSubscriber(clientId);
-          }
-        }, HEARTBEAT_MS);
-        this.heartbeats.set(clientId, interval);
+        this.ensureHeartbeatRunning();
       },
       cancel: () => {
         this.removeSubscriber(clientId);
@@ -81,6 +78,20 @@ export class NotificationOwnerRoom extends DurableObject<unknown> {
         'x-accel-buffering': 'no',
       },
     });
+  }
+
+  private ensureHeartbeatRunning(): void {
+    if (this.heartbeatInterval !== null) return;
+    this.heartbeatInterval = setInterval(() => {
+      const beat = this.encoder.encode(`: heartbeat\n\n`);
+      for (const [clientId, controller] of this.subscribers) {
+        try {
+          controller.enqueue(beat);
+        } catch {
+          this.removeSubscriber(clientId);
+        }
+      }
+    }, HEARTBEAT_MS);
   }
 
   private async handlePush(request: Request): Promise<Response> {
@@ -108,12 +119,13 @@ export class NotificationOwnerRoom extends DurableObject<unknown> {
   }
 
   private removeSubscriber(clientId: string): void {
-    const interval = this.heartbeats.get(clientId);
-    if (interval !== undefined) {
-      clearInterval(interval);
-      this.heartbeats.delete(clientId);
-    }
     this.subscribers.delete(clientId);
+    // Stop the shared heartbeat when the last subscriber leaves so the DO
+    // can hibernate instead of ticking every HEARTBEAT_MS forever.
+    if (this.subscribers.size === 0 && this.heartbeatInterval !== null) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
   }
 }
 

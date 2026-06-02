@@ -339,7 +339,7 @@ function clientScript(): string {
         saveBtn.disabled = false;
         saveBtn.textContent = prev;
         if (!result.ok) throw new Error(result.data.error || 'Save failed');
-        if (msg) { msg.textContent = 'Saved. Publish to apply.'; msg.className = 'addon-msg addon-msg-ok'; }
+        if (msg) { msg.textContent = 'Saved. Live on your published site.'; msg.className = 'addon-msg addon-msg-ok'; }
         // Refresh the in-memory state so the user's next site-switch
         // reflects what they just saved instead of resetting to the
         // server-rendered baseline.
