@@ -145,6 +145,14 @@ export interface OrchestratorContext {
    * The canvas-agent preview endpoint pins 0.2 for slightly tighter output.
    */
   temperature?: number;
+  /**
+   * Optional. Token-budget ceiling on accumulated history (ADR 0055 dec 2).
+   * When trim cannot get history under this cap (verified precisely via
+   * `countTokens` once the cheap estimate is within 20%), the turn ends
+   * with `tokens-exceeded`. Defaults to CHAT_TOKEN_BUDGET. Smokes use this
+   * to pin a deterministic budget without depending on the global constant.
+   */
+  tokenBudget?: number;
 }
 
 export interface RunTurnInput {
@@ -208,6 +216,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const toolCallBudget = ctx.toolCallBudget ?? TOOL_CALL_SAFETY_NET;
   const wallClockMs = ctx.wallClockMs ?? DEFAULT_WALL_CLOCK_MS;
   const temperature = ctx.temperature ?? 0.3;
+  const tokenBudget = ctx.tokenBudget ?? CHAT_TOKEN_BUDGET;
 
   // 1. Append the user message to history.
   let history: ChatMessage[] = [...session.messages, { role: 'user', content: userMessage }];
@@ -270,7 +279,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         return { messages: history, previewOps, doneReason: 'summarise-failed' };
       }
     }
-    history = trimToBudget(history, CHAT_TOKEN_BUDGET);
+    history = trimToBudget(history, tokenBudget);
 
     while (iteration < toolCallBudget) {
       iteration++;
@@ -366,7 +375,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       // query_site / query_assets result can land mid-iteration and blow the
       // token budget for the next pass. The trimmer drops oldest non-system,
       // non-summary messages; the active turn at the tail stays pinned.
-      history = trimToBudget(history, CHAT_TOKEN_BUDGET);
+      history = trimToBudget(history, tokenBudget);
 
       // Per ADR 0055 decision 2+3, decide token-exhaustion with the cheap
       // length/4 estimate as a pre-filter and only call Gemini's countTokens
@@ -379,6 +388,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         systemInstruction,
         tools,
         signal: controller.signal,
+        tokenBudget,
       });
       if (overBudget) {
         logBudgetExhausted({
@@ -782,18 +792,19 @@ interface OverBudgetInput {
   systemInstruction: string;
   tools: LlmTool[];
   signal: AbortSignal;
+  tokenBudget: number;
 }
 
 const PRECISE_COUNT_THRESHOLD = 0.8;
 
 async function isOverTokenBudget(input: OverBudgetInput): Promise<boolean> {
   const cheap = estimateMessagesTokens(input.history);
-  if (cheap > CHAT_TOKEN_BUDGET) {
+  if (cheap > input.tokenBudget) {
     // Cheap estimate already over — the precise count is only ever lower by
     // ~25% on tool-call JSON, so spending a round-trip cannot save us.
     return true;
   }
-  if (cheap <= CHAT_TOKEN_BUDGET * PRECISE_COUNT_THRESHOLD) {
+  if (cheap <= input.tokenBudget * PRECISE_COUNT_THRESHOLD) {
     // Comfortably under the cap; don't burn an API call.
     return false;
   }
@@ -803,7 +814,7 @@ async function isOverTokenBudget(input: OverBudgetInput): Promise<boolean> {
     tools: input.tools,
     signal: input.signal,
   });
-  return precise > CHAT_TOKEN_BUDGET;
+  return precise > input.tokenBudget;
 }
 
 // ---------------------------------------------------------------------------
