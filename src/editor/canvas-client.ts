@@ -1130,6 +1130,54 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return response;
   }
 
+  // When the Owner pastes a Google Maps "Share" short link into an embed
+  // element, ask the server to follow the redirect chain and return the
+  // canonical destination. The browser then frames that URL instead, which
+  // for /maps/place/, /maps/@lat,lng, etc. flows through the resolver to
+  // the embeddable ?q=...&output=embed form. Short link as-is doesn't
+  // work: it redirects to the full Google Maps app page, which sets
+  // X-Frame-Options: SAMEORIGIN and refuses to be framed by anyone.
+  //
+  // Detection is via simple prefix checks (not a regex) so the template-
+  // literal upstream wrap doesn't eat a single backslash and turn the
+  // detector into a syntax error.
+  function isShortLinkUrlClient(url) {
+    if (typeof url !== "string") return false;
+    return (
+      url.indexOf("https://maps.app.goo.gl/") === 0 ||
+      url.indexOf("https://goo.gl/") === 0
+    );
+  }
+  async function maybeExpandEmbedShortLink(element, input) {
+    var url = element.url;
+    if (!isShortLinkUrlClient(url)) return;
+    setStatus("Expanding short link...");
+    try {
+      var res = await authFetch(API_BASE + "/embed/expand-shortlink", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: url }),
+      });
+      var body = await res.json().catch(function () { return null; });
+      if (!res.ok || !body || body.ok !== true || typeof body.finalUrl !== "string") {
+        var detail = body && typeof body.error === "string" ? body.error : "unknown";
+        setStatus("Could not expand short link (" + detail + ") - keeping original URL", "error");
+        return;
+      }
+      if (body.finalUrl === url) {
+        setStatus("Short link was already its own destination", "ok");
+        return;
+      }
+      element.url = body.finalUrl;
+      input.value = body.finalUrl;
+      rebuildElement(element.id);
+      scheduleSave();
+      setStatus("Expanded short link", "ok");
+    } catch (err) {
+      setStatus("Short link expansion failed: " + (err && err.message ? err.message : String(err)), "error");
+    }
+  }
+
   // -- Modal overlay (text + select) -------------------------------------
   // Single-modal stack: calling
   // openTextModal/openSelectModal while another is open throws loud so we
@@ -4442,6 +4490,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           }
           if (!f.noRebuild) rebuildElement(element.id);
           scheduleSave();
+          // Embed URL: short links (maps.app.goo.gl, goo.gl) redirect to
+          // the full Google Maps app, which sets X-Frame-Options: SAMEORIGIN
+          // and refuses framing. We hit a server-side endpoint that follows
+          // the redirect chain and returns the canonical destination so the
+          // saved URL is actually embeddable.
+          if (element.type === "embed" && f.path === "url") {
+            maybeExpandEmbedShortLink(element, ti);
+          }
         });
         inspector.appendChild(field(f.label, ti));
         return;
@@ -6295,8 +6351,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         applyPageStyles(page);
         scheduleSave();
       },
-      enabledTitle: "Enable page background",
+      enabledTitle: "Override theme background",
       swatchDefault: "#ffffff",
+      resetLabel: "Follow theme",
     });
     group5.appendChild(pageBgRow);
     inspector.appendChild(group5);
@@ -6437,6 +6494,35 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       return v.toLowerCase();
     }
+    // Optional "Follow theme" reset link, visible only while an override is
+    // active. Without this users couldn't tell the unlabelled checkbox at the
+    // start of the row WAS the off-switch — they'd swap kits, watch the page
+    // ignore the new theme bg, and assume kit-switching was broken. The link
+    // toggles enabled off, clears the value, and fires onChange so the inline
+    // override is removed and the kit token re-applies. Hidden when there is
+    // no override (no value set) so it doesn't crowd the row by default.
+    var reset = null;
+    if (typeof opts.resetLabel === "string" && opts.resetLabel.length > 0) {
+      reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = "color-reset";
+      reset.textContent = opts.resetLabel;
+      reset.title = opts.resetLabel;
+      reset.style.display = enabled.checked ? "" : "none";
+      reset.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+      reset.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        enabled.checked = false;
+        opts.clearValue();
+        hex.value = "";
+        if (reset) reset.style.display = "none";
+        opts.onChange();
+      });
+    }
+    function refreshResetVisibility() {
+      if (!reset) return;
+      reset.style.display = enabled.checked ? "" : "none";
+    }
     enabled.addEventListener("change", function() {
       if (enabled.checked) {
         opts.setValue(swatch.value);
@@ -6445,12 +6531,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         opts.clearValue();
         hex.value = "";
       }
+      refreshResetVisibility();
       opts.onChange();
     });
     swatch.addEventListener("input", function() {
       if (!enabled.checked) enabled.checked = true;
       opts.setValue(swatch.value);
       hex.value = swatch.value;
+      refreshResetVisibility();
       opts.onChange();
     });
     hex.addEventListener("input", function() {
@@ -6460,12 +6548,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         swatch.value = normalised;
         if (!enabled.checked) enabled.checked = true;
         opts.setValue(normalised);
+        refreshResetVisibility();
         opts.onChange();
       }
     });
     row.appendChild(enabled);
     row.appendChild(swatch);
     row.appendChild(hex);
+    if (reset) row.appendChild(reset);
     return row;
   }
 
@@ -10244,6 +10334,369 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return "Unknown op";
   }
 
+  // -- Per-op inverse computation (chat Revert) ---------------------------
+  //
+  // For each accepted chat suggestion we capture an inverse op against the
+  // state SNAPSHOT taken right before the original op applied. Reverting
+  // then re-POSTs that inverse through /apply — a true point-undo that
+  // does not roll back unrelated later accepts (the user's chosen
+  // semantic). Destructive ops (delete*) have no clean per-op inverse in
+  // the current CanvasAgentOp union, so they surface as { kind:
+  // "destructive" } and the Revert button stays hidden for those cards.
+  // Ops that create new entities (addElement, addPage, insertSection,
+  // designSection, duplicateSection) yield a new server-side id we only
+  // learn AFTER /apply returns, so they come back as { kind: "deferred" }
+  // and are resolved by diffing pre-state vs post-state.
+  function walkSnapshotElements(snap, visit) {
+    function walkArr(arr, section) {
+      if (!Array.isArray(arr)) return;
+      for (var i = 0; i < arr.length; i++) {
+        var el = arr[i];
+        if (!el) continue;
+        visit(el, section, arr, i);
+        if (el.type === "tabs" && Array.isArray(el.tabs)) {
+          for (var ti = 0; ti < el.tabs.length; ti++) {
+            var tab = el.tabs[ti];
+            if (tab && Array.isArray(tab.elements)) walkArr(tab.elements, section);
+          }
+        } else if (el.type === "collection" && Array.isArray(el.entries)) {
+          for (var ei = 0; ei < el.entries.length; ei++) {
+            walkArr(el.entries[ei], section);
+          }
+        }
+      }
+    }
+    if (snap.header) walkArr(snap.header.elements, snap.header);
+    if (snap.footer) walkArr(snap.footer.elements, snap.footer);
+    if (Array.isArray(snap.pages)) {
+      for (var pi = 0; pi < snap.pages.length; pi++) {
+        var page = snap.pages[pi];
+        if (!page || !Array.isArray(page.sections)) continue;
+        for (var si = 0; si < page.sections.length; si++) {
+          walkArr(page.sections[si].elements, page.sections[si]);
+        }
+      }
+    }
+  }
+
+  function findElementInSnapshot(snap, elementId) {
+    var found = null;
+    walkSnapshotElements(snap, function (el, section) {
+      if (!found && el.id === elementId) found = { element: el, section: section };
+    });
+    return found;
+  }
+
+  // Like findElementInSnapshot but also captures enough context to put the
+  // element back via a restoreElement op: section id, parent kind, parent
+  // ids (NOT live refs — those go stale across renderAll), and the index in
+  // the parent array. Walks tabs and collections recursively because the
+  // element being deleted may live nested inside either.
+  function findElementLocationInSnapshot(snap, elementId) {
+    function searchArr(arr, section, parentKind, meta) {
+      if (!Array.isArray(arr)) return null;
+      for (var i = 0; i < arr.length; i++) {
+        var el = arr[i];
+        if (!el) continue;
+        if (el.id === elementId) {
+          return {
+            element: el,
+            section: section,
+            parentKind: parentKind,
+            tabsElementId: meta ? meta.tabsElementId : undefined,
+            tabId: meta ? meta.tabId : undefined,
+            collectionElementId: meta ? meta.collectionElementId : undefined,
+            entryIndex: meta ? meta.entryIndex : undefined,
+            index: i,
+          };
+        }
+        if (el.type === "tabs" && Array.isArray(el.tabs)) {
+          for (var ti = 0; ti < el.tabs.length; ti++) {
+            var tab = el.tabs[ti];
+            if (tab && Array.isArray(tab.elements)) {
+              var hit = searchArr(tab.elements, section, "tab-panel", { tabsElementId: el.id, tabId: tab.id });
+              if (hit) return hit;
+            }
+          }
+        } else if (el.type === "collection" && Array.isArray(el.entries)) {
+          for (var ei = 0; ei < el.entries.length; ei++) {
+            var entry = el.entries[ei];
+            if (Array.isArray(entry)) {
+              var hitC = searchArr(entry, section, "collection-entry", { collectionElementId: el.id, entryIndex: ei });
+              if (hitC) return hitC;
+            }
+          }
+        }
+      }
+      return null;
+    }
+    if (snap.header && Array.isArray(snap.header.elements)) {
+      var h = searchArr(snap.header.elements, snap.header, "section", null);
+      if (h) return h;
+    }
+    if (snap.footer && Array.isArray(snap.footer.elements)) {
+      var f = searchArr(snap.footer.elements, snap.footer, "section", null);
+      if (f) return f;
+    }
+    if (Array.isArray(snap.pages)) {
+      for (var pi = 0; pi < snap.pages.length; pi++) {
+        var page = snap.pages[pi];
+        if (!Array.isArray(page.sections)) continue;
+        for (var si = 0; si < page.sections.length; si++) {
+          var sec = page.sections[si];
+          var hitS = searchArr(sec.elements, sec, "section", null);
+          if (hitS) return hitS;
+        }
+      }
+    }
+    return null;
+  }
+
+  function findSectionInSnapshot(snap, sectionId) {
+    if (snap.header && snap.header.id === sectionId) {
+      return { section: snap.header, prevSectionId: null, scope: "header", pageId: null, index: -1 };
+    }
+    if (snap.footer && snap.footer.id === sectionId) {
+      return { section: snap.footer, prevSectionId: null, scope: "footer", pageId: null, index: -1 };
+    }
+    if (!Array.isArray(snap.pages)) return null;
+    for (var pi = 0; pi < snap.pages.length; pi++) {
+      var page = snap.pages[pi];
+      if (!Array.isArray(page.sections)) continue;
+      for (var si = 0; si < page.sections.length; si++) {
+        if (page.sections[si].id === sectionId) {
+          var prev = si > 0 ? page.sections[si - 1].id : null;
+          return { section: page.sections[si], prevSectionId: prev, scope: "page", pageId: page.id, index: si };
+        }
+      }
+    }
+    return null;
+  }
+
+  // Scan the whole snapshot for action elements whose href points at the
+  // given pageId. deletePage rewrites these to '{type:external, url:"#"}';
+  // restorePage uses the captured list to re-point them.
+  function collectActionRefsToPage(snap, pageId) {
+    var refs = [];
+    function scanSection(section) {
+      if (!section || !Array.isArray(section.elements)) return;
+      for (var i = 0; i < section.elements.length; i++) {
+        var el = section.elements[i];
+        if (
+          el &&
+          el.type === "action" &&
+          el.href &&
+          typeof el.href === "object" &&
+          el.href.type === "page" &&
+          el.href.pageId === pageId
+        ) {
+          refs.push({ sectionId: section.id, elementId: el.id });
+        }
+      }
+    }
+    if (snap.header) scanSection(snap.header);
+    if (snap.footer) scanSection(snap.footer);
+    if (Array.isArray(snap.pages)) {
+      for (var pi = 0; pi < snap.pages.length; pi++) {
+        var page = snap.pages[pi];
+        if (page.id === pageId || !Array.isArray(page.sections)) continue;
+        for (var si = 0; si < page.sections.length; si++) {
+          scanSection(page.sections[si]);
+        }
+      }
+    }
+    return refs;
+  }
+
+  function findPageInSnapshot(snap, pageId) {
+    if (!Array.isArray(snap.pages)) return null;
+    for (var i = 0; i < snap.pages.length; i++) {
+      if (snap.pages[i].id === pageId) return { page: snap.pages[i], index: i };
+    }
+    return null;
+  }
+
+  function collectElementIds(snap) {
+    var ids = {};
+    walkSnapshotElements(snap, function (el) {
+      if (el && el.id) ids[el.id] = true;
+    });
+    return ids;
+  }
+
+  function collectSectionIds(snap) {
+    var ids = {};
+    if (snap.header && snap.header.id) ids[snap.header.id] = true;
+    if (snap.footer && snap.footer.id) ids[snap.footer.id] = true;
+    if (Array.isArray(snap.pages)) {
+      for (var pi = 0; pi < snap.pages.length; pi++) {
+        var page = snap.pages[pi];
+        if (!Array.isArray(page.sections)) continue;
+        for (var si = 0; si < page.sections.length; si++) {
+          if (page.sections[si].id) ids[page.sections[si].id] = true;
+        }
+      }
+    }
+    return ids;
+  }
+
+  function collectPageIds(snap) {
+    var ids = {};
+    if (Array.isArray(snap.pages)) {
+      for (var i = 0; i < snap.pages.length; i++) {
+        if (snap.pages[i].id) ids[snap.pages[i].id] = true;
+      }
+    }
+    return ids;
+  }
+
+  function firstNewId(prevMap, nextMap) {
+    for (var k in nextMap) {
+      if (Object.prototype.hasOwnProperty.call(nextMap, k) && !prevMap[k]) return k;
+    }
+    return null;
+  }
+
+  function clonePatchPrev(target, patch) {
+    var prev = {};
+    if (!patch || typeof patch !== "object") return prev;
+    for (var k in patch) {
+      if (!Object.prototype.hasOwnProperty.call(patch, k)) continue;
+      prev[k] = (target && Object.prototype.hasOwnProperty.call(target, k))
+        ? structuredClone(target[k])
+        : null;
+    }
+    return prev;
+  }
+
+  // Pre-state inverse: { kind: "ready", op } | { kind: "deferred", op }
+  // | { kind: "destructive", reason }. Ready means we can revert right
+  // now; deferred means we need the post-state from /apply to learn the
+  // new id; destructive means no inverse exists in the op union and the
+  // Revert button must stay hidden.
+  function computeInverseFromPre(op, pre) {
+    if (!op || !pre) return { kind: "destructive", reason: "missing state" };
+    if (op.kind === "rewriteText") {
+      var rt = findElementInSnapshot(pre, op.elementId);
+      if (!rt || rt.element.type !== "text") return { kind: "destructive", reason: "rewriteText target missing" };
+      return { kind: "ready", op: { kind: "rewriteText", elementId: op.elementId, content: structuredClone(rt.element.content || []) } };
+    }
+    if (op.kind === "replaceMedia") {
+      var rm = findElementInSnapshot(pre, op.elementId);
+      if (!rm || rm.element.type !== "media") return { kind: "destructive", reason: "replaceMedia target missing" };
+      return { kind: "ready", op: {
+        kind: "replaceMedia",
+        elementId: op.elementId,
+        mediaKind: rm.element.mediaKind,
+        assetId: rm.element.assetId,
+        alt: typeof rm.element.alt === "string" ? rm.element.alt : "",
+      } };
+    }
+    if (op.kind === "updateElement") {
+      var ue = findElementInSnapshot(pre, op.elementId);
+      if (!ue) return { kind: "destructive", reason: "updateElement target missing" };
+      return { kind: "ready", op: {
+        kind: "updateElement",
+        elementId: op.elementId,
+        elementType: ue.element.type,
+        patch: clonePatchPrev(ue.element, op.patch),
+      } };
+    }
+    if (op.kind === "updateSection") {
+      var us = findSectionInSnapshot(pre, op.sectionId);
+      if (!us) return { kind: "destructive", reason: "updateSection target missing" };
+      return { kind: "ready", op: {
+        kind: "updateSection",
+        sectionId: op.sectionId,
+        patch: clonePatchPrev(us.section, op.patch),
+      } };
+    }
+    if (op.kind === "updatePage") {
+      var up = findPageInSnapshot(pre, op.pageId);
+      if (!up) return { kind: "destructive", reason: "updatePage target missing" };
+      return { kind: "ready", op: {
+        kind: "updatePage",
+        pageId: op.pageId,
+        patch: clonePatchPrev(up.page, op.patch),
+      } };
+    }
+    if (op.kind === "setStyleKit") {
+      return { kind: "ready", op: { kind: "setStyleKit", styleKit: pre.styleKit } };
+    }
+    if (op.kind === "setSiteConfig") {
+      return { kind: "ready", op: { kind: "setSiteConfig", patch: clonePatchPrev(pre, op.patch) } };
+    }
+    if (op.kind === "moveSection") {
+      var ms = findSectionInSnapshot(pre, op.sectionId);
+      if (!ms) return { kind: "destructive", reason: "moveSection target missing" };
+      return { kind: "ready", op: { kind: "moveSection", sectionId: op.sectionId, afterSectionId: ms.prevSectionId } };
+    }
+    if (op.kind === "addElement" || op.kind === "addPage" || op.kind === "insertSection" || op.kind === "designSection" || op.kind === "duplicateSection") {
+      return { kind: "deferred", op: op };
+    }
+    // Delete ops: snapshot the entity + its position so we can re-insert
+    // it via the internal restore* ops. These ops are not exposed to the
+    // LLM; only the editor's revert flow emits them.
+    if (op.kind === "deleteElement") {
+      var loc = findElementLocationInSnapshot(pre, op.elementId);
+      if (!loc) return { kind: "destructive", reason: "deleteElement target missing" };
+      var restoreEl = {
+        kind: "restoreElement",
+        sectionId: loc.section.id,
+        parentKind: loc.parentKind,
+        index: loc.index,
+        element: structuredClone(loc.element),
+      };
+      if (loc.parentKind === "tab-panel") {
+        restoreEl.tabsElementId = loc.tabsElementId;
+        restoreEl.tabId = loc.tabId;
+      } else if (loc.parentKind === "collection-entry") {
+        restoreEl.collectionElementId = loc.collectionElementId;
+        restoreEl.entryIndex = loc.entryIndex;
+      }
+      return { kind: "ready", op: restoreEl };
+    }
+    if (op.kind === "deleteSection") {
+      var ds = findSectionInSnapshot(pre, op.sectionId);
+      if (!ds) return { kind: "destructive", reason: "deleteSection target missing" };
+      return { kind: "ready", op: {
+        kind: "restoreSection",
+        scope: ds.scope,
+        pageId: ds.pageId,
+        index: ds.index >= 0 ? ds.index : 0,
+        section: structuredClone(ds.section),
+      } };
+    }
+    if (op.kind === "deletePage") {
+      var dp = findPageInSnapshot(pre, op.pageId);
+      if (!dp) return { kind: "destructive", reason: "deletePage target missing" };
+      return { kind: "ready", op: {
+        kind: "restorePage",
+        index: dp.index,
+        page: structuredClone(dp.page),
+        actionHrefRestores: collectActionRefsToPage(pre, op.pageId),
+      } };
+    }
+    return { kind: "destructive", reason: "no per-op inverse for " + op.kind };
+  }
+
+  function resolveDeferredInverse(originalOp, pre, post) {
+    if (!originalOp || !pre || !post) return null;
+    if (originalOp.kind === "addElement") {
+      var newEl = firstNewId(collectElementIds(pre), collectElementIds(post));
+      return newEl ? { kind: "deleteElement", elementId: newEl } : null;
+    }
+    if (originalOp.kind === "insertSection" || originalOp.kind === "designSection" || originalOp.kind === "duplicateSection") {
+      var newSec = firstNewId(collectSectionIds(pre), collectSectionIds(post));
+      return newSec ? { kind: "deleteSection", sectionId: newSec } : null;
+    }
+    if (originalOp.kind === "addPage") {
+      var newPg = firstNewId(collectPageIds(pre), collectPageIds(post));
+      return newPg ? { kind: "deletePage", pageId: newPg } : null;
+    }
+    return null;
+  }
+
   // Resolve the canvas node the op points at so the chat suggestion
   // card can paint an overlay around it and a click on the suggestion
   // can pan the camera there. Tries the op's elementId first, then any
@@ -10295,13 +10748,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function refreshAcceptAllButton() {
     if (!chatAcceptAllBtn) return;
     var live = pendingAiSuggestions.filter(function (s) { return s.status === "pending"; });
+    var label = chatAcceptAllBtn.querySelector("[data-accept-all-label]");
+    var count = chatAcceptAllBtn.querySelector("[data-accept-all-count]");
     if (live.length === 0) {
+      // Reset the count text on hide so a future show without a fresh
+      // refresh (or a CSS regression) cannot leak a stale "1".
       chatAcceptAllBtn.hidden = true;
+      if (label) label.textContent = "Accept all changes";
+      if (count) count.textContent = "0";
       return;
     }
     chatAcceptAllBtn.hidden = false;
-    var label = chatAcceptAllBtn.querySelector("[data-accept-all-label]");
-    var count = chatAcceptAllBtn.querySelector("[data-accept-all-count]");
     if (label) label.textContent = "Accept all " + (live.length === 1 ? "change" : "changes");
     if (count) count.textContent = String(live.length);
   }
@@ -10310,8 +10767,22 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // the matching suggestion entries as accepted on success. Status
   // flip stays in lockstep with the server commit — a rejected apply
   // leaves the cards in their pending state so the owner can retry.
+  //
+  // Inverse capture: before /apply mutates state we snapshot a deep
+  // clone and compute an inverse op per suggestion against that
+  // snapshot. New-id ops (addElement/addPage/insert/design/duplicate)
+  // come back as "deferred" — their inverse is finalised after /apply
+  // returns post-state by diffing pre-vs-post id sets. The inverse op
+  // lives on entry.inverseOp; the Revert button reads from it.
   function applyAgentOps(ops, suggestions) {
     if (!ops || ops.length === 0) return Promise.resolve(false);
+    var preSnapshot = state ? structuredClone(state) : null;
+    var precomputed = [];
+    if (suggestions && preSnapshot) {
+      for (var pi = 0; pi < suggestions.length; pi++) {
+        precomputed.push(computeInverseFromPre(suggestions[pi].op, preSnapshot));
+      }
+    }
     return flushPendingSave().then(function (saved) {
       if (!saved) return false;
       return authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
@@ -10345,6 +10816,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             // gone with them. Clear the back-reference so a future
             // Reject can't poke a detached node.
             s.targetNode = null;
+            // Resolve the captured inverse. Deferred entries (new-id
+            // ops) need the post-state to look up the new id; otherwise
+            // we just lift the ready inverse onto the entry.
+            var pc = precomputed[i] || { kind: "destructive", reason: "missing pre-snapshot" };
+            if (pc.kind === "ready") {
+              s.inverseOp = pc.op;
+            } else if (pc.kind === "deferred" && preSnapshot) {
+              var resolved = resolveDeferredInverse(pc.op, preSnapshot, state);
+              s.inverseOp = resolved || null;
+            } else {
+              s.inverseOp = null;
+            }
+            if (s.revertBtn) {
+              if (s.inverseOp) {
+                s.revertBtn.hidden = false;
+                s.revertBtn.disabled = false;
+              } else {
+                s.revertBtn.hidden = true;
+              }
+            }
           }
         }
         setStatus("AI edit applied", "ok");
@@ -10353,6 +10844,68 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
     }).catch(function (err) {
       setStatus("Apply failed: " + (err && err.message ? err.message : String(err)), "error");
+      return false;
+    });
+  }
+
+  // Revert one accepted suggestion via its captured inverse op. Sends
+  // [entry.inverseOp] through the same /apply route, then flips the
+  // chat card back to "pending" so the Owner can re-Accept if they
+  // change their mind. Status semantic chosen by the Owner (the other
+  // option, freezing as "reverted", was declined).
+  function revertAgentEntry(entry) {
+    if (!entry || !entry.inverseOp) {
+      setStatus("Cannot revert this change", "error");
+      return Promise.resolve(false);
+    }
+    var inverseOp = entry.inverseOp;
+    if (entry.revertBtn) entry.revertBtn.disabled = true;
+    return flushPendingSave().then(function (saved) {
+      if (!saved) {
+        if (entry.revertBtn) entry.revertBtn.disabled = false;
+        return false;
+      }
+      return authFetch(API_BASE + "/canvas-agent/sites/" + SITE_ID + "/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ops: [inverseOp] }),
+      }).then(function (r) {
+        return r.json().then(function (body) { return { ok: r.ok, body: body }; });
+      }).then(function (res) {
+        if (!res.ok || !res.body || !res.body.editableState) {
+          var detail = (res.body && (res.body.errors && res.body.errors[0] || res.body.error)) || "revert failed";
+          setStatus("Revert failed: " + detail, "error");
+          if (entry.revertBtn) entry.revertBtn.disabled = false;
+          return false;
+        }
+        state = res.body.editableState;
+        if (state) state = migrateState(state);
+        selectedSectionId = null;
+        selectedElementId = null;
+        if (mainEl && state && state.styleKit) {
+          mainEl.setAttribute("data-style-kit", state.styleKit);
+        }
+        renderAll();
+        // Re-arm the card. Owner can Accept again; that path will
+        // recompute a fresh inverse against the new pre-state.
+        entry.status = "pending";
+        entry.inverseOp = null;
+        if (entry.cardEl) entry.cardEl.setAttribute("data-status", "pending");
+        if (entry.acceptBtn) entry.acceptBtn.disabled = false;
+        if (entry.rejectBtn) entry.rejectBtn.disabled = false;
+        if (entry.revertBtn) entry.revertBtn.hidden = true;
+        // Repaint the canvas overlay so the proposal is visible again.
+        entry.targetNode = findCanvasNodeForOp(entry.op);
+        if (entry.targetNode) {
+          entry.targetNode.setAttribute("data-ai-overlay-status", "proposed");
+        }
+        setStatus("Reverted", "ok");
+        refreshAcceptAllButton();
+        return true;
+      });
+    }).catch(function (err) {
+      setStatus("Revert failed: " + (err && err.message ? err.message : String(err)), "error");
+      if (entry.revertBtn) entry.revertBtn.disabled = false;
       return false;
     });
   }
@@ -13622,8 +14175,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                         bubble.textContent = assistantText;
                         chatMessages.scrollTop = chatMessages.scrollHeight;
                       } else if (kind === "tool-call") {
+                        // Tool calls are internal plumbing — the user only
+                        // cares about the resulting suggestion card. Keep
+                        // them in the devtools log for debugging but don't
+                        // pollute the chat transcript.
                         removeThinking();
-                        appendChatMessage("assistant", "[Calling " + (data.name || "tool") + "]");
+                        if (window.console && console.debug) {
+                          console.debug("[chat tool-call]", data.name, data.args || data.arguments);
+                        }
                       } else if (kind === "op-preview") {
                         // IIFE-scope the op + toolName snapshots so each
                         // suggestion card captures THIS event's op, not
@@ -13661,20 +14220,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                             status: "pending",
                             cardEl: card,
                             targetNode: targetNode,
+                            inverseOp: null,
                           };
                           pendingAiSuggestions.push(entry);
-
-                          // Click the description to pan the camera onto
-                          // the target node and pulse-ring it. If the op
-                          // has no resolvable target (e.g. addPage), the
-                          // click is a no-op but still safe.
-                          body.addEventListener("click", function () {
-                            if (entry.status !== "pending") return;
-                            if (!entry.targetNode) {
-                              entry.targetNode = findCanvasNodeForOp(entry.op);
-                            }
-                            if (entry.targetNode) focusCanvasOnNode(entry.targetNode);
-                          });
 
                           var actions = document.createElement("div");
                           actions.className = "opencanvas-chat-suggestion-actions";
@@ -13682,7 +14230,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                           acceptBtn.type = "button";
                           acceptBtn.className = "accept";
                           acceptBtn.textContent = "Accept";
-                          acceptBtn.addEventListener("click", function () {
+                          acceptBtn.addEventListener("click", function (ev) {
+                            ev.stopPropagation();
                             if (entry.status !== "pending") return;
                             acceptBtn.disabled = true;
                             rejectBtn.disabled = true;
@@ -13692,7 +14241,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                           rejectBtn.type = "button";
                           rejectBtn.className = "reject";
                           rejectBtn.textContent = "Reject";
-                          rejectBtn.addEventListener("click", function () {
+                          rejectBtn.addEventListener("click", function (ev) {
+                            ev.stopPropagation();
                             if (entry.status !== "pending") return;
                             entry.status = "rejected";
                             card.setAttribute("data-status", "rejected");
@@ -13703,11 +14253,48 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
                             }
                             refreshAcceptAllButton();
                           });
+                          // Revert button — hidden until /apply succeeds
+                          // AND a per-op inverse was captured. Destructive
+                          // ops (deleteElement/Section/Page) leave it hidden
+                          // because the CanvasAgentOp union has no clean
+                          // reconstructor for them.
+                          var revertBtn = document.createElement("button");
+                          revertBtn.type = "button";
+                          revertBtn.className = "revert";
+                          revertBtn.textContent = "Revert";
+                          revertBtn.hidden = true;
+                          revertBtn.addEventListener("click", function (ev) {
+                            ev.stopPropagation();
+                            if (entry.status !== "accepted" || !entry.inverseOp) return;
+                            revertAgentEntry(entry);
+                          });
                           entry.acceptBtn = acceptBtn;
                           entry.rejectBtn = rejectBtn;
+                          entry.revertBtn = revertBtn;
                           actions.appendChild(acceptBtn);
                           actions.appendChild(rejectBtn);
+                          actions.appendChild(revertBtn);
                           card.appendChild(actions);
+
+                          // Whole-card click pans the camera onto the
+                          // target node and pulse-rings it. Action buttons
+                          // stopPropagation so clicking Accept/Reject/Revert
+                          // never triggers an unwanted pan. Ops with no
+                          // resolvable target (e.g. addPage before the
+                          // page is created) just no-op.
+                          card.style.cursor = "pointer";
+                          card.addEventListener("click", function () {
+                            if (!entry.targetNode) {
+                              entry.targetNode = findCanvasNodeForOp(entry.op);
+                            }
+                            if (entry.targetNode) {
+                              entry.targetNode.setAttribute(
+                                "data-ai-overlay-status",
+                                entry.status === "accepted" ? "accepted" : "proposed",
+                              );
+                              focusCanvasOnNode(entry.targetNode);
+                            }
+                          });
 
                           chatMessages.appendChild(card);
                           chatMessages.scrollTop = chatMessages.scrollHeight;

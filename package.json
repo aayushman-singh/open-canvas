@@ -104,6 +104,7 @@
     "on-site-edit-security:smoke": "bun run src/auth/on-site-edit-security.smoke.ts",
     "layout-engine:smoke": "bun run src/canvas/layout/engine-smoke.ts",
     "google-maps:smoke": "bun run src/embed/google-maps.smoke.ts",
+    "expand-short-link:smoke": "bun run src/embed/expand-short-link.smoke.ts",
     "editor-auth:smoke": "bun run src/live/editor-auth.smoke.ts",
     "theme:smoke": "bun run src/theme/smoke.ts",
     "element-dispatch:smoke": "bun run src/editor/element-dispatch.smoke.ts",
