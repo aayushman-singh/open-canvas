@@ -32,7 +32,12 @@ const FONT_SIZE_MAX = 96;
 const CONTAINER_PADDING_MAX = 80;
 
 export type ParseDesignSectionResult =
-  | { ok: true; afterSectionId: string | null; input: DesignSectionInput }
+  | {
+      ok: true;
+      pageId: string | null;
+      afterSectionId: string | null;
+      input: DesignSectionInput;
+    }
   | { ok: false; error: string };
 
 export function parseDesignSectionToolArgs(args: unknown): ParseDesignSectionResult {
@@ -58,6 +63,17 @@ export function parseDesignSectionToolArgs(args: unknown): ParseDesignSectionRes
       ok: false,
       error: `designSection.layout has ${String(elementCount)} elements; maximum is ${String(DESIGN_ELEMENT_MAX)}`,
     };
+  }
+
+  let pageId: string | null = null;
+  if (args.pageId !== undefined && args.pageId !== '') {
+    if (!isNonEmptyString(args.pageId)) {
+      return {
+        ok: false,
+        error: 'designSection.pageId must be a non-empty string when provided',
+      };
+    }
+    pageId = args.pageId;
   }
 
   let afterSectionId: string | null = null;
@@ -101,7 +117,7 @@ export function parseDesignSectionToolArgs(args: unknown): ParseDesignSectionRes
     input.entrance = args.entrance;
   }
 
-  return { ok: true, afterSectionId, input };
+  return { ok: true, pageId, afterSectionId, input };
 }
 
 function parseLayoutTree(

@@ -854,6 +854,61 @@ try {
 }
 assert(designUnknownAfterThrew, 'expected designSection with unknown afterSectionId to throw');
 
+// designSection with pageId → targets that page, not pages[0]. Without this
+// routing, an agent that calls addPage('Manifesto') and then designSection(...)
+// would have the section land on the original page even though the new one
+// just got created.
+const twoPageState: EditableSite = {
+  ...baseState,
+  pages: [
+    baseState.pages[0]!,
+    {
+      id: 'page-manifesto',
+      slug: 'manifesto',
+      title: 'Manifesto',
+      width: baseState.pages[0]!.width,
+      sections: [
+        {
+          id: 'sec-manifesto-blank',
+          recipeId: 'custom',
+          name: 'Blank',
+          height: 600,
+          elements: [],
+        },
+      ],
+    },
+  ],
+};
+const designOnNewPage = applyCanvasAgentOp(twoPageState, {
+  kind: 'designSection',
+  pageId: 'page-manifesto',
+  afterSectionId: null,
+  input: { sectionName: 'Manifesto Hero', layout: designInput.layout },
+});
+assert(
+  designOnNewPage.pages[0]?.sections.length === twoPageState.pages[0]!.sections.length,
+  'expected designSection with pageId to leave the first page untouched',
+);
+assert(
+  designOnNewPage.pages[1]?.sections.length === 2 &&
+    designOnNewPage.pages[1].sections[1]?.name === 'Manifesto Hero',
+  'expected designSection with pageId to append the new section on the named page',
+);
+
+// designSection with an unknown pageId → throws.
+let designUnknownPageThrew = false;
+try {
+  applyCanvasAgentOp(twoPageState, {
+    kind: 'designSection',
+    pageId: 'page-not-here',
+    afterSectionId: null,
+    input: designInput,
+  });
+} catch (err) {
+  designUnknownPageThrew = err instanceof Error && err.message.includes('page-not-here');
+}
+assert(designUnknownPageThrew, 'expected designSection with unknown pageId to throw');
+
 // resolveDesignOp — returns section + imagePrompts without modifying state.
 const designWithImages: DesignSectionInput = {
   sectionName: 'Image test',

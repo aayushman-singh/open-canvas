@@ -300,11 +300,16 @@ const designSectionSchema: JsonSchema = {
       enum: [...MOTION_PRESETS],
       description: 'Optional entrance animation preset.',
     },
+    pageId: {
+      type: 'string',
+      description:
+        'Target page for the new section. Required when the section should land on a page other than the first one — pass the page id returned by addPage (or read from the current state listing) so the section is inserted there. Omit (or send empty string) to default to the first page.',
+    },
     afterSectionId: {
       type: 'string',
       description:
         'The id of the section after which to insert this new section. ' +
-        'Empty string or omitted = append at the end of the page.',
+        'Empty string or omitted = append at the end of the page. When pageId is provided the afterSectionId must reference a section on that page.',
     },
     layout: layoutNodeSchema,
   },

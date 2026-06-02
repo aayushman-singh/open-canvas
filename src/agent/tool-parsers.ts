@@ -103,7 +103,12 @@ export function parseDesignSection(args: unknown): ParseResult {
   if (!parsed.ok) return { ok: false, error: parsed.error };
   return {
     ok: true,
-    op: { kind: 'designSection', afterSectionId: parsed.afterSectionId, input: parsed.input },
+    op: {
+      kind: 'designSection',
+      pageId: parsed.pageId,
+      afterSectionId: parsed.afterSectionId,
+      input: parsed.input,
+    },
   };
 }
 
@@ -117,6 +122,10 @@ export function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResu
   }
   if (typeof args.brief !== 'string' || args.brief.length === 0) {
     return { ok: false, error: 'createSection.brief must be a non-empty string' };
+  }
+  let pageId: string | null = null;
+  if (typeof args.pageId === 'string' && args.pageId.length > 0) {
+    pageId = args.pageId;
   }
   // afterSectionId: null OR string. We accept '' as "append at end" to keep
   // the JSON-Schema simple (no null variant in our subset).
@@ -148,6 +157,7 @@ export function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResu
     ok: true,
     op: {
       kind: 'insertSection',
+      pageId,
       afterSectionId,
       recipeId: args.recipeId,
       input: { brief: args.brief, styleKit, assetIds },
@@ -575,6 +585,13 @@ export function parseSetSiteConfig(args: unknown): ParseResult {
 }
 
 function parseCanonicalDesignSectionOp(value: Record<string, unknown>): ParseResult {
+  let pageId: string | null = null;
+  if (value.pageId !== undefined && value.pageId !== null && value.pageId !== '') {
+    if (typeof value.pageId !== 'string' || value.pageId.length === 0) {
+      return { ok: false, error: 'designSection.pageId must be a non-empty string when provided' };
+    }
+    pageId = value.pageId;
+  }
   const after = parseNullableSectionId(value.afterSectionId, 'designSection.afterSectionId');
   if (!after.ok) return { ok: false, error: after.error };
   if (!isRecord(value.input)) {
@@ -618,6 +635,7 @@ function parseCanonicalDesignSectionOp(value: Record<string, unknown>): ParseRes
     ok: true,
     op: {
       kind: 'designSection',
+      pageId,
       afterSectionId: after.value,
       input: value.input as unknown as DesignSectionInput,
     },
@@ -775,12 +793,13 @@ export function parseApplyOp(value: unknown, styleKit: StyleKit): ParseResult {
   if (value.kind === 'replaceMedia') return parseReplaceMedia(value);
   if (value.kind === 'insertSection') {
     // The apply payload mirrors the LLM tool shape exactly: recipeId, brief,
-    // afterSectionId, assetIds. We re-derive a RecipeFactoryInput so we never
-    // trust the styleKit field from the wire — the styleKit comes from the
-    // freshly-loaded site row, not from the request body.
+    // pageId, afterSectionId, assetIds. We re-derive a RecipeFactoryInput so
+    // we never trust the styleKit field from the wire — the styleKit comes
+    // from the freshly-loaded site row, not from the request body.
     const flattened = {
       recipeId: value.recipeId,
       brief: isRecord(value.input) ? value.input.brief : undefined,
+      pageId: value.pageId,
       afterSectionId: value.afterSectionId,
       assetIds: isRecord(value.input) ? value.input.assetIds : undefined,
     };

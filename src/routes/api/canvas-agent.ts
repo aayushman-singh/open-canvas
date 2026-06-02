@@ -245,7 +245,7 @@ function buildSystemPrompt(state: EditableSite): string {
   );
   lines.push('  replaceMedia — swap a media element to an existing uploaded asset.');
   lines.push(
-    '  designSection — create a new section from a semantic layout tree (stack/grid/split nodes with element leaves).',
+    '  designSection — create a new section from a semantic layout tree (stack/grid/split nodes with element leaves). Pass pageId when the section should land on a page other than the first one (e.g. immediately after calling addPage).',
   );
   lines.push(
     '  updateElement — change properties of an existing element. Pass elementType matching the actual type.',

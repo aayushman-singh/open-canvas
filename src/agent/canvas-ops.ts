@@ -29,6 +29,7 @@ import { createSectionFromRecipe, type RecipeFactoryInput } from '../canvas/reci
 import type {
   BuiltInStyleKit,
   CanvasElement,
+  CanvasPage,
   CanvasSection,
   EditableSite,
   InlineRun,
@@ -59,12 +60,14 @@ export type CanvasAgentOp =
     }
   | {
       kind: 'insertSection';
+      pageId?: string | null;
       afterSectionId: string | null;
       recipeId: SectionRecipeId;
       input: RecipeFactoryInput;
     }
   | {
       kind: 'designSection';
+      pageId?: string | null;
       afterSectionId: string | null;
       input: DesignSectionInput;
     }
@@ -174,9 +177,56 @@ function findSectionAcrossSite(
  */
 export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): EditableSite {
   const next = structuredClone(state);
-  const page = next.pages[0];
-  if (!page) {
+  const firstPage = next.pages[0];
+  if (!firstPage) {
     throw new Error('applyCanvasAgentOp: state must have at least one page');
+  }
+  const page: CanvasPage = firstPage;
+
+  // Resolve the target page for section-insertion ops. Precedence:
+  //   1. Explicit op.pageId - the agent named the page (required after an
+  //      addPage call so the new section lands on the new page rather than
+  //      defaulting back to pages[0]).
+  //   2. op.afterSectionId - the named section's page is the implied target.
+  //   3. pages[0] - legacy default for the single-page case.
+  // afterSectionId must reference a section on the resolved page.
+  function resolveInsertionPage(
+    opPageId: string | null | undefined,
+    opAfterSectionId: string | null,
+    kindLabel: string,
+  ): { page: CanvasPage } {
+    if (typeof opPageId === 'string' && opPageId.length > 0) {
+      const target = next.pages.find((p) => p.id === opPageId);
+      if (!target) {
+        throw new Error(
+          `applyCanvasAgentOp(${kindLabel}): pageId not found: ${opPageId}. Known pages: ${next.pages
+            .map((p) => p.id)
+            .join(', ')}`,
+        );
+      }
+      if (
+        typeof opAfterSectionId === 'string' &&
+        opAfterSectionId.length > 0 &&
+        !target.sections.some((s) => s.id === opAfterSectionId)
+      ) {
+        throw new Error(
+          `applyCanvasAgentOp(${kindLabel}): afterSectionId ${opAfterSectionId} does not exist on page ${opPageId}`,
+        );
+      }
+      return { page: target };
+    }
+    if (typeof opAfterSectionId === 'string' && opAfterSectionId.length > 0) {
+      const target = next.pages.find((p) =>
+        p.sections.some((s) => s.id === opAfterSectionId),
+      );
+      if (!target) {
+        throw new Error(
+          `applyCanvasAgentOp(${kindLabel}): afterSectionId not found on any page: ${opAfterSectionId}`,
+        );
+      }
+      return { page: target };
+    }
+    return { page };
   }
 
   // -- rewriteText (uses findElementAcrossSite for header/footer support) ---
@@ -211,43 +261,52 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
   }
 
   if (op.kind === 'insertSection') {
+    const { page: targetPage } = resolveInsertionPage(
+      op.pageId ?? null,
+      op.afterSectionId,
+      'insertSection',
+    );
     const section = createSectionFromRecipe(op.recipeId, op.input);
     if (op.afterSectionId === null) {
-      page.sections.push(section);
+      targetPage.sections.push(section);
       return next;
     }
-    const idx = page.sections.findIndex((s) => s.id === op.afterSectionId);
+    const idx = targetPage.sections.findIndex((s) => s.id === op.afterSectionId);
     if (idx < 0) {
       throw new Error(
-        `applyCanvasAgentOp(insertSection): afterSectionId not found: ${op.afterSectionId}`,
+        `applyCanvasAgentOp(insertSection): afterSectionId not found on target page: ${op.afterSectionId}`,
       );
     }
-    page.sections.splice(idx + 1, 0, section);
+    targetPage.sections.splice(idx + 1, 0, section);
     return next;
   }
 
   if (op.kind === 'designSection') {
     // designSection — layout engine resolves a semantic tree into positioned
     // elements. The LLM describes structure; the engine computes geometry.
+    const { page: targetPage } = resolveInsertionPage(
+      op.pageId ?? null,
+      op.afterSectionId,
+      'designSection',
+    );
     const preset = getStyleKitPreset(next.styleKit);
-    const pageWidth = page.width;
-    const result = resolveDesignSection(op.input, pageWidth, preset);
+    const result = resolveDesignSection(op.input, targetPage.width, preset);
     if (result.imagePrompts.size > 0) {
       throw new Error(
         `applyCanvasAgentOp(designSection): image generation is not wired for media prompts (${[...result.imagePrompts.values()].join('; ')})`,
       );
     }
     if (op.afterSectionId === null) {
-      page.sections.push(result.section);
+      targetPage.sections.push(result.section);
       return next;
     }
-    const insertIdx = page.sections.findIndex((s) => s.id === op.afterSectionId);
+    const insertIdx = targetPage.sections.findIndex((s) => s.id === op.afterSectionId);
     if (insertIdx < 0) {
       throw new Error(
-        `applyCanvasAgentOp(designSection): afterSectionId not found: ${op.afterSectionId}`,
+        `applyCanvasAgentOp(designSection): afterSectionId not found on target page: ${op.afterSectionId}`,
       );
     }
-    page.sections.splice(insertIdx + 1, 0, result.section);
+    targetPage.sections.splice(insertIdx + 1, 0, result.section);
     return next;
   }
 
