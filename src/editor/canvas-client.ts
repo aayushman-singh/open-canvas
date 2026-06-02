@@ -348,13 +348,79 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (typeof factory !== "function") {
       throw new Error("insertElementForSidebarCommand: no factory registered for " + JSON.stringify(cmd.factoryName));
     }
+    // Implicit nesting: if the currently-selected element is a tabs (or
+    // collection) container, the insert lands inside its active child rather
+    // than at section level. Selecting an empty area or a top-level element
+    // falls through to the section-level path.
+    var nestedTarget = resolveNestedInsertionTarget();
     var built = factory(section);
     var newEl = { id: newElementId() };
     var payload = built.payload;
     var keys = Object.keys(payload);
     for (var i = 0; i < keys.length; i++) newEl[keys[i]] = payload[keys[i]];
+    if (nestedTarget) {
+      // Tab panels and collection entries have their own coord space anchored
+      // at (0,0). defaultBox's section-relative offset would push the new
+      // element off-screen of the panel - use a small inset instead.
+      newEl.box = {
+        x: 24,
+        y: 24,
+        w: built.defaultSize.w,
+        h: built.defaultSize.h,
+        z: nestedTarget.elements.length + 1,
+      };
+      addElementToContainer(section, nestedTarget.elements, newEl);
+      return;
+    }
     newEl.box = defaultBox(section, built.defaultSize.w, built.defaultSize.h);
     addElementToSection(section, newEl);
+  }
+
+  // Returns { elements } pointing at the immediate elements array a new insert
+  // should land in, or null when the section-level path applies. Reads the
+  // current selection to decide; passes through a tabs element selected on its
+  // own (insert into its active tab) or a child of a tabs/collection (insert
+  // alongside the selected child, in the same container).
+  function resolveNestedInsertionTarget() {
+    if (!selectedElementId) return null;
+    var found = findElement(selectedElementId);
+    if (!found) return null;
+    if (found.element.type === "tabs") {
+      var activeTab = (found.element.tabs || []).find(function (t) {
+        return t && t.id === found.element.activeTabId;
+      });
+      if (activeTab && Array.isArray(activeTab.elements)) {
+        return { elements: activeTab.elements };
+      }
+      return null;
+    }
+    if (found.parentKind === "tab-panel" && found.parentArray) {
+      return { elements: found.parentArray };
+    }
+    if (found.parentKind === "collection-entry" && found.parentArray) {
+      return { elements: found.parentArray };
+    }
+    return null;
+  }
+
+  // Section-agnostic insertion shared by the nested-container path. Mirrors
+  // addElementToSection but pushes to an arbitrary elements array instead.
+  // Section is still passed for motion defaults (the page's defaultMotionPreset
+  // applies regardless of where the element lands within the section). Skips
+  // panToElement because the user just clicked a sidebar command while a tab
+  // panel was on screen - the new element lands inside that panel, already in
+  // view; panToElement reads box coords as section-local which would mis-pan.
+  function addElementToContainer(section, containerArray, element) {
+    if (!element.motion) {
+      var pg = currentPage();
+      if (pg && pg.defaultMotionPreset && pg.defaultMotionPreset !== "none") {
+        element.motion = { preset: pg.defaultMotionPreset, delayMs: 0 };
+      }
+    }
+    containerArray.push(element);
+    renderAll();
+    selectElement(element.id);
+    scheduleSave();
   }
 
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic", "ivory-press", "midnight-violet"];
@@ -374,7 +440,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   //      of CANONICAL_MARK_ORDER because wrap() pushes innermost first).
   //   3. The mark-toolbar button loop (toolbar iterates this list directly so
   //      adding a mark here surfaces a button automatically).
-  const CANONICAL_MARK_ORDER = ["link", "bold", "italic", "underline", "strike", "highlight", "code"];
+  // fontSize sits outermost (it stamps a style attribute on the outer span
+  // rather than a tag wrap), so it comes first in the canonical order.
+  const CANONICAL_MARK_ORDER = ["fontSize", "link", "bold", "italic", "underline", "strike", "highlight", "code"];
+  const INLINE_FONT_SIZE_PX_MIN = 8;
+  const INLINE_FONT_SIZE_PX_MAX = 200;
   // Scroll-trigger modes for page entrance animations. Mirrors schema's
   // SCROLL_TRIGGER_MODES; if you add a mode there, add it here too.
   const SCROLL_TRIGGER_MODES = ["on-load", "on-scroll"];
@@ -2192,24 +2262,62 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return null;
   }
 
+  // Recursively scan a section + every nested container inside it.
+  //
+  // Returns the matched element along with the immediate elements-array that
+  // contains it (parentArray) and what kind of container that array belongs to
+  // (parentKind). section always points to the outermost owning section so
+  // callers that just need section context (selectSection, motion default,
+  // etc.) keep working without conditionals.
+  //
+  // parentKind values:
+  //   "section"         - element lives directly in section.elements
+  //   "tab-panel"       - element is in a tabs[].elements panel; parentMeta
+  //                       carries { tabsElement, tab } so deletes/inserts can
+  //                       address the right tab.
+  //   "collection-entry"- element is in a collection.entries[i] array.
+  function findElementIn(section, elementId) {
+    function searchArray(arr, kind, meta) {
+      for (var i = 0; i < arr.length; i++) {
+        var el = arr[i];
+        if (el.id === elementId) {
+          return { section: section, element: el, parentArray: arr, parentKind: kind, parentMeta: meta };
+        }
+        if (el.type === "tabs" && Array.isArray(el.tabs)) {
+          for (var ti = 0; ti < el.tabs.length; ti++) {
+            var tab = el.tabs[ti];
+            if (!Array.isArray(tab.elements)) continue;
+            var hit = searchArray(tab.elements, "tab-panel", { tabsElement: el, tab: tab });
+            if (hit) return hit;
+          }
+        } else if (el.type === "collection" && Array.isArray(el.entries)) {
+          for (var ei = 0; ei < el.entries.length; ei++) {
+            var entry = el.entries[ei];
+            if (!Array.isArray(entry)) continue;
+            var hitC = searchArray(entry, "collection-entry", { collectionElement: el, entryIndex: ei });
+            if (hitC) return hitC;
+          }
+        }
+      }
+      return null;
+    }
+    return searchArray(section.elements, "section", null);
+  }
+
   function findElement(elementId) {
     if (state.header) {
-      for (var hi = 0; hi < state.header.elements.length; hi++) {
-        if (state.header.elements[hi].id === elementId) return { section: state.header, element: state.header.elements[hi] };
-      }
+      var hitH = findElementIn(state.header, elementId);
+      if (hitH) return hitH;
     }
     if (state.footer) {
-      for (var fi = 0; fi < state.footer.elements.length; fi++) {
-        if (state.footer.elements[fi].id === elementId) return { section: state.footer, element: state.footer.elements[fi] };
-      }
+      var hitF = findElementIn(state.footer, elementId);
+      if (hitF) return hitF;
     }
     var page = currentPage();
     if (!page) return null;
     for (var si = 0; si < page.sections.length; si++) {
-      var section = page.sections[si];
-      for (var ei = 0; ei < section.elements.length; ei++) {
-        if (section.elements[ei].id === elementId) return { section: section, element: section.elements[ei] };
-      }
+      var hit = findElementIn(page.sections[si], elementId);
+      if (hit) return hit;
     }
     return null;
   }
@@ -2544,6 +2652,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     return null;
   }
+  function findFontSizeMark(run) {
+    if (!run.marks || !Array.isArray(run.marks)) return null;
+    for (let i = 0; i < run.marks.length; i++) {
+      if (run.marks[i] && run.marks[i].type === "fontSize") return run.marks[i];
+    }
+    return null;
+  }
   // Maps CANONICAL_MARK_ORDER mark types to their DOM tags. "link" is omitted
   // because the <a> wrap needs href/target attributes and is built inline below.
   const MARK_TYPE_TO_TAG = { bold: "strong", italic: "em", underline: "u", strike: "s", highlight: "mark", code: "code" };
@@ -2595,6 +2710,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     }
     const span = document.createElement("span");
     span.appendChild(inner);
+    const fontSize = findFontSizeMark(run);
+    if (fontSize) span.style.fontSize = String(fontSize.px) + "px";
     return span;
   }
 
@@ -3471,8 +3588,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     delBtn.className = "menu-item danger";
     delBtn.textContent = "Delete";
     delBtn.addEventListener("click", function() {
-      var idx = section.elements.indexOf(element);
-      if (idx >= 0) section.elements.splice(idx, 1);
+      var arr = parentArrayFor(section, element);
+      var idx = arr.indexOf(element);
+      if (idx >= 0) arr.splice(idx, 1);
       closeElementMenu();
       selectedElementId = null;
       renderAll();
@@ -3893,13 +4011,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     scheduleSave();
   }
 
+  // Resolve the immediate elements array an element lives in. Falls back to
+  // section.elements for legacy compat when findElement misses (shouldn't,
+  // but a fallback avoids crashing the editor on edge cases).
+  function parentArrayFor(section, element) {
+    var found = findElement(element.id);
+    if (found && Array.isArray(found.parentArray)) return found.parentArray;
+    return section.elements;
+  }
+
   function moveInReadingOrder(section, element, direction) {
-    const idx = section.elements.indexOf(element);
+    const arr = parentArrayFor(section, element);
+    const idx = arr.indexOf(element);
     if (idx < 0) return false;
     const target = idx + direction;
-    if (target < 0 || target >= section.elements.length) return false;
-    section.elements.splice(idx, 1);
-    section.elements.splice(target, 0, element);
+    if (target < 0 || target >= arr.length) return false;
+    arr.splice(idx, 1);
+    arr.splice(target, 0, element);
     renderAll();
     selectElement(element.id);
     scheduleSave();
@@ -3909,8 +4037,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   function buildReorderGroup(section, element) {
     const group = document.createElement("div");
     group.className = "opencanvas-reorder-buttons";
-    const idx = section.elements.indexOf(element);
-    const total = section.elements.length;
+    const arr = parentArrayFor(section, element);
+    const idx = arr.indexOf(element);
+    const total = arr.length;
     const caption = document.createElement("div");
     caption.className = "opencanvas-reorder-caption";
     caption.textContent = "Reading order: " + (idx + 1) + " of " + total;
@@ -3967,9 +4096,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (typeof clone.box.x === "number") clone.box.x = clone.box.x + 20;
       if (typeof clone.box.y === "number") clone.box.y = clone.box.y + 20;
     }
-    var idx = section.elements.indexOf(element);
-    if (idx >= 0) section.elements.splice(idx + 1, 0, clone);
-    else section.elements.push(clone);
+    var arr = parentArrayFor(section, element);
+    var idx = arr.indexOf(element);
+    if (idx >= 0) arr.splice(idx + 1, 0, clone);
+    else arr.push(clone);
     selectedElementId = clone.id;
     captureForUndo();
     renderAll();
@@ -3978,9 +4108,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function deleteElement(section, element) {
-    var idx = section.elements.indexOf(element);
+    var arr = parentArrayFor(section, element);
+    var idx = arr.indexOf(element);
     if (idx < 0) return;
-    section.elements.splice(idx, 1);
+    arr.splice(idx, 1);
     closeElementMenu();
     if (selectedElementId === element.id) selectedElementId = null;
     captureForUndo();
@@ -8393,6 +8524,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             marks.push(built);
           }
         }
+        if (!seen.has("fontSize") && tag === "SPAN") {
+          // Inline font-size carried by the run's outer span (renderInlineRun)
+          // OR by a pasted-source size span (normalizePastedHtml emits these
+          // for H1-H6 + inline style="font-size:..." nodes). Innermost wrap
+          // wins, matching the natural CSS cascade an editor user would expect
+          // when nesting one sized span inside another.
+          var rawFs = cur.style && cur.style.fontSize ? cur.style.fontSize : "";
+          if (rawFs) {
+            var px = parseFloat(rawFs);
+            if (Number.isFinite(px) && px >= INLINE_FONT_SIZE_PX_MIN && px <= INLINE_FONT_SIZE_PX_MAX) {
+              seen.add("fontSize");
+              marks.push({ type: "fontSize", px: px });
+            }
+          }
+        }
       }
       cur = cur.parentNode;
     }
@@ -8413,6 +8559,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (a[i].href !== b[i].href) return false;
         if ((a[i].target || "") !== (b[i].target || "")) return false;
       }
+      if (a[i].type === "fontSize" && a[i].px !== b[i].px) return false;
     }
     return true;
   }
@@ -9459,9 +9606,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // the bar. Existing runs with code marks still render via the public-
     // styles <code> rule, but new code wraps can only land through the
     // canvas agent or paste from a code-formatted source.
+    // fontSize is also absent — it only enters runs via paste (heading/inline
+    // font-size source); editing the value goes through the element-level
+    // fontSize inspector field, not a toolbar button.
     for (let i = 0; i < CANONICAL_MARK_ORDER.length; i++) {
       const type = CANONICAL_MARK_ORDER[i];
-      if (type === "code") continue;
+      if (type === "code" || type === "fontSize") continue;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = labels[type];
@@ -10321,20 +10471,38 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     if (!elementId) return;
     const found = findElement(elementId);
     if (!found) return;
-    const sectionEl = wrapper.closest('.opencanvas-section');
-    if (!sectionEl) return;
-    const start = pointerToCanvas(startEv, sectionEl);
+    // The element's box is in its IMMEDIATE container's coord space. For a
+    // section child that's the section. For a tab-panel or collection-entry
+    // child it's the panel/card. Resolve the nearest positioned ancestor that
+    // matches one of those wrappers, falling back to section.
+    const frame = wrapper.parentElement
+      ? wrapper.parentElement.closest('.opencanvas-tab-panel, .opencanvas-section')
+      : null;
+    const frameEl = frame || wrapper.closest('.opencanvas-section');
+    if (!frameEl) return;
+    const start = pointerToCanvas(startEv, frameEl);
     if (!start) return;
     const originalBox = Object.assign({}, found.element.box);
-    const page = currentPage();
-    // Page width is required by the schema; a missing page here means the
-    // element being dragged has no page, which is a bug worth surfacing.
-    if (!page) throw new Error("beginDrag: element " + elementId + " has no active page");
-    const pageWidth = page.width;
-    const sectionHeight = found.section.height;
+    // Bounds: at section level use the page width + section height (the
+    // authoritative values from state). For nested containers use the rendered
+    // panel size since the panel's logical dimensions aren't carried on the
+    // element state directly.
+    let boundW;
+    let boundH;
+    if (frameEl.classList.contains('opencanvas-section')) {
+      const page = currentPage();
+      if (!page) throw new Error("beginDrag: element " + elementId + " has no active page");
+      boundW = page.width;
+      boundH = found.section.height;
+    } else {
+      const rect = frameEl.getBoundingClientRect();
+      const scale = wrapperScale(frameEl);
+      boundW = rect.width / scale;
+      boundH = rect.height / scale;
+    }
 
     function onMove(ev) {
-      const current = pointerToCanvas(ev, sectionEl);
+      const current = pointerToCanvas(ev, frameEl);
       if (!current) return;
       const dx = current.x - start.x;
       const dy = current.y - start.y;
@@ -10342,8 +10510,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       let ny = originalBox.y + dy;
       if (nx < 0) nx = 0;
       if (ny < 0) ny = 0;
-      if (nx + originalBox.w > pageWidth) nx = pageWidth - originalBox.w;
-      if (ny + originalBox.h > sectionHeight) ny = sectionHeight - originalBox.h;
+      if (nx + originalBox.w > boundW) nx = boundW - originalBox.w;
+      if (ny + originalBox.h > boundH) ny = boundH - originalBox.h;
       wrapper.style.left = nx + "px";
       wrapper.style.top = ny + "px";
       found.element.box.x = nx;
@@ -10358,29 +10526,56 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     window.addEventListener("mouseup", onUp);
   }
 
+  // Best-effort current-zoom estimator. pointerToCanvas already handles scale
+  // for sections via its own logic; for nested frames we read the actual
+  // rendered transform off the closest section ancestor since the canvas zoom
+  // applies uniformly above the section.
+  function wrapperScale(frameEl) {
+    const section = frameEl.closest('.opencanvas-section');
+    if (!section) return 1;
+    const matrix = window.getComputedStyle(section).transform;
+    if (!matrix || matrix === 'none') return 1;
+    const match = /matrix\(([^,]+),/.exec(matrix);
+    if (!match) return 1;
+    const parsed = parseFloat(match[1]);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+  }
+
   function beginResize(startEv, wrapper, dir) {
     const elementId = wrapper.getAttribute('data-opencanvas-element');
     if (!elementId) return;
     const found = findElement(elementId);
     if (!found) return;
-    const sectionEl = wrapper.closest('.opencanvas-section');
-    if (!sectionEl) return;
-    const start = pointerToCanvas(startEv, sectionEl);
+    // Match beginDrag's frame resolution so resizing a tab-panel/collection
+    // child respects panel-local coords rather than section coords.
+    const frame = wrapper.parentElement
+      ? wrapper.parentElement.closest('.opencanvas-tab-panel, .opencanvas-section')
+      : null;
+    const frameEl = frame || wrapper.closest('.opencanvas-section');
+    if (!frameEl) return;
+    const start = pointerToCanvas(startEv, frameEl);
     if (!start) return;
     const ob = Object.assign({}, found.element.box);
-    const page = currentPage();
-    // Page width is required by the schema; a missing page here means the
-    // element being resized has no page, which is a bug worth surfacing.
-    if (!page) throw new Error("beginResize: element " + elementId + " has no active page");
-    const pageWidth = page.width;
-    const sectionHeight = found.section.height;
+    let pageWidth;
+    let sectionHeight;
+    if (frameEl.classList.contains('opencanvas-section')) {
+      const page = currentPage();
+      if (!page) throw new Error("beginResize: element " + elementId + " has no active page");
+      pageWidth = page.width;
+      sectionHeight = found.section.height;
+    } else {
+      const rect = frameEl.getBoundingClientRect();
+      const scale = wrapperScale(frameEl);
+      pageWidth = rect.width / scale;
+      sectionHeight = rect.height / scale;
+    }
     const moveX = dir.includes("e") || dir.includes("w");
     const moveY = dir.includes("s") || dir.includes("n");
     const fromLeft = dir.includes("w");
     const fromTop = dir.includes("n");
 
     function onMove(ev) {
-      const current = pointerToCanvas(ev, sectionEl);
+      const current = pointerToCanvas(ev, frameEl);
       if (!current) return;
       const dx = current.x - start.x;
       const dy = current.y - start.y;
@@ -11205,6 +11400,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     function isHighlight(el) {
       return !!el && el.nodeType === 1 && el.tagName === 'MARK';
     }
+    // Default px sizes for H1-H6 when the source omits an explicit font-size.
+    // Inline style font-size on the heading (or any ancestor span) wins over
+    // these — see the walker below.
+    var HEADING_DEFAULT_PX = { H1: 32, H2: 24, H3: 20, H4: 18, H5: 16, H6: 14 };
+    function readInlineFontSizePx(el) {
+      var style = styleOf(el);
+      if (!style) return null;
+      var match = /font-size\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*(px|pt|em|rem)?/i.exec(style);
+      if (!match) return null;
+      var n = parseFloat(match[1]);
+      if (!Number.isFinite(n)) return null;
+      var unit = (match[2] || 'px').toLowerCase();
+      // pt -> px at 96dpi, em/rem assume 16px root.
+      if (unit === 'pt') n = n * (96 / 72);
+      else if (unit === 'em' || unit === 'rem') n = n * 16;
+      if (n < INLINE_FONT_SIZE_PX_MIN || n > INLINE_FONT_SIZE_PX_MAX) return null;
+      return Math.round(n);
+    }
     var BLOCK_TAGS = { P: 1, DIV: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, LI: 1, BLOCKQUOTE: 1, TR: 1, PRE: 1 };
     var out = [];
     function walk(node) {
@@ -11213,6 +11426,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (text.length === 0) return;
         var bold = false, italic = false, underline = false, strike = false, code = false, mark = false;
         var linkHref = null;
+        var fontSizePx = null;
         var cur = node.parentNode;
         while (cur && cur.nodeType === 1 && cur !== doc.body) {
           if (!linkHref && cur.tagName === 'A') {
@@ -11225,6 +11439,18 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           if (isStrike(cur)) strike = true;
           if (isCode(cur)) code = true;
           if (isHighlight(cur)) mark = true;
+          if (fontSizePx === null) {
+            // Inline style first (innermost ancestor with explicit size wins),
+            // then fall back to a heading-default mapping. Plain P/DIV/SPAN
+            // without an explicit size contribute nothing and the run inherits
+            // the TextElement's own fontSize.
+            var inline = readInlineFontSizePx(cur);
+            if (inline !== null) {
+              fontSizePx = inline;
+            } else if (HEADING_DEFAULT_PX[cur.tagName] !== undefined) {
+              fontSizePx = HEADING_DEFAULT_PX[cur.tagName];
+            }
+          }
           cur = cur.parentNode;
         }
         var content = escapeHtml(text);
@@ -11235,6 +11461,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (underline) content = '<u>' + content + '</u>';
         if (italic) content = '<em>' + content + '</em>';
         if (bold) content = '<strong>' + content + '</strong>';
+        if (fontSizePx !== null) {
+          content = '<span style="font-size:' + String(fontSizePx) + 'px">' + content + '</span>';
+        }
         out.push(content);
         return;
       }
