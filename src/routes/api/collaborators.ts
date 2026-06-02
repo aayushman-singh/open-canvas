@@ -107,6 +107,20 @@ async function buildAndSendInviteEmail(ctx: InviteEmailContext): Promise<void> {
 }
 
 async function resolveInviterName(c: Context<Env>, fallbackEmail: string): Promise<string> {
+  // User-set displayName on the customer row wins over Clerk's first/last name
+  // (which mirrors the Google OAuth profile). The profile settings page is the
+  // intended place to override the name that shows up in invites + collaborator
+  // notifications, so honour it here.
+  const auth = c.get('auth');
+  if (auth.userId) {
+    const rows = await db(c.env)
+      .select({ displayName: customer.displayName })
+      .from(customer)
+      .where(eq(customer.clerkUserId, auth.userId))
+      .limit(1);
+    const displayName = rows[0]?.displayName?.trim();
+    if (displayName) return displayName;
+  }
   const ownerUser = await getClerkUser(c);
   if (!ownerUser) return 'A user';
   const named = `${ownerUser.firstName ?? ''} ${ownerUser.lastName ?? ''}`.trim();
