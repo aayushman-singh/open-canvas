@@ -824,21 +824,27 @@ function buildShapeBlock(kitName: string, preset: StyleKitPreset): string {
 // state" shape. Everything else (`none`, the multi-stop `bounce-in`, the
 // continuous-loop `slow-drift`, the entrance-with-amplitude `parallax-soft`,
 // the reuses-fade-up `stagger-children`) is special-cased below.
+//
+// The resting `opacity` reads `--opencanvas-element-opacity` (set by the
+// renderer when `elementStyle.opacity` is present) so an entrance with
+// `animation-fill-mode: both` doesn't pin the wrapper at opacity:1 and
+// silently override an authored 0.3. var()'s fallback is 1, so elements
+// without an explicit opacity behave identically to before.
 const MOTION_ENTRANCE_RESTING_STATE: Record<string, string> = {
-  'fade-up': 'transform: translateY(0); opacity: 1;',
-  'fade-down': 'transform: translateY(0); opacity: 1;',
-  'fade-in': 'opacity: 1;',
-  'fade-right': 'transform: translateX(0); opacity: 1;',
-  'slide-left': 'transform: translateX(0); opacity: 1;',
+  'fade-up': 'transform: translateY(0); opacity: var(--opencanvas-element-opacity, 1);',
+  'fade-down': 'transform: translateY(0); opacity: var(--opencanvas-element-opacity, 1);',
+  'fade-in': 'opacity: var(--opencanvas-element-opacity, 1);',
+  'fade-right': 'transform: translateX(0); opacity: var(--opencanvas-element-opacity, 1);',
+  'slide-left': 'transform: translateX(0); opacity: var(--opencanvas-element-opacity, 1);',
   'slide-up': 'transform: translateY(0);',
   'slide-right': 'transform: translateX(0);',
-  'scale-in': 'transform: scale(1); opacity: 1;',
-  'zoom-out': 'transform: scale(1); opacity: 1;',
+  'scale-in': 'transform: scale(1); opacity: var(--opencanvas-element-opacity, 1);',
+  'zoom-out': 'transform: scale(1); opacity: var(--opencanvas-element-opacity, 1);',
   // `blur-in`'s filter dimension isn't expressible in `MotionPresetTokens`;
   // the blur(8px) initial AND blur(0) resting are hardcoded here.
-  'blur-in': 'filter: blur(0); opacity: 1;',
-  'rotate-in': 'transform: rotate(0) scale(1); opacity: 1;',
-  'flip-in': 'transform: perspective(600px) rotateY(0); opacity: 1;',
+  'blur-in': 'filter: blur(0); opacity: var(--opencanvas-element-opacity, 1);',
+  'rotate-in': 'transform: rotate(0) scale(1); opacity: var(--opencanvas-element-opacity, 1);',
+  'flip-in': 'transform: perspective(600px) rotateY(0); opacity: var(--opencanvas-element-opacity, 1);',
 };
 
 function buildEntranceKeyframe(ns: string, preset: MotionPreset, tokens: MotionPresetTokens): string {
@@ -874,7 +880,7 @@ function buildMotionKeyframes(kitName: string, preset: StyleKitPreset): string {
   // 60%/80% overshoot stops are intrinsic to the preset's character.
   const bounceFrom = preset.motionPresets['bounce-in'].transform ?? 'scale(0.6)';
   blocks.push(
-    `@keyframes ${ns}-bounce-in { 0% { transform: ${bounceFrom}; opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 80% { transform: scale(0.95); } 100% { transform: scale(1); } }`,
+    `@keyframes ${ns}-bounce-in { 0% { transform: ${bounceFrom}; opacity: 0; } 60% { transform: scale(1.12); opacity: var(--opencanvas-element-opacity, 1); } 80% { transform: scale(0.95); } 100% { transform: scale(1); } }`,
   );
   // `slow-drift`: continuous loop. The data seeds `translateY(0px)` across
   // all four built-in kits (the resting centre of the drift); the loop

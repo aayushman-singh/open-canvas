@@ -57,7 +57,12 @@ function applyElementStyle(
     if (v) entries.push(['box-shadow', v]);
   }
   if (typeof es.opacity === 'number') {
+    // Inline opacity covers elements without an entrance animation; the
+    // custom property is what the kit's fade-up/fade-in/etc. keyframes
+    // resolve at their `to` stop, so animated elements settle at the
+    // authored opacity instead of being pinned to 1 by fill-mode: both.
     entries.push(['opacity', String(es.opacity)]);
+    entries.push(['--opencanvas-element-opacity', String(es.opacity)]);
   }
   if (es.color) {
     const v = escapeCssValue(es.color);
