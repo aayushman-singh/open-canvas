@@ -470,6 +470,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         if (el.type === "action" && typeof el.href === "string") {
           el.href = { type: "external", url: el.href };
         }
+        if (el.type === "action" && typeof el.label === "string") {
+          el.label = [{ text: el.label }];
+        }
       }
     }
     for (var i = 0; i < s.pages.length; i++) {
@@ -2130,7 +2133,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
           el.href.type === "page" &&
           el.href.pageId === pageId
         ) {
-          refs.push(label + " / " + (el.label || el.id));
+          var actionLabelText = "";
+          for (var ri = 0; ri < el.label.length; ri++) {
+            actionLabelText += el.label[ri].text;
+          }
+          refs.push(label + " / " + (actionLabelText || el.id));
         }
       }
     }
@@ -2501,7 +2508,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       wrapper.style.boxShadow = es.boxShadow;
       wrapper.setAttribute("data-es-shadow", "");
     }
-    if (typeof es.opacity === "number") wrapper.style.opacity = String(es.opacity);
+    if (typeof es.opacity === "number") {
+      // Inline opacity covers elements without an entrance animation; the
+      // custom property is what the kit fade-up/fade-in/etc. keyframes resolve
+      // at their resting stop, so animated elements settle at the authored
+      // opacity instead of being pinned to 1 by animation-fill-mode both.
+      wrapper.style.opacity = String(es.opacity);
+      wrapper.style.setProperty("--opencanvas-element-opacity", String(es.opacity));
+    }
     if (es.color) wrapper.style.color = es.color;
     if (es.overflow) wrapper.style.overflow = es.overflow;
   }
@@ -2705,7 +2719,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         }
       }
     });
-    node.textContent = element.label;
+    var labelText = "";
+    for (var li = 0; li < element.label.length; li++) {
+      labelText += element.label[li].text;
+    }
+    node.textContent = labelText;
     return node;
   }
 
@@ -3284,6 +3302,76 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return node;
   }
 
+  function buildTabsBody(element) {
+    const node = document.createElement("div");
+    node.className = "opencanvas-tabs";
+    node.style.position = "relative";
+    node.style.width = "100%";
+    node.style.height = "100%";
+
+    const tabs = Array.isArray(element.tabs) ? element.tabs : [];
+    const barHeight = typeof element.tabBarHeight === "number" ? element.tabBarHeight : 56;
+
+    const bar = document.createElement("div");
+    bar.className = "opencanvas-tab-bar";
+    bar.style.position = "absolute";
+    bar.style.left = "0";
+    bar.style.top = "0";
+    bar.style.width = "100%";
+    bar.style.height = barHeight + "px";
+    bar.style.display = "flex";
+    bar.style.alignItems = "center";
+    bar.style.gap = "8px";
+
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i] || {};
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "opencanvas-tab";
+      let labelText = "";
+      const runs = Array.isArray(tab.label) ? tab.label : [];
+      for (let r = 0; r < runs.length; r++) {
+        labelText += (runs[r] && runs[r].text) || "";
+      }
+      btn.textContent = labelText || tab.id || "Tab";
+      if (tab.id === element.activeTabId) btn.setAttribute("data-tab-active", "");
+      (function (tabId) {
+        btn.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (element.activeTabId === tabId) return;
+          element.activeTabId = tabId;
+          rebuildElement(element.id);
+          scheduleSave();
+        });
+      })(tab.id);
+      bar.appendChild(btn);
+    }
+    node.appendChild(bar);
+
+    const activeTab = tabs.find(function (t) { return t && t.id === element.activeTabId; });
+    if (activeTab) {
+      const panel = document.createElement("div");
+      panel.className = "opencanvas-tab-panel";
+      panel.setAttribute("data-tab-active", "");
+      panel.style.position = "absolute";
+      panel.style.left = "0";
+      panel.style.top = barHeight + "px";
+      panel.style.right = "0";
+      panel.style.bottom = "0";
+      const children = Array.isArray(activeTab.elements) ? activeTab.elements : [];
+      for (let i = 0; i < children.length; i++) {
+        const childWrap = document.createElement("div");
+        childWrap.style.position = "absolute";
+        setBoxStyle(childWrap, children[i].box || { x: 0, y: 0, w: 120, h: 40, z: 1 });
+        childWrap.appendChild(buildElementBody(children[i]));
+        panel.appendChild(childWrap);
+      }
+      node.appendChild(panel);
+    }
+
+    return node;
+  }
+
   function buildElementBody(element) {
     switch (element.type) {
       case "text": return buildTextBody(element);
@@ -3300,6 +3388,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       case "table": return buildTableBody(element);
       case "nav": return buildNavBody(element);
       case "collection": return buildCollectionBody(element);
+      case "tabs": return buildTabsBody(element);
     }
     throw new Error("unsupported editor element type: " + String(element.type));
   }
@@ -3468,6 +3557,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const existing = existingNodes[i];
       if (!existing.parentNode) continue;
       const replacement = buildElementNode(found.element);
+      // Entrance animations are for first paint, not inspector tweaks. Without
+      // this, every variant/opacity/etc. change re-fires the kit data-motion-preset
+      // animation (fade-up etc.) so the wrapper flickers from opacity 0 to
+      // opacity 1 on each edit, and animation-fill-mode both on the fade-up
+      // keyframe pins the wrapper at the resting opacity 1 state, so an inline
+      // opacity 0.3 from elementStyle.opacity never takes effect.
+      replacement.removeAttribute("data-motion-preset");
+      replacement.removeAttribute("data-motion-delay-ms");
+      replacement.style.removeProperty("--opencanvas-motion-delay");
       existing.parentNode.replaceChild(replacement, existing);
       if (found.element.type === "text") {
         var inner = replacement.querySelector(".opencanvas-text");
@@ -10165,6 +10263,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     root.addEventListener("mousedown", (ev) => {
       if (interactionMode === "pan") return;
       if (ev.target instanceof Element && (ev.target.closest("[data-element-menu-trigger]") || ev.target.closest("[data-element-menu]"))) return;
+      // Grip clicks own their own mousedown/click semantics (open reel,
+      // optionally start a section drag). Letting this handler resolve an
+      // element wrapper at the grip's pixel would select whatever element's
+      // bbox overlaps the grip and immediately close the freshly-opened reel.
+      if (ev.target instanceof Element && ev.target.closest("[data-section-grip]")) return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
         const wrapper = handle.closest('.opencanvas-element');
@@ -10797,6 +10900,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         return;
       }
       closeElementMenu();
+      if (target.closest("[data-section-grip]")) return;
       const toolbarButton = target.closest('[data-section-action]');
       if (toolbarButton) {
         const action = toolbarButton.getAttribute('data-section-action');

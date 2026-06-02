@@ -151,8 +151,9 @@ function estimateIntrinsicWidth(node: ElementNode): number {
   const el = node.element;
   switch (el.type) {
     case 'action': {
-      const label = el.action?.label ?? 'Click';
-      return Math.max(120, label.length * 10 + 40);
+      const runs = el.action?.label ?? [{ text: 'Click' }];
+      const charCount = runs.reduce((sum, run) => sum + run.text.length, 0);
+      return Math.max(120, charCount * 10 + 40);
     }
     case 'shape':
       return 60;
