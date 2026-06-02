@@ -822,7 +822,16 @@ async function isOverTokenBudget(input: OverBudgetInput): Promise<boolean> {
 // once the session crosses the SUMMARIZE_AFTER_TURNS threshold.
 // ---------------------------------------------------------------------------
 
-async function summariseIfNeeded(
+/**
+ * Run the summarisation step on `history`, returning a new array with the
+ * old turns replaced by a synthesised `summary` message. Exported so the
+ * Flash-summarisation integration smoke (ADR 0056 follow-up) can call the
+ * exact production code path without duplicating the prompt format.
+ *
+ * Throws when the summarisation call returns empty / errors — the caller in
+ * `runChatTurn` maps that to a loud `done(summarise-failed)`.
+ */
+export async function summariseIfNeeded(
   history: ChatMessage[],
   adapter: LlmAdapter,
   model: string,
