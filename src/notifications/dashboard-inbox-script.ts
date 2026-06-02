@@ -301,34 +301,75 @@ export const notificationsInboxScript = `(function(){
 
   fetchInbox().catch(function(err) { reportFailure('initial fetch', err); });
 
-  // ADR 0043 Phase D live delivery. The /api/notifications/stream endpoint
-  // is a long-lived SSE response backed by the per-Customer
-  // NotificationOwnerRoom DO. Two event kinds:
-  //   - 'notification'        — a new row landed; refetch the inbox.
-  //   - 'read-state-changed'  — another tab marked a row read; refetch so
-  //                             the badge + unread shading stay in sync.
-  // EventSource auto-reconnects on transport drops. Per ADR dec 5 there is
-  // no in-DO buffer; on reconnect the next fetchInbox call backfills any
-  // rows that landed during the gap.
-  if (typeof window.EventSource === 'function') {
-    var es = new EventSource(apiBase + '/notifications/stream', { withCredentials: true });
+  // ADR 0043 Phase D live delivery. /api/notifications/stream upgrades to a
+  // WebSocket backed by the per-Customer NotificationOwnerRoom DO, which
+  // uses the Hibernation API so the DO is only billed for active pushes,
+  // not for the idle hold time. Two frame kinds (JSON):
+  //   - { kind: 'notification', id }        — a new row landed; refetch.
+  //   - { kind: 'read-state-changed', id }  — another tab marked a row
+  //                                            read; refetch so the badge
+  //                                            + unread shading sync.
+  // Per ADR dec 5 there is no in-DO buffer; on reconnect the next
+  // fetchInbox call with since=lastSeenCreatedAt backfills any rows that
+  // landed during the gap.
+  //
+  // Reconnect strategy: exponential backoff with jitter, and we skip the
+  // socket entirely on hidden tabs so background dashboards don't keep the
+  // DO warm (visibilitychange triggers an immediate reconnect on return).
+  if (typeof window.WebSocket === 'function') {
+    var wsScheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var streamUrl = wsScheme + '//' + location.host + apiBase + '/notifications/stream';
     var streamOpened = false;
-    es.addEventListener('open', function() {
-      if (streamOpened && lastSeenCreatedAt) {
-        fetchInbox({ since: lastSeenCreatedAt }).catch(function(err) {
-          reportFailure('stream reconnect backfill', err);
-        });
+    var streamRetry = 0;
+    var streamPending = false;
+    function openStream() {
+      if (document.visibilityState === 'hidden') {
+        streamPending = true;
+        return;
       }
-      streamOpened = true;
+      streamPending = false;
+      var ws = new WebSocket(streamUrl);
+      ws.addEventListener('open', function() {
+        streamRetry = 0;
+        if (streamOpened && lastSeenCreatedAt) {
+          fetchInbox({ since: lastSeenCreatedAt }).catch(function(err) {
+            reportFailure('stream reconnect backfill', err);
+          });
+        }
+        streamOpened = true;
+      });
+      ws.addEventListener('message', function(ev) {
+        var msg;
+        try { msg = JSON.parse(ev.data); }
+        catch (err) { reportFailure('stream parse', err); return; }
+        if (!msg || typeof msg.kind !== 'string') return;
+        if (msg.kind === 'notification') {
+          fetchInbox().catch(function(err) { reportFailure('notification event fetch', err); });
+        } else if (msg.kind === 'read-state-changed') {
+          fetchInbox().catch(function(err) { reportFailure('read-state event fetch', err); });
+        }
+      });
+      ws.addEventListener('close', function() {
+        if (document.visibilityState === 'hidden') {
+          streamPending = true;
+          return;
+        }
+        var base = Math.min(1000 * Math.pow(2, streamRetry), 30000);
+        var delay = base + Math.random() * 500;
+        streamRetry += 1;
+        setTimeout(openStream, delay);
+      });
+      ws.addEventListener('error', function() {
+        // Let the close handler schedule the reconnect; don't double-fire.
+        try { ws.close(); } catch (e) { /* noop */ }
+      });
+    }
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible' && streamPending) {
+        streamRetry = 0;
+        openStream();
+      }
     });
-    es.addEventListener('notification', function() {
-      fetchInbox().catch(function(err) { reportFailure('notification event fetch', err); });
-    });
-    es.addEventListener('read-state-changed', function() {
-      fetchInbox().catch(function(err) { reportFailure('read-state event fetch', err); });
-    });
-    es.addEventListener('error', function() {
-      reportFailure('stream transport', new Error('EventSource reported a transport error'));
-    });
+    openStream();
   }
 })();`;

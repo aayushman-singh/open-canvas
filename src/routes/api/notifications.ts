@@ -112,16 +112,22 @@ notificationsApi.post('/notifications/mark-all-read', async (c) => {
   return c.json({ ok: true, markedRead });
 });
 
-// SSE live-delivery channel per ADR 0043 dec 4. Holds a streaming Response
-// against the per-Customer NotificationOwnerRoom DO. The client (dashboard
-// or editor IIFE) attaches via `new EventSource('/api/notifications/stream')`
-// and listens for 'notification' + 'read-state-changed' events. Each event
-// payload carries `{ id }` only — clients re-fetch /api/notifications to
-// learn the row body, per the no-buffer-in-DO contract.
+// Live-delivery channel per ADR 0043 dec 4. WebSocket upgrade forwarded to
+// the per-Customer NotificationOwnerRoom DO which accepts it via the
+// Hibernation API so the isolate is only billed for active push handling,
+// not idle hold time. The client (dashboard or editor IIFE) attaches via
+// `new WebSocket(...)` and listens for JSON frames
+// `{ kind: 'notification' | 'read-state-changed', id }`; the client then
+// refetches /api/notifications to learn the row body, per the
+// no-buffer-in-DO contract.
 notificationsApi.get('/notifications/stream', async (c) => {
   const customerId = await resolveCustomerId(c);
   if (!customerId) {
     return c.json({ error: 'account not found' }, 404);
+  }
+  const upgrade = c.req.header('upgrade');
+  if (upgrade !== 'websocket') {
+    return c.text('expected websocket upgrade', 426);
   }
   const ns = c.env.NOTIFICATION_OWNER_ROOM;
   if (ns === undefined) {
@@ -129,7 +135,14 @@ notificationsApi.get('/notifications/stream', async (c) => {
   }
   const stubId = ns.idFromName(customerId);
   const stub = ns.get(stubId);
-  return stub.fetch('https://internal/subscribe', { method: 'GET' });
+  // RFC 2606 reserves `.invalid` for synthetic URLs — DO stubs ignore the
+  // host portion but need a syntactically valid URL.
+  return stub.fetch(
+    new Request('https://do.invalid/subscribe', {
+      method: 'GET',
+      headers: c.req.raw.headers,
+    }),
+  );
 });
 
 export default notificationsApi;

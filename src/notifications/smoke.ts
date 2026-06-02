@@ -348,10 +348,10 @@ process.stdout.write('[notifications:smoke] writer failure contracts OK\n');
 
 {
   assert(
-    notificationsInboxScript.includes("es.addEventListener('open'") &&
+    notificationsInboxScript.includes("ws.addEventListener('open'") &&
       notificationsInboxScript.includes('since=') &&
       notificationsInboxScript.includes('lastSeenCreatedAt'),
-    'notification IIFE must backfill on EventSource reconnect with since=lastSeenCreatedAt',
+    'notification IIFE must backfill on WebSocket reconnect with since=lastSeenCreatedAt',
   );
   assert(
     notificationsInboxScript.includes('pendingNavigationHref') &&
