@@ -4,6 +4,17 @@
 **Date:** 2026-05-29
 **Author:** Aayushman Singh
 **Drives:** Theme E of the rev01 OSS code review (handoff-rev01-batch-27 §"Theme E — Inline-string CSS + inline-string JS in TS templates") for the editor surface. Supersedes [ADR 0014](0014-template-literal-data-substitution.md) on completion.
+**Verified-state:** verified 2026-06-03 — **none of the eight decisions below are as-built; the migration has not begun.**
+- `src/editor-client/` does not exist — Decision 1's target module tree has no files.
+- `scripts/build-editor-client.ts` does not exist — Decision 2's build script is unwritten.
+- `wrangler.toml` has no `[assets]` block — Decision 7's binding scope is not configured.
+- [`src/editor/canvas-client.ts`](../../src/editor/canvas-client.ts) is **14,352 lines** (Context cites 9,333 — the inlined source has grown ~5k since this ADR was drafted on 2026-05-29) and remains the editor route's source-of-truth.
+- [`src/editor/canvas-styles.ts`](../../src/editor/canvas-styles.ts) is **3,733 lines** (Context cites 2,089), still inlined.
+- [ADR 0014](0014-template-literal-data-substitution.md)'s substitution mechanism remains in active use; Decision 8's supersession has not triggered.
+
+Status stays **Proposed** because no `Accepted-context:` proof can be written against the current code. The decisions remain the intended target. The migration ships in the order named under Follow-ups; the ADR flips to Accepted only when all eight decisions are as-built and this `Verified-state:` block is replaced by an `Accepted-context:` block citing the landed mechanisms. The growth in `canvas-client.ts` between 2026-05-29 and 2026-06-03 reinforces rather than weakens the ADR's premise — every week of deferral concentrates more cost on the inline-delivery model.
+
+Adjacent ratchet: [ADR 0011](0011-canvas-element-registry.md) Step 5 (client renderer dispatch) is blocked behind this ADR; until the editor ships as a real TS module tree, no per-element `CLIENT_RENDER_DISPATCH` can exist as a typed mapped-record.
 
 ## Context
 
