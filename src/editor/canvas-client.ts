@@ -10530,12 +10530,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // for sections via its own logic; for nested frames we read the actual
   // rendered transform off the closest section ancestor since the canvas zoom
   // applies uniformly above the section.
+  //
+  // The regex is built via new RegExp instead of a literal because the entire
+  // IIFE body is wrapped in an untagged template literal upstream. Inside
+  // that template, a regex literal like /matrix\(.../ has its backslash
+  // silently dropped on cook, so the shipped JS becomes /matrix(.../ - an
+  // unterminated group that throws "Invalid regular expression" at parse
+  // time and prevents the entire editor script from loading. Doubling each
+  // backslash in the RegExp string source ("\\\\(") gets a literal \( into
+  // the shipped JS and then a real backslash escape in the runtime regex.
+  // Same workaround applies to any other regex authored inside this IIFE.
+  var WRAPPER_MATRIX_RE = new RegExp("matrix\\\\(([^,]+),");
   function wrapperScale(frameEl) {
     const section = frameEl.closest('.opencanvas-section');
     if (!section) return 1;
     const matrix = window.getComputedStyle(section).transform;
     if (!matrix || matrix === 'none') return 1;
-    const match = /matrix\(([^,]+),/.exec(matrix);
+    const match = WRAPPER_MATRIX_RE.exec(matrix);
     if (!match) return 1;
     const parsed = parseFloat(match[1]);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
