@@ -176,6 +176,29 @@ export interface RunTurnResult {
  * Drive one Owner ↔ Agent turn end-to-end. Mutates nothing externally — the
  * caller persists the returned `messages` array via `saveMessages()`.
  */
+
+// Telemetry helpers (ADR 0055 + ADR 0056 follow-ups). Cloudflare Workers Logs
+// captures these via console.warn / console.log; the structured payload lets a
+// log query slice by reason / model / iteration without parsing free text.
+function logBudgetExhausted(payload: {
+  sessionId: string;
+  reason: RunTurnResult['doneReason'];
+  iteration: number;
+  toolCallBudget: number;
+  wallClockMs: number;
+}): void {
+  console.warn('[chat/orchestrator] ADR-0055 budget exhausted', payload);
+}
+
+function logIterationTier(payload: {
+  sessionId: string;
+  iteration: number;
+  model: string;
+  reactedToReadOnly: boolean;
+}): void {
+  console.log('[chat/orchestrator] ADR-0056 tier choice', payload);
+}
+
 export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const { session, userMessage, writer, ctx } = input;
   const tools = ctx.tools ?? CHAT_AGENT_TOOLS;
@@ -224,10 +247,24 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         );
       } catch (err) {
         if (controller.signal.aborted) {
+          logBudgetExhausted({
+            sessionId: session.id,
+            reason: 'wallclock-exceeded',
+            iteration,
+            toolCallBudget,
+            wallClockMs,
+          });
           await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
           return { messages: history, previewOps, doneReason: 'wallclock-exceeded' };
         }
         const message = err instanceof Error ? err.message : String(err);
+        logBudgetExhausted({
+          sessionId: session.id,
+          reason: 'summarise-failed',
+          iteration,
+          toolCallBudget,
+          wallClockMs,
+        });
         await writer.write({ kind: 'error', error: message });
         await writer.write({ kind: 'done', reason: 'summarise-failed' });
         return { messages: history, previewOps, doneReason: 'summarise-failed' };
@@ -240,6 +277,12 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
 
       const llmMessages = toLlmMessages(history);
       const iterationModel = lastIterationWasReadOnlyOnly ? CHAT_FLASH_MODEL : model;
+      logIterationTier({
+        sessionId: session.id,
+        iteration,
+        model: iterationModel,
+        reactedToReadOnly: lastIterationWasReadOnlyOnly,
+      });
       const opts: ChatWithToolsOptions = {
         model: iterationModel,
         tools,
@@ -253,6 +296,13 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         pass = await streamOnePass(ctx.adapter, llmMessages, opts, writer);
       } catch (err) {
         if (controller.signal.aborted) {
+          logBudgetExhausted({
+            sessionId: session.id,
+            reason: 'wallclock-exceeded',
+            iteration,
+            toolCallBudget,
+            wallClockMs,
+          });
           await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
           return { messages: history, previewOps, doneReason: 'wallclock-exceeded' };
         }
@@ -331,14 +381,32 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         signal: controller.signal,
       });
       if (overBudget) {
+        logBudgetExhausted({
+          sessionId: session.id,
+          reason: 'tokens-exceeded',
+          iteration,
+          toolCallBudget,
+          wallClockMs,
+        });
         await writer.write({ kind: 'done', reason: 'tokens-exceeded' });
         return { messages: history, previewOps, doneReason: 'tokens-exceeded' };
       }
 
       // Safety net: a degenerate loop calling the same tool over and over
-      // exits here. Real work completes well below this ceiling.
+      // exits here. Real work completes well below this ceiling. Per ADR 0056
+      // follow-up F, no separate "next turn forced to Pro" escalation is
+      // needed — `lastIterationWasReadOnlyOnly` is scoped to this turn and
+      // resets to false on the next runChatTurn call, so the next turn's
+      // iteration 1 always starts on Pro by default.
       if (iteration >= toolCallBudget) {
         doneReason = 'tool-call-cap';
+        logBudgetExhausted({
+          sessionId: session.id,
+          reason: 'tool-call-cap',
+          iteration,
+          toolCallBudget,
+          wallClockMs,
+        });
         break;
       }
     }
