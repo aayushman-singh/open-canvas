@@ -25,14 +25,8 @@ import { renderAccordion } from '../canvas/elements/accordion.js';
 import type { CarouselElement } from '../canvas/elements/carousel.js';
 import { renderCarousel } from '../canvas/elements/carousel.js';
 import type { PublishedSnapshot } from '../canvas/schema.js';
-import {
-  INTERACTIVE_RUNTIME_SRC,
-  INTERACTIVE_RUNTIME_SRC_CHARS,
-} from './build.js';
-import {
-  injectInteractiveRuntime,
-  snapshotNeedsInteractiveRuntime,
-} from './inject.js';
+import { INTERACTIVE_RUNTIME_SRC, INTERACTIVE_RUNTIME_SRC_CHARS } from './build.js';
+import { injectInteractiveRuntime, snapshotNeedsInteractiveRuntime } from './inject.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[interactive:smoke] ${message}`);
@@ -365,22 +359,13 @@ assert(
   injectedHtml.includes('data-opencanvas-carousel-next'),
   'carousel next arrow marker missing',
 );
-assert(
-  injectedHtml.includes('data-opencanvas-carousel-dot="0"'),
-  'carousel dot index 0 missing',
-);
+assert(injectedHtml.includes('data-opencanvas-carousel-dot="0"'), 'carousel dot index 0 missing');
 assert(
   injectedHtml.includes('<script data-opencanvas-interactive-runtime>'),
   'runtime <script> tag missing from injected HTML',
 );
-assert(
-  injectedHtml.includes('hydrateAccordion'),
-  'runtime body missing hydrateAccordion fn',
-);
-assert(
-  injectedHtml.includes('hydrateCarousel'),
-  'runtime body missing hydrateCarousel fn',
-);
+assert(injectedHtml.includes('hydrateAccordion'), 'runtime body missing hydrateAccordion fn');
+assert(injectedHtml.includes('hydrateCarousel'), 'runtime body missing hydrateCarousel fn');
 
 // First item open by default (assertion lives here so the renderer can change
 // the default state behaviour and a single line tells you).
@@ -389,7 +374,9 @@ assert(
   'first accordion item should be open by default in rendered HTML',
 );
 assert(
-  /<div class="opencanvas-accordion-body"[^>]*data-opencanvas-acc-body="b"[^>]*hidden/.test(injectedHtml),
+  /<div class="opencanvas-accordion-body"[^>]*data-opencanvas-acc-body="b"[^>]*hidden/.test(
+    injectedHtml,
+  ),
   'second accordion body should be hidden by default in rendered HTML',
 );
 
@@ -447,10 +434,7 @@ const bareSnapshot: PublishedSnapshot = {
 
 const bareHtml = '<main>nothing here</main>';
 const bareOut = injectInteractiveRuntime(bareHtml, bareSnapshot);
-assert(
-  bareOut === bareHtml,
-  'snapshot without interactive elements must produce HTML untouched',
-);
+assert(bareOut === bareHtml, 'snapshot without interactive elements must produce HTML untouched');
 assert(
   !bareOut.includes('<script data-opencanvas-interactive-runtime>'),
   'bare snapshot must NOT carry the runtime <script>',
@@ -462,6 +446,57 @@ assert(
 assert(
   snapshotNeedsInteractiveRuntime(interactiveSnapshot) === true,
   'snapshotNeedsInteractiveRuntime must return true for an interactive snapshot',
+);
+const nestedInteractiveSnapshot: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-05-23T00:00:00.000Z',
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-tabs',
+      slug: 'tabs',
+      title: 'Tabs',
+      width: 1440,
+      sections: [
+        {
+          id: 'sec-tabs',
+          recipeId: 'custom',
+          name: 'Nested interactive',
+          height: 900,
+          elements: [
+            {
+              id: 'tabs-with-accordion',
+              type: 'tabs',
+              box: { x: 0, y: 0, w: 900, h: 640, z: 1 },
+              activeTabId: 'faq',
+              tabs: [
+                {
+                  id: 'faq',
+                  label: [{ text: 'FAQ' }],
+                  elements: [accordionEl],
+                },
+                {
+                  id: 'empty',
+                  label: [{ text: 'Empty' }],
+                  elements: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+assert(
+  snapshotNeedsInteractiveRuntime(nestedInteractiveSnapshot) === true,
+  'snapshotNeedsInteractiveRuntime must recurse into tab panels',
+);
+assert(
+  injectInteractiveRuntime('<main>nested</main>', nestedInteractiveSnapshot).includes(
+    '<script data-opencanvas-interactive-runtime>',
+  ),
+  'nested interactive snapshots must receive the runtime script',
 );
 
 // ---------------------------------------------------------------------------
@@ -489,18 +524,9 @@ assert(toggleA !== null && toggleB !== null, 'expected toggles a + b in accordio
 assert(bodyA !== null && bodyB !== null, 'expected bodies a + b in accordion DOM');
 
 // Initial state from render: a is open, b is closed.
-assert(
-  itemA.getAttribute('data-opencanvas-acc-open') === 'true',
-  'item a should start open',
-);
-assert(
-  itemB.getAttribute('data-opencanvas-acc-open') === null,
-  'item b should start closed',
-);
-assert(
-  bodyB.getAttribute('hidden') !== null,
-  'body b should start with hidden attr',
-);
+assert(itemA.getAttribute('data-opencanvas-acc-open') === 'true', 'item a should start open');
+assert(itemB.getAttribute('data-opencanvas-acc-open') === null, 'item b should start closed');
+assert(bodyB.getAttribute('hidden') !== null, 'body b should start with hidden attr');
 
 // Click toggle b → b opens, a closes (single-open mode).
 toggleB.dispatchEvent(makeEvent('click'));
@@ -520,10 +546,7 @@ assert(
   toggleA.getAttribute('aria-expanded') === 'false',
   'toggle a aria-expanded should be "false" after sibling open',
 );
-assert(
-  bodyB.getAttribute('hidden') === null,
-  'body b should no longer be hidden after open',
-);
+assert(bodyB.getAttribute('hidden') === null, 'body b should no longer be hidden after open');
 
 // Click toggle b again → b closes.
 toggleB.dispatchEvent(makeEvent('click'));
@@ -551,24 +574,21 @@ assert(
 // Accordion with allowMultipleOpen: true — opening b should NOT close a.
 const multiAcc: AccordionElement = { ...accordionEl, allowMultipleOpen: true };
 const multiHtml = renderAccordion(multiAcc, { styleKit: 'charcoal' });
-const multiInjected = injectInteractiveRuntime(
-  `<main>${multiHtml}</main>`,
-  {
-    ...interactiveSnapshot,
-    pages: [
-      {
-        ...(interactiveSnapshot.pages[0] as PublishedSnapshot['pages'][number]),
-        sections: [
-          {
-            ...((interactiveSnapshot.pages[0] as PublishedSnapshot['pages'][number])
-              .sections[0] as PublishedSnapshot['pages'][number]['sections'][number]),
-            elements: [multiAcc],
-          },
-        ],
-      },
-    ],
-  },
-);
+const multiInjected = injectInteractiveRuntime(`<main>${multiHtml}</main>`, {
+  ...interactiveSnapshot,
+  pages: [
+    {
+      ...(interactiveSnapshot.pages[0] as PublishedSnapshot['pages'][number]),
+      sections: [
+        {
+          ...((interactiveSnapshot.pages[0] as PublishedSnapshot['pages'][number])
+            .sections[0] as PublishedSnapshot['pages'][number]['sections'][number]),
+          elements: [multiAcc],
+        },
+      ],
+    },
+  ],
+});
 const docMulti = new StubDocument();
 const parsedMulti = parseHtml(multiInjected);
 for (const child of parsedMulti.children) docMulti.root.appendChild(child);
@@ -673,9 +693,7 @@ const doc5 = new StubDocument();
 const parsed5 = parseHtml(injectedHtml);
 for (const child of parsed5.children) doc5.root.appendChild(child);
 runRuntimeAgainstDocument(doc5);
-const acc5 = doc5.querySelectorAll(
-  '[data-opencanvas-interactive="accordion"]',
-)[0] as StubElement;
+const acc5 = doc5.querySelectorAll('[data-opencanvas-interactive="accordion"]')[0] as StubElement;
 const item5b = acc5.querySelector('[data-opencanvas-acc-item="b"]') as StubElement;
 const toggle5b = acc5.querySelector('[data-opencanvas-acc-toggle="b"]') as StubElement;
 assert(
@@ -706,10 +724,7 @@ assert(
 const before = item5b.getAttribute('data-opencanvas-acc-open');
 toggle5b.dispatchEvent(makeEvent('keydown', { key: 'a' }));
 const after = item5b.getAttribute('data-opencanvas-acc-open');
-assert(
-  before === after,
-  'pressing unrelated key "a" must NOT change accordion open state',
-);
+assert(before === after, 'pressing unrelated key "a" must NOT change accordion open state');
 
 // ---------------------------------------------------------------------------
 // (6) DOMContentLoaded gating: when readyState === 'loading', hydration
@@ -724,12 +739,8 @@ runRuntimeAgainstDocument(docLoading);
 const accLoading = docLoading.querySelectorAll(
   '[data-opencanvas-interactive="accordion"]',
 )[0] as StubElement;
-const toggleLoadingB = accLoading.querySelector(
-  '[data-opencanvas-acc-toggle="b"]',
-) as StubElement;
-const itemLoadingB = accLoading.querySelector(
-  '[data-opencanvas-acc-item="b"]',
-) as StubElement;
+const toggleLoadingB = accLoading.querySelector('[data-opencanvas-acc-toggle="b"]') as StubElement;
+const itemLoadingB = accLoading.querySelector('[data-opencanvas-acc-item="b"]') as StubElement;
 // Before DOMContentLoaded fires, listeners are not yet attached — a click
 // should be a no-op.
 toggleLoadingB.dispatchEvent(makeEvent('click'));
@@ -751,6 +762,4 @@ assert(
 // All assertions passed.
 // ---------------------------------------------------------------------------
 
-console.log(
-  `[interactive:smoke] OK — runtime size ${String(INTERACTIVE_RUNTIME_SRC_CHARS)} chars`,
-);
+console.log(`[interactive:smoke] OK — runtime size ${String(INTERACTIVE_RUNTIME_SRC_CHARS)} chars`);

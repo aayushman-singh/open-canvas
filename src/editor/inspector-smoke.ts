@@ -6,6 +6,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const source = readFileSync(join(process.cwd(), 'src', 'editor', 'canvas-client.ts'), 'utf8');
+const canvasStyles = readFileSync(join(process.cwd(), 'src', 'editor', 'canvas-styles.ts'), 'utf8');
 
 function sliceBetween(startNeedle: string, endNeedle: string): string {
   const start = source.indexOf(startNeedle);
@@ -45,6 +46,12 @@ assert(
     renderInspector.includes('renderInspectorSpec(inspectorSpec, element);') &&
     !renderInspector.includes('const inspectorBuilders = {'),
   'element inspector routing must use INSPECTOR_DISPATCH directly, without the legacy named-helper branch',
+);
+
+assert(
+  canvasStyles.includes('[data-opencanvas-tab-panel-id]:not([data-tab-active])') &&
+    canvasStyles.includes('scroll-snap-type:x mandatory'),
+  'editor canvas styles must include tabs panel hiding and scroll-snap carousel rules',
 );
 
 const inspectorInterpreter = sliceBetween(

@@ -14,8 +14,10 @@
 // Run with `bun.cmd run layout-primitives:smoke`.
 
 import type { EditableSite, PublishedSnapshot, TextElement } from './schema.js';
+import type { CarouselElement } from './elements/carousel.js';
 import { renderCanvasSnapshot } from './render.js';
 import { validateEditableSite } from './validate.js';
+import { canvasPublishedStyles } from './public-styles.js';
 
 const TURNSTILE = 'turnstile-test-key';
 
@@ -58,6 +60,46 @@ function siteWith(text: TextElement, opts: Partial<EditableSite> = {}): Editable
       },
     ],
     ...opts,
+  };
+}
+
+function siteWithElements(
+  elements: EditableSite['pages'][number]['sections'][number]['elements'],
+): EditableSite {
+  return {
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-smoke',
+        slug: 'index',
+        title: 'Layout primitives smoke',
+        width: 1440,
+        sections: [
+          {
+            id: 'section-smoke',
+            recipeId: 'feature-grid',
+            name: 'Smoke',
+            height: 640,
+            elements,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function baseCarousel(overrides: Partial<CarouselElement> = {}): CarouselElement {
+  return {
+    id: 'el-carousel',
+    type: 'carousel',
+    box: { x: 0, y: 0, w: 640, h: 360, z: 1 },
+    slides: [
+      { id: 'one', assetId: 'asset-one', caption: 'One' },
+      { id: 'two', assetId: 'asset-two', caption: 'Two' },
+    ],
+    showArrows: true,
+    showDots: true,
+    ...overrides,
   };
 }
 
@@ -146,10 +188,7 @@ assert(!staticHtml.includes('clamp('), 'absent fluidSize must not emit clamp()')
 // Renderer emits id="..." on the element wrapper.
 const anchorEl = baseText({ anchorId: 'hero', id: 'el-hero' });
 const anchorElHtml = renderHtml(siteWith(anchorEl));
-assert(
-  anchorElHtml.includes(' id="hero"'),
-  `expected element id="hero"; got ${anchorElHtml}`,
-);
+assert(anchorElHtml.includes(' id="hero"'), `expected element id="hero"; got ${anchorElHtml}`);
 
 // Renderer emits id on the section wrapper.
 const sectionAnchorState: EditableSite = {
@@ -274,10 +313,7 @@ assert(
     ],
   };
   const r = validateEditableSite(crossPageState);
-  assert(
-    r.valid,
-    `expected cross-page anchor reuse to validate; got ${JSON.stringify(r)}`,
-  );
+  assert(r.valid, `expected cross-page anchor reuse to validate; got ${JSON.stringify(r)}`);
 }
 
 // Shared header/footer anchors render into every page, so they must also be
@@ -315,8 +351,7 @@ assert(
   };
   const r = validateEditableSite(headerCollisionState);
   assert(
-    !r.valid &&
-      r.errors.some((e) => e.includes('anchorId "top"') && e.includes('state.header')),
+    !r.valid && r.errors.some((e) => e.includes('anchorId "top"') && e.includes('state.header')),
     `expected shared-header anchor collision; got ${JSON.stringify(r)}`,
   );
 }
@@ -365,7 +400,9 @@ assert(
 
 // Renderer emits a global <style> block when smooth + paddingTop both set.
 {
-  const html = renderHtml(siteWith(baseText(), { scrollBehavior: { smooth: true, paddingTop: 80 } }));
+  const html = renderHtml(
+    siteWith(baseText(), { scrollBehavior: { smooth: true, paddingTop: 80 } }),
+  );
   assert(
     html.includes('data-opencanvas-scroll-behavior') &&
       html.includes('html{scroll-behavior:smooth;scroll-padding-top:80px}'),
@@ -390,7 +427,10 @@ assert(
     html.includes('html{scroll-padding-top:64px}'),
     `expected scroll-padding-top:64px alone; got ${html}`,
   );
-  assert(!html.includes('scroll-behavior:smooth'), 'must not emit smooth rule when only padding set');
+  assert(
+    !html.includes('scroll-behavior:smooth'),
+    'must not emit smooth rule when only padding set',
+  );
 }
 
 // scrollBehavior absent OR all-fields-absent → no <style data-opencanvas-scroll-behavior>.
@@ -436,6 +476,38 @@ assert(
   assert(
     !r.valid && r.errors.some((e) => e.includes('scrollBehavior')),
     `expected non-object error; got ${JSON.stringify(r)}`,
+  );
+}
+
+// ============================================================================
+// layout-v2 scroll-snap carousel mode (ADR 0054 dec 2)
+// ============================================================================
+
+{
+  const html = renderHtml(siteWithElements([baseCarousel({ mode: 'scroll-snap' })]));
+  assert(
+    html.includes('data-opencanvas-carousel-mode="scroll-snap"'),
+    `expected scroll-snap carousel mode attribute; got ${html}`,
+  );
+  assert(
+    !html.includes('data-opencanvas-carousel-prev') &&
+      !html.includes('data-opencanvas-carousel-dot'),
+    `scroll-snap carousel must suppress paginate controls; got ${html}`,
+  );
+  assert(
+    canvasPublishedStyles.includes(
+      '.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"]',
+    ) && canvasPublishedStyles.includes('scroll-snap-type:x mandatory'),
+    'published CSS must make scroll-snap carousels a horizontal snap rail',
+  );
+}
+
+{
+  const bad = { ...baseCarousel(), mode: 'deck' } as unknown as CarouselElement;
+  const r = validateEditableSite(siteWithElements([bad]));
+  assert(
+    !r.valid && r.errors.some((e) => e.includes('mode') && e.includes('scroll-snap')),
+    `expected invalid carousel mode rejection; got ${JSON.stringify(r)}`,
   );
 }
 

@@ -17,6 +17,7 @@ import {
 } from './elements/form.js';
 import { ICON_NAMES, isIconName } from './icons.js';
 import { TABS_DEFAULT_BAR_HEIGHT } from './elements/tabs.js';
+import { CAROUSEL_MODES } from './elements/carousel.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -403,12 +404,7 @@ function validateCustomStyleKit(value: unknown, basePath: string, errors: string
             `${basePath}.tintTokens key ${JSON.stringify(tokenName)} must match /^[a-z][a-z0-9-]*$/`,
           );
         }
-        validateInjectionSafeString(
-          colour,
-          `tintTokens.${tokenName}`,
-          basePath,
-          errors,
-        );
+        validateInjectionSafeString(colour, `tintTokens.${tokenName}`, basePath, errors);
       }
     }
   }
@@ -698,9 +694,7 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
         errors.push(`${markPath} must be an object`);
         return;
       }
-      if (
-        !assertOneOf<InlineMarkType>(mark.type, INLINE_MARK_TYPES, `${markPath}.type`, errors)
-      ) {
+      if (!assertOneOf<InlineMarkType>(mark.type, INLINE_MARK_TYPES, `${markPath}.type`, errors)) {
         return;
       }
       assertUnique(mark.type, seenTypes, `${markPath}.type`, 'within the same run', errors);
@@ -903,7 +897,9 @@ function validateElement(
       if (element.fluidSize !== undefined) {
         const fsPath = `${basePath}.fluidSize`;
         if (!isRecord(element.fluidSize)) {
-          errors.push(`${fsPath} must be an object when present (got ${describe(element.fluidSize)})`);
+          errors.push(
+            `${fsPath} must be an object when present (got ${describe(element.fluidSize)})`,
+          );
         } else {
           const rawMin = element.fluidSize.min;
           const rawMax = element.fluidSize.max;
@@ -965,11 +961,7 @@ function validateElement(
           break;
         }
         for (const field of ['autoplay', 'muted', 'loop', 'controls'] as const) {
-          assertOptionalBoolean(
-            element.playback[field],
-            `${basePath}.playback.${field}`,
-            errors,
-          );
+          assertOptionalBoolean(element.playback[field], `${basePath}.playback.${field}`, errors);
         }
         const { autoplay, muted } = element.playback;
         if (autoplay === true && muted !== true) {
@@ -977,6 +969,12 @@ function validateElement(
             `${basePath}.playback: video with autoplay=true must also set muted=true (visitor autoplay policy)`,
           );
         }
+      }
+      break;
+    }
+    case 'carousel': {
+      if (element.mode !== undefined) {
+        assertOneOf(element.mode, CAROUSEL_MODES, `${basePath}.mode`, errors);
       }
       break;
     }
@@ -997,13 +995,9 @@ function validateElement(
       const hasHref = element.href !== undefined;
       const hasBehavior = element.behavior !== undefined;
       if (!hasHref && !hasBehavior) {
-        errors.push(
-          `${basePath} must set exactly one of href or behavior (got neither)`,
-        );
+        errors.push(`${basePath} must set exactly one of href or behavior (got neither)`);
       } else if (hasHref && hasBehavior) {
-        errors.push(
-          `${basePath} must set exactly one of href or behavior (got both)`,
-        );
+        errors.push(`${basePath} must set exactly one of href or behavior (got both)`);
       } else if (hasHref) {
         validateActionHref(element.href, basePath + '.href', errors, validPageIds);
       } else {
@@ -1012,7 +1006,10 @@ function validateElement(
           errors.push(`${bPath} must be an object`);
         } else if (element.behavior.type !== 'copy') {
           errors.push(`${bPath}.type must be "copy" (got ${describe(element.behavior.type)})`);
-        } else if (typeof element.behavior.value !== 'string' || element.behavior.value.length === 0) {
+        } else if (
+          typeof element.behavior.value !== 'string' ||
+          element.behavior.value.length === 0
+        ) {
           errors.push(`${bPath}.value must be a non-empty string`);
         }
       }
@@ -1222,11 +1219,11 @@ function validateElement(
           return;
         }
         if (typeof tab.id !== 'string' || !ANCHOR_ID_RE.test(tab.id)) {
-          errors.push(
-            `${tabPath}.id must match /^[a-z][a-z0-9-]*$/ (got ${describe(tab.id)})`,
-          );
+          errors.push(`${tabPath}.id must match /^[a-z][a-z0-9-]*$/ (got ${describe(tab.id)})`);
         } else if (tabIds.has(tab.id)) {
-          errors.push(`${tabPath}.id "${tab.id}" is already used by another tab in this TabsElement`);
+          errors.push(
+            `${tabPath}.id "${tab.id}" is already used by another tab in this TabsElement`,
+          );
         } else {
           tabIds.add(tab.id);
         }
@@ -1460,7 +1457,10 @@ function validatePage(
     );
   }
   if (page.canonical !== undefined) {
-    if (assertOptionalNonEmptyString(page.canonical, `${basePath}.canonical`, errors) && page.canonical !== undefined) {
+    if (
+      assertOptionalNonEmptyString(page.canonical, `${basePath}.canonical`, errors) &&
+      page.canonical !== undefined
+    ) {
       const issue = pinnedStyleValueIssue(page.canonical);
       if (issue !== null) {
         errors.push(
@@ -1520,14 +1520,58 @@ function validatePageAnchorIdUniqueness(
       `${path}.anchorId "${anchor}" is already used at ${first} on the rendered page; anchor ids must be unique within a rendered page (ADR 0050 dec 2)`,
     );
   };
+  const visitElementTree = (el: unknown, elementPath: string): void => {
+    if (!isRecord(el)) return;
+    visit(el.anchorId, elementPath);
+    if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+      el.tabs.forEach((tab, tabIdx) => {
+        if (!isRecord(tab) || !Array.isArray(tab.elements)) return;
+        tab.elements.forEach((child, childIdx) => {
+          visitElementTree(
+            child,
+            pathJoin(
+              pathJoin(pathJoin(pathJoin(elementPath, 'tabs'), tabIdx), 'elements'),
+              childIdx,
+            ),
+          );
+        });
+      });
+      return;
+    }
+    if (el.type === 'collection') {
+      if (Array.isArray(el.entryTemplate)) {
+        el.entryTemplate.forEach((child, childIdx) => {
+          visitElementTree(child, pathJoin(pathJoin(elementPath, 'entryTemplate'), childIdx));
+        });
+      }
+      if (Array.isArray(el.cardTemplate)) {
+        el.cardTemplate.forEach((child, childIdx) => {
+          visitElementTree(child, pathJoin(pathJoin(elementPath, 'cardTemplate'), childIdx));
+        });
+      }
+      if (Array.isArray(el.entries)) {
+        el.entries.forEach((entry, entryIdx) => {
+          if (!Array.isArray(entry)) return;
+          entry.forEach((child, childIdx) => {
+            visitElementTree(
+              child,
+              pathJoin(
+                pathJoin(pathJoin(pathJoin(elementPath, 'entries'), entryIdx), 'children'),
+                childIdx,
+              ),
+            );
+          });
+        });
+      }
+    }
+  };
   const visitSection = (section: unknown, sectionPath: string): void => {
     if (!isRecord(section)) return;
     visit(section.anchorId, sectionPath);
     if (!Array.isArray(section.elements)) return;
     section.elements.forEach((el, eIdx) => {
-      if (!isRecord(el)) return;
       const elementPath = pathJoin(pathJoin(sectionPath, 'elements'), eIdx);
-      visit(el.anchorId, elementPath);
+      visitElementTree(el, elementPath);
     });
   };
   visitSection(header, 'state.header');
@@ -1596,12 +1640,16 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
   // a non-object.
   header: ({ state, errors }) => {
     if (state.header !== undefined && !isRecord(state.header)) {
-      errors.push(`state.header must be a section object when present (got ${describe(state.header)})`);
+      errors.push(
+        `state.header must be a section object when present (got ${describe(state.header)})`,
+      );
     }
   },
   footer: ({ state, errors }) => {
     if (state.footer !== undefined && !isRecord(state.footer)) {
-      errors.push(`state.footer must be a section object when present (got ${describe(state.footer)})`);
+      errors.push(
+        `state.footer must be a section object when present (got ${describe(state.footer)})`,
+      );
     }
   },
   // `customStyleKit` is required iff styleKit === 'custom'; validated for
@@ -1664,7 +1712,9 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
     }
     const sb = state.scrollBehavior;
     if (sb.smooth !== undefined && typeof sb.smooth !== 'boolean') {
-      errors.push(`scrollBehavior.smooth must be a boolean when present (got ${describe(sb.smooth)})`);
+      errors.push(
+        `scrollBehavior.smooth must be a boolean when present (got ${describe(sb.smooth)})`,
+      );
     }
     if (sb.paddingTop !== undefined) {
       if (!isFiniteNumber(sb.paddingTop) || sb.paddingTop < 0) {

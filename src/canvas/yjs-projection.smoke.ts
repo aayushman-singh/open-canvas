@@ -214,6 +214,7 @@ const syntheticElements: CanvasElement[] = [
     ],
     showArrows: true,
     showDots: false,
+    mode: 'scroll-snap',
   },
   {
     id: 'el-table',

@@ -11,14 +11,10 @@
 //
 // Run with `bun.cmd run tabs-element:smoke`.
 
-import type {
-  EditableSite,
-  PublishedSnapshot,
-  TabsElement,
-  TextElement,
-} from './schema.js';
+import type { EditableSite, PublishedSnapshot, TabsElement, TextElement } from './schema.js';
 import { renderCanvasSnapshot } from './render.js';
 import { validateEditableSite } from './validate.js';
+import { canvasPublishedStyles } from './public-styles.js';
 
 const TURNSTILE = 'turnstile-test-key';
 
@@ -40,7 +36,9 @@ function baseText(overrides: Partial<TextElement> = {}): TextElement {
   };
 }
 
-function siteWith(elements: EditableSite['pages'][number]['sections'][number]['elements']): EditableSite {
+function siteWith(
+  elements: EditableSite['pages'][number]['sections'][number]['elements'],
+): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [
@@ -148,6 +146,16 @@ function goodTabs(overrides: Partial<TabsElement> = {}): TabsElement {
   assert(html.includes('height:80px'), `expected bar height:80px; got ${html}`);
   // Panel height = 600 - 80 = 520
   assert(html.includes('height:520px'), `expected panel height:520px; got ${html}`);
+}
+
+// Published CSS hides inactive panels while preserving the no-JS all-panels
+// HTML fallback. Without this selector, clicking tabs only flips attributes
+// and every panel remains visible.
+{
+  assert(
+    canvasPublishedStyles.includes('[data-opencanvas-tab-panel-id]:not([data-tab-active])'),
+    'published CSS must hide inactive tab panels by data-tab-active',
+  );
 }
 
 // ============================================================================
@@ -261,8 +269,7 @@ function goodTabs(overrides: Partial<TabsElement> = {}): TabsElement {
   };
   const r = validateEditableSite(siteWith([bad]));
   assert(
-    !r.valid &&
-      r.errors.some((e) => e.includes('tabs[0].label') && e.includes('non-empty array')),
+    !r.valid && r.errors.some((e) => e.includes('tabs[0].label') && e.includes('non-empty array')),
     `expected empty-label rejection; got ${JSON.stringify(r)}`,
   );
 }
@@ -277,6 +284,33 @@ function goodTabs(overrides: Partial<TabsElement> = {}): TabsElement {
   assert(
     !r.valid && r.errors.some((e) => e.includes('tabBarHeight')),
     `expected negative tabBarHeight rejection; got ${JSON.stringify(r)}`,
+  );
+}
+
+// Nested tab-panel anchorId must participate in rendered-page anchor uniqueness.
+{
+  const r = validateEditableSite(
+    siteWith([
+      baseText({ id: 'top-copy', anchorId: 'shared-anchor' }),
+      goodTabs({
+        tabs: [
+          {
+            id: 'one',
+            label: [{ text: 'One' }],
+            elements: [baseText({ id: 'nested-copy', anchorId: 'shared-anchor' })],
+          },
+          {
+            id: 'two',
+            label: [{ text: 'Two' }],
+            elements: [],
+          },
+        ],
+      }),
+    ]),
+  );
+  assert(
+    !r.valid && r.errors.some((e) => e.includes('anchorId "shared-anchor"')),
+    `expected nested tab anchor collision; got ${JSON.stringify(r)}`,
   );
 }
 

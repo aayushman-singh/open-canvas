@@ -16,6 +16,7 @@
 // handler.
 
 import type { AgentToolSpec } from './agent-tool-spec.js';
+import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, renderInlineRun, styleFromEntries } from './render-utils.js';
 import type { BaseElement, CanvasElement, InlineRun } from '../schema.js';
@@ -84,10 +85,25 @@ export function renderTabs(el: TabsElement, ctx: TabsRenderCtx): string {
 }
 
 // Tabs is the second element type to nest CanvasElement[] (after Collection).
-// Inspector dispatch excludes it the same way it excludes collection — the
-// Owner selects a panel child and that child's inspector renders. Inspector
-// follow-up (per ADR 0052 follow-ups bullet 1) introduces an "Edit tabs"
-// custom mount that drives tab order + label edits.
+// The first inspector cut exposes only the scalar fields the generic inspector
+// can safely edit. The richer follow-up introduces an "Edit tabs" custom mount
+// that drives tab order + label edits.
+
+export const tabsInspectorSpec: InspectorSpec = {
+  fields: [
+    {
+      kind: 'text',
+      label: 'Active tab id',
+      path: 'activeTabId',
+    },
+    {
+      kind: 'number',
+      label: 'Tab bar height',
+      path: 'tabBarHeight',
+      min: 1,
+    },
+  ],
+};
 
 export const tabsSidebarSpec: SidebarSpec = {
   commands: [

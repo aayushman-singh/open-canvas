@@ -49,6 +49,7 @@
     "seed:apogee-demo": "bun run scripts/seed-apogee-demo.ts",
     "fix:dead-contact-urls": "bun run scripts/fix-dead-contact-urls.ts",
     "fix:dead-contact-urls:smoke": "bun run scripts/fix-dead-contact-urls.smoke.ts",
+    "sync-brand-icons:smoke": "bun run scripts/sync-brand-icons.smoke.ts",
     "landing:preview": "bun run src/landing/build-preview.ts",
     "review:smoke": "bun run --preload ./src/review-smoke-bun-shim.ts src/review-smoke.ts",
     "sections:smoke": "bun run src/routes/api/sections-smoke.ts",

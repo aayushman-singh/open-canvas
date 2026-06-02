@@ -107,6 +107,18 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     direction: 'horizontal',
     arrowPosition: 'split-vertical-center',
     arrowStyle: 'round',
+    mode: 'paginate',
+  },
+  tabs: {
+    id: 'fx-tabs',
+    type: 'tabs',
+    box: { x: 0, y: 0, w: 640, h: 360, z: 0 },
+    activeTabId: 'overview',
+    tabBarHeight: 56,
+    tabs: [
+      { id: 'overview', label: [{ text: 'Overview' }], elements: [] },
+      { id: 'details', label: [{ text: 'Details' }], elements: [] },
+    ],
   },
   table: {
     id: 'fx-table',
@@ -289,6 +301,19 @@ function checkField(field: InspectorField, fixture: object, where: string): void
     }
   }
 }
+
+const tabsSpec = (
+  INSPECTOR_DISPATCH as unknown as Record<
+    string,
+    { readonly fields: readonly InspectorField[] } | undefined
+  >
+).tabs;
+assert(tabsSpec !== undefined, 'tabs: sidebar-creatable elements must have an inspector spec');
+assert(
+  tabsSpec.fields.some((field) => 'path' in field && field.path === 'activeTabId') &&
+    tabsSpec.fields.some((field) => 'path' in field && field.path === 'tabBarHeight'),
+  'tabs: inspector spec must expose activeTabId and tabBarHeight',
+);
 
 const types = Object.keys(INSPECTOR_DISPATCH) as Array<keyof typeof INSPECTOR_DISPATCH>;
 assert(types.length > 0, 'INSPECTOR_DISPATCH must declare at least one entry');

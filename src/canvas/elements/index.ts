@@ -44,7 +44,7 @@ import { mediaAgentToolSpec, mediaInspectorSpec, mediaSidebarSpec, renderMedia }
 import { navAgentToolSpec, navInspectorSpec, navSidebarSpec, renderNav } from './nav.js';
 import { renderShape, shapeAgentToolSpec, shapeInspectorSpec, shapeSidebarSpec } from './shape.js';
 import { renderTable, tableAgentToolSpec, tableInspectorSpec, tableSidebarSpec } from './table.js';
-import { renderTabs, tabsAgentToolSpec, tabsSidebarSpec } from './tabs.js';
+import { renderTabs, tabsAgentToolSpec, tabsInspectorSpec, tabsSidebarSpec } from './tabs.js';
 import { renderText, textAgentToolSpec, textInspectorSpec, textSidebarSpec } from './text.js';
 
 // Re-export every element interface so downstream code has a single import
@@ -236,10 +236,7 @@ export const RENDER_DISPATCH: RenderDispatch = {
 // than a runtime no-op, matching the failure mode RENDER_DISPATCH catches.
 // A future element type that legitimately wants no inspector adds itself
 // to the Exclude<...> list as an explicit opt-out.
-export type InspectorDispatch = Record<
-  Exclude<CanvasElement['type'], 'collection' | 'tabs'>,
-  InspectorSpec
->;
+export type InspectorDispatch = Record<Exclude<CanvasElement['type'], 'collection'>, InspectorSpec>;
 
 export const INSPECTOR_DISPATCH: InspectorDispatch = {
   shape: shapeInspectorSpec,
@@ -255,6 +252,7 @@ export const INSPECTOR_DISPATCH: InspectorDispatch = {
   nav: navInspectorSpec,
   chart: chartInspectorSpec,
   form: formInspectorSpec,
+  tabs: tabsInspectorSpec,
 };
 
 // ---------------------------------------------------------------------------

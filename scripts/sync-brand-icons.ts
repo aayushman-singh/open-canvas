@@ -47,6 +47,23 @@ interface FetchedIcon {
   innerSvg: string; // The inner geometry (paths, etc.) — strips the wrapping <svg>.
 }
 
+export function stripSimpleIconInnerSvg(slug: string, svg: string): string {
+  const opener = svg.indexOf('>');
+  const closer = svg.lastIndexOf('</svg>');
+  if (!svg.trimStart().startsWith('<svg') || opener < 0 || closer < 0 || closer <= opener) {
+    throw new Error(`malformed SVG response for ${slug}: ${svg.slice(0, 120)}`);
+  }
+  const openingTag = svg.slice(0, opener + 1);
+  if (!/\bviewBox=["']0 0 24 24["']/.test(openingTag)) {
+    throw new Error(`malformed SVG response for ${slug}: expected viewBox="0 0 24 24"`);
+  }
+  const innerSvg = svg.slice(opener + 1, closer).trim();
+  if (!/^<(path|g|circle|rect|polygon|polyline|line|ellipse)\b/.test(innerSvg)) {
+    throw new Error(`malformed SVG response for ${slug}: expected SVG geometry`);
+  }
+  return innerSvg;
+}
+
 async function fetchOne(slug: string): Promise<FetchedIcon> {
   const url = `${SOURCE}/${slug}/`;
   const res = await fetch(url);
@@ -59,21 +76,14 @@ async function fetchOne(slug: string): Promise<FetchedIcon> {
   // with our standard attributes (viewBox, currentColor, etc.). Simple Icons'
   // viewBox is always "0 0 24 24" — same as our generic registry — so we can
   // splice the inner geometry straight into our wrapper without reprojecting.
-  const opener = svg.indexOf('>');
-  const closer = svg.lastIndexOf('</svg>');
-  if (opener < 0 || closer < 0) {
-    throw new Error(`malformed SVG response for ${slug}: ${svg.slice(0, 120)}`);
-  }
-  const innerSvg = svg.slice(opener + 1, closer).trim();
+  const innerSvg = stripSimpleIconInnerSvg(slug, svg);
   return { slug, innerSvg };
 }
 
 function emitFile(icons: FetchedIcon[]): string {
   const sorted = [...icons].sort((a, b) => a.slug.localeCompare(b.slug));
   const slugList = sorted.map((i) => `  '${i.slug}',`).join('\n');
-  const pathEntries = sorted
-    .map((i) => `  '${i.slug}': ${JSON.stringify(i.innerSvg)},`)
-    .join('\n');
+  const pathEntries = sorted.map((i) => `  '${i.slug}': ${JSON.stringify(i.innerSvg)},`).join('\n');
   return [
     '// src/canvas/icons/brand-icons.generated.ts',
     '//',
@@ -111,4 +121,6 @@ async function main(): Promise<void> {
   console.log(`wrote ${OUT}: ${String(icons.length)} brand icons`);
 }
 
-await main();
+if (import.meta.main) {
+  await main();
+}

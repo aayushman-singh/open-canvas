@@ -7,9 +7,9 @@
 // IIFE runtime. Otherwise the HTML is returned untouched — a snapshot with no
 // interactives pays zero runtime bytes.
 //
-// The scan is shallow + cheap: it walks `pages[*].sections[*].elements[*]` and
-// short-circuits on the first matching `type`. We never instantiate the
-// elements; this is a discriminant-only scan.
+// The scan walks header/footer/page sections plus nested collection entries and
+// tab panels, short-circuiting on the first matching `type`. We never
+// instantiate the elements; this is a discriminant-only scan.
 //
 // Integration shape (main thread):
 //
@@ -18,7 +18,12 @@
 //     const finalHtml = injectInteractiveRuntime(snapshotHtml, snapshot);
 //     // ... pass finalHtml into the document envelope ...
 
-import type { ElementType, PublishedSnapshot } from '../canvas/schema.js';
+import type {
+  CanvasElement,
+  CanvasSection,
+  ElementType,
+  PublishedSnapshot,
+} from '../canvas/schema.js';
 import { INTERACTIVE_RUNTIME_SRC } from './build.js';
 
 /**
@@ -37,12 +42,27 @@ const INTERACTIVE_ELEMENT_TYPES: ReadonlySet<ElementType> = new Set<ElementType>
  * in their first interactive section.
  */
 export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): boolean {
+  const sectionNeedsRuntime = (section: CanvasSection): boolean => {
+    if (section.trigger) return true;
+    return section.elements.some(elementNeedsRuntime);
+  };
+  const elementNeedsRuntime = (element: CanvasElement): boolean => {
+    if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
+    if (element.type === 'tabs') {
+      return element.tabs.some((tab) => tab.elements.some(elementNeedsRuntime));
+    }
+    if (element.type === 'collection') {
+      if (element.entryTemplate.some(elementNeedsRuntime)) return true;
+      if (element.entries.some((entry) => entry.some(elementNeedsRuntime))) return true;
+      return element.cardTemplate?.some(elementNeedsRuntime) === true;
+    }
+    return false;
+  };
+  if (snapshot.header && sectionNeedsRuntime(snapshot.header)) return true;
+  if (snapshot.footer && sectionNeedsRuntime(snapshot.footer)) return true;
   for (const page of snapshot.pages) {
     for (const section of page.sections) {
-      if (section.trigger) return true;
-      for (const element of section.elements) {
-        if (INTERACTIVE_ELEMENT_TYPES.has(element.type)) return true;
-      }
+      if (sectionNeedsRuntime(section)) return true;
     }
   }
   return false;

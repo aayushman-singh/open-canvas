@@ -1891,6 +1891,64 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   color: var(--opencanvas-fg-mute);
 }
 
+.opencanvas-tabs {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.opencanvas-tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--opencanvas-hairline-strong);
+  overflow-x: auto;
+}
+.opencanvas-tab {
+  appearance: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--opencanvas-fg-mute);
+  padding: 0 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.opencanvas-tab[data-tab-active] {
+  background: var(--kit-accent);
+  color: var(--kit-bg);
+}
+.opencanvas-tab-panel {
+  overflow: visible;
+}
+[data-opencanvas-tab-panel-id]:not([data-tab-active]) {
+  display: none;
+}
+
+.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type:x mandatory;
+}
+.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"] .opencanvas-carousel-track {
+  position: relative;
+  inset: auto;
+  height: 100%;
+  min-width: 100%;
+  display: flex;
+}
+.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"] .opencanvas-carousel-slide {
+  position: relative;
+  inset: auto;
+  flex: 0 0 100%;
+  height: 100%;
+  opacity: 1;
+  visibility: visible;
+  scroll-snap-align: start;
+}
+
 /* Inspector dock (.ipanel in editor.html) — surface + left hairline,
    sans body. Field labels keep mono ONLY for the .meta debug strip; the
    form labels themselves switch to sans-bold per Open Canvas. */

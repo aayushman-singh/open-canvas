@@ -350,6 +350,43 @@ html, body {
 }
 .opencanvas-accordion-body[hidden] { display: none; }
 
+/* ---- Tabs ------------------------------------------------------------- */
+.opencanvas-tabs {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.opencanvas-tab-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--opencanvas-kit-hairline, rgba(127, 127, 127, 0.18));
+  overflow-x: auto;
+}
+.opencanvas-tab {
+  appearance: none;
+  border: 0;
+  border-radius: var(--opencanvas-kit-radius, 8px);
+  background: transparent;
+  color: var(--opencanvas-kit-muted, #9ca3af);
+  padding: 0 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.opencanvas-tab[data-tab-active] {
+  background: var(--opencanvas-kit-accent, #7dd3fc);
+  color: var(--opencanvas-kit-bg, #0c0c0d);
+}
+.opencanvas-tab-panel {
+  overflow: visible;
+}
+[data-opencanvas-tab-panel-id]:not([data-tab-active]) {
+  display: none;
+}
+
 /* ---- Carousel ---------------------------------------------------------
    Slides occupy the same absolute box; only the slide whose
    data-opencanvas-carousel-slide-index matches the wrapper's
@@ -378,6 +415,27 @@ html, body {
   opacity: 0;
   visibility: hidden;
   transition: opacity 240ms ease;
+}
+.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type:x mandatory;
+}
+.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"] .opencanvas-carousel-track {
+  position: relative;
+  inset: auto;
+  height: 100%;
+  min-width: 100%;
+  display: flex;
+}
+.opencanvas-carousel[data-opencanvas-carousel-mode="scroll-snap"] .opencanvas-carousel-slide {
+  position: relative;
+  inset: auto;
+  flex: 0 0 100%;
+  height: 100%;
+  opacity: 1;
+  visibility: visible;
+  scroll-snap-align: start;
 }
 .opencanvas-carousel-link {
   display: block;

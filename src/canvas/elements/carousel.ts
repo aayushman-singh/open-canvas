@@ -154,38 +154,40 @@ export function renderCarousel(el: CarouselElement, ctx: CarouselRenderCtx): str
   const nextGlyph = direction === 'vertical' ? '⌄' : '›';
   // ADR 0054 dec 2 — scroll-snap mode suppresses arrows + dots; the visitor
   // scrolls the track natively, the browser snaps each slide.
-  const arrowsHtml = el.showArrows && !isScrollSnap
-    ? [
-        `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-prev" type="button" `,
-        `data-opencanvas-carousel-prev aria-label="Previous slide">`,
-        prevGlyph,
-        `</button>`,
-        `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-next" type="button" `,
-        `data-opencanvas-carousel-next aria-label="Next slide">`,
-        nextGlyph,
-        `</button>`,
-      ].join('')
-    : '';
+  const arrowsHtml =
+    el.showArrows && !isScrollSnap
+      ? [
+          `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-prev" type="button" `,
+          `data-opencanvas-carousel-prev aria-label="Previous slide">`,
+          prevGlyph,
+          `</button>`,
+          `<button class="opencanvas-carousel-arrow opencanvas-carousel-arrow-next" type="button" `,
+          `data-opencanvas-carousel-next aria-label="Next slide">`,
+          nextGlyph,
+          `</button>`,
+        ].join('')
+      : '';
 
-  const dotsHtml = el.showDots && !isScrollSnap
-    ? [
-        `<div class="opencanvas-carousel-dots" role="tablist" aria-label="Slide navigation">`,
-        el.slides
-          .map((slide, idx) => {
-            const isActive = idx === 0;
-            return [
-              `<button class="opencanvas-carousel-dot" type="button" `,
-              `data-opencanvas-carousel-dot="${String(idx)}" `,
-              `role="tab" aria-selected="${isActive ? 'true' : 'false'}" `,
-              `aria-label="${escapeAttr(`Go to slide ${String(idx + 1)}`)}" `,
-              `data-opencanvas-slide-target-id="${escapeAttr(slide.id)}">`,
-              `</button>`,
-            ].join('');
-          })
-          .join(''),
-        `</div>`,
-      ].join('')
-    : '';
+  const dotsHtml =
+    el.showDots && !isScrollSnap
+      ? [
+          `<div class="opencanvas-carousel-dots" role="tablist" aria-label="Slide navigation">`,
+          el.slides
+            .map((slide, idx) => {
+              const isActive = idx === 0;
+              return [
+                `<button class="opencanvas-carousel-dot" type="button" `,
+                `data-opencanvas-carousel-dot="${String(idx)}" `,
+                `role="tab" aria-selected="${isActive ? 'true' : 'false'}" `,
+                `aria-label="${escapeAttr(`Go to slide ${String(idx + 1)}`)}" `,
+                `data-opencanvas-slide-target-id="${escapeAttr(slide.id)}">`,
+                `</button>`,
+              ].join('');
+            })
+            .join(''),
+          `</div>`,
+        ].join('')
+      : '';
 
   // Outer wrapper. `data-opencanvas-slide-index` is the runtime-mutated cursor;
   // initial value is '0' (first slide). `data-opencanvas-slide-count` is read by
@@ -221,6 +223,13 @@ export const carouselInspectorSpec: InspectorSpec = {
     // third such mount lands the trigger to design a declarative
     // list-editor kind per ADR 0011 dec 3.
     { kind: 'custom-mount', name: 'carousel-slides' },
+    {
+      kind: 'select',
+      label: 'Mode',
+      path: 'mode',
+      options: CAROUSEL_MODES,
+      defaultValue: 'paginate',
+    },
     { kind: 'checkbox', label: 'Show arrows', path: 'showArrows' },
     { kind: 'checkbox', label: 'Show dots', path: 'showDots' },
     {
@@ -268,10 +277,17 @@ export const carouselAgentToolSpec: AgentToolSpec = {
       type: 'boolean',
       description: 'Show dot pagination. Carousel elements only.',
     },
+    mode: {
+      type: 'string',
+      enum: [...CAROUSEL_MODES],
+      description:
+        'Carousel presentation mode: paginate (default) or scroll-snap. Carousel elements only.',
+    },
     direction: {
       type: 'string',
       enum: [...CAROUSEL_DIRECTIONS],
-      description: 'Carousel layout axis: horizontal (default) or vertical. Carousel elements only.',
+      description:
+        'Carousel layout axis: horizontal (default) or vertical. Carousel elements only.',
     },
     arrowPosition: {
       type: 'string',
@@ -309,6 +325,10 @@ export const carouselAgentToolSpec: AgentToolSpec = {
     if (args.showDots !== undefined) {
       if (typeof args.showDots !== 'boolean') throw new Error('showDots must be a boolean');
       patch.showDots = args.showDots;
+    }
+    if (args.mode !== undefined) {
+      if (typeof args.mode !== 'string') throw new Error('mode must be a string');
+      patch.mode = args.mode;
     }
     if (args.direction !== undefined) {
       if (typeof args.direction !== 'string') throw new Error('direction must be a string');

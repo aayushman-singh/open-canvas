@@ -588,6 +588,7 @@ function encodeCarouselElement(el: CarouselElement): Y.Map<unknown> {
   out.set('slides', slides);
   out.set('showArrows', el.showArrows);
   out.set('showDots', el.showDots);
+  setIfDefined(out, 'mode', el.mode);
   return out;
 }
 
@@ -1179,13 +1180,15 @@ function decodeAccordionElement(map: Y.Map<unknown>, base: BaseElement): Accordi
 
 function decodeCarouselElement(map: Y.Map<unknown>, base: BaseElement): CarouselElement {
   const slides = (map.get('slides') as Y.Array<Y.Map<unknown>>).map(decodeCarouselSlide);
-  return {
+  const el: CarouselElement = {
     ...base,
     type: 'carousel',
     slides,
     showArrows: map.get('showArrows') as boolean,
     showDots: map.get('showDots') as boolean,
   };
+  if (map.has('mode')) el.mode = map.get('mode') as NonNullable<CarouselElement['mode']>;
+  return el;
 }
 
 function decodeTableElement(map: Y.Map<unknown>, base: BaseElement): TableElement {
