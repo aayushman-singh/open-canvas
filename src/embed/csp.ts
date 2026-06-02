@@ -75,8 +75,13 @@ export function collectEmbedFrameSrcOrigins(snapshot: PublishedSnapshot): string
  * `cdn.jsdelivr.net`'s KaTeX stylesheet to make it look right; CSP
  * `style-src` has to include that origin or the stylesheet is blocked and
  * the equation renders as raw boxes.
+ *
+ * Exported so the public route can gate the stylesheet `<link>` tag on
+ * the same condition - emitting the link unconditionally when CSP only
+ * allows the origin for math-bearing snapshots produces a "Loading the
+ * stylesheet ... violates ... directive" error on every math-free page.
  */
-function snapshotHasMathRun(snapshot: PublishedSnapshot): boolean {
+export function snapshotHasMathRun(snapshot: PublishedSnapshot): boolean {
   for (const page of snapshot.pages) {
     for (const section of page.sections) {
       for (const element of section.elements) {

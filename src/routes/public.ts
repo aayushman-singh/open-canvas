@@ -46,7 +46,7 @@ import { writeNotification } from '../notifications/writer';
 import type { CollaboratorEventPayload } from '../notifications/kinds';
 import type { NotificationOwnerRoomMarker } from '../notifications/owner-room';
 // Wave 2 #8 — per-snapshot Content-Security-Policy frame-src allowlist.
-import { buildEmbedCsp } from '../embed/csp';
+import { buildEmbedCsp, snapshotHasMathRun } from '../embed/csp';
 // Wave 2 #9 — password-protected publish gate. Called per request after the
 // site row is resolved; returns a gate Response when the visitor must unlock,
 // or null to continue serving the snapshot.
@@ -1178,11 +1178,11 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           ${raw(headMeta)} ${themeEmitsCss ? raw(`<script>${modeSetterScript}</script>`) : ''}
-          <link
-            rel="stylesheet"
-            href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css"
-            crossorigin="anonymous"
-          />
+          ${snapshotHasMathRun(pageRenderSnapshot)
+            ? raw(
+                '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">',
+              )
+            : ''}
           <style>
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',
