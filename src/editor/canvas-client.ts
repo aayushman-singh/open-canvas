@@ -13997,12 +13997,15 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
       // Session keepalive — prevents auth expiry during long editing sessions.
       // Dashboard editors (Clerk sessions) get a periodic heartbeat that keeps
-      // the Clerk cookie alive. Published-site editors (edit tokens) get a
-      // proactive token refresh ~15 min before expiry.
+      // the Clerk cookie alive. Clerk's configured session TTL is 7 days, so
+      // an hourly HEAD has a 168x safety margin and costs ~24 worker requests
+      // per tab per day vs the prior 5-min cadence's ~288/day. Published-site
+      // editors (edit tokens) get a proactive token refresh ~15 min before
+      // expiry — that's a separate, much shorter-lived credential.
       if (API_BASE === "/api") {
         setInterval(function() {
           fetch(SITE_BASE, { method: "HEAD" }).catch(function() {});
-        }, 5 * 60 * 1000);
+        }, 60 * 60 * 1000);
       } else if (API_BASE === "/__api") {
         var REFRESH_BUFFER = 900; // seconds before expiry to refresh
         function scheduleTokenRefresh(ttl) {
