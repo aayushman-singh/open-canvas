@@ -58,6 +58,7 @@ import {
   CHAT_TOKEN_BUDGET,
   SUMMARIZE_AFTER_TURNS,
   countTurns,
+  estimateMessagesTokens,
   trimToBudget,
   type ChatMessage,
   type ChatSessionState,
@@ -74,7 +75,13 @@ import type { ChatStreamWriter } from './stream.js';
 // returns HTTP 400 on every multi-turn tool flow. Reverted to 2.5-pro
 // until the adapter is upgraded; do not bump without that work first.
 export const CHAT_DEFAULT_MODEL = 'gemini-2.5-pro';
-export const MAX_TOOL_CALL_ITERATIONS = 5;
+
+// Tool-call safety net per ADR 0055 decision 2. The cap is intentionally
+// high — it is NOT the primary stop condition (wall-clock and token budgets
+// are). It exists to break a degenerate loop where the model calls the same
+// read-only tool over and over. Set so legitimate sitewide revamps complete
+// without bumping the cap; revisit if telemetry shows real work hitting it.
+export const TOOL_CALL_SAFETY_NET = 50;
 
 // Wall-clock budget per turn, per ADR 0055 decision 6. When the deadline
 // fires the orchestrator aborts the in-flight Gemini stream, discards any
@@ -116,10 +123,11 @@ export interface OrchestratorContext {
   selectedElementId?: string;
   tools?: LlmTool[];
   /**
-   * Optional. If provided, the orchestrator runs at most this many tool-call
-   * iterations before forcing a `done` event. Defaults to MAX_TOOL_CALL_ITERATIONS.
+   * Optional. Safety-net ceiling on tool-call iterations per turn (ADR 0055
+   * decision 2). NOT the primary stop condition — wall-clock and token
+   * budgets fire first on real work. Defaults to TOOL_CALL_SAFETY_NET.
    */
-  maxIterations?: number;
+  toolCallBudget?: number;
   /**
    * Optional. Per-turn wall-clock budget in milliseconds (ADR 0055 decision 6).
    * When the deadline fires the in-flight Gemini stream is aborted and the turn
@@ -147,7 +155,8 @@ export interface RunTurnResult {
     | 'tool_use'
     | 'safety'
     | 'other'
-    | 'cap'
+    | 'tool-call-cap'
+    | 'tokens-exceeded'
     | 'summarise-failed'
     | 'wallclock-exceeded';
 }
@@ -162,7 +171,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
   const model = ctx.model ?? CHAT_DEFAULT_MODEL;
   const systemInstruction =
     ctx.systemInstruction ?? buildSystemPrompt(ctx.state, ctx.selectedElementId);
-  const maxIterations = ctx.maxIterations ?? MAX_TOOL_CALL_ITERATIONS;
+  const toolCallBudget = ctx.toolCallBudget ?? TOOL_CALL_SAFETY_NET;
   const wallClockMs = ctx.wallClockMs ?? DEFAULT_WALL_CLOCK_MS;
 
   // 1. Append the user message to history.
@@ -202,7 +211,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
     }
     history = trimToBudget(history, CHAT_TOKEN_BUDGET);
 
-    while (iteration < maxIterations) {
+    while (iteration < toolCallBudget) {
       iteration++;
 
       const llmMessages = toLlmMessages(history);
@@ -273,14 +282,29 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         }
       }
 
-      // After mutating tools we still loop back so the model can either
-      // confirm, propose the next op, or finish. Cap protects us from runaway
-      // loops.
-      if (iteration >= maxIterations) {
-        doneReason = 'cap';
+      void sawMutating;
+
+      // Per ADR 0055 decision 4, re-trim after every tool dispatch — a large
+      // query_site / query_assets result can land mid-iteration and blow the
+      // token budget for the next pass. The trimmer drops oldest non-system,
+      // non-summary messages; the active turn at the tail stays pinned.
+      history = trimToBudget(history, CHAT_TOKEN_BUDGET);
+
+      // Per ADR 0055 decision 2, if trim can't get history under budget
+      // (only the un-droppable active turn exceeds the cap), end the turn
+      // loudly with `tokens-exceeded`. The Owner sees why their request
+      // could not continue rather than a silent stall on the next pass.
+      if (estimateMessagesTokens(history) > CHAT_TOKEN_BUDGET) {
+        await writer.write({ kind: 'done', reason: 'tokens-exceeded' });
+        return { messages: history, previewOps, doneReason: 'tokens-exceeded' };
+      }
+
+      // Safety net: a degenerate loop calling the same tool over and over
+      // exits here. Real work completes well below this ceiling.
+      if (iteration >= toolCallBudget) {
+        doneReason = 'tool-call-cap';
         break;
       }
-      void sawMutating;
     }
 
     await writer.write({ kind: 'done', reason: doneReason });

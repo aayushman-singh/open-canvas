@@ -39,7 +39,8 @@ export type ChatStreamEvent =
         | 'tool_use'
         | 'safety'
         | 'other'
-        | 'cap'
+        | 'tool-call-cap'
+        | 'tokens-exceeded'
         | 'summarise-failed'
         | 'wallclock-exceeded';
     };
