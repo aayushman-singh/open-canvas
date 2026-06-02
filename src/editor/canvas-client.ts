@@ -367,7 +367,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         y: 24,
         w: built.defaultSize.w,
         h: built.defaultSize.h,
-        z: nestedTarget.elements.length + 1,
+        z: nextZInArray(nestedTarget.elements),
       };
       addElementToContainer(section, nestedTarget.elements, newEl);
       return;
@@ -2688,15 +2688,24 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       inner = mathSpan;
     } else {
-      // Innermost carries the raw run.text. Embedded "\n" chars become <br>
+      // Innermost carries the raw run.text. Embedded "\\n" chars become <br>
       // elements so block-level breaks from a multi-paragraph paste survive a
       // save/reload round-trip via the schema's literal-U+000A contract.
+      // (Comments use "\\n" because this whole IIFE body is inside an
+      // untagged template literal upstream: a single backslash-n in the
+      // comment cooks to a real newline, splitting the comment and
+      // breaking the next line of code.)
       const rawText = typeof run.text === "string" ? run.text : "";
-      if (rawText.indexOf("\n") < 0) {
+      // Doubled backslashes in source: the IIFE template literal cooks
+      // "\\n" to a backslash-n in the shipped JS, which the browser then
+      // parses as a one-char LF runtime string. A single backslash-n in
+      // source cooks to a real LF INSIDE the string literal, which is a
+      // parse error since no JS string can contain a raw LF.
+      if (rawText.indexOf("\\n") < 0) {
         inner = document.createTextNode(rawText);
       } else {
         const frag = document.createDocumentFragment();
-        const parts = rawText.split("\n");
+        const parts = rawText.split("\\n");
         for (let p = 0; p < parts.length; p++) {
           if (parts[p].length > 0) frag.appendChild(document.createTextNode(parts[p]));
           if (p < parts.length - 1) frag.appendChild(document.createElement("br"));
@@ -3445,11 +3454,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       card.style.position = "relative";
       card.style.minHeight = "80px";
       for (let j = 0; j < entry.length; j++) {
-        const child = document.createElement("div");
-        child.style.position = "absolute";
-        setBoxStyle(child, entry[j].box || { x: 0, y: 0, w: 120, h: 40, z: 1 });
-        child.appendChild(buildElementBody(entry[j]));
-        card.appendChild(child);
+        card.appendChild(buildElementNode(entry[j]));
       }
       node.appendChild(card);
     }
@@ -3524,11 +3529,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       panel.style.bottom = "0";
       const children = Array.isArray(activeTab.elements) ? activeTab.elements : [];
       for (let i = 0; i < children.length; i++) {
-        const childWrap = document.createElement("div");
-        childWrap.style.position = "absolute";
-        setBoxStyle(childWrap, children[i].box || { x: 0, y: 0, w: 120, h: 40, z: 1 });
-        childWrap.appendChild(buildElementBody(children[i]));
-        panel.appendChild(childWrap);
+        panel.appendChild(buildElementNode(children[i]));
       }
       node.appendChild(panel);
     }
@@ -3602,18 +3603,26 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     dupBtn.className = "menu-item";
     dupBtn.textContent = "Duplicate";
     dupBtn.addEventListener("click", function() {
-      // Duplicate is only surfaced once a section is already rendered, which
-      // requires state.pages to be non-empty. A missing currentPage() here
-      // means state went sideways between render and the click — fail loudly
-      // instead of clamping against an invented width.
-      var page = currentPage();
-      if (!page) throw new Error("duplicate element: no current page; cannot clamp duplicate within artboard");
+      var arr = parentArrayFor(section, element);
+      var idx = arr.indexOf(element);
+      if (idx < 0) throw new Error("duplicate element: parent array does not contain " + element.id);
       var copy = JSON.parse(JSON.stringify(element));
       copy.id = newElementId();
-      copy.box.x = Math.min(copy.box.x + 20, page.width - copy.box.w);
-      copy.box.y = Math.min(copy.box.y + 20, section.height - copy.box.h);
-      copy.box.z = nextZ(section);
-      section.elements.push(copy);
+      if (copy.box && typeof copy.box === "object") {
+        if (typeof copy.box.x === "number") copy.box.x = copy.box.x + 20;
+        if (typeof copy.box.y === "number") copy.box.y = copy.box.y + 20;
+        if (parentArrayFor(section, element) === section.elements) {
+          // Section-level duplicates can be clamped against the artboard.
+          // Nested containers use panel-local coordinates, so there is no
+          // section-sized bound to apply here.
+          var page = currentPage();
+          if (!page) throw new Error("duplicate element: no current page; cannot clamp duplicate within artboard");
+          copy.box.x = Math.min(copy.box.x, page.width - copy.box.w);
+          copy.box.y = Math.min(copy.box.y, section.height - copy.box.h);
+        }
+        copy.box.z = nextZInArray(arr);
+      }
+      arr.splice(idx + 1, 0, copy);
       closeElementMenu();
       renderAll();
       selectElement(copy.id);
@@ -3981,23 +3990,23 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Z-order + reading-order helpers ----------------------------------
   // Z-order operates on element.box.z (visual stacking); reading order
-  // operates on the section.elements[] index (DOM order). The two are
-  // intentionally independent — see CONTEXT / plan invariants.
+  // operates on the immediate parent elements[] index (DOM order). The two
+  // are intentionally independent — see CONTEXT / plan invariants.
 
-  function bringToFront(section, element) {
+  function bringToFront(elements, element) {
     let maxZ = element.box.z;
-    for (let i = 0; i < section.elements.length; i++) {
-      const sibling = section.elements[i];
+    for (let i = 0; i < elements.length; i++) {
+      const sibling = elements[i];
       if (sibling.id === element.id) continue;
       if (typeof sibling.box.z === "number" && sibling.box.z > maxZ) maxZ = sibling.box.z;
     }
     element.box.z = maxZ + 1;
   }
 
-  function sendToBack(section, element) {
+  function sendToBack(elements, element) {
     let minZ = element.box.z;
-    for (let i = 0; i < section.elements.length; i++) {
-      const sibling = section.elements[i];
+    for (let i = 0; i < elements.length; i++) {
+      const sibling = elements[i];
       if (sibling.id === element.id) continue;
       if (typeof sibling.box.z === "number" && sibling.box.z < minZ) minZ = sibling.box.z;
     }
@@ -4006,11 +4015,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // Swap z with the next-higher (forward) or next-lower (backward) sibling.
   // No-op when already at the top/bottom of the stack.
-  function nudgeZ(section, element, direction) {
+  function nudgeZ(elements, element, direction) {
     const elZ = element.box.z;
     let target = null;
-    for (let i = 0; i < section.elements.length; i++) {
-      const sibling = section.elements[i];
+    for (let i = 0; i < elements.length; i++) {
+      const sibling = elements[i];
       if (sibling.id === element.id) continue;
       if (typeof sibling.box.z !== "number") continue;
       if (direction > 0) {
@@ -4030,32 +4039,31 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // order. bringToFront/sendToBack widen the range every call, so without
   // this a long edit session drifts z toward Number.MAX_SAFE_INTEGer until
   // arithmetic precision becomes visible.
-  function renormalizeZ(section) {
-    if (!section || !Array.isArray(section.elements)) return;
-    const items = section.elements
+  function renormalizeZ(elements) {
+    if (!Array.isArray(elements)) return;
+    const items = elements
       .map(function (el, i) { return { el: el, idx: i, z: typeof el.box.z === "number" ? el.box.z : 0 }; })
       .sort(function (a, b) { return a.z - b.z || a.idx - b.idx; });
     for (let i = 0; i < items.length; i++) items[i].el.box.z = i;
   }
 
   function applyZOrderAction(section, element, action) {
-    if (action === "front") bringToFront(section, element);
-    else if (action === "back") sendToBack(section, element);
-    else if (action === "forward") nudgeZ(section, element, 1);
-    else if (action === "backward") nudgeZ(section, element, -1);
-    renormalizeZ(section);
+    const arr = parentArrayFor(section, element);
+    if (action === "front") bringToFront(arr, element);
+    else if (action === "back") sendToBack(arr, element);
+    else if (action === "forward") nudgeZ(arr, element, 1);
+    else if (action === "backward") nudgeZ(arr, element, -1);
+    renormalizeZ(arr);
     renderAll();
     selectElement(element.id);
     scheduleSave();
   }
 
-  // Resolve the immediate elements array an element lives in. Falls back to
-  // section.elements for legacy compat when findElement misses (shouldn't,
-  // but a fallback avoids crashing the editor on edge cases).
+  // Resolve the immediate elements array an element lives in.
   function parentArrayFor(section, element) {
     var found = findElement(element.id);
     if (found && Array.isArray(found.parentArray)) return found.parentArray;
-    return section.elements;
+    throw new Error("parentArrayFor: element " + element.id + " is not present in section " + section.id);
   }
 
   function moveInReadingOrder(section, element, direction) {
@@ -4128,13 +4136,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // the same verbs for elements so Owners don't have to remember a keyboard
   // shortcut (Delete still works for deletion).
   function duplicateElement(section, element) {
+    var arr = parentArrayFor(section, element);
     var clone = structuredClone(element);
     clone.id = newElementId();
     if (clone.box && typeof clone.box === "object") {
       if (typeof clone.box.x === "number") clone.box.x = clone.box.x + 20;
       if (typeof clone.box.y === "number") clone.box.y = clone.box.y + 20;
+      clone.box.z = nextZInArray(arr);
     }
-    var arr = parentArrayFor(section, element);
     var idx = arr.indexOf(element);
     if (idx >= 0) arr.splice(idx + 1, 0, clone);
     else arr.push(clone);
@@ -4561,6 +4570,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     var hrefValueContainer = document.createElement("div");
 
+    function setActionHref(nextHref) {
+      element[f.path] = nextHref;
+      if (element.type === "action" && f.path === "href") {
+        delete element.behavior;
+      }
+    }
+
     function renderHrefValue() {
       hrefValueContainer.replaceChildren();
       var href = element[f.path];
@@ -4578,7 +4594,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             setStatus("URL not allowed", "error");
             return;
           }
-          element[f.path] = { type: "external", url: urlInput.value };
+          setActionHref({ type: "external", url: urlInput.value });
           rebuildElement(element.id);
           scheduleSave();
         });
@@ -4598,7 +4614,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         pageSelect.value = href.pageId;
       }
       pageSelect.addEventListener("change", function() {
-        element[f.path] = { type: "page", pageId: pageSelect.value };
+        setActionHref({ type: "page", pageId: pageSelect.value });
         rebuildElement(element.id);
         scheduleSave();
       });
@@ -4607,9 +4623,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
     hrefTypeSelect.addEventListener("change", function() {
       if (hrefTypeSelect.value === "external") {
-        element[f.path] = { type: "external", url: "" };
+        setActionHref({ type: "external", url: "" });
       } else {
-        element[f.path] = { type: "page", pageId: state.pages[0] ? state.pages[0].id : "" };
+        setActionHref({ type: "page", pageId: state.pages[0] ? state.pages[0].id : "" });
       }
       renderHrefValue();
       rebuildElement(element.id);
@@ -8607,9 +8623,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // marks-only placeholders dropped). Throws if any link mark href fails the
   // allowlist — the caller treats that as "do not commit".
   //
-  // <br> elements emit a synthetic "\n" run carrying the ancestor marks so
+  // <br> elements emit a synthetic "\\n" run carrying the ancestor marks so
   // block-level breaks pasted from a multi-paragraph source survive the
-  // round-trip. The renderer turns "\n" back into <br> on the way out.
+  // round-trip. The renderer turns "\\n" back into <br> on the way out.
+  // (Doubled backslashes per the IIFE template-literal cook rule explained
+  // at the top of buildRunNode.)
   function serializeContentToRuns(rootNode) {
     const raw = [];
     // Manual DFS instead of TreeWalker: we need to ACCEPT a math span (emit
@@ -8623,7 +8641,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       if (node.nodeType !== 1) return;
       if (node.tagName === "BR") {
-        raw.push({ text: "\n", marks: activeMarksFor(node, rootNode) });
+        // Doubled "\\n" in source cooks to backslash-n in shipped JS, then
+        // a one-char LF string at runtime. A single backslash-n here would
+        // cook to a raw LF inside the string literal - a parse error.
+        raw.push({ text: "\\n", marks: activeMarksFor(node, rootNode) });
         return;
       }
       if (node.classList && node.classList.contains("opencanvas-math")) {
@@ -10843,8 +10864,17 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
 
   // -- Section toolbar actions -------------------------------------------
 
+  function nextZInArray(elements) {
+    let maxZ = 0;
+    for (let i = 0; i < elements.length; i++) {
+      const z = elements[i] && elements[i].box && typeof elements[i].box.z === "number" ? elements[i].box.z : 0;
+      if (z > maxZ) maxZ = z;
+    }
+    return maxZ + 1;
+  }
+
   function nextZ(section) {
-    return section.elements.length + 1;
+    return nextZInArray(section.elements);
   }
 
   function defaultBox(section, w, h) {
@@ -11508,11 +11538,32 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     });
   }
 
+  // Apply kit visually first, then persist in the background. The previous
+  // shape blocked the visual swap behind flushPendingSave + the /style-kit
+  // POST, so on a slow network the user clicked Charcoal and nothing
+  // happened for seconds. Now the attribute flip and inspector re-render
+  // are synchronous; the persistence races behind. On rapid kit clicks the
+  // targetKit guard ensures we only POST the kit the user actually ended
+  // on, and on POST failure we roll the local state back to prevKit so the
+  // UI stops lying about what's saved.
   async function applySidebarStyleKit(kit, buttons) {
     if (!kit || STYLE_KITS.indexOf(kit) < 0) return;
+    if (!state) return;
+    if (state.styleKit === kit) return;
+    const prevKit = state.styleKit;
+    captureForUndo();
+    state.styleKit = kit;
+    if (mainEl) mainEl.setAttribute("data-style-kit", kit);
+    syncSidebarStyleKitButtons(buttons);
+    renderInspector();
+    setStatus("Style kit: " + kit, "ok");
     try {
       const saved = await flushPendingSave();
       if (!saved) return;
+      // A later click may have moved on to a different kit while the save
+      // flush was in flight; only the kit currently held in local state
+      // should reach the backend.
+      if (state.styleKit !== kit) return;
       const response = await authFetch(SITE_BASE + "/style-kit", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -11521,18 +11572,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (!response.ok) {
         let detail = response.statusText;
         try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
-        setStatus(detail, "error");
-        return;
+        if (state.styleKit === kit) {
+          state.styleKit = prevKit;
+          if (mainEl) mainEl.setAttribute("data-style-kit", prevKit);
+          syncSidebarStyleKitButtons(buttons);
+          renderInspector();
+        }
+        setStatus("Style kit revert: " + detail, "error");
       }
-      captureForUndo();
-      state.styleKit = kit;
-      if (mainEl) mainEl.setAttribute("data-style-kit", kit);
-      syncSidebarStyleKitButtons(buttons);
-      // Re-render the inspector so the kit summary picks up the new
-      // computed CSS values. Cheap because the inspector is a small DOM.
-      renderInspector();
-      setStatus("Style kit: " + kit, "ok");
-    } catch (err) {
+    } catch (_err) {
+      if (state.styleKit === kit) {
+        state.styleKit = prevKit;
+        if (mainEl) mainEl.setAttribute("data-style-kit", prevKit);
+        syncSidebarStyleKitButtons(buttons);
+        renderInspector();
+      }
       setStatus("Style kit change failed", "error");
     }
   }
@@ -11625,17 +11679,27 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       if (ch === '$') {
         var close1 = src.indexOf('$', i + 1);
         // Reject empty / multi-line $..$ to avoid false positives ($5 + $3).
-        if (close1 > i + 1 && src.slice(i + 1, close1).indexOf('\n') < 0) {
+        var afterClose = src.charAt(close1 + 1);
+        // Doubled-backslash-n cooks to backslash-n in shipped JS and a 1-char
+        // LF string at runtime. The single form would inject a raw LF inside
+        // the string literal, which is a parse error.
+        if (close1 > i + 1 && src.slice(i + 1, close1).indexOf('\\n') < 0 && !(afterClose >= '0' && afterClose <= '9')) {
           pushMath(src.slice(i + 1, close1));
           i = close1 + 1; continue;
         }
       }
-      if (ch === '\\' && src.charAt(i + 1) === '[') {
-        var closeB = src.indexOf('\\]', i + 2);
+      // Each backslash needs to ship as "\\" in the IIFE output (the runtime
+      // 1-char backslash string), which means SOURCE here uses "\\\\". A
+      // shorter "\\" in source would cook to a single backslash in the
+      // shipped JS, turning the string literal into either a syntax error
+      // (unterminated) or a logic bug (escaped wrong char). Same rule for
+      // "\\\\]", "\\\\)" - they need to ship as "\\]" and "\\)".
+      if (ch === '\\\\' && src.charAt(i + 1) === '[') {
+        var closeB = src.indexOf('\\\\]', i + 2);
         if (closeB > i + 2) { pushMath(src.slice(i + 2, closeB)); i = closeB + 2; continue; }
       }
-      if (ch === '\\' && src.charAt(i + 1) === '(') {
-        var closeP = src.indexOf('\\)', i + 2);
+      if (ch === '\\\\' && src.charAt(i + 1) === '(') {
+        var closeP = src.indexOf('\\\\)', i + 2);
         if (closeP > i + 2) { pushMath(src.slice(i + 2, closeP)); i = closeP + 2; continue; }
       }
       // Accumulate plain run up to the next delimiter candidate.
@@ -11643,7 +11707,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       while (next < src.length) {
         var nc = src.charAt(next);
         if (nc === '$') break;
-        if (nc === '\\' && (src.charAt(next + 1) === '[' || src.charAt(next + 1) === '(')) break;
+        if (nc === '\\\\' && (src.charAt(next + 1) === '[' || src.charAt(next + 1) === '(')) break;
         next++;
       }
       pushText(src.slice(i, next));
@@ -11654,9 +11718,9 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var tok = tokens[t];
       if (tok.kind === 'text') {
         // Source uses /\\n/g (doubled backslash) so the IIFE template
-        // literal cooks it to /\n/g - a regex matching newline. The single-
-        // backslash form would cook to /<newline>/g, a SyntaxError that
-        // prevents the entire editor script from parsing.
+        // literal cooks it to /\\n/g - a regex matching newline. The single-
+        // backslash form would cook to a real newline inside the regex,
+        // making it a SyntaxError that breaks the entire editor script.
         parts.push(escapeHtml(tok.value).replace(/\\n/g, '<br>'));
       } else {
         parts.push('<span class="opencanvas-math" contenteditable="false" data-math-tex="' + escapeAttr(tok.tex) + '">' + escapeHtml(tok.tex) + '</span>');
