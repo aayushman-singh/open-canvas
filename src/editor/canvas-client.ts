@@ -357,7 +357,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     addElementToSection(section, newEl);
   }
 
-  const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic"];
+  const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic", "ivory-press", "midnight-violet"];
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
   const SURFACE_VARIANTS = ["flat", "raised", "glass", "outlined", "sticker", "editorial-frame", "soft-panel"];
   const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
@@ -3328,6 +3328,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "opencanvas-tab";
+      // data-opencanvas-tab-id mirrors the server renderer and is the
+      // selector the canvas mousedown handler keys off to skip
+      // selection/drag for clicks that target a tab button.
+      btn.setAttribute("data-opencanvas-tab-id", tab.id);
       let labelText = "";
       const runs = Array.isArray(tab.label) ? tab.label : [];
       for (let r = 0; r < runs.length; r++) {
@@ -3335,6 +3339,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       }
       btn.textContent = labelText || tab.id || "Tab";
       if (tab.id === element.activeTabId) btn.setAttribute("data-tab-active", "");
+      // stopPropagation on mousedown so the canvas root listener doesn't
+      // resolve the parent tabs wrapper and start a selection/drag — that
+      // pipeline jitters the wrapper position and steals focus before the
+      // button's click handler ever runs.
+      btn.addEventListener("mousedown", function (ev) { ev.stopPropagation(); });
       (function (tabId) {
         btn.addEventListener("click", function (ev) {
           ev.stopPropagation();
@@ -10276,6 +10285,12 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // element wrapper at the grip's pixel would select whatever element's
       // bbox overlaps the grip and immediately close the freshly-opened reel.
       if (ev.target instanceof Element && ev.target.closest("[data-section-grip]")) return;
+      // Tab buttons inside a tabs element handle their own click to switch
+      // the active tab. Letting this handler resolve the parent tabs wrapper
+      // would either re-select the same element on every click (a no-op
+      // round-trip) or — on a second click — start a drag that jitters the
+      // wrapper before the button's click handler can swap tabs.
+      if (ev.target instanceof Element && ev.target.closest("[data-opencanvas-tab-id]")) return;
       const handle = ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
       if (handle) {
         const wrapper = handle.closest('.opencanvas-element');
