@@ -15,12 +15,14 @@ import {
   GoogleGenAI,
   Type,
   type Content,
+  type CountTokensConfig,
   type FunctionDeclaration,
   type GenerateContentConfig,
   type ToolListUnion,
 } from '@google/genai';
 import type {
   ChatWithToolsOptions,
+  CountTokensOptions,
   JsonSchema,
   LlmAdapter,
   LlmChunk,
@@ -89,6 +91,26 @@ export class GeminiAdapter implements LlmAdapter {
     }
 
     yield { type: 'done', reason: mapFinishReason(finishReason) };
+  }
+
+  async countTokens(messages: LlmMessage[], opts: CountTokensOptions): Promise<number> {
+    const contents = translateMessagesToContents(messages);
+    const config: CountTokensConfig = {};
+    if (opts.systemInstruction) config.systemInstruction = opts.systemInstruction;
+    if (opts.signal) config.abortSignal = opts.signal;
+    if (opts.tools && opts.tools.length > 0) {
+      const functionDeclarations = opts.tools.map(translateToolToDeclaration);
+      config.tools = [{ functionDeclarations }];
+    }
+    const response = await this.client.models.countTokens({
+      model: opts.model,
+      contents,
+      config,
+    });
+    if (typeof response.totalTokens !== 'number') {
+      throw new Error('GeminiAdapter.countTokens: response missing totalTokens');
+    }
+    return response.totalTokens;
   }
 }
 

@@ -61,6 +61,20 @@ export interface ChatWithToolsOptions {
   signal?: AbortSignal;
 }
 
+export interface CountTokensOptions {
+  model: string;
+  systemInstruction?: string;
+  tools?: LlmTool[];
+  signal?: AbortSignal;
+}
+
 export interface LlmAdapter {
   chatWithTools(messages: LlmMessage[], opts: ChatWithToolsOptions): AsyncIterable<LlmChunk>;
+  /**
+   * Authoritative token count for the given messages + system prompt + tools.
+   * Per ADR 0055 decision 3 the orchestrator calls this only when the cheap
+   * char/4 estimate is within 20% of the cap, so the API round-trip cost is
+   * bounded to at most one per turn.
+   */
+  countTokens(messages: LlmMessage[], opts: CountTokensOptions): Promise<number>;
 }

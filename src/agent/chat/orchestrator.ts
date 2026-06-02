@@ -290,11 +290,19 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       // non-summary messages; the active turn at the tail stays pinned.
       history = trimToBudget(history, CHAT_TOKEN_BUDGET);
 
-      // Per ADR 0055 decision 2, if trim can't get history under budget
-      // (only the un-droppable active turn exceeds the cap), end the turn
-      // loudly with `tokens-exceeded`. The Owner sees why their request
-      // could not continue rather than a silent stall on the next pass.
-      if (estimateMessagesTokens(history) > CHAT_TOKEN_BUDGET) {
+      // Per ADR 0055 decision 2+3, decide token-exhaustion with the cheap
+      // length/4 estimate as a pre-filter and only call Gemini's countTokens
+      // when the cheap estimate signals we're within 20% of the cap. Bounds
+      // the API round-trip cost to at most once per turn.
+      const overBudget = await isOverTokenBudget({
+        adapter: ctx.adapter,
+        history,
+        model,
+        systemInstruction,
+        tools,
+        signal: controller.signal,
+      });
+      if (overBudget) {
         await writer.write({ kind: 'done', reason: 'tokens-exceeded' });
         return { messages: history, previewOps, doneReason: 'tokens-exceeded' };
       }
@@ -664,6 +672,42 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   }
 
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Token-budget check — cheap estimate as pre-filter, precise countTokens
+// at the cap boundary. Per ADR 0055 decision 3.
+// ---------------------------------------------------------------------------
+
+interface OverBudgetInput {
+  adapter: LlmAdapter;
+  history: ChatMessage[];
+  model: string;
+  systemInstruction: string;
+  tools: LlmTool[];
+  signal: AbortSignal;
+}
+
+const PRECISE_COUNT_THRESHOLD = 0.8;
+
+async function isOverTokenBudget(input: OverBudgetInput): Promise<boolean> {
+  const cheap = estimateMessagesTokens(input.history);
+  if (cheap > CHAT_TOKEN_BUDGET) {
+    // Cheap estimate already over — the precise count is only ever lower by
+    // ~25% on tool-call JSON, so spending a round-trip cannot save us.
+    return true;
+  }
+  if (cheap <= CHAT_TOKEN_BUDGET * PRECISE_COUNT_THRESHOLD) {
+    // Comfortably under the cap; don't burn an API call.
+    return false;
+  }
+  const precise = await input.adapter.countTokens(toLlmMessages(input.history), {
+    model: input.model,
+    systemInstruction: input.systemInstruction,
+    tools: input.tools,
+    signal: input.signal,
+  });
+  return precise > CHAT_TOKEN_BUDGET;
 }
 
 // ---------------------------------------------------------------------------

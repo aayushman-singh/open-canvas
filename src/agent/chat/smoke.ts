@@ -117,6 +117,14 @@ class MockLlmAdapter implements LlmAdapter {
     }
     return next();
   }
+
+  // Smoke fixtures keep history well below the 80% pre-filter, so the
+  // orchestrator never actually calls countTokens here. The stub returns 0
+  // so a regression that does call it stays loudly under budget rather than
+  // silently failing.
+  countTokens(): Promise<number> {
+    return Promise.resolve(0);
+  }
 }
 
 async function* yieldChunks(...chunks: LlmChunk[]): AsyncIterable<LlmChunk> {
