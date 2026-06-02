@@ -232,6 +232,10 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <title>Open Canvas — editing {siteName}</title>
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
+        {raw(
+          '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">' +
+            '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous" onload="window.dispatchEvent(new Event(\'opencanvas-katex-ready\'))"></script>',
+        )}
         <style>{raw(canvasEditorStyles)}</style>
         <style>{raw(bellStyles)}</style>
         {clerkPublishableKey &&

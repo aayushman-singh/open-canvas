@@ -1832,6 +1832,19 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   border-radius: 3px;
   font-size: 0.92em;
 }
+.opencanvas-math {
+  display: inline-block;
+  vertical-align: baseline;
+  color: inherit;
+  user-select: all;
+}
+.opencanvas-math-error {
+  color: var(--red, #d83a52);
+  background: rgba(216, 58, 82, 0.08);
+  font-family: var(--opencanvas-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  padding: 0 0.25em;
+  border-radius: 3px;
+}
 .opencanvas-action {
   display: inline-flex;
   align-items: center;
@@ -2789,6 +2802,32 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   align-self: stretch;
   margin: 2px 4px;
   background: var(--line);
+}
+/* Font size <select>. Styled to read as a chip alongside the bold/italic
+   buttons; same border-radius and font as the toolbar buttons so the row
+   still scans as a single component. */
+.opencanvas-mark-toolbar .opencanvas-mark-size {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  margin: 0 2px;
+  height: 26px;
+  line-height: 1;
+}
+.opencanvas-mark-toolbar .opencanvas-mark-size:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.opencanvas-mark-toolbar .opencanvas-mark-size:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
 }
 /* Alignment buttons — pressed state mirrors the active alignment. */
 .opencanvas-mark-toolbar .opencanvas-mark-align svg {

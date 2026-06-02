@@ -128,8 +128,18 @@ export const INLINE_MARK_TYPES = [
   'code',
   'highlight',
   'link',
+  'fontSize',
 ] as const;
 export type InlineMarkType = (typeof INLINE_MARK_TYPES)[number];
+
+// `fontSize` carries a px payload so paste from a heading-with-body source
+// can preserve per-run size differences inside a single TextElement (the
+// element's own `fontSize` field still drives the no-mark baseline). The
+// renderer wraps the run's outer <span> with an inline `font-size:Npx`
+// style; no <h1>/<h2> tag substitution happens — block-level role/tag still
+// comes from TextElement.role.
+export const INLINE_FONT_SIZE_PX_MIN = 8;
+export const INLINE_FONT_SIZE_PX_MAX = 200;
 
 export type InlineMark =
   | { type: 'bold' }
@@ -138,13 +148,27 @@ export type InlineMark =
   | { type: 'strike' }
   | { type: 'code' }
   | { type: 'highlight' }
-  | { type: 'link'; href: string; target?: '_blank' };
+  | { type: 'link'; href: string; target?: '_blank' }
+  | { type: 'fontSize'; px: number };
+
+// Cap on the TeX source carried by a math run. Bounded so a malicious paste
+// can't shovel an arbitrary string through validation; KaTeX itself rejects
+// anything pathological at render time. 4 KiB covers any realistic inline
+// equation pasted from Notion / MathJax / Wikipedia / LaTeX source.
+export const INLINE_MATH_TEX_MAX_LEN = 4096;
 
 export interface InlineRun {
-  // raw text, no HTML; newlines are literal U+000A
+  // raw text, no HTML; newlines are literal U+000A. When `math` is present
+  // `text` is the plain-text fallback (aria-label / search / plain-text
+  // projection) — KaTeX renders `math.tex` for the visible HTML.
   text: string;
   // 0..N marks; order is style-irrelevant but must be deduplicated by type
   marks?: InlineMark[];
+  // Optional inline equation. Renderer replaces the run's text body with
+  // KaTeX-rendered HTML (server-rendered at publish; lazy-loaded in editor).
+  // Paste handler populates this from KaTeX-rendered web sources, inline
+  // MathML, and LaTeX delimiters in plain-text pastes.
+  math?: { tex: string };
 }
 
 export const BACKGROUND_EFFECTS = [

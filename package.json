@@ -123,6 +123,7 @@
     "@resvg/resvg-wasm": "2.6.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.21",
+    "katex": "^0.17.0",
     "satori": "0.26.0",
     "shiki": "^4.1.0",
     "y-protocols": "^1.0.7",
@@ -131,6 +132,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260521.1",
     "@playwright/test": "^1.60.0",
+    "@types/katex": "^0.16.8",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "drizzle-kit": "^0.31.10",

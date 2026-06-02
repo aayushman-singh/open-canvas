@@ -237,6 +237,9 @@ function encodeInlineMark(mark: InlineMark): Y.Map<unknown> {
     out.set('href', mark.href);
     if (mark.target !== undefined) out.set('target', mark.target);
   }
+  if (mark.type === 'fontSize') {
+    out.set('px', mark.px);
+  }
   return out;
 }
 
@@ -247,6 +250,11 @@ function encodeInlineRun(run: InlineRun): Y.Map<unknown> {
     const marks = new Y.Array<Y.Map<unknown>>();
     for (const mark of run.marks) marks.push([encodeInlineMark(mark)]);
     out.set('marks', marks);
+  }
+  if (run.math !== undefined) {
+    const math = new Y.Map<unknown>();
+    math.set('tex', run.math.tex);
+    out.set('math', math);
   }
   return out;
 }
@@ -957,6 +965,9 @@ function decodeInlineMark(map: Y.Map<unknown>): InlineMark {
     if (map.has('target')) mark.target = map.get('target') as '_blank';
     return mark;
   }
+  if (type === 'fontSize') {
+    return { type, px: map.get('px') as number };
+  }
   return { type };
 }
 
@@ -965,6 +976,10 @@ function decodeInlineRun(map: Y.Map<unknown>): InlineRun {
   if (map.has('marks')) {
     const arr = map.get('marks') as Y.Array<Y.Map<unknown>>;
     run.marks = arr.map(decodeInlineMark);
+  }
+  if (map.has('math')) {
+    const m = map.get('math') as Y.Map<unknown>;
+    run.math = { tex: m.get('tex') as string };
   }
   return run;
 }

@@ -1178,6 +1178,11 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           ${raw(headMeta)} ${themeEmitsCss ? raw(`<script>${modeSetterScript}</script>`) : ''}
+          <link
+            rel="stylesheet"
+            href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css"
+            crossorigin="anonymous"
+          />
           <style>
             ${raw(canvasPublishedStyles)}${raw(customKitCss)}${raw(
               fontFaceCss ? `\n${fontFaceCss}` : '',

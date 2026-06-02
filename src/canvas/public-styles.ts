@@ -118,6 +118,18 @@ html, body {
   border-radius: 3px;
   font-size: 0.92em;
 }
+.opencanvas-math {
+  display: inline-block;
+  vertical-align: baseline;
+  color: inherit;
+}
+.opencanvas-math-error {
+  color: #d83a52;
+  background: rgba(216, 58, 82, 0.08);
+  font-family: var(--opencanvas-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  padding: 0 0.25em;
+  border-radius: 3px;
+}
 
 .opencanvas-nav-link {
   color: inherit;

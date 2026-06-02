@@ -10,7 +10,10 @@ import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, escapeCssValue, renderInlineRun, styleFromEntries } from './render-utils.js';
 import {
+  INLINE_FONT_SIZE_PX_MAX,
+  INLINE_FONT_SIZE_PX_MIN,
   INLINE_MARK_TYPES,
+  INLINE_MATH_TEX_MAX_LEN,
   TEXT_ROLES,
   type BaseElement,
   type InlineMark,
@@ -236,6 +239,15 @@ function parseInlineMark(value: unknown, runIdx: number, markIdx: number): Inlin
     }
     return { type: 'link', href: value.href };
   }
+  if (value.type === 'fontSize') {
+    if (typeof value.px !== 'number' || !Number.isFinite(value.px)) {
+      return `mark[${String(runIdx)}][${String(markIdx)}] fontSize mark requires numeric px`;
+    }
+    if (value.px < INLINE_FONT_SIZE_PX_MIN || value.px > INLINE_FONT_SIZE_PX_MAX) {
+      return `mark[${String(runIdx)}][${String(markIdx)}] fontSize px ${String(value.px)} out of range [${String(INLINE_FONT_SIZE_PX_MIN)}, ${String(INLINE_FONT_SIZE_PX_MAX)}]`;
+    }
+    return { type: 'fontSize', px: value.px };
+  }
   return { type: value.type as InlineMark['type'] } as InlineMark;
 }
 
@@ -259,6 +271,21 @@ export function parseTextInlineRuns(
       return { ok: false, error: `content[${String(i)}].text must be a string` };
     }
     const run: InlineRun = { text: raw.text };
+    if (raw.math !== undefined) {
+      if (!isRecordLocal(raw.math)) {
+        return { ok: false, error: `content[${String(i)}].math must be an object` };
+      }
+      if (typeof raw.math.tex !== 'string' || raw.math.tex.length === 0) {
+        return { ok: false, error: `content[${String(i)}].math.tex must be a non-empty string` };
+      }
+      if (raw.math.tex.length > INLINE_MATH_TEX_MAX_LEN) {
+        return {
+          ok: false,
+          error: `content[${String(i)}].math.tex exceeds ${String(INLINE_MATH_TEX_MAX_LEN)} chars`,
+        };
+      }
+      run.math = { tex: raw.math.tex };
+    }
     if (raw.marks !== undefined) {
       if (!Array.isArray(raw.marks)) {
         return { ok: false, error: `content[${String(i)}].marks must be an array when present` };
@@ -309,8 +336,10 @@ const inlineMarkSchema: JsonSchema = {
     'One inline mark applied to a run of text. Valid shapes:\n' +
     '  { "type": "bold" } | { "type": "italic" } | { "type": "underline" } |\n' +
     '  { "type": "strike" } | { "type": "code" } | { "type": "highlight" } |\n' +
-    '  { "type": "link", "href": "https://example.com" }\n' +
-    'For link marks, `href` MUST be http:, https:, mailto:, tel:, /relative, or #anchor — javascript: and data: are rejected.',
+    '  { "type": "link", "href": "https://example.com" } |\n' +
+    '  { "type": "fontSize", "px": 24 }\n' +
+    'For link marks, `href` MUST be http:, https:, mailto:, tel:, /relative, or #anchor — javascript: and data: are rejected. ' +
+    `For fontSize marks, \`px\` is required and bounded [${String(INLINE_FONT_SIZE_PX_MIN)}, ${String(INLINE_FONT_SIZE_PX_MAX)}].`,
   properties: {
     type: {
       type: 'string',
@@ -321,6 +350,10 @@ const inlineMarkSchema: JsonSchema = {
       type: 'string',
       description:
         'Required ONLY when type=="link". http:/https:/mailto:/tel: schemes, plus /relative and #anchor, are allowed.',
+    },
+    px: {
+      type: 'number',
+      description: `Required ONLY when type=="fontSize". Pixel size, ${String(INLINE_FONT_SIZE_PX_MIN)}-${String(INLINE_FONT_SIZE_PX_MAX)}.`,
     },
   },
   required: ['type'],

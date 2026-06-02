@@ -28,7 +28,10 @@ import {
   BACKGROUND_EFFECTS,
   BACKGROUND_SIZES,
   ELEMENT_TYPES,
+  INLINE_FONT_SIZE_PX_MAX,
+  INLINE_FONT_SIZE_PX_MIN,
   INLINE_MARK_TYPES,
+  INLINE_MATH_TEX_MAX_LEN,
   MEDIA_KINDS,
   MOTION_PRESETS,
   OVERFLOW_VALUES,
@@ -682,6 +685,17 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
     } else {
       concatenated += run.text;
     }
+    if (run.math !== undefined) {
+      if (!isRecord(run.math)) {
+        errors.push(`${runPath}.math must be an object when present`);
+      } else if (typeof run.math.tex !== 'string' || run.math.tex.length === 0) {
+        errors.push(`${runPath}.math.tex must be a non-empty string (got ${describe(run.math.tex)})`);
+      } else if (run.math.tex.length > INLINE_MATH_TEX_MAX_LEN) {
+        errors.push(
+          `${runPath}.math.tex exceeds the ${String(INLINE_MATH_TEX_MAX_LEN)}-char cap (got ${String(run.math.tex.length)})`,
+        );
+      }
+    }
     if (run.marks === undefined) return;
     if (!Array.isArray(run.marks)) {
       errors.push(`${runPath}.marks must be an array when present`);
@@ -713,6 +727,19 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
         if (mark.target !== undefined && mark.target !== '_blank') {
           errors.push(
             `${markPath}.target must be "_blank" when present (got ${describe(mark.target)})`,
+          );
+        }
+      }
+      if (mark.type === 'fontSize') {
+        if (typeof mark.px !== 'number' || !Number.isFinite(mark.px)) {
+          errors.push(
+            `${markPath}.px must be a finite number for fontSize marks (got ${describe(mark.px)})`,
+          );
+          return;
+        }
+        if (mark.px < INLINE_FONT_SIZE_PX_MIN || mark.px > INLINE_FONT_SIZE_PX_MAX) {
+          errors.push(
+            `${markPath}.px ${String(mark.px)} out of range [${String(INLINE_FONT_SIZE_PX_MIN)}, ${String(INLINE_FONT_SIZE_PX_MAX)}]`,
           );
         }
       }

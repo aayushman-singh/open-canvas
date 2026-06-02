@@ -7,6 +7,8 @@
 // All user-controlled strings are escaped at the boundary. Functions are
 // pure — no DOM access, no I/O.
 
+import katex from 'katex';
+
 import type { InlineMark, InlineRun } from '../schema.js';
 
 // The HTML escapes are a strict subset of ATTR_ESCAPES with identical values
@@ -72,6 +74,17 @@ export function findLinkMark(run: InlineRun): Extract<InlineMark, { type: 'link'
   return null;
 }
 
+/** Find the fontSize mark in a run (zero or one). */
+export function findFontSizeMark(
+  run: InlineRun,
+): Extract<InlineMark, { type: 'fontSize' }> | null {
+  if (!run.marks) return null;
+  for (const mark of run.marks) {
+    if (mark.type === 'fontSize') return mark;
+  }
+  return null;
+}
+
 export function hasMark(run: InlineRun, type: InlineMark['type']): boolean {
   if (!run.marks) return false;
   for (const mark of run.marks) {
@@ -94,7 +107,41 @@ export function hasMark(run: InlineRun, type: InlineMark['type']): boolean {
  * the editor a stable DOM addressing target per run.
  */
 export function renderInlineRun(run: InlineRun): string {
-  let inner = escapeHtml(run.text);
+  // Math runs render via server-side KaTeX. `run.text` is the plain-text
+  // fallback (search / aria-label) and never appears in the visible HTML
+  // when math is present. throwOnError=false makes KaTeX emit an error span
+  // for malformed TeX instead of crashing the page render.
+  if (run.math !== undefined) {
+    const fallback = escapeAttr(run.text || run.math.tex);
+    let rendered: string;
+    try {
+      rendered = katex.renderToString(run.math.tex, {
+        throwOnError: false,
+        output: 'html',
+        displayMode: false,
+      });
+    } catch {
+      rendered = `<span class="opencanvas-math-error">${escapeHtml(run.math.tex)}</span>`;
+    }
+    let mathInner = `<span class="opencanvas-math" aria-label="${fallback}" data-math-tex="${escapeAttr(run.math.tex)}">${rendered}</span>`;
+    const link = findLinkMark(run);
+    if (link) {
+      const targetAttr =
+        link.target === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
+      mathInner = `<a class="opencanvas-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${mathInner}</a>`;
+    }
+    const fontSize = findFontSizeMark(run);
+    if (fontSize) {
+      return `<span style="font-size:${String(fontSize.px)}px">${mathInner}</span>`;
+    }
+    return `<span>${mathInner}</span>`;
+  }
+  // Per schema, run.text may carry literal U+000A. Convert to <br> after
+  // escapeHtml so block-level breaks in pasted multi-paragraph source survive
+  // a save/reload round-trip. escapeHtml has already neutralised any HTML
+  // metacharacters in the source so this <br> insertion is on a string we
+  // generated, not user content.
+  let inner = escapeHtml(run.text).replace(/\n/g, '<br>');
   if (hasMark(run, 'code')) inner = `<code>${inner}</code>`;
   if (hasMark(run, 'highlight')) inner = `<mark>${inner}</mark>`;
   if (hasMark(run, 'strike')) inner = `<s>${inner}</s>`;
@@ -106,6 +153,10 @@ export function renderInlineRun(run: InlineRun): string {
     const targetAttr =
       link.target === '_blank' ? ' target="_blank" rel="noopener noreferrer"' : '';
     inner = `<a class="opencanvas-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${inner}</a>`;
+  }
+  const fontSize = findFontSizeMark(run);
+  if (fontSize) {
+    return `<span style="font-size:${String(fontSize.px)}px">${inner}</span>`;
   }
   return `<span>${inner}</span>`;
 }

@@ -2663,9 +2663,47 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // because the <a> wrap needs href/target attributes and is built inline below.
   const MARK_TYPE_TO_TAG = { bold: "strong", italic: "em", underline: "u", strike: "s", highlight: "mark", code: "code" };
   function buildRunNode(run) {
-    // Innermost text node carries the raw run.text. wrapInTag wraps the
-    // current node in a new element of the given tag, returning the outer.
-    let inner = document.createTextNode(typeof run.text === "string" ? run.text : "");
+    let inner;
+    if (run && run.math && typeof run.math.tex === "string") {
+      // Math runs render via KaTeX (lazy-loaded in the editor head). When
+      // window.katex hasn't finished loading yet we fall back to raw TeX so
+      // the user sees something rather than a blank span; renderMathInScope
+      // re-renders all .opencanvas-math nodes as soon as KaTeX resolves.
+      // contenteditable=false makes the equation atomic: the caret can't
+      // land inside KaTeX's generated DOM, so backspace/delete remove the
+      // whole equation instead of corrupting one of its inner tags.
+      const mathSpan = document.createElement("span");
+      mathSpan.className = "opencanvas-math";
+      mathSpan.setAttribute("data-math-tex", run.math.tex);
+      mathSpan.setAttribute("aria-label", run.text || run.math.tex);
+      mathSpan.setAttribute("contenteditable", "false");
+      if (typeof window !== "undefined" && window.katex && typeof window.katex.render === "function") {
+        try {
+          window.katex.render(run.math.tex, mathSpan, { throwOnError: false, output: "html", displayMode: false });
+        } catch (_e) {
+          mathSpan.textContent = run.math.tex;
+        }
+      } else {
+        mathSpan.textContent = run.math.tex;
+      }
+      inner = mathSpan;
+    } else {
+      // Innermost carries the raw run.text. Embedded "\n" chars become <br>
+      // elements so block-level breaks from a multi-paragraph paste survive a
+      // save/reload round-trip via the schema's literal-U+000A contract.
+      const rawText = typeof run.text === "string" ? run.text : "";
+      if (rawText.indexOf("\n") < 0) {
+        inner = document.createTextNode(rawText);
+      } else {
+        const frag = document.createDocumentFragment();
+        const parts = rawText.split("\n");
+        for (let p = 0; p < parts.length; p++) {
+          if (parts[p].length > 0) frag.appendChild(document.createTextNode(parts[p]));
+          if (p < parts.length - 1) frag.appendChild(document.createElement("br"));
+        }
+        inner = frag;
+      }
+    }
     function wrap(tag) {
       const el = document.createElement(tag);
       el.appendChild(inner);
@@ -8568,28 +8606,57 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // deduped (adjacent identical-mark runs merge) and trimmed (empty
   // marks-only placeholders dropped). Throws if any link mark href fails the
   // allowlist — the caller treats that as "do not commit".
+  //
+  // <br> elements emit a synthetic "\n" run carrying the ancestor marks so
+  // block-level breaks pasted from a multi-paragraph source survive the
+  // round-trip. The renderer turns "\n" back into <br> on the way out.
   function serializeContentToRuns(rootNode) {
-    const walker = document.createTreeWalker(rootNode, NodeFilter.SHOW_TEXT);
     const raw = [];
-    let textNode = walker.nextNode();
-    while (textNode) {
-      const marks = activeMarksFor(textNode, rootNode);
-      raw.push({ text: textNode.nodeValue || "", marks });
-      textNode = walker.nextNode();
+    // Manual DFS instead of TreeWalker: we need to ACCEPT a math span (emit
+    // a math run) AND then prevent descent into its KaTeX-generated DOM,
+    // which TreeWalker's filter API can't express in one node (FILTER_REJECT
+    // would skip the math span itself; FILTER_ACCEPT walks descendants).
+    function visit(node) {
+      if (node.nodeType === 3) {
+        raw.push({ text: node.nodeValue || "", marks: activeMarksFor(node, rootNode) });
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      if (node.tagName === "BR") {
+        raw.push({ text: "\n", marks: activeMarksFor(node, rootNode) });
+        return;
+      }
+      if (node.classList && node.classList.contains("opencanvas-math")) {
+        const tex = node.getAttribute("data-math-tex") || "";
+        const fallback = node.getAttribute("aria-label") || tex;
+        if (tex.length > 0) {
+          const marks = activeMarksFor(node, rootNode);
+          raw.push({ text: fallback, marks, math: { tex } });
+        }
+        return;
+      }
+      const kids = node.childNodes;
+      for (let k = 0; k < kids.length; k++) visit(kids[k]);
     }
-    // Merge adjacent runs whose mark sets are byte-identical.
+    const kids = rootNode.childNodes;
+    for (let k = 0; k < kids.length; k++) visit(kids[k]);
+    // Merge adjacent runs whose mark sets are byte-identical. Math runs are
+    // atomic (each equation is its own run) and never merge with neighbours.
     const merged = [];
     for (let i = 0; i < raw.length; i++) {
       const run = raw[i];
       const prev = merged.length > 0 ? merged[merged.length - 1] : null;
-      if (prev && marksEqual(prev.marks, run.marks)) {
+      if (prev && !prev.math && !run.math && marksEqual(prev.marks, run.marks)) {
         prev.text += run.text;
       } else {
-        merged.push({ text: run.text, marks: run.marks });
+        const next = { text: run.text, marks: run.marks };
+        if (run.math) next.math = run.math;
+        merged.push(next);
       }
     }
-    // Drop runs that are empty AND have no marks — they carry no signal.
-    const trimmed = merged.filter((r) => r.text.length > 0 || r.marks.length > 0);
+    // Drop runs that are empty AND have no marks AND no math — they carry
+    // no signal.
+    const trimmed = merged.filter((r) => r.text.length > 0 || r.marks.length > 0 || r.math);
     // Validate link hrefs (fail loud — no silent rewrite).
     for (let i = 0; i < trimmed.length; i++) {
       for (let m = 0; m < trimmed[i].marks.length; m++) {
@@ -8603,8 +8670,10 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // Final shape: drop empty marks arrays so the JSON is minimal and equal
     // to what hand-written fixtures look like.
     return trimmed.map((r) => {
-      if (r.marks.length === 0) return { text: r.text };
-      return { text: r.text, marks: r.marks };
+      const out = { text: r.text };
+      if (r.marks.length > 0) out.marks = r.marks;
+      if (r.math) out.math = r.math;
+      return out;
     });
   }
 
@@ -8979,6 +9048,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // pinned popover dismisses (hover may re-show it without pinning).
   function onSelectionChangeForLinkPopover() {
     if (!editingElementId) return;
+    refreshMarkToolbarFontSizeState();
     var sel = document.getSelection();
     if (!sel || sel.rangeCount === 0) {
       if (linkPopoverPinned) removeLinkPopover();
@@ -8993,6 +9063,33 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // Already pinned to this link → nothing to do.
     if (linkPopoverPinned && linkPopoverAnchor === linkEl) return;
     showLinkPopover(linkEl, { pinned: true });
+  }
+
+  // Refresh the toolbar font-size <select> to reflect the current selection.
+  // Walks ancestors from the selection anchor; the innermost span carrying
+  // an inline font-size wins (matches the buildRunNode and serializer rules).
+  // No font-size in scope → select shows the "Size" placeholder.
+  function refreshMarkToolbarFontSizeState() {
+    if (!markToolbar) return;
+    var sel = document.getSelection();
+    var picker = markToolbar.querySelector('[data-mark-fontsize]');
+    if (!picker) return;
+    if (!sel || sel.rangeCount === 0) { picker.value = ""; return; }
+    var node = sel.anchorNode;
+    if (!node) { picker.value = ""; return; }
+    var cur = node.nodeType === 1 ? node : node.parentNode;
+    var px = null;
+    while (cur && cur.nodeType === 1) {
+      if (cur.tagName === "SPAN" && cur.style && cur.style.fontSize) {
+        var parsed = parseFloat(cur.style.fontSize);
+        if (Number.isFinite(parsed)) { px = parsed; break; }
+      }
+      // Stop walking when we leave the editable subtree so an ancestor
+      // font-size on the canvas chrome can't leak into the picker reading.
+      if (cur.getAttribute && cur.getAttribute("contenteditable") === "true") break;
+      cur = cur.parentNode;
+    }
+    picker.value = px === null ? "" : String(px);
   }
 
   // -- Inline mark toolbar ------------------------------------------------
@@ -9258,6 +9355,93 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     while (inner.firstChild) inner.removeChild(inner.firstChild);
     for (var i = 0; i < nextRuns.length; i++) {
       inner.appendChild(buildRunNode(nextRuns[i]));
+    }
+
+    inner.focus();
+    selectByCharBounds(inner, start, end);
+  }
+
+  // Apply (or clear) a fontSize mark to the slice [start, end) of runs.
+  // px=null removes the mark; otherwise replaces any existing fontSize in the
+  // slice with the new px. Mirrors setLinkOnRuns but for the px-attr variant.
+  function setFontSizeOnRuns(runs, start, end, px) {
+    var split = [];
+    var cum = 0;
+    for (var i = 0; i < runs.length; i++) {
+      var run = runs[i];
+      var text = typeof run.text === "string" ? run.text : "";
+      var s = cum;
+      var e = cum + text.length;
+      var bps = [0];
+      if (start > s && start < e) bps.push(start - s);
+      if (end > s && end < e) bps.push(end - s);
+      bps.push(text.length);
+      for (var j = 0; j < bps.length - 1; j++) {
+        var a = bps[j], b = bps[j + 1];
+        if (b > a) split.push({ text: text.substring(a, b), marks: cloneMarksArr(run.marks) });
+      }
+      cum = e;
+    }
+
+    cum = 0;
+    for (var k = 0; k < split.length; k++) {
+      var sr = split[k];
+      var rs = cum;
+      var re = cum + sr.text.length;
+      cum = re;
+      if (re <= start || rs >= end) continue;
+      sr.marks = sr.marks.filter(function (mm) { return mm.type !== "fontSize"; });
+      if (px !== null) sr.marks.push({ type: "fontSize", px: px });
+    }
+
+    var merged = [];
+    for (var p = 0; p < split.length; p++) {
+      var prev = merged.length > 0 ? merged[merged.length - 1] : null;
+      if (prev && marksEqual(prev.marks, split[p].marks)) {
+        prev.text += split[p].text;
+      } else {
+        merged.push({ text: split[p].text, marks: split[p].marks });
+      }
+    }
+    return merged;
+  }
+
+  function applyFontSizeMark(px) {
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    var range = sel.getRangeAt(0);
+    if (range.collapsed) {
+      setStatus('Select some text first to change size', 'error');
+      return;
+    }
+    var inner = closestEditableRoot(range.commonAncestorContainer);
+    if (!inner) return;
+
+    var preStart = document.createRange();
+    preStart.setStart(inner, 0);
+    preStart.setEnd(range.startContainer, range.startOffset);
+    var startOff = preStart.toString().length;
+    var preEnd = document.createRange();
+    preEnd.setStart(inner, 0);
+    preEnd.setEnd(range.endContainer, range.endOffset);
+    var endOff = preEnd.toString().length;
+    var start = Math.min(startOff, endOff);
+    var end = Math.max(startOff, endOff);
+    if (start === end) return;
+
+    var runs;
+    try {
+      runs = serializeContentToRuns(inner);
+    } catch (err) {
+      setStatus('Font size failed: ' + (err && err.message ? err.message : String(err)), 'error');
+      return;
+    }
+
+    var nextRuns = setFontSizeOnRuns(runs, start, end, px);
+
+    while (inner.firstChild) inner.removeChild(inner.firstChild);
+    for (var ri = 0; ri < nextRuns.length; ri++) {
+      inner.appendChild(buildRunNode(nextRuns[ri]));
     }
 
     inner.focus();
@@ -9606,9 +9790,8 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     // the bar. Existing runs with code marks still render via the public-
     // styles <code> rule, but new code wraps can only land through the
     // canvas agent or paste from a code-formatted source.
-    // fontSize is also absent — it only enters runs via paste (heading/inline
-    // font-size source); editing the value goes through the element-level
-    // fontSize inspector field, not a toolbar button.
+    // fontSize is handled by the size <select> below (not the per-mark loop)
+    // because it carries a numeric payload rather than a boolean toggle.
     for (let i = 0; i < CANONICAL_MARK_ORDER.length; i++) {
       const type = CANONICAL_MARK_ORDER[i];
       if (type === "code" || type === "fontSize") continue;
@@ -9624,6 +9807,39 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       });
       bar.appendChild(btn);
     }
+
+    // -- Font size picker ------------------------------------------------
+    // <select> driving the fontSize InlineMark across the current selection.
+    // Empty value === "no fontSize mark" (the run inherits the TextElement's
+    // own fontSize). Preset list covers the typical heading-down-to-caption
+    // span so owners rarely need a custom value.
+    var sizeSelect = document.createElement("select");
+    sizeSelect.className = "opencanvas-mark-size";
+    sizeSelect.setAttribute("data-mark-fontsize", "true");
+    sizeSelect.setAttribute("aria-label", "Font size (px)");
+    sizeSelect.title = "Font size (px)";
+    var FONT_SIZE_PRESETS = [12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 80, 96];
+    var defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "Size";
+    sizeSelect.appendChild(defaultOpt);
+    for (var sp = 0; sp < FONT_SIZE_PRESETS.length; sp++) {
+      var opt = document.createElement("option");
+      opt.value = String(FONT_SIZE_PRESETS[sp]);
+      opt.textContent = String(FONT_SIZE_PRESETS[sp]);
+      sizeSelect.appendChild(opt);
+    }
+    sizeSelect.addEventListener("mousedown", function (ev) { ev.stopPropagation(); });
+    sizeSelect.addEventListener("change", function (ev) {
+      ev.preventDefault();
+      var raw = sizeSelect.value;
+      var px = raw === "" ? null : parseFloat(raw);
+      if (px !== null && (!Number.isFinite(px) || px < INLINE_FONT_SIZE_PX_MIN || px > INLINE_FONT_SIZE_PX_MAX)) {
+        return;
+      }
+      applyFontSizeMark(px);
+    });
+    bar.appendChild(sizeSelect);
 
     // -- Alignment block --------------------------------------------------
     // Element-level alignment buttons mirror the inspector's align select
@@ -9760,6 +9976,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     document.body.appendChild(bar);
     positionMarkToolbar(anchor);
     refreshMarkToolbarAlignState();
+    refreshMarkToolbarFontSizeState();
   }
 
   function beginTextEdit(elementId) {
@@ -9840,7 +10057,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         fragmentHtml = normalizePastedHtml(html);
       } else {
         var plain = cd.getData('text/plain') || '';
-        fragmentHtml = escapeHtml(plain).replace(/\\n/g, '<br>');
+        fragmentHtml = plainTextToFragmentHtml(plain);
       }
       var sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return;
@@ -9858,6 +10075,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         sel.removeAllRanges();
         sel.addRange(after);
       }
+      // Render any opencanvas-math spans that landed in this paste. The
+      // pasted HTML carries TeX in data-math-tex; renderMathInScope swaps
+      // each span's plain-tex fallback for KaTeX HTML. No-op when KaTeX
+      // hasn't loaded yet — onKatexReady reruns this scope once it does.
+      renderMathInScope(inner);
     });
 
     // selectionchange is a document-level event; register it for the
@@ -10531,15 +10753,11 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   // rendered transform off the closest section ancestor since the canvas zoom
   // applies uniformly above the section.
   //
-  // The regex is built via new RegExp instead of a literal because the entire
-  // IIFE body is wrapped in an untagged template literal upstream. Inside
-  // that template, a regex literal like /matrix\(.../ has its backslash
-  // silently dropped on cook, so the shipped JS becomes /matrix(.../ - an
-  // unterminated group that throws "Invalid regular expression" at parse
-  // time and prevents the entire editor script from loading. Doubling each
-  // backslash in the RegExp string source ("\\\\(") gets a literal \( into
-  // the shipped JS and then a real backslash escape in the runtime regex.
-  // Same workaround applies to any other regex authored inside this IIFE.
+  // The regex is built via new RegExp instead of a literal because this whole
+  // IIFE body is wrapped in a tagged-less template literal upstream; a regex
+  // literal here would have its backslashes silently dropped on cook,
+  // producing "Invalid regular expression: /matrix(([^,]+),/" at runtime.
+  // Same pattern applies to any regex authored inside this IIFE.
   var WRAPPER_MATRIX_RE = new RegExp("matrix\\\\(([^,]+),");
   function wrapperScale(frameEl) {
     const section = frameEl.closest('.opencanvas-section');
@@ -11366,6 +11584,87 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return escapeHtml(value);
   }
 
+  // Run KaTeX over every .opencanvas-math span under scope whose visible
+  // body is still the raw TeX fallback (data-katex-rendered missing). Called
+  // immediately after a paste that contains math (KaTeX/MathML/inline TeX)
+  // and on the katex-loaded event so spans that landed before the bundle
+  // was ready get the rendered HTML once it shows up.
+  function renderMathInScope(scope) {
+    if (!scope) return;
+    if (typeof window === "undefined" || !window.katex || typeof window.katex.render !== "function") return;
+    var nodes = scope.querySelectorAll('.opencanvas-math:not([data-katex-rendered])');
+    for (var i = 0; i < nodes.length; i++) {
+      var span = nodes[i];
+      var tex = span.getAttribute('data-math-tex') || '';
+      if (!tex) continue;
+      try {
+        window.katex.render(tex, span, { throwOnError: false, output: "html", displayMode: false });
+        span.setAttribute('data-katex-rendered', 'true');
+      } catch (_e) {
+        // Leave the plain-tex fallback in place; user still sees something.
+      }
+    }
+  }
+
+  // Plain-text paste path: escape, restore line breaks, and recognise the
+  // four standard LaTeX delimiter pairs ($$...$$, $...$, \[...\], \(...\))
+  // so a "raw markdown" paste with inline math comes through as real
+  // equations rather than a stream of $ characters.
+  function plainTextToFragmentHtml(plain) {
+    var src = String(plain || '');
+    var tokens = [];
+    var i = 0;
+    function pushText(s) { if (s) tokens.push({ kind: 'text', value: s }); }
+    function pushMath(t) { var tex = (t || '').trim(); if (tex) tokens.push({ kind: 'math', tex: tex }); }
+    while (i < src.length) {
+      var ch = src.charAt(i);
+      if (ch === '$' && src.charAt(i + 1) === '$') {
+        var close = src.indexOf('$$', i + 2);
+        if (close > i + 2) { pushMath(src.slice(i + 2, close)); i = close + 2; continue; }
+      }
+      if (ch === '$') {
+        var close1 = src.indexOf('$', i + 1);
+        // Reject empty / multi-line $..$ to avoid false positives ($5 + $3).
+        if (close1 > i + 1 && src.slice(i + 1, close1).indexOf('\n') < 0) {
+          pushMath(src.slice(i + 1, close1));
+          i = close1 + 1; continue;
+        }
+      }
+      if (ch === '\\' && src.charAt(i + 1) === '[') {
+        var closeB = src.indexOf('\\]', i + 2);
+        if (closeB > i + 2) { pushMath(src.slice(i + 2, closeB)); i = closeB + 2; continue; }
+      }
+      if (ch === '\\' && src.charAt(i + 1) === '(') {
+        var closeP = src.indexOf('\\)', i + 2);
+        if (closeP > i + 2) { pushMath(src.slice(i + 2, closeP)); i = closeP + 2; continue; }
+      }
+      // Accumulate plain run up to the next delimiter candidate.
+      var next = i + 1;
+      while (next < src.length) {
+        var nc = src.charAt(next);
+        if (nc === '$') break;
+        if (nc === '\\' && (src.charAt(next + 1) === '[' || src.charAt(next + 1) === '(')) break;
+        next++;
+      }
+      pushText(src.slice(i, next));
+      i = next;
+    }
+    var parts = [];
+    for (var t = 0; t < tokens.length; t++) {
+      var tok = tokens[t];
+      if (tok.kind === 'text') {
+        // Source uses /\\n/g (doubled backslash) so the IIFE template
+        // literal cooks it to /\n/g - a regex matching newline. The single-
+        // backslash form would cook to /<newline>/g, a SyntaxError that
+        // prevents the entire editor script from parsing.
+        parts.push(escapeHtml(tok.value).replace(/\\n/g, '<br>'));
+      } else {
+        parts.push('<span class="opencanvas-math" contenteditable="false" data-math-tex="' + escapeAttr(tok.tex) + '">' + escapeHtml(tok.tex) + '</span>');
+      }
+    }
+    return parts.join('');
+  }
+
   // Convert arbitrary pasted HTML (Google Docs, Notion, web pages, …) into
   // a minimal markup string that uses only the canonical mark tags
   // serializeContentToRuns recognises (B / I / U / S / MARK / CODE / A).
@@ -11482,6 +11781,33 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var tag = node.tagName;
       if (tag === 'BR') { out.push('<br>'); return; }
       if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'META' || tag === 'LINK' || tag === 'HEAD') return;
+      // Equation pastes: KaTeX-rendered sources (Notion, Obsidian, web pages)
+      // and MathML (MathJax, Wikipedia) carry a verbatim TeX source string
+      // inside <annotation encoding="application/x-tex">. Detect either
+      // wrapper, lift the tex, emit an atomic opencanvas-math span, and stop
+      // recursing — the children are presentation HTML we'd otherwise pick up
+      // as plain text and lose the formula structure.
+      if (node.classList && node.classList.contains('katex')) {
+        var katexAnno = node.querySelector('annotation[encoding="application/x-tex"]');
+        var katexTex = katexAnno && katexAnno.textContent ? katexAnno.textContent.trim() : '';
+        if (katexTex.length > 0) {
+          out.push('<span class="opencanvas-math" contenteditable="false" data-math-tex="' + escapeAttr(katexTex) + '">' + escapeHtml(katexTex) + '</span>');
+          return;
+        }
+      }
+      if (tag === 'MATH') {
+        var mathAnno = node.querySelector('annotation[encoding="application/x-tex"]');
+        var mathTex = mathAnno && mathAnno.textContent ? mathAnno.textContent.trim() : '';
+        if (mathTex.length > 0) {
+          out.push('<span class="opencanvas-math" contenteditable="false" data-math-tex="' + escapeAttr(mathTex) + '">' + escapeHtml(mathTex) + '</span>');
+          return;
+        }
+        // MathML without a TeX annotation — fall back to its plain-text projection
+        // rather than dumping raw <mi>/<mn> tags into the editor.
+        var mathPlain = node.textContent ? node.textContent.trim() : '';
+        if (mathPlain.length > 0) out.push(escapeHtml(mathPlain));
+        return;
+      }
       // Preserve a visual paragraph break for block-level containers — many
       // sources (Docs, Notion) wrap each line in its own <p>/<div>.
       var leadingBreak = !!BLOCK_TAGS[tag] && out.length > 0 && out[out.length - 1] !== '<br>';
@@ -12940,6 +13266,13 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       // calls (which only mutate root's children).
       mountViewport();
       renderAll();
+      // Math content rendered by buildRunNode while KaTeX was still
+      // downloading sits as plain-tex placeholders. Re-render once KaTeX
+      // resolves so the visible equations match the published page.
+      window.addEventListener("opencanvas-katex-ready", function () {
+        if (root) renderMathInScope(root);
+      });
+      if (window.katex && root) renderMathInScope(root);
       attachRootEvents();
       attachPointerHandlers();
       mountReel();
