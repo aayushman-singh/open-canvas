@@ -234,6 +234,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
       throw new Error('flushPendingSave stub: smoke does not exercise persistence flush');
     },
     editingElementId: null,
+    MIN_ELEMENT_SIZE_PX: 24,
     interactionMode: 'select',
     spaceHeldForPan: false,
     temporaryPanPreviousMode: null,
@@ -241,6 +242,15 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     clearTemporaryPanState: () => {},
     endTemporaryPan: () => {},
     exitPlacementMode: () => {},
+    pointerToCanvas: () => {
+      throw new Error('pointerToCanvas stub: smoke does not exercise drag/resize');
+    },
+    resolveElementWrapperAtPoint: () => {
+      throw new Error('resolveElementWrapperAtPoint stub: smoke does not exercise drag/resize');
+    },
+    onCanvasLinkHover: () => {},
+    onCanvasLinkHoverLeave: () => {},
+    renderSectionsPanel: () => {},
     handleSectionAction: () => {},
   };
   return { ctx, log };

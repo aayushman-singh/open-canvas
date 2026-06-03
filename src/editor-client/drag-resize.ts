@@ -1,0 +1,370 @@
+// src/editor-client/drag-resize.ts
+//
+// ADR 0058 Phase 2i — drag/resize handler cluster + pointer wiring.
+// canvas-client.ts:11281-11325 (attachPointerHandlers), :11327-11385
+// (beginDrag), :11387-11407 (wrapperScale + WRAPPER_MATRIX_RE),
+// :11409-11478 (beginResize) carry the inline twins. Twins retire on
+// ADR 0015 Phase 3 atomic cutover; until then, the inline IIFE is the
+// production source-of-truth and this module is dead code.
+//
+// Two exports map onto Phase 2i's ctx fields:
+//
+//   - attachPointerHandlersImpl(ctx) — the boot-time wiring fn. Attaches
+//     onCanvasLinkHover/Leave to ctx.root and a `mousedown` handler that
+//     branches three ways: bail in pan-mode (the camera pan path owns
+//     mousedown then), start a beginResize on a resize-handle click, or
+//     resolve the element wrapper at the pointer and either select it
+//     (first click) or start a beginDrag (second click on the same
+//     selection). Resists three pre-existing mousedown owners that the
+//     inline twin learnt the hard way: the element context menu, the
+//     section grip's reel-open, and the tabs element's tab-switch button.
+//     createEditor invokes this once at boot; not bound onto ctx itself
+//     since no other module re-fires it.
+//
+//   - beginDragImpl(ctx, startEv, wrapper) — frame-relative drag of the
+//     element under `wrapper`. Frame resolution walks up to the nearest
+//     tab-panel or section ancestor so a tab-panel child stays inside its
+//     panel rather than escaping into the parent section. Mutates
+//     wrapper.style.left/top + found.element.box.x/y on every mousemove
+//     and calls ctx.scheduleSave on mouseup; the inline twin's drag does
+//     NOT call captureForUndo (intentional — the snapshot is taken at the
+//     mousedown→select transition, not at the drag-end transition). Throws
+//     loudly when frameEl is a section but no active page exists (boot-
+//     ordering bug rather than a silent "skip the drag" default).
+//
+//   - beginResizeImpl(ctx, startEv, wrapper, dir) — frame-relative resize
+//     with eight-direction handle dispatch. Same frame resolution as
+//     beginDrag; reads MIN_ELEMENT_SIZE_PX off ctx so the lower-bound clamp
+//     matches the inline twin's closure constant. fromLeft/fromTop track
+//     which side moves with the pointer (north/west handles shift origin
+//     while south/east only grow size). Same throw-on-missing-page contract
+//     as beginDrag.
+//
+// Private helpers (module-scope):
+//
+//   - wrapperScale(frameEl) — best-effort current-zoom estimator. Reads
+//     the closest .opencanvas-section ancestor's computed transform matrix
+//     and parses the first scalar via WRAPPER_MATRIX_RE. Returns 1 on any
+//     failure path (no section, transform="none", regex miss, NaN). The
+//     inline twin's comment-block at canvas-client.ts:11387-11396 explains
+//     why the regex must be `new RegExp` — that comment is preserved here
+//     because a future reviewer might "fix" the escaping back.
+//
+//   - WRAPPER_MATRIX_RE — string-form regex matching "matrix(<scalar>,".
+//     ESCAPING NOTE: the inline twin authors the pattern as
+//     `"matrix\\\\(([^,]+),"` because the IIFE body is wrapped in a tagged-
+//     less template literal upstream — every backslash on the source line
+//     loses one level on cook. The extracted module is no longer inside
+//     such a template, so it uses `"matrix\\(([^,]+),"` (single-escape) to
+//     produce the SAME final regex (`/matrix\(([^,]+),/`). Do NOT "fix"
+//     the escaping back to match the inline twin literally — the
+//     surrounding template-literal wrap is what made the inline form
+//     necessary, and lifting the code out of that wrap removes the need.
+//
+// Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
+// Phase 3 cutover destination, not a live call site yet.
+
+import type { EditorContext } from './editor-context.js';
+
+/**
+ * Best-effort current-zoom estimator. pointerToCanvas already handles
+ * scale for sections via its own logic; for nested frames we read the
+ * actual rendered transform off the closest section ancestor since the
+ * canvas zoom applies uniformly above the section.
+ *
+ * Private to this module: only beginDragImpl + beginResizeImpl call it,
+ * and both use it through the frameEl branch that's already module-local.
+ */
+function wrapperScale(frameEl: Element): number {
+  const section = frameEl.closest('.opencanvas-section');
+  if (!section) return 1;
+  const matrix = window.getComputedStyle(section).transform;
+  if (!matrix || matrix === 'none') return 1;
+  const match = WRAPPER_MATRIX_RE.exec(matrix);
+  if (!match) return 1;
+  const parsed = parseFloat(match[1]!);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+/**
+ * Regex parsing the leading scalar from a `matrix(a, b, c, d, tx, ty)`
+ * computed-style string. See the module-header ESCAPING NOTE for why
+ * this is `new RegExp("matrix\\(([^,]+),")` rather than a regex literal
+ * AND why the escape level differs from the inline twin's literal form.
+ */
+const WRAPPER_MATRIX_RE = new RegExp('matrix\\(([^,]+),');
+
+export function attachPointerHandlersImpl(ctx: EditorContext): void {
+  const root = ctx.root;
+  if (!root) return;
+  // Canvas-wide link hover → popover. Inline marks inside a contenteditable
+  // text element are handled by beginTextEdit's per-inner listeners; this
+  // wiring covers nav links and action elements which live outside any
+  // contenteditable subtree. Arrow wrappers avoid passing bare ctx methods
+  // as listeners (which trips unbound-method lint — the methods do not
+  // capture `this` but the rule cannot prove that statically).
+  root.addEventListener('mouseover', (ev) => {
+    ctx.onCanvasLinkHover(ev);
+  });
+  root.addEventListener('mouseout', (ev) => {
+    ctx.onCanvasLinkHoverLeave(ev);
+  });
+  root.addEventListener('mousedown', (ev) => {
+    if (ctx.interactionMode === 'pan') return;
+    if (
+      ev.target instanceof Element &&
+      (ev.target.closest('[data-element-menu-trigger]') || ev.target.closest('[data-element-menu]'))
+    )
+      return;
+    // Grip clicks own their own mousedown/click semantics (open reel,
+    // optionally start a section drag). Letting this handler resolve an
+    // element wrapper at the grip's pixel would select whatever element's
+    // bbox overlaps the grip and immediately close the freshly-opened reel.
+    if (ev.target instanceof Element && ev.target.closest('[data-section-grip]')) return;
+    // Tab buttons inside a tabs element handle their own click to switch
+    // the active tab. Letting this handler resolve the parent tabs wrapper
+    // would either re-select the same element on every click (a no-op
+    // round-trip) or — on a second click — start a drag that jitters the
+    // wrapper before the button's click handler can swap tabs.
+    if (ev.target instanceof Element && ev.target.closest('[data-opencanvas-tab-id]')) return;
+    const handle =
+      ev.target instanceof Element ? ev.target.closest('[data-resize-handle]') : null;
+    if (handle) {
+      const wrapper = handle.closest('.opencanvas-element');
+      const dir = handle.getAttribute('data-resize-dir') || 'se';
+      if (wrapper) {
+        beginResizeImpl(ctx, ev, wrapper as HTMLElement, dir);
+        ev.preventDefault();
+      }
+      return;
+    }
+    const wrapper =
+      ev.target instanceof Element
+        ? ctx.resolveElementWrapperAtPoint(ev.target, ev.clientX, ev.clientY)
+        : null;
+    if (!wrapper) return;
+    const elementId = wrapper.getAttribute('data-opencanvas-element');
+    if (!elementId) return;
+    if (ctx.editingElementId === elementId) return;
+    const elType = wrapper.getAttribute('data-element-type');
+    if (elType === 'text') return;
+    if (ctx.selectedElementId !== elementId) {
+      ctx.selectElement(elementId);
+      return;
+    }
+    beginDragImpl(ctx, ev, wrapper);
+    ev.preventDefault();
+  });
+}
+
+export function beginDragImpl(
+  ctx: EditorContext,
+  startEv: PointerEvent | MouseEvent,
+  wrapper: HTMLElement,
+): void {
+  const elementId = wrapper.getAttribute('data-opencanvas-element');
+  if (!elementId) return;
+  const found = ctx.findElement(elementId);
+  if (!found) return;
+  // The element's box is in its IMMEDIATE container's coord space. For a
+  // section child that's the section. For a tab-panel or collection-entry
+  // child it's the panel/card. Resolve the nearest positioned ancestor that
+  // matches one of those wrappers, falling back to section.
+  const frame = wrapper.parentElement
+    ? wrapper.parentElement.closest('.opencanvas-tab-panel, .opencanvas-section')
+    : null;
+  const frameEl = (frame || wrapper.closest('.opencanvas-section')) as HTMLElement | null;
+  if (!frameEl) return;
+  const start = ctx.pointerToCanvas(startEv, frameEl);
+  if (!start) return;
+  const originalBox = Object.assign({}, found.element.box);
+  // Bounds: at section level use the page width + section height (the
+  // authoritative values from state). For nested containers use the rendered
+  // panel size since the panel's logical dimensions aren't carried on the
+  // element state directly.
+  let boundW: number;
+  let boundH: number;
+  if (frameEl.classList.contains('opencanvas-section')) {
+    const page = ctx.currentPage();
+    if (!page) throw new Error('beginDrag: element ' + elementId + ' has no active page');
+    boundW = page.width;
+    boundH = found.section.height;
+  } else {
+    const rect = frameEl.getBoundingClientRect();
+    const scale = wrapperScale(frameEl);
+    boundW = rect.width / scale;
+    boundH = rect.height / scale;
+  }
+
+  function onMove(ev: MouseEvent): void {
+    const current = ctx.pointerToCanvas(ev, frameEl!);
+    if (!current) return;
+    const dx = current.x - start!.x;
+    const dy = current.y - start!.y;
+    let nx = originalBox.x + dx;
+    let ny = originalBox.y + dy;
+    if (nx < 0) nx = 0;
+    if (ny < 0) ny = 0;
+    if (nx + originalBox.w > boundW) nx = boundW - originalBox.w;
+    if (ny + originalBox.h > boundH) ny = boundH - originalBox.h;
+    wrapper.style.left = nx + 'px';
+    wrapper.style.top = ny + 'px';
+    found!.element.box.x = nx;
+    found!.element.box.y = ny;
+  }
+  function onUp(): void {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    ctx.scheduleSave();
+  }
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+export function beginResizeImpl(
+  ctx: EditorContext,
+  startEv: PointerEvent | MouseEvent,
+  wrapper: HTMLElement,
+  dir: string,
+): void {
+  const elementId = wrapper.getAttribute('data-opencanvas-element');
+  if (!elementId) return;
+  const found = ctx.findElement(elementId);
+  if (!found) return;
+  // Match beginDrag's frame resolution so resizing a tab-panel/collection
+  // child respects panel-local coords rather than section coords.
+  const frame = wrapper.parentElement
+    ? wrapper.parentElement.closest('.opencanvas-tab-panel, .opencanvas-section')
+    : null;
+  const frameEl = (frame || wrapper.closest('.opencanvas-section')) as HTMLElement | null;
+  if (!frameEl) return;
+  const start = ctx.pointerToCanvas(startEv, frameEl);
+  if (!start) return;
+  const ob = Object.assign({}, found.element.box);
+  let pageWidth: number;
+  let sectionHeight: number;
+  if (frameEl.classList.contains('opencanvas-section')) {
+    const page = ctx.currentPage();
+    if (!page) throw new Error('beginResize: element ' + elementId + ' has no active page');
+    pageWidth = page.width;
+    sectionHeight = found.section.height;
+  } else {
+    const rect = frameEl.getBoundingClientRect();
+    const scale = wrapperScale(frameEl);
+    pageWidth = rect.width / scale;
+    sectionHeight = rect.height / scale;
+  }
+  const moveX = dir.includes('e') || dir.includes('w');
+  const moveY = dir.includes('s') || dir.includes('n');
+  const fromLeft = dir.includes('w');
+  const fromTop = dir.includes('n');
+
+  function onMove(ev: MouseEvent): void {
+    const current = ctx.pointerToCanvas(ev, frameEl!);
+    if (!current) return;
+    const dx = current.x - start!.x;
+    const dy = current.y - start!.y;
+    let nx = ob.x;
+    let ny = ob.y;
+    let nw = ob.w;
+    let nh = ob.h;
+    if (moveX) {
+      if (fromLeft) {
+        nx = ob.x + dx;
+        nw = ob.w - dx;
+      } else {
+        nw = ob.w + dx;
+      }
+    }
+    if (moveY) {
+      if (fromTop) {
+        ny = ob.y + dy;
+        nh = ob.h - dy;
+      } else {
+        nh = ob.h + dy;
+      }
+    }
+    if (nw < ctx.MIN_ELEMENT_SIZE_PX) {
+      if (fromLeft) nx = ob.x + ob.w - ctx.MIN_ELEMENT_SIZE_PX;
+      nw = ctx.MIN_ELEMENT_SIZE_PX;
+    }
+    if (nh < ctx.MIN_ELEMENT_SIZE_PX) {
+      if (fromTop) ny = ob.y + ob.h - ctx.MIN_ELEMENT_SIZE_PX;
+      nh = ctx.MIN_ELEMENT_SIZE_PX;
+    }
+    if (nx < 0) {
+      nw += nx;
+      nx = 0;
+    }
+    if (ny < 0) {
+      nh += ny;
+      ny = 0;
+    }
+    if (nx + nw > pageWidth) nw = pageWidth - nx;
+    if (ny + nh > sectionHeight) nh = sectionHeight - ny;
+    wrapper.style.left = nx + 'px';
+    wrapper.style.top = ny + 'px';
+    wrapper.style.width = nw + 'px';
+    wrapper.style.height = nh + 'px';
+    found!.element.box.x = nx;
+    found!.element.box.y = ny;
+    found!.element.box.w = nw;
+    found!.element.box.h = nh;
+  }
+  function onUp(): void {
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+    ctx.scheduleSave();
+  }
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+// -- Phase 2i ctx-method implementations -------------------------------
+//
+// The four state-management functions (setInteractionMode,
+// clearTemporaryPanState, endTemporaryPan, exitPlacementMode) were
+// forward-declared in Phase 2o.b for the keyboard module's consumption.
+// Phase 2i now owns the implementations. createEditor binds them as:
+//   ctx.setInteractionMode    = (mode) => setInteractionModeImpl(ctx, mode);
+//   ctx.clearTemporaryPanState = ()    => clearTemporaryPanStateImpl(ctx);
+//   ctx.endTemporaryPan        = ()    => endTemporaryPanImpl(ctx);
+//   ctx.exitPlacementMode      = ()    => exitPlacementModeImpl(ctx);
+
+export function setInteractionModeImpl(ctx: EditorContext, mode: string): void {
+  if (mode !== 'select' && mode !== 'pan') {
+    throw new Error('setInteractionMode: expected select or pan, got ' + String(mode));
+  }
+  ctx.interactionMode = mode;
+  if (ctx.viewport) {
+    ctx.viewport.setAttribute('data-interaction-mode', mode);
+  }
+  if (ctx.zoomToolbar) {
+    const btns = ctx.zoomToolbar.querySelectorAll('[data-mode-action]');
+    for (let i = 0; i < btns.length; i++) {
+      btns[i]!.setAttribute(
+        'aria-pressed',
+        btns[i]!.getAttribute('data-mode-action') === mode ? 'true' : 'false',
+      );
+    }
+  }
+}
+
+export function clearTemporaryPanStateImpl(ctx: EditorContext): void {
+  ctx.spaceHeldForPan = false;
+  ctx.temporaryPanPreviousMode = null;
+}
+
+export function endTemporaryPanImpl(ctx: EditorContext): void {
+  if (!ctx.spaceHeldForPan) return;
+  const nextMode = ctx.temporaryPanPreviousMode || 'select';
+  clearTemporaryPanStateImpl(ctx);
+  setInteractionModeImpl(ctx, nextMode);
+}
+
+export function exitPlacementModeImpl(ctx: EditorContext): void {
+  ctx.pendingImport = null;
+  ctx.setStatus('Cancelled', 'ok');
+  ctx.renderSectionsPanel();
+  ctx.renderPlacementSlots();
+}

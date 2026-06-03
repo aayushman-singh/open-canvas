@@ -671,50 +671,104 @@ export interface EditorContext {
    *  it onto ctx. */
   editingElementId: string | null;
 
-  // -- Phase 2i forward declarations (filled by drag/pan phase) ---------
+  // -- Phase 2i: drag/resize cluster + pointer state machine -------------
+  /** Lower bound for resize width/height, in canvas px. Mirrored in
+   *  server-side validate.ts / render.ts bounds so a state authored in
+   *  the editor passes server validation on save. Carried on ctx (rather
+   *  than as a module-local constant in drag-resize.ts) because the
+   *  inline twin reads it as a free closure identifier and the surface
+   *  must mirror that closure shape per ADR 0058 Decision 1. */
+  MIN_ELEMENT_SIZE_PX: number;
   /** Current pointer interaction mode. "select" lets the Owner click +
-   *  drag elements; "pan" lets them drag the canvas (camera). FORWARD:
-   *  Phase 2i owns this. Phase 2o.b's keyboard handler reads this to
-   *  capture the pre-temporary-pan mode (so Space-held → temporary pan
-   *  → release restores the prior mode) and writes via setInteractionMode.
-   *  Legal runtime values are "select" and "pan" — setInteractionMode
-   *  throws on anything else. Typed as the broader `string` so call sites
-   *  that round-trip the value through DOM attributes (data-interaction-
-   *  mode) don't need a cast at every read. */
+   *  drag elements; "pan" lets them drag the canvas (camera). Phase 2o.b's
+   *  keyboard handler captures the pre-temporary-pan mode (so Space-held
+   *  → temporary pan → release restores the prior mode) and writes via
+   *  setInteractionMode. Legal runtime values are "select" and "pan" —
+   *  setInteractionMode throws on anything else. Typed as the broader
+   *  `string` so call sites that round-trip the value through DOM
+   *  attributes (data-interaction-mode) don't need a cast at every read.
+   *  Initial value at boot: "select". */
   interactionMode: string;
-  /** True while the Space key is held for temporary pan-mode. FORWARD:
-   *  Phase 2i owns this. Phase 2o.b's keyboard handler latches this on
-   *  Space-keydown and endTemporaryPan reads it to decide whether to
-   *  restore the prior mode on Space-keyup / window-blur. */
+  /** True while the Space key is held for temporary pan-mode. Phase 2o.b's
+   *  keyboard handler latches this on Space-keydown and endTemporaryPan
+   *  reads it to decide whether to restore the prior mode on Space-keyup
+   *  / window-blur. */
   spaceHeldForPan: boolean;
   /** The interactionMode value captured at the moment Space was pressed,
-   *  so endTemporaryPan can restore it. FORWARD: Phase 2i owns this.
-   *  Phase 2o.b's keyboard handler writes it on Space-keydown; null when
-   *  no temporary pan is active. */
+   *  so endTemporaryPan can restore it. Phase 2o.b's keyboard handler
+   *  writes it on Space-keydown; null when no temporary pan is active. */
   temporaryPanPreviousMode: string | null;
   /** Set the active pointer interaction mode and mirror it onto the
    *  viewport's data-interaction-mode + zoom-toolbar aria-pressed.
    *  Throws on values other than "select"/"pan" — callers MUST stick to
-   *  the two-state machine. FORWARD: Phase 2i owns this. Phase 2o.b's
-   *  keyboard handler invokes it for Space → pan and V → select. */
+   *  the two-state machine. Implementation: setInteractionModeImpl in
+   *  drag-resize.ts; createEditor binds ctx.setInteractionMode =
+   *  (mode) => setInteractionModeImpl(ctx, mode). */
   setInteractionMode(mode: string): void;
   /** Clear the spaceHeldForPan + temporaryPanPreviousMode latches without
-   *  changing interactionMode. FORWARD: Phase 2i owns this. Phase 2o.b's
-   *  keyboard handler invokes it on V (explicit select-mode) so a
-   *  subsequent Space release doesn't bounce the mode back. */
+   *  changing interactionMode. Phase 2o.b's keyboard handler invokes it
+   *  on V (explicit select-mode) so a subsequent Space release doesn't
+   *  bounce the mode back. Implementation: clearTemporaryPanStateImpl in
+   *  drag-resize.ts. */
   clearTemporaryPanState(): void;
   /** Exit temporary pan-mode — if spaceHeldForPan is true, restore the
    *  pre-Space interactionMode (defaulting to "select" when the prior
    *  mode is null) and clear the latches. No-op when no temporary pan is
-   *  active. FORWARD: Phase 2i owns this. Phase 2o.b's keyboard handler
-   *  invokes it on Space-keyup and window-blur. */
+   *  active. Phase 2o.b's keyboard handler invokes it on Space-keyup and
+   *  window-blur. Implementation: endTemporaryPanImpl in drag-resize.ts. */
   endTemporaryPan(): void;
   /** Cancel the pending sections-picker import (ctx.pendingImport) and
-   *  re-render so the between-section drop slots disappear. FORWARD:
-   *  Phase 2i owns this (placement is a drag-adjacent interaction).
+   *  re-render so the between-section drop slots disappear. Placement is
+   *  a drag-adjacent interaction, so the cancel lives in Phase 2i.
    *  Phase 2o.b's keyboard handler invokes it on Escape when an import
-   *  is pending. */
+   *  is pending. Implementation: exitPlacementModeImpl in drag-resize.ts;
+   *  reads ctx.pendingImport, calls ctx.setStatus / ctx.renderSectionsPanel
+   *  / ctx.renderPlacementSlots. */
   exitPlacementMode(): void;
+  /** Map a browser-coord pointer event into the named frame's local
+   *  coordinate space (section / tab-panel / collection-entry). Used by
+   *  beginDragImpl + beginResizeImpl to translate mousemove deltas into
+   *  state-space mutations. Returns null when sectionEl is missing or the
+   *  event has no clientX (defensive guard against synthetic events
+   *  during boot). FORWARD: kept inline by this phase; the camera/world
+   *  helpers cluster (canvas-client.ts:947) owns the implementation and
+   *  a later phase (sibling to render.ts's screenToWorld) will lift it
+   *  onto ctx with a real signature. */
+  pointerToCanvas(
+    event: PointerEvent | MouseEvent,
+    sectionEl: Element,
+  ): { x: number; y: number } | null;
+  /** Walk up from `target` (and synthetic hit-tests via document.
+   *  elementFromPoint for overlay layers) to the nearest .opencanvas-
+   *  element wrapper at the given pointer coords. Used by
+   *  attachPointerHandlersImpl's mousedown branch + the canvas-wide
+   *  context menu wiring. Returns null when no wrapper covers the
+   *  pointer. FORWARD: kept inline by this phase; canvas-client.ts:11853
+   *  owns the implementation and a later phase (the canvas-overlay/hit-
+   *  test cluster) will lift it onto ctx. */
+  resolveElementWrapperAtPoint(
+    target: Element,
+    clientX: number,
+    clientY: number,
+  ): HTMLElement | null;
+  /** Canvas-wide link-hover handler — shows the link popover when the
+   *  pointer enters a nav-link or action element outside any
+   *  contenteditable subtree. attachPointerHandlersImpl wires this onto
+   *  ctx.root as the `mouseover` listener. FORWARD: kept inline by this
+   *  phase; canvas-client.ts:9165 owns the implementation and the future
+   *  link-popover cluster (Phase TBD) will lift it onto ctx. */
+  onCanvasLinkHover(ev: MouseEvent): void;
+  /** Symmetric counterpart to onCanvasLinkHover — hides the link popover
+   *  when the pointer leaves the link region. Wired as `mouseout` on
+   *  ctx.root by attachPointerHandlersImpl. FORWARD: kept inline by this
+   *  phase; canvas-client.ts:9183 owns the implementation. */
+  onCanvasLinkHoverLeave(ev: MouseEvent): void;
+  /** Re-render the sections picker panel (the left-sidebar tray that
+   *  shows pre-built section recipes). exitPlacementModeImpl calls this
+   *  so the picker resets when an import is cancelled. FORWARD: kept
+   *  inline by this phase; canvas-client.ts:12522 owns the implementation
+   *  and the future sections-picker phase will lift it onto ctx. */
+  renderSectionsPanel(): void;
 
   // -- Phase 2j forward declarations (filled by section ops phase) -------
   /** Dispatch a section-toolbar action ("delete-section", "duplicate-
