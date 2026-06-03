@@ -44,6 +44,10 @@ import { bringToFront, nextZInArray, nudgeZ, renormalizeZ, sendToBack } from './
 import { cssEscape } from './css-escape.js';
 import { previewPaletteFromAccent } from './palette.js';
 import { SIDEBAR_FACTORIES } from './sidebar-factories.js';
+import { field, selectInput } from './dom-builders.js';
+
+void field;
+void selectInput;
 
 void clampInsertIndex;
 void hasFooterSection;
