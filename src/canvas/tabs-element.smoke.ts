@@ -169,6 +169,10 @@ function goodTabs(overrides: Partial<TabsElement> = {}): TabsElement {
     html.includes('data-opencanvas-tabs-handler') && html.includes('toggleAttribute'),
     `expected tabs handler script; got ${html}`,
   );
+  assert(
+    html.includes("var n=e.target;if(!n||typeof n.closest!=='function')return;var btn=n.closest"),
+    'tabs handler must guard non-Element click targets before calling closest',
+  );
 }
 
 // No script emitted when no TabsElement exists.

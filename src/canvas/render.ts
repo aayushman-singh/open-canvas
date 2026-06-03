@@ -457,7 +457,7 @@ function snapshotHasCopyAction(snapshot: PublishedSnapshot): boolean {
 function renderTabsHandlerScript(snapshot: PublishedSnapshot): string {
   if (!snapshotHasTabsElement(snapshot)) return '';
   const script =
-    "document.addEventListener('click',function(e){var btn=e.target.closest('[data-opencanvas-tab-id]');if(!btn||btn.tagName!=='BUTTON')return;var root=btn.closest('[data-opencanvas-tabs]');if(!root)return;var id=btn.getAttribute('data-opencanvas-tab-id');root.querySelectorAll('[data-opencanvas-tab-id]').forEach(function(b){if(b.closest('[data-opencanvas-tabs]')!==root)return;b.toggleAttribute('data-tab-active',b.getAttribute('data-opencanvas-tab-id')===id)});root.querySelectorAll('[data-opencanvas-tab-panel-id]').forEach(function(p){if(p.closest('[data-opencanvas-tabs]')!==root)return;p.toggleAttribute('data-tab-active',p.getAttribute('data-opencanvas-tab-panel-id')===id)})});";
+    "document.addEventListener('click',function(e){var n=e.target;if(!n||typeof n.closest!=='function')return;var btn=n.closest('[data-opencanvas-tab-id]');if(!btn||btn.tagName!=='BUTTON')return;var root=btn.closest('[data-opencanvas-tabs]');if(!root)return;var id=btn.getAttribute('data-opencanvas-tab-id');root.querySelectorAll('[data-opencanvas-tab-id]').forEach(function(b){if(b.closest('[data-opencanvas-tabs]')!==root)return;b.toggleAttribute('data-tab-active',b.getAttribute('data-opencanvas-tab-id')===id)});root.querySelectorAll('[data-opencanvas-tab-panel-id]').forEach(function(p){if(p.closest('[data-opencanvas-tabs]')!==root)return;p.toggleAttribute('data-tab-active',p.getAttribute('data-opencanvas-tab-panel-id')===id)})});";
   return `<script data-opencanvas-tabs-handler>${script}</script>`;
 }
 
