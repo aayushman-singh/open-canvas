@@ -969,6 +969,28 @@ assert(
     resolveActionHrefSource.includes('href.anchor ? base + "#" + href.anchor : base'),
   'expected editor resolveActionHref mirror to throw on missing pages and preserve page anchors',
 );
+// ADR 0051 dec 3 — ActionElement is a one-of: { href } OR { behavior }. The
+// editor IIFE's buildActionBody must branch before calling resolveActionHref
+// so a behavior-arm element (no href) doesn't crash editor load. Reverting
+// the branch unconditionally calls resolveActionHref(element.href) on a
+// behavior-arm element → "resolveActionHref: unknown href shape" → editor
+// surfaces "Failed to load site". This guard lights up red if that revert
+// ever sneaks back in.
+const buildShapeBodyStart = canvasClientSource.indexOf(
+  'function buildShapeBody',
+  buildActionBodyStart,
+);
+assert(buildShapeBodyStart >= 0, 'expected editor client to define buildShapeBody');
+const buildActionBodySource = canvasClientSource.slice(
+  buildActionBodyStart,
+  buildShapeBodyStart,
+);
+assert(
+  buildActionBodySource.includes('element.behavior !== undefined') &&
+    buildActionBodySource.includes('createElement("button")') &&
+    buildActionBodySource.includes('data-opencanvas-copy'),
+  'expected buildActionBody to branch on element.behavior (ADR 0051 dec 3) and emit a copy button for the behavior arm',
+);
 assert(
   yjsProjectionSource.includes('[canvas:yjs-projection] autosave persist failed') &&
     coEditAutosaveSource.includes('outer `attachAutosave` logs') &&
