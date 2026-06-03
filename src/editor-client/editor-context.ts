@@ -14,6 +14,7 @@ import type {
   CanvasSection,
   EditableSite,
   InlineRun,
+  PositionedBox,
 } from '../canvas/schema.js';
 import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { MediaElement } from '../canvas/elements/media.js';
@@ -381,4 +382,87 @@ export interface EditorContext {
    *  because selectElement re-enters selectSection for the element's
    *  parent section. */
   selectSection(sectionId: string | null): void;
+
+  // -- Phase 2l: camera + render orchestrator ----------------------------
+  /** The .opencanvas-viewport wrapper inserted around #canvas-root at boot.
+   *  Owns the dark background + dock-clearing margins; carries
+   *  overflow:hidden so the camera (not the browser) handles pan+zoom.
+   *  Null before mountViewport runs — every camera helper exits early
+   *  on null so the boot order doesn't have to assert mount completion. */
+  viewport: HTMLElement | null;
+  /** The floating zoom toolbar (+/-/Fit) at the bottom-right of the
+   *  editor. Wired late by the camera bootstrap; the camera helpers do
+   *  not read it (only the click handlers do), so the field is exposed on
+   *  ctx for the late wiring path rather than for the inline render. */
+  zoomToolbar: HTMLElement | null;
+  /** The "100%" zoom-percentage readout inside the zoom toolbar.
+   *  applyCameraTransform writes Math.round(camera.zoom * 100) + "%" into
+   *  it on every transform — null is treated as "readout not mounted yet"
+   *  and skipped without a fallback. */
+  zoomReadout: HTMLElement | null;
+  /** The {x, y, zoom} camera state. Mutated in place by setZoom /
+   *  zoomAtPoint / fitToPage / fitAllPages and read by applyCameraTransform.
+   *  Initial values mirror the IIFE's `{ x: 0, y: 0, zoom: 1 }` — fresh
+   *  identity-matrix camera at boot. */
+  camera: { x: number; y: number; zoom: number };
+  /** Per-page artboard layout: where each page's artboard sits in
+   *  world-space (x is the left edge of the artboard, y is
+   *  ARTBOARD_LABEL_HEIGHT below the top, width comes from page.width,
+   *  height sums header + page sections + footer). Recomputed by
+   *  computePagePositions; consumed by getPagePosition + renderAllImpl +
+   *  fitToPage + fitAllPages + (Phase 2i) drag handlers. Exposed on ctx
+   *  because the drag cluster needs the artboard bounds. */
+  pagePositions: Array<{
+    pageId: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+  /** Truthy when the Owner has clicked "Use" on a Sections-picker card
+   *  and the canvas should render between-section drop slots. The field
+   *  is set+cleared by the sections-picker (Phase 2k territory) and only
+   *  read by renderAllImpl as a truthiness gate before calling
+   *  ctx.renderPlacementSlots — so the on-ctx type is the loosest possible
+   *  shape (`unknown`) rather than the full PendingImport record. */
+  pendingImport: unknown;
+  /** Re-render the inline link popover when the camera moves. The IIFE's
+   *  inline applyCameraTransform calls this through a `typeof === "function"`
+   *  gate because the co-edit cursor layer mounts asynchronously after the
+   *  first camera transform fires; the extracted module replicates the
+   *  same gate against the (optional) ctx method to preserve boot-order
+   *  parity. Filled in by the Phase 2p co-edit cluster. */
+  repaintRemoteCursors?: () => void;
+  /** Re-anchor the mark toolbar + link popover when the camera moves. The
+   *  inline IIFE's applyCameraTransform gates this through a
+   *  `typeof === "function"` check; the extracted module replicates the
+   *  same gate so the boot order (camera fires before mark-toolbar wiring)
+   *  stays valid. Filled in by the mark-toolbar cluster (later phase). */
+  onMarkToolbarReflow?: () => void;
+  /** Build the live DOM node for a section at the given page width.
+   *  Called from renderAllImpl for header → page sections → footer in
+   *  that order. Exposed on ctx because renderAllImpl in this module needs
+   *  it but the implementation stays inline in canvas-client.ts (Phase 2
+   *  doesn't touch the IIFE); future phases will move the builder over
+   *  and the field stays. */
+  buildSectionNode(section: CanvasSection, pageWidth: number): HTMLElement;
+  /** Toggle the .active class + aria-pressed on every sidebar style-kit
+   *  chip so the chip row matches state.styleKit. Called from renderAllImpl
+   *  on every full render so undo/redo (or any non-sidebar kit change)
+   *  reflects in the chip row. Implementation stays inline in
+   *  canvas-client.ts during Phase 2; renderAllImpl invokes it through
+   *  ctx to keep the call shape mechanical. */
+  syncSidebarStyleKitButtons(buttons: NodeListOf<Element>): void;
+  /** Draw the between-section drop slots used while a sections-picker
+   *  import is pending. renderAllImpl only invokes this when
+   *  ctx.pendingImport is truthy; implementation stays inline in
+   *  canvas-client.ts during Phase 2. */
+  renderPlacementSlots(): void;
+  /** Apply (x, y, w, h, z, rotation) from a PositionedBox onto an absolute-
+   *  positioned wrapper. autoGrowTextElements calls this after growing a
+   *  text element's box.h so the live DOM matches the freshly mutated
+   *  box. Implementation stays inline in canvas-client.ts during Phase 2;
+   *  the field exists on ctx so the extracted autoGrowTextElements can
+   *  invoke it through the same call shape the inline twin uses. */
+  setBoxStyle(wrapper: HTMLElement, box: PositionedBox): void;
 }

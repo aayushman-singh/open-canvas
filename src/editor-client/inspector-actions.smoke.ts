@@ -189,6 +189,18 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     updateChatSelectionChip: () => {},
     renderReel: () => {},
     selectSection: () => {},
+    viewport: null,
+    zoomToolbar: null,
+    zoomReadout: null,
+    camera: { x: 0, y: 0, zoom: 1 },
+    pagePositions: [],
+    pendingImport: null,
+    buildSectionNode: () => {
+      throw new Error('buildSectionNode stub: smoke does not exercise section rendering');
+    },
+    syncSidebarStyleKitButtons: () => {},
+    renderPlacementSlots: () => {},
+    setBoxStyle: () => {},
   };
   return { ctx, log };
 }
