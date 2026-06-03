@@ -381,15 +381,42 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       // length/4 estimate as a pre-filter and only call Gemini's countTokens
       // when the cheap estimate signals we're within 20% of the cap. Bounds
       // the API round-trip cost to at most once per turn.
-      const overBudget = await isOverTokenBudget({
-        adapter: ctx.adapter,
-        history,
-        model,
-        systemInstruction,
-        tools,
-        signal: controller.signal,
-        tokenBudget,
-      });
+      let overBudget: boolean;
+      try {
+        overBudget = await isOverTokenBudget({
+          adapter: ctx.adapter,
+          history,
+          model,
+          systemInstruction,
+          tools,
+          signal: controller.signal,
+          tokenBudget,
+        });
+      } catch (err) {
+        if (controller.signal.aborted) {
+          logBudgetExhausted({
+            sessionId: session.id,
+            reason: 'wallclock-exceeded',
+            iteration,
+            toolCallBudget,
+            wallClockMs,
+          });
+          await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
+          return { messages: history, previewOps, doneReason: 'wallclock-exceeded' };
+        }
+        throw err;
+      }
+      if (controller.signal.aborted) {
+        logBudgetExhausted({
+          sessionId: session.id,
+          reason: 'wallclock-exceeded',
+          iteration,
+          toolCallBudget,
+          wallClockMs,
+        });
+        await writer.write({ kind: 'done', reason: 'wallclock-exceeded' });
+        return { messages: history, previewOps, doneReason: 'wallclock-exceeded' };
+      }
       if (overBudget) {
         logBudgetExhausted({
           sessionId: session.id,
@@ -714,6 +741,20 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
     '  3. Past tense becomes accurate only AFTER a tool call has been accepted. Until then, the Editable Site is unchanged.',
   );
   lines.push('');
+  lines.push('Reply structure — must follow exactly:');
+  lines.push(
+    "  A. Open with a SHORT acknowledgement of the request before emitting any mutating tool call. One short phrase only, e.g. \"Got it.\", \"On it.\", \"Sure — proposing this now.\". Do NOT enumerate or describe the proposals you are about to make. The Owner sees each proposal rendered as its own card; pre-announcing them duplicates the UI.",
+  );
+  lines.push(
+    '  B. Emit your tool calls. Do not narrate between them. Do not write sentences like "First, I\'ll propose...", "After that, I\'ll propose...", "Now I\'ll add..." — the cards speak for themselves.',
+  );
+  lines.push(
+    "  C. After the last tool call for the turn, close with ONE short sentence summarising what was proposed and inviting feedback, e.g. \"I've proposed a new Manifesto page and a hero section — let me know if you'd like changes.\" Keep proposal-tense (\"proposed\", \"suggested\"), never accepted-tense.",
+  );
+  lines.push(
+    '  D. For read-only or question-answering turns (no mutating tool calls), reply in normal prose. The acknowledgement-then-summary rule only applies when at least one mutating tool call is emitted.',
+  );
+  lines.push('');
   lines.push('Read-only tools:');
   lines.push(
     '  query_site — inspect site structure (pages, sections, elements with IDs). Defaults to detail="full" so every element id is visible. Call this BEFORE proposing any element-level change. NEVER invent element ids — every rewriteText / updateElement / deleteElement target id MUST appear verbatim in a prior query_site result.',
@@ -799,15 +840,13 @@ const PRECISE_COUNT_THRESHOLD = 0.8;
 
 async function isOverTokenBudget(input: OverBudgetInput): Promise<boolean> {
   const cheap = estimateMessagesTokens(input.history);
-  if (cheap > input.tokenBudget) {
-    // Cheap estimate already over — the precise count is only ever lower by
-    // ~25% on tool-call JSON, so spending a round-trip cannot save us.
-    return true;
-  }
   if (cheap <= input.tokenBudget * PRECISE_COUNT_THRESHOLD) {
     // Comfortably under the cap; don't burn an API call.
     return false;
   }
+  // At the cap boundary the Gemini count is authoritative. The length/4
+  // estimate can be high on tool-result JSON; using it as a hard stop would
+  // end turns the real model context can still accept.
   const precise = await input.adapter.countTokens(toLlmMessages(input.history), {
     model: input.model,
     systemInstruction: input.systemInstruction,

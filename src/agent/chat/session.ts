@@ -111,8 +111,9 @@ export const QUERY_SITE_TOKEN_CAP = 12_000;
 
 /**
  * Trim oldest non-system / non-summary messages from the front of the array
- * until the remaining estimated token count fits within `budget`. The most
- * recent message is always preserved (we never drop the active turn).
+ * until the remaining estimated token count fits within `budget`. The latest
+ * user message and everything after it is always preserved (we never drop the
+ * active turn, including assistant tool calls and tool responses).
  *
  * Returns a NEW array; the input is not mutated.
  */
@@ -121,23 +122,29 @@ export function trimToBudget(
   budget: number = CHAT_TOKEN_BUDGET,
 ): ChatMessage[] {
   const out = [...messages];
-  // The active turn is whatever sits at the end; keep it pinned.
   while (out.length > 1 && estimateMessagesTokens(out) > budget) {
+    const activeStart = activeTurnStartIndex(out);
     // Find the first message we can drop: skip any system / summary at the
     // very front (they hold the persistent context) and drop the next one.
     let dropIdx = 0;
     while (dropIdx < out.length && (out[dropIdx]?.role === 'system' || out[dropIdx]?.role === 'summary')) {
       dropIdx++;
     }
-    if (dropIdx >= out.length - 1) {
-      // Nothing left to drop besides the active turn — give up; the caller
-      // will get whatever still fits. Better to send slightly over budget
-      // than drop the active turn.
+    if (dropIdx >= activeStart) {
+      // Nothing left to drop besides the active turn. The orchestrator's
+      // precise token-budget check decides whether to continue or end loudly.
       break;
     }
     out.splice(dropIdx, 1);
   }
   return out;
+}
+
+function activeTurnStartIndex(messages: readonly ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'user') return i;
+  }
+  return Math.max(0, messages.length - 1);
 }
 
 /**

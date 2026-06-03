@@ -12,12 +12,21 @@
 //   5. Loud summarisation failure: empty model output ends the turn with
 //      `error` + `done(summarise-failed)`, never silently. Owner message is
 //      preserved in history (ADR 0055 dec 5 + ADR 0056 follow-up).
+//   6. Precise token count is authoritative at the cap boundary.
+//   7. Wall-clock aborts during countTokens end the turn loudly.
+//   8. Token trimming never orphans active tool responses.
 //
 // All paths run without GEMINI_API_KEY / DATABASE_URL — the mock LlmAdapter
 // + InMemorySessionStore stand in.
 
 import { applyCanvasAgentOp } from '../canvas-ops.js';
-import type { LlmAdapter, LlmChunk, LlmMessage, ChatWithToolsOptions } from '../llm.js';
+import type {
+  ChatWithToolsOptions,
+  CountTokensOptions,
+  LlmAdapter,
+  LlmChunk,
+  LlmMessage,
+} from '../llm.js';
 import type { EditableSite, SectionRecipeId } from '../../canvas/schema.js';
 import { SECTION_RECIPE_IDS } from '../../canvas/schema.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../../canvas/recipes.js';
@@ -28,6 +37,7 @@ import {
   InMemorySessionStore,
   QUERY_SITE_TOKEN_CAP,
   estimateTokens,
+  trimToBudget,
   type ChatMessage,
   type ChatSessionState,
 } from './session.js';
@@ -103,12 +113,18 @@ function buildLargeState(): EditableSite {
 // ---------------------------------------------------------------------------
 
 type Script = Array<() => AsyncIterable<LlmChunk>>;
+type CountTokensImpl = (messages: LlmMessage[], opts: CountTokensOptions) => Promise<number>;
 
 class MockLlmAdapter implements LlmAdapter {
   private callIdx = 0;
+  public readonly countTokenCalls: Array<{ messages: LlmMessage[]; opts: CountTokensOptions }> = [];
   public readonly messageHistorySnapshots: LlmMessage[][] = [];
 
-  constructor(private readonly script: Script) {}
+  constructor(
+    private readonly script: Script,
+    private readonly preciseTokenCounts: number[] = [],
+    private readonly countTokensImpl?: CountTokensImpl,
+  ) {}
 
   chatWithTools(messages: LlmMessage[], opts: ChatWithToolsOptions): AsyncIterable<LlmChunk> {
     void opts;
@@ -121,12 +137,10 @@ class MockLlmAdapter implements LlmAdapter {
     return next();
   }
 
-  // Smoke fixtures keep history well below the 80% pre-filter, so the
-  // orchestrator never actually calls countTokens here. The stub returns 0
-  // so a regression that does call it stays loudly under budget rather than
-  // silently failing.
-  countTokens(): Promise<number> {
-    return Promise.resolve(0);
+  countTokens(messages: LlmMessage[], opts: CountTokensOptions): Promise<number> {
+    this.countTokenCalls.push({ messages: messages.map((m) => ({ ...m })), opts });
+    if (this.countTokensImpl) return this.countTokensImpl(messages, opts);
+    return Promise.resolve(this.preciseTokenCounts.shift() ?? 0);
   }
 }
 
@@ -279,7 +293,7 @@ if (previewOp.op.kind === 'rewriteText') {
   );
 }
 
-console.log('[chat:smoke] 1/5 SSE event order — OK');
+console.log('[chat:smoke] 1/8 SSE event order — OK');
 
 // ---------------------------------------------------------------------------
 // Test 2 — Session persistence: history grows across send-message calls
@@ -328,7 +342,7 @@ assert(
   'expected the new user message to be persisted',
 );
 
-console.log('[chat:smoke] 2/5 Session persistence — OK');
+console.log('[chat:smoke] 2/8 Session persistence — OK');
 
 // ---------------------------------------------------------------------------
 // Test 3 — Token budget on query_site output (≤ 2k tokens, truncated).
@@ -353,7 +367,7 @@ assert(
   summaryLarge.truncated === true,
   'large site summary must flip truncated=true after trimming',
 );
-console.log('[chat:smoke] 3/5 Token budget cap — OK');
+console.log('[chat:smoke] 3/8 Token budget cap — OK');
 
 // ---------------------------------------------------------------------------
 // Test 4 — Op preview is NOT applied automatically; the live editable state
@@ -416,7 +430,7 @@ assert(
 // The source must STILL be unchanged after the clone-apply.
 assert(JSON.stringify(fixtureState) === beforeJson, 'apply-clone must not mutate source');
 
-console.log('[chat:smoke] 4/5 Op preview not auto-applied — OK');
+console.log('[chat:smoke] 4/8 Op preview not auto-applied — OK');
 
 // ---------------------------------------------------------------------------
 // Test 5 — Loud summarisation failure (ADR 0055 dec 5 + ADR 0056 follow-up).
@@ -477,7 +491,174 @@ assert(
   'failed-summarise turn must preserve the Owner appended message',
 );
 
-console.log('[chat:smoke] 5/5 Loud summarisation failure — OK');
+console.log('[chat:smoke] 5/8 Loud summarisation failure — OK');
+
+// ---------------------------------------------------------------------------
+// Test 6 - Precise countTokens is authoritative at the cap boundary.
+// ---------------------------------------------------------------------------
+
+const preciseUnderBudgetAdapter = new MockLlmAdapter(
+  [
+    () =>
+      yieldChunks(
+        {
+          type: 'tool_call',
+          id: 'query-assets-large-cheap-estimate',
+          name: 'query_assets',
+          arguments: { limit: 20 },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () =>
+      yieldChunks(
+        { type: 'text', text: 'The precise count still fits.' },
+        { type: 'done', reason: 'stop' },
+      ),
+  ],
+  [90],
+);
+
+const writer6 = new BufferedStreamWriter();
+const store6 = new InMemorySessionStore();
+const session6 = await store6.create('site-smoke-precise-count', 'customer-smoke-precise-count');
+const result6 = await runChatTurn({
+  session: session6,
+  userMessage: 'Inspect the assets before planning.',
+  writer: writer6,
+  ctx: {
+    adapter: preciseUnderBudgetAdapter,
+    state: fixtureState,
+    assets: Array.from({ length: 20 }, (_, idx) => ({
+      id: `asset-large-${String(idx)}`,
+      kind: 'image',
+      alt: `large asset alt ${String(idx)} ${'x'.repeat(160)}`,
+      contentHash: `hash-large-${String(idx)}`,
+    })),
+    systemInstruction: '[smoke] system prompt',
+    tokenBudget: 100,
+  },
+});
+assert(
+  preciseUnderBudgetAdapter.countTokenCalls.length === 1,
+  `expected one precise countTokens call at the cap boundary, got ${String(
+    preciseUnderBudgetAdapter.countTokenCalls.length,
+  )}`,
+);
+assert(
+  result6.doneReason === 'stop',
+  `precise under-budget count must allow the turn to continue, got ${result6.doneReason}`,
+);
+assert(
+  writer6.events().some((e) => e.kind === 'token' && e.text.includes('precise count still fits')),
+  'expected the second LLM pass to run after the precise under-budget count',
+);
+assert(
+  !writer6.events().some((e) => e.kind === 'done' && e.reason === 'tokens-exceeded'),
+  'precise under-budget count must not emit done(tokens-exceeded)',
+);
+
+console.log('[chat:smoke] 6/8 Precise token count boundary — OK');
+
+// ---------------------------------------------------------------------------
+// Test 7 - Wall-clock abort during countTokens maps to done(wallclock-exceeded).
+// ---------------------------------------------------------------------------
+
+const abortDuringCountAdapter = new MockLlmAdapter(
+  [
+    () =>
+      yieldChunks(
+        {
+          type: 'tool_call',
+          id: 'query-assets-count-abort',
+          name: 'query_assets',
+          arguments: { limit: 20 },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+  ],
+  [],
+  async (_messages, opts) => {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    if (opts.signal?.aborted) throw new Error('countTokens aborted');
+    return 90;
+  },
+);
+
+const writer7 = new BufferedStreamWriter();
+const store7 = new InMemorySessionStore();
+const session7 = await store7.create('site-smoke-count-abort', 'customer-smoke-count-abort');
+const result7 = await runChatTurn({
+  session: session7,
+  userMessage: 'Inspect assets until the deadline trips.',
+  writer: writer7,
+  ctx: {
+    adapter: abortDuringCountAdapter,
+    state: fixtureState,
+    assets: Array.from({ length: 20 }, (_, idx) => ({
+      id: `asset-count-abort-${String(idx)}`,
+      kind: 'image',
+      alt: `count abort asset alt ${String(idx)} ${'x'.repeat(160)}`,
+      contentHash: `hash-count-abort-${String(idx)}`,
+    })),
+    systemInstruction: '[smoke] system prompt',
+    tokenBudget: 100,
+    wallClockMs: 1,
+  },
+});
+assert(
+  result7.doneReason === 'wallclock-exceeded',
+  `expected countTokens abort to end as wallclock-exceeded, got ${result7.doneReason}`,
+);
+const events7 = writer7.events();
+const final7 = events7[events7.length - 1];
+assert(
+  final7?.kind === 'done' && final7.reason === 'wallclock-exceeded',
+  `expected final event done(wallclock-exceeded), got ${final7?.kind ?? 'none'}`,
+);
+
+console.log('[chat:smoke] 7/8 countTokens wall-clock abort — OK');
+
+// ---------------------------------------------------------------------------
+// Test 8 - Trimming preserves the active tool-call protocol tail.
+// ---------------------------------------------------------------------------
+
+const activeToolTail: ChatMessage[] = [
+  { role: 'user', content: 'Old prompt ' + 'x'.repeat(400) },
+  { role: 'assistant', content: 'Old answer ' + 'x'.repeat(400) },
+  { role: 'user', content: 'Inspect the current site.' },
+  {
+    role: 'assistant',
+    content: '',
+    toolCalls: [{ id: 'query-site-active', name: 'query_site', arguments: { detail: 'full' } }],
+  },
+  {
+    role: 'tool',
+    toolCallId: 'query-site-active',
+    toolName: 'query_site',
+    content: JSON.stringify({ summary: 'x'.repeat(400) }),
+  },
+];
+const trimmedActiveToolTail = trimToBudget(activeToolTail, 10);
+assert(
+  trimmedActiveToolTail.some((m) => m.role === 'user' && m.content === 'Inspect the current site.'),
+  'trimToBudget must preserve the active user message',
+);
+assert(
+  trimmedActiveToolTail.some(
+    (m) =>
+      m.role === 'assistant' &&
+      m.toolCalls?.some((call) => call.id === 'query-site-active'),
+  ),
+  'trimToBudget must preserve the assistant tool-call message for active tool results',
+);
+assert(
+  trimmedActiveToolTail.some(
+    (m) => m.role === 'tool' && m.toolCallId === 'query-site-active',
+  ),
+  'trimToBudget must preserve the active tool result',
+);
+
+console.log('[chat:smoke] 8/8 Active tool tail trim — OK');
 
 // ---------------------------------------------------------------------------
 // Done.
