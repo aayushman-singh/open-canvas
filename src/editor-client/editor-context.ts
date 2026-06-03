@@ -1096,6 +1096,69 @@ export interface EditorContext {
    *  point (canvas or reel), and commits on mouseup. Called from
    *  attachGripHandlers after the 5px movement threshold trips. */
   beginSectionDrag(sectionId: string, startEv: MouseEvent): void;
+
+  // -- Phase 2q.c: page CRUD + page-crumb popover ------------------------
+  /** Live page-switcher popover anchored to the breadcrumb chip, or null
+   *  when no popover is mounted. Open/close are toggles — calling open
+   *  while non-null closes; calling close while null is a no-op. The
+   *  field is mutated by openPageCrumbMenu / closePageCrumbMenu in
+   *  page-crud.ts. */
+  pageCrumbMenu: HTMLElement | null;
+  /** Cached outside-click handler for the page-crumb popover. Stored on
+   *  ctx because addEventListener('mousedown', ...) and the matching
+   *  removeEventListener MUST receive the same reference; re-deriving the
+   *  handler per open would leak listeners across reopens. Lazily seeded
+   *  on the first open and reused for the rest of the editor session. */
+  pageCrumbOutsideHandler: ((ev: Event) => void) | null;
+  /** Cached Escape-key handler for the page-crumb popover. Same listener-
+   *  identity requirement as pageCrumbOutsideHandler. */
+  pageCrumbKeyHandler: ((ev: Event) => void) | null;
+  /** Drive editor selection state for the active page. Clears the current
+   *  section + element selection, re-renders inspector + reel, toggles the
+   *  data-active attribute on every artboard wrapper, and refreshes the
+   *  breadcrumb label. Passing null is currently unused but accepted —
+   *  matches the inline twin's signature. */
+  setActivePage(pageId: string | null): void;
+  /** Refresh the [data-page-crumb-label] DOM text from
+   *  ctx.currentPage().title / .slug, or "page" when neither is set.
+   *  Idempotent — no-op when the label DOM ref is missing. */
+  refreshPageCrumb(): void;
+  /** Resolve a string href (e.g. "/about", "/about#hero", "about") to a
+   *  CanvasPage in the current state. Returns null when the href is not
+   *  internal (scheme:, "#fragment", external URL) or no page slug
+   *  matches the path. Strips query + fragment so an Owner-stored
+   *  "/about#hero" still resolves to the about page. */
+  findPageByHref(href: unknown): CanvasPage | null;
+  /** Drive editor navigation from a clicked link: internal pages switch
+   *  the active artboard, external/mailto/tel open in a new tab, anchors
+   *  no-op. Returns true when something was handled, false when the URL
+   *  allowlist rejected the href — callers surface a status line on false. */
+  goToHrefOnCanvas(href: unknown): boolean;
+  /** Open the create-page modal, push the resulting page with a blank
+   *  starter section, capture undo, activate the new page, fit the
+   *  viewport to it, schedule a save. No-op when state is null or the
+   *  modal is cancelled. */
+  createPage(): Promise<void>;
+  /** Prompt for a new title, derive a slug (rejects "_404"/"404",
+   *  reserved for the dedicated custom-404 flow), dedupe slugs by
+   *  appending -2/-3/..., capture undo, re-render, schedule a save.
+   *  No-op when state is null, page is missing, or the prompt is empty. */
+  renamePage(pageId: string): Promise<void>;
+  /** Refuse when the page is the last one or when any action element
+   *  links to it; otherwise confirm via openConfirmModal, splice it out,
+   *  capture undo, re-render, fit viewport, schedule a save. The inbound-
+   *  link guard is hard NO-DELETE — there is no rewrite-references
+   *  fallback; the Owner must repoint the action(s) first. */
+  deletePage(pageId: string): Promise<void>;
+  /** Center the named page in the viewport and auto-zoom up to
+   *  ZOOM_MAX_FIT (100%). Defaults pageId to the active page. Bound impl
+   *  lives in render.ts (Phase 2l). Forward-declared here so the page
+   *  CRUD cluster can fit-on-create without re-importing render. */
+  fitToPage(pageId: string | null): void;
+  /** Center the bounding box of all artboards in the viewport and
+   *  auto-zoom up to ZOOM_MAX_FIT (100%). Bound impl lives in render.ts.
+   *  Forward-declared here so deletePage can re-fit after a page exits. */
+  fitAllPages(): void;
 }
 
 /**

@@ -320,6 +320,24 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     openReel: () => {},
     moveSectionToIndex: () => {},
     beginSectionDrag: () => {},
+    pageCrumbMenu: null,
+    pageCrumbOutsideHandler: null,
+    pageCrumbKeyHandler: null,
+    setActivePage: () => {},
+    refreshPageCrumb: () => {},
+    findPageByHref: () => null,
+    goToHrefOnCanvas: () => false,
+    createPage: () => {
+      throw new Error('createPage stub: smoke does not exercise page CRUD');
+    },
+    renamePage: () => {
+      throw new Error('renamePage stub: smoke does not exercise page CRUD');
+    },
+    deletePage: () => {
+      throw new Error('deletePage stub: smoke does not exercise page CRUD');
+    },
+    fitToPage: () => {},
+    fitAllPages: () => {},
   };
   return { ctx, log };
 }
