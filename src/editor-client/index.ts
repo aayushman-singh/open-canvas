@@ -26,8 +26,11 @@ import {
   COEDIT_RECONNECT_MAX_ATTEMPTS,
   CANONICAL_MARK_ORDER,
 } from './editor-constants.js';
+import { isAllowedHref, isSafeCssValue, isValidActionHref } from './href-utils.js';
+import { migrateState } from './state-migration.js';
+import { MARK_TAGS } from './mark-tags.js';
 
-console.log('[editor-client] Phase 2a stub ready', {
+console.log('[editor-client] Phase 2b stub ready', {
   styleKits: STYLE_KITS.length,
   motionPresets: MOTION_PRESETS.length,
   inlineMarkTypes: INLINE_MARK_TYPES.length,
@@ -36,4 +39,9 @@ console.log('[editor-client] Phase 2a stub ready', {
   minElementSizePx: MIN_ELEMENT_SIZE_PX,
   defaultPageWidthPx: DEFAULT_PAGE_WIDTH_PX,
   coeditReconnectMaxAttempts: COEDIT_RECONNECT_MAX_ATTEMPTS,
+  markTagNames: Object.keys(MARK_TAGS).length,
+  isAllowedHrefOk: isAllowedHref('https://example.com'),
+  isSafeCssValueOk: isSafeCssValue('1rem'),
+  isValidActionHrefOk: isValidActionHref({ type: 'external', url: 'https://example.com' }),
+  migrateStateNullPassthrough: migrateState(null) === null,
 });
