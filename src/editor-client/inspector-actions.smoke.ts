@@ -149,6 +149,18 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     aiCreateSection: () => {
       throw new Error('aiCreateSection stub: smoke does not exercise AI section creation');
     },
+    root: null,
+    activePageId: null,
+    currentPage: () => null,
+    updatePageSidebar: () => {},
+    openConfirmModal: () => {
+      throw new Error('openConfirmModal stub: smoke does not exercise modals');
+    },
+    applyPageMotionAttributes: () => {},
+    applyPageStyleProperties: () => {},
+    pageRenderWidth: () => {
+      throw new Error('pageRenderWidth stub: smoke does not exercise page width');
+    },
   };
   return { ctx, log };
 }

@@ -8,7 +8,7 @@
 // Read this file to see the migration's scoreboard: when the interface
 // stops growing, the IIFE is fully decomposed.
 
-import type { CanvasSection, EditableSite, InlineRun } from '../canvas/schema.js';
+import type { CanvasPage, CanvasSection, EditableSite, InlineRun } from '../canvas/schema.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import type { FindElementResult } from './editor-context-types.js';
 
@@ -204,4 +204,50 @@ export interface EditorContext {
    *  Synchronously checks ctx.aiBusy and short-circuits when an AI request
    *  is in flight. */
   aiCreateSection(afterSectionId: string): void;
+
+  // -- Phase 2h.3.b: page inspector --------------------------------------
+  /** Canvas DOM root (`document.getElementById("canvas-root")`), cached at
+   *  boot. Null before boot wires it; the page inspector and replay path
+   *  are no-ops while null so the module never has to assert a live root. */
+  root: HTMLElement | null;
+  /** Active artboard id. Drives currentPage()'s selection — null falls
+   *  back to state.pages[0]. Mutated externally by setActivePage; the
+   *  page inspector reads it through ctx during replayAnimations so the
+   *  selector lookup matches whatever the canvas is showing. */
+  activePageId: string | null;
+  /** Walks state.pages and returns the one matching activePageId, or
+   *  state.pages[0] when no active id is set. Null when state is null
+   *  or pages is empty — callers must null-check; the page inspector
+   *  hides itself on null rather than throwing. */
+  currentPage(): CanvasPage | null;
+  /** Re-render the page list in the left sidebar. Called after page
+   *  title/slug mutations so the sidebar entry text matches the freshly
+   *  edited fields. No-op when the sidebar root is missing or state is
+   *  null. */
+  updatePageSidebar(): void;
+  /** Open the OK/Cancel confirm modal and resolve with the user's
+   *  choice. Throws synchronously if another modal is already open —
+   *  callers must serialise modals themselves, no implicit queueing. */
+  openConfirmModal(opts: {
+    title?: string;
+    message?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    danger?: boolean;
+  }): Promise<boolean>;
+  /** Mirror page.entranceAnimation + page.scrollTriggerMode onto the
+   *  artboard's <article> via data-motion-preset / data-entrance-animation
+   *  + data-scroll-trigger. Clears all three first so transitioning to
+   *  "none" doesn't leave stale attributes behind. */
+  applyPageMotionAttributes(article: HTMLElement, page: CanvasPage): void;
+  /** Mirror page.pageBackground / sectionGap / maxWidth onto the
+   *  artboard's <article> as inline styles. Width comes from
+   *  pageRenderWidth(page) (max-width-clamped). Empty-string assignments
+   *  clear unset fields rather than leaving prior values pinned. */
+  applyPageStyleProperties(article: HTMLElement, page: CanvasPage): void;
+  /** The effective render width: page.maxWidth when set and below
+   *  page.width, otherwise page.width. Throws on null page — callers
+   *  always pass a page resolved from state.pages, so null is a
+   *  dangling-reference bug rather than a silent default-1440 path. */
+  pageRenderWidth(page: CanvasPage): number;
 }
