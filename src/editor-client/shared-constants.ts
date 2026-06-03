@@ -34,3 +34,5 @@ export {
 } from '../canvas/schema.js';
 
 export { ALLOWED_HREF_SCHEMES } from '../canvas/action-href.js';
+
+export { CHART_KINDS } from '../canvas/elements/chart.js';

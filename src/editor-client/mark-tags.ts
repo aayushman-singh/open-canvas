@@ -19,3 +19,17 @@ export const MARK_TAGS: Readonly<Record<string, () => InlineMark>> = {
   MARK: () => ({ type: 'highlight' }),
   CODE: () => ({ type: 'code' }),
 };
+
+/** Inverse of MARK_TAGS — given an InlineMark type, the DOM tag the
+ *  editor's run renderer wraps the inner node with. `link` and
+ *  `fontSize` are intentionally absent: link needs href/target attrs
+ *  built inline by the renderer; fontSize stamps a style attribute
+ *  rather than wrapping a tag. */
+export const MARK_TYPE_TO_TAG: Readonly<Record<string, string>> = {
+  bold: 'strong',
+  italic: 'em',
+  underline: 'u',
+  strike: 's',
+  highlight: 'mark',
+  code: 'code',
+};

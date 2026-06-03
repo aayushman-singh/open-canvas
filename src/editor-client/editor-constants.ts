@@ -53,6 +53,35 @@ export const COEDIT_RECONNECT_MAX_ATTEMPTS = 10;
 export const CROPPER_SRI_SHA384 =
   'yCR/qrwwtTzBEzopZRNsQRqJmomeGgAikrPg/5vB2wkQLsM3OGRnEktc9gpN1KDg';
 
+/** CDN URL for the Cropper.js v2.1.1 ESM bundle. Must match the version
+ *  the CROPPER_SRI_SHA384 hash above was computed against. */
+export const CROPPER_CDN =
+  'https://cdn.jsdelivr.net/npm/cropperjs@2.1.1/dist/cropper.esm.js';
+
+/** Inter-artboard gap in canvas px. Pages stack vertically with this
+ *  much space between their artboard borders. */
+export const PAGE_GAP = 120;
+
+/** Height of the per-page artboard label above each page in canvas px. */
+export const ARTBOARD_LABEL_HEIGHT = 40;
+
+/** Lower bound for the camera zoom factor. */
+export const ZOOM_MIN = 0.25;
+
+/** Upper bound for `fitToPage` / `fitAllPages` automatic zoom. The fit
+ *  affordances never zoom past 100% — a small artboard fitting to
+ *  500% would surface huge pixelation. */
+export const ZOOM_MAX_FIT = 1.0;
+
+/** Upper bound for manual zoom (toolbar +/- and wheel). Owners can
+ *  intentionally zoom past 100% for precise positioning. */
+export const ZOOM_MAX_MANUAL = 2.0;
+
+/** Increment for the zoom toolbar +/- buttons. Wheel zoom uses a
+ *  finer step computed from the wheel delta; this constant is the
+ *  click-step floor. */
+export const ZOOM_STEP = 0.1;
+
 /** Canonical nesting order for inline marks. Outermost first: `link`
  *  wraps every other mark so anchor styling stays intact; the typographic
  *  tags nest inside in this exact sequence so the editor preview matches
