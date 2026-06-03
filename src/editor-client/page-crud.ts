@@ -391,17 +391,16 @@ export async function renamePageImpl(ctx: EditorContext, pageId: string): Promis
 
 export function findActionPageLinkReferences(ctx: EditorContext, pageId: string): string[] {
   const refs: string[] = [];
-  function scanSection(
-    section: { elements?: unknown[] } | null | undefined,
-    label: string,
-  ): void {
-    if (!section || !Array.isArray(section.elements)) return;
-    for (let i = 0; i < section.elements.length; i++) {
-      const el = section.elements[i] as {
+  function scanElements(elements: unknown[] | null | undefined, label: string): void {
+    if (!Array.isArray(elements)) return;
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i] as {
         type?: string;
         id?: string;
         href?: { type?: string; pageId?: string } | null;
         label?: Array<{ text?: string }>;
+        tabs?: Array<{ elements?: unknown[] }>;
+        entries?: unknown[][];
       };
       if (
         el.type === 'action' &&
@@ -417,7 +416,22 @@ export function findActionPageLinkReferences(ctx: EditorContext, pageId: string)
         }
         refs.push(label + ' / ' + (actionLabelText || el.id || ''));
       }
+      if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+        for (let ti = 0; ti < el.tabs.length; ti++) {
+          scanElements(el.tabs[ti]?.elements, label);
+        }
+      } else if (el.type === 'collection' && Array.isArray(el.entries)) {
+        for (let ei = 0; ei < el.entries.length; ei++) {
+          scanElements(el.entries[ei], label);
+        }
+      }
     }
+  }
+  function scanSection(
+    section: { elements?: unknown[] } | null | undefined,
+    label: string,
+  ): void {
+    scanElements(section?.elements, label);
   }
   if (!ctx.state) return refs;
   for (let pageIdx = 0; pageIdx < ctx.state.pages.length; pageIdx++) {
