@@ -139,6 +139,16 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     uploadMediaForElement: () => {
       throw new Error('uploadMediaForElement stub: smoke does not exercise uploads');
     },
+    inspector: null,
+    selectedSectionId: null,
+    inspectorRenderSubject: null,
+    findSection: () => null,
+    preserveInspectorScrollFor: () => {},
+    revokePendingPreviews: () => {},
+    selectableSectionRoles: () => ['body'],
+    aiCreateSection: () => {
+      throw new Error('aiCreateSection stub: smoke does not exercise AI section creation');
+    },
   };
   return { ctx, log };
 }

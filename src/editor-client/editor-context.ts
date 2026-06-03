@@ -8,7 +8,7 @@
 // Read this file to see the migration's scoreboard: when the interface
 // stops growing, the IIFE is fully decomposed.
 
-import type { EditableSite, InlineRun } from '../canvas/schema.js';
+import type { CanvasSection, EditableSite, InlineRun } from '../canvas/schema.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import type { FindElementResult } from './editor-context-types.js';
 
@@ -115,10 +115,12 @@ export interface EditorContext {
     elementId: string,
   ): Promise<{ assetId: string; kind: string }>;
   /** Writes a status line to the editor's status DOM ref, with optional
-   *  tone ("ok" / "error" / undefined). Auto-decorates trailing "…" with
-   *  a spinner. Carousel upload UI calls this to mark in-progress and
-   *  error states without re-rendering the inspector. */
-  setStatus(text: string, tone?: 'ok' | 'error'): void;
+   *  tone ("ok" / "error" / "info" / undefined). Auto-decorates trailing
+   *  "…" with a spinner. Carousel upload UI calls this to mark in-progress
+   *  and error states without re-rendering the inspector. The 'info' tone
+   *  is text-only — no CSS class lands on the status DOM ref; it exists
+   *  so callers can name the call-site intent explicitly. */
+  setStatus(text: string, tone?: 'ok' | 'error' | 'info'): void;
 
   // -- Phase 2h.2.d: nav links + media picker mounts ---------------------
   /** Same shape as the global `fetch` but throws "session expired" /
@@ -165,4 +167,41 @@ export interface EditorContext {
     file: File,
     refreshFn?: () => Promise<unknown>,
   ): Promise<void>;
+
+  // -- Phase 2h.3.a: section inspector ----------------------------------
+  /** Inspector panel DOM ref, cached at boot. Null before boot wires the
+   *  mount point; the section inspector is a no-op while null so the
+   *  module never has to assert a live mount. */
+  inspector: HTMLElement | null;
+  /** Section selection state. Null when no section is selected (element
+   *  or nothing is the active selection). Read-only from the section
+   *  inspector; selectSection writes it elsewhere. */
+  selectedSectionId: string | null;
+  /** Tag for the inspector content currently rendered ("section:<id>" /
+   *  "element:<id>" / "page"). preserveInspectorScrollFor reads + mutates
+   *  it so successive renders of the same subject keep the scrollTop
+   *  while subject switches reset to top. */
+  inspectorRenderSubject: string | null;
+  /** Walks state.header → state.footer → currentPage().sections in that
+   *  order and returns the first match. Returns null when no section has
+   *  the id — callers must null-check; the section inspector hides itself
+   *  on null rather than throwing. */
+  findSection(sectionId: string | null): CanvasSection | null;
+  /** Preserve inspector scrollTop across re-renders of the same subject;
+   *  reset to top when subject changes. Mutates inspectorRenderSubject
+   *  on call so callers don't have to thread the tag separately. */
+  preserveInspectorScrollFor(subject: string): void;
+  /** Revoke every object URL queued under [data-object-url] inside the
+   *  inspector before re-render. Without this, every blob-backed preview
+   *  leaks its bytes for the rest of the tab session. */
+  revokePendingPreviews(): void;
+  /** Resolve the legal role values for a section's role dropdown in the
+   *  inspector. "header"/"footer" only appear when the section is already
+   *  pinned OR sits at the page boundary AND no other section already
+   *  carries that role. Returned list is what the <select> renders. */
+  selectableSectionRoles(section: CanvasSection): string[];
+  /** Open the AI section-create modal anchored after the named section.
+   *  Synchronously checks ctx.aiBusy and short-circuits when an AI request
+   *  is in flight. */
+  aiCreateSection(afterSectionId: string): void;
 }
