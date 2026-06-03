@@ -770,12 +770,144 @@ export interface EditorContext {
    *  and the future sections-picker phase will lift it onto ctx. */
   renderSectionsPanel(): void;
 
-  // -- Phase 2j forward declarations (filled by section ops phase) -------
+  // -- Phase 2j: section toolbar + section orchestration -----------------
+  /** Compute the (x, y, w, h, z) box for a freshly-inserted element. Throws
+   *  on missing current page — a null page here means the caller passed a
+   *  section that no longer belongs to state, so we fail loudly rather
+   *  than invent geometry. Reads ctx.currentPage(); calls nextZInArray on
+   *  section.elements internally (z-order.ts). Implementation:
+   *  defaultBoxImpl in section-toolbar.ts. */
+  defaultBox(
+    section: CanvasSection,
+    w: number,
+    h: number,
+  ): { x: number; y: number; w: number; h: number; z: number };
+  /** Append `element` to `section.elements`, apply the page's default
+   *  motion preset when the element carries none, then renderAll +
+   *  selectElement + panToElement + scheduleSave. The pan keeps the new
+   *  element visible even when it lands far from the current scroll
+   *  position. Implementation: addElementToSectionImpl in
+   *  section-toolbar.ts. */
+  addElementToSection(section: CanvasSection, element: CanvasElement): void;
+  /** Resolve the section a sidebar drop-in should land in: explicit
+   *  selection → viewport-centre hit-test → first body section → first
+   *  section of any kind. Returns null when state has no pages. Reads
+   *  ctx.currentPage(), ctx.selectedSectionId, ctx.findSection,
+   *  ctx.viewport. Implementation: targetSectionForSidebarImpl in
+   *  section-toolbar.ts. */
+  targetSectionForSidebar(): CanvasSection | null;
+  /** Centre ctx.camera on the named element by walking page → section →
+   *  element world coords. No-op when any link in the chain is missing
+   *  (page / section / element / viewport) — addElementToSection calls
+   *  this unconditionally after insert, so swallowing missing-element is
+   *  the correct contract. Calls applyCameraTransform(ctx) from
+   *  render.ts. Implementation: panToElementImpl in section-toolbar.ts. */
+  panToElement(elementId: string): void;
+  /** Insert a fresh "Blank section" after the active section selection
+   *  (or at the end of the page when no section is selected), then
+   *  select the new section. Index runs through clampInsertIndex so
+   *  header/footer pins are respected. Implementation:
+   *  addBlankSectionFromSidebarImpl in section-toolbar.ts. */
+  addBlankSectionFromSidebar(): void;
+  /** Pure: map a sidebar component key ("text", "media", ...) to the
+   *  matching "add-X" action string handleSectionAction recognises, or
+   *  null when the key isn't registered in SIDEBAR_COMMANDS. Reads
+   *  ctx.SIDEBAR_COMMANDS only. Implementation: componentActionForSidebar
+   *  in section-toolbar.ts. */
+  componentActionForSidebar(component: string): string | null;
+  /** Dispatch a sidebar drop-in: pick a target section via
+   *  targetSectionForSidebar, resolve the action key via
+   *  componentActionForSidebar, route through handleSectionAction.
+   *  Surfaces "Add a section first" / "Unknown component: <key>" status
+   *  lines on the two failure paths — no silent no-ops. Implementation:
+   *  addComponentFromSidebarImpl in section-toolbar.ts. */
+  addComponentFromSidebar(component: string): void;
   /** Dispatch a section-toolbar action ("delete-section", "duplicate-
-   *  section", "move-up", "move-down", "convert-to-header", etc.) against
-   *  the named section. FORWARD: Phase 2j owns this. Phase 2o.b's
-   *  keyboard handler invokes it for Delete/Backspace when a section is
-   *  selected (action="delete-section"). The action string set lives in
-   *  canvas-client.ts:11621 (handleSectionAction's switch). */
+   *  section", "move-up", "move-down", "add-<key>", "save-to-library")
+   *  against the named section. Header/footer "delete-section" branches
+   *  short-circuit before page lookup so site-level deletes don't fall
+   *  through to the page-section path. Phase 2o.b's keyboard handler
+   *  invokes it for Delete/Backspace when a section is selected.
+   *  Implementation: handleSectionActionImpl in section-toolbar.ts. */
   handleSectionAction(action: string, sectionId: string): void;
+  /** Three-modal flow (name → optional description → visibility) then POST
+   *  to /library/sections. Clears ctx.sectionsCatalog on success so the
+   *  next picker open re-fetches. Every failure path writes a "Save
+   *  failed: <detail>" status line — no silent swallows. Awaits
+   *  ctx.flushPendingSave first so the server side reads the latest
+   *  persisted state. Implementation: saveToLibraryImpl in
+   *  section-toolbar.ts. */
+  saveToLibrary(section: CanvasSection): Promise<void>;
+  /** Three-modal flow (name → description → visibility) then POST to
+   *  /custom-templates. Refuses empty names with a status line instead of
+   *  POSTing. Same flushPendingSave-first contract + loud-failure status
+   *  line as saveToLibrary. Implementation: saveSiteAsTemplateImpl in
+   *  section-toolbar.ts. */
+  saveSiteAsTemplate(): Promise<void>;
+
+  // -- Phase 2j forward declarations (kept inline by this phase) ---------
+  /** Per-key sidebar command lookup table flattened from SIDEBAR_DISPATCH
+   *  at IIFE start. Phase 2j's handleSectionAction reads
+   *  SIDEBAR_COMMANDS[key] to decide whether an "add-<key>" action routes
+   *  through insertElementForSidebarCommand. Loose record shape
+   *  (Record<string, unknown>) because the SidebarCommandSpec union is
+   *  internal to the inline IIFE and Phase 2j doesn't read its fields
+   *  beyond truthiness. FORWARD: kept inline by this phase; a later phase
+   *  owns the dispatch table extraction. Inline twin at
+   *  canvas-client.ts:89-99. */
+  SIDEBAR_COMMANDS: Record<string, unknown>;
+  /** Build + insert a sidebar-command element into the given section
+   *  (or its nested tabs/collection target). Mutates state, renders,
+   *  schedules a save. Phase 2j's handleSectionAction routes "add-<key>"
+   *  actions through this. FORWARD: kept inline by this phase; the
+   *  per-element factory cluster owns the implementation. Inline twin at
+   *  canvas-client.ts:352-392. */
+  insertElementForSidebarCommand(section: CanvasSection, commandKey: string): void;
+  /** Resolve the world-space position of a page's artboard given its id,
+   *  or null when the page isn't in ctx.pagePositions. Phase 2j's
+   *  panToElement reads this to translate an element's section-local
+   *  coords into world coords. FORWARD: kept inline by this phase
+   *  (computePagePositions writes pagePositions inline; the lookup helper
+   *  travels with it). Inline twin at canvas-client.ts:794-799. */
+  getPagePosition(pageId: string): {
+    pageId: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+  /** Open the editor's single-field text modal (1-line by default; opt-in
+   *  multiline). Resolves with the entered string, or null when the
+   *  Owner cancels (Escape / backdrop click / Cancel button). Throws
+   *  synchronously when another modal is already open — callers must
+   *  serialise modals themselves. Phase 2j's saveToLibrary +
+   *  saveSiteAsTemplate chain three of these per call. FORWARD: kept
+   *  inline by this phase (the modal cluster has its own boundary).
+   *  Inline twin at canvas-client.ts:1195-1285. */
+  openTextModal(opts: {
+    title?: string;
+    label?: string;
+    defaultValue?: string;
+    placeholder?: string;
+    multiline?: boolean;
+  }): Promise<string | null>;
+  /** Open the editor's single-field select modal. Same cancel /
+   *  modal-stacking contract as openTextModal. Phase 2j's
+   *  saveToLibrary + saveSiteAsTemplate use this for the visibility
+   *  picker. FORWARD: kept inline by this phase. Inline twin at
+   *  canvas-client.ts:1287+. */
+  openSelectModal(opts: {
+    title?: string;
+    label?: string;
+    options?: Array<{ value: string; label?: string }>;
+    defaultValue?: string;
+  }): Promise<string | null>;
+  /** Cached cross-template sections catalog: null until first load, then
+   *  an array (possibly empty) of catalog rows. Phase 2j's saveToLibrary
+   *  sets this back to null on a successful POST so the next picker open
+   *  re-fetches. FORWARD: kept inline by this phase (the sections picker
+   *  owns the load + filter logic and the row shape). Loose `unknown`
+   *  array typing — Phase 2j only writes null. Inline twin at
+   *  canvas-client.ts:12233. */
+  sectionsCatalog: unknown[] | null;
 }

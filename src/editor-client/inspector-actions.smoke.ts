@@ -251,7 +251,40 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     onCanvasLinkHover: () => {},
     onCanvasLinkHoverLeave: () => {},
     renderSectionsPanel: () => {},
+    defaultBox: () => {
+      throw new Error('defaultBox stub: smoke does not exercise section toolbar');
+    },
+    addElementToSection: () => {
+      throw new Error('addElementToSection stub: smoke does not exercise section toolbar');
+    },
+    targetSectionForSidebar: () => null,
+    panToElement: () => {},
+    addBlankSectionFromSidebar: () => {
+      throw new Error('addBlankSectionFromSidebar stub: smoke does not exercise section toolbar');
+    },
+    componentActionForSidebar: () => null,
+    addComponentFromSidebar: () => {
+      throw new Error('addComponentFromSidebar stub: smoke does not exercise section toolbar');
+    },
     handleSectionAction: () => {},
+    saveToLibrary: () => {
+      throw new Error('saveToLibrary stub: smoke does not exercise section toolbar');
+    },
+    saveSiteAsTemplate: () => {
+      throw new Error('saveSiteAsTemplate stub: smoke does not exercise section toolbar');
+    },
+    SIDEBAR_COMMANDS: {},
+    insertElementForSidebarCommand: () => {
+      throw new Error('insertElementForSidebarCommand stub: smoke does not exercise sidebar dispatch');
+    },
+    getPagePosition: () => null,
+    openTextModal: () => {
+      throw new Error('openTextModal stub: smoke does not exercise modals');
+    },
+    openSelectModal: () => {
+      throw new Error('openSelectModal stub: smoke does not exercise modals');
+    },
+    sectionsCatalog: null,
   };
   return { ctx, log };
 }
