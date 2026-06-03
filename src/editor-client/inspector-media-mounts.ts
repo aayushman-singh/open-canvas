@@ -1,0 +1,119 @@
+// src/editor-client/inspector-media-mounts.ts
+//
+// ADR 0058 Phase 2h.2.a — media inspector mount functions.
+// canvas-client.ts:4772-4838 carries the inline twins; retires on Phase 3
+// cutover. Behavioural parity assertion lives in src/editor/inspector-smoke.ts
+// against the production inline path (no DOM in Bun, so this module skips
+// its own parity smoke).
+//
+// Two mounts:
+//   - mountMediaAi: image-only "AI media" button wired through
+//     ctx.INSPECTOR_ACTION_HANDLERS["replace-media"]. Disabled while
+//     ctx.aiBusy is true.
+//   - mountVideoPlayback: video-only autoplay/muted/loop/controls switches
+//     with the autoplay-implies-muted enforcement intact and the lazy
+//     element.playback default-init on first inspector open.
+
+import type { EditorContext } from './editor-context.js';
+import type { MediaElement } from '../canvas/elements/media.js';
+
+// AI media generation is image-only. Skip rendering for video elements
+// entirely — the upstream model has no video synthesis endpoint, so the
+// button used to fail with "server did not return image bytes" if owners
+// tried it. The image branch matches the legacy button-action shape:
+// primary inspector button wired to the replaceMedia AI handler.
+export function mountMediaAi(
+  ctx: EditorContext,
+  element: MediaElement,
+  host: HTMLElement,
+): void {
+  if (element.mediaKind === 'video') return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'AI media';
+  btn.setAttribute('data-ai-button', 'replace-media');
+  if (ctx.aiBusy) btn.disabled = true;
+  const handler = ctx.INSPECTOR_ACTION_HANDLERS['replace-media'];
+  if (typeof handler !== 'function') {
+    throw new Error('mountMediaAi: no action handler registered for replace-media');
+  }
+  btn.addEventListener('click', function () {
+    handler(element.id);
+  });
+  host.appendChild(btn);
+}
+
+// Video-playback controls — autoplay, muted, loop, controls — with the
+// autoplay-implies-muted enforcement that the legacy buildMediaInspector
+// carried. No-op on images. Lazy-initialises element.playback on first
+// render so older sites that pre-date the playback field still pick up
+// the default shape on first inspector open.
+export function mountVideoPlayback(
+  ctx: EditorContext,
+  element: MediaElement,
+  host: HTMLElement,
+): void {
+  if (element.mediaKind !== 'video') return;
+  const playback =
+    element.playback ||
+    (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
+  const autoplay = document.createElement('input');
+  autoplay.type = 'checkbox';
+  autoplay.checked = !!playback.autoplay;
+  const muted = document.createElement('input');
+  muted.type = 'checkbox';
+  muted.checked = !!playback.muted;
+  const loop = document.createElement('input');
+  loop.type = 'checkbox';
+  loop.checked = !!playback.loop;
+  const controls = document.createElement('input');
+  controls.type = 'checkbox';
+  controls.checked = !!playback.controls;
+
+  function enforceMuted() {
+    if (autoplay.checked) {
+      muted.checked = true;
+      muted.disabled = true;
+    } else {
+      muted.disabled = false;
+    }
+  }
+  enforceMuted();
+
+  autoplay.addEventListener('change', function () {
+    playback.autoplay = autoplay.checked;
+    enforceMuted();
+    playback.muted = muted.checked;
+    ctx.scheduleSave();
+  });
+  muted.addEventListener('change', function () {
+    if (autoplay.checked) {
+      muted.checked = true;
+      return;
+    }
+    playback.muted = muted.checked;
+    ctx.scheduleSave();
+  });
+  loop.addEventListener('change', function () {
+    playback.loop = loop.checked;
+    ctx.scheduleSave();
+  });
+  controls.addEventListener('change', function () {
+    playback.controls = controls.checked;
+    ctx.scheduleSave();
+  });
+
+  function rowFor(node: HTMLElement, labelText: string): HTMLDivElement {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.appendChild(node);
+    const lbl = document.createElement('label');
+    lbl.textContent = labelText;
+    row.appendChild(lbl);
+    return row;
+  }
+  host.appendChild(rowFor(autoplay, 'autoplay'));
+  host.appendChild(rowFor(muted, 'muted'));
+  host.appendChild(rowFor(loop, 'loop'));
+  host.appendChild(rowFor(controls, 'controls'));
+}

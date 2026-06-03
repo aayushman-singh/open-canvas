@@ -68,4 +68,16 @@ export interface EditorContext {
   /** Debounced. */
   scheduleSave(): void;
   closeElementMenu(): void;
+
+  // -- Phase 2h.2.a: media inspector mounts ------------------------------
+  /** Mutated externally by AI panel handlers — flips true while an AI
+   *  request is in flight so every AI button on the page disables until
+   *  the preview lands or is dismissed. Mount fns read this synchronously
+   *  at render time; the inspector re-renders when the flag flips. */
+  aiBusy: boolean;
+  /** Dispatch table populated at boot from inspector action registrations
+   *  (e.g. "replace-media" → aiReplaceMedia). Mount fns look up handlers
+   *  by name and throw synchronously at first mount when missing, rather
+   *  than failing silently on click. */
+  INSPECTOR_ACTION_HANDLERS: Record<string, (elementId: string) => void>;
 }

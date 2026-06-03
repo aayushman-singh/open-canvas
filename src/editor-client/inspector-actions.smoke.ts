@@ -114,6 +114,8 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     closeElementMenu: () => {
       log.closeElementMenu += 1;
     },
+    aiBusy: false,
+    INSPECTOR_ACTION_HANDLERS: {},
   };
   return { ctx, log };
 }
