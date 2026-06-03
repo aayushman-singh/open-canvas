@@ -116,6 +116,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     },
     aiBusy: false,
     INSPECTOR_ACTION_HANDLERS: {},
+    rebuildElement: () => {},
   };
   return { ctx, log };
 }

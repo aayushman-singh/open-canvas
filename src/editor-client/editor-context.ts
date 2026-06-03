@@ -80,4 +80,12 @@ export interface EditorContext {
    *  by name and throw synchronously at first mount when missing, rather
    *  than failing silently on click. */
   INSPECTOR_ACTION_HANDLERS: Record<string, (elementId: string) => void>;
+
+  // -- Phase 2h.2.b: form inspector mounts -------------------------------
+  /** Re-renders just the named element's DOM in place — call after
+   *  mutating fields whose render output depends on the field value, to
+   *  avoid a full renderAll(). Falls back to renderAll when the element
+   *  has no live wrapper in the canvas (e.g. it lives on a non-current
+   *  page); callers don't need to branch on that themselves. */
+  rebuildElement(elementId: string): void;
 }
