@@ -701,16 +701,28 @@ body.opencanvas-modal-open {
   border-color: var(--red);
   color: var(--red);
 }
+/* Revert lives on accepted cards. Same shape as reject but a neutral
+   hover so it reads as an undo (return-to-pending), not a destruction. */
+.opencanvas-chat-suggestion-actions button.revert {
+  font-weight: 700;
+}
+.opencanvas-chat-suggestion-actions button.revert:hover {
+  border-color: var(--ink);
+  color: var(--paper);
+  background: var(--ink);
+}
 .opencanvas-chat-suggestion-actions button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .opencanvas-chat-suggestion[data-status="accepted"] {
-  opacity: 0.6;
+  opacity: 0.85;
 }
 .opencanvas-chat-suggestion[data-status="accepted"] .opencanvas-chat-suggestion-body {
   text-decoration: line-through;
-  cursor: default;
+  /* Keep the body clickable on accepted cards so the user can still pan
+     to the now-applied target (e.g. to confirm or to revert from there). */
+  cursor: pointer;
 }
 .opencanvas-chat-suggestion[data-status="rejected"] {
   opacity: 0.5;
@@ -744,6 +756,12 @@ body.opencanvas-modal-open {
 .opencanvas-chat-accept-all:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+/* UA [hidden] => display:none is overridden by the .opencanvas-chat-accept-all
+   rule's display:flex, so the JS toggle silently leaves the button visible.
+   Re-pin display:none for the [hidden] state with matching specificity. */
+.opencanvas-chat-accept-all[hidden] {
+  display: none;
 }
 .opencanvas-chat-accept-all-count {
   font-weight: 600;

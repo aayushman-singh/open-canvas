@@ -10771,14 +10771,21 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     var label = chatAcceptAllBtn.querySelector("[data-accept-all-label]");
     var count = chatAcceptAllBtn.querySelector("[data-accept-all-count]");
     if (live.length === 0) {
-      // Reset the count text on hide so a future show without a fresh
-      // refresh (or a CSS regression) cannot leak a stale "1".
+      // Belt-and-suspenders hide: set both the hidden attribute AND
+      // inline display:none. Inline style beats any stylesheet rule
+      // regardless of specificity, so a future CSS regression (or a
+      // browser caching an old build) cannot leave a phantom banner on
+      // a blank chat. Also reset count + label text so a re-show after
+      // hide cannot leak the previous "1".
       chatAcceptAllBtn.hidden = true;
+      chatAcceptAllBtn.style.display = "none";
       if (label) label.textContent = "Accept all changes";
       if (count) count.textContent = "0";
       return;
     }
     chatAcceptAllBtn.hidden = false;
+    // Clear the inline override so the stylesheet's display:flex applies.
+    chatAcceptAllBtn.style.display = "";
     if (label) label.textContent = "Accept all " + (live.length === 1 ? "change" : "changes");
     if (count) count.textContent = String(live.length);
   }
@@ -14059,9 +14066,14 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
       var chatMessages = document.getElementById("canvas-chat-messages");
       var chatWelcome = document.getElementById("canvas-chat-welcome");
       // Bind the Accept-all banner to the module-scope handle so the
-      // suggestion tracker can hide/show it as ops drain.
+      // suggestion tracker can hide/show it as ops drain. Pin the
+      // initial-hidden state on bind so the banner is invisible from
+      // first paint regardless of how the route emitted the hidden
+      // attribute or what the user's cached stylesheet looks like.
       chatAcceptAllBtn = document.getElementById("canvas-chat-accept-all");
       if (chatAcceptAllBtn) {
+        chatAcceptAllBtn.hidden = true;
+        chatAcceptAllBtn.style.display = "none";
         chatAcceptAllBtn.addEventListener("click", function () {
           showAcceptAllSummary();
         });
