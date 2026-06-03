@@ -161,6 +161,12 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     pageRenderWidth: () => {
       throw new Error('pageRenderWidth stub: smoke does not exercise page width');
     },
+    isReelOpen: false,
+    INSPECTOR_DISPATCH: {} as EditorContext['INSPECTOR_DISPATCH'],
+    renderInspectorSpec: () => {
+      throw new Error('renderInspectorSpec stub: smoke does not exercise spec walking');
+    },
+    siteBase: '/api/canvas/sites/site-smoke',
   };
   return { ctx, log };
 }

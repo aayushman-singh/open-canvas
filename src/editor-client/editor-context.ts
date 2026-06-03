@@ -8,7 +8,14 @@
 // Read this file to see the migration's scoreboard: when the interface
 // stops growing, the IIFE is fully decomposed.
 
-import type { CanvasPage, CanvasSection, EditableSite, InlineRun } from '../canvas/schema.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  EditableSite,
+  InlineRun,
+} from '../canvas/schema.js';
+import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import type { FindElementResult } from './editor-context-types.js';
 
@@ -61,8 +68,10 @@ export interface EditorContext {
   renderAll(): void;
   renderInspector(): void;
   /** No-op when `elementId` is already the active selection; callers rely
-   *  on the idempotence to avoid re-render storms. */
-  selectElement(elementId: string): void;
+   *  on the idempotence to avoid re-render storms. Passing null clears the
+   *  selection — the inspector-close button uses this to dismiss the
+   *  inspector when no element is selected. */
+  selectElement(elementId: string | null): void;
   /** Called BEFORE the mutation; pairs with redoStack for symmetric
    *  undo/redo. Callers that mutate then capture invert the contract. */
   captureForUndo(): void;
@@ -250,4 +259,33 @@ export interface EditorContext {
    *  always pass a page resolved from state.pages, so null is a
    *  dangling-reference bug rather than a silent default-1440 path. */
   pageRenderWidth(page: CanvasPage): number;
+
+  // -- Phase 2h.3.c: element inspector orchestrator ----------------------
+  /** True while the asset reel (full-screen browser overlay) is open. The
+   *  element inspector hides itself synchronously when this flips true so
+   *  the inspector pane doesn't render under/over the reel. The reel
+   *  open/close path mutates this; the inspector only reads it. */
+  isReelOpen: boolean;
+  /** Per-element-type inspector spec table. JSON-injected into the IIFE at
+   *  boot (canvas-client.ts: `const INSPECTOR_DISPATCH = ${json};`) so the
+   *  closure carries it as a constant. On ctx, the type matches the
+   *  source `InspectorDispatch` shape — `collection` is intentionally
+   *  excluded from the static dispatch table (children render their own
+   *  inspectors), so the runtime lookup returns undefined for it and the
+   *  inspector body stays empty. */
+  INSPECTOR_DISPATCH: Record<Exclude<CanvasElement['type'], 'collection'>, InspectorSpec>;
+  /** Walk an InspectorSpec into DOM, appending fields to ctx.inspector.
+   *  The walker owns kind-by-kind branches for select / select-mapped /
+   *  text / textarea / checkbox / number / button-action / action-href /
+   *  custom-mount. Mount handlers are looked up via the INSPECTOR_MOUNT_
+   *  HANDLERS closure (NOT yet on ctx — still inline in canvas-client.ts);
+   *  this field exposes the walker so the element-inspector orchestrator
+   *  can render the spec without re-importing the walker's closure deps. */
+  renderInspectorSpec(spec: InspectorSpec, element: CanvasElement): void;
+  /** API_BASE + "/canvas/sites/" + SITE_ID — the per-site API root used
+   *  for /assets, /style-kit, etc. The IIFE caches it as `SITE_BASE` at
+   *  the top of the closure; on ctx it's a plain string so extracted
+   *  modules can construct `<siteBase>/assets/<id>` without re-deriving
+   *  apiBase + siteId concatenation. */
+  siteBase: string;
 }
