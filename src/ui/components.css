@@ -10,12 +10,9 @@
    Visitor sites are unaffected — `src/canvas/public-styles.ts`
    and `src/canvas/style-kits.ts` do not consume this file.
 
-   Source of truth: this file is the byte-identical twin of the
-   component class block in
-   design_handoff_opencanvas_rebrand/design-references/styles.css
-   (everything below the `:root` token blocks). The token blocks
-   themselves live in src/ui/theme.css to keep tokens and
-   primitives editable independently.
+   This file is the source of truth for the component class block;
+   the matching token blocks live in src/ui/theme.css so tokens and
+   primitives stay editable independently.
    ============================================================ */
 
 * { box-sizing: border-box; }

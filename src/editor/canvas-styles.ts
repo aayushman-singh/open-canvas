@@ -24,8 +24,7 @@ const kitCss = buildAllStyleKitsCss();
 
 // The :root{--opencanvas-...} block that used to head chromeCss has been
 // deleted — `themeCss` (prepended below) defines every --opencanvas-* alias
-// the chrome reads. See
-// design_handoff_opencanvas_rebrand/design-references/MIGRATION.md §1.
+// the chrome reads.
 const chromeCss = String.raw`
 * { box-sizing: border-box; }
 

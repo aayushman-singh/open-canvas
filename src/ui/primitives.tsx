@@ -14,10 +14,9 @@ function classes(...parts: Array<string | undefined | false>): string {
 // Button variant -> Open Canvas class. `danger` consolidates onto
 // .btn-primary (red fill) because components.css ships only one red
 // button style — primary action and destructive action share the same
-// affordance in the Open Canvas system (see
-// design_handoff_opencanvas_rebrand/design-references/styles.css).
-// `secondary` maps to .btn-outline (white surface + hairline) since
-// that is the closest match to the prior rev01 secondary affordance.
+// affordance in the Open Canvas system. `secondary` maps to .btn-outline
+// (white surface + hairline) since that is the closest match to the
+// prior rev01 secondary affordance.
 const BUTTON_VARIANT_CLASS: Record<ButtonVariant, string> = {
   primary: 'btn-primary',
   secondary: 'btn-outline',
