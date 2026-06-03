@@ -112,7 +112,9 @@ export interface EditorContext {
    *  mutating fields whose render output depends on the field value, to
    *  avoid a full renderAll(). Falls back to renderAll when the element
    *  has no live wrapper in the canvas (e.g. it lives on a non-current
-   *  page); callers don't need to branch on that themselves. */
+   *  page); callers don't need to branch on that themselves. Forward-
+   *  declared on ctx since Phase 2h.2.b; Phase 2q.d collapses the forward
+   *  decl into the real implementation in element-menu.ts. */
   rebuildElement(elementId: string): void;
 
   // -- Phase 2h.2.c: content inspector mounts ----------------------------
@@ -478,10 +480,83 @@ export interface EditorContext {
   /** Apply (x, y, w, h, z, rotation) from a PositionedBox onto an absolute-
    *  positioned wrapper. autoGrowTextElements calls this after growing a
    *  text element's box.h so the live DOM matches the freshly mutated
-   *  box. Implementation stays inline in canvas-client.ts during Phase 2;
-   *  the field exists on ctx so the extracted autoGrowTextElements can
-   *  invoke it through the same call shape the inline twin uses. */
+   *  box. Forward-declared on ctx since Phase 2l (impl stayed inline during
+   *  Phase 2); Phase 2q.d collapses the forward decl into the real
+   *  implementation in style-apply.ts. */
   setBoxStyle(wrapper: HTMLElement, box: PositionedBox): void;
+
+  // -- Phase 2q.d: run + body builders + element menu --------------------
+  /** Static map from IconName → inner SVG markup (path geometry only —
+   *  wrapper <svg> + stroke attrs come from renderIconSvg's caller). The
+   *  IIFE injects this as a JSON literal at boot (canvas-client.ts:86),
+   *  so on ctx it is a plain Record<string, string> the shape inspector
+   *  reads at render time to fill icon-variant shape elements. The
+   *  buildShapeBody path no-ops when the iconKind is not in the map —
+   *  validate.ts rejects unknown iconKinds at /apply, but during editing
+   *  the value can transiently miss the map. */
+  ICON_SVG_MAP: Record<string, string>;
+  /** Build the rich-text DOM for a single InlineRun. Walks
+   *  CANONICAL_MARK_ORDER innermost-first so the nesting matches the
+   *  public renderer; outermost <a> link wrap reads link.href/target and
+   *  pins the link popover on click. Math runs use window.katex when
+   *  available; missing-KaTeX fallback writes raw TeX as textContent so
+   *  the run is at least visible. Bound impl lives in run-builders.ts;
+   *  forward-declared on ctx since Phase 2q.g so chart-axis labels could
+   *  embed math runs even before the builder itself was extracted — this
+   *  commit promotes the forward decl into the real bind. */
+  buildRunNode(run: InlineRun): HTMLElement;
+  /** Build the per-element-type body content (text content / media tag /
+   *  action button-or-anchor / form fields / etc.). Dispatches to
+   *  buildTextBody / buildMediaBody / ... via a switch over element.type.
+   *  Throws on unknown types — there's no fallback that draws an empty
+   *  wrapper. Bound impl lives in body-builders-data.ts. */
+  buildElementBody(element: CanvasElement): HTMLElement;
+  /** Build the per-element wrapper DOM: data-attrs, position/box, motion
+   *  attrs, body, resize handles, menu trigger, and the data-selected
+   *  marker when this element matches ctx.selectedElementId. Bound impl
+   *  lives in element-menu.ts; collection/tabs body builders thread back
+   *  through ctx to recursively build their children. */
+  buildElementNode(element: CanvasElement): HTMLElement;
+  /** Apply (x, y, w, h, z, rotation) from a PositionedBox onto an absolute-
+   *  positioned wrapper. Forward-declared on ctx since Phase 2l (the
+   *  Phase 2l comment said impl stays inline during Phase 2); Phase 2q.d
+   *  collapses the forward decl into the real implementation in
+   *  style-apply.ts. */
+  applyElementStyle(wrapper: HTMLElement, element: CanvasElement): void;
+  /** Apply Owner-pinned CSS overrides onto the wrapper after the
+   *  allowlist filter (key matches /^[a-zA-Z-]+$/, value contains none of
+   *  ; : { }). Mirrors validate.ts pinnedStyleValueIssue — change one,
+   *  change the other or the editor accepts what the server rejects. */
+  applyPinnedStyle(wrapper: HTMLElement, element: CanvasElement): void;
+  /** Build the 3-dot element context menu (bring-to-front / send-to-back
+   *  / duplicate / delete) and return the menu DOM. The duplicate path
+   *  clamps section-level clones to the artboard — a behaviour
+   *  duplicateElement (the inspector-actions verb) does NOT encode, so
+   *  the menu must inline the duplicate path rather than reuse the verb. */
+  buildElementMenu(element: CanvasElement, section: CanvasSection, wrapper: HTMLElement): HTMLElement;
+  /** Toggle the per-element 3-dot menu open or closed. Idempotent: a
+   *  second call with the same elementId closes the menu. Pulls the
+   *  element through ctx.findElement so the menu's verbs use the same
+   *  section/parent-array bindings as the rest of the inspector cluster. */
+  toggleElementMenu(elementId: string, wrapper: HTMLElement): void;
+  /** Active element id whose 3-dot menu is open in the DOM. Null when no
+   *  menu is open. The menu is mutually exclusive — opening a second one
+   *  closes the prior. */
+  openMenuElementId: string | null;
+  /** Resolve href + navigate inside the editor: page hrefs swap the active
+   *  artboard, in-page anchors stay put, allow-listed external hrefs open
+   *  in a new tab. Returns true when the href was handled, false when it
+   *  was unrecognised or rejected. Forward-declared on ctx because the
+   *  nav-link builder needs it but the impl (which walks state.pages via
+   *  findPageByHref) stays inline in canvas-client.ts until a later phase
+   *  extracts the page-resolver cluster. */
+  goToHrefOnCanvas(href: string): boolean;
+  /** Swap the active artboard to the named page. Forward-declared on ctx
+   *  because the action-element alt-click handler needs it but the impl
+   *  stays inline in canvas-client.ts until a later phase extracts the
+   *  page-routing cluster (it mutates activePageId + re-renders + nudges
+   *  the camera). */
+  setActivePage(pageId: string): void;
 
   // -- Phase 2k.a: chat panel toggle + selection chip --------------------
   /** Toolbar button that opens the chat panel. Wired early — before site

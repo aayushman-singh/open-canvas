@@ -1,0 +1,675 @@
+// src/editor-client/body-builders-data.ts
+//
+// ADR 0058 Phase 2q.d — body builders for the ten data-heavy element
+// types: chart, form, embed, code, accordion, carousel, table, nav,
+// collection, tabs. Plus the buildElementBody dispatch that routes every
+// CanvasElement to its per-type builder.
+//
+// Extracted from canvas-client.ts:3095-3648. The inline IIFE twin remains
+// the production source-of-truth until ADR 0015 Phase 3 atomic cutover.
+//
+// Cross-module dependencies:
+//   - buildCollectionBody and buildTabsBody build child nodes by calling
+//     ctx.buildElementNode (lives in element-menu.ts). Routing through ctx
+//     avoids the cycle body-builders-data ↔ element-menu ↔ body-builders-data.
+//   - buildTabsBody mutates the active tab id and re-renders the element
+//     via ctx.rebuildElement — the inline IIFE calls the closure-resident
+//     rebuildElement; we route through ctx for the same reason.
+//   - The chart preview reads ctx.mainEl (for the computed kit accent) and
+//     calls previewPaletteFromAccent from palette.ts (server canonical).
+//   - The nav preview routes click navigation through ctx.goToHrefOnCanvas
+//     (forward-declared on ctx; impl remains inline in canvas-client.ts
+//     until a later phase extracts the URL-to-page-id resolver).
+
+import type { CanvasElement, TabsElement } from '../canvas/schema.js';
+import type { AccordionElement } from '../canvas/elements/accordion.js';
+import type { CarouselElement } from '../canvas/elements/carousel.js';
+import type { ChartElement } from '../canvas/elements/chart.js';
+import type { CodeElement } from '../canvas/elements/code.js';
+import type { CollectionElement } from '../canvas/elements/collection.js';
+import type { EmbedElement } from '../canvas/elements/embed.js';
+import type { FormElement } from '../canvas/elements/form.js';
+import type { NavElement } from '../canvas/elements/nav.js';
+import type { TableElement } from '../canvas/elements/table.js';
+
+import type { EditorContext } from './editor-context.js';
+import { isAllowedHref } from './href-utils.js';
+import { previewPaletteFromAccent } from './palette.js';
+import {
+  buildActionBodyImpl,
+  buildContainerBodyImpl,
+  buildMediaBodyImpl,
+  buildShapeBodyImpl,
+  buildTextBodyImpl,
+} from './body-builders-basic.js';
+
+// -- Chart editor preview ----------------------------------------------
+//
+// The editor preview renders an inline approximation of the server SVG
+// so the Owner sees colour bands + a kind hint while typing into the
+// data grid. The visitor-facing render is the canonical server SVG
+// (see src/canvas/elements/chart.ts) — this preview deliberately uses
+// the SAME palette algorithm by reading the kit accent off the editor
+// wrapper's --opencanvas-kit-accent token, so the editor swatch order
+// matches what the server emits. No client-side chart library: ~80 lines
+// of plain DOM + a fixed-format colour-rotation.
+
+function currentChartPalette(ctx: EditorContext): string[] {
+  if (!ctx.mainEl) return ['#888', '#888', '#888', '#888', '#888'];
+  const cs = window.getComputedStyle(ctx.mainEl);
+  const accent = (cs.getPropertyValue('--opencanvas-kit-accent') || '').trim();
+  return previewPaletteFromAccent(accent || '#888888');
+}
+
+export function buildChartBodyImpl(ctx: EditorContext, element: ChartElement): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-chart-preview';
+  node.style.width = '100%';
+  node.style.height = '100%';
+  node.style.position = 'relative';
+  node.style.overflow = 'hidden';
+  node.style.borderRadius = '4px';
+  node.style.background = 'rgba(0, 0, 0, 0.04)';
+  const palette = currentChartPalette(ctx);
+  const series = Array.isArray(element.series) ? element.series : [];
+  const categories = Array.isArray(element.categories) ? element.categories : [];
+  if (series.length === 0 || categories.length === 0) {
+    const empty = document.createElement('div');
+    empty.textContent = 'Chart (' + (element.kind || 'bar') + ') — add data';
+    empty.style.position = 'absolute';
+    empty.style.inset = '0';
+    empty.style.display = 'flex';
+    empty.style.alignItems = 'center';
+    empty.style.justifyContent = 'center';
+    empty.style.fontSize = '12px';
+    empty.style.opacity = '0.7';
+    node.appendChild(empty);
+    return node;
+  }
+  if (element.kind === 'pie' || element.kind === 'donut') {
+    const firstSeries = series[0];
+    const values =
+      firstSeries && Array.isArray(firstSeries.values)
+        ? firstSeries.values.slice(0, categories.length)
+        : [];
+    let total = 0;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (typeof v === 'number' && isFinite(v) && v > 0) total += v;
+    }
+    if (total <= 0) {
+      node.textContent = 'Pie has no data';
+      node.style.display = 'flex';
+      node.style.alignItems = 'center';
+      node.style.justifyContent = 'center';
+      node.style.fontSize = '12px';
+      return node;
+    }
+    // CSS conic-gradient gives us a tooltip-free pie preview with zero math.
+    const stops: string[] = [];
+    let cursor = 0;
+    for (let i = 0; i < values.length; i++) {
+      const raw = values[i];
+      const v = typeof raw === 'number' && isFinite(raw) && raw > 0 ? raw : 0;
+      const start = cursor;
+      const end = cursor + (v / total) * 100;
+      const color = palette[i % palette.length] ?? '#888';
+      stops.push(color + ' ' + start.toFixed(2) + '% ' + end.toFixed(2) + '%');
+      cursor = end;
+    }
+    const disc = document.createElement('div');
+    disc.style.position = 'absolute';
+    disc.style.inset = '8px';
+    disc.style.borderRadius = '50%';
+    disc.style.background = 'conic-gradient(' + stops.join(', ') + ')';
+    if (element.kind === 'donut') {
+      disc.style.maskImage = 'radial-gradient(circle, transparent 28%, black 29%)';
+      (disc.style as unknown as { webkitMaskImage: string }).webkitMaskImage =
+        'radial-gradient(circle, transparent 28%, black 29%)';
+    }
+    node.appendChild(disc);
+    return node;
+  }
+  // bar / line / area share a stacked band preview. Compute per-series
+  // max so legends line up; render N rows where each row is the per-
+  // category values as proportional cells.
+  const rowHost = document.createElement('div');
+  rowHost.style.position = 'absolute';
+  rowHost.style.inset = '8px';
+  rowHost.style.display = 'flex';
+  rowHost.style.flexDirection = 'column';
+  rowHost.style.gap = '4px';
+  for (let si = 0; si < series.length; si++) {
+    const seriesEntry = series[si];
+    if (!seriesEntry) continue;
+    const row = document.createElement('div');
+    row.style.flex = '1';
+    row.style.display = 'flex';
+    row.style.gap = '2px';
+    const values = Array.isArray(seriesEntry.values) ? seriesEntry.values : [];
+    let maxVal = 0;
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (typeof v === 'number' && isFinite(v) && v > maxVal) maxVal = v;
+    }
+    const color = palette[si % palette.length] ?? '#888';
+    for (let ci = 0; ci < categories.length; ci++) {
+      const cell = document.createElement('div');
+      cell.style.flex = '1';
+      cell.style.background = color;
+      const v = values[ci];
+      const ratio =
+        typeof v === 'number' && isFinite(v) && maxVal > 0 ? Math.max(0.05, v / maxVal) : 0.05;
+      cell.style.opacity = String(ratio);
+      cell.title =
+        (seriesEntry.label || 'Series ' + (si + 1)) +
+        ' / ' +
+        (categories[ci] || 'Cat ' + (ci + 1)) +
+        ': ' +
+        (typeof v === 'number' ? v : '—');
+      row.appendChild(cell);
+    }
+    rowHost.appendChild(row);
+  }
+  node.appendChild(rowHost);
+  return node;
+}
+
+export function buildFormBodyImpl(_ctx: EditorContext, element: FormElement): HTMLElement {
+  const node = document.createElement('form');
+  node.className = 'opencanvas-form-preview';
+  node.style.display = 'flex';
+  node.style.flexDirection = 'column';
+  node.style.gap = '8px';
+  node.style.width = '100%';
+  node.style.height = '100%';
+  node.addEventListener('submit', function (ev: Event) {
+    ev.preventDefault();
+  });
+  const fields = Array.isArray(element.fields) ? element.fields : [];
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    if (!field) continue;
+    const label = document.createElement('label');
+    label.style.display = 'flex';
+    label.style.flexDirection = 'column';
+    label.style.gap = '4px';
+    label.style.fontSize = '12px';
+    label.textContent = field.label || field.id || 'Field';
+    const input: HTMLInputElement | HTMLTextAreaElement =
+      field.kind === 'textarea' ? document.createElement('textarea') : document.createElement('input');
+    if (field.kind && field.kind !== 'textarea' && input instanceof HTMLInputElement) {
+      input.setAttribute(
+        'type',
+        field.kind === 'email' ? 'email' : field.kind === 'checkbox' ? 'checkbox' : 'text',
+      );
+    }
+    input.disabled = true;
+    input.placeholder = field.placeholder || '';
+    input.style.boxSizing = 'border-box';
+    input.style.width = '100%';
+    label.appendChild(input);
+    node.appendChild(label);
+  }
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = element.submitLabel || 'Submit';
+  node.appendChild(button);
+  return node;
+}
+
+export function buildEmbedBodyImpl(_ctx: EditorContext, element: EmbedElement): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-embed-preview';
+  node.style.display = 'flex';
+  node.style.alignItems = 'center';
+  node.style.justifyContent = 'center';
+  node.style.width = '100%';
+  node.style.height = '100%';
+  node.style.padding = '12px';
+  node.style.boxSizing = 'border-box';
+  node.style.textAlign = 'center';
+  node.textContent = element.title || element.url || 'Embed';
+  return node;
+}
+
+export function buildCodeBodyImpl(_ctx: EditorContext, element: CodeElement): HTMLElement {
+  const pre = document.createElement('pre');
+  pre.className = 'opencanvas-code-preview';
+  pre.style.margin = '0';
+  pre.style.width = '100%';
+  pre.style.height = '100%';
+  pre.style.overflow = 'auto';
+  pre.style.boxSizing = 'border-box';
+  pre.style.padding = '12px';
+  pre.textContent = element.source || '';
+  return pre;
+}
+
+export function buildAccordionBodyImpl(_ctx: EditorContext, element: AccordionElement): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-accordion-preview';
+  const items = Array.isArray(element.items) ? element.items : [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item) continue;
+    const details = document.createElement('details');
+    if (i === 0) details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = item.title || 'Item';
+    details.appendChild(summary);
+    const body = document.createElement('div');
+    const runs = Array.isArray(item.body) ? item.body : [];
+    body.textContent = runs
+      .map(function (run) {
+        return run && typeof run.text === 'string' ? run.text : '';
+      })
+      .join('');
+    details.appendChild(body);
+    node.appendChild(details);
+  }
+  return node;
+}
+
+// Build the editor preview as the SAME DOM the visitor sees, then hydrate
+// it locally so arrows + dots actually advance the slide on click. The
+// previous static flex strip showed each slide's caption as text and gave
+// the Owner no sense of how the carousel would behave on the published
+// page; this gives a true preview that respects direction, arrow position,
+// and arrow style presets.
+export function buildCarouselBodyImpl(ctx: EditorContext, element: CarouselElement): HTMLElement {
+  const slides = Array.isArray(element.slides) ? element.slides : [];
+  const count = slides.length;
+  const direction = element.direction === 'vertical' ? 'vertical' : 'horizontal';
+  const arrowPosition =
+    element.arrowPosition === 'bunched-bottom-right' || element.arrowPosition === 'split-below'
+      ? element.arrowPosition
+      : 'split-vertical-center';
+  const arrowStyle =
+    element.arrowStyle === 'square' || element.arrowStyle === 'pill' ? element.arrowStyle : 'round';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'opencanvas-carousel';
+  wrap.setAttribute('data-opencanvas-interactive', 'carousel');
+  wrap.setAttribute('data-opencanvas-slide-index', '0');
+  wrap.setAttribute('data-opencanvas-slide-count', String(count));
+  wrap.setAttribute('data-opencanvas-direction', direction);
+  wrap.setAttribute('data-opencanvas-arrow-position', arrowPosition);
+  wrap.setAttribute('data-opencanvas-arrow-style', arrowStyle);
+  wrap.setAttribute('role', 'region');
+  wrap.setAttribute('aria-roledescription', 'carousel');
+
+  const track = document.createElement('div');
+  track.className = 'opencanvas-carousel-track';
+  wrap.appendChild(track);
+
+  for (let i = 0; i < count; i++) {
+    const slide = slides[i];
+    if (!slide) continue;
+    const fig = document.createElement('figure');
+    fig.className = 'opencanvas-carousel-slide';
+    fig.setAttribute('data-opencanvas-carousel-slide', slide.id || 'slide-' + String(i));
+    fig.setAttribute('data-opencanvas-carousel-slide-index', String(i));
+    fig.setAttribute('role', 'group');
+    fig.setAttribute('aria-roledescription', 'slide');
+    fig.setAttribute('aria-label', String(i + 1) + ' of ' + String(count));
+    if (slide.assetId) {
+      const img = document.createElement('img');
+      img.className = 'opencanvas-carousel-image';
+      img.src = ctx.siteBase + '/assets/' + encodeURIComponent(slide.assetId);
+      img.alt = slide.caption || '';
+      img.loading = 'lazy';
+      fig.appendChild(img);
+    }
+    if (typeof slide.caption === 'string' && slide.caption.length > 0) {
+      const cap = document.createElement('figcaption');
+      cap.className = 'opencanvas-carousel-caption';
+      cap.textContent = slide.caption;
+      fig.appendChild(cap);
+    }
+    track.appendChild(fig);
+  }
+
+  if (element.showArrows !== false && count > 1) {
+    const prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'opencanvas-carousel-arrow opencanvas-carousel-arrow-prev';
+    prev.setAttribute('data-opencanvas-carousel-prev', '');
+    prev.setAttribute('aria-label', 'Previous slide');
+    prev.textContent = direction === 'vertical' ? '⌃' : '‹';
+    wrap.appendChild(prev);
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'opencanvas-carousel-arrow opencanvas-carousel-arrow-next';
+    next.setAttribute('data-opencanvas-carousel-next', '');
+    next.setAttribute('aria-label', 'Next slide');
+    next.textContent = direction === 'vertical' ? '⌄' : '›';
+    wrap.appendChild(next);
+  }
+
+  if (element.showDots !== false && count > 1) {
+    const dots = document.createElement('div');
+    dots.className = 'opencanvas-carousel-dots';
+    dots.setAttribute('role', 'tablist');
+    dots.setAttribute('aria-label', 'Slide navigation');
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('button');
+      dot.type = 'button';
+      dot.className = 'opencanvas-carousel-dot';
+      dot.setAttribute('data-opencanvas-carousel-dot', String(i));
+      dot.setAttribute('role', 'tab');
+      dot.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+      dot.setAttribute('aria-label', 'Go to slide ' + String(i + 1));
+      dots.appendChild(dot);
+    }
+    wrap.appendChild(dots);
+  }
+
+  hydrateCarouselPreview(wrap, count);
+  return wrap;
+}
+
+// Local copy of the visitor-side carousel hydration (src/interactive/
+// carousel.ts) — same index-clamp + dot aria-selected mirroring, but
+// attached at build time so Owners can click through their slides in
+// the editor without leaving edit mode. Stops mousedown propagating so
+// the canvas wrapper's drag handler doesn't snatch focus the moment
+// the Owner tries to click an arrow.
+function hydrateCarouselPreview(root: HTMLElement, count: number): void {
+  if (!(count > 0)) return;
+  function readIndex(): number {
+    const raw = root.getAttribute('data-opencanvas-slide-index');
+    let n = raw ? parseInt(raw, 10) : 0;
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > count - 1) n = count - 1;
+    return n;
+  }
+  function setIndex(next: number): void {
+    let n = next;
+    if (n < 0) n = 0;
+    if (n > count - 1) n = count - 1;
+    root.setAttribute('data-opencanvas-slide-index', String(n));
+    const dots = root.querySelectorAll('[data-opencanvas-carousel-dot]');
+    for (let i = 0; i < dots.length; i++) {
+      const dot = dots[i];
+      if (!dot) continue;
+      const idx = parseInt(dot.getAttribute('data-opencanvas-carousel-dot') || '0', 10);
+      dot.setAttribute('aria-selected', idx === n ? 'true' : 'false');
+    }
+  }
+  function block(ev: Event): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  const prevBtn = root.querySelector('[data-opencanvas-carousel-prev]');
+  if (prevBtn) {
+    prevBtn.addEventListener('mousedown', block);
+    prevBtn.addEventListener('click', function (ev: Event) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      setIndex(readIndex() - 1);
+    });
+  }
+  const nextBtn = root.querySelector('[data-opencanvas-carousel-next]');
+  if (nextBtn) {
+    nextBtn.addEventListener('mousedown', block);
+    nextBtn.addEventListener('click', function (ev: Event) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      setIndex(readIndex() + 1);
+    });
+  }
+  const dotEls = root.querySelectorAll('[data-opencanvas-carousel-dot]');
+  for (let i = 0; i < dotEls.length; i++) {
+    const dot = dotEls[i];
+    if (!dot) continue;
+    (function (capturedDot: Element) {
+      capturedDot.addEventListener('mousedown', block);
+      capturedDot.addEventListener('click', function (ev: Event) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const target = parseInt(capturedDot.getAttribute('data-opencanvas-carousel-dot') || '0', 10);
+        setIndex(target);
+      });
+    })(dot);
+  }
+}
+
+export function buildTableBodyImpl(_ctx: EditorContext, element: TableElement): HTMLElement {
+  const table = document.createElement('table');
+  table.className = 'opencanvas-table-preview';
+  table.style.width = '100%';
+  table.style.height = '100%';
+  table.style.borderCollapse = 'collapse';
+  const columns = Array.isArray(element.columns) ? element.columns : [];
+  const rows = Array.isArray(element.rows) ? element.rows : [];
+  if (columns.length > 0) {
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i];
+      if (!col) continue;
+      const th = document.createElement('th');
+      th.textContent = col.header || col.id || '';
+      tr.appendChild(th);
+    }
+    thead.appendChild(tr);
+    table.appendChild(thead);
+  }
+  const tbody = document.createElement('tbody');
+  for (let r = 0; r < rows.length; r++) {
+    const tr = document.createElement('tr');
+    const row = rows[r];
+    for (let c = 0; c < columns.length; c++) {
+      const col = columns[c];
+      if (!col) continue;
+      const td = document.createElement('td');
+      const key = col.id;
+      const cells = row && row.cells ? row.cells : {};
+      const cellValue = key ? cells[key] : undefined;
+      td.textContent = key ? String(cellValue ?? '') : '';
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  return table;
+}
+
+export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLElement {
+  const nav = document.createElement('nav');
+  nav.className = 'opencanvas-nav-preview';
+  nav.style.display = 'flex';
+  nav.style.alignItems = 'center';
+  nav.style.gap = '12px';
+  nav.style.width = '100%';
+  nav.style.height = '100%';
+  const links = Array.isArray(element.links) ? element.links : [];
+  for (let i = 0; i < links.length; i++) {
+    const link = links[i];
+    if (!link) continue;
+    const a = document.createElement('a');
+    a.className = 'opencanvas-nav-link';
+    const kind = link.kind === 'external' || link.kind === 'anchor' ? link.kind : 'internal';
+    a.setAttribute('data-opencanvas-nav-link-kind', kind);
+    let resolvedHref = typeof link.href === 'string' ? link.href : '';
+    if (kind === 'internal' && resolvedHref.length > 0 && resolvedHref.charAt(0) !== '/') {
+      resolvedHref = '/' + resolvedHref;
+    }
+    a.setAttribute('href', resolvedHref.length > 0 ? resolvedHref : '#');
+    if (kind === 'external') {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener');
+    }
+    a.textContent = link.label || 'Link';
+    // Capture href/kind per-iteration so the click handler doesn't see the
+    // last loop value (the surrounding for-loop uses let but the closure is
+    // attached via addEventListener, which is fine — explicit locals make
+    // the intent obvious and survive refactors).
+    (function (capturedHref: string, capturedKind: 'internal' | 'external' | 'anchor') {
+      a.addEventListener('click', function (ev: MouseEvent) {
+        ev.preventDefault();
+        if (ev.altKey) return;
+        if (capturedKind === 'internal') {
+          ctx.goToHrefOnCanvas(capturedHref);
+          return;
+        }
+        if (capturedKind === 'external') {
+          if (isAllowedHref(capturedHref)) {
+            window.open(capturedHref, '_blank', 'noopener,noreferrer');
+          }
+          return;
+        }
+        // anchor: in-page fragments have no canvas-side destination; the
+        // public renderer scrolls, the editor stays put.
+      });
+    })(resolvedHref, kind);
+    nav.appendChild(a);
+  }
+  return nav;
+}
+
+export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionElement): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-collection-preview';
+  node.style.display = 'grid';
+  node.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+  node.style.gap = '8px';
+  const entries = Array.isArray(element.entries) ? element.entries : [];
+  for (let i = 0; i < entries.length; i++) {
+    const raw = entries[i];
+    const entry: CanvasElement[] = Array.isArray(raw) ? raw : [];
+    const card = document.createElement('div');
+    card.style.position = 'relative';
+    card.style.minHeight = '80px';
+    for (let j = 0; j < entry.length; j++) {
+      const child = entry[j];
+      if (child !== undefined) card.appendChild(ctx.buildElementNode(child));
+    }
+    node.appendChild(card);
+  }
+  if (entries.length === 0) node.textContent = 'Collection';
+  return node;
+}
+
+export function buildTabsBodyImpl(ctx: EditorContext, element: TabsElement): HTMLElement {
+  const node = document.createElement('div');
+  node.className = 'opencanvas-tabs';
+  node.style.position = 'relative';
+  node.style.width = '100%';
+  node.style.height = '100%';
+
+  const tabs = Array.isArray(element.tabs) ? element.tabs : [];
+  const barHeight = typeof element.tabBarHeight === 'number' ? element.tabBarHeight : 56;
+
+  const bar = document.createElement('div');
+  bar.className = 'opencanvas-tab-bar';
+  bar.style.position = 'absolute';
+  bar.style.left = '0';
+  bar.style.top = '0';
+  bar.style.width = '100%';
+  bar.style.height = barHeight + 'px';
+  bar.style.display = 'flex';
+  bar.style.alignItems = 'center';
+  bar.style.gap = '8px';
+
+  for (let i = 0; i < tabs.length; i++) {
+    const tab = tabs[i];
+    if (!tab) continue;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'opencanvas-tab';
+    // data-opencanvas-tab-id mirrors the server renderer and is the
+    // selector the canvas mousedown handler keys off to skip
+    // selection/drag for clicks that target a tab button.
+    btn.setAttribute('data-opencanvas-tab-id', tab.id);
+    let labelText = '';
+    const runs = Array.isArray(tab.label) ? tab.label : [];
+    for (let r = 0; r < runs.length; r++) {
+      const run = runs[r];
+      labelText += (run && run.text) || '';
+    }
+    btn.textContent = labelText || tab.id || 'Tab';
+    if (tab.id === element.activeTabId) btn.setAttribute('data-tab-active', '');
+    // stopPropagation on mousedown so the canvas root listener doesn't
+    // resolve the parent tabs wrapper and start a selection/drag — that
+    // pipeline jitters the wrapper position and steals focus before the
+    // button's click handler ever runs.
+    btn.addEventListener('mousedown', function (ev: Event) {
+      ev.stopPropagation();
+    });
+    (function (tabId: string) {
+      btn.addEventListener('click', function (ev: Event) {
+        ev.stopPropagation();
+        if (element.activeTabId === tabId) return;
+        element.activeTabId = tabId;
+        ctx.rebuildElement(element.id);
+        ctx.scheduleSave();
+      });
+    })(tab.id);
+    bar.appendChild(btn);
+  }
+  node.appendChild(bar);
+
+  const activeTab = tabs.find(function (t) {
+    return t && t.id === element.activeTabId;
+  });
+  if (activeTab) {
+    const panel = document.createElement('div');
+    panel.className = 'opencanvas-tab-panel';
+    panel.setAttribute('data-tab-active', '');
+    panel.style.position = 'absolute';
+    panel.style.left = '0';
+    panel.style.top = barHeight + 'px';
+    panel.style.right = '0';
+    panel.style.bottom = '0';
+    const children = Array.isArray(activeTab.elements) ? activeTab.elements : [];
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      if (child !== undefined) panel.appendChild(ctx.buildElementNode(child));
+    }
+    node.appendChild(panel);
+  }
+
+  return node;
+}
+
+export function buildElementBodyImpl(ctx: EditorContext, element: CanvasElement): HTMLElement {
+  switch (element.type) {
+    case 'text':
+      return buildTextBodyImpl(ctx, element);
+    case 'media':
+      return buildMediaBodyImpl(ctx, element);
+    case 'action':
+      return buildActionBodyImpl(ctx, element);
+    case 'shape':
+      return buildShapeBodyImpl(ctx, element);
+    case 'container':
+      return buildContainerBodyImpl(ctx, element);
+    case 'chart':
+      return buildChartBodyImpl(ctx, element);
+    case 'form':
+      return buildFormBodyImpl(ctx, element);
+    case 'embed':
+      return buildEmbedBodyImpl(ctx, element);
+    case 'code':
+      return buildCodeBodyImpl(ctx, element);
+    case 'accordion':
+      return buildAccordionBodyImpl(ctx, element);
+    case 'carousel':
+      return buildCarouselBodyImpl(ctx, element);
+    case 'table':
+      return buildTableBodyImpl(ctx, element);
+    case 'nav':
+      return buildNavBodyImpl(ctx, element);
+    case 'collection':
+      return buildCollectionBodyImpl(ctx, element);
+    case 'tabs':
+      return buildTabsBodyImpl(ctx, element);
+  }
+  // Exhaustive switch above — TypeScript proves this is unreachable.
+  // Throw loudly anyway so a hand-rolled element type added without a
+  // builder doesn't silently degrade to a blank wrapper.
+  const exhaustive: never = element;
+  throw new Error('unsupported editor element type: ' + String((exhaustive as { type: string }).type));
+}

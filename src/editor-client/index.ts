@@ -53,6 +53,27 @@ import {
   openSelectModalImpl,
   openTextModalImpl,
 } from './modals.js';
+import {
+  applyElementStyleImpl,
+  applyPinnedStyleImpl,
+  setBoxStyleImpl,
+} from './style-apply.js';
+import { buildRunNodeImpl } from './run-builders.js';
+import {
+  buildActionBodyImpl,
+  buildContainerBodyImpl,
+  buildMediaBodyImpl,
+  buildShapeBodyImpl,
+  buildTextBodyImpl,
+} from './body-builders-basic.js';
+import { buildElementBodyImpl } from './body-builders-data.js';
+import {
+  buildElementMenuImpl,
+  buildElementNodeImpl,
+  closeElementMenuImpl,
+  rebuildElementImpl,
+  toggleElementMenuImpl,
+} from './element-menu.js';
 import type { EditorBoot, EditorContext } from './editor-context.js';
 
 void field;
@@ -77,6 +98,21 @@ void openConfirmModalImpl;
 void openAlertModalImpl;
 void openAiMediaModalImpl;
 void openNewPageModalImpl;
+void setBoxStyleImpl;
+void applyElementStyleImpl;
+void applyPinnedStyleImpl;
+void buildRunNodeImpl;
+void buildTextBodyImpl;
+void buildMediaBodyImpl;
+void buildActionBodyImpl;
+void buildShapeBodyImpl;
+void buildContainerBodyImpl;
+void buildElementBodyImpl;
+void buildElementNodeImpl;
+void buildElementMenuImpl;
+void closeElementMenuImpl;
+void toggleElementMenuImpl;
+void rebuildElementImpl;
 
 console.log('[editor-client] Phase 2d stub ready', {
   styleKits: STYLE_KITS.length,

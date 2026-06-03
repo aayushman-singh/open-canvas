@@ -405,6 +405,20 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     buildKitSummary: () => {
       throw new Error('buildKitSummary stub: smoke does not exercise kit summary build');
     },
+    ICON_SVG_MAP: {},
+    buildElementBody: () => {
+      throw new Error('buildElementBody stub: smoke does not exercise body building');
+    },
+    buildElementNode: () => {
+      throw new Error('buildElementNode stub: smoke does not exercise wrapper building');
+    },
+    applyElementStyle: () => {},
+    applyPinnedStyle: () => {},
+    buildElementMenu: () => {
+      throw new Error('buildElementMenu stub: smoke does not exercise menu building');
+    },
+    toggleElementMenu: () => {},
+    openMenuElementId: null,
   };
   return { ctx, log };
 }
