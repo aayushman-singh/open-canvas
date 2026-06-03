@@ -125,6 +125,20 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
       throw new Error('postAssetUpload stub: smoke does not exercise uploads');
     },
     setStatus: () => {},
+    authFetch: () => {
+      throw new Error('authFetch stub: smoke does not exercise picker fetches');
+    },
+    apiBase: '/api',
+    siteId: 'site-smoke',
+    applyAssetIdToElement: () => {
+      throw new Error('applyAssetIdToElement stub: smoke does not exercise picker apply');
+    },
+    runDeleteAsset: () => {
+      throw new Error('runDeleteAsset stub: smoke does not exercise asset delete');
+    },
+    uploadMediaForElement: () => {
+      throw new Error('uploadMediaForElement stub: smoke does not exercise uploads');
+    },
   };
   return { ctx, log };
 }

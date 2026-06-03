@@ -9,6 +9,7 @@
 // stops growing, the IIFE is fully decomposed.
 
 import type { EditableSite, InlineRun } from '../canvas/schema.js';
+import type { MediaElement } from '../canvas/elements/media.js';
 import type { FindElementResult } from './editor-context-types.js';
 
 /**
@@ -118,4 +119,50 @@ export interface EditorContext {
    *  a spinner. Carousel upload UI calls this to mark in-progress and
    *  error states without re-rendering the inspector. */
   setStatus(text: string, tone?: 'ok' | 'error'): void;
+
+  // -- Phase 2h.2.d: nav links + media picker mounts ---------------------
+  /** Same shape as the global `fetch` but throws "session expired" /
+   *  "access revoked" on 401/403 after triggering the session-expired or
+   *  access-revoked UI flows. Mount fns use it for slot-history / gallery
+   *  GETs so the picker doesn't silently render stale data when the editor
+   *  loses auth mid-session. */
+  authFetch(input: RequestInfo, init?: RequestInit): Promise<Response>;
+  /** API root the IIFE was booted with (e.g. "/api" in prod, "/__api" in
+   *  preview). Joined with "/owner/assets" and "/sites/<id>/elements/<id>/
+   *  history" inside the media picker — kept as a raw prefix so call sites
+   *  read like the IIFE twin. */
+  apiBase: string;
+  /** Site id the IIFE was booted with. Same role as apiBase — kept as a
+   *  raw string so media-picker URL construction is `s/<closure-var>/
+   *  ctx.<closure-var>/g` from the inline twin without restructuring. */
+  siteId: string;
+  /** Mutates element.assetId (+ optional element.mediaKind), re-renders,
+   *  schedules a save, then upserts the chosen asset into the slot-history
+   *  ledger (PUT /sites/<id>/elements/<id>/history/<assetId>). Awaits
+   *  refreshFn when supplied so picker rows re-render after the apply
+   *  completes. History upsert errors only log to console — they do not
+   *  fail the apply, since the new asset is already on the element. */
+  applyAssetIdToElement(
+    element: MediaElement,
+    nextAssetId: string,
+    refreshFn?: () => Promise<unknown>,
+    nextKind?: string,
+  ): Promise<void>;
+  /** Deletes an asset from the gallery. First DELETE probes for references
+   *  (412 path lists editable + published slots in a confirm modal), then
+   *  re-issues DELETE with ?confirm=1 on user OK. Clears the asset id from
+   *  local state on success and awaits refreshFn. Status line carries the
+   *  outcome ("Asset deleted" / "Delete failed: <detail>"). */
+  runDeleteAsset(assetId: string, refreshFn?: () => Promise<unknown>): Promise<void>;
+  /** Drives the upload pipeline for the media picker: image branch crops
+   *  to slot aspect then uploads; video branch extracts a first-frame
+   *  poster, crops the poster, uploads the video + poster, then applies.
+   *  Reads alt from #media-upload-alt-<elementId>. Aborts with a status
+   *  line when the slot has no size yet. "crop cancelled" is the one
+   *  non-error exit — surfaces as "Cancelled" status, no error tone. */
+  uploadMediaForElement(
+    element: MediaElement,
+    file: File,
+    refreshFn?: () => Promise<unknown>,
+  ): Promise<void>;
 }
