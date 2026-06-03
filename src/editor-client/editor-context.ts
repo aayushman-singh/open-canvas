@@ -611,4 +611,69 @@ export interface EditorContext {
    *  handler invokes it; 2n provides the implementation and narrows the
    *  entry param. */
   revertAgentEntry(entry: unknown): void;
+
+  // -- Phase 2o.b: keyboard handlers -------------------------------------
+  /** Active inline-editing element id (null when no element is in
+   *  contentEditable mode). The window-level keyboard handler reads this
+   *  to gate Space/V/Delete/Backspace shortcuts — typing into a text
+   *  element MUST NOT trigger pan-mode, select-mode, or delete. Phase
+   *  2h's inspector/edit code (canvas-client.ts:586 inline declaration,
+   *  mutated by enterEditing/exitEditing around line 10148) reads and
+   *  writes this; the keyboard module reads it. Cross-module use forces
+   *  it onto ctx. */
+  editingElementId: string | null;
+
+  // -- Phase 2i forward declarations (filled by drag/pan phase) ---------
+  /** Current pointer interaction mode. "select" lets the Owner click +
+   *  drag elements; "pan" lets them drag the canvas (camera). FORWARD:
+   *  Phase 2i owns this. Phase 2o.b's keyboard handler reads this to
+   *  capture the pre-temporary-pan mode (so Space-held → temporary pan
+   *  → release restores the prior mode) and writes via setInteractionMode.
+   *  Legal runtime values are "select" and "pan" — setInteractionMode
+   *  throws on anything else. Typed as the broader `string` so call sites
+   *  that round-trip the value through DOM attributes (data-interaction-
+   *  mode) don't need a cast at every read. */
+  interactionMode: string;
+  /** True while the Space key is held for temporary pan-mode. FORWARD:
+   *  Phase 2i owns this. Phase 2o.b's keyboard handler latches this on
+   *  Space-keydown and endTemporaryPan reads it to decide whether to
+   *  restore the prior mode on Space-keyup / window-blur. */
+  spaceHeldForPan: boolean;
+  /** The interactionMode value captured at the moment Space was pressed,
+   *  so endTemporaryPan can restore it. FORWARD: Phase 2i owns this.
+   *  Phase 2o.b's keyboard handler writes it on Space-keydown; null when
+   *  no temporary pan is active. */
+  temporaryPanPreviousMode: string | null;
+  /** Set the active pointer interaction mode and mirror it onto the
+   *  viewport's data-interaction-mode + zoom-toolbar aria-pressed.
+   *  Throws on values other than "select"/"pan" — callers MUST stick to
+   *  the two-state machine. FORWARD: Phase 2i owns this. Phase 2o.b's
+   *  keyboard handler invokes it for Space → pan and V → select. */
+  setInteractionMode(mode: string): void;
+  /** Clear the spaceHeldForPan + temporaryPanPreviousMode latches without
+   *  changing interactionMode. FORWARD: Phase 2i owns this. Phase 2o.b's
+   *  keyboard handler invokes it on V (explicit select-mode) so a
+   *  subsequent Space release doesn't bounce the mode back. */
+  clearTemporaryPanState(): void;
+  /** Exit temporary pan-mode — if spaceHeldForPan is true, restore the
+   *  pre-Space interactionMode (defaulting to "select" when the prior
+   *  mode is null) and clear the latches. No-op when no temporary pan is
+   *  active. FORWARD: Phase 2i owns this. Phase 2o.b's keyboard handler
+   *  invokes it on Space-keyup and window-blur. */
+  endTemporaryPan(): void;
+  /** Cancel the pending sections-picker import (ctx.pendingImport) and
+   *  re-render so the between-section drop slots disappear. FORWARD:
+   *  Phase 2i owns this (placement is a drag-adjacent interaction).
+   *  Phase 2o.b's keyboard handler invokes it on Escape when an import
+   *  is pending. */
+  exitPlacementMode(): void;
+
+  // -- Phase 2j forward declarations (filled by section ops phase) -------
+  /** Dispatch a section-toolbar action ("delete-section", "duplicate-
+   *  section", "move-up", "move-down", "convert-to-header", etc.) against
+   *  the named section. FORWARD: Phase 2j owns this. Phase 2o.b's
+   *  keyboard handler invokes it for Delete/Backspace when a section is
+   *  selected (action="delete-section"). The action string set lives in
+   *  canvas-client.ts:11621 (handleSectionAction's switch). */
+  handleSectionAction(action: string, sectionId: string): void;
 }

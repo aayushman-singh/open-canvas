@@ -227,6 +227,15 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     focusCanvasOnNode: () => {},
     describeOp: () => '',
     revertAgentEntry: () => {},
+    editingElementId: null,
+    interactionMode: 'select',
+    spaceHeldForPan: false,
+    temporaryPanPreviousMode: null,
+    setInteractionMode: () => {},
+    clearTemporaryPanState: () => {},
+    endTemporaryPan: () => {},
+    exitPlacementMode: () => {},
+    handleSectionAction: () => {},
   };
   return { ctx, log };
 }
