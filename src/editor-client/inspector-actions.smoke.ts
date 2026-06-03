@@ -338,6 +338,23 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     },
     fitToPage: () => {},
     fitAllPages: () => {},
+    aiPanel: null,
+    closeAiPanel: () => {},
+    runAiPreview: () => {
+      throw new Error('runAiPreview stub: smoke does not exercise AI preview');
+    },
+    aiRewriteText: () => {
+      throw new Error('aiRewriteText stub: smoke does not exercise AI rewrite');
+    },
+    aiReplaceMedia: () => {
+      throw new Error('aiReplaceMedia stub: smoke does not exercise AI media');
+    },
+    migrateState: (s) => s,
+    uploadGeneratedBlobToElement: () => {
+      throw new Error(
+        'uploadGeneratedBlobToElement stub: smoke does not exercise generated-blob upload',
+      );
+    },
   };
   return { ctx, log };
 }

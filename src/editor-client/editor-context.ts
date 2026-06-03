@@ -1159,6 +1159,54 @@ export interface EditorContext {
    *  auto-zoom up to ZOOM_MAX_FIT (100%). Bound impl lives in render.ts.
    *  Forward-declared here so deletePage can re-fit after a page exits. */
   fitAllPages(): void;
+
+  // -- Phase 2q.f: AI preview panel (single-shot) ------------------------
+  /** The live AI-preview <aside> mounted onto document.body while a
+   *  single-shot AI request is awaiting Accept/Dismiss. Null when no
+   *  preview is open. buildAiPanel sets it; closeAiPanel detaches the
+   *  node and clears the field. Distinct from the chat-driven suggestion
+   *  cluster — this is the older preview panel surfaced from inspector
+   *  "AI rewrite" / "Replace media" / "Generate with AI" buttons. */
+  aiPanel: HTMLElement | null;
+  /** Detach the AI preview <aside> (if mounted) and release ctx.aiBusy.
+   *  Every exit path through applyPreview / runAiPreview / dismiss must
+   *  end here — otherwise [data-ai-button] elements stay disabled and
+   *  the Owner sees a frozen editor after the first failed apply. */
+  closeAiPanel(): void;
+  /** POST the Owner prompt to /canvas-agent/sites/<id>/preview, build
+   *  the AI panel from the response, and surface Accept / Dismiss. Sets
+   *  aiBusy=true on entry; clears it (or hands it to closeAiPanel) on
+   *  every exit. Surfaces server errors via an alert modal AND the
+   *  status line so the Owner can't miss them. */
+  runAiPreview(prompt: string): Promise<void>;
+  /** Inspector "AI rewrite" handler — prompts the Owner for a brief,
+   *  builds the rewriteText prompt, and routes through runAiPreview.
+   *  No-op when ctx.aiBusy is true so AI buttons can't stack. Null
+   *  brief (Escape / empty) returns silently — no preview is requested. */
+  aiRewriteText(elementId: string): Promise<void>;
+  /** Inspector "Replace media" handler — opens the 4-up AI media modal,
+   *  uploads the selected blob via uploadGeneratedBlobToElement, and
+   *  flashes Applied / Apply failed in the status line. Image-only;
+   *  refuses video elements loudly via the status line. Bypasses the
+   *  preview panel entirely — picking a tile IS the apply. */
+  aiReplaceMedia(elementId: string): Promise<void>;
+  /** Migrate a server-returned EditableSite into the editor's current
+   *  schema shape. applyPreview pipes the /apply response through this
+   *  before assigning to ctx.state. FORWARD: kept inline at this phase;
+   *  state-migration.ts already owns the impl, the inline-vs-ctx wiring
+   *  lands at Phase 3 cutover. Inline twin at canvas-client.ts:541. */
+  migrateState(s: EditableSite): EditableSite;
+  /** Upload a generated image blob to /owner/assets, rewrite the
+   *  element's assetId/mediaKind/alt in place, then rebuildElement +
+   *  renderInspector + scheduleSave. aiReplaceMedia hands it the tile
+   *  the Owner picked from the 4-up modal. FORWARD: kept inline at this
+   *  phase. Inline twin at canvas-client.ts:7876. */
+  uploadGeneratedBlobToElement(
+    element: MediaElement,
+    blob: Blob,
+    mediaType: string,
+    altValue: string,
+  ): Promise<void>;
 }
 
 /**
@@ -1185,3 +1233,4 @@ export interface RemoteCursorEntry {
     offset?: number;
   } | null;
 }
+
