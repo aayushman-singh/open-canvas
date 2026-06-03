@@ -42,8 +42,8 @@ export interface EditorContext {
    *  that read fields off state MUST null-check first — there is no
    *  silent fallback to an empty site. */
   state: EditableSite | null;
-  /** Canvas mount DOM ref (e.g. `#canvas-main`), cached at boot. Read
-   *  by builders that need to inspect the live computed CSS (kit
+  /** Canvas mount DOM ref (`main.opencanvas-editor`), cached at boot.
+   *  Read by builders that need to inspect the live computed CSS (kit
    *  summary, responsive breakpoint readouts). Null before boot wires
    *  the mount point. */
   mainEl: HTMLElement | null;

@@ -185,7 +185,7 @@ export function buildKitSummary(ctx: EditorContext): HTMLDivElement {
   const rows: [string, string, string | null][] = [
     ['kit', ctx.state.styleKit, null],
     ['accent', accent, accent],
-    ['display', display.split(',')[0]?.replace(/['"]/g, '').trim() ?? '', null],
+    ['display', display.split(',')[0]!.replace(/['"]/g, '').trim(), null],
     ['motion', duration, null],
   ];
   for (let i = 0; i < rows.length; i++) {
