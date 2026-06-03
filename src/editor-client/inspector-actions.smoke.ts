@@ -285,6 +285,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
       throw new Error('openSelectModal stub: smoke does not exercise modals');
     },
     sectionsCatalog: null,
+    saveBusy: false,
+    saveButton: null,
+    publishButton: null,
   };
   return { ctx, log };
 }

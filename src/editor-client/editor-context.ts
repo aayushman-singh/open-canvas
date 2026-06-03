@@ -635,20 +635,6 @@ export interface EditorContext {
    *  precedence. Implementation: setAiBusyImpl in ai-integration.ts. */
   setAiBusy(busy: boolean): void;
 
-  // -- Phase 2p forward declarations (filled by co-edit / presence) -----
-  /** True after the editor has detected a 401 on a mutating request
-   *  (save / chat / apply) and the session-expired modal has been raised.
-   *  setAiBusy ORs this into ctx.aiBusy so the AI surface stays disabled
-   *  through the modal flow; applyAgentOps' catch path short-circuits the
-   *  error toast when this is true to avoid double-surfacing. FORWARD:
-   *  Phase 2p owns this. Inline twin at canvas-client.ts:1043. */
-  sessionExpired: boolean;
-  /** True after the editor has detected a 403 (Owner access revoked
-   *  mid-session). Same role as sessionExpired but does not auto-recover;
-   *  setAiBusy ORs this in so the AI surface stays disabled until reload.
-   *  FORWARD: Phase 2p owns this. Inline twin at canvas-client.ts:1044. */
-  accessRevoked: boolean;
-
   // -- Phase 2m residual forward declaration ---------------------------
   /** Flush the 500ms HTTP-PUT save debounce synchronously so a follow-on
    *  /canvas-agent/.../apply request sees the latest persisted state. Used
@@ -910,4 +896,45 @@ export interface EditorContext {
    *  array typing — Phase 2j only writes null. Inline twin at
    *  canvas-client.ts:12233. */
   sectionsCatalog: unknown[] | null;
+
+  // -- Phase 2p.a: session-expired / access-revoked lifecycle ------------
+  /** Latched true the first time authFetch sees a 401 from /api/*. Locks
+   *  every mutating control (save / AI / publish), status-flashes the
+   *  "session expired" message, and schedules a 1.5s page reload so
+   *  Clerk's handshake fires fresh on the next load. Read by save / AI /
+   *  publish guards so a 401 mid-flight short-circuits the in-progress
+   *  side-effect (the cluster-of-controls is already disabled; the guard
+   *  also suppresses the redundant "Save failed: session expired" status
+   *  flash that would otherwise stomp the lifecycle message).
+   *  Pinned as a forward-decl from the Phase 2n breadcrumbs; implemented
+   *  in session-lifecycle.ts. */
+  sessionExpired: boolean;
+  /** Latched true the first time authFetch sees a 403 from /api/*. Same
+   *  control-lock as sessionExpired but no auto-reload — the user's
+   *  Clerk session is still valid for other sites, so a reload would just
+   *  put them on the same editor with another 403. Surfaces the access-
+   *  removed modal instead so the Owner can navigate away on their own
+   *  terms. Read by the same save / AI / publish guards as sessionExpired.
+   *  Pinned as a forward-decl from the Phase 2n breadcrumbs; implemented
+   *  in session-lifecycle.ts. */
+  accessRevoked: boolean;
+  /** Mirrors ctx.saveButton.disabled. Or-ed against sessionExpired /
+   *  accessRevoked inside setSaveBusy so once either latch flips on, the
+   *  save button stays disabled regardless of subsequent setSaveBusy(false)
+   *  calls. Module-private writer; no other call site reads the flag. */
+  saveBusy: boolean;
+  /** Toolbar Save button, cached at boot. setSaveBusy mirrors its
+   *  disabled state from ctx.saveBusy; the click handler in canvas-
+   *  client.ts (and, post-cutover, in createEditor) calls saveStateNow.
+   *  Null when the route omits the button — every read site null-checks
+   *  rather than asserting mount completion. Forward-declared here so
+   *  session-lifecycle can disable it on 401/403; the click-wiring stays
+   *  inline until createEditor lands. */
+  saveButton: HTMLElement | null;
+  /** Toolbar Publish button, cached at boot. handleSessionExpired and
+   *  handleAccessRevoked disable it directly (not through a setter)
+   *  because the only other writer is the publish path itself toggling
+   *  in-flight state. Null when the route omits the button.
+   *  Forward-declared here for the same reason as saveButton. */
+  publishButton: HTMLElement | null;
 }
