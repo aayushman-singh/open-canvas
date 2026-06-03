@@ -99,7 +99,7 @@ export const MOTION_PRESETS = [
 ] as const;
 export type MotionPreset = (typeof MOTION_PRESETS)[number];
 
-export const SCROLL_TRIGGER_MODES = ['on-scroll', 'on-load'] as const;
+export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;
 export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 
 export const AGENT_RECIPE_IDS = [

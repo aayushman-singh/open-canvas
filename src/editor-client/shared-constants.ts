@@ -12,14 +12,14 @@
 //     schema.ts:78 declares. Real bug — a shape with variant:'icon'
 //     passes server validation but the editor's inspector + render path
 //     doesn't know the variant. Resolves on Phase 3 cutover.
-//   - SCROLL_TRIGGER_MODES: schema is ['on-scroll', 'on-load'];
-//     canvas-client.ts:450 is ['on-load', 'on-scroll']. Same members,
-//     reversed order. Whether order is load-bearing depends on UI
-//     iteration; resolves on Phase 3.
+//   - SCROLL_TRIGGER_MODES: order resolved by flipping schema.ts:102
+//     to ['on-load', 'on-scroll'] (matching the editor's deliberate
+//     default-first dropdown UX). Validation only uses membership; no
+//     other consumer iterates the array.
 //
-// Neither is fixed in canvas-client.ts as part of this commit because
-// this file is not on the runtime path yet — Phase 3 is the atomic
-// cutover that retires the inline mirrors.
+// SHAPE_VARIANTS resolves on Phase 3 cutover when this file becomes
+// the only path; the canvas-client.ts inline mirror is dead code and
+// will not be patched.
 
 export {
   STYLE_KITS,
