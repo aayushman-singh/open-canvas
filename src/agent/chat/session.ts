@@ -127,7 +127,10 @@ export function trimToBudget(
     // Find the first message we can drop: skip any system / summary at the
     // very front (they hold the persistent context) and drop the next one.
     let dropIdx = 0;
-    while (dropIdx < out.length && (out[dropIdx]?.role === 'system' || out[dropIdx]?.role === 'summary')) {
+    while (
+      dropIdx < out.length &&
+      (out[dropIdx]?.role === 'system' || out[dropIdx]?.role === 'summary')
+    ) {
       dropIdx++;
     }
     if (dropIdx >= activeStart) {
@@ -135,7 +138,11 @@ export function trimToBudget(
       // precise token-budget check decides whether to continue or end loudly.
       break;
     }
-    out.splice(dropIdx, 1);
+    let dropEnd = dropIdx + 1;
+    while (dropEnd < activeStart && out[dropEnd]?.role !== 'user') {
+      dropEnd++;
+    }
+    out.splice(dropIdx, dropEnd - dropIdx);
   }
   return out;
 }
@@ -167,10 +174,7 @@ export function countTurns(messages: readonly ChatMessage[]): number {
 type DbEnv = { DATABASE_URL: string };
 
 /** Load a session by id. Returns null when the row does not exist. */
-export async function loadSession(
-  env: DbEnv,
-  sessionId: string,
-): Promise<ChatSessionState | null> {
+export async function loadSession(env: DbEnv, sessionId: string): Promise<ChatSessionState | null> {
   const database = db(env);
   const row = await database
     .select()

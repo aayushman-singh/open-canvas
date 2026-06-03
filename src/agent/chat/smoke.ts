@@ -293,7 +293,7 @@ if (previewOp.op.kind === 'rewriteText') {
   );
 }
 
-console.log('[chat:smoke] 1/8 SSE event order — OK');
+console.log('[chat:smoke] 1/9 SSE event order — OK');
 
 // ---------------------------------------------------------------------------
 // Test 2 — Session persistence: history grows across send-message calls
@@ -342,7 +342,7 @@ assert(
   'expected the new user message to be persisted',
 );
 
-console.log('[chat:smoke] 2/8 Session persistence — OK');
+console.log('[chat:smoke] 2/9 Session persistence — OK');
 
 // ---------------------------------------------------------------------------
 // Test 3 — Token budget on query_site output (≤ 2k tokens, truncated).
@@ -367,7 +367,7 @@ assert(
   summaryLarge.truncated === true,
   'large site summary must flip truncated=true after trimming',
 );
-console.log('[chat:smoke] 3/8 Token budget cap — OK');
+console.log('[chat:smoke] 3/9 Token budget cap — OK');
 
 // ---------------------------------------------------------------------------
 // Test 4 — Op preview is NOT applied automatically; the live editable state
@@ -430,7 +430,7 @@ assert(
 // The source must STILL be unchanged after the clone-apply.
 assert(JSON.stringify(fixtureState) === beforeJson, 'apply-clone must not mutate source');
 
-console.log('[chat:smoke] 4/8 Op preview not auto-applied — OK');
+console.log('[chat:smoke] 4/9 Op preview not auto-applied — OK');
 
 // ---------------------------------------------------------------------------
 // Test 5 — Loud summarisation failure (ADR 0055 dec 5 + ADR 0056 follow-up).
@@ -479,10 +479,7 @@ assert(
   lastTwo[1]?.kind === 'done' && lastTwo[1].reason === 'summarise-failed',
   `expected final event done(summarise-failed), got ${lastTwo[1]?.kind ?? 'none'}`,
 );
-assert(
-  result5.previewOps.length === 0,
-  'failed-summarise turn must produce zero preview ops',
-);
+assert(result5.previewOps.length === 0, 'failed-summarise turn must produce zero preview ops');
 // The Owner's appended user message must still be in the returned history so
 // the caller can persist it.
 const lastMessage5 = result5.messages[result5.messages.length - 1];
@@ -491,7 +488,7 @@ assert(
   'failed-summarise turn must preserve the Owner appended message',
 );
 
-console.log('[chat:smoke] 5/8 Loud summarisation failure — OK');
+console.log('[chat:smoke] 5/9 Loud summarisation failure — OK');
 
 // ---------------------------------------------------------------------------
 // Test 6 - Precise countTokens is authoritative at the cap boundary.
@@ -557,7 +554,7 @@ assert(
   'precise under-budget count must not emit done(tokens-exceeded)',
 );
 
-console.log('[chat:smoke] 6/8 Precise token count boundary — OK');
+console.log('[chat:smoke] 6/9 Precise token count boundary — OK');
 
 // ---------------------------------------------------------------------------
 // Test 7 - Wall-clock abort during countTokens maps to done(wallclock-exceeded).
@@ -616,7 +613,7 @@ assert(
   `expected final event done(wallclock-exceeded), got ${final7?.kind ?? 'none'}`,
 );
 
-console.log('[chat:smoke] 7/8 countTokens wall-clock abort — OK');
+console.log('[chat:smoke] 7/9 countTokens wall-clock abort — OK');
 
 // ---------------------------------------------------------------------------
 // Test 8 - Trimming preserves the active tool-call protocol tail.
@@ -645,20 +642,49 @@ assert(
 );
 assert(
   trimmedActiveToolTail.some(
-    (m) =>
-      m.role === 'assistant' &&
-      m.toolCalls?.some((call) => call.id === 'query-site-active'),
+    (m) => m.role === 'assistant' && m.toolCalls?.some((call) => call.id === 'query-site-active'),
   ),
   'trimToBudget must preserve the assistant tool-call message for active tool results',
 );
 assert(
-  trimmedActiveToolTail.some(
-    (m) => m.role === 'tool' && m.toolCallId === 'query-site-active',
-  ),
+  trimmedActiveToolTail.some((m) => m.role === 'tool' && m.toolCallId === 'query-site-active'),
   'trimToBudget must preserve the active tool result',
 );
 
-console.log('[chat:smoke] 8/8 Active tool tail trim — OK');
+console.log('[chat:smoke] 8/9 Active tool tail trim — OK');
+
+// ---------------------------------------------------------------------------
+// Test 9 - Trimming drops complete historical tool-call turns.
+// ---------------------------------------------------------------------------
+
+const historicalToolTurn: ChatMessage[] = [
+  { role: 'user', content: 'Old prompt ' + 'x'.repeat(200) },
+  {
+    role: 'assistant',
+    content: 'Calling query_site. ' + 'x'.repeat(800),
+    toolCalls: [{ id: 'query-site-old', name: 'query_site', arguments: { detail: 'full' } }],
+  },
+  {
+    role: 'tool',
+    toolCallId: 'query-site-old',
+    toolName: 'query_site',
+    content: JSON.stringify({ ok: true }),
+  },
+  { role: 'user', content: 'Keep this active request.' },
+];
+const trimmedHistoricalToolTurn = trimToBudget(historicalToolTurn, 80);
+assert(
+  trimmedHistoricalToolTurn.length === 1 &&
+    trimmedHistoricalToolTurn[0]?.role === 'user' &&
+    trimmedHistoricalToolTurn[0].content === 'Keep this active request.',
+  'trimToBudget must drop the whole historical tool-call turn before the active user message',
+);
+assert(
+  !trimmedHistoricalToolTurn.some((m) => m.role === 'tool'),
+  'trimToBudget must not leave orphan historical tool results',
+);
+
+console.log('[chat:smoke] 9/9 Historical tool-call trim — OK');
 
 // ---------------------------------------------------------------------------
 // Done.
