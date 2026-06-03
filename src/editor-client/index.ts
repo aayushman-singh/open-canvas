@@ -31,8 +31,34 @@ import { migrateState } from './state-migration.js';
 import { MARK_TAGS } from './mark-tags.js';
 import { newElementId, newPageId, newSectionId } from './ids.js';
 import { escapeAttr, escapeHtml } from './html-escape.js';
+import {
+  clampInsertIndex,
+  hasFooterSection,
+  hasHeaderSection,
+  isPinnedSection,
+  pinnedSectionLabel,
+  sectionDisplayName,
+} from './section-roles.js';
+import { findFontSizeMark, findLinkMark, hasMark } from './mark-queries.js';
+import { bringToFront, nextZInArray, nudgeZ, renormalizeZ, sendToBack } from './z-order.js';
+import { cssEscape } from './css-escape.js';
+import { previewPaletteFromAccent } from './palette.js';
 
-console.log('[editor-client] Phase 2c stub ready', {
+void clampInsertIndex;
+void hasFooterSection;
+void hasHeaderSection;
+void isPinnedSection;
+void pinnedSectionLabel;
+void sectionDisplayName;
+void findFontSizeMark;
+void findLinkMark;
+void hasMark;
+void bringToFront;
+void nudgeZ;
+void renormalizeZ;
+void sendToBack;
+
+console.log('[editor-client] Phase 2d stub ready', {
   styleKits: STYLE_KITS.length,
   motionPresets: MOTION_PRESETS.length,
   inlineMarkTypes: INLINE_MARK_TYPES.length,
@@ -51,4 +77,7 @@ console.log('[editor-client] Phase 2c stub ready', {
   ),
   escapeHtmlSample: escapeHtml('<&>"\''),
   escapeAttrSample: escapeAttr('<&>"\''),
+  cssEscapeOk: cssEscape('opencanvas-element__id-1234').length > 0,
+  paletteLen: previewPaletteFromAccent('#3366cc').length,
+  nextZ: nextZInArray([]),
 });
