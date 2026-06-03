@@ -1069,6 +1069,33 @@ export interface EditorContext {
    *  null on cancel. Throws synchronously if ctx.modalOpen is already
    *  true. Bound impl lives in modals.ts (openNewPageModalImpl). */
   openNewPageModal(opts: NewPageModalOpts): Promise<NewPageModalResult | null>;
+
+  // -- Phase 2q.h: asset reel + section drag -----------------------------
+  /** Reel tile-vs-list layout selector. "tile" renders 288px-wide thumbnail
+   *  cards stacked vertically with their recipe label underneath; "list"
+   *  renders a 64px-wide thumbnail strip with a name/recipe info column to
+   *  the right. The Tile/List header buttons in mountReel toggle this and
+   *  re-render. beginReelDrag also reads it to size the drag ghost (200px
+   *  in tile mode, 64px in list mode). Default "tile" at boot. */
+  reelViewMode: 'tile' | 'list';
+  /** Open the film-reel overlay (sets ctx.isReelOpen=true, clears the
+   *  element selection because reel + element selection are mutually
+   *  exclusive UI modes, re-renders). attachGripHandlers calls this on
+   *  drag-start so the reel reveals as the section lifts; the reel "+"
+   *  affordance and click-to-toggle paths also drive this. Bound at boot
+   *  to `openReelImpl(ctx)`. */
+  openReel(): void;
+  /** Re-order the section at `fromIdx` to land at `toIdx` in the current
+   *  page's sections array. No-op when fromIdx equals toIdx or toIdx is
+   *  the adjacent +1 slot (which would be a no-move). Pinned sections
+   *  refuse to move. Bound to the reel/canvas drop path; the section
+   *  inspector's "move up/down" buttons share the same impl. */
+  moveSectionToIndex(fromIdx: number, toIdx: number): void;
+  /** Start the canvas-side section drag gesture. Builds a 200px-wide
+   *  ghost following the pointer, a drop-line indicating the insertion
+   *  point (canvas or reel), and commits on mouseup. Called from
+   *  attachGripHandlers after the 5px movement threshold trips. */
+  beginSectionDrag(sectionId: string, startEv: MouseEvent): void;
 }
 
 /**

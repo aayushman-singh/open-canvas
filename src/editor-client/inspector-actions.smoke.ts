@@ -316,6 +316,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     presenceDisplayName: '',
     presenceUserId: '',
     editingSnapshot: null,
+    reelViewMode: 'tile',
+    openReel: () => {},
+    moveSectionToIndex: () => {},
+    beginSectionDrag: () => {},
   };
   return { ctx, log };
 }
