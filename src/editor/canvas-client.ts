@@ -2910,27 +2910,47 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   function buildActionBody(element) {
-    var node = document.createElement("a");
-    node.className = "opencanvas-action";
-    node.setAttribute("data-variant", element.variant);
-    node.setAttribute("href", resolveActionHref(element.href));
-    // Plain click selects the action element on canvas (default selection
-    // flow). Alt-click navigates instead — internal page hrefs swap the
-    // active artboard, external hrefs open in a new tab.
-    node.addEventListener("click", function (ev) {
-      ev.preventDefault();
-      if (!ev.altKey) return;
-      ev.stopPropagation();
-      if (element.href && element.href.type === "page") {
-        setActivePage(element.href.pageId);
-        return;
+    // ADR 0051 dec 3 — ActionElement is a one-of: { href } OR { behavior }.
+    // The behavior arm (currently copy-to-clipboard) has no href at all, so
+    // calling resolveActionHref(element.href) on it throws "unknown href
+    // shape" and crashes site load. Mirror the server-side branching from
+    // src/canvas/elements/action.ts:renderAction so the editor handles both
+    // arms cleanly.
+    var node;
+    if (element.behavior !== undefined) {
+      node = document.createElement("button");
+      node.setAttribute("type", "button");
+      node.className = "opencanvas-action";
+      node.setAttribute("data-variant", element.variant);
+      if (
+        element.behavior.type === "copy" &&
+        typeof element.behavior.value === "string"
+      ) {
+        node.setAttribute("data-opencanvas-copy", element.behavior.value);
       }
-      if (element.href && element.href.type === "external") {
-        if (isAllowedHref(element.href.url)) {
-          window.open(element.href.url, "_blank", "noopener,noreferrer");
+    } else {
+      node = document.createElement("a");
+      node.className = "opencanvas-action";
+      node.setAttribute("data-variant", element.variant);
+      node.setAttribute("href", resolveActionHref(element.href));
+      // Plain click selects the action element on canvas (default selection
+      // flow). Alt-click navigates instead — internal page hrefs swap the
+      // active artboard, external hrefs open in a new tab.
+      node.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (!ev.altKey) return;
+        ev.stopPropagation();
+        if (element.href && element.href.type === "page") {
+          setActivePage(element.href.pageId);
+          return;
         }
-      }
-    });
+        if (element.href && element.href.type === "external") {
+          if (isAllowedHref(element.href.url)) {
+            window.open(element.href.url, "_blank", "noopener,noreferrer");
+          }
+        }
+      });
+    }
     var labelText = "";
     for (var li = 0; li < element.label.length; li++) {
       labelText += element.label[li].text;
