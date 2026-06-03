@@ -10,12 +10,11 @@
 // wired into the ci:smoke chain — per-phase manual smoke (per ADR 0058
 // Decision 4 / Task 2 protocol P.5).
 //
-// DOM-builder coverage is intentionally OUT OF SCOPE here: the smoke
-// runs under bare Bun (no `document` global) and adding a DOM polyfill
-// only for one phase is heavier than the value of an outerHTML snapshot
-// that, by construction, would not capture attached event listeners.
-// Behavioural assertion the existing `src/editor/inspector-smoke.ts`
-// must continue to satisfy on the inline production path:
+// DOM builders live in a sibling module (./inspector-action-buttons.ts)
+// precisely because bare Bun has no `document`. The inline IIFE twin's
+// DOM-building behaviour is pinned by `src/editor/inspector-smoke.ts`
+// on the production path. Behavioural assertions the existing inspector
+// smoke must continue to satisfy:
 //   - `parentArrayFor` throws loudly on missing parents
 //   - `duplicateElement` uses `nextZInArray(arr)` for clone z
 //   - The element context-menu duplicate inserts into the immediate
@@ -23,12 +22,10 @@
 // Those are already pinned at inspector-smoke.ts lines 142-166.
 
 import type { CanvasElement, CanvasSection, TextElement } from '../canvas/schema.js';
-import type { EditorContext, FindElementResult } from './editor-context.js';
+import type { EditorContext } from './editor-context.js';
+import type { FindElementResult } from './editor-context-types.js';
 import {
   applyZOrderAction,
-  buildElementActionsGroup,
-  buildReorderGroup,
-  buildZOrderGroup,
   deleteElement,
   duplicateElement,
   moveInReadingOrder,
@@ -256,17 +253,5 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
   }
   assert(threw, 'duplicateElement on a missing element must throw loudly (no silent fallback)');
 })();
-
-// ----- DOM builders are exercised for type/import only -----------------
-//
-// We don't run them here — there's no document in bare Bun. The exports
-// being importable and typechecking is the gate; the inline IIFE twin's
-// DOM-building behaviour is pinned by src/editor/inspector-smoke.ts on
-// the production path. Keep these references so tree-shaking doesn't
-// flag the exports as unused, and so a future DOM-enabled smoke can
-// extend this file without re-importing.
-void buildReorderGroup;
-void buildZOrderGroup;
-void buildElementActionsGroup;
 
 console.log('[inspector-actions:smoke] OK');

@@ -8,7 +8,7 @@
 // Read this file to see the migration's scoreboard: when the interface
 // stops growing, the IIFE is fully decomposed.
 
-import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
+import type { FindElementResult } from './editor-context-types.js';
 
 /**
  * Shape of the boot payload the editor route emits as
@@ -24,24 +24,6 @@ export interface EditorBoot {
 }
 
 /**
- * Result shape of `findElement`. Mirrors the inline IIFE's
- * `findElementIn` return — the section that contains the element, the
- * element itself, the immediate parent array it lives in, plus parent-
- * kind/meta so callers can distinguish section-level vs nested (tab
- * panel / collection entry) parents.
- */
-export interface FindElementResult {
-  section: CanvasSection;
-  element: CanvasElement;
-  parentArray: CanvasElement[];
-  parentKind: 'section' | 'tab-panel' | 'collection-entry';
-  parentMeta:
-    | null
-    | { tabsElement: CanvasElement; tab: { elements: CanvasElement[] } }
-    | { collectionElement: CanvasElement; entryIndex: number };
-}
-
-/**
  * Single mutable object mirroring the IIFE closure surface. Extracted
  * modules accept this as their first parameter and read/mutate fields
  * directly — the same shape the IIFE uses today, lifted out of closure.
@@ -51,26 +33,23 @@ export interface FindElementResult {
  */
 export interface EditorContext {
   // -- Phase 2h.1.a: inspector element-action cluster ---------------------
-  /** Id of the selected positioned element, or null when nothing is
-   *  selected. Read AND mutated by inspector verbs (duplicate sets it
-   *  to the clone's id; delete clears it if it pointed at the removed
-   *  element). */
+  /** Read AND written by inspector verbs — duplicate writes the clone id,
+   *  delete clears when it matched the removed element. Callers must use
+   *  ctx.selectedElementId rather than capturing the field via closure. */
   selectedElementId: string | null;
-  /** Walk the loaded site (header → footer → current page sections) and
-   *  return the section + element + immediate parent array for `elementId`,
-   *  or null when the id is not present. Mirrors the inline
-   *  `findElement` closure helper. */
+  /** Walks header → footer → current-page sections in that order; the
+   *  parent-walk order matters for nested containers (tab panels,
+   *  collection entries). */
   findElement(elementId: string): FindElementResult | null;
-  /** Re-render the whole canvas + inspector. */
   renderAll(): void;
-  /** Re-render only the inspector pane. */
   renderInspector(): void;
-  /** Make `elementId` the active selection. No-op when already selected. */
+  /** No-op when `elementId` is already the active selection; callers rely
+   *  on the idempotence to avoid re-render storms. */
   selectElement(elementId: string): void;
-  /** Push the current state onto the undo stack (debounced). */
+  /** Called BEFORE the mutation; pairs with redoStack for symmetric
+   *  undo/redo. Callers that mutate then capture invert the contract. */
   captureForUndo(): void;
-  /** Debounced persistence — POSTs the state to the editor save endpoint. */
+  /** Debounced. */
   scheduleSave(): void;
-  /** Close the per-element context menu if one is open. */
   closeElementMenu(): void;
 }
