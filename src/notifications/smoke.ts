@@ -51,13 +51,14 @@ function fakeWriteDb(): Db {
       return {
         from() {
           return {
-            where: () => Promise.resolve([
-              {
-                id: 'cust-1',
-                email: 'owner@example.com',
-                displayName: 'Owner One',
-              },
-            ]),
+            where: () =>
+              Promise.resolve([
+                {
+                  id: 'cust-1',
+                  email: 'owner@example.com',
+                  displayName: 'Owner One',
+                },
+              ]),
           };
         },
       };
@@ -110,7 +111,10 @@ async function assertRejects(
   assert(spec.row.recipientKind === 'site', 'recipientKind site');
   assert(spec.row.recipientId === 'site-abc', 'recipientId siteId');
   assert(spec.fanOutCustomerIds.length === 2, 'site fan-out length');
-  assert(spec.fanOutCustomerIds[0] === 'cust-1' && spec.fanOutCustomerIds[1] === 'cust-2', 'fan-out order');
+  assert(
+    spec.fanOutCustomerIds[0] === 'cust-1' && spec.fanOutCustomerIds[1] === 'cust-2',
+    'fan-out order',
+  );
 }
 
 {
@@ -176,7 +180,12 @@ process.stdout.write('[notifications:smoke] constructors OK\n');
     actorDisplayName: 'Actor',
     occurredAt: '2026-06-01T00:00:00Z',
   };
-  const publishOk: PublishEventPayload = { ...publishFailed, outcome: 'succeeded', publishedVersion: 7, failureReason: null };
+  const publishOk: PublishEventPayload = {
+    ...publishFailed,
+    outcome: 'succeeded',
+    publishedVersion: 7,
+    failureReason: null,
+  };
   assert(shouldEmail('publish_event', publishFailed, 'cust-x'), 'publish failed emails');
   assert(!shouldEmail('publish_event', publishOk, 'cust-x'), 'publish succeeded does not email');
 
@@ -191,8 +200,14 @@ process.stdout.write('[notifications:smoke] constructors OK\n');
     actorCustomerId: 'cust-inviter',
     actorDisplayName: 'Inviter',
   };
-  assert(shouldEmail('collaborator_event', collabP, 'cust-invitee'), 'collaborator subject gets email');
-  assert(!shouldEmail('collaborator_event', collabP, 'cust-onlooker'), 'collaborator onlooker skipped');
+  assert(
+    shouldEmail('collaborator_event', collabP, 'cust-invitee'),
+    'collaborator subject gets email',
+  );
+  assert(
+    !shouldEmail('collaborator_event', collabP, 'cust-onlooker'),
+    'collaborator onlooker skipped',
+  );
 }
 
 process.stdout.write('[notifications:smoke] email policy OK\n');
@@ -220,7 +235,11 @@ function assertContains(html: string, needle: string, label: string): void {
   assert(e.subject.includes('Acme'), 'form_submission subject contains siteName');
   assertContains(e.html, 'Contact form', 'form_submission body');
   assertContains(e.html, '/contact', 'form_submission body page slug');
-  assertContains(e.html, `${CTX.appOrigin}/dashboard/sites/site-acme/forms`, 'form_submission inbox URL');
+  assertContains(
+    e.html,
+    `${CTX.appOrigin}/dashboard/sites/site-acme/forms`,
+    'form_submission inbox URL',
+  );
 }
 
 {
@@ -352,6 +371,12 @@ process.stdout.write('[notifications:smoke] writer failure contracts OK\n');
       notificationsInboxScript.includes('since=') &&
       notificationsInboxScript.includes('lastSeenCreatedAt'),
     'notification IIFE must backfill on WebSocket reconnect with since=lastSeenCreatedAt',
+  );
+  assert(
+    notificationsInboxScript.includes('currentStreamSocket') &&
+      notificationsInboxScript.includes("currentStreamSocket.close(1000, 'tab hidden');") &&
+      notificationsInboxScript.includes("document.visibilityState === 'hidden'"),
+    'notification IIFE must close the live WebSocket when the tab becomes hidden',
   );
   assert(
     notificationsInboxScript.includes('pendingNavigationHref') &&

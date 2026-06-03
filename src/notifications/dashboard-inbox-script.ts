@@ -322,13 +322,17 @@ export const notificationsInboxScript = `(function(){
     var streamOpened = false;
     var streamRetry = 0;
     var streamPending = false;
+    var currentStreamSocket = null;
     function openStream() {
       if (document.visibilityState === 'hidden') {
         streamPending = true;
         return;
       }
+      if (currentStreamSocket && currentStreamSocket.readyState !== WebSocket.CLOSED) return;
+      currentStreamSocket = null;
       streamPending = false;
       var ws = new WebSocket(streamUrl);
+      currentStreamSocket = ws;
       ws.addEventListener('open', function() {
         streamRetry = 0;
         if (streamOpened && lastSeenCreatedAt) {
@@ -350,6 +354,7 @@ export const notificationsInboxScript = `(function(){
         }
       });
       ws.addEventListener('close', function() {
+        if (currentStreamSocket === ws) currentStreamSocket = null;
         if (document.visibilityState === 'hidden') {
           streamPending = true;
           return;
@@ -361,10 +366,18 @@ export const notificationsInboxScript = `(function(){
       });
       ws.addEventListener('error', function() {
         // Let the close handler schedule the reconnect; don't double-fire.
-        try { ws.close(); } catch (e) { /* noop */ }
+        ws.close();
       });
     }
     document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') {
+        streamPending = true;
+        if (currentStreamSocket && currentStreamSocket.readyState !== WebSocket.CLOSED) {
+          currentStreamSocket.close(1000, 'tab hidden');
+          currentStreamSocket = null;
+        }
+        return;
+      }
       if (document.visibilityState === 'visible' && streamPending) {
         streamRetry = 0;
         openStream();
