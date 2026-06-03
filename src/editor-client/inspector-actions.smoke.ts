@@ -389,6 +389,22 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     openLinkModal: () => {
       throw new Error('openLinkModal stub: smoke does not exercise modals');
     },
+    activeTemplateFilter: 'all',
+    activeSearchQuery: '',
+    enterPlacementMode: () => {},
+    importPendingSectionAt: () => {
+      throw new Error('importPendingSectionAt stub: smoke does not exercise section import');
+    },
+    sidebar: null,
+    activateSidebarTab: () => {},
+    attachSidebarTabs: () => {},
+    attachSidebarActions: () => {},
+    applySidebarStyleKit: () => {
+      throw new Error('applySidebarStyleKit stub: smoke does not exercise style kit POST');
+    },
+    buildKitSummary: () => {
+      throw new Error('buildKitSummary stub: smoke does not exercise kit summary build');
+    },
   };
   return { ctx, log };
 }

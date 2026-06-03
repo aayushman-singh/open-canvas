@@ -33,6 +33,7 @@ import type {
   TextModalOpts,
 } from './modals.js';
 import type { SiteSnapshot } from './persist.js';
+import type { PendingImport, SectionsCatalogEntry } from './sections-picker.js';
 
 /**
  * Shape of the boot payload the editor route emits as
@@ -432,13 +433,16 @@ export interface EditorContext {
     width: number;
     height: number;
   }>;
-  /** Truthy when the Owner has clicked "Use" on a Sections-picker card
-   *  and the canvas should render between-section drop slots. The field
-   *  is set+cleared by the sections-picker (Phase 2k territory) and only
-   *  read by renderAllImpl as a truthiness gate before calling
-   *  ctx.renderPlacementSlots — so the on-ctx type is the loosest possible
-   *  shape (`unknown`) rather than the full PendingImport record. */
-  pendingImport: unknown;
+  /** Owner's pending Sections-picker import. Non-null after the Owner
+   *  clicks "Use" on a card and before they click a drop slot or
+   *  Cancel. renderAllImpl reads it as a truthiness gate before invoking
+   *  ctx.renderPlacementSlots; sections-picker.ts owns the writes
+   *  (enterPlacementModeImpl / exitPlacementModeImpl /
+   *  importPendingSectionAt) and reads the full record shape. Narrowed
+   *  from the previous `unknown` shape at Phase 2q.i extraction — the
+   *  camera module's truthiness gate stays valid under the narrower
+   *  type. */
+  pendingImport: PendingImport | null;
   /** Re-render the inline link popover when the camera moves. The IIFE's
    *  inline applyCameraTransform calls this through a `typeof === "function"`
    *  gate because the co-edit cursor layer mounts asynchronously after the
@@ -876,14 +880,7 @@ export interface EditorContext {
     height: number;
   } | null;
   // openTextModal + openSelectModal moved to the Phase 2q.a modal cluster section below.
-  /** Cached cross-template sections catalog: null until first load, then
-   *  an array (possibly empty) of catalog rows. Phase 2j's saveToLibrary
-   *  sets this back to null on a successful POST so the next picker open
-   *  re-fetches. FORWARD: kept inline by this phase (the sections picker
-   *  owns the load + filter logic and the row shape). Loose `unknown`
-   *  array typing — Phase 2j only writes null. Inline twin at
-   *  canvas-client.ts:12233. */
-  sectionsCatalog: unknown[] | null;
+  // sectionsCatalog moved to the Phase 2q.i sections picker section below.
 
   // -- Phase 2p.a: session-expired / access-revoked lifecycle ------------
   /** Latched true the first time authFetch sees a 401 from /api/*. Locks
@@ -1313,6 +1310,74 @@ export interface EditorContext {
     blank?: boolean;
     focusAfterClose?: HTMLElement | null;
   }): Promise<{ href: string; target?: '_blank' } | null>;
+
+  // -- Phase 2q.i: sections picker + sidebar wiring ----------------------
+  /** Cross-template Sections-picker catalog. Three-state sentinel:
+   *  - `null` = unloaded (the picker fetches on first sidebar-tab open
+   *    and memoises the result here).
+   *  - `[]` = loaded-empty (the picker shows "No sections match.").
+   *  - `[...]` = loaded with entries.
+   *  ensureSectionsPanelLoaded reads + writes; saveAsLibrarySection
+   *  (kept inline) resets to `null` after a successful save so the next
+   *  panel open re-fetches and surfaces the new entry. */
+  sectionsCatalog: SectionsCatalogEntry[] | null;
+  /** Sections-picker template-source filter ("all" / "seed" / "library").
+   *  Mirrored from the <select data-section-picker-filter> control;
+   *  renderSectionsPickerGrid reads it to filter the catalog. Defaults
+   *  to "all" at boot. */
+  activeTemplateFilter: string;
+  /** Sections-picker search box value. Mirrored from the
+   *  <input data-section-picker-search> control; renderSectionsPickerGrid
+   *  reads it (case-insensitive substring) to filter the catalog.
+   *  Defaults to "" at boot. */
+  activeSearchQuery: string;
+  /** Re-render the Sections-picker panel (controls shell on first call,
+   *  grid-only on subsequent calls so the search input keeps focus).
+   *  Bound impl lives in sections-picker.ts (renderSectionsPanelImpl);
+   *  exposed on ctx because importPendingSectionAt re-renders after
+   *  swapping state. */
+  renderSectionsPanel(): void;
+  /** Stash the pending import target, surface the "click a slot" prompt,
+   *  and re-render the picker grid + canvas drop slots. Bound impl lives
+   *  in sections-picker.ts (enterPlacementModeImpl). */
+  enterPlacementMode(target: PendingImport): void;
+  /** Commit the pending import at the given inter-section index. POSTs
+   *  /sites/<id>/sections/import with library or seed coordinates, then
+   *  swaps ctx.state for the response's editableState (migrated), clears
+   *  selection, and re-renders. Bound impl lives in sections-picker.ts. */
+  importPendingSectionAt(insertAt: number): Promise<void>;
+  /** The left sidebar container (`#canvas-sidebar`), cached at boot.
+   *  Null when the route omits it; attachSidebarActions short-circuits
+   *  on null. */
+  sidebar: HTMLElement | null;
+  /** Switch the active sidebar tab by data-sidebar-tab name. Toggles the
+   *  .active class on every tab button + flips panel hidden flags, then
+   *  kicks the tab-specific bootstrap (ensureSectionsPanelLoaded for
+   *  "sections", renderVersionsPanel for "versions",
+   *  updatePageSidebar for "pages"). Implementation stays inline in
+   *  canvas-client.ts during Phase 2; sidebar.ts attachSidebarTabs
+   *  invokes it through ctx so the tab handler list stays mechanical. */
+  activateSidebarTab(tabName: string): void;
+  /** Wire click handlers on the static sidebar tabs. Bound impl lives
+   *  in sidebar.ts (attachSidebarTabs). Exposed on ctx for the Phase 3
+   *  createEditor wiring to call symmetrically with the other
+   *  attach*-style boot helpers. */
+  attachSidebarTabs(): void;
+  /** Wire click handlers on the static sidebar action buttons (add
+   *  section, add component, style kit) + the inspector's section-
+   *  action delegation. Bound impl lives in sidebar.ts
+   *  (attachSidebarActions). */
+  attachSidebarActions(): void;
+  /** Apply a style kit visually first (mirror onto ctx.mainEl +
+   *  re-render the inspector), then persist in the background. Rolls
+   *  back to the previous kit on POST failure so the UI never lies
+   *  about what's saved. Bound impl lives in sidebar.ts
+   *  (applySidebarStyleKit). */
+  applySidebarStyleKit(kit: string | null, buttons: NodeListOf<Element>): Promise<void>;
+  /** Inspector summary card that reads computed CSS off ctx.mainEl so
+   *  it stays in sync with whatever style-kits.ts emits at runtime.
+   *  Bound impl lives in sidebar.ts (buildKitSummary). */
+  buildKitSummary(): HTMLElement;
 }
 
 /**
