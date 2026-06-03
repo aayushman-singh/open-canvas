@@ -8,6 +8,7 @@
 // Read this file to see the migration's scoreboard: when the interface
 // stops growing, the IIFE is fully decomposed.
 
+import type { EditableSite } from '../canvas/schema.js';
 import type { FindElementResult } from './editor-context-types.js';
 
 /**
@@ -32,6 +33,21 @@ export interface EditorBoot {
  * fields its module touches. See ADR 0058 Decision 4.
  */
 export interface EditorContext {
+  // -- Phase 2h.1.b: foundational state surface --------------------------
+  /** The loaded site, mutable. Today's IIFE has `let state = null` and
+   *  mutates `state.pages[i].sections[j]…` freely; extracted modules
+   *  read/write through ctx.state so they share the same object identity.
+   *
+   *  Null before boot completes and after a fatal load failure. Callers
+   *  that read fields off state MUST null-check first — there is no
+   *  silent fallback to an empty site. */
+  state: EditableSite | null;
+  /** Canvas mount DOM ref (e.g. `#canvas-main`), cached at boot. Read
+   *  by builders that need to inspect the live computed CSS (kit
+   *  summary, responsive breakpoint readouts). Null before boot wires
+   *  the mount point. */
+  mainEl: HTMLElement | null;
+
   // -- Phase 2h.1.a: inspector element-action cluster ---------------------
   /** Read AND written by inspector verbs — duplicate writes the clone id,
    *  delete clears when it matched the removed element. Callers must use
