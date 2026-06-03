@@ -100,7 +100,6 @@ export type { EditorBoot, EditorContext };
  * to wire into.
  */
 export function createEditor(_boot: EditorBoot): void {
-  void _boot;
   throw new Error(
     'createEditor: stub — the editor route still serves canvasClientScript() ' +
       'until ADR 0015 Phase 3 cutover. Phase 2h+ extractions land here.',
