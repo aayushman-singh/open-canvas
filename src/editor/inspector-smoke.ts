@@ -69,6 +69,17 @@ assert(
   'text inspector fields with noRebuild must skip rebuildElement while still saving',
 );
 
+const actionHrefField = sliceBetween(
+  'function renderActionHrefField(f, element) {',
+  '// Action handler + busy-flag registries',
+);
+assert(
+  actionHrefField.includes('delete element.behavior;') &&
+    actionHrefField.includes('setActionHref({ type: "external", url: urlInput.value });') &&
+    actionHrefField.includes('setActionHref({ type: "page", pageId: pageSelect.value });'),
+  'action href inspector must clear behavior when writing href so ActionElement stays one-of',
+);
+
 const accordionInspector = sliceBetween(
   'function mountAccordionItems(element, host) {',
   '// buildCarouselInspector migrated to INSPECTOR_DISPATCH',
@@ -94,6 +105,66 @@ assert(
   'table inspector grid must mount through custom-mount while simple booleans live in INSPECTOR_DISPATCH',
 );
 
+const collectionBody = sliceBetween(
+  'function buildCollectionBody(element) {',
+  'function buildTabsBody(element) {',
+);
+assert(
+  collectionBody.includes('card.appendChild(buildElementNode(entry[j]));') &&
+    !collectionBody.includes('child.appendChild(buildElementBody(entry[j]));'),
+  'collection preview children must render as full opencanvas-element wrappers so nested editing can select them',
+);
+
+const tabsBody = sliceBetween(
+  'function buildTabsBody(element) {',
+  'function buildElementBody(element) {',
+);
+assert(
+  tabsBody.includes('panel.appendChild(buildElementNode(children[i]));') &&
+    !tabsBody.includes('childWrap.appendChild(buildElementBody(children[i]));'),
+  'tabs panel children must render as full opencanvas-element wrappers so nested editing can select them',
+);
+
+const sidebarInsert = sliceBetween(
+  'function insertElementForSidebarCommand(section, commandKey) {',
+  'const STYLE_KITS =',
+);
+assert(
+  sidebarInsert.includes('z: nextZInArray(nestedTarget.elements),'),
+  'nested sidebar inserts must choose z from sibling max-z, not elements.length',
+);
+
+const elementMenu = sliceBetween(
+  'function buildElementMenu(element, section, wrapper) {',
+  'function toggleElementMenu(elementId, wrapper) {',
+);
+assert(
+  elementMenu.includes('var arr = parentArrayFor(section, element);') &&
+    !elementMenu.includes('section.elements.push(copy);'),
+  'element context-menu duplicate must insert into the immediate parent array, not always section.elements',
+);
+
+const zOrderHelpers = sliceBetween(
+  '// -- Z-order + reading-order helpers',
+  'function moveInReadingOrder(section, element, direction) {',
+);
+assert(
+  zOrderHelpers.includes('throw new Error("parentArrayFor: element "') &&
+    zOrderHelpers.includes('const arr = parentArrayFor(section, element);') &&
+    zOrderHelpers.includes('bringToFront(arr, element)') &&
+    zOrderHelpers.includes('renormalizeZ(arr);'),
+  'z-order helpers must fail loudly on missing parent arrays and operate on nested siblings, not only section.elements',
+);
+
+const duplicateElement = sliceBetween(
+  'function duplicateElement(section, element) {',
+  'function deleteElement(section, element) {',
+);
+assert(
+  duplicateElement.includes('clone.box.z = nextZInArray(arr);'),
+  'inspector duplicate must assign z from the immediate sibling array',
+);
+
 const navInspector = sliceBetween(
   'function mountNavLinks(element, host) {',
   '// Revoke any blob URLs',
@@ -107,6 +178,16 @@ assert(
     navInspector.includes('if (!validateNavLinkEdit(kindSel.value, lnk.href))') &&
     navInspector.includes('kindSel.value = lnk.kind;'),
   'canvas nav inspector must reject non-fragment hrefs for anchor links',
+);
+
+const plainTextPaste = sliceBetween(
+  'function plainTextToFragmentHtml(plain) {',
+  '// Convert arbitrary pasted HTML',
+);
+assert(
+  plainTextPaste.includes('var afterClose = src.charAt(close1 + 1);') &&
+    plainTextPaste.includes("!(afterClose >= '0' && afterClose <= '9')"),
+  'plain-text paste must not parse currency-like "$5 + $3" as inline math',
 );
 
 const elementStyleControls = sliceBetween('// -- Element style controls', '// Motion controls.');
