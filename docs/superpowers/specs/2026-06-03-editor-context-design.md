@@ -64,9 +64,10 @@ export interface EditorContext {
 ```ts
 // src/editor-client/index.ts
 export function createEditor(boot: EditorBoot): void {
-  const ctx: EditorContext = { /* ...IIFE-cached refs + initial state... */ };
-  // ...wire event listeners that close over ctx and dispatch into
-  //    extracted modules with (ctx, …) signatures...
+  const ctx: EditorContext = { /* ...IIFE-cached refs + mutable boot slots... */ };
+  // ...start the internally-handled async boot task, wire event listeners
+  //    that close over ctx, and dispatch into extracted modules with
+  //    (ctx, …) signatures...
 }
 ```
 
@@ -82,9 +83,9 @@ Helpers consumed by many modules (`scheduleSave`, `renderAll`, `findElement`, `s
 ## Sequenced follow-ups
 
 1. **Land ADR 0058 + spec** (this commit-set). No code change.
-2. **Land empty `EditorContext` interface + `createEditor` stub** in `src/editor-client/`. No behavioural change.
+2. **Land empty `EditorContext` interface + `createEditor` stub** in `src/editor-client/`. Preserve the existing entry point's `styles.css` import and build-smoke imports so `scripts/build-editor-client.ts` still emits both JS and CSS. No behavioural change.
 3. **Phase 2h..2N: cohesive-chunk extractions**, each adding its touched fields to `EditorContext`. Suggested boundaries in ADR 0058 §Follow-ups (subject to discovery).
-4. **Per-phase parity smoke** where feasible — feed identical input to inline IIFE and extracted module, assert byte-identical output. Where parity doesn't admit a clean smoke (drag handlers, event-driven flows), document the behavioural assertion the existing editor smoke must satisfy.
+4. **Per-phase bundle + parity smoke** where feasible — run `bun run editor-client:build`, feed identical input to inline IIFE and extracted module, and assert byte-identical output. Where parity doesn't admit a clean smoke (drag handlers, event-driven flows), add an import/build smoke for the extracted module and document the behavioural assertion the existing editor smoke must satisfy on the production inline path.
 5. **Phase 3 cutover ADR** — separate decision moment when all Phase 2 extractions complete.
 6. **Post-Phase-3 decomposition ADR** — split EditorContext into smaller named contexts. This is real future work, not speculative.
 
@@ -100,7 +101,7 @@ Helpers consumed by many modules (`scheduleSave`, `renderAll`, `findElement`, `s
 
 - Wide `EditorContext` interface (~40-50 fields when complete). Hard to mock. Coupling not narrowed at module boundaries. Cost paid for the migration's duration; lifted by the post-Phase-3 decomposition.
 - Interface grows commit-by-commit during migration; reviewers of an early-phase commit can't see the eventual shape. Acceptable because each commit's growth is small and tied to one cohesive extraction.
-- Per-module unit tests with mocked `ctx` are deferred. Each extracted module is exercised through existing editor smokes plus, where feasible, a parity smoke against the inline IIFE.
+- Per-module unit tests with mocked `ctx` are deferred. Because `src/editor-client/` is dead code until Phase 3, each extracted module must stay covered by `bun run editor-client:build` plus a phase-specific parity/import smoke where feasible; existing editor smokes continue to prove the production inline path.
 
 ## What this spec is not
 
