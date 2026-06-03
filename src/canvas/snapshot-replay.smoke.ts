@@ -129,6 +129,11 @@ assert(
   'PUBLISH_ONLY_REQUIRED_FIELDS empty — the publish gate has no required fields, ' +
     'which contradicts ADR 0012 dec 5. Either restore the constraint or supersede the ADR.',
 );
+assert(
+  publishedPassed >= 1,
+  'expected at least one fixture to replay through validatePublishedSnapshot; ' +
+    'all fixtures were skipped due to empty media assetIds, so the published gate is not exercised',
+);
 
 process.stdout.write(
   `[snapshot-replay:smoke] OK — ${String(editablePassed)} editable replays, ` +
