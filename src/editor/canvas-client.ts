@@ -22,6 +22,7 @@
 // imports the emitted client as JavaScript and catches broken escaping.
 
 import { INSPECTOR_DISPATCH, SIDEBAR_DISPATCH } from '../canvas/elements/index.js';
+import { ICON_NAMES, renderIconSvg } from '../canvas/icons.js';
 import { SITE_ID_RE } from '../canvas/validate.js';
 
 export interface CanvasClientScriptParams {
@@ -59,14 +60,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   }
 
   // Safe interpolations: siteId, apiBase, displayName, INSPECTOR_DISPATCH,
-  // SIDEBAR_DISPATCH. siteId + apiBase are validated above; displayName goes
-  // through JSON.stringify so any string is safely embedded as a literal.
-  // INSPECTOR_DISPATCH (ADR 0011 Step 1) and SIDEBAR_DISPATCH (ADR 0011 Step
-  // 3) are static module exports of pure data so JSON.stringify produces
-  // value-only payloads with no embedded code. Everything inside the IIFE is
-  // plain JavaScript, not TypeScript.
+  // SIDEBAR_DISPATCH, ICON_SVG_MAP. siteId + apiBase are validated above;
+  // displayName goes through JSON.stringify so any string is safely embedded
+  // as a literal. INSPECTOR_DISPATCH (ADR 0011 Step 1), SIDEBAR_DISPATCH (ADR
+  // 0011 Step 3), and ICON_SVG_MAP (icon registry from src/canvas/icons.ts)
+  // are static module exports of pure data, so JSON.stringify produces
+  // value-only payloads with no embedded code. Icon SVG content contains
+  // only </svg>, </g>, </path> etc. — never </script> — so HTML's
+  // script-end parsing inside a `<script>` host can't trip on the payload.
+  // Everything inside the IIFE is plain JavaScript, not TypeScript.
   const inspectorDispatchJson = JSON.stringify(INSPECTOR_DISPATCH);
   const sidebarDispatchJson = JSON.stringify(SIDEBAR_DISPATCH);
+  const iconSvgMapJson = JSON.stringify(
+    Object.fromEntries(ICON_NAMES.map((name) => [name, renderIconSvg(name, { inline: false })])),
+  );
   return `(() => {
   const SITE_ID = ${JSON.stringify(siteId)};
   const API_BASE = ${JSON.stringify(apiBase)};
@@ -76,6 +83,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const SITE_BASE = API_BASE + "/canvas/sites/" + SITE_ID;
   const INSPECTOR_DISPATCH = ${inspectorDispatchJson};
   const SIDEBAR_DISPATCH = ${sidebarDispatchJson};
+  const ICON_SVG_MAP = ${iconSvgMapJson};
   // Flatten SIDEBAR_DISPATCH to a key→command map for O(1) lookups by
   // sidebar-add-component value or "add-X" action key (ADR 0011 Step 3).
   const SIDEBAR_COMMANDS = (function() {
@@ -426,7 +434,6 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
   const STYLE_KITS = ["charcoal", "orange-editorial", "blue-saas", "green-organic", "ivory-press", "midnight-violet"];
   const ACTION_VARIANTS = ["solid", "outline", "ghost", "pill", "glass", "brutalist", "underline"];
   const SURFACE_VARIANTS = ["flat", "raised", "glass", "outlined", "sticker", "editorial-frame", "soft-panel"];
-  const SHAPE_VARIANTS = ["rect", "pill", "circle", "line", "badge", "blob"];
   const MOTION_PRESETS = ["none", "fade-up", "fade-down", "fade-in", "fade-right", "slide-left", "slide-up", "slide-right", "scale-in", "zoom-out", "blur-in", "rotate-in", "flip-in", "bounce-in", "stagger-children", "slow-drift", "parallax-soft"];
   // Canonical nesting order for inline marks. Outermost first: link wraps every
   // other mark so anchor styling stays intact when marks combine; the typographic
@@ -2963,6 +2970,20 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     const node = document.createElement("div");
     node.className = "opencanvas-shape";
     node.setAttribute("data-variant", element.variant);
+    // ADR 0051 dec 2 — variant 'icon' fills the box with an inline SVG glyph
+    // (ICON_SVG_MAP is keyed by IconName; renderIconSvg in src/canvas/icons.ts
+    // is the server-side renderer that produced the same markup at build
+    // time). iconKind is validated against ICON_NAMES at /apply; during
+    // editing it can transiently miss the map, in which case we leave the
+    // empty-div fallback so the box is still selectable.
+    if (
+      element.variant === "icon" &&
+      typeof element.iconKind === "string" &&
+      ICON_SVG_MAP[element.iconKind]
+    ) {
+      node.setAttribute("data-icon-kind", element.iconKind);
+      node.innerHTML = ICON_SVG_MAP[element.iconKind];
+    }
     return node;
   }
 
