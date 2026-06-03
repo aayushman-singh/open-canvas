@@ -227,6 +227,12 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     focusCanvasOnNode: () => {},
     describeOp: () => '',
     revertAgentEntry: () => {},
+    setAiBusy: () => {},
+    sessionExpired: false,
+    accessRevoked: false,
+    flushPendingSave: () => {
+      throw new Error('flushPendingSave stub: smoke does not exercise persistence flush');
+    },
     editingElementId: null,
     interactionMode: 'select',
     spaceHeldForPan: false,

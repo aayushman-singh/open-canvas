@@ -552,27 +552,31 @@ export interface EditorContext {
    *  hideChatWelcomeImpl(ctx) at boot. */
   hideChatWelcome(): void;
 
-  // -- Phase 2n forward declarations (filled by AI integration phase) ----
+  // -- Phase 2n: AI integration -----------------------------------------
   /** The "Accept all changes" banner at the top of the chat panel.
-   *  FORWARD: Phase 2n owns this. 2k.b assigns it during the chat-session
-   *  init block (the assignment is co-located with the chatForm DOM-ref
-   *  bind it neighbours in the IIFE) but the banner's show/hide semantics
-   *  and the showAcceptAllSummary handler are Phase 2n territory. Null
-   *  short-circuits refreshAcceptAllButton + showAcceptAllSummary. */
+   *  chat-session.ts binds it during setupChatSession (the assignment is
+   *  co-located with the chatForm DOM-ref bind it neighbours in the IIFE)
+   *  and pins the initial-hidden state on bind. The banner's show/hide
+   *  semantics + click handler live in ai-integration.ts. Null short-
+   *  circuits refreshAcceptAllButton + showAcceptAllSummary so a missing
+   *  DOM ref is silent rather than fatal. */
   chatAcceptAllBtn: HTMLElement | null;
-  /** Open the "Accept all" summary modal/dialog listing every pending
-   *  suggestion. FORWARD: Phase 2n owns this. 2k.b extracts the click
-   *  handler on chatAcceptAllBtn that invokes this; 2n provides the
-   *  implementation. */
+  /** Open the "Apply N change(s)?" summary modal listing every pending
+   *  op as an ordered list; the Apply all button routes through
+   *  ctx.applyAgentOps with the same suggestion array so chat-side cards
+   *  flip status in lockstep with the canvas mutation. No-op when no
+   *  suggestions are pending. Implementation: showAcceptAllSummaryImpl
+   *  in ai-integration.ts; createEditor binds ctx.showAcceptAllSummary
+   *  = () => showAcceptAllSummaryImpl(ctx). */
   showAcceptAllSummary(): void;
   /** Pending AI suggestion tracker — one entry per op-preview event the
-   *  agent emitted this turn. Mutated by the SSE op-preview branch
-   *  (push), by accept (status="accepted" + inverseOp), by reject
-   *  (status="rejected"), and by revertAgentEntry (status="reverted").
-   *  FORWARD: Phase 2n owns this. 2k.b extracts the push site (op-preview
-   *  branch in chat-session.ts) but 2n provides the runtime backing array
-   *  and narrows the entry shape. The type stays maximally loose here so
-   *  the SSE branch typechecks while 2n implements. */
+   *  agent emitted this turn. Mutated by the SSE op-preview branch in
+   *  chat-session.ts (push), by accept (status="accepted" + inverseOp on
+   *  ai-integration.ts's applyAgentOps), by reject (status="rejected" in
+   *  the SSE branch's reject button handler), and by revertAgentEntry
+   *  (status="pending" again on success). The entry shape stays loose
+   *  (`op: unknown`, `inverseOp: unknown`) because the underlying
+   *  CanvasAgentOp union is exposed only to the server's apply route. */
   pendingAiSuggestions: Array<{
     op: unknown;
     toolName: string;
@@ -584,33 +588,77 @@ export interface EditorContext {
     rejectBtn?: HTMLButtonElement;
     revertBtn?: HTMLButtonElement;
   }>;
-  /** POST the given ops through /canvas-agent/.../apply and flip matching
-   *  suggestion entries to status="accepted" on success. FORWARD: Phase
-   *  2n owns this. 2k.b's SSE op-preview accept handler calls this; 2n
-   *  provides the implementation and narrows the param types. */
+  /** POST the given ops through /canvas-agent/.../apply, snapshot pre-
+   *  state to compute per-op inverses, flip matching suggestion entries
+   *  to status="accepted" on success and attach the captured inverse to
+   *  entry.inverseOp so a later Revert click can roll back without
+   *  affecting unrelated later accepts. Returns false on flushPendingSave
+   *  failure or a non-OK /apply response — the status line carries the
+   *  detail; no silent retries. Implementation: applyAgentOpsImpl in
+   *  ai-integration.ts. */
   applyAgentOps(ops: unknown[], suggestions: unknown[]): Promise<boolean>;
-  /** Re-evaluate pendingAiSuggestions and show/hide the Accept-all banner
-   *  with the live count. FORWARD: Phase 2n owns this. 2k.b's op-preview /
-   *  reject paths invoke it; 2n provides the implementation. */
+  /** Re-evaluate ctx.pendingAiSuggestions and show/hide the Accept-all
+   *  banner with the live (pending) count. Belt-and-suspenders hide
+   *  (hidden attr + inline display:none) so a CSS regression cannot leave
+   *  a phantom banner on a blank chat. Implementation:
+   *  refreshAcceptAllButtonImpl in ai-integration.ts. */
   refreshAcceptAllButton(): void;
-  /** Resolve a canvas DOM node for the op's targetElementId / targetSectionId
-   *  / targetPageId so the suggestion card can paint an overlay + the
-   *  card click can pan the camera. FORWARD: Phase 2n owns this. 2k.b's
-   *  op-preview branch invokes it; 2n provides the implementation. */
+  /** Resolve a canvas DOM node for the op's elementId / sectionId /
+   *  afterSectionId so the suggestion card can paint an overlay around
+   *  the affected block and the card click can pan the camera there.
+   *  Returns null when no canvas node matches (e.g. addPage before the
+   *  new page mounts). Implementation: findCanvasNodeForOpImpl in
+   *  ai-integration.ts. */
   findCanvasNodeForOp(op: unknown): HTMLElement | null;
-  /** Pan the camera so the given canvas node centres in the viewport and
-   *  pulse-ring it. FORWARD: Phase 2n owns this. 2k.b's suggestion-card
-   *  click handler invokes it; 2n provides the implementation. */
+  /** Pan ctx.camera so node centres in ctx.viewport, then pulse-ring it
+   *  via the .opencanvas-ai-focus-pulse class (reflow-forced so repeated
+   *  clicks restart the keyframe). No-op when node or viewport is null.
+   *  Implementation: focusCanvasOnNodeImpl in ai-integration.ts. */
   focusCanvasOnNode(node: HTMLElement): void;
   /** Human-readable one-liner describing the op for the suggestion card's
-   *  body text. FORWARD: Phase 2n owns this. 2k.b's op-preview branch
-   *  invokes it; 2n provides the implementation. */
+   *  body text + the Accept-all summary modal's list items. Pure — the
+   *  one ctx-method exception in this section, since the inline twin is
+   *  a closure-free function. Implementation: describeOp in
+   *  ai-integration.ts. */
   describeOp(op: unknown): string;
-  /** Apply the inverseOp captured on accept so the original suggestion is
-   *  rolled back. FORWARD: Phase 2n owns this. 2k.b's revert button click
-   *  handler invokes it; 2n provides the implementation and narrows the
-   *  entry param. */
+  /** Apply entry.inverseOp through /canvas-agent/.../apply to roll back
+   *  one accepted suggestion. Flips the card back to status="pending" so
+   *  the Owner can re-Accept; re-resolves entry.targetNode against the
+   *  freshly rendered canvas. The "pending" semantic is the Owner's
+   *  chosen alternative to freezing as "reverted". Implementation:
+   *  revertAgentEntryImpl in ai-integration.ts. */
   revertAgentEntry(entry: unknown): void;
+  /** Flip ctx.aiBusy and toggle disabled on every [data-ai-button] so a
+   *  preview-in-flight locks the AI surface against stacked previews.
+   *  ORs in ctx.sessionExpired + ctx.accessRevoked so a busy=false call
+   *  during a locked session keeps the buttons disabled — the lock takes
+   *  precedence. Implementation: setAiBusyImpl in ai-integration.ts. */
+  setAiBusy(busy: boolean): void;
+
+  // -- Phase 2p forward declarations (filled by co-edit / presence) -----
+  /** True after the editor has detected a 401 on a mutating request
+   *  (save / chat / apply) and the session-expired modal has been raised.
+   *  setAiBusy ORs this into ctx.aiBusy so the AI surface stays disabled
+   *  through the modal flow; applyAgentOps' catch path short-circuits the
+   *  error toast when this is true to avoid double-surfacing. FORWARD:
+   *  Phase 2p owns this. Inline twin at canvas-client.ts:1043. */
+  sessionExpired: boolean;
+  /** True after the editor has detected a 403 (Owner access revoked
+   *  mid-session). Same role as sessionExpired but does not auto-recover;
+   *  setAiBusy ORs this in so the AI surface stays disabled until reload.
+   *  FORWARD: Phase 2p owns this. Inline twin at canvas-client.ts:1044. */
+  accessRevoked: boolean;
+
+  // -- Phase 2m residual forward declaration ---------------------------
+  /** Flush the 500ms HTTP-PUT save debounce synchronously so a follow-on
+   *  /canvas-agent/.../apply request sees the latest persisted state. Used
+   *  by applyAgentOps / revertAgentEntry — both run apply against the
+   *  freshly-saved editable state, so a still-pending save would race the
+   *  apply's server-side reload. Returns false on save failure so the
+   *  apply caller can short-circuit. FORWARD: kept inline by Phase 2m
+   *  (the persist module exports the debouncer but not the flush path).
+   *  Inline twin at canvas-client.ts:2428. */
+  flushPendingSave(): Promise<boolean>;
 
   // -- Phase 2o.b: keyboard handlers -------------------------------------
   /** Active inline-editing element id (null when no element is in
