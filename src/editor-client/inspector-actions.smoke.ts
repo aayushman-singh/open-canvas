@@ -419,6 +419,27 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     },
     toggleElementMenu: () => {},
     openMenuElementId: null,
+    versionBadge: null,
+    versionPill: null,
+    versionPillOutsideHandler: null,
+    versionPillKeyHandler: null,
+    saveTemplateButton: null,
+    versionsLoaded: false,
+    versionsList: [],
+    isEditableShortcutTarget: () => false,
+    deleteElement: () => {},
+    ensureSectionsPanelLoaded: () => {},
+    updateVersionBadge: () => {},
+    publishSite: () => {
+      throw new Error('publishSite stub: smoke does not exercise publish flow');
+    },
+    attachPublishButton: () => {},
+    closeVersionPill: () => {},
+    openVersionPill: () => {},
+    attachVersionBadge: () => {},
+    attachSaveButton: () => {},
+    ensureVersionsTabMounted: () => null,
+    renderVersionsPanel: () => {},
   };
   return { ctx, log };
 }

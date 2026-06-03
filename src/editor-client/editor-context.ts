@@ -996,7 +996,7 @@ export interface EditorContext {
    *  because the only other writer is the publish path itself toggling
    *  in-flight state. Null when the route omits the button.
    *  Forward-declared here for the same reason as saveButton. */
-  publishButton: HTMLElement | null;
+  publishButton: HTMLButtonElement | null;
 
   // -- Phase 2p.b: co-edit / presence integration ------------------------
   /** Tracks whether the underlying WebSocket is currently OPEN. The
@@ -1453,6 +1453,101 @@ export interface EditorContext {
    *  it stays in sync with whatever style-kits.ts emits at runtime.
    *  Bound impl lives in sidebar.ts (buildKitSummary). */
   buildKitSummary(): HTMLElement;
+
+  // -- Phase 2q.j: publish + version pill + save wiring + versions panel
+  /** The "v3 / Draft" pill in the editor header that doubles as a popover
+   *  trigger for the social-preview card. Cached at boot from
+   *  `getElementById("canvas-version")`; null when the route omits the
+   *  affordance. publishSite + updateVersionBadge no-op on null. */
+  versionBadge: HTMLElement | null;
+  /** Live version-pill popover DOM node, mounted under document.body
+   *  while the social-preview card is open. Null when closed.
+   *  openVersionPill mutates this; closeVersionPill removes it from the
+   *  DOM and resets to null. */
+  versionPill: HTMLElement | null;
+  /** Outside-mousedown listener identity for the version pill. Stored on
+   *  ctx so openVersionPill (addEventListener) and closeVersionPill
+   *  (removeEventListener) reference the SAME function. */
+  versionPillOutsideHandler: ((ev: MouseEvent) => void) | null;
+  /** Escape-key listener identity for the version pill. Same pattern as
+   *  versionPillOutsideHandler. */
+  versionPillKeyHandler: ((ev: KeyboardEvent) => void) | null;
+  /** The "Save as template" button in the editor header (Owner-only).
+   *  Cached at boot from `getElementById("canvas-save-template")`. Null
+   *  when the route omits it. attachSaveButton only wires the click
+   *  handler when both this and saveSiteAsTemplate are present. */
+  saveTemplateButton: HTMLElement | null;
+  /** True once the versions list has been fetched in the current session.
+   *  renderVersionsPanel branches on this — first call kicks the GET +
+   *  renders a "Loading..." placeholder; subsequent calls render directly
+   *  from versionsList. publishSite + snapshot save/delete reset to false
+   *  so the next render re-fetches. */
+  versionsLoaded: boolean;
+  /** In-memory list of snapshots for the Versions sidebar tab. Populated
+   *  by renderVersionsPanel's first-load GET. Shape mirrors the server's
+   *  /sites/<id>/snapshots response item — `unknown[]` on ctx so the
+   *  extracted module can render fields it knows are present without
+   *  forcing a schema declaration here. */
+  versionsList: unknown[];
+  /** Return true when the keydown target is a control that owns the
+   *  keystroke (input/textarea/select/button or a contentEditable
+   *  subtree). attachSaveButton's keydown uses this to suppress canvas
+   *  shortcuts while the Owner is typing. Bound impl lives inline. */
+  isEditableShortcutTarget(target: EventTarget | null): boolean;
+  /** Delete a single element from its parent section. attachSaveButton's
+   *  keydown calls this for the Delete/Backspace shortcut when an
+   *  element is selected. Bound impl lives in inspector-actions.ts;
+   *  ctx pins the call so the keyboard handler doesn't re-import. */
+  deleteElement(
+    section: import('../canvas/schema.js').CanvasSection,
+    element: import('../canvas/schema.js').CanvasElement,
+  ): void;
+  /** Lazy-mount + populate the Sections sidebar tab (the sections-picker).
+   *  activateSidebarTab calls this when the Owner clicks the Sections
+   *  tab so the heavy template list only loads on demand. Bound impl
+   *  lives in sections-picker.ts. */
+  ensureSectionsPanelLoaded(): Promise<void> | void;
+  /** Update the version-badge label + data-version attribute from the
+   *  freshly-published version number. Falls back to "Draft" for 0 / non-
+   *  finite values. Bound impl lives in publish.ts. */
+  updateVersionBadge(version: number): void;
+  /** Publish the current site to the live URL. Awaits flushPendingSave
+   *  so the publish reflects the latest local state, then POSTs to
+   *  /publish/sites/<id> and routes the response through the version
+   *  pill update + post-publish "View live site" modal. Bound impl
+   *  lives in publish.ts. */
+  publishSite(): Promise<void>;
+  /** Wire the publish-button click to publishSite. Idempotent — boot
+   *  wires this once; safe to no-op when the button is missing. Bound
+   *  impl lives in publish.ts. */
+  attachPublishButton(): void;
+  /** Close the version-pill social-preview popover. Removes the pill
+   *  node + its outside/escape listeners and resets aria-expanded on the
+   *  badge. Bound impl lives in version-pill.ts. */
+  closeVersionPill(): void;
+  /** Open the version-pill social-preview popover anchored under the
+   *  version badge. Re-entrant — calling while open closes the existing
+   *  pill (badge click toggles). Bound impl lives in version-pill.ts. */
+  openVersionPill(): void;
+  /** Wire the version-badge click to openVersionPill. Bound impl lives
+   *  in version-pill.ts. */
+  attachVersionBadge(): void;
+  /** Wire the save-button + save-template-button clicks and the global
+   *  window keydown/keyup/blur handlers for Ctrl+S / Ctrl+Z / Ctrl+Y /
+   *  Space (temporary pan) / V (select) / Delete / 1 (fit page) / 0
+   *  (fit all). Idempotent — boot calls once. Bound impl lives in
+   *  save-wiring.ts. */
+  attachSaveButton(): void;
+  /** Lazy-mount the Versions tab button + panel onto the sidebar if it
+   *  isn't there yet. Returns the panel element (or null when the
+   *  sidebar isn't mounted). renderVersionsPanel calls this so the tab
+   *  appears only on first render. Bound impl lives in versions-panel.ts. */
+  ensureVersionsTabMounted(): HTMLElement | null;
+  /** Render the Versions sidebar panel (snapshot list + Save snapshot
+   *  button). First call kicks the GET + renders a "Loading..."
+   *  placeholder; subsequent calls render synchronously from
+   *  ctx.versionsList. Bound impl lives in versions-panel.ts. */
+  renderVersionsPanel(): void;
 }
 
 /**
