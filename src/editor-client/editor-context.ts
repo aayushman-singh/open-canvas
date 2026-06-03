@@ -8,7 +8,7 @@
 // Read this file to see the migration's scoreboard: when the interface
 // stops growing, the IIFE is fully decomposed.
 
-import type { EditableSite } from '../canvas/schema.js';
+import type { EditableSite, InlineRun } from '../canvas/schema.js';
 import type { FindElementResult } from './editor-context-types.js';
 
 /**
@@ -88,4 +88,34 @@ export interface EditorContext {
    *  has no live wrapper in the canvas (e.g. it lives on a non-current
    *  page); callers don't need to branch on that themselves. */
   rebuildElement(elementId: string): void;
+
+  // -- Phase 2h.2.c: content inspector mounts ----------------------------
+  /** Walks a contentEditable subtree DFS, emits the InlineRun[] the rich
+   *  text was serialised to. Used by accordion item-body editors that
+   *  round-trip user edits back into storage. Throws on invalid link
+   *  hrefs rather than silently rewriting. */
+  serializeContentToRuns(rootNode: Node): InlineRun[];
+  /** Builds the per-asset thumbnail DOM node used in media pickers and
+   *  carousel-slide editor cards. Returns a <div class="picker-thumb
+   *  empty"> sentinel when the asset id is missing/placeholder; otherwise
+   *  an <img> wired to the click handler. */
+  buildPickerThumb(
+    assetId: string,
+    selectedAssetId: string,
+    onClick: (assetId: string) => void,
+  ): HTMLElement;
+  /** Uploads a Blob to /owner/assets, scoped to (siteId, elementId) when
+   *  the elementId is non-empty. Throws on non-OK response or malformed
+   *  body — no silent fallback to placeholder ids. Returns the assigned
+   *  asset id and the server-detected kind. */
+  postAssetUpload(
+    blob: Blob,
+    altValue: string,
+    elementId: string,
+  ): Promise<{ assetId: string; kind: string }>;
+  /** Writes a status line to the editor's status DOM ref, with optional
+   *  tone ("ok" / "error" / undefined). Auto-decorates trailing "…" with
+   *  a spinner. Carousel upload UI calls this to mark in-progress and
+   *  error states without re-rendering the inspector. */
+  setStatus(text: string, tone?: 'ok' | 'error'): void;
 }

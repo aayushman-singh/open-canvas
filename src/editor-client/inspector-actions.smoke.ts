@@ -117,6 +117,14 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     aiBusy: false,
     INSPECTOR_ACTION_HANDLERS: {},
     rebuildElement: () => {},
+    serializeContentToRuns: () => [],
+    buildPickerThumb: () => {
+      throw new Error('buildPickerThumb stub: smoke does not exercise picker UI');
+    },
+    postAssetUpload: () => {
+      throw new Error('postAssetUpload stub: smoke does not exercise uploads');
+    },
+    setStatus: () => {},
   };
   return { ctx, log };
 }
