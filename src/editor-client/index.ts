@@ -29,8 +29,10 @@ import {
 import { isAllowedHref, isSafeCssValue, isValidActionHref } from './href-utils.js';
 import { migrateState } from './state-migration.js';
 import { MARK_TAGS } from './mark-tags.js';
+import { newElementId, newPageId, newSectionId } from './ids.js';
+import { escapeAttr, escapeHtml } from './html-escape.js';
 
-console.log('[editor-client] Phase 2b stub ready', {
+console.log('[editor-client] Phase 2c stub ready', {
   styleKits: STYLE_KITS.length,
   motionPresets: MOTION_PRESETS.length,
   inlineMarkTypes: INLINE_MARK_TYPES.length,
@@ -44,4 +46,9 @@ console.log('[editor-client] Phase 2b stub ready', {
   isSafeCssValueOk: isSafeCssValue('1rem'),
   isValidActionHrefOk: isValidActionHref({ type: 'external', url: 'https://example.com' }),
   migrateStateNullPassthrough: migrateState(null) === null,
+  idPrefixes: [newElementId(), newSectionId(), newPageId()].every(
+    (id) => id.startsWith('el-') || id.startsWith('sec-') || id.startsWith('page-'),
+  ),
+  escapeHtmlSample: escapeHtml('<&>"\''),
+  escapeAttrSample: escapeAttr('<&>"\''),
 });
