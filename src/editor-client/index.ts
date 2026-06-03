@@ -45,6 +45,7 @@ import { cssEscape } from './css-escape.js';
 import { previewPaletteFromAccent } from './palette.js';
 import { SIDEBAR_FACTORIES } from './sidebar-factories.js';
 import { field, selectInput } from './dom-builders.js';
+import type { EditorBoot, EditorContext } from './editor-context.js';
 
 void field;
 void selectInput;
@@ -88,8 +89,6 @@ console.log('[editor-client] Phase 2d stub ready', {
   sidebarFactoryCount: Object.keys(SIDEBAR_FACTORIES).length,
 });
 
-import type { EditorBoot, EditorContext } from './editor-context.js';
-
 export type { EditorBoot, EditorContext };
 
 /**
@@ -99,10 +98,6 @@ export type { EditorBoot, EditorContext };
  * (the editor route still serves canvasClientScript() until Phase 3
  * cutover), and exists so extracted modules have a real entry point
  * to wire into.
- *
- * Failure contract: when this function fails initial-load, the error
- * is caught here and surfaced through the editor status line. No
- * unhandled top-level promise rejection.
  */
 export function createEditor(_boot: EditorBoot): void {
   void _boot;
@@ -111,9 +106,3 @@ export function createEditor(_boot: EditorBoot): void {
       'until ADR 0015 Phase 3 cutover. Phase 2h+ extractions land here.',
   );
 }
-
-// Re-export the empty interface so consumers can import the type from
-// the entry point and benefit from auto-import suggestions.
-type _ContextSignatureCheck = EditorContext;
-const _ctxCheck: _ContextSignatureCheck = {};
-void _ctxCheck;

@@ -30,6 +30,4 @@ export interface EditorBoot {
  * fields its module touches. See ADR 0058 Decision 4.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- ADR 0058: interface is the migration scoreboard; grows as Phase 2h+ extractions land
-export interface EditorContext {
-  // Populated incrementally by Phase 2h+ extractions.
-}
+export interface EditorContext {}
