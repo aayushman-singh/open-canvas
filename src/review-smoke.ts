@@ -1,5 +1,5 @@
 import { eq, sql } from 'drizzle-orm';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -1151,10 +1151,10 @@ assert(
   canvasIndexSource.includes('data-sidebar-style-kit={kit}'),
   'expected style-kit controls to live in the sidebar',
 );
-assert(
-  canvasIndexSource.includes('id="canvas-sidebar-selection"'),
-  'expected selected-element color controls to reserve a sidebar region',
-);
+// Text-colour picker moved out of the sidebar and into the floating RTE mark
+// toolbar in be7d083 (and the colour-wheel UI landed in 93a14c0). The old
+// `#canvas-sidebar-selection` region is gone by design — the mark-toolbar
+// path is covered separately via opencanvas-mark-color assertions.
 assert(
   !canvasIndexSource.includes('<span class="style-kits"'),
   'expected style-kit controls to move out of the editor header',
@@ -1164,19 +1164,15 @@ assert(
   'expected canvas client to look up #canvas-sidebar',
 );
 assert(
-  canvasClientSource.includes(
-    'const sidebarSelection = document.getElementById("canvas-sidebar-selection")',
-  ),
-  'expected canvas client to look up the sidebar selected-element region',
-);
-assert(
   canvasClientSource.includes('function attachSidebarActions()'),
   'expected canvas client to wire sidebar add/style actions',
 );
-assert(
-  canvasClientSource.includes('function renderSidebarSelection()'),
-  'expected canvas client to render selected-element color controls in the sidebar',
-);
+// `renderSidebarSelection` + its `#canvas-sidebar-selection` host were removed
+// in be7d083 when the text-colour picker moved to the floating RTE mark
+// toolbar. Assertions for those identifiers would now light up forever.
+// The mark-toolbar colour-picker has its own coverage via the
+// `opencanvas-mark-color` selectors elsewhere; the negative assertion below
+// pins the prior `appendPinnedColor` exit from the right inspector.
 assert(
   !canvasClientSource.includes('appendPinnedColor(element);'),
   'expected text color control to move out of the right inspector',
@@ -1327,10 +1323,24 @@ assert(
 
 const tsconfigSource = await readSource('../tsconfig.json');
 const tsconfig = JSON.parse(tsconfigSource) as { exclude?: string[] };
-assert(
-  !(tsconfig.exclude ?? []).some((entry) => entry.startsWith('src/')),
-  'expected tsconfig not to exclude legacy src code from typecheck; retired code should be removed',
-);
+// `src/*` excludes are only allowed when the excluded subtree is actively
+// typechecked under its own tsconfig (per ADR-0015 Phase 2.5, src/editor-client
+// runs `tsc -p src/editor-client` separately so it can use a DOM-aware lib).
+// Excludes without a sibling tsconfig still mean "retired code hidden from
+// typecheck" and would fail the assertion.
+const srcExcludes = (tsconfig.exclude ?? []).filter((entry) => entry.startsWith('src/'));
+for (const entry of srcExcludes) {
+  let subTsconfigExists = true;
+  try {
+    await access(join(process.cwd(), entry, 'tsconfig.json'));
+  } catch {
+    subTsconfigExists = false;
+  }
+  assert(
+    subTsconfigExists,
+    `tsconfig excludes ${entry} but has no sibling tsconfig — retired code should be removed, not hidden from typecheck`,
+  );
+}
 const eslintConfigSource = await readSource('../eslint.config.js');
 assert(
   !eslintConfigSource.includes("'src/multiplayer/**'") &&
