@@ -45,6 +45,14 @@ import { cssEscape } from './css-escape.js';
 import { previewPaletteFromAccent } from './palette.js';
 import { SIDEBAR_FACTORIES } from './sidebar-factories.js';
 import { field, selectInput } from './dom-builders.js';
+import {
+  openAiMediaModalImpl,
+  openAlertModalImpl,
+  openConfirmModalImpl,
+  openNewPageModalImpl,
+  openSelectModalImpl,
+  openTextModalImpl,
+} from './modals.js';
 import type { EditorBoot, EditorContext } from './editor-context.js';
 
 void field;
@@ -63,6 +71,12 @@ void bringToFront;
 void nudgeZ;
 void renormalizeZ;
 void sendToBack;
+void openTextModalImpl;
+void openSelectModalImpl;
+void openConfirmModalImpl;
+void openAlertModalImpl;
+void openAiMediaModalImpl;
+void openNewPageModalImpl;
 
 console.log('[editor-client] Phase 2d stub ready', {
   styleKits: STYLE_KITS.length,

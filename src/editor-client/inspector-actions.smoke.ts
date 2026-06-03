@@ -153,8 +153,24 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     activePageId: null,
     currentPage: () => null,
     updatePageSidebar: () => {},
+    modalOpen: false,
+    openTextModal: () => {
+      throw new Error('openTextModal stub: smoke does not exercise modals');
+    },
+    openSelectModal: () => {
+      throw new Error('openSelectModal stub: smoke does not exercise modals');
+    },
     openConfirmModal: () => {
       throw new Error('openConfirmModal stub: smoke does not exercise modals');
+    },
+    openAlertModal: () => {
+      throw new Error('openAlertModal stub: smoke does not exercise modals');
+    },
+    openAiMediaModal: () => {
+      throw new Error('openAiMediaModal stub: smoke does not exercise modals');
+    },
+    openNewPageModal: () => {
+      throw new Error('openNewPageModal stub: smoke does not exercise modals');
     },
     applyPageMotionAttributes: () => {},
     applyPageStyleProperties: () => {},
@@ -278,12 +294,6 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
       throw new Error('insertElementForSidebarCommand stub: smoke does not exercise sidebar dispatch');
     },
     getPagePosition: () => null,
-    openTextModal: () => {
-      throw new Error('openTextModal stub: smoke does not exercise modals');
-    },
-    openSelectModal: () => {
-      throw new Error('openSelectModal stub: smoke does not exercise modals');
-    },
     sectionsCatalog: null,
     saveBusy: false,
     saveButton: null,

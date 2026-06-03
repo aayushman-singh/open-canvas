@@ -20,6 +20,16 @@ import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import type { CoEditConnection } from '../live/co-edit/client.js';
 import type { FindElementResult } from './editor-context-types.js';
+import type {
+  AiMediaModalOpts,
+  AiMediaModalResult,
+  AlertModalOpts,
+  ConfirmModalOpts,
+  NewPageModalOpts,
+  NewPageModalResult,
+  SelectModalOpts,
+  TextModalOpts,
+} from './modals.js';
 import type { SiteSnapshot } from './persist.js';
 
 /**
@@ -237,16 +247,7 @@ export interface EditorContext {
    *  edited fields. No-op when the sidebar root is missing or state is
    *  null. */
   updatePageSidebar(): void;
-  /** Open the OK/Cancel confirm modal and resolve with the user's
-   *  choice. Throws synchronously if another modal is already open —
-   *  callers must serialise modals themselves, no implicit queueing. */
-  openConfirmModal(opts: {
-    title?: string;
-    message?: string;
-    confirmLabel?: string;
-    cancelLabel?: string;
-    danger?: boolean;
-  }): Promise<boolean>;
+  // openConfirmModal moved to the Phase 2q.a modal cluster section below.
   /** Mirror page.entranceAnimation + page.scrollTriggerMode onto the
    *  artboard's <article> via data-motion-preset / data-entrance-animation
    *  + data-scroll-trigger. Clears all three first so transitioning to
@@ -862,32 +863,7 @@ export interface EditorContext {
     width: number;
     height: number;
   } | null;
-  /** Open the editor's single-field text modal (1-line by default; opt-in
-   *  multiline). Resolves with the entered string, or null when the
-   *  Owner cancels (Escape / backdrop click / Cancel button). Throws
-   *  synchronously when another modal is already open — callers must
-   *  serialise modals themselves. Phase 2j's saveToLibrary +
-   *  saveSiteAsTemplate chain three of these per call. FORWARD: kept
-   *  inline by this phase (the modal cluster has its own boundary).
-   *  Inline twin at canvas-client.ts:1195-1285. */
-  openTextModal(opts: {
-    title?: string;
-    label?: string;
-    defaultValue?: string;
-    placeholder?: string;
-    multiline?: boolean;
-  }): Promise<string | null>;
-  /** Open the editor's single-field select modal. Same cancel /
-   *  modal-stacking contract as openTextModal. Phase 2j's
-   *  saveToLibrary + saveSiteAsTemplate use this for the visibility
-   *  picker. FORWARD: kept inline by this phase. Inline twin at
-   *  canvas-client.ts:1287+. */
-  openSelectModal(opts: {
-    title?: string;
-    label?: string;
-    options?: Array<{ value: string; label?: string }>;
-    defaultValue?: string;
-  }): Promise<string | null>;
+  // openTextModal + openSelectModal moved to the Phase 2q.a modal cluster section below.
   /** Cached cross-template sections catalog: null until first load, then
    *  an array (possibly empty) of catalog rows. Phase 2j's saveToLibrary
    *  sets this back to null on a successful POST so the next picker open
@@ -1042,6 +1018,57 @@ export interface EditorContext {
    *  as `unknown` because co-edit only nulls the field and the actual
    *  InlineRun[] type ships with the editing cluster. */
   editingSnapshot: unknown;
+
+  // -- Phase 2q.a: modal cluster -----------------------------------------
+  /** Hard sync gate: every opener throws synchronously if this is true,
+   *  and resets it to false in its close() path. Callers serialise modals
+   *  themselves (e.g. saveToLibrary chains name → description → visibility
+   *  through three sequential awaits) — no implicit queueing. The inline
+   *  twin keeps modalOpen as a closure-local `let`; here it lives on ctx
+   *  so the extracted openers + the inline mark-toolbar blur handler
+   *  (canvas-client.ts:10290) read the same flag. Initialised false at
+   *  boot. */
+  modalOpen: boolean;
+  /** Open the single- or multi-line text prompt. Resolves to the entered
+   *  string on OK/Enter (Ctrl/Cmd+Enter when multiline) or null on
+   *  Cancel/Escape/backdrop click. Throws synchronously if ctx.modalOpen
+   *  is already true — callers must serialise. Bound impl lives in
+   *  modals.ts (openTextModalImpl). */
+  openTextModal(opts: TextModalOpts): Promise<string | null>;
+  /** Open the single-pick dropdown. Resolves to the chosen value on
+   *  OK/Enter or null on Cancel/Escape. Throws synchronously if
+   *  ctx.modalOpen is already true. Bound impl lives in modals.ts
+   *  (openSelectModalImpl). */
+  openSelectModal(opts: SelectModalOpts): Promise<string | null>;
+  /** Open the OK/Cancel confirm modal and resolve with the user's
+   *  choice. Throws synchronously if another modal is already open —
+   *  callers must serialise modals themselves, no implicit queueing.
+   *  Bound impl lives in modals.ts (openConfirmModalImpl). */
+  openConfirmModal(opts: ConfirmModalOpts): Promise<boolean>;
+  /** Open the single-button OK acknowledgement (role="alertdialog"). Both
+   *  OK/Enter and Escape close. Resolves to void. Throws synchronously if
+   *  ctx.modalOpen is already true. Bound impl lives in modals.ts
+   *  (openAlertModalImpl). */
+  openAlertModal(opts: AlertModalOpts): Promise<void>;
+  /** Open the AI media modal — prompt textarea + aspect-ratio radio row +
+   *  4-up preview gallery. The supplied requestFn is invoked four times
+   *  in parallel on click; picking a tile resolves with {blob, mediaType,
+   *  aspectRatio, prompt}. Cancel resolves with null. Tile object URLs
+   *  are revoked in the close() path; the chosen blob is handed back as
+   *  a Blob (not a URL) so the caller creates and owns its own preview
+   *  URL. Throws synchronously if ctx.modalOpen is already true or if
+   *  opts.requestFn is missing. Bound impl lives in modals.ts
+   *  (openAiMediaModalImpl). */
+  openAiMediaModal(opts: AiMediaModalOpts): Promise<AiMediaModalResult | null>;
+  /** Open the "+ New Page" capture modal (ADR 0034) — title, slug, and
+   *  locale up front so the new page lands fully-formed. Slug
+   *  auto-derives from title and freezes on first manual slug edit
+   *  (re-arms on slug clear). Reserved-slug pre-validation blocks
+   *  _404/404; duplicate-slug pre-validation blocks slugs in
+   *  opts.existingSlugs. Resolves to {title, slug, locale} on submit or
+   *  null on cancel. Throws synchronously if ctx.modalOpen is already
+   *  true. Bound impl lives in modals.ts (openNewPageModalImpl). */
+  openNewPageModal(opts: NewPageModalOpts): Promise<NewPageModalResult | null>;
 }
 
 /**
