@@ -956,7 +956,7 @@ export function buildMarkToolbarImpl(ctx: EditorContext, anchor: HTMLElement): v
   aiBtn.addEventListener('click', function (ev) {
     ev.preventDefault();
     if (!ctx.editingElementId) return;
-    ctx.aiRewriteText(ctx.editingElementId);
+    void ctx.aiRewriteText(ctx.editingElementId);
   });
   bar.appendChild(aiBtn);
 
