@@ -17,7 +17,9 @@ import type {
 } from '../canvas/schema.js';
 import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
 import type { MediaElement } from '../canvas/elements/media.js';
+import type { CoEditConnection } from '../live/co-edit/client.js';
 import type { FindElementResult } from './editor-context-types.js';
+import type { SiteSnapshot } from './persist.js';
 
 /**
  * Shape of the boot payload the editor route emits as
@@ -288,4 +290,53 @@ export interface EditorContext {
    *  modules can construct `<siteBase>/assets/<id>` without re-deriving
    *  apiBase + siteId concatenation. */
   siteBase: string;
+
+  // -- Phase 2m: persist + undo/redo cluster -----------------------------
+  /** In-memory undo history. Entries are structured-cloned EditableSite
+   *  snapshots taken before each mutation. Capped at UNDO_MAX (60) in
+   *  flushPendingUndoCapture; persisted to localStorage at
+   *  UNDO_PERSIST_MAX (20) so a busy session doesn't blow the per-origin
+   *  storage quota. Mutated by captureForUndo / flushPendingUndoCapture /
+   *  undo / redo / initUndo; read by persistUndo. */
+  undoStack: SiteSnapshot[];
+  /** Symmetric redo history. Cleared on every fresh capture (mutating
+   *  forward invalidates the redo timeline) and grown by undo. */
+  redoStack: SiteSnapshot[];
+  /** 0ms debounce handle for captureForUndo. A burst of mutations
+   *  collapses into one snapshot rather than one snapshot per setter.
+   *  Null when no capture is pending. undo/redo flush this synchronously
+   *  so a fast Ctrl+Z sees the post-mutation state on the stack. */
+  undoTimer: ReturnType<typeof setTimeout> | null;
+  /** True while undo/redo is replaying a snapshot. captureForUndo skips
+   *  on this flag so the restore itself doesn't grow the stack and turn
+   *  every undo into a no-op. */
+  undoRedoing: boolean;
+  /** Latched true the first time persistUndo's localStorage write fails
+   *  (quota exceeded, private-window block, etc.). Idempotent failure
+   *  channel — subsequent persist attempts no-op, so a write loop can't
+   *  spam the console. The status line surfaces the failure once. */
+  undoPersistenceFailed: boolean;
+  /** 500ms debounce handle for the HTTP PUT save path. Null when no save
+   *  is pending. flushPendingSave (kept inline) clears this synchronously
+   *  before forcing an immediate save. */
+  saveTimer: ReturnType<typeof setTimeout> | null;
+  /** Live co-edit handle, or null when WS isn't attached. scheduleSave
+   *  branches on this — present means Yjs autosave drives persistence;
+   *  null means the HTTP PUT debounce is the save path. */
+  coEditConnection: CoEditConnection | null;
+  /** Project the current state into the Yjs doc. Returns true when the
+   *  socket is open and the projection went out; false when the channel
+   *  is missing or unhealthy. scheduleSave reads the boolean to decide
+   *  between "Synced" / "Co-edit disconnected" status lines. */
+  coEditSync(): boolean;
+  /** Force an immediate HTTP PUT of the current state, chained through
+   *  the save queue so concurrent calls serialise. Resolves true on a
+   *  successful save, false on a server / network failure (loud — the
+   *  status line carries the detail; no silent fallback). */
+  saveStateNow(): Promise<boolean>;
+  /** Latch the undo-persistence-failed flag, log a structured error, and
+   *  surface a status line. Exposed on ctx because the IIFE's inline
+   *  paths beyond persistUndo (e.g. boot-time storage probe) also need
+   *  to trip the latch without re-importing the persist module. */
+  disableUndoPersistence(reason: string, error: unknown): void;
 }

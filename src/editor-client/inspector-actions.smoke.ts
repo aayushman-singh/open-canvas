@@ -167,6 +167,20 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
       throw new Error('renderInspectorSpec stub: smoke does not exercise spec walking');
     },
     siteBase: '/api/canvas/sites/site-smoke',
+    undoStack: [],
+    redoStack: [],
+    undoTimer: null,
+    undoRedoing: false,
+    undoPersistenceFailed: false,
+    saveTimer: null,
+    coEditConnection: null,
+    coEditSync: () => false,
+    saveStateNow: () => {
+      throw new Error('saveStateNow stub: smoke does not exercise persistence');
+    },
+    disableUndoPersistence: () => {
+      throw new Error('disableUndoPersistence stub: smoke does not exercise persistence failure');
+    },
   };
   return { ctx, log };
 }
