@@ -1,0 +1,11 @@
+/* src/editor-client/styles.css */
+/* ADR 0015 editor-client styles — Phase 1 stub.                     */
+/*                                                                   */
+/* Validates Bun.build's CSS import path. The CSS bundle is co-built */
+/* with the JS entrypoint and emitted as a sibling hashed file under */
+/* dist/_assets/. Real selectors from src/editor/canvas-styles.ts    */
+/* migrate here in Phase 2.                                          */
+
+:root {
+  --editor-client-loaded: 1;
+}
