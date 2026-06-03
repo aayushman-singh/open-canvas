@@ -201,6 +201,13 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     syncSidebarStyleKitButtons: () => {},
     renderPlacementSlots: () => {},
     setBoxStyle: () => {},
+    chatToggleBtn: null,
+    chatPanelEl: null,
+    chatCloseBtn: null,
+    chatSelectionEl: null,
+    chatSelectionTextEl: null,
+    chatSelectionClearBtn: null,
+    toggleChatPanel: () => {},
   };
   return { ctx, log };
 }

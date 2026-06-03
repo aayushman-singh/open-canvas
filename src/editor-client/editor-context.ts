@@ -465,4 +465,44 @@ export interface EditorContext {
    *  the field exists on ctx so the extracted autoGrowTextElements can
    *  invoke it through the same call shape the inline twin uses. */
   setBoxStyle(wrapper: HTMLElement, box: PositionedBox): void;
+
+  // -- Phase 2k.a: chat panel toggle + selection chip --------------------
+  /** Toolbar button that opens the chat panel. Wired early — before site
+   *  data loads — so the Owner can open the panel during the boot wait.
+   *  toggleChatPanel mirrors the open state onto its .active class.
+   *  Null when the route omits the toggle (no graceful fallback — the
+   *  toggle is part of the editor shell, so null means a DOM regression). */
+  chatToggleBtn: HTMLElement | null;
+  /** The chat panel container itself. toggleChatPanel flips its `hidden`
+   *  flag to open/close; null short-circuits the toggle so the boot order
+   *  (DOM caching happens before any user interaction wires) doesn't have
+   *  to assert mount completion. */
+  chatPanelEl: HTMLElement | null;
+  /** Close button inside the chat panel. Wired to the same toggleChatPanel
+   *  handler as chatToggleBtn — flipping a hidden panel hidden is the
+   *  close action. Null when the route omits the close affordance. */
+  chatCloseBtn: HTMLElement | null;
+  /** The "this element is in scope" chip mounted inside the chat panel.
+   *  updateChatSelectionChip flips its `hidden` flag from
+   *  ctx.selectedElementId + ctx.chatSelectionDropped + ctx.state. Null
+   *  short-circuits the update so the chip never renders during boot when
+   *  the chat panel hasn't mounted yet. */
+  chatSelectionEl: HTMLElement | null;
+  /** The text span inside the chat selection chip — receives
+   *  "<elementType> - <truncated id>". Null short-circuits the update
+   *  alongside chatSelectionEl since both must be live for the chip to
+   *  render its label. */
+  chatSelectionTextEl: HTMLElement | null;
+  /** The X button on the chat selection chip. Click flips
+   *  ctx.chatSelectionDropped=true and re-runs updateChatSelectionChip so
+   *  the chip hides for the next message; the canvas selection itself is
+   *  untouched. Null when the route omits the clear affordance. */
+  chatSelectionClearBtn: HTMLElement | null;
+  /** Open/close the chat panel — flips ctx.chatPanelEl.hidden, mirrors
+   *  the new open state onto ctx.chatToggleBtn's .active class, and
+   *  focuses #canvas-chat-input on open. Bound impl lives in
+   *  chat-panel.ts (toggleChatPanel); exposed on ctx because the
+   *  toggle/close event handlers in canvas-client.ts (and, post-cutover,
+   *  in createEditor) need a ctx-method reference, not a re-import. */
+  toggleChatPanel(): void;
 }
