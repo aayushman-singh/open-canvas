@@ -937,4 +937,134 @@ export interface EditorContext {
    *  in-flight state. Null when the route omits the button.
    *  Forward-declared here for the same reason as saveButton. */
   publishButton: HTMLElement | null;
+
+  // -- Phase 2p.b: co-edit / presence integration ------------------------
+  /** Tracks whether the underlying WebSocket is currently OPEN. The
+   *  websocketFactory's open/close/error handlers maintain it, and
+   *  coEditSync reads it as the return value so the persist cluster can
+   *  surface "Synced" vs "Co-edit disconnected" status lines. False at
+   *  boot and during every reconnect window. */
+  coEditSocketOpen: boolean;
+  /** Local editor identity for the awareness pill + remote cursor labels.
+   *  Resolved once at attachCoEdit time via loadPresenceIdentity (which
+   *  consults ctx.presenceDisplayName, localStorage, and a uuid-prefix
+   *  fallback in that order). Null before attach runs; null when the
+   *  co-edit bundle global is missing and attachCoEdit short-circuited. */
+  localPresence: { name: string; color: string } | null;
+  /** The document.body-attached `.opencanvas-presence-layer` div that
+   *  holds every remote caret + label. Lazily created by
+   *  ensurePresenceLayer on the first remote presence event. Null before
+   *  the layer mounts so callers don't have to assert presence; every
+   *  read site short-circuits on null. */
+  presenceLayer: HTMLElement | null;
+  /** Live map of Yjs clientID → rendered cursor entry. onRemotePresence
+   *  diffs the active peer set against this map: missing peers gain new
+   *  caret + label DOM nodes appended to presenceLayer; departed peers
+   *  have their nodes removed and the entry deleted. Initialised as an
+   *  empty Map at boot (createEditor); no extracted module assumes the
+   *  map carries entries before attachCoEdit fires its first
+   *  onRemotePresence callback. */
+  remoteCursors: Map<number, RemoteCursorEntry>;
+  /** Authoritative count of remote awareness peers, refreshed inside
+   *  onRemotePresence. The pointer-publish + selectionchange-publish
+   *  paths consult this to suppress outbound updates when nobody else
+   *  can see the cursor — local self renders straight from
+   *  window.mousemove, not from awareness, so the skip is invisible to
+   *  the operator and saves a billable DO request per cursor tick. */
+  remotePeerCount: number;
+  /** Last viewport-relative pointer position in world coordinates,
+   *  refreshed every mousemove by handleViewportMousemove. publishPointer
+   *  reads this when assembling the outbound presence payload so peers
+   *  see the cursor track across the canvas in real-time. Null before
+   *  the first mousemove, and null when the pointer leaves the viewport. */
+  lastWorldPoint: { x: number; y: number } | null;
+  /** True while a pointer-publish is scheduled but not yet flushed.
+   *  schedulePointer reads this as a re-entry guard so a mousemove burst
+   *  collapses into one publish per POINTER_PUBLISH_INTERVAL_MS window. */
+  pointerPublishPending: boolean;
+  /** Handle for the pointer-publish setTimeout. flushPointer clears it
+   *  when the throttle window elapses; no other call site reads it (the
+   *  field exists only so a future flushPointer could pre-empt its own
+   *  timer if needed). */
+  pointerPublishTimerId: ReturnType<typeof setTimeout> | null;
+  /** Date.now() of the last pointer publish that went out. schedulePointer
+   *  reads this to compute the throttle delay (full-interval at boot,
+   *  shrinking as time-since-last-publish grows). */
+  pointerPublishLastAtMs: number;
+  /** Same role as pointerPublishPending but for the selectionchange-driven
+   *  presence-publish loop. schedulePublishLocalPresence reads it as a
+   *  re-entry guard. */
+  presencePublishPending: boolean;
+  /** Same role as pointerPublishLastAtMs but for the selectionchange-driven
+   *  presence-publish loop. */
+  presencePublishLastAtMs: number;
+  /** Boot-time entry to the co-edit cluster. Reads ctx.siteId + ctx.state
+   *  + ctx.wsToken, opens the WebSocket via window.__opencanvasCoEdit
+   *  with a custom websocketFactory that drives the reconnect-counter UI
+   *  (status line + give-up threshold + destroy on cap), wires
+   *  onRemoteState (replace ctx.state + render) and onRemotePresence
+   *  (refresh the presence pill + diff the remoteCursors set), and
+   *  assigns the connection to ctx.coEditConnection. Also binds
+   *  ctx.repaintRemoteCursors at the moment the connection attaches so
+   *  the camera module's typeof-check picks up the live function from
+   *  the first camera transform onwards. No-op when the co-edit bundle
+   *  global is missing (smoke / kill-switch). Bound impl lives in
+   *  co-edit.ts (attachCoEditImpl); exposed on ctx because the boot
+   *  sequence in canvas-client.ts (and, post-cutover, in createEditor)
+   *  needs a ctx-method reference, not a re-import. */
+  attachCoEdit(): void;
+
+  // -- Phase 2p.b: forward declarations ----------------------------------
+  /** WebSocket token issued by the editor route for published-site
+   *  collaborators; the editor host appends it to the /__live URL so the
+   *  Durable Object can authorize anonymous edit-token sessions without
+   *  re-running the Clerk handshake. Empty string for Owner sessions
+   *  (Clerk cookie does the auth). Filled from EditorBoot at Phase 3 boot. */
+  wsToken: string;
+  /** Server-injected customer display name / email (resolved by the
+   *  editor route from the customer row tied to the current Clerk
+   *  session or invite acceptance). loadPresenceIdentity prefers this
+   *  over localStorage and the uuid-prefix fallback so the presence pill
+   *  reads as the operator's real identity rather than an opaque id.
+   *  Empty string for sessions without a resolvable display name. Filled
+   *  from EditorBoot at Phase 3 boot. */
+  presenceDisplayName: string;
+  /** Stable user identity (Clerk user id) used to dedupe presence in the
+   *  "N editing" pill so opening the same site in two tabs reads as
+   *  "1 editing", not "2". Empty string for sessions without a Clerk
+   *  identity (edit-token / unauthenticated). Filled from EditorBoot at
+   *  Phase 3 boot. */
+  presenceUserId: string;
+  /** Deep clone of the InlineRun[] taken when text editing started;
+   *  Escape/Cancel restores from this. onRemoteState clears it alongside
+   *  editingElementId when the active element vanishes. The text-editing
+   *  cluster (later phase) owns the full implementation; declared here
+   *  as `unknown` because co-edit only nulls the field and the actual
+   *  InlineRun[] type ships with the editing cluster. */
+  editingSnapshot: unknown;
+}
+
+/**
+ * One rendered remote peer's caret + label, plus the most recently
+ * received cursor payload. The Phase 2p.b onRemotePresence handler
+ * maintains the (clientID → entry) map; repaintRemoteCursorsImpl reads
+ * it on every camera transform and viewport scroll to keep peer cursors
+ * pinned to their world-space position.
+ *
+ * `cursor` is optional + nullable because the inline twin reads `entry.
+ * cursor && entry.cursor.point` and treats both absent and null cursors
+ * as "hide this peer's caret." `point` is the Figma-style free-floating
+ * pointer; `{sectionId, elementId, offset}` is the text-caret anchor;
+ * peers can ship either / both / neither and the renderer prefers point
+ * when present.
+ */
+export interface RemoteCursorEntry {
+  caret: HTMLElement;
+  label: HTMLElement;
+  cursor: {
+    point?: { x: number; y: number };
+    sectionId?: string;
+    elementId?: string;
+    offset?: number;
+  } | null;
 }

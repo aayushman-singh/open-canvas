@@ -288,6 +288,24 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     saveBusy: false,
     saveButton: null,
     publishButton: null,
+    coEditSocketOpen: false,
+    localPresence: null,
+    presenceLayer: null,
+    remoteCursors: new Map(),
+    remotePeerCount: 0,
+    lastWorldPoint: null,
+    pointerPublishPending: false,
+    pointerPublishTimerId: null,
+    pointerPublishLastAtMs: 0,
+    presencePublishPending: false,
+    presencePublishLastAtMs: 0,
+    attachCoEdit: () => {
+      throw new Error('attachCoEdit stub: smoke does not exercise co-edit WS boot');
+    },
+    wsToken: '',
+    presenceDisplayName: '',
+    presenceUserId: '',
+    editingSnapshot: null,
   };
   return { ctx, log };
 }
