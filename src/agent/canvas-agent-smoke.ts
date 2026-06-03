@@ -577,6 +577,41 @@ assert(
   'expected parseApplyOp(insertSection) to reject malformed afterSectionId loudly',
 );
 
+const styledState = structuredClone(baseState);
+const styledText = styledState.pages[0]?.sections[0]?.elements.find(
+  (element) => element.type === 'text',
+);
+if (styledText === undefined) {
+  throw new Error('canvas-agent smoke fixture must include a text element');
+}
+styledText.elementStyle = { opacity: 0.5 };
+const deleteElementStyleParsed = parseApplyOp(
+  {
+    kind: 'updateElement',
+    elementId: styledText.id,
+    elementType: 'text',
+    patch: { __deleteFields: ['elementStyle'] },
+  },
+  'charcoal',
+);
+assert(
+  deleteElementStyleParsed.ok,
+  deleteElementStyleParsed.ok
+    ? ''
+    : `expected internal updateElement __deleteFields to parse: ${deleteElementStyleParsed.error}`,
+);
+if (deleteElementStyleParsed.ok) {
+  const afterDeleteElementStyle = applyCanvasAgentOp(styledState, deleteElementStyleParsed.op);
+  const afterStyledText = afterDeleteElementStyle.pages[0]?.sections[0]?.elements.find(
+    (element) => element.id === styledText.id,
+  );
+  assert(
+    afterStyledText !== undefined &&
+      !Object.prototype.hasOwnProperty.call(afterStyledText, 'elementStyle'),
+    'internal updateElement __deleteFields must delete optional element fields for chat revert',
+  );
+}
+
 const addActionToolCall = translateToolCall({
   id: 'add-action-end-to-end',
   name: 'addElement',

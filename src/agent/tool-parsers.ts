@@ -221,6 +221,51 @@ function parseAddElementBox(
   return { ok: true, box: { x, y, w, h } };
 }
 
+const INTERNAL_DELETE_FIELDS_KEY = '__deleteFields';
+
+function parseInternalDeleteFields(
+  patch: Record<string, unknown>,
+  opName: string,
+): { ok: true; fields?: string[] } | { ok: false; error: string } {
+  const raw = patch[INTERNAL_DELETE_FIELDS_KEY];
+  if (raw === undefined) return { ok: true };
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: `${opName}.${INTERNAL_DELETE_FIELDS_KEY} must be a string[]` };
+  }
+  const rawFields = raw as unknown[];
+  const fields: string[] = [];
+  for (let i = 0; i < rawFields.length; i++) {
+    const field = rawFields[i];
+    if (!isNonEmptyString(field)) {
+      return {
+        ok: false,
+        error: `${opName}.${INTERNAL_DELETE_FIELDS_KEY}[${String(i)}] must be a non-empty string`,
+      };
+    }
+    fields.push(field);
+  }
+  return fields.length > 0 ? { ok: true, fields } : { ok: true };
+}
+
+function copyInternalDeleteFields(
+  targetPatch: Record<string, unknown>,
+  sourcePatch: Record<string, unknown>,
+  opName: string,
+): { ok: true } | { ok: false; error: string } {
+  const parsed = parseInternalDeleteFields(sourcePatch, opName);
+  if (!parsed.ok) return parsed;
+  if (parsed.fields !== undefined) targetPatch[INTERNAL_DELETE_FIELDS_KEY] = parsed.fields;
+  return { ok: true };
+}
+
+function withoutInternalDeleteFields(patch: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (key !== INTERNAL_DELETE_FIELDS_KEY) out[key] = value;
+  }
+  return out;
+}
+
 /**
  * Parse a motion sub-object. Returns parsed motion or undefined.
  */
@@ -667,6 +712,8 @@ function parseCanonicalUpdateElementOp(value: Record<string, unknown>): ParseRes
     const message = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `updateElement.${message}` };
   }
+  const deletes = copyInternalDeleteFields(patch, value.patch, 'updateElement');
+  if (!deletes.ok) return deletes;
   return {
     ok: true,
     op: {
@@ -728,21 +775,52 @@ function parseCanonicalUpdateSectionOp(value: Record<string, unknown>): ParseRes
   if (!isRecord(value.patch)) {
     return { ok: false, error: 'updateSection.patch must be an object' };
   }
-  return parseUpdateSection({ sectionId: value.sectionId, ...value.patch });
+  const parsed = parseUpdateSection({
+    sectionId: value.sectionId,
+    ...withoutInternalDeleteFields(value.patch),
+  });
+  if (!parsed.ok) return parsed;
+  if (parsed.op.kind !== 'updateSection') {
+    return { ok: false, error: `updateSection parsed as unexpected op ${parsed.op.kind}` };
+  }
+  const deletes = copyInternalDeleteFields(parsed.op.patch, value.patch, 'updateSection');
+  if (!deletes.ok) return deletes;
+  return parsed;
 }
 
 function parseCanonicalUpdatePageOp(value: Record<string, unknown>): ParseResult {
   if (!isRecord(value.patch)) {
     return { ok: false, error: 'updatePage.patch must be an object' };
   }
-  return parseUpdatePage({ pageId: value.pageId, ...value.patch });
+  const parsed = parseUpdatePage({
+    pageId: value.pageId,
+    ...withoutInternalDeleteFields(value.patch),
+  });
+  if (!parsed.ok) return parsed;
+  if (parsed.op.kind !== 'updatePage') {
+    return { ok: false, error: `updatePage parsed as unexpected op ${parsed.op.kind}` };
+  }
+  const deletes = copyInternalDeleteFields(parsed.op.patch, value.patch, 'updatePage');
+  if (!deletes.ok) return deletes;
+  return parsed;
 }
 
 function parseCanonicalSetSiteConfigOp(value: Record<string, unknown>): ParseResult {
   if (!isRecord(value.patch)) {
     return { ok: false, error: 'setSiteConfig.patch must be an object' };
   }
-  return parseSetSiteConfig(value.patch);
+  const regularPatch = withoutInternalDeleteFields(value.patch);
+  const parsed =
+    Object.keys(regularPatch).length > 0
+      ? parseSetSiteConfig(regularPatch)
+      : ({ ok: true, op: { kind: 'setSiteConfig', patch: {} } } satisfies ParseResult);
+  if (!parsed.ok) return parsed;
+  if (parsed.op.kind !== 'setSiteConfig') {
+    return { ok: false, error: `setSiteConfig parsed as unexpected op ${parsed.op.kind}` };
+  }
+  const deletes = copyInternalDeleteFields(parsed.op.patch, value.patch, 'setSiteConfig');
+  if (!deletes.ok) return deletes;
+  return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -808,7 +886,11 @@ function parseRestoreElement(value: Record<string, unknown>): ParseResult {
   if (!isFiniteNumber(value.index) || value.index < 0) {
     return { ok: false, error: 'restoreElement.index must be a non-negative number' };
   }
-  if (!isRecord(value.element) || !isNonEmptyString(value.element.id) || !isNonEmptyString(value.element.type)) {
+  if (
+    !isRecord(value.element) ||
+    !isNonEmptyString(value.element.id) ||
+    !isNonEmptyString(value.element.type)
+  ) {
     return { ok: false, error: 'restoreElement.element must be a CanvasElement with id + type' };
   }
   const op: CanvasAgentOp = {
@@ -867,7 +949,11 @@ function parseRestorePage(value: Record<string, unknown>): ParseResult {
   if (!isFiniteNumber(value.index) || value.index < 0) {
     return { ok: false, error: 'restorePage.index must be a non-negative number' };
   }
-  if (!isRecord(value.page) || !isNonEmptyString(value.page.id) || !isNonEmptyString(value.page.slug)) {
+  if (
+    !isRecord(value.page) ||
+    !isNonEmptyString(value.page.id) ||
+    !isNonEmptyString(value.page.slug)
+  ) {
     return { ok: false, error: 'restorePage.page must be a CanvasPage with id + slug' };
   }
   const op: CanvasAgentOp = {

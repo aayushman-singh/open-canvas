@@ -16,6 +16,26 @@ function sliceBetween(startNeedle: string, endNeedle: string): string {
   return source.slice(start, end);
 }
 
+const clonePatchPrevHelper = sliceBetween(
+  'function clonePatchPrev(target, patch) {',
+  '  // Pre-state inverse',
+);
+const inverseHelpers = sliceBetween(
+  'function clonePatchPrev(target, patch) {',
+  '// Resolve the canvas node the op points at',
+);
+assert(
+  clonePatchPrevHelper.includes('prev.__deleteFields = deletes;') &&
+    !clonePatchPrevHelper.includes(': null;') &&
+    inverseHelpers.includes(
+      'function resolveDeferredInverse(originalOp, pre, post, consumedIds)',
+    ) &&
+    inverseHelpers.includes('consumedIds.elements') &&
+    inverseHelpers.includes('consumedIds.sections') &&
+    inverseHelpers.includes('consumedIds.pages'),
+  'chat revert inverse helpers must delete absent optional fields explicitly and consume new ids across accept-all batches',
+);
+
 const formInspector = sliceBetween(
   'function mountFormFields(element, host) {',
   '// buildEmbedInspector + buildCodeInspector migrated to INSPECTOR_DISPATCH',

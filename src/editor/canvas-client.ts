@@ -10591,22 +10591,34 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return ids;
   }
 
-  function firstNewId(prevMap, nextMap) {
+  function firstNewId(prevMap, nextMap, consumedMap) {
     for (var k in nextMap) {
-      if (Object.prototype.hasOwnProperty.call(nextMap, k) && !prevMap[k]) return k;
+      if (
+        Object.prototype.hasOwnProperty.call(nextMap, k) &&
+        !prevMap[k] &&
+        !(consumedMap && consumedMap[k])
+      ) {
+        if (consumedMap) consumedMap[k] = true;
+        return k;
+      }
     }
     return null;
   }
 
   function clonePatchPrev(target, patch) {
     var prev = {};
+    var deletes = [];
     if (!patch || typeof patch !== "object") return prev;
     for (var k in patch) {
       if (!Object.prototype.hasOwnProperty.call(patch, k)) continue;
-      prev[k] = (target && Object.prototype.hasOwnProperty.call(target, k))
-        ? structuredClone(target[k])
-        : null;
+      if (k === "__deleteFields") continue;
+      if (target && Object.prototype.hasOwnProperty.call(target, k)) {
+        prev[k] = structuredClone(target[k]);
+      } else {
+        deletes.push(k);
+      }
     }
+    if (deletes.length > 0) prev.__deleteFields = deletes;
     return prev;
   }
 
@@ -10721,18 +10733,19 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
     return { kind: "destructive", reason: "no per-op inverse for " + op.kind };
   }
 
-  function resolveDeferredInverse(originalOp, pre, post) {
+  function resolveDeferredInverse(originalOp, pre, post, consumedIds) {
     if (!originalOp || !pre || !post) return null;
+    consumedIds = consumedIds || { elements: {}, sections: {}, pages: {} };
     if (originalOp.kind === "addElement") {
-      var newEl = firstNewId(collectElementIds(pre), collectElementIds(post));
+      var newEl = firstNewId(collectElementIds(pre), collectElementIds(post), consumedIds.elements);
       return newEl ? { kind: "deleteElement", elementId: newEl } : null;
     }
     if (originalOp.kind === "insertSection" || originalOp.kind === "designSection" || originalOp.kind === "duplicateSection") {
-      var newSec = firstNewId(collectSectionIds(pre), collectSectionIds(post));
+      var newSec = firstNewId(collectSectionIds(pre), collectSectionIds(post), consumedIds.sections);
       return newSec ? { kind: "deleteSection", sectionId: newSec } : null;
     }
     if (originalOp.kind === "addPage") {
-      var newPg = firstNewId(collectPageIds(pre), collectPageIds(post));
+      var newPg = firstNewId(collectPageIds(pre), collectPageIds(post), consumedIds.pages);
       return newPg ? { kind: "deletePage", pageId: newPg } : null;
     }
     return null;
@@ -10854,6 +10867,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
         }
         renderAll();
         if (suggestions) {
+          var consumedDeferredIds = { elements: {}, sections: {}, pages: {} };
           for (var i = 0; i < suggestions.length; i++) {
             var s = suggestions[i];
             s.status = "accepted";
@@ -10871,7 +10885,7 @@ export function canvasClientScript(params: CanvasClientScriptParams): string {
             if (pc.kind === "ready") {
               s.inverseOp = pc.op;
             } else if (pc.kind === "deferred" && preSnapshot) {
-              var resolved = resolveDeferredInverse(pc.op, preSnapshot, state);
+              var resolved = resolveDeferredInverse(pc.op, preSnapshot, state, consumedDeferredIds);
               s.inverseOp = resolved || null;
             } else {
               s.inverseOp = null;

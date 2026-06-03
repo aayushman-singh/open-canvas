@@ -39,6 +39,7 @@ import type {
 import { getStyleKitPreset } from '../canvas/style-kits.js';
 
 const SECTION_HEIGHT_MAX = 1400;
+const INTERNAL_DELETE_FIELDS_KEY = '__deleteFields';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -47,6 +48,38 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function setElementField(element: CanvasElement, key: string, value: unknown): void {
   const target = element as CanvasElement & Record<string, unknown>;
   target[key] = value;
+}
+
+function applyInternalDeleteFields(
+  target: Record<string, unknown>,
+  patch: Record<string, unknown>,
+  opName: string,
+  options: {
+    allowedFields?: readonly string[];
+    protectedFields?: readonly string[];
+  },
+): void {
+  const raw = patch[INTERNAL_DELETE_FIELDS_KEY];
+  if (raw === undefined) return;
+  if (!Array.isArray(raw)) {
+    throw new Error(`${opName}: ${INTERNAL_DELETE_FIELDS_KEY} must be a string[]`);
+  }
+  const rawFields = raw as unknown[];
+  const allowed = options.allowedFields ? new Set(options.allowedFields) : null;
+  const protectedFields = new Set(options.protectedFields ?? []);
+  for (let i = 0; i < rawFields.length; i++) {
+    const field = rawFields[i];
+    if (typeof field !== 'string' || field.length === 0) {
+      throw new Error(`${opName}: ${INTERNAL_DELETE_FIELDS_KEY}[${String(i)}] must be a string`);
+    }
+    if (allowed !== null && !allowed.has(field)) {
+      throw new Error(`${opName}: cannot delete unsupported field ${field}`);
+    }
+    if (protectedFields.has(field)) {
+      throw new Error(`${opName}: cannot delete protected field ${field}`);
+    }
+    delete target[field];
+  }
 }
 
 export type CanvasAgentOp =
@@ -265,9 +298,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       return { page: target };
     }
     if (typeof opAfterSectionId === 'string' && opAfterSectionId.length > 0) {
-      const target = next.pages.find((p) =>
-        p.sections.some((s) => s.id === opAfterSectionId),
-      );
+      const target = next.pages.find((p) => p.sections.some((s) => s.id === opAfterSectionId));
       if (!target) {
         throw new Error(
           `applyCanvasAgentOp(${kindLabel}): afterSectionId not found on any page: ${opAfterSectionId}`,
@@ -379,6 +410,14 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       );
     }
     const patch = op.patch;
+    applyInternalDeleteFields(
+      element as unknown as Record<string, unknown>,
+      patch,
+      'updateElement',
+      {
+        protectedFields: ['id', 'type', 'box'],
+      },
+    );
     // Apply shared BaseElement patches
     if (isRecord(patch.box)) {
       const b = patch.box;
@@ -406,7 +445,13 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     }
     // Apply type-specific patches — spread remaining fields onto the element.
     // validateEditableSite will catch invalid fields.
-    const sharedKeys = new Set(['box', 'motion', 'elementStyle', 'responsive']);
+    const sharedKeys = new Set([
+      'box',
+      'motion',
+      'elementStyle',
+      'responsive',
+      INTERNAL_DELETE_FIELDS_KEY,
+    ]);
     for (const [key, value] of Object.entries(patch)) {
       if (!sharedKeys.has(key) && value !== undefined) {
         setElementField(element, key, value);
@@ -452,6 +497,14 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
   if (op.kind === 'updateSection') {
     const { section } = findSectionAcrossSite(next, op.sectionId);
     const patch = op.patch;
+    applyInternalDeleteFields(
+      section as unknown as Record<string, unknown>,
+      patch,
+      'updateSection',
+      {
+        allowedFields: ['backgroundEffect', 'entrance'],
+      },
+    );
     if (typeof patch.name === 'string') section.name = patch.name;
     if (typeof patch.height === 'number') {
       section.height = Math.max(240, Math.min(1200, patch.height));
@@ -555,6 +608,24 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     const targetPage = next.pages.find((p) => p.id === op.pageId);
     if (!targetPage) throw new Error(`updatePage: page not found: ${op.pageId}`);
     const patch = op.patch;
+    applyInternalDeleteFields(
+      targetPage as unknown as Record<string, unknown>,
+      patch,
+      'updatePage',
+      {
+        allowedFields: [
+          'description',
+          'ogImageAssetId',
+          'canonical',
+          'noIndex',
+          'locale',
+          'publishedDate',
+          'author',
+          'tags',
+          'category',
+        ],
+      },
+    );
     if (typeof patch.title === 'string') targetPage.title = patch.title;
     if (typeof patch.slug === 'string') targetPage.slug = patch.slug;
     if (typeof patch.description === 'string') targetPage.description = patch.description;
@@ -625,6 +696,9 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
   // -- setSiteConfig --------------------------------------------------------
   if (op.kind === 'setSiteConfig') {
     const patch = op.patch;
+    applyInternalDeleteFields(next as unknown as Record<string, unknown>, patch, 'setSiteConfig', {
+      allowedFields: ['visitorTheme', 'defaultLocale', 'siteNoIndex'],
+    });
     if (
       patch.visitorTheme === 'light' ||
       patch.visitorTheme === 'dark' ||
@@ -663,7 +737,9 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       parentArray = tab.elements;
     } else if (op.parentKind === 'collection-entry') {
       if (typeof op.collectionElementId !== 'string' || typeof op.entryIndex !== 'number') {
-        throw new Error('restoreElement(collection-entry): collectionElementId + entryIndex required');
+        throw new Error(
+          'restoreElement(collection-entry): collectionElementId + entryIndex required',
+        );
       }
       const collectionElement = section.elements.find((el) => el.id === op.collectionElementId);
       if (!collectionElement || collectionElement.type !== 'collection') {
