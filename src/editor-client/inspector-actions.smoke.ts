@@ -208,6 +208,25 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     chatSelectionTextEl: null,
     chatSelectionClearBtn: null,
     toggleChatPanel: () => {},
+    chatForm: null,
+    chatInput: null,
+    chatMessages: null,
+    chatWelcome: null,
+    chatSessionId: null,
+    chatBusy: false,
+    appendChatMessage: () => {},
+    hideChatWelcome: () => {},
+    chatAcceptAllBtn: null,
+    showAcceptAllSummary: () => {},
+    pendingAiSuggestions: [],
+    applyAgentOps: () => {
+      throw new Error('applyAgentOps stub: smoke does not exercise AI ops apply');
+    },
+    refreshAcceptAllButton: () => {},
+    findCanvasNodeForOp: () => null,
+    focusCanvasOnNode: () => {},
+    describeOp: () => '',
+    revertAgentEntry: () => {},
   };
   return { ctx, log };
 }

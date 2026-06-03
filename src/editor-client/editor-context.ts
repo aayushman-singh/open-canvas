@@ -505,4 +505,110 @@ export interface EditorContext {
    *  toggle/close event handlers in canvas-client.ts (and, post-cutover,
    *  in createEditor) need a ctx-method reference, not a re-import. */
   toggleChatPanel(): void;
+
+  // -- Phase 2k.b: chat session form + SSE streaming --------------------
+  /** The chat panel's <form> element. The chat-session module attaches a
+   *  submit listener that POSTs the message + SSE-streams the response.
+   *  Null short-circuits the whole flow so boot order (DOM caching runs
+   *  before the user can submit) doesn't have to assert mount completion.
+   *  Suggestion-chip clicks call ctx.chatForm.requestSubmit() to reuse
+   *  the same submit handler. */
+  chatForm: HTMLFormElement | null;
+  /** The chat panel's <input> for the message. Submit handler reads
+   *  .value, clears it after capture, then re-arms for the next turn.
+   *  Suggestion-chip clicks write into this before triggering submit. */
+  chatInput: HTMLInputElement | null;
+  /** The scrolling message list inside the chat panel. appendChatMessage
+   *  appends + auto-scrolls; the SSE token branch streams text into a
+   *  reusable assistant bubble appended here. Null short-circuits every
+   *  append + scroll path so missing DOM is silent at boot. */
+  chatMessages: HTMLElement | null;
+  /** Welcome blurb shown before the first message in a fresh chat.
+   *  hideChatWelcome flips its .hidden flag on the first turn so the
+   *  blurb makes way for the conversation. Null leaves the flag alone —
+   *  the route may have omitted the blurb. */
+  chatWelcome: HTMLElement | null;
+  /** Server-issued session id correlating subsequent turns. Captured from
+   *  the SSE "session" event and threaded back into the next request's
+   *  payload so the agent's context survives across turns. Null on the
+   *  first turn (the server mints the id and echoes it back). */
+  chatSessionId: string | null;
+  /** True while a chat turn is in flight (request issued, SSE stream not
+   *  yet closed). Suggestion-chip clicks and the submit handler both
+   *  short-circuit on this so a busy chat never races a second submission.
+   *  Flipped false on "done", "error", network error, or non-OK response. */
+  chatBusy: boolean;
+  /** Append a styled message bubble to ctx.chatMessages. role drives the
+   *  CSS class (`opencanvas-chat-msg <role>`); text becomes the bubble's
+   *  textContent (NOT innerHTML — caller doesn't have to sanitise). No-op
+   *  when ctx.chatMessages is null. Implemented by chat-session.ts as
+   *  appendChatMessageImpl; createEditor wiring binds ctx.appendChatMessage
+   *  = (role, text) => appendChatMessageImpl(ctx, role, text) at boot. */
+  appendChatMessage(role: string, text: string): void;
+  /** Hide the welcome blurb the chat panel ships with so it makes way for
+   *  the first message. No-op when ctx.chatWelcome is null or already
+   *  hidden. Implemented by chat-session.ts as hideChatWelcomeImpl;
+   *  createEditor wiring binds ctx.hideChatWelcome = () =>
+   *  hideChatWelcomeImpl(ctx) at boot. */
+  hideChatWelcome(): void;
+
+  // -- Phase 2n forward declarations (filled by AI integration phase) ----
+  /** The "Accept all changes" banner at the top of the chat panel.
+   *  FORWARD: Phase 2n owns this. 2k.b assigns it during the chat-session
+   *  init block (the assignment is co-located with the chatForm DOM-ref
+   *  bind it neighbours in the IIFE) but the banner's show/hide semantics
+   *  and the showAcceptAllSummary handler are Phase 2n territory. Null
+   *  short-circuits refreshAcceptAllButton + showAcceptAllSummary. */
+  chatAcceptAllBtn: HTMLElement | null;
+  /** Open the "Accept all" summary modal/dialog listing every pending
+   *  suggestion. FORWARD: Phase 2n owns this. 2k.b extracts the click
+   *  handler on chatAcceptAllBtn that invokes this; 2n provides the
+   *  implementation. */
+  showAcceptAllSummary(): void;
+  /** Pending AI suggestion tracker — one entry per op-preview event the
+   *  agent emitted this turn. Mutated by the SSE op-preview branch
+   *  (push), by accept (status="accepted" + inverseOp), by reject
+   *  (status="rejected"), and by revertAgentEntry (status="reverted").
+   *  FORWARD: Phase 2n owns this. 2k.b extracts the push site (op-preview
+   *  branch in chat-session.ts) but 2n provides the runtime backing array
+   *  and narrows the entry shape. The type stays maximally loose here so
+   *  the SSE branch typechecks while 2n implements. */
+  pendingAiSuggestions: Array<{
+    op: unknown;
+    toolName: string;
+    status: string;
+    cardEl: HTMLElement;
+    targetNode: HTMLElement | null;
+    inverseOp: unknown;
+    acceptBtn?: HTMLButtonElement;
+    rejectBtn?: HTMLButtonElement;
+    revertBtn?: HTMLButtonElement;
+  }>;
+  /** POST the given ops through /canvas-agent/.../apply and flip matching
+   *  suggestion entries to status="accepted" on success. FORWARD: Phase
+   *  2n owns this. 2k.b's SSE op-preview accept handler calls this; 2n
+   *  provides the implementation and narrows the param types. */
+  applyAgentOps(ops: unknown[], suggestions: unknown[]): Promise<boolean>;
+  /** Re-evaluate pendingAiSuggestions and show/hide the Accept-all banner
+   *  with the live count. FORWARD: Phase 2n owns this. 2k.b's op-preview /
+   *  reject paths invoke it; 2n provides the implementation. */
+  refreshAcceptAllButton(): void;
+  /** Resolve a canvas DOM node for the op's targetElementId / targetSectionId
+   *  / targetPageId so the suggestion card can paint an overlay + the
+   *  card click can pan the camera. FORWARD: Phase 2n owns this. 2k.b's
+   *  op-preview branch invokes it; 2n provides the implementation. */
+  findCanvasNodeForOp(op: unknown): HTMLElement | null;
+  /** Pan the camera so the given canvas node centres in the viewport and
+   *  pulse-ring it. FORWARD: Phase 2n owns this. 2k.b's suggestion-card
+   *  click handler invokes it; 2n provides the implementation. */
+  focusCanvasOnNode(node: HTMLElement): void;
+  /** Human-readable one-liner describing the op for the suggestion card's
+   *  body text. FORWARD: Phase 2n owns this. 2k.b's op-preview branch
+   *  invokes it; 2n provides the implementation. */
+  describeOp(op: unknown): string;
+  /** Apply the inverseOp captured on accept so the original suggestion is
+   *  rolled back. FORWARD: Phase 2n owns this. 2k.b's revert button click
+   *  handler invokes it; 2n provides the implementation and narrows the
+   *  entry param. */
+  revertAgentEntry(entry: unknown): void;
 }
