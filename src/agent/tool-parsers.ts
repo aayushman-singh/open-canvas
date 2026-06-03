@@ -24,6 +24,9 @@ import {
   type AgentRecipeId,
   type BackgroundEffect,
   type BuiltInStyleKit,
+  type CanvasElement,
+  type CanvasPage,
+  type CanvasSection,
   type ElementType,
   type MotionPreset,
   type StyleKit,
@@ -784,6 +787,120 @@ export function translateToolCall(call: LlmAssistantToolCall): ParseResult {
 }
 
 // ---------------------------------------------------------------------------
+// Internal revert-op parsers — never exposed via translateToolCall. The
+// editor's chat-revert flow is the only emitter; the snapshot payloads
+// originate from the same Owner's pre-apply state, so we structurally
+// gate the wrapper here and rely on runOpsPipeline → validateEditableSite
+// to catch deeper shape regressions in the inserted entity.
+// ---------------------------------------------------------------------------
+
+function parseRestoreElement(value: Record<string, unknown>): ParseResult {
+  if (!isNonEmptyString(value.sectionId)) {
+    return { ok: false, error: 'restoreElement.sectionId must be a non-empty string' };
+  }
+  const parentKind = value.parentKind;
+  if (parentKind !== 'section' && parentKind !== 'tab-panel' && parentKind !== 'collection-entry') {
+    return {
+      ok: false,
+      error: "restoreElement.parentKind must be 'section' | 'tab-panel' | 'collection-entry'",
+    };
+  }
+  if (!isFiniteNumber(value.index) || value.index < 0) {
+    return { ok: false, error: 'restoreElement.index must be a non-negative number' };
+  }
+  if (!isRecord(value.element) || !isNonEmptyString(value.element.id) || !isNonEmptyString(value.element.type)) {
+    return { ok: false, error: 'restoreElement.element must be a CanvasElement with id + type' };
+  }
+  const op: CanvasAgentOp = {
+    kind: 'restoreElement',
+    sectionId: value.sectionId,
+    parentKind,
+    index: value.index,
+    element: value.element as unknown as CanvasElement,
+  };
+  if (parentKind === 'tab-panel') {
+    if (!isNonEmptyString(value.tabsElementId) || !isNonEmptyString(value.tabId)) {
+      return { ok: false, error: 'restoreElement(tab-panel): tabsElementId + tabId required' };
+    }
+    op.tabsElementId = value.tabsElementId;
+    op.tabId = value.tabId;
+  } else if (parentKind === 'collection-entry') {
+    if (!isNonEmptyString(value.collectionElementId) || !isFiniteNumber(value.entryIndex)) {
+      return {
+        ok: false,
+        error: 'restoreElement(collection-entry): collectionElementId + entryIndex required',
+      };
+    }
+    op.collectionElementId = value.collectionElementId;
+    op.entryIndex = value.entryIndex;
+  }
+  return { ok: true, op };
+}
+
+function parseRestoreSection(value: Record<string, unknown>): ParseResult {
+  const scope = value.scope;
+  if (scope !== 'page' && scope !== 'header' && scope !== 'footer') {
+    return { ok: false, error: "restoreSection.scope must be 'page' | 'header' | 'footer'" };
+  }
+  if (!isFiniteNumber(value.index) || value.index < 0) {
+    return { ok: false, error: 'restoreSection.index must be a non-negative number' };
+  }
+  if (!isRecord(value.section) || !isNonEmptyString(value.section.id)) {
+    return { ok: false, error: 'restoreSection.section must be a CanvasSection with id' };
+  }
+  const op: CanvasAgentOp = {
+    kind: 'restoreSection',
+    scope,
+    index: value.index,
+    section: value.section as unknown as CanvasSection,
+  };
+  if (scope === 'page') {
+    if (!isNonEmptyString(value.pageId)) {
+      return { ok: false, error: 'restoreSection(page): pageId required' };
+    }
+    op.pageId = value.pageId;
+  }
+  return { ok: true, op };
+}
+
+function parseRestorePage(value: Record<string, unknown>): ParseResult {
+  if (!isFiniteNumber(value.index) || value.index < 0) {
+    return { ok: false, error: 'restorePage.index must be a non-negative number' };
+  }
+  if (!isRecord(value.page) || !isNonEmptyString(value.page.id) || !isNonEmptyString(value.page.slug)) {
+    return { ok: false, error: 'restorePage.page must be a CanvasPage with id + slug' };
+  }
+  const op: CanvasAgentOp = {
+    kind: 'restorePage',
+    index: value.index,
+    page: value.page as unknown as CanvasPage,
+  };
+  if (value.actionHrefRestores !== undefined) {
+    if (!Array.isArray(value.actionHrefRestores)) {
+      return { ok: false, error: 'restorePage.actionHrefRestores must be an array' };
+    }
+    const actionHrefRestores = value.actionHrefRestores as unknown[];
+    const restores: Array<{ sectionId: string; elementId: string }> = [];
+    for (let i = 0; i < actionHrefRestores.length; i++) {
+      const entry = actionHrefRestores[i];
+      if (
+        !isRecord(entry) ||
+        !isNonEmptyString(entry.sectionId) ||
+        !isNonEmptyString(entry.elementId)
+      ) {
+        return {
+          ok: false,
+          error: `restorePage.actionHrefRestores[${String(i)}] must have sectionId + elementId`,
+        };
+      }
+      restores.push({ sectionId: entry.sectionId, elementId: entry.elementId });
+    }
+    op.actionHrefRestores = restores;
+  }
+  return { ok: true, op };
+}
+
+// ---------------------------------------------------------------------------
 // parseApplyOp — wire-format op → parse function dispatch for the apply route
 // ---------------------------------------------------------------------------
 
@@ -840,6 +957,13 @@ export function parseApplyOp(value: unknown, styleKit: StyleKit): ParseResult {
   if (value.kind === 'setSiteConfig') {
     return isRecord(value.patch) ? parseCanonicalSetSiteConfigOp(value) : parseSetSiteConfig(value);
   }
+
+  // Internal revert ops — emitted only by the editor's chat-revert flow.
+  // Intentionally absent from translateToolCall: the LLM never sees them
+  // and can't request them.
+  if (value.kind === 'restoreElement') return parseRestoreElement(value);
+  if (value.kind === 'restoreSection') return parseRestoreSection(value);
+  if (value.kind === 'restorePage') return parseRestorePage(value);
 
   return { ok: false, error: `unknown op kind: ${JSON.stringify(value.kind)}` };
 }

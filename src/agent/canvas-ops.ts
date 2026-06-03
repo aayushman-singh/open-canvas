@@ -93,7 +93,56 @@ export type CanvasAgentOp =
   | { kind: 'updatePage'; pageId: string; patch: Record<string, unknown> }
   | { kind: 'deletePage'; pageId: string }
   | { kind: 'setStyleKit'; styleKit: BuiltInStyleKit }
-  | { kind: 'setSiteConfig'; patch: Record<string, unknown> };
+  | { kind: 'setSiteConfig'; patch: Record<string, unknown> }
+  /**
+   * Internal revert ops — emitted ONLY by the editor's chat-revert flow,
+   * never offered to the LLM (intentionally absent from translateToolCall
+   * and the agent tool list). Each restore op carries the FULL captured
+   * snapshot of the entity that was destroyed by a paired delete op, plus
+   * just enough position info to put it back in the same slot. The final
+   * state is revalidated end-to-end by runOpsPipeline → validateEditableSite,
+   * so a duplicate-id or shape regression introduced by a stale snapshot
+   * fails loud at the /apply boundary rather than silently corrupting state.
+   */
+  | {
+      kind: 'restoreElement';
+      sectionId: string;
+      /** Where inside the section's element tree to insert. */
+      parentKind: 'section' | 'tab-panel' | 'collection-entry';
+      /** Required for tab-panel: tabsElementId + tabId. */
+      tabsElementId?: string;
+      tabId?: string;
+      /** Required for collection-entry: collectionElementId + entryIndex. */
+      collectionElementId?: string;
+      entryIndex?: number;
+      /** Insertion index inside the resolved parent array. */
+      index: number;
+      element: CanvasElement;
+    }
+  | {
+      kind: 'restoreSection';
+      scope: 'page' | 'header' | 'footer';
+      /** Required when scope === 'page'. */
+      pageId?: string;
+      /** Position inside page.sections. Ignored for header/footer. */
+      index: number;
+      section: CanvasSection;
+    }
+  | {
+      kind: 'restorePage';
+      index: number;
+      page: CanvasPage;
+      /**
+       * deletePage rewrites every `action.href = { type:'page', pageId:X }` to
+       * `{ type:'external', url:'#' }`. To make revert flawless we re-point
+       * each of those rewrites back at the restored page. The client captures
+       * this list from the pre-apply state.
+       */
+      actionHrefRestores?: Array<{
+        sectionId: string;
+        elementId: string;
+      }>;
+    };
 
 // ---------------------------------------------------------------------------
 // Helpers — search across all pages, header, and footer
@@ -585,6 +634,114 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     }
     if (typeof patch.defaultLocale === 'string') next.defaultLocale = patch.defaultLocale;
     if (typeof patch.siteNoIndex === 'boolean') next.siteNoIndex = patch.siteNoIndex;
+    return next;
+  }
+
+  // -- restoreElement -------------------------------------------------------
+  // Re-inserts a previously deleted CanvasElement at its original location.
+  // Internal-only — emitted by the editor's chat-revert flow. Final state is
+  // revalidated by runOpsPipeline so a stale snapshot (duplicate id, etc.)
+  // fails loud at /apply rather than silently corrupting state.
+  if (op.kind === 'restoreElement') {
+    const sectionLookup = findSectionAcrossSite(next, op.sectionId);
+    const section = sectionLookup.section;
+    let parentArray: CanvasElement[] | null = null;
+    if (op.parentKind === 'section') {
+      parentArray = section.elements;
+    } else if (op.parentKind === 'tab-panel') {
+      if (typeof op.tabsElementId !== 'string' || typeof op.tabId !== 'string') {
+        throw new Error('restoreElement(tab-panel): tabsElementId + tabId required');
+      }
+      const tabsElement = section.elements.find((el) => el.id === op.tabsElementId);
+      if (!tabsElement || tabsElement.type !== 'tabs') {
+        throw new Error(`restoreElement: tabs element not found: ${op.tabsElementId}`);
+      }
+      const tab = tabsElement.tabs.find((t) => t.id === op.tabId);
+      if (!tab) {
+        throw new Error(`restoreElement: tab not found: ${op.tabId} in ${op.tabsElementId}`);
+      }
+      parentArray = tab.elements;
+    } else if (op.parentKind === 'collection-entry') {
+      if (typeof op.collectionElementId !== 'string' || typeof op.entryIndex !== 'number') {
+        throw new Error('restoreElement(collection-entry): collectionElementId + entryIndex required');
+      }
+      const collectionElement = section.elements.find((el) => el.id === op.collectionElementId);
+      if (!collectionElement || collectionElement.type !== 'collection') {
+        throw new Error(`restoreElement: collection element not found: ${op.collectionElementId}`);
+      }
+      const entry = collectionElement.entries[op.entryIndex];
+      if (!Array.isArray(entry)) {
+        throw new Error(
+          `restoreElement: collection entry ${String(op.entryIndex)} missing on ${op.collectionElementId}`,
+        );
+      }
+      parentArray = entry;
+    } else {
+      throw new Error(`restoreElement: unknown parentKind: ${String(op.parentKind)}`);
+    }
+    const insertAt = Math.max(0, Math.min(op.index, parentArray.length));
+    parentArray.splice(insertAt, 0, structuredClone(op.element));
+    return next;
+  }
+
+  // -- restoreSection -------------------------------------------------------
+  if (op.kind === 'restoreSection') {
+    if (op.scope === 'header') {
+      next.header = structuredClone(op.section);
+      return next;
+    }
+    if (op.scope === 'footer') {
+      next.footer = structuredClone(op.section);
+      return next;
+    }
+    if (op.scope === 'page') {
+      if (typeof op.pageId !== 'string') {
+        throw new Error('restoreSection(page): pageId required');
+      }
+      const targetPage = next.pages.find((p) => p.id === op.pageId);
+      if (!targetPage) throw new Error(`restoreSection: page not found: ${op.pageId}`);
+      const insertAt = Math.max(0, Math.min(op.index, targetPage.sections.length));
+      targetPage.sections.splice(insertAt, 0, structuredClone(op.section));
+      return next;
+    }
+    throw new Error(`restoreSection: unknown scope: ${String(op.scope)}`);
+  }
+
+  // -- restorePage ----------------------------------------------------------
+  // Re-inserts the deleted page, then re-points every action.href that
+  // deletePage rewrote to '#'. The href list is captured client-side from
+  // the pre-apply snapshot; targets that have since been deleted or have a
+  // different href shape are silently skipped (their post-revert href is
+  // already whatever the Owner most recently chose for them).
+  if (op.kind === 'restorePage') {
+    const insertAt = Math.max(0, Math.min(op.index, next.pages.length));
+    next.pages.splice(insertAt, 0, structuredClone(op.page));
+    if (Array.isArray(op.actionHrefRestores)) {
+      const restoredPageId = op.page.id;
+      const sectionsToScan: CanvasSection[] = [];
+      for (const pg of next.pages) {
+        for (const sec of pg.sections) sectionsToScan.push(sec);
+      }
+      if (next.header) sectionsToScan.push(next.header);
+      if (next.footer) sectionsToScan.push(next.footer);
+      for (const restore of op.actionHrefRestores) {
+        const section = sectionsToScan.find((s) => s.id === restore.sectionId);
+        if (!section) continue;
+        const element = section.elements.find((el) => el.id === restore.elementId);
+        if (!element || element.type !== 'action') continue;
+        // Only undo the deletePage-introduced '#' rewrite. If the Owner has
+        // since pointed the action elsewhere (different href shape, or a
+        // different external url), we leave their choice alone.
+        if (
+          typeof element.href === 'object' &&
+          element.href !== null &&
+          element.href.type === 'external' &&
+          element.href.url === '#'
+        ) {
+          element.href = { type: 'page', pageId: restoredPageId };
+        }
+      }
+    }
     return next;
   }
 
