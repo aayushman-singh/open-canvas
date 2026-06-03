@@ -181,6 +181,14 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     disableUndoPersistence: () => {
       throw new Error('disableUndoPersistence stub: smoke does not exercise persistence failure');
     },
+    chatSelectionDropped: false,
+    linkPopoverPinned: false,
+    removeLinkPopover: () => {},
+    closeReel: () => {},
+    showLinkPopover: () => {},
+    updateChatSelectionChip: () => {},
+    renderReel: () => {},
+    selectSection: () => {},
   };
   return { ctx, log };
 }

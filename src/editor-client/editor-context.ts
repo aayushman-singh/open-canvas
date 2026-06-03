@@ -339,4 +339,46 @@ export interface EditorContext {
    *  paths beyond persistUndo (e.g. boot-time storage probe) also need
    *  to trip the latch without re-importing the persist module. */
   disableUndoPersistence(reason: string, error: unknown): void;
+
+  // -- Phase 2o.a: selection state-machine -------------------------------
+  /** Latched true the first time the Owner clicks "Drop selection" in the
+   *  chat selection chip — the chip then renders empty until a fresh
+   *  selectElement() reopens the loop. selectElement() resets to false on
+   *  every new selection (including null) so the chip surfaces the next
+   *  element the Owner picks. */
+  chatSelectionDropped: boolean;
+  /** True while a link popover is pinned (auto-shown for action elements,
+   *  or stuck-open via the popover's pin button). selectElement reads this
+   *  to decide whether to dismiss the popover when the selection moves; an
+   *  unpinned hover popover doesn't survive any selection change, so the
+   *  flag-only gate is correct. */
+  linkPopoverPinned: boolean;
+  /** Remove the live link popover from the DOM and clear the pinned/anchor
+   *  state. Called by selectElement when the prior selection had a pinned
+   *  popover — the new selection either pins its own or shows none. */
+  removeLinkPopover(): void;
+  /** Close the film-reel overlay (sets ctx.isReelOpen=false, re-renders
+   *  the canvas without the reel). selectElement calls this when entering
+   *  an element selection, since the reel and a selected element are
+   *  mutually exclusive UI modes. */
+  closeReel(): void;
+  /** Show a link popover anchored to the given element. The {pinned:true}
+   *  branch auto-fires for action elements so the Owner can navigate to
+   *  the linked page without hunting for the inspector's href field. */
+  showLinkPopover(anchorEl: HTMLElement, opts: { pinned: boolean }): void;
+  /** Re-render the chat selection chip from ctx.selectedElementId +
+   *  ctx.chatSelectionDropped. selectElement calls this after mutating
+   *  selection state so the chip surfaces the freshly picked element. */
+  updateChatSelectionChip(): void;
+  /** Re-render the film-reel overlay (selected-section highlight, reel
+   *  contents). selectSection calls this when the reel is open so the
+   *  reel's section highlight tracks the section selection. */
+  renderReel(): void;
+  /** Idempotent selection setter — no-op when sectionId already matches
+   *  the active selection. Reads ctx.selectedSectionId, ctx.root,
+   *  ctx.selectedElementId, ctx.isReelOpen; mutates ctx.selectedSectionId
+   *  and calls ctx.renderInspector / ctx.renderReel. Exposed on ctx
+   *  because selectElement re-enters selectSection for the element's
+   *  parent section. */
+  selectSection(sectionId: string | null): void;
 }
