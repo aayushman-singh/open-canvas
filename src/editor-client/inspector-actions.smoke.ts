@@ -139,6 +139,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     uploadMediaForElement: () => {
       throw new Error('uploadMediaForElement stub: smoke does not exercise uploads');
     },
+    generateImageForElement: () => {
+      throw new Error('generateImageForElement stub: smoke does not exercise generation');
+    },
     inspector: null,
     selectedSectionId: null,
     inspectorRenderSubject: null,

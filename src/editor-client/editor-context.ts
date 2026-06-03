@@ -191,6 +191,14 @@ export interface EditorContext {
     file: File,
     refreshFn?: () => Promise<unknown>,
   ): Promise<void>;
+  /** Phase 2q.e — POST /assets/generate with the prompt + slot box
+   *  dimensions, hold the returned image bytes as a blob URL preview, and
+   *  let the Owner Apply (uploads to /api/owner/assets) or Discard
+   *  (revokes the blob URL). Reads alt from #media-upload-alt-<elementId>
+   *  when present. Aborts with a "slot has no size yet" status when
+   *  element.box has zero width or height. Failure tones surface through
+   *  ctx.setStatus — no silent fallback. */
+  generateImageForElement(element: MediaElement, prompt: string): Promise<void>;
 
   // -- Phase 2h.3.a: section inspector ----------------------------------
   /** Inspector panel DOM ref, cached at boot. Null before boot wires the
