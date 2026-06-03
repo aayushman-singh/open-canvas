@@ -43,6 +43,7 @@ import { findFontSizeMark, findLinkMark, hasMark } from './mark-queries.js';
 import { bringToFront, nextZInArray, nudgeZ, renormalizeZ, sendToBack } from './z-order.js';
 import { cssEscape } from './css-escape.js';
 import { previewPaletteFromAccent } from './palette.js';
+import { SIDEBAR_FACTORIES } from './sidebar-factories.js';
 
 void clampInsertIndex;
 void hasFooterSection;
@@ -80,4 +81,5 @@ console.log('[editor-client] Phase 2d stub ready', {
   cssEscapeOk: cssEscape('opencanvas-element__id-1234').length > 0,
   paletteLen: previewPaletteFromAccent('#3366cc').length,
   nextZ: nextZInArray([]),
+  sidebarFactoryCount: Object.keys(SIDEBAR_FACTORIES).length,
 });
