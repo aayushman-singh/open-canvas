@@ -299,6 +299,38 @@ try {
 }
 assert(insertUnknownAfterThrew, 'expected insertSection with unknown afterSectionId to throw');
 
+// insertSection with pageId -> targets that page, not pages[0].
+const insertPagedState: EditableSite = {
+  ...baseState,
+  pages: [
+    baseState.pages[0]!,
+    {
+      id: 'page-pricing',
+      title: 'Pricing',
+      slug: 'pricing',
+      description: '',
+      width: baseState.pages[0]!.width,
+      sections: [],
+    },
+  ],
+};
+const afterPagedInsert = applyCanvasAgentOp(insertPagedState, {
+  kind: 'insertSection',
+  pageId: 'page-pricing',
+  afterSectionId: null,
+  recipeId: 'cta-band',
+  input: { brief: 'Pricing closer.', styleKit: 'charcoal' },
+});
+assert(
+  afterPagedInsert.pages[0]?.sections.length === 1,
+  'expected insertSection with pageId to leave the first page untouched',
+);
+assert(
+  afterPagedInsert.pages[1]?.sections.length === 1 &&
+    afterPagedInsert.pages[1].sections[0]?.recipeId === 'cta-band',
+  'expected insertSection with pageId to append the new section on the named page',
+);
+
 // ---------------------------------------------------------------------------
 // CANVAS_AGENT_TOOLS — schema sanity (well-formed JSON-Schema bodies).
 // ---------------------------------------------------------------------------
@@ -511,6 +543,39 @@ for (const name of expectedCanvasToolNames) {
     `expected parseApplyOp(${name}) to preserve the normalized preview op`,
   );
 }
+
+const malformedInsertPageId = parseApplyOp(
+  {
+    kind: 'insertSection',
+    pageId: 42,
+    afterSectionId: null,
+    recipeId: 'cta-band',
+    input: { brief: 'Pricing closer.', assetIds: {} },
+  },
+  'charcoal',
+);
+assert(
+  !malformedInsertPageId.ok &&
+    malformedInsertPageId.error.includes('createSection.pageId must be a non-empty string'),
+  'expected parseApplyOp(insertSection) to reject malformed pageId loudly',
+);
+const malformedInsertAfterSectionId = parseApplyOp(
+  {
+    kind: 'insertSection',
+    pageId: null,
+    afterSectionId: 42,
+    recipeId: 'cta-band',
+    input: { brief: 'Pricing closer.', assetIds: {} },
+  },
+  'charcoal',
+);
+assert(
+  !malformedInsertAfterSectionId.ok &&
+    malformedInsertAfterSectionId.error.includes(
+      'createSection.afterSectionId must be a non-empty string or null',
+    ),
+  'expected parseApplyOp(insertSection) to reject malformed afterSectionId loudly',
+);
 
 const addActionToolCall = translateToolCall({
   id: 'add-action-end-to-end',

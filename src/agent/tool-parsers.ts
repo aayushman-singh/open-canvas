@@ -124,15 +124,17 @@ export function parseCreateSection(args: unknown, styleKit: StyleKit): ParseResu
     return { ok: false, error: 'createSection.brief must be a non-empty string' };
   }
   let pageId: string | null = null;
-  if (typeof args.pageId === 'string' && args.pageId.length > 0) {
+  if (args.pageId !== undefined && args.pageId !== null && args.pageId !== '') {
+    if (typeof args.pageId !== 'string' || args.pageId.length === 0) {
+      return { ok: false, error: 'createSection.pageId must be a non-empty string when provided' };
+    }
     pageId = args.pageId;
   }
-  // afterSectionId: null OR string. We accept '' as "append at end" to keep
-  // the JSON-Schema simple (no null variant in our subset).
-  let afterSectionId: string | null = null;
-  if (typeof args.afterSectionId === 'string' && args.afterSectionId.length > 0) {
-    afterSectionId = args.afterSectionId;
+  const after = parseNullableSectionId(args.afterSectionId, 'createSection.afterSectionId');
+  if (!after.ok) {
+    return { ok: false, error: after.error };
   }
+  const afterSectionId = after.value;
   const assetIds: RecipeFactoryInput['assetIds'] = {};
   if (isRecord(args.assetIds)) {
     if (typeof args.assetIds.hero === 'string' && args.assetIds.hero.length > 0) {
