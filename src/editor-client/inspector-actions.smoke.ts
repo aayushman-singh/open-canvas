@@ -355,6 +355,37 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
         'uploadGeneratedBlobToElement stub: smoke does not exercise generated-blob upload',
       );
     },
+    markToolbar: null,
+    markToolbarAnchor: null,
+    linkPopover: null,
+    linkPopoverAnchor: null,
+    linkPopoverShowTimer: null,
+    linkPopoverHideTimer: null,
+    refreshMarkToolbarFontSizeState: () => {},
+    buildMarkToolbar: () => {
+      throw new Error('buildMarkToolbar stub: smoke does not exercise mark toolbar UI');
+    },
+    applyMark: () => {
+      throw new Error('applyMark stub: smoke does not exercise mark application');
+    },
+    beginTextEdit: () => {
+      throw new Error('beginTextEdit stub: smoke does not exercise text editing');
+    },
+    forceOpenInspector: () => {},
+    buildRunNode: () => {
+      throw new Error('buildRunNode stub: smoke does not exercise run rendering');
+    },
+    marksEqual: () => false,
+    plainTextOf: () => '',
+    renderMathInScope: () => {},
+    normalizePastedHtml: (html: string) => html,
+    plainTextToFragmentHtml: (plain: string) => plain,
+    beginDrag: () => {
+      throw new Error('beginDrag stub: smoke does not exercise drag');
+    },
+    openLinkModal: () => {
+      throw new Error('openLinkModal stub: smoke does not exercise modals');
+    },
   };
   return { ctx, log };
 }

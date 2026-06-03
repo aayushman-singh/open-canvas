@@ -13,6 +13,8 @@ import type {
   CanvasPage,
   CanvasSection,
   EditableSite,
+  InlineMark,
+  InlineMarkType,
   InlineRun,
   PositionedBox,
 } from '../canvas/schema.js';
@@ -366,8 +368,10 @@ export interface EditorContext {
   closeReel(): void;
   /** Show a link popover anchored to the given element. The {pinned:true}
    *  branch auto-fires for action elements so the Owner can navigate to
-   *  the linked page without hunting for the inspector's href field. */
-  showLinkPopover(anchorEl: HTMLElement, opts: { pinned: boolean }): void;
+   *  the linked page without hunting for the inspector's href field.
+   *  Opts is optional — the hover trigger paths invoke this with no
+   *  options, in which case the popover is non-pinned by default. */
+  showLinkPopover(anchorEl: HTMLElement, opts?: { pinned: boolean }): void;
   /** Re-render the chat selection chip from ctx.selectedElementId +
    *  ctx.chatSelectionDropped. selectElement calls this after mutating
    *  selection state so the chip surfaces the freshly picked element. */
@@ -1017,7 +1021,7 @@ export interface EditorContext {
    *  cluster (later phase) owns the full implementation; declared here
    *  as `unknown` because co-edit only nulls the field and the actual
    *  InlineRun[] type ships with the editing cluster. */
-  editingSnapshot: unknown;
+  editingSnapshot: InlineRun[] | null;
 
   // -- Phase 2q.a: modal cluster -----------------------------------------
   /** Hard sync gate: every opener throws synchronously if this is true,
@@ -1207,6 +1211,100 @@ export interface EditorContext {
     mediaType: string,
     altValue: string,
   ): Promise<void>;
+
+  // -- Phase 2q.g: link popover + mark toolbar + text editing ------------
+  /** Floating inline mark toolbar — singleton DOM node appended to
+   *  document.body while a text element is in edit mode. Set by
+   *  buildMarkToolbar, cleared by removeMarkToolbar. The
+   *  onMarkToolbarReflow listener gates its position update on this being
+   *  live so scroll/resize events outside an edit session no-op. */
+  markToolbar: HTMLElement | null;
+  /** The wrapper element the mark toolbar is positioned against. The
+   *  reflow listeners (window scroll/resize) read this to re-pin the
+   *  toolbar on scroll; null short-circuits the reflow path. */
+  markToolbarAnchor: HTMLElement | null;
+  /** Floating link popover — singleton DOM node appended to document.body
+   *  while a link is hovered or pinned. Mutated by showLinkPopover /
+   *  removeLinkPopover. */
+  linkPopover: HTMLElement | null;
+  /** The anchor element the link popover is positioned against. The
+   *  reflow listeners (window scroll/resize) read this to re-pin the
+   *  popover on scroll; null short-circuits the reflow path. */
+  linkPopoverAnchor: HTMLElement | null;
+  /** Debounce handle for the link-popover show delay (150ms). Set by
+   *  hover-enter, cleared by hover-leave / removeLinkPopover. Null when
+   *  no show is pending. */
+  linkPopoverShowTimer: ReturnType<typeof setTimeout> | null;
+  /** Debounce handle for the link-popover hide grace window (200ms). Set
+   *  by hover-leave on non-pinned popovers, cleared by hover-enter /
+   *  removeLinkPopover. Null when no hide is pending. */
+  linkPopoverHideTimer: ReturnType<typeof setTimeout> | null;
+
+  /** Re-render the toolbar font-size <select> from the current selection's
+   *  ancestor font-size. Called by the selectionchange handler so the
+   *  picker tracks the caret. No-op when the toolbar isn't mounted. */
+  refreshMarkToolbarFontSizeState(): void;
+  /** Build the inline mark toolbar above the given anchor (the text
+   *  element wrapper). Replaces any toolbar already in the DOM via
+   *  removeMarkToolbar before constructing. */
+  buildMarkToolbar(anchor: HTMLElement): void;
+  /** Apply (or toggle) a mark across the current Selection. Bold/italic/
+   *  underline route through execCommand; strike/code/highlight route
+   *  through the serialize → toggle → rebuild path; link opens the link
+   *  modal. */
+  applyMark(type: InlineMarkType): void;
+  /** Flip a text element into contenteditable mode and wire its
+   *  blur/keydown/paste/mouseover/mouseout/mousedown event handlers + the
+   *  document-level selectionchange handler. No-op when the element id
+   *  doesn't resolve or isn't a text element. */
+  beginTextEdit(elementId: string): void;
+
+  // -- Forward declarations consumed by the Phase 2q.g extraction --------
+  // These functions stay inline in canvas-client.ts during Phase 2; the
+  // extracted modules invoke them through ctx so the call shape is
+  // mechanical (s/<closure-var>/ctx.<closure-var>/g). Implementations
+  // move into their own sibling modules in later phases.
+
+  /** Force the inspector panel out of collapsed / hidden state so the
+   *  newly-selected element's inspector is visible. Inline twin:
+   *  canvas-client.ts:8004. */
+  forceOpenInspector(): void;
+  /** Build the live DOM node for a single InlineRun. Wrap order follows
+   *  CANONICAL_MARK_ORDER. Inline twin: canvas-client.ts:2720. */
+  buildRunNode(run: InlineRun): HTMLElement;
+  /** Deep-equality on two mark arrays. Used by the serialize→mutate→
+   *  rebuild path to merge adjacent identical-mark runs. Inline twin:
+   *  canvas-client.ts:8739. */
+  marksEqual(a: InlineMark[], b: InlineMark[]): boolean;
+  /** Concatenate run.text across a content array. Used by the commit
+   *  path to enforce the "concatenated plain text must not be empty"
+   *  rule client-side. Inline twin: canvas-client.ts:8835. */
+  plainTextOf(content: InlineRun[]): string;
+  /** Re-render KaTeX inside the given subtree. Called by the paste
+   *  handler so pasted math spans render immediately. Inline twin:
+   *  canvas-client.ts:12261. */
+  renderMathInScope(scope: HTMLElement): void;
+  /** Normalise pasted HTML through the editor's canonical mark tag set
+   *  so the serializer sees the tags it knows. Inline twin:
+   *  canvas-client.ts:12353. */
+  normalizePastedHtml(html: string): string;
+  /** Build an HTML fragment string from a plain-text paste payload —
+   *  promotes embedded LaTeX delimiters and double-newline breaks.
+   *  Inline twin: canvas-client.ts:12282. */
+  plainTextToFragmentHtml(plain: string): string;
+  /** Begin a drag on the given wrapper element. The mark toolbar's
+   *  drag handle calls this so the Owner can move a text element
+   *  without leaving edit mode. Inline twin: canvas-client.ts:11327. */
+  beginDrag(startEv: MouseEvent, wrapper: HTMLElement): void;
+  /** Open the link-editing modal and resolve with the edited href /
+   *  target — or null on cancel. Throws synchronously when another modal
+   *  is already open (modalOpen=true). Inline twin: canvas-client.ts:9301. */
+  openLinkModal(opts: {
+    linkText?: string;
+    href?: string;
+    blank?: boolean;
+    focusAfterClose?: HTMLElement | null;
+  }): Promise<{ href: string; target?: '_blank' } | null>;
 }
 
 /**
