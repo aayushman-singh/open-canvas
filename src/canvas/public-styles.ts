@@ -56,6 +56,17 @@ html, body {
 
 .opencanvas-text { color: inherit; }
 
+/* Text element wrappers clip overflow by default so a long line typed into
+   a small text box stops at the wrapper's right edge instead of spilling
+   past the declared width/height. The inspector's Overflow control still
+   wins: when it emits inline overflow:visible on the wrapper, the inline
+   declaration outranks this stylesheet rule. The :not([data-editing])
+   carveout is for the editor preview — published visitor pages never set
+   that attribute, so they always clip. */
+.opencanvas-element[data-element-type="text"]:not([data-editing="true"]) {
+  overflow: hidden;
+}
+
 .opencanvas-action {
   display: inline-flex;
   align-items: center;

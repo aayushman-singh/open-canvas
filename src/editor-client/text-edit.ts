@@ -80,6 +80,12 @@ export function beginTextEditImpl(ctx: EditorContext, elementId: string): void {
   ctx.editingElementId = elementId;
   // Deep-clone the pre-edit content so Escape/Cancel can restore exactly.
   ctx.editingSnapshot = JSON.parse(JSON.stringify(textElement.content || [])) as InlineRun[];
+  // Flag the wrapper as actively edited so the editor stylesheet drops the
+  // `overflow:hidden` default for text wrappers. Without this, typing a long
+  // line during inline edit would push the caret past the clipped right
+  // edge and leave the Owner typing into an invisible region. finish()
+  // removes the flag so the clip resumes the moment the edit ends.
+  (wrapper as HTMLElement).setAttribute('data-editing', 'true');
   inner.setAttribute('contenteditable', 'true');
   inner.focus();
 
@@ -186,6 +192,9 @@ export function beginTextEditImpl(ctx: EditorContext, elementId: string): void {
 
   function finish(commit: boolean): void {
     inner!.removeAttribute('contenteditable');
+    // Restore the overflow-clip on the wrapper now the edit is over. Pairs
+    // with the setAttribute('data-editing', 'true') above.
+    (wrapper as HTMLElement).removeAttribute('data-editing');
     inner!.removeEventListener('blur', onBlur);
     inner!.removeEventListener('keydown', onKey);
     document.removeEventListener('selectionchange', onSelectionChange);
