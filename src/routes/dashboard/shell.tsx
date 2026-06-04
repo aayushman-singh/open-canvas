@@ -276,6 +276,10 @@ const SITE_NAV_ITEMS: Omit<SiteNavItem, 'href'>[] = [
     icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h5" stroke-linecap="round"/>',
   },
   {
+    label: 'Entries',
+    icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h7" stroke-linecap="round"/>',
+  },
+  {
     label: 'Versions',
     icon: '<circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2" stroke-linecap="round"/>',
   },
@@ -301,6 +305,7 @@ const SITE_NAV_PATHS: Record<string, string> = {
   Editor: 'edit',
   Settings: 'settings',
   Forms: 'forms',
+  Entries: 'entries',
   Versions: 'snapshots',
   Domains: 'domains',
   Addons: 'addons',
