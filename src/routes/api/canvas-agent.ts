@@ -22,7 +22,7 @@
 // or unknown asset → 400 with the bad value in the message body. No silent
 // fallbacks.
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { GeminiAdapter } from '../../agent/llm-gemini';
 import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
@@ -38,10 +38,11 @@ import type { ChatSessionState } from '../../agent/chat/session';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
+import { loadAssetKindsWithSeedFallback } from '../../assets/seed-id-fallback';
 import { type EditableSite, type StyleKit } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, ownerAsset, site } from '../../db/schema';
+import { customer, site } from '../../db/schema';
 import { broadcastEditableStateReplaced } from './canvas';
 
 type Bindings = {
@@ -150,18 +151,22 @@ async function runOpsPipeline(
   // this Owner and matches the media element's expected kind. Per ADR 0004
   // the asset root is the Owner, not the site — so two sites under the
   // same Owner can share assets. The scoping below honours that.
+  //
+  // Goes through `loadAssetKindsWithSeedFallback` (the same helper the save
+  // validator at canvas.ts:269 and the read endpoint at canvas.ts:852 use)
+  // so pre-2026-06 editable states with bare seed ids (e.g.
+  // `seed-project-thumb-neutral`) resolve against the materialised
+  // `seed-{customerId}-{seedId}` row via the seed's content_hash. Without
+  // this fallback, AI Accept on a legacy state 400s with "canvas agent
+  // references unknown asset id(s)" and the proposal stays stuck in
+  // `data-ai-overlay-status="proposed"`. See PR
+  // `fix(api): canvas-agent apply uses same seed-id fallback as save and read`.
   const referencedAssetIds = collectReferencedAssetIds(next);
   if (referencedAssetIds.size > 0) {
     const database = db(c.env);
-    const rows = await database
-      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
-      .from(ownerAsset)
-      .where(
-        and(
-          eq(ownerAsset.customerId, row.customerId),
-          inArray(ownerAsset.id, [...referencedAssetIds]),
-        ),
-      );
+    const rows = await loadAssetKindsWithSeedFallback(database, row.customerId, [
+      ...referencedAssetIds,
+    ]);
     const referenceErrors = findAssetReferenceErrors(next, rows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
