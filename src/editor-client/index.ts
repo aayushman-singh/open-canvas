@@ -774,8 +774,11 @@ export function createEditor(boot: EditorBoot): void {
           if (pageItem) {
             const pid2 = pageItem.getAttribute('data-page-id');
             if (pid2 && pid2 !== ctx.activePageId) {
+              // setActivePage now pans the camera (preserves zoom). The
+              // earlier behaviour also called fitToPage to re-zoom; per
+              // spec the desired UX is pan-on-activate everywhere, so
+              // the explicit fitToPage was retired.
               ctx.setActivePage(pid2);
-              ctx.fitToPage(pid2);
             }
           }
         });

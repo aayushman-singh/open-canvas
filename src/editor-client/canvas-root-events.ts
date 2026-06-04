@@ -37,13 +37,17 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
     if (ctx.interactionMode === 'pan') return;
     const target = ev.target instanceof Element ? ev.target : null;
     if (!target) return;
-    // -- Artboard label click: switch active page and zoom to fit --------
+    // -- Artboard label click: switch active page and pan to it ---------
+    // setActivePage handles the camera pan now (preserves zoom). The
+    // earlier behaviour also re-zoomed via fitToPage; the user-visible
+    // UX is "bring the page into view at the current zoom" — pan, not
+    // fit — so the explicit fitToPage was retired alongside the
+    // pan-on-setActivePage wiring in page-crud.ts.
     const artboardLabel = target.closest('.opencanvas-artboard-label');
     if (artboardLabel) {
       const labelPageId = artboardLabel.getAttribute('data-page-id');
       if (labelPageId && labelPageId !== ctx.activePageId) {
         ctx.setActivePage(labelPageId);
-        ctx.fitToPage(labelPageId);
       }
       root.classList.remove('canvas-pages-deselected');
       return;
@@ -120,6 +124,10 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
   });
 
   root.addEventListener('dblclick', (ev) => {
+    // Double-click on the label: keep the "really focus this page" intent
+    // and explicitly fit-to-page (re-zooms to ZOOM_MAX_FIT). This is the
+    // one path that still touches zoom — single-click pans via
+    // setActivePage; double-click escalates to fit.
     const dblLabel =
       ev.target instanceof Element ? ev.target.closest('.opencanvas-artboard-label') : null;
     if (dblLabel) {
