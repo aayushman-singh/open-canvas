@@ -1,13 +1,11 @@
 // src/editor-client/drag-resize.ts
 //
 // ADR 0058 Phase 2i — drag/resize handler cluster + pointer wiring.
-// canvas-client.ts:11281-11325 (attachPointerHandlers), :11327-11385
-// (beginDrag), :11387-11407 (wrapperScale + WRAPPER_MATRIX_RE),
-// :11409-11478 (beginResize) carry the inline twins. Twins retire on
-// ADR 0015 Phase 3 atomic cutover; until then, the inline IIFE is the
-// production source-of-truth and this module is dead code.
+// Now the production source-of-truth following the ADR 0015 Phase 3
+// cutover; the editor route serves this bundle and the inline IIFE is
+// retired.
 //
-// Two exports map onto Phase 2i's ctx fields:
+// Three exports:
 //
 //   - attachPointerHandlersImpl(ctx) — the boot-time wiring fn. Attaches
 //     onCanvasLinkHover/Leave to ctx.root and a `mousedown` handler that
@@ -15,84 +13,44 @@
 //     mousedown then), start a beginResize on a resize-handle click, or
 //     resolve the element wrapper at the pointer and either select it
 //     (first click) or start a beginDrag (second click on the same
-//     selection). Resists three pre-existing mousedown owners that the
-//     inline twin learnt the hard way: the element context menu, the
-//     section grip's reel-open, and the tabs element's tab-switch button.
-//     createEditor invokes this once at boot; not bound onto ctx itself
-//     since no other module re-fires it.
+//     selection). Resists three pre-existing mousedown owners learned the
+//     hard way: the element context menu, the section grip's reel-open,
+//     and the tabs element's tab-switch button. createEditor invokes
+//     this once at boot; not bound onto ctx itself since no other module
+//     re-fires it.
 //
 //   - beginDragImpl(ctx, startEv, wrapper) — frame-relative drag of the
 //     element under `wrapper`. Frame resolution walks up to the nearest
 //     tab-panel or section ancestor so a tab-panel child stays inside its
 //     panel rather than escaping into the parent section. Mutates
 //     wrapper.style.left/top + found.element.box.x/y on every mousemove
-//     and calls ctx.scheduleSave on mouseup; the inline twin's drag does
-//     NOT call captureForUndo (intentional — the snapshot is taken at the
-//     mousedown→select transition, not at the drag-end transition). Throws
-//     loudly when frameEl is a section but no active page exists (boot-
-//     ordering bug rather than a silent "skip the drag" default).
+//     and calls ctx.scheduleSave on mouseup; does NOT call captureForUndo
+//     (intentional — the snapshot is taken at the mousedown→select
+//     transition, not at the drag-end transition). Throws loudly when
+//     frameEl is a section but no active page exists (boot-ordering bug
+//     rather than a silent "skip the drag" default).
 //
 //   - beginResizeImpl(ctx, startEv, wrapper, dir) — frame-relative resize
 //     with eight-direction handle dispatch. Same frame resolution as
-//     beginDrag; reads MIN_ELEMENT_SIZE_PX off ctx so the lower-bound clamp
-//     matches the inline twin's closure constant. fromLeft/fromTop track
-//     which side moves with the pointer (north/west handles shift origin
-//     while south/east only grow size). Same throw-on-missing-page contract
-//     as beginDrag.
+//     beginDrag; reads MIN_ELEMENT_SIZE_PX off ctx so the lower-bound
+//     clamp matches the historical inline closure constant. fromLeft/
+//     fromTop track which side moves with the pointer (north/west handles
+//     shift origin while south/east only grow size). Same throw-on-
+//     missing-page contract as beginDrag.
 //
-// Private helpers (module-scope):
-//
-//   - wrapperScale(frameEl) — best-effort current-zoom estimator. Reads
-//     the closest .opencanvas-section ancestor's computed transform matrix
-//     and parses the first scalar via WRAPPER_MATRIX_RE. Returns 1 on any
-//     failure path (no section, transform="none", regex miss, NaN). The
-//     inline twin's comment-block at canvas-client.ts:11387-11396 explains
-//     why the regex must be `new RegExp` — that comment is preserved here
-//     because a future reviewer might "fix" the escaping back.
-//
-//   - WRAPPER_MATRIX_RE — string-form regex matching "matrix(<scalar>,".
-//     ESCAPING NOTE: the inline twin authors the pattern as
-//     `"matrix\\\\(([^,]+),"` because the IIFE body is wrapped in a tagged-
-//     less template literal upstream — every backslash on the source line
-//     loses one level on cook. The extracted module is no longer inside
-//     such a template, so it uses `"matrix\\(([^,]+),"` (single-escape) to
-//     produce the SAME final regex (`/matrix\(([^,]+),/`). Do NOT "fix"
-//     the escaping back to match the inline twin literally — the
-//     surrounding template-literal wrap is what made the inline form
-//     necessary, and lifting the code out of that wrap removes the need.
-//
-// Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
-// Phase 3 cutover destination, not a live call site yet.
+// Bound math notes: the section branch reads page.width + section.height
+// directly from state (canonical world coords). The nested-frame branch
+// reads getBoundingClientRect on the tab-panel / collection card and
+// divides by ctx.camera.zoom — the rect is screen-space (post canvas
+// zoom on ctx.root) and the section ancestor itself uses translate-only
+// transforms, so a single divide by the camera zoom recovers world
+// coords. Regression: a former wrapperScale() helper read the section's
+// own transform looking for a scale factor that was never there (the
+// scale lives on ctx.root), causing the nested-frame clamp to collapse
+// to camera.zoom × world-size and trap dragged elements in roughly the
+// top-left quadrant of the panel at any zoom < 1.
 
 import type { EditorContext } from './editor-context.js';
-
-/**
- * Best-effort current-zoom estimator. pointerToCanvas already handles
- * scale for sections via its own logic; for nested frames we read the
- * actual rendered transform off the closest section ancestor since the
- * canvas zoom applies uniformly above the section.
- *
- * Private to this module: only beginDragImpl + beginResizeImpl call it,
- * and both use it through the frameEl branch that's already module-local.
- */
-function wrapperScale(frameEl: Element): number {
-  const section = frameEl.closest('.opencanvas-section');
-  if (!section) return 1;
-  const matrix = window.getComputedStyle(section).transform;
-  if (!matrix || matrix === 'none') return 1;
-  const match = WRAPPER_MATRIX_RE.exec(matrix);
-  if (!match) return 1;
-  const parsed = parseFloat(match[1]!);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-}
-
-/**
- * Regex parsing the leading scalar from a `matrix(a, b, c, d, tx, ty)`
- * computed-style string. See the module-header ESCAPING NOTE for why
- * this is `new RegExp("matrix\\(([^,]+),")` rather than a regex literal
- * AND why the escape level differs from the inline twin's literal form.
- */
-const WRAPPER_MATRIX_RE = new RegExp('matrix\\(([^,]+),');
 
 /**
  * 8px snap grid applied to free-form element positioning during drag/resize.
@@ -191,9 +149,13 @@ export function beginDragImpl(
   if (!start) return;
   const originalBox = Object.assign({}, found.element.box);
   // Bounds: at section level use the page width + section height (the
-  // authoritative values from state). For nested containers use the rendered
-  // panel size since the panel's logical dimensions aren't carried on the
-  // element state directly.
+  // authoritative values from state). For nested containers (tab panel,
+  // collection card) read the rendered box and divide by the canvas zoom
+  // applied to ctx.root — getBoundingClientRect is post-transform, so the
+  // raw width/height are screen-pixel multiples of the world-coord box.
+  // ctx.camera.zoom is the ONLY scale between the section ancestor and the
+  // viewport (sections themselves use translate-only transforms), so this
+  // single divide recovers the world-coord box authoritatively.
   let boundW: number;
   let boundH: number;
   if (frameEl.classList.contains('opencanvas-section')) {
@@ -203,9 +165,9 @@ export function beginDragImpl(
     boundH = found.section.height;
   } else {
     const rect = frameEl.getBoundingClientRect();
-    const scale = wrapperScale(frameEl);
-    boundW = rect.width / scale;
-    boundH = rect.height / scale;
+    const zoom = ctx.camera.zoom > 0 ? ctx.camera.zoom : 1;
+    boundW = rect.width / zoom;
+    boundH = rect.height / zoom;
   }
 
   frameEl.setAttribute('data-snap-overlay', '');
@@ -268,10 +230,12 @@ export function beginResizeImpl(
     pageWidth = page.width;
     sectionHeight = found.section.height;
   } else {
+    // Mirrors beginDrag's bound math — see comment there. The rect is
+    // screen-space (post canvas zoom); world-coord bounds = rect / camera.zoom.
     const rect = frameEl.getBoundingClientRect();
-    const scale = wrapperScale(frameEl);
-    pageWidth = rect.width / scale;
-    sectionHeight = rect.height / scale;
+    const zoom = ctx.camera.zoom > 0 ? ctx.camera.zoom : 1;
+    pageWidth = rect.width / zoom;
+    sectionHeight = rect.height / zoom;
   }
   const moveX = dir.includes('e') || dir.includes('w');
   const moveY = dir.includes('s') || dir.includes('n');

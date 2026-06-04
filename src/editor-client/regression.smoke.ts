@@ -112,4 +112,35 @@ assert(
   'inline link edit must restore focus to the editable root after modal close',
 );
 
+// Drag/resize clamp regression: the nested-frame (tab panel, collection
+// card) branch must convert the screen-space getBoundingClientRect to
+// world coords by dividing by ctx.camera.zoom — NOT by reading a scale
+// off the section's own transform, which is translate-only and would
+// always return 1, collapsing the clamp to camera.zoom × world-size and
+// trapping dragged elements in the top-left quadrant of the panel at any
+// zoom < 1.
+const dragResize = await source('./drag-resize.ts');
+assert(
+  !/function\s+wrapperScale\s*\(/.test(dragResize),
+  'drag-resize must NOT reintroduce wrapperScale — section transforms are translate-only and the function always returned 1; use ctx.camera.zoom for the world-coord conversion',
+);
+assert(
+  !/WRAPPER_MATRIX_RE/.test(dragResize),
+  'drag-resize must NOT reintroduce WRAPPER_MATRIX_RE — the section-transform parse it served is dead code; ctx.camera.zoom replaces it',
+);
+assert(
+  /boundW\s*=\s*rect\.width\s*\/\s*zoom/.test(dragResize) &&
+    /boundH\s*=\s*rect\.height\s*\/\s*zoom/.test(dragResize),
+  'beginDragImpl nested-frame clamp must divide rect.width/height by the canvas zoom to recover world coords',
+);
+assert(
+  /pageWidth\s*=\s*rect\.width\s*\/\s*zoom/.test(dragResize) &&
+    /sectionHeight\s*=\s*rect\.height\s*\/\s*zoom/.test(dragResize),
+  'beginResizeImpl nested-frame clamp must divide rect.width/height by the canvas zoom to recover world coords',
+);
+assert(
+  /ctx\.camera\.zoom\s*>\s*0\s*\?\s*ctx\.camera\.zoom\s*:\s*1/.test(dragResize),
+  'drag-resize must guard ctx.camera.zoom > 0 before dividing — a stale 0 would NaN-poison the clamp',
+);
+
 console.log('[editor-client-regression:smoke] OK');
