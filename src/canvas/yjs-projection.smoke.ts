@@ -343,6 +343,8 @@ const syntheticPage: CanvasPage = {
   defaultMotionPreset: 'scale-in',
   sectionGap: 24,
   maxWidth: 960,
+  suppressHeader: true,
+  suppressFooter: true,
   sections: [syntheticSection],
 };
 
