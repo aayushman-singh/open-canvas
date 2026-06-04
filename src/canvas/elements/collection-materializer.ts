@@ -299,9 +299,19 @@ function applyFieldBindings(
  *  produces N clones of the same cardTemplate within a single page, and the
  *  validator's element-id-unique-within-page rule (page-routing.ts) would
  *  otherwise fail on the first multi-entry index page. The suffix runs
- *  AFTER `applyFieldBindings` because that lookup is keyed by the original
- *  element id. The clone has already been deep-cloned by the caller, so
- *  binding can mutate in place. */
+ *  AFTER `applyFieldBindings` because the OUTER lookup is keyed by the
+ *  original element id. The clone has already been deep-cloned by the
+ *  caller, so binding can mutate in place.
+ *
+ *  Nested page-bound CollectionElements inside the cardTemplate carry their
+ *  own `fieldBindings` map keyed by the inner-card element ids. The id
+ *  suffix would invalidate those maps: when the next pass (`hydrateIndexSection`
+ *  descending into our clone) hydrates the nested collection, its
+ *  `applyFieldBindings` lookup would miss every key and silently drop the
+ *  bindings. Remap each nested CollectionElement's `fieldBindings` keys
+ *  to the suffixed ids in the same walk, preserving the invariant that
+ *  `fieldBindings` keys match the ids of the cardTemplate elements they
+ *  bind to. */
 function substituteCardTemplate(
   cardTemplate: CanvasElement[],
   fieldBindings: CollectionElement['fieldBindings'],
@@ -311,6 +321,13 @@ function substituteCardTemplate(
   applyFieldBindings(substituted, fieldBindings, entry);
   walkElements(substituted, (el) => {
     el.id = `${el.id}--${entry.slug}`;
+    if (el.type === 'collection' && el.fieldBindings !== undefined) {
+      const remapped: Record<string, PageMetadataField> = {};
+      for (const [k, v] of Object.entries(el.fieldBindings)) {
+        remapped[`${k}--${entry.slug}`] = v;
+      }
+      el.fieldBindings = remapped;
+    }
   });
   return substituted;
 }
@@ -363,10 +380,18 @@ function clonePageForEntry(template: CanvasPage, entry: MaterializerEntry): Canv
   cloned.id = `${template.id}--${entry.slug}`;
   cloned.slug = `${template.collectionSlug ?? ''}/${entry.slug}`;
   cloned.title = entry.title;
-  cloned.description = entry.excerpt;
+  // CanvasPage's optional metadata fields (`description`, `author`,
+  // `category`) reject empty strings at validation time ("non-empty when
+  // present"). The entry row uses an empty string to mean "unset" because
+  // the DB column is NOT NULL with a `''` default. Translate that here: if
+  // the entry value is empty, drop the field rather than set ''.
+  if (entry.excerpt.length > 0) cloned.description = entry.excerpt;
+  else delete cloned.description;
   cloned.publishedDate = entry.publishedDate;
-  cloned.author = entry.author;
-  cloned.category = entry.category;
+  if (entry.author.length > 0) cloned.author = entry.author;
+  else delete cloned.author;
+  if (entry.category.length > 0) cloned.category = entry.category;
+  else delete cloned.category;
   cloned.tags = [...entry.tags];
   if (entry.ogImageAssetId !== null) {
     cloned.ogImageAssetId = entry.ogImageAssetId;

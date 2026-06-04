@@ -420,4 +420,97 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   );
 }
 
+// ---------------------------------------------------------------------------
+// (11) Nested page-bound collection inside an outer cardTemplate: when the
+//      outer hydration suffixes element ids with the outer entry slug, the
+//      nested collection's `fieldBindings` map must be remapped to the new
+//      ids in lockstep — otherwise the next hydration pass's
+//      applyFieldBindings lookup misses every key and the nested cards
+//      render their static placeholder content. Regression pin for the
+//      codex P2 finding on the id-suffix change.
+// ---------------------------------------------------------------------------
+
+{
+  const innerText = makeText('nested-title', 'Static');
+  const nested: CollectionElement = {
+    id: 'nested-coll',
+    type: 'collection',
+    mode: 'page-bound',
+    box: { x: 0, y: 0, w: 300, h: 200, z: 1 },
+    entryTemplate: [],
+    entries: [],
+    filter: { category: 'child' },
+    cardTemplate: [innerText],
+    fieldBindings: { 'nested-title': 'title' },
+    layout: { columns: 1, gap: 1 },
+  };
+  const outer: CollectionElement = {
+    id: 'outer-coll',
+    type: 'collection',
+    mode: 'page-bound',
+    box: { x: 0, y: 0, w: 300, h: 200, z: 1 },
+    entryTemplate: [],
+    entries: [],
+    filter: { category: 'parent' },
+    cardTemplate: [nested],
+    layout: { columns: 1, gap: 1 },
+  };
+  const site: EditableSite = {
+    styleKit: 'charcoal',
+    pages: [
+      {
+        id: 'page-blog',
+        slug: 'blog',
+        title: 'Blog',
+        width: 1200,
+        pageKind: 'collection-index',
+        collectionSlug: 'blog',
+        sections: [
+          {
+            id: 'sec',
+            recipeId: 'custom',
+            name: 's',
+            height: 800,
+            elements: [outer],
+          },
+        ],
+      },
+    ],
+  };
+  const entries: MaterializerEntry[] = [
+    makeEntry({
+      slug: 'parent',
+      title: 'Parent title',
+      category: 'parent',
+      collectionSlug: 'blog',
+    }),
+    makeEntry({
+      slug: 'child',
+      title: 'Child title',
+      category: 'child',
+      collectionSlug: 'blog',
+    }),
+  ];
+  const out = materializeCollections(site, entries);
+  const hydratedOuter = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
+  assert(
+    hydratedOuter.entries.length === 1,
+    `(11) outer hydration must pick parent-categorised entry only (got ${String(hydratedOuter.entries.length)})`,
+  );
+  const hydratedNested = hydratedOuter.entries[0]![0]! as CollectionElement;
+  assert(
+    hydratedNested.type === 'collection',
+    '(11) nested element must remain a collection after id suffixing',
+  );
+  assert(
+    hydratedNested.entries.length === 1,
+    `(11) nested hydration must pick child-categorised entry only (got ${String(hydratedNested.entries.length)})`,
+  );
+  const nestedCardText = (hydratedNested.entries[0]![0]! as TextElement).content[0]!.text;
+  assert(
+    nestedCardText === 'Child title',
+    `(11) nested cardTemplate fieldBindings must resolve to entry title after outer id-suffix rename (got ${nestedCardText})`,
+  );
+}
+
 console.log('[collection-materializer:smoke] OK');
