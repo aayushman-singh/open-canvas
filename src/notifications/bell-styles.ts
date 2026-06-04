@@ -61,13 +61,35 @@ export const bellStyles = `
 }
 .notif-panel[hidden] { display: none; }
 .notif-panel-head {
-  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 12px 18px;
   font-weight: 700;
   font-size: 14px;
   color: var(--ink);
   border-bottom: 1px solid var(--line);
   background: var(--paper);
 }
+.notif-mark-all {
+  appearance: none;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+  padding: 6px 11px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background-color 0.15s;
+}
+.notif-mark-all:hover { border-color: var(--ink); color: var(--ink); }
+.notif-mark-all:disabled { opacity: 0.55; cursor: progress; }
+.notif-mark-all[hidden] { display: none; }
 .notif-list {
   list-style: none;
   margin: 0;
@@ -115,4 +137,36 @@ export const bellStyles = `
   font-size: 11px;
   margin-top: 4px;
 }
+
+/* Toast stack used by the bell IIFE (Mark all read confirmation, errors).
+   Lives outside .notif-wrap so it can sit at the page edge regardless of
+   which surface mounts the bell. */
+.notif-toast-host {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 10010;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+.notif-toast {
+  pointer-events: auto;
+  min-width: 220px;
+  max-width: 340px;
+  padding: 11px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.4;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.notif-toast.is-open { opacity: 1; transform: translateY(0); }
+.notif-toast.is-error { background: var(--red); color: #fff; }
 `;

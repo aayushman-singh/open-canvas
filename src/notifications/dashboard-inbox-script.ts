@@ -171,6 +171,40 @@ export const notificationsInboxScript = `(function(){
     console.error('[notifications/inbox] ' + step + ' failed', detail);
   }
 
+  // Toast stack used by Mark all read + error surfaces. Styling lives in
+  // bell-styles.ts (.notif-toast-*) so both the dashboard shell and the
+  // canvas editor render the same toast without per-page CSS.
+  function toast(message, kind) {
+    var host = document.getElementById('notif-toast-host');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'notif-toast-host';
+      host.className = 'notif-toast-host';
+      document.body.appendChild(host);
+    }
+    var card = document.createElement('div');
+    card.className = 'notif-toast' + (kind === 'error' ? ' is-error' : '');
+    card.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    card.textContent = String(message);
+    host.appendChild(card);
+    requestAnimationFrame(function(){ card.classList.add('is-open'); });
+    setTimeout(function(){
+      card.classList.remove('is-open');
+      setTimeout(function(){ if (card.parentNode) card.parentNode.removeChild(card); }, 220);
+    }, 4000);
+  }
+
+  // Both surfaces (dashboard shell + canvas editor) must register
+  // window.__opencanvasModal. If it is missing, fail this action loudly
+  // instead of routing through a browser-native confirm with different chrome.
+  function confirmStylized(message, opts) {
+    var modal = window.__opencanvasModal;
+    if (modal && typeof modal.confirm === 'function') {
+      return modal.confirm(message, opts || {});
+    }
+    return Promise.reject(new Error('notification confirm modal is unavailable'));
+  }
+
   function rememberNotifications(items, replace) {
     if (replace) {
       inboxItems = [];
@@ -283,19 +317,36 @@ export const notificationsInboxScript = `(function(){
       e.preventDefault();
       e.stopPropagation();
       var unreadText = badge && !badge.hidden ? badge.textContent : '0';
-      if (!window.confirm('Mark all ' + (unreadText || '0') + ' notifications as read?')) return;
-      fetch(apiBase + '/notifications/mark-all-read', {
-        method: 'POST',
-        credentials: 'include',
-      })
-        .then(function(r) {
-          if (r.ok) return r.json();
-          return r.text().then(function(body) {
-            throw new Error('POST mark-all-read failed: ' + r.status + ' ' + body);
-          });
+      confirmStylized('Mark all ' + (unreadText || '0') + ' notifications as read?', {
+        title: 'Mark all as read',
+        confirmLabel: 'Mark all read',
+      }).then(function(ok) {
+        if (!ok) return;
+        markAll.disabled = true;
+        return fetch(apiBase + '/notifications/mark-all-read', {
+          method: 'POST',
+          credentials: 'include',
         })
-        .then(function() { return fetchInbox(); })
-        .catch(function(err) { reportFailure('mark-all-read', err); });
+          .then(function(r) {
+            if (r.ok) return r.json();
+            return r.text().then(function(body) {
+              throw new Error('POST mark-all-read failed: ' + r.status + ' ' + body);
+            });
+          })
+          .then(function(data) {
+            var n = (data && typeof data.markedRead === 'number') ? data.markedRead : 0;
+            toast(n === 0 ? 'No unread notifications.' : (n === 1 ? '1 notification marked read.' : n + ' notifications marked read.'));
+            return fetchInbox();
+          })
+          .catch(function(err) {
+            toast('Could not mark notifications as read.', 'error');
+            reportFailure('mark-all-read', err);
+          })
+          .then(function() { markAll.disabled = false; });
+      }).catch(function(err) {
+        toast('Could not open notification confirmation.', 'error');
+        reportFailure('mark-all-read confirm', err);
+      });
     });
   }
 
