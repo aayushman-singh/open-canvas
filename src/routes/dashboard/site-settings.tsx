@@ -23,7 +23,7 @@ import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { db } from '../../db/client';
-import { customer, site, siteCollaborator } from '../../db/schema';
+import { customer, site, siteCollaborator, siteFont } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
@@ -305,6 +305,114 @@ const pageStyles = `
     border-color: var(--red);
   }
   .collab-item button:disabled { opacity: 0.55; cursor: wait; }
+
+  /* custom-fonts panel — file picker + display-name input on one row, then a
+     stacked list of uploaded fonts with per-row Delete. Inline DOM hooks
+     (data-font-picker, data-font-file, data-font-name, data-font-upload,
+     data-font-list, data-font-row, data-font-delete) are consumed by the
+     client script + smoke. Styling mirrors the favicon-picker / collaborator
+     surfaces. */
+  .font-picker {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    background: var(--surface-2);
+    margin: 0 0 12px;
+  }
+  .font-picker label {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+  .font-picker input[type="text"] {
+    font-family: var(--sans);
+    font-size: 14.5px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--line-2);
+    border-radius: var(--r-sm);
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .font-picker input[type="text"]:focus {
+    border-color: var(--red);
+    box-shadow: var(--ring);
+  }
+  .font-picker input[type="file"] {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--ink-2);
+    padding: 0;
+  }
+  .font-picker button {
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 13px;
+    padding: 9px 16px;
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    background: var(--ink);
+    color: var(--paper);
+    border: 1.5px solid var(--ink);
+    transition: opacity .15s, border-color .15s;
+  }
+  .font-picker button:hover { opacity: 0.9; }
+  .font-picker button:disabled { opacity: 0.55; cursor: wait; }
+  ul.font-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .font-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .font-row:first-of-type { border-top: none; }
+  .font-row .font-name {
+    flex: 1;
+    color: var(--ink);
+    min-width: 0;
+    word-break: break-word;
+    font-weight: 600;
+  }
+  .font-row .font-size {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    font-family: var(--mono);
+  }
+  .font-row button.font-delete {
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 12.5px;
+    padding: 6px 12px;
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--red-ink);
+    border: 1.5px solid var(--red-line);
+    transition: background .15s, border-color .15s;
+  }
+  .font-row button.font-delete:hover {
+    background: var(--red-soft);
+    border-color: var(--red);
+  }
+  .font-row button.font-delete:disabled { opacity: 0.55; cursor: wait; }
+  .font-empty {
+    color: var(--ink-3);
+    font-size: 13.5px;
+    padding: 14px 0 0;
+    text-align: center;
+  }
 
   /* favicon picker — uses theme tokens for the dashed drop zone */
   .favicon-picker {
@@ -905,6 +1013,180 @@ const rev01SiteSettingsConfig = (() => {
   }
 })();
 
+// Custom-fonts panel — upload + delete + list refresh against
+// /api/sites/<id>/fonts. The server route accepts WOFF2 only and caps
+// uploads at 1 MB; this client preflights both so a too-big or
+// wrong-extension file fails loudly before crossing the network.
+//
+// All failures surface a toast (data-font-status / data-font-err) and
+// re-enable the controls so the Owner can retry — no silent swallows. The
+// delete affordance routes through __opencanvasModal.confirm so a misclick
+// can't nuke a font row.
+(() => {
+  const SITE_ID = rev01SiteSettingsConfig.SITE_ID;
+  const MAX_FONT_BYTES = 1048576;
+  const picker = document.querySelector('[data-font-picker]');
+  if (!picker) return;
+  const fileInput = picker.querySelector('[data-font-file]');
+  const nameInput = picker.querySelector('[data-font-name]');
+  const uploadBtn = picker.querySelector('[data-font-upload]');
+  const listEl = document.querySelector('[data-font-list]');
+  const okMsg = document.querySelector('[data-font-status]');
+  const errMsg = document.querySelector('[data-font-err]');
+  function showOk(msg) { if (okMsg) okMsg.textContent = msg; if (errMsg) errMsg.textContent = ''; }
+  function showErr(msg) { if (errMsg) errMsg.textContent = msg; if (okMsg) okMsg.textContent = ''; }
+  function clearMessages() { if (okMsg) okMsg.textContent = ''; if (errMsg) errMsg.textContent = ''; }
+
+  function formatSize(bytes) {
+    return (Number(bytes) / 1024).toFixed(1) + ' KB';
+  }
+
+  function renderList(fonts) {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    if (!fonts || fonts.length === 0) {
+      const empty = document.createElement('li');
+      empty.className = 'font-empty';
+      empty.setAttribute('data-font-empty', '');
+      empty.textContent = 'No custom fonts uploaded yet. Pick a WOFF2 file above to add one.';
+      listEl.appendChild(empty);
+      return;
+    }
+    for (let i = 0; i < fonts.length; i++) {
+      const f = fonts[i];
+      const li = document.createElement('li');
+      li.className = 'font-row';
+      li.setAttribute('data-font-row', '');
+      li.setAttribute('data-font-id', String(f.id));
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'font-name';
+      nameSpan.textContent = String(f.name);
+      const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'font-size';
+      sizeSpan.textContent = formatSize(f.byteSize);
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'font-delete';
+      delBtn.setAttribute('data-font-delete', String(f.id));
+      delBtn.textContent = 'Delete';
+      li.appendChild(nameSpan);
+      li.appendChild(sizeSpan);
+      li.appendChild(delBtn);
+      listEl.appendChild(li);
+    }
+  }
+
+  async function refreshList() {
+    try {
+      const r = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/fonts', {
+        headers: { accept: 'application/json' },
+      });
+      if (!r.ok) {
+        showErr('Could not load fonts (' + r.status + ')');
+        return;
+      }
+      const body = await r.json();
+      renderList(Array.isArray(body.fonts) ? body.fonts : []);
+    } catch (e) {
+      showErr('Network error: ' + (e && e.message ? e.message : String(e)));
+    }
+  }
+
+  if (uploadBtn) {
+    uploadBtn.addEventListener('click', async () => {
+      clearMessages();
+      const file = fileInput && fileInput.files && fileInput.files[0];
+      if (!file) {
+        showErr('Pick a WOFF2 file first.');
+        return;
+      }
+      const rawName = nameInput && nameInput.value ? String(nameInput.value).trim() : '';
+      if (!rawName) {
+        showErr('Display name is required.');
+        return;
+      }
+      // Client-side preflights mirroring the server contract. The server
+      // rejects anything that isn't WOFF2 (magic bytes + extension); we
+      // refuse before the round-trip so the Owner sees the constraint
+      // immediately. The 1 MB cap matches validate.ts MAX_FONT_BYTES.
+      if (!/\.woff2$/i.test(file.name)) {
+        showErr('Only .woff2 files are accepted. Other formats can be converted via a free converter.');
+        return;
+      }
+      if (file.size > MAX_FONT_BYTES) {
+        showErr('File too large (' + (file.size / 1024).toFixed(0) + ' KB). Maximum is 1 MB.');
+        return;
+      }
+      uploadBtn.disabled = true;
+      const originalLabel = uploadBtn.textContent;
+      uploadBtn.textContent = 'Uploading…';
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('name', rawName);
+        // Family classification is required by the server; we default to
+        // 'sans-serif' since the picker UI doesn't surface the choice yet
+        // — the field exists as future grouping metadata for the theme panel
+        // and is not consumed by the renderer today.
+        fd.append('family', 'sans-serif');
+        const r = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/fonts', {
+          method: 'POST',
+          body: fd,
+        });
+        if (!r.ok) {
+          let detail = r.statusText;
+          try { const b = await r.json(); if (b && b.error) detail = b.error; } catch (_) {}
+          showErr('Upload failed: ' + detail);
+          return;
+        }
+        showOk('Uploaded "' + rawName + '".');
+        if (fileInput) fileInput.value = '';
+        if (nameInput) nameInput.value = '';
+        await refreshList();
+      } catch (e) {
+        showErr('Network error: ' + (e && e.message ? e.message : String(e)));
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = originalLabel;
+      }
+    });
+  }
+
+  if (listEl) {
+    listEl.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const delBtn = target.closest('button.font-delete');
+      if (!(delBtn instanceof HTMLButtonElement)) return;
+      const fontId = delBtn.getAttribute('data-font-delete');
+      if (!fontId) return;
+      const row = delBtn.closest('.font-row');
+      const fontName = row ? (row.querySelector('.font-name')?.textContent || 'this font') : 'this font';
+      if (!await __opencanvasModal.confirm('Delete "' + fontName + '"? Elements that pin this font will fall back to the style kit default.', { title: 'Delete font', confirmLabel: 'Delete', danger: true })) return;
+      clearMessages();
+      delBtn.disabled = true;
+      try {
+        const r = await fetch('/api/sites/' + encodeURIComponent(SITE_ID) + '/fonts/' + encodeURIComponent(fontId), {
+          method: 'DELETE',
+          headers: { accept: 'application/json' },
+        });
+        if (!r.ok) {
+          let detail = r.statusText;
+          try { const b = await r.json(); if (b && b.error) detail = b.error; } catch (_) {}
+          showErr('Delete failed: ' + detail);
+          delBtn.disabled = false;
+          return;
+        }
+        showOk('Deleted "' + fontName + '".');
+        await refreshList();
+      } catch (e) {
+        showErr('Network error: ' + (e && e.message ? e.message : String(e)));
+        delBtn.disabled = false;
+      }
+    });
+  }
+})();
+
 // Site-config controls (search indexing, visitor theme). Each control
 // input carries data-config-key (the API field).
 //   - Checkbox controls (siteNoIndex): boolean. data-invert=true for the
@@ -1117,6 +1399,18 @@ function FaviconIcon() {
   );
 }
 
+function FontIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7V5h16v2" />
+      <path d="M9 5v14" />
+      <path d="M15 5v14" />
+      <path d="M7 19h4" />
+      <path d="M13 19h4" />
+    </svg>
+  );
+}
+
 function MoonIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
@@ -1293,6 +1587,19 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
     .from(siteCollaborator)
     .where(eq(siteCollaborator.siteId, siteId));
 
+  // Uploaded custom fonts for this site. The Custom fonts panel below
+  // server-renders the row list so the page is correct from first paint;
+  // post-upload / post-delete the inline client script re-fetches via
+  // GET /api/sites/:siteId/fonts and re-renders client-side.
+  const fonts = await database
+    .select({
+      id: siteFont.id,
+      name: siteFont.name,
+      byteSize: siteFont.byteSize,
+    })
+    .from(siteFont)
+    .where(eq(siteFont.siteId, siteId));
+
   return c.html(
     <DashboardShell
       title={`${owned.name} — settings`}
@@ -1315,6 +1622,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         <a href="#password">Password</a>
         <a href="#seo">Search engines</a>
         <a href="#favicon">Favicon</a>
+        <a href="#custom-fonts">Custom fonts</a>
         <a href="#dark-mode">Dark mode</a>
         <a href={`/dashboard/sites/${owned.id}/a11y`}>Accessibility</a>
         <a href="#collaborators">Collaborators</a>
@@ -1542,6 +1850,85 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             <span class="ok" data-favicon-status role="status" aria-live="polite"></span>
             <span class="err" data-favicon-err role="alert" aria-live="polite"></span>
           </p>
+        </div>
+      </div>
+
+      {/* Custom fonts — Wave 5 #12 UI surface for the font upload backend.
+          The Owner picks a WOFF2 file + a display name, uploads it (POST
+          /api/sites/:siteId/fonts as multipart), and the uploaded face shows
+          up in the editor's text-inspector font-family picker. The list of
+          uploaded fonts is server-rendered for first paint; the client script
+          handles upload + delete + list refresh without a full page reload.
+
+          DOM hooks (data-font-picker, data-font-file, data-font-name,
+          data-font-upload, data-font-list, data-font-row, data-font-delete,
+          data-font-status, data-font-err) are consumed by the inline client
+          script + the smoke test. */}
+      <div class="set" id="custom-fonts">
+        <div class="set-h">
+          <span class="ic">
+            <FontIcon />
+          </span>
+          <div class="tt">
+            <h2>Custom fonts</h2>
+            <p>
+              Upload WOFF2 files to use them anywhere on this site. Each font
+              becomes selectable in the text element's font-family picker.
+              Files must be under 1 MB.
+            </p>
+          </div>
+        </div>
+        <div class="set-body">
+          <div class="font-picker" data-font-picker>
+            <label>
+              <span>Font file</span>
+              <input
+                type="file"
+                accept=".woff2"
+                data-font-file
+              />
+            </label>
+            <label>
+              <span>Display name</span>
+              <input
+                type="text"
+                placeholder="My Display Font"
+                maxLength={64}
+                data-font-name
+              />
+            </label>
+            <button type="button" data-font-upload>
+              Upload
+            </button>
+          </div>
+          <p class="hint">
+            <span class="ok" data-font-status role="status" aria-live="polite"></span>
+            <span class="err" data-font-err role="alert" aria-live="polite"></span>
+          </p>
+          <ul class="font-list" data-font-list>
+            {fonts.length === 0 ? (
+              <li class="font-empty" data-font-empty>
+                No custom fonts uploaded yet. Pick a WOFF2 file above to add
+                one.
+              </li>
+            ) : (
+              fonts.map((font) => (
+                <li class="font-row" data-font-row data-font-id={font.id}>
+                  <span class="font-name">{font.name}</span>
+                  <span class="font-size">
+                    {(font.byteSize / 1024).toFixed(1)} KB
+                  </span>
+                  <button
+                    type="button"
+                    class="font-delete"
+                    data-font-delete={font.id}
+                  >
+                    Delete
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
         </div>
       </div>
 
