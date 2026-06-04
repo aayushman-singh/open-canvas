@@ -235,6 +235,97 @@ function runReferenceWalkTests(): void {
     'expected footer background video asset to be reachable',
   );
   assert(siteIds.has('slide-image-id'), 'expected footer carousel slide asset to be reachable');
+
+  // Regression: published-site `/assets/:addr` 404'd assets nested inside
+  // `tabs` and `collection` elements because the walker never recursed past
+  // the section.elements layer. Both nested container shapes must be
+  // reachable, otherwise the public router's reachability gate (in
+  // src/routes/public.ts) refuses to serve assets the renderer just emitted.
+  const nestedContainerPages: CanvasPage[] = [
+    {
+      id: 'page-nested',
+      slug: 'nested',
+      title: 'Nested',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-nested',
+          recipeId: 'custom',
+          name: 'Nested',
+          height: 800,
+          elements: [
+            {
+              id: 'tabs-host',
+              type: 'tabs',
+              box: { x: 0, y: 0, w: 800, h: 400, z: 1 },
+              activeTabId: 'first',
+              tabs: [
+                {
+                  id: 'first',
+                  label: [{ text: 'First' }],
+                  elements: [
+                    {
+                      id: 'tab-media',
+                      type: 'media',
+                      mediaKind: 'image',
+                      assetId: 'tab-asset-id',
+                      alt: 'Inside a tab panel',
+                      fit: 'cover',
+                      box: { x: 0, y: 0, w: 400, h: 200, z: 1 },
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'collection-host',
+              type: 'collection',
+              box: { x: 0, y: 420, w: 800, h: 380, z: 1 },
+              mode: 'manual',
+              entryTemplate: [
+                {
+                  id: 'entry-template-media',
+                  type: 'media',
+                  mediaKind: 'image',
+                  assetId: 'entry-template-asset-id',
+                  alt: 'Template',
+                  fit: 'cover',
+                  box: { x: 0, y: 0, w: 200, h: 200, z: 1 },
+                },
+              ],
+              entries: [
+                [
+                  {
+                    id: 'entry-0-media',
+                    type: 'media',
+                    mediaKind: 'image',
+                    assetId: 'entry-0-asset-id',
+                    alt: 'Entry 0',
+                    fit: 'cover',
+                    box: { x: 0, y: 0, w: 200, h: 200, z: 1 },
+                  },
+                ],
+              ],
+              layout: { columns: 3, gap: 16 },
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const nestedIds = collectReferencedAssetIds(nestedContainerPages);
+  assert(
+    nestedIds.has('tab-asset-id'),
+    'expected media nested inside a tabs panel to be reachable on the published `/assets/` route',
+  );
+  assert(
+    nestedIds.has('entry-template-asset-id'),
+    'expected media in a collection entryTemplate to be reachable',
+  );
+  assert(
+    nestedIds.has('entry-0-asset-id'),
+    'expected media nested inside a materialised collection entry to be reachable on the published `/assets/` route',
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -153,6 +153,56 @@ function collectElementReferences(
         element.id,
       );
     });
+    return;
+  }
+  // Container elements that nest CanvasElement[] — `tabs` and `collection`.
+  // Without this recursion, the published `/assets/:addr` reachability check
+  // (collectReferencedAssetIds in src/routes/public.ts) 404s every asset
+  // that lives inside a tab panel or a collection entry, because the
+  // walker never sees the inner MediaElement. The save/publish validators
+  // (canvas.ts, publish.ts, canvas-agent.ts) share the same walker, so the
+  // gap also let unreachable references slip past `findAssetReferenceErrors`.
+  // Mirrors `walkElements` in collection-materializer.ts: descend into
+  // every CanvasElement[] surface that the renderer paints.
+  if (element.type === 'tabs') {
+    element.tabs.forEach((tab, tabIdx) => {
+      for (const [innerIdx, child] of tab.elements.entries()) {
+        collectElementReferences(
+          child,
+          `${elementPath}.tabs[${String(tabIdx)}].elements[${String(innerIdx)}]`,
+          out,
+        );
+      }
+    });
+    return;
+  }
+  if (element.type === 'collection') {
+    for (const [innerIdx, child] of element.entryTemplate.entries()) {
+      collectElementReferences(
+        child,
+        `${elementPath}.entryTemplate[${String(innerIdx)}]`,
+        out,
+      );
+    }
+    if (element.cardTemplate !== undefined) {
+      for (const [innerIdx, child] of element.cardTemplate.entries()) {
+        collectElementReferences(
+          child,
+          `${elementPath}.cardTemplate[${String(innerIdx)}]`,
+          out,
+        );
+      }
+    }
+    element.entries.forEach((entry, entryIdx) => {
+      for (const [innerIdx, child] of entry.entries()) {
+        collectElementReferences(
+          child,
+          `${elementPath}.entries[${String(entryIdx)}][${String(innerIdx)}]`,
+          out,
+        );
+      }
+    });
+    return;
   }
 }
 
