@@ -17,7 +17,7 @@
 //       - Ctrl/Cmd+S   → flush saveTimer + saveStateNow (synchronous)
 //       - Space (held) → temporary pan mode (releases on keyup/blur)
 //       - V            → switch to select mode + clear temporary pan
-//       - Delete/Backspace → deleteElement / handleSectionAction("delete-section")
+//       - Delete/Backspace → handleDeleteShortcut (delete-shortcut.ts)
 //       - 1            → fitToPage(ctx.activePageId)
 //       - 0            → fitAllPages
 //
@@ -26,8 +26,8 @@
 
 import type { EditorContext } from './editor-context.js';
 import { undo, redo } from './persist.js';
-import { deleteElement } from './inspector-actions.js';
 import { fitToPage, fitAllPages } from './render.js';
+import { handleDeleteShortcut } from './delete-shortcut.js';
 
 /**
  * Private to this module — the canonical impl lives at
@@ -107,20 +107,10 @@ export function registerKeyboardHandlers(ctx: EditorContext): void {
       ctx.setInteractionMode('select');
       return;
     }
-    if (
-      (ev.key === 'Delete' || ev.key === 'Backspace') &&
-      !ctx.editingElementId &&
-      !isEditableShortcutTarget(ev.target)
-    ) {
-      if (ctx.selectedElementId) {
+    if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      const outcome = handleDeleteShortcut(ctx, ev);
+      if (outcome !== 'none') {
         ev.preventDefault();
-        const found = ctx.findElement(ctx.selectedElementId);
-        if (found) deleteElement(ctx, found.section, found.element);
-        return;
-      }
-      if (ctx.selectedSectionId) {
-        ev.preventDefault();
-        ctx.handleSectionAction('delete-section', ctx.selectedSectionId);
         return;
       }
     }
