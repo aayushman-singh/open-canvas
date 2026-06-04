@@ -1580,6 +1580,38 @@ export interface EditorContext {
    *  deselect, and the document-level click-outside deselect. Run once
    *  at boot. Implementation: attachRootEventsImpl in canvas-root-events.ts. */
   attachRootEvents(): void;
+
+  // -- Wave 5 #12: custom font catalog ----------------------------------
+  /** Uploaded custom fonts for the active site, fetched once at boot via
+   *  `GET /api/sites/:id/fonts`. Consumed by the text inspector's font-
+   *  family picker (inspector-font-family.ts) for option building, and by
+   *  the editor-side @font-face emitter (installEditorCustomFontFaces) so
+   *  the picker's chosen face actually renders on the editor canvas.
+   *  Empty array at boot; populated after the fetch resolves. Refreshed
+   *  on demand via refreshCustomFonts() so an upload completed in the
+   *  Settings tab surfaces without reloading the editor. */
+  customFonts: EditorCustomFont[];
+  /** Re-fetch the custom-font catalog and refresh the editor's @font-face
+   *  <style> block. The boot path calls this once; future call sites
+   *  (e.g. a font-uploaded broadcast from the Settings tab) re-invoke it
+   *  to pick up new fonts without a full page reload. */
+  refreshCustomFonts(): Promise<void>;
+}
+
+/**
+ * Minimal `siteFont` shape the editor needs from the GET /api/sites/:id/fonts
+ * response. Mirrors the row projection in src/fonts/route.ts's LIST handler
+ * — only the fields the font-family picker + @font-face emitter consume are
+ * declared so we don't drag the full Drizzle row type into the editor bundle.
+ */
+export interface EditorCustomFont {
+  id: string;
+  name: string;
+  family: string;
+  weight: number;
+  style: 'normal' | 'italic';
+  contentHash: string;
+  byteSize: number;
 }
 
 /**

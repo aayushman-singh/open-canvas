@@ -212,6 +212,12 @@ export const textInspectorSpec: InspectorSpec = {
       min: TEXT_FONT_SIZE_MIN,
       max: TEXT_FONT_SIZE_MAX,
     },
+    // Wave 5 #12 — Font family picker. Custom-mount because the option
+    // list is dynamic (built from ctx.customFonts + kit role tokens) and
+    // can't be expressed with the static select / select-mapped specs.
+    // Sits above Font weight so the typography surface reads top-down:
+    // family → weight → size → align.
+    { kind: 'custom-mount', name: 'text-font-family' },
     {
       kind: 'select-mapped',
       label: 'Font weight',

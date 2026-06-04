@@ -616,6 +616,15 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     // ---- Phase 2q.k: canvas root events ------------------------------
     attachRootEvents: () => attachRootEventsImpl(ctx),
 
+    // ---- Wave 5 #12: custom font catalog ------------------------------
+    // Empty at boot; populated by ctx.refreshCustomFonts() after the
+    // initial site fetch resolves. The font-family picker reads
+    // ctx.customFonts on each inspector render so an empty catalog at
+    // boot just shows the kit-token options; the picker re-renders when
+    // the fetch lands and the inspector re-mounts.
+    customFonts: [],
+    refreshCustomFonts: runtimeHelperNotInstalled('refreshCustomFonts'),
+
     // ---- Camera-reflow opt-in callbacks (kept undefined at boot) -----
     // repaintRemoteCursors + onMarkToolbarReflow are typeof-gated by the
     // camera helpers so they stay undefined until co-edit attaches /
@@ -790,6 +799,14 @@ export function createEditor(boot: EditorBoot): void {
       ctx.localPresence = loadPresenceIdentity(ctx.presenceDisplayName);
       ctx.attachCoEdit();
       wireCoEditPresenceListeners(ctx);
+
+      // Wave 5 #12 — pull the site's custom font catalog so the text
+      // inspector's font-family picker can offer uploaded faces and the
+      // editor canvas's @font-face <style> block renders them. The fetch
+      // runs in the background; the picker degrades gracefully (kit-token
+      // options only) until the catalog lands.
+      void ctx.refreshCustomFonts();
+
       ctx.setStatus('Ready', 'ok');
 
       // Session keepalive — Owner sessions get an hourly HEAD; published-

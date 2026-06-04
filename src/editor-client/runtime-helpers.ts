@@ -14,7 +14,7 @@ import type { SidebarCommandSpec } from '../canvas/elements/sidebar-spec.js';
 import type { Tab } from '../canvas/elements/tabs.js';
 import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from '../canvas/schema.js';
 import type { FindElementResult } from './editor-context-types.js';
-import type { EditorContext } from './editor-context.js';
+import type { EditorContext, EditorCustomFont } from './editor-context.js';
 import {
   CROPPER_CDN,
   CROPPER_SRI_SHA384,
@@ -35,6 +35,7 @@ import {
   mountCarouselSlides,
   mountTableGrid,
 } from './inspector-content-mounts.js';
+import { mountTextFontFamily } from './inspector-font-family.js';
 import { mountFormFields, mountFormStyle } from './inspector-form-mounts.js';
 import { mountMediaAi, mountVideoPlayback } from './inspector-media-mounts.js';
 import {
@@ -136,6 +137,118 @@ export function installRuntimeHelpers(ctx: EditorContext): void {
   ctx.generateImageForElement = (element, prompt) =>
     generateImageForElementImpl(ctx, element, prompt);
   ctx.isEditableShortcutTarget = (target) => isEditableShortcutTargetImpl(target);
+  ctx.refreshCustomFonts = () => refreshCustomFontsImpl(ctx);
+}
+
+/** Public read path mirror for `emitSingleFontFace` in face-emit.ts —
+ *  kept local to the editor bundle because face-emit.ts is a server-side
+ *  module (depends on the resolve.ts FontTokenTriple contract) and the
+ *  editor doesn't bundle the server graph. The shape is intentionally
+ *  identical to emitSingleFontFace so the editor canvas and the published
+ *  visitor page resolve the same `font-family: "<name>"` reference. */
+function emitEditorFontFaceCss(fonts: ReadonlyArray<EditorCustomFont>): string {
+  if (fonts.length === 0) return '';
+  const blocks: string[] = [];
+  for (let i = 0; i < fonts.length; i++) {
+    const f = fonts[i]!;
+    // Defense-in-depth: the server-side validator already restricts
+    // contentHash to 64-hex on insert, but the editor refuses to write a
+    // src URL it can't prove is safe. Quoting the name via JSON.stringify
+    // matches the face-emit.ts contract so multi-word names round-trip
+    // safely.
+    if (!/^[0-9a-fA-F]{64}$/.test(f.contentHash)) continue;
+    const familyQuoted = JSON.stringify(f.name);
+    blocks.push(
+      [
+        '@font-face {',
+        `  font-family: ${familyQuoted};`,
+        `  src: url('/fonts/${f.contentHash}') format('woff2');`,
+        '  font-display: swap;',
+        `  font-weight: ${String(f.weight)};`,
+        `  font-style: ${f.style};`,
+        '}',
+      ].join('\n'),
+    );
+  }
+  return blocks.join('\n');
+}
+
+/** Mount (or refresh) the editor-canvas `<style id="opencanvas-editor-custom-
+ *  fonts">` block from the supplied font catalog. Idempotent — re-invocation
+ *  replaces the tag's textContent so a delete + re-upload doesn't leave
+ *  orphan @font-face declarations behind. The `document.head` guard is the
+ *  hand-rolled DOM stub in create-editor-runtime.smoke.ts — that stub
+ *  doesn't expose `head` because no other boot path touches it, and we
+ *  silently skip mounting rather than crash the boot smoke. */
+function installEditorCustomFontFaces(fonts: ReadonlyArray<EditorCustomFont>): void {
+  const head = (document as Document & { head?: HTMLHeadElement }).head;
+  if (!head) return;
+  const css = emitEditorFontFaceCss(fonts);
+  const STYLE_ID = 'opencanvas-editor-custom-fonts';
+  let style = document.getElementById(STYLE_ID);
+  if (!style) {
+    style = document.createElement('style');
+    style.id = STYLE_ID;
+    head.appendChild(style);
+  }
+  style.textContent = css;
+}
+
+/**
+ * Fetch the site's custom-font catalog and refresh both ctx.customFonts and
+ * the editor-canvas @font-face style block. Failures are logged + status-
+ * flashed but don't tear down the editor — the font picker degrades to just
+ * the kit-token options.
+ */
+export async function refreshCustomFontsImpl(ctx: EditorContext): Promise<void> {
+  try {
+    const response = await ctx.authFetch(
+      ctx.apiBase + '/sites/' + encodeURIComponent(ctx.siteId) + '/fonts',
+    );
+    if (!response.ok) {
+      ctx.setStatus('Could not load custom fonts (' + response.status + ')', 'error');
+      return;
+    }
+    const body = (await response.json()) as { fonts?: unknown };
+    const rows: EditorCustomFont[] = [];
+    if (Array.isArray(body.fonts)) {
+      for (let i = 0; i < body.fonts.length; i++) {
+        const row = body.fonts[i] as Record<string, unknown> | null;
+        if (!row || typeof row !== 'object') continue;
+        // Shape-guard each field; missing types skip the row rather than
+        // crashing the editor boot. The server schema guarantees these are
+        // present + typed on insert but the editor refuses to trust it.
+        if (
+          typeof row.id !== 'string' ||
+          typeof row.name !== 'string' ||
+          typeof row.family !== 'string' ||
+          typeof row.weight !== 'number' ||
+          (row.style !== 'normal' && row.style !== 'italic') ||
+          typeof row.contentHash !== 'string' ||
+          typeof row.byteSize !== 'number'
+        ) {
+          continue;
+        }
+        rows.push({
+          id: row.id,
+          name: row.name,
+          family: row.family,
+          weight: row.weight,
+          style: row.style,
+          contentHash: row.contentHash,
+          byteSize: row.byteSize,
+        });
+      }
+    }
+    ctx.customFonts = rows;
+    installEditorCustomFontFaces(rows);
+    // Re-render the inspector so a fonts refresh while a text element is
+    // selected reflects the new options without forcing the Owner to
+    // reselect.
+    ctx.renderInspector();
+  } catch (err: unknown) {
+    ctx.setStatus('Custom font fetch failed: ' + errorToString(err), 'error');
+  }
 }
 
 export function currentPageImpl(ctx: EditorContext): CanvasPage | null {
@@ -580,6 +693,8 @@ function inspectorMountHandler(
     'chart-data': (element, host) => mountChartData(ctx, element as ChartElement, host),
     'form-fields': (element, host) => mountFormFields(ctx, element as FormElement, host),
     'form-style': (element, host) => mountFormStyle(ctx, element as FormElement, host),
+    'text-font-family': (element, host) =>
+      mountTextFontFamily(ctx, element as Parameters<typeof mountTextFontFamily>[1], host),
   };
   return mounts[name] || null;
 }
