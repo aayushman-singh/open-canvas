@@ -1,51 +1,37 @@
 // src/editor-client/section-roles.ts
 //
-// ADR 0015 Phase 2d — Section Role helpers. Every Section in the POC
-// carries one of three roles (`body` by default, `header`, `footer`);
-// these predicates and label helpers consult the role and the page
-// section layout to surface user-facing labels and insertion bounds.
-//
-// canvas-client.ts:3812-3834 + :8093-8099 carry inline copies. All
-// pure: no DOM, no IIFE-local state, no side effects.
+// ADR 0059 — page-level pinning is removed. `CanvasSection.role` no longer
+// admits `'header' | 'footer'`; site-level header/footer live exclusively
+// at `EditableSite.header` and `EditableSite.footer`. The helpers below are
+// retained as thin no-ops so the schema/validator cutover commit stays
+// focused; Phase 5 (next commit) deletes them and rewrites the callers
+// (reel.ts, section-toolbar.ts, section-drag.ts, section-inspector.ts,
+// runtime-helpers.ts, index.ts) to drop the pinned-section branches.
 
 import type { CanvasPage, CanvasSection } from '../canvas/schema.js';
 
-export function isPinnedSection(section: CanvasSection | undefined): boolean {
-  return !!section && (section.role === 'header' || section.role === 'footer');
+export function isPinnedSection(_section: CanvasSection | undefined): boolean {
+  return false;
 }
 
-export function hasHeaderSection(page: CanvasPage): boolean {
-  return page.sections.length > 0 && page.sections[0]?.role === 'header';
+export function hasHeaderSection(_page: CanvasPage): boolean {
+  return false;
 }
 
-export function hasFooterSection(page: CanvasPage): boolean {
-  return (
-    page.sections.length > 0 &&
-    page.sections[page.sections.length - 1]?.role === 'footer'
-  );
+export function hasFooterSection(_page: CanvasPage): boolean {
+  return false;
 }
 
-export function pinnedSectionLabel(section: CanvasSection): string {
-  if (section.role === 'header') return 'Header';
-  if (section.role === 'footer') return 'Footer';
+export function pinnedSectionLabel(_section: CanvasSection): string {
   return '';
 }
 
 export function sectionDisplayName(section: CanvasSection, fallback: string): string {
-  const label = pinnedSectionLabel(section);
-  const name = section.name || fallback;
-  return label ? label + ' — ' + name : name;
+  return section.name || fallback;
 }
 
-/** Clamp an insertion index against header (always first) and footer
- *  (always last) pin positions; new body sections cannot land before
- *  the header or after the footer. */
 export function clampInsertIndex(page: CanvasPage, insertAt: number): number {
-  const lo = hasHeaderSection(page) ? 1 : 0;
-  const hi = hasFooterSection(page)
-    ? page.sections.length - 1
-    : page.sections.length;
-  if (insertAt < lo) return lo;
-  if (insertAt > hi) return hi;
+  if (insertAt < 0) return 0;
+  if (insertAt > page.sections.length) return page.sections.length;
   return insertAt;
 }

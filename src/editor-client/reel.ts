@@ -214,12 +214,12 @@ function buildReelRoleSlot(ctx: EditorContext, role: 'header' | 'footer'): HTMLB
   slot.textContent = '+ Add ' + label;
   slot.addEventListener('click', () => {
     if (!ctx.state) return;
+    // ADR 0059 — site-level slot position conveys role; no `role` field needed.
     const section: CanvasSection = {
       id: newSectionId(),
       recipeId: 'custom',
       name: label,
       height: role === 'header' ? 80 : 120,
-      role,
       elements: [],
     };
     if (role === 'header') {

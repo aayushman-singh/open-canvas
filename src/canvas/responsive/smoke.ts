@@ -217,7 +217,6 @@ const headerOnlyOverride: PublishedSnapshot = {
     recipeId: 'hero-split',
     name: 'Header',
     height: 80,
-    role: 'header',
     elements: [
       {
         id: 'header-logo',
@@ -267,7 +266,6 @@ const footerOnlyOverride: PublishedSnapshot = {
     recipeId: 'hero-split',
     name: 'Footer',
     height: 80,
-    role: 'footer',
     elements: [
       {
         id: 'footer-credit',

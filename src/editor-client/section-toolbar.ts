@@ -384,20 +384,16 @@ export function handleSectionActionImpl(
     ctx.scheduleSave();
   } else if (action === 'move-up') {
     if (idx === 0) return;
-    if (isPinnedSection(section)) return;
     const prev = page.sections[idx - 1];
     if (!prev) return;
-    if (prev.role === 'header') return;
     page.sections[idx - 1] = section;
     page.sections[idx] = prev;
     ctx.renderAll();
     ctx.scheduleSave();
   } else if (action === 'move-down') {
     if (idx >= page.sections.length - 1) return;
-    if (isPinnedSection(section)) return;
     const next = page.sections[idx + 1];
     if (!next) return;
-    if (next.role === 'footer') return;
     page.sections[idx + 1] = section;
     page.sections[idx] = next;
     ctx.renderAll();

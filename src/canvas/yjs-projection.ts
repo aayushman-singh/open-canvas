@@ -652,6 +652,10 @@ function encodeNavElement(el: NavElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
   setIfDefined(out, 'logoAssetId', el.logoAssetId);
+  setIfDefined(out, 'siteTitle', el.siteTitle);
+  if (el.primaryAction !== undefined) {
+    out.set('primaryAction', encodeNavLink(el.primaryAction));
+  }
   const links = new Y.Array<Y.Map<unknown>>();
   for (const link of el.links) links.push([encodeNavLink(link)]);
   out.set('links', links);
@@ -1243,6 +1247,10 @@ function decodeNavElement(map: Y.Map<unknown>, base: BaseElement): NavElement {
     sticky: map.get('sticky') as boolean,
   };
   if (map.has('logoAssetId')) el.logoAssetId = map.get('logoAssetId') as string;
+  if (map.has('siteTitle')) el.siteTitle = map.get('siteTitle') as string;
+  if (map.has('primaryAction')) {
+    el.primaryAction = decodeNavLink(map.get('primaryAction') as Y.Map<unknown>);
+  }
   return el;
 }
 

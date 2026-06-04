@@ -353,7 +353,6 @@ const syntheticState: EditableSite = {
     id: 'site-header',
     recipeId: 'custom',
     name: 'Site Header',
-    role: 'header',
     anchorId: 'site-header',
     height: 96,
     elements: [
@@ -371,7 +370,6 @@ const syntheticState: EditableSite = {
     id: 'site-footer',
     recipeId: 'custom',
     name: 'Site Footer',
-    role: 'footer',
     anchorId: 'site-footer',
     height: 96,
     elements: [

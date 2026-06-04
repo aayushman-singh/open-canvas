@@ -553,7 +553,6 @@ const headerMediaSnapshot: PublishedSnapshot = {
     id: 'header-media',
     recipeId: 'custom',
     name: 'Header Media',
-    role: 'header',
     height: 72,
     elements: [
       {
@@ -645,7 +644,6 @@ const headerFormHtml = renderCanvasSnapshot(
       id: 'header-form',
       recipeId: 'custom',
       name: 'Header Form',
-      role: 'header',
       height: 120,
       elements: [
         {
@@ -669,22 +667,23 @@ assert(
   'expected site-wide header forms to render with each page slug, not a shared blank slug',
 );
 
-function roleTestSection(
-  id: string,
-  role?: CanvasSection['role'],
-  height: number = 240,
-): CanvasSection {
+// ADR 0059 — pinned sections live exclusively at `state.header` / `state.footer`;
+// page sections can no longer carry `role:'header'|'footer'`. The lower height
+// minimum (48px) is reserved for the site-level slots.
+function roleTestSection(id: string, height: number = 240): CanvasSection {
   return {
     id,
     recipeId: 'custom',
     name: id,
     height,
-    ...(role ? { role } : {}),
     elements: [],
   };
 }
 
-function roleTestState(sections: CanvasSection[]): EditableSite {
+function roleTestState(
+  sections: CanvasSection[],
+  pins?: { header?: CanvasSection; footer?: CanvasSection },
+): EditableSite {
   return {
     styleKit: 'charcoal',
     pages: [
@@ -696,72 +695,59 @@ function roleTestState(sections: CanvasSection[]): EditableSite {
         sections,
       },
     ],
+    ...(pins?.header ? { header: pins.header } : {}),
+    ...(pins?.footer ? { footer: pins.footer } : {}),
   };
 }
 
-const shortFrameRoleState = roleTestState([
-  roleTestSection('section-header-short', 'header', 72),
-  roleTestSection('section-body-ok'),
-  roleTestSection('section-footer-short', 'footer', 120),
-]);
-const shortFrameRoleResult = validateEditableSite(shortFrameRoleState);
+// Short site-level header/footer (below the page-section minimum of 240) must
+// validate because the pinned-site-section path uses the lower 48px floor.
+const shortPinnedSiteState = roleTestState([roleTestSection('section-body-ok')], {
+  header: roleTestSection('site-header-short', 72),
+  footer: roleTestSection('site-footer-short', 120),
+});
+const shortPinnedSiteResult = validateEditableSite(shortPinnedSiteState);
 assert(
-  shortFrameRoleResult.valid,
-  shortFrameRoleResult.valid
+  shortPinnedSiteResult.valid,
+  shortPinnedSiteResult.valid
     ? ''
-    : 'expected short header/footer sections to validate: ' +
-        shortFrameRoleResult.errors.join('; '),
+    : 'expected short site-level header/footer to validate: ' +
+        shortPinnedSiteResult.errors.join('; '),
 );
 
-const duplicateHeaderResult = validateEditableSite(
-  roleTestState([
-    roleTestSection('section-header-a', 'header', 72),
-    roleTestSection('section-header-b', 'header', 72),
-    roleTestSection('section-body-after-duplicate'),
-  ]),
+// A short PAGE section (below 240px) must be rejected because page sections
+// no longer get the pinned lower-floor treatment.
+const shortPageSectionResult = validateEditableSite(
+  roleTestState([roleTestSection('section-too-short', 72)]),
 );
-assert(!duplicateHeaderResult.valid, 'expected validator to reject duplicate header sections');
 assert(
-  !duplicateHeaderResult.valid &&
-    duplicateHeaderResult.errors.some((m) => m.includes('at most one Header Section')),
-  'expected duplicate-header rejection to mention at most one Header Section',
+  !shortPageSectionResult.valid,
+  'expected page section shorter than the body minimum to be rejected',
 );
 
-const misplacedHeaderResult = validateEditableSite(
-  roleTestState([
-    roleTestSection('section-body-before-header'),
-    roleTestSection('section-header-misplaced', 'header', 72),
-  ]),
-);
-assert(!misplacedHeaderResult.valid, 'expected validator to reject a header after index 0');
+// A page section that carries the dead `role:'header'` value must be rejected
+// because the union narrowed to `['body']`.
+const deadPinnedRoleState = roleTestState([roleTestSection('section-dead-role')]);
+(deadPinnedRoleState.pages[0]!.sections[0]! as unknown as { role: string }).role = 'header';
+const deadPinnedRoleResult = validateEditableSite(deadPinnedRoleState);
 assert(
-  !misplacedHeaderResult.valid &&
-    misplacedHeaderResult.errors.some((m) => m.includes('header role must be at sections[0]')),
-  'expected misplaced-header rejection to mention sections[0]',
+  !deadPinnedRoleResult.valid,
+  'expected page section with the legacy header role to be rejected after ADR 0059',
 );
-
-const misplacedFooterResult = validateEditableSite(
-  roleTestState([
-    roleTestSection('section-footer-misplaced', 'footer', 120),
-    roleTestSection('section-body-after-footer'),
-  ]),
-);
-assert(!misplacedFooterResult.valid, 'expected validator to reject a footer before the last slot');
 assert(
-  !misplacedFooterResult.valid &&
-    misplacedFooterResult.errors.some((m) => m.includes('footer role must be at sections[last]')),
-  'expected misplaced-footer rejection to mention sections[last]',
+  !deadPinnedRoleResult.valid &&
+    deadPinnedRoleResult.errors.some((m) => m.includes('role must be one of [body]')),
+  'expected legacy-role rejection to mention the narrowed allowed roles',
 );
 
+// And any unknown role string is still rejected.
 const badSectionRoleState = roleTestState([roleTestSection('section-bad-role')]);
 (badSectionRoleState.pages[0]!.sections[0]! as unknown as { role: string }).role = 'sidebar';
 const badSectionRoleResult = validateEditableSite(badSectionRoleState);
 assert(!badSectionRoleResult.valid, 'expected validator to reject an unknown section role');
 assert(
   !badSectionRoleResult.valid &&
-    badSectionRoleResult.errors.some((m) =>
-      m.includes('role must be one of [header, footer, body]'),
-    ),
+    badSectionRoleResult.errors.some((m) => m.includes('role must be one of [body]')),
   'expected bad-section-role rejection to mention the allowed roles',
 );
 

@@ -61,6 +61,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0056 | Summarisation and read-only inspection iterations run on Flash; planning iterations run on Pro | Accepted | [`docs/adr/0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md`](0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md) |
 | 0057 | Every canvas element dispatch shares one shape: mapped-type record, typed dispatcher, runtime guard | Accepted | [`docs/adr/0057-canvas-element-dispatch-shape.md`](0057-canvas-element-dispatch-shape.md) |
 | 0058 | EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally | Proposed | [`docs/adr/0058-editor-context-as-iife-closure-mirror.md`](0058-editor-context-as-iife-closure-mirror.md) |
+| 0059 | Site header/footer is the only canonical pinned section; pages opt-in or opt-out | Proposed | [`docs/adr/0059-site-header-footer-is-only-canonical-pin.md`](0059-site-header-footer-is-only-canonical-pin.md) |
 | 0060 | CMS-style entries live in a dedicated table; the canvas holds template pages, not individual entries | Accepted | [`docs/adr/0060-cms-entries-table-and-template-pages.md`](0060-cms-entries-table-and-template-pages.md) |
 
 Add new ADRs here. Keep the index sorted by number.

@@ -82,13 +82,11 @@ export function validateBodySectionInsertAt(
   page: Pick<CanvasPage, 'sections'>,
   insertAt: number,
 ): InsertAtValidation {
-  const min = page.sections[0]?.role === 'header' ? 1 : 0;
-  const last = page.sections[page.sections.length - 1];
-  const max = last?.role === 'footer' ? page.sections.length - 1 : page.sections.length;
-  if (insertAt < min || insertAt > max) {
+  // ADR 0059 — page sections are never pinned; any index in [0, length] is valid.
+  if (insertAt < 0 || insertAt > page.sections.length) {
     return {
       ok: false,
-      error: `insertAt must be between ${String(min)} and ${String(max)} for body sections (got ${String(insertAt)})`,
+      error: `insertAt must be between 0 and ${String(page.sections.length)} for body sections (got ${String(insertAt)})`,
     };
   }
   return { ok: true };

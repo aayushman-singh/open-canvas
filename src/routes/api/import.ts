@@ -447,23 +447,33 @@ export function buildEditableSite(
   assetIdMap: Map<string, string>,
   fontFamilyTokenMap: Map<string, string> = new Map(),
 ): EditableSite {
-  const sections: CanvasSection[] = data.sections.map((s, i) => {
+  // ADR 0059 — scraped header/footer-shaped sections become the site-level
+  // pinned slots; everything else lands in `page.sections`.
+  let siteHeader: CanvasSection | undefined;
+  let siteFooter: CanvasSection | undefined;
+  const bodySections: CanvasSection[] = [];
+
+  data.sections.forEach((s, i) => {
     const name = s.name || `section-${i}`;
     const nameLower = name.toLowerCase();
-    const role: CanvasSection['role'] =
-      i === 0 && nameLower.includes('header')
-        ? 'header'
-        : i === data.sections.length - 1 && nameLower.includes('footer')
-          ? 'footer'
-          : undefined;
-    return {
+    const section: CanvasSection = {
       id: crypto.randomUUID(),
       recipeId: 'custom' as const,
       name,
       height: Math.max(Math.round(s.height), 100),
-      ...(role ? { role } : {}),
       elements: s.elements.map((el) => convertElement(el, assetIdMap)),
     };
+    if (i === 0 && nameLower.includes('header') && siteHeader === undefined) {
+      siteHeader = section;
+    } else if (
+      i === data.sections.length - 1 &&
+      nameLower.includes('footer') &&
+      siteFooter === undefined
+    ) {
+      siteFooter = section;
+    } else {
+      bodySections.push(section);
+    }
   });
 
   const page: CanvasPage = {
@@ -471,13 +481,15 @@ export function buildEditableSite(
     slug: 'index',
     title: 'Home',
     width: 1440,
-    sections,
+    sections: bodySections,
   };
 
   return {
     styleKit: 'custom',
     customStyleKit: buildCustomStyleKit(data, fontFamilyTokenMap),
     pages: [page],
+    ...(siteHeader ? { header: siteHeader } : {}),
+    ...(siteFooter ? { footer: siteFooter } : {}),
   };
 }
 

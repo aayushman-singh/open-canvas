@@ -403,7 +403,12 @@ const _UNION_COVERS_MARK_TYPES: Exclude<InlineMark['type'], InlineMarkType> exte
   ? true
   : never = true;
 
-export const SECTION_ROLES = ['header', 'footer', 'body'] as const;
+// ADR 0059 — `'header'` and `'footer'` removed from the union. Pinned
+// header/footer live exclusively at `EditableSite.header` and
+// `EditableSite.footer`; the only valid role for a page section is
+// `'body'` (typically omitted). Whether to delete the field entirely is
+// tracked as an ADR 0059 follow-up.
+export const SECTION_ROLES = ['body'] as const;
 export type SectionRole = (typeof SECTION_ROLES)[number];
 
 export interface CanvasSection {
@@ -481,6 +486,11 @@ export interface CanvasPage {
   pageKind?: CollectionPageKind;
   /** Which collection (e.g. 'blog') this template/index binds to. Required iff pageKind is set. */
   collectionSlug?: string;
+  // -- Site-pin opt-out (ADR 0059) --------------------------------------------
+  /** When true, the site-level `EditableSite.header` is not rendered on this page. Absent = show. */
+  suppressHeader?: boolean;
+  /** When true, the site-level `EditableSite.footer` is not rendered on this page. Absent = show. */
+  suppressFooter?: boolean;
 }
 
 export interface EditableSite {

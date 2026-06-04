@@ -98,7 +98,6 @@ if (firstImport.ok) {
     recipeId: 'custom',
     name: 'Reusable Header',
     height: 80,
-    role: 'header',
     elements: [],
   };
   const seedImport = importSectionIntoSite({

@@ -1356,6 +1356,7 @@ function validateSection(
   errors: string[],
   localIds: Set<string>,
   validPageIds: Set<string> | null,
+  isPinnedSiteSection: boolean = false,
 ): void {
   if (!isRecord(section)) {
     errors.push(`${basePath} must be an object`);
@@ -1378,10 +1379,10 @@ function validateSection(
   if (section.role !== undefined) {
     assertOneOf<SectionRole>(section.role, SECTION_ROLES, `${basePath}.role`, errors);
   }
-  const minHeight =
-    section.role === 'header' || section.role === 'footer'
-      ? PINNED_SECTION_HEIGHT_MIN
-      : SECTION_HEIGHT_MIN;
+  // ADR 0059 — `isPinnedSiteSection` is signalled by the caller (true when
+  // validating `state.header` / `state.footer`), no longer derived from a
+  // `role` field on the section itself.
+  const minHeight = isPinnedSiteSection ? PINNED_SECTION_HEIGHT_MIN : SECTION_HEIGHT_MIN;
   const heightValid =
     isFiniteNumber(section.height) &&
     section.height >= minHeight &&
@@ -1467,38 +1468,6 @@ function validateBackgroundVideo(value: unknown, basePath: string, errors: strin
   }
   if (!isAssetIdLike(value)) {
     errors.push(`${basePath} must be an asset id, not a path or URL`);
-  }
-}
-
-function validateSectionRolePlacement(
-  sections: unknown[],
-  basePath: string,
-  errors: string[],
-): void {
-  let headerCount = 0;
-  let footerCount = 0;
-  for (let idx = 0; idx < sections.length; idx += 1) {
-    const section = sections[idx];
-    if (!isRecord(section)) continue;
-    const sectionPath = pathJoin(pathJoin(basePath, 'sections'), idx);
-    if (section.role === 'header') {
-      headerCount += 1;
-      if (idx !== 0) {
-        errors.push(`${sectionPath}.role header role must be at sections[0]`);
-      }
-    }
-    if (section.role === 'footer') {
-      footerCount += 1;
-      if (idx !== sections.length - 1) {
-        errors.push(`${sectionPath}.role footer role must be at sections[last]`);
-      }
-    }
-  }
-  if (headerCount > 1) {
-    errors.push(`${basePath}.sections must contain at most one Header Section`);
-  }
-  if (footerCount > 1) {
-    errors.push(`${basePath}.sections must contain at most one Footer Section`);
   }
 }
 
@@ -1594,7 +1563,9 @@ function validatePage(
     errors.push(`${basePath}.sections must be a non-empty array`);
     return;
   }
-  validateSectionRolePlacement(page.sections, basePath, errors);
+  // ADR 0059 — page-level suppression of the site-level header/footer.
+  assertOptionalBoolean(page.suppressHeader, `${basePath}.suppressHeader`, errors);
+  assertOptionalBoolean(page.suppressFooter, `${basePath}.suppressFooter`, errors);
   const ids = new Set<string>();
   if (isNonEmptyString(page.id)) ids.add(page.id);
   const effectiveWidth = widthValid ? (page.width as number) : PAGE_WIDTH_MAX;
@@ -1865,19 +1836,15 @@ function validateSiteShape(state: unknown, errors: string[]): void {
     validatePage(page, `pages[${String(idx)}]`, errors, validPageIds);
   });
   // Site-wide header and footer are optional top-level sections. When present,
-  // validate them with the same section validator used for page sections.
-  // Use PAGE_WIDTH_MAX as the width bound since header/footer span the full
-  // viewport and are not tied to a single page's width. validateSectionRolePlacement
-  // is intentionally skipped here — it checks position-in-array for inline
-  // header/footer sections, but state.header / state.footer are standalone
-  // fields, not array entries, so there is no positional invariant to assert.
+  // validate them with the same section validator used for page sections; the
+  // `isPinnedSiteSection: true` flag selects the lower height minimum (ADR 0059).
   if (isRecord(state.header)) {
     const headerIds = new Set<string>();
-    validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds);
+    validateSection(state.header, PAGE_WIDTH_MAX, 'state.header', errors, headerIds, validPageIds, true);
   }
   if (isRecord(state.footer)) {
     const footerIds = new Set<string>();
-    validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds);
+    validateSection(state.footer, PAGE_WIDTH_MAX, 'state.footer', errors, footerIds, validPageIds, true);
   }
   // ADR 0050 dec 2 — per-page anchor uniqueness across (header + sections + footer).
   if (Array.isArray(state.pages)) {

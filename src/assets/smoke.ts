@@ -196,7 +196,6 @@ function runReferenceWalkTests(): void {
       id: 'site-header',
       recipeId: 'custom',
       name: 'Header',
-      role: 'header',
       height: 80,
       elements: [
         {
@@ -214,7 +213,6 @@ function runReferenceWalkTests(): void {
       id: 'site-footer',
       recipeId: 'custom',
       name: 'Footer',
-      role: 'footer',
       height: 120,
       backgroundVideoAssetId: 'footer-bg-video-id',
       elements: [

@@ -189,7 +189,6 @@
     "recipeId": "custom",
     "name": "Navigation",
     "height": 64,
-    "role": "header",
     "elements": [
       {
         "id": "pf-header-nav",
@@ -254,7 +253,6 @@
     "recipeId": "custom",
     "name": "Footer",
     "height": 420,
-    "role": "footer",
     "elements": [
       {
         "id": "pf-footer-bg",

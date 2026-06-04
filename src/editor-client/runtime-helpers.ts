@@ -298,45 +298,13 @@ export function revokePendingPreviewsImpl(ctx: EditorContext): void {
   }
 }
 
-function findCurrentPageSectionInfo(
-  ctx: EditorContext,
-  sectionId: string,
-): { page: CanvasPage; index: number } | null {
-  const page = ctx.currentPage();
-  if (!page) return null;
-  for (let i = 0; i < page.sections.length; i++) {
-    if (page.sections[i]!.id === sectionId) return { page, index: i };
-  }
-  return null;
-}
-
 export function selectableSectionRolesImpl(
-  ctx: EditorContext,
-  section: CanvasSection,
+  _ctx: EditorContext,
+  _section: CanvasSection,
 ): string[] {
-  const roles = ['body'];
-  const sectionInfo = findCurrentPageSectionInfo(ctx, section.id);
-  if (!sectionInfo) {
-    if (section.role === 'header') return ['header'];
-    if (section.role === 'footer') return ['footer'];
-    return roles;
-  }
-  const hasOtherHeader = sectionInfo.page.sections.some(
-    (candidate) => candidate.id !== section.id && candidate.role === 'header',
-  );
-  if (section.role === 'header' || (sectionInfo.index === 0 && !hasOtherHeader)) {
-    roles.push('header');
-  }
-  const hasOtherFooter = sectionInfo.page.sections.some(
-    (candidate) => candidate.id !== section.id && candidate.role === 'footer',
-  );
-  if (
-    section.role === 'footer' ||
-    (sectionInfo.index === sectionInfo.page.sections.length - 1 && !hasOtherFooter)
-  ) {
-    roles.push('footer');
-  }
-  return roles;
+  // ADR 0059 — page sections can only carry the implicit `'body'` role;
+  // header/footer pinning is gone. The role-selector UI follows in Phase 5.
+  return ['body'];
 }
 
 export function pageRenderWidthImpl(page: CanvasPage | null): number {
