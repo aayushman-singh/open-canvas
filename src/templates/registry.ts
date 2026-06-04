@@ -398,61 +398,36 @@ export const portfolioShowcaseTemplate: TemplateSeed = {
       description:
         'Long-form writing on autonomous agents, self-healing CI, local-first software, and building tools for the State.',
       entranceAnimation: 'fade-up',
+      pageKind: 'collection-index',
+      collectionSlug: 'blog',
       bodyRefs: [
         { sectionId: 'portfolio-template-blog-hero-v1', instanceId: 'pfbloghero' },
         { sectionId: 'portfolio-template-blog-list-v1', instanceId: 'pfbloglist' },
       ],
     },
     {
-      id: 'page-pf-post-demos-lie',
-      slug: 'blog/demos-lie',
-      title: 'Demos lie. Week three is the only honest metric.',
+      // ADR 0060 F2 — single template page that materializes per collection
+      // entry at publish time. Replaces the pre-F2 hand-authored
+      // page-pf-post-* pages (post1..post4) that the portfolio composition
+      // had at branch base. Section refs point at the new
+      // `portfolio-template-post-tmpl-*` pool entries extracted from the
+      // current portfolio-showcase.json fixture.
+      id: 'page-pf-post-template',
+      slug: 'blog/template',
+      title: '{{title}}',
       width: 1440,
-      description:
-        "The first demo is easy. Week three — when the energy fades and the bug surface hasn't — is where the engineering happens.",
+      description: '{{excerpt}}',
+      locale: 'en',
+      pageBackground: '#16140f',
       entranceAnimation: 'fade-up',
+      defaultMotionPreset: 'fade-up',
+      sectionGap: 0,
+      maxWidth: 1440,
+      pageKind: 'collection-item-template',
+      collectionSlug: 'blog',
       bodyRefs: [
-        { sectionId: 'portfolio-template-post1-hero-v1', instanceId: 'pfpost1hero' },
-        { sectionId: 'portfolio-template-post1-body-v1', instanceId: 'pfpost1body' },
-      ],
-    },
-    {
-      id: 'page-pf-post-jarvis-ci',
-      slug: 'blog/jarvis-self-healing-ci',
-      title: 'Three-tier self-healing CI: how Jarvis closes its own PRs',
-      width: 1440,
-      description:
-        'Runner LLMs grind implementation against your tests. Claude reviews. You merge. A three-tier brain split across processes — and why no tier ever gets to decide.',
-      entranceAnimation: 'fade-up',
-      bodyRefs: [
-        { sectionId: 'portfolio-template-post2-hero-v1', instanceId: 'pfpost2hero' },
-        { sectionId: 'portfolio-template-post2-body-v1', instanceId: 'pfpost2body' },
-      ],
-    },
-    {
-      id: 'page-pf-post-local-first',
-      slug: 'blog/local-first-honest',
-      title: 'Local-first is not a buzzword — it’s the only honest software',
-      width: 1440,
-      description:
-        "If your app stops working when the server goes down, you don't have software — you have a thin client to someone else's database.",
-      entranceAnimation: 'fade-up',
-      bodyRefs: [
-        { sectionId: 'portfolio-template-post3-hero-v1', instanceId: 'pfpost3hero' },
-        { sectionId: 'portfolio-template-post3-body-v1', instanceId: 'pfpost3body' },
-      ],
-    },
-    {
-      id: 'page-pf-post-state-trust',
-      slug: 'blog/state-trust',
-      title: 'Building software the State will trust',
-      width: 1440,
-      description:
-        'Notes from shipping OSINT tooling that landed inside an investigative agency — what changes when the buyer is a department, not a user.',
-      entranceAnimation: 'fade-up',
-      bodyRefs: [
-        { sectionId: 'portfolio-template-post4-hero-v1', instanceId: 'pfpost4hero' },
-        { sectionId: 'portfolio-template-post4-body-v1', instanceId: 'pfpost4body' },
+        { sectionId: 'portfolio-template-post-tmpl-hero-v1', instanceId: 'pfposttmplhero' },
+        { sectionId: 'portfolio-template-post-tmpl-body-v1', instanceId: 'pfposttmplbody' },
       ],
     },
   ],

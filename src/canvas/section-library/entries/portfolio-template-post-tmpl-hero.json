@@ -1,0 +1,113 @@
+{
+  "baseSlug": "portfolio-template-post-tmpl-hero",
+  "category": "other",
+  "name": "Post header",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "{{title}}",
+  "sectionData": {
+    "id": "pf-post-tmpl-hero",
+    "recipeId": "custom",
+    "name": "Post header",
+    "height": 460,
+    "elements": [
+      {
+        "id": "pf-post-tmpl-back",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 64,
+          "w": 100,
+          "h": 28,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "notes"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-pf-blog"
+        },
+        "variant": "underline",
+        "iconKind": "arrow-left"
+      },
+      {
+        "id": "pf-post-tmpl-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 116,
+          "w": 300,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "NOTES · {{publishedDate}}"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5b94ff"
+        },
+        "letterSpacing": "0.16em"
+      },
+      {
+        "id": "pf-post-tmpl-title",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 156,
+          "w": 1180,
+          "h": 200,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "{{title}}"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 64,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        },
+        "letterSpacing": "-0.02em",
+        "lineHeight": 1.04
+      },
+      {
+        "id": "pf-post-tmpl-byline",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 376,
+          "w": 600,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "{{author}}"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

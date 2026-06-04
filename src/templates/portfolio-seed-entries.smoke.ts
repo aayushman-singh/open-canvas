@@ -21,7 +21,7 @@ import {
 } from '../canvas/elements/collection-materializer.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import { PORTFOLIO_SHOWCASE_SEED_ENTRIES } from './portfolio-seed-entries.js';
-import { portfolioShowcaseTemplate } from './registry.js';
+import { instantiateTemplate, portfolioShowcaseTemplate } from './registry.js';
 
 function assert(condition: boolean, message: string): void {
   if (!condition) throw new Error(`[portfolio-seed-entries:smoke] ${message}`);
@@ -32,7 +32,7 @@ function assert(condition: boolean, message: string): void {
 // ---------------------------------------------------------------------------
 
 {
-  const state = portfolioShowcaseTemplate.state;
+  const state = instantiateTemplate(portfolioShowcaseTemplate.id);
   const postPages = state.pages.filter((p) => /^page-pf-post-/.test(p.id));
   const templatePages = postPages.filter((p) => p.pageKind === 'collection-item-template');
   const concretePostPages = postPages.filter((p) => p.pageKind === undefined);
@@ -60,7 +60,7 @@ function assert(condition: boolean, message: string): void {
 // ---------------------------------------------------------------------------
 
 {
-  const state = portfolioShowcaseTemplate.state;
+  const state = instantiateTemplate(portfolioShowcaseTemplate.id);
   const indexPage = state.pages.find((p) => p.id === 'page-pf-blog');
   assert(indexPage !== undefined, '(2) page-pf-blog must be present');
   assert(indexPage!.pageKind === 'collection-index', '(2) blog page must be collection-index');
@@ -109,7 +109,7 @@ function assert(condition: boolean, message: string): void {
     tags: row.tags,
     ogImageAssetId: row.ogImageAssetId,
   }));
-  const state: EditableSite = portfolioShowcaseTemplate.state;
+  const state: EditableSite = instantiateTemplate(portfolioShowcaseTemplate.id);
   const materialized = materializeCollections(state, materializerEntries);
 
   const concretePostPages = materialized.pages.filter((p) => p.slug.startsWith('blog/'));
@@ -158,7 +158,7 @@ function assert(condition: boolean, message: string): void {
     tags: row.tags,
     ogImageAssetId: row.ogImageAssetId,
   }));
-  const materialized = materializeCollections(portfolioShowcaseTemplate.state, materializerEntries);
+  const materialized = materializeCollections(instantiateTemplate(portfolioShowcaseTemplate.id), materializerEntries);
   const result = validateEditableSite(materialized);
   assert(
     result.valid,

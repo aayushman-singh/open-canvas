@@ -1,0 +1,81 @@
+{
+  "baseSlug": "portfolio-template-post-tmpl-body",
+  "category": "other",
+  "name": "Post body",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "custom",
+  "sectionData": {
+    "id": "pf-post-tmpl-body",
+    "recipeId": "custom",
+    "name": "Post body",
+    "height": 980,
+    "elements": [
+      {
+        "id": "pf-post-tmpl-body-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-post-tmpl-lead",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 80,
+          "w": 720,
+          "h": 140,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "{{excerpt}}"
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        },
+        "lineHeight": 1.55
+      },
+      {
+        "id": "pf-post-tmpl-body-content",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 248,
+          "w": 720,
+          "h": 680,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "{{body}}"
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

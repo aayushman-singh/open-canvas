@@ -92,6 +92,10 @@ import e82 from './violet-template-features.json' with { type: 'json' };
 import e83 from './violet-template-footer.json' with { type: 'json' };
 import e84 from './violet-template-header.json' with { type: 'json' };
 import e85 from './violet-template-hero.json' with { type: 'json' };
+// Appended post-rebase: portfolio template collection-item-template sections
+// added by main's ADR 0060 F2/F3 refactor (page-pf-post-template page).
+import e86 from './portfolio-template-post-tmpl-body.json' with { type: 'json' };
+import e87 from './portfolio-template-post-tmpl-hero.json' with { type: 'json' };
 
 export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e0 as SectionLibraryEntry,
@@ -180,4 +184,6 @@ export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e83 as SectionLibraryEntry,
   e84 as SectionLibraryEntry,
   e85 as SectionLibraryEntry,
+  e86 as SectionLibraryEntry,
+  e87 as SectionLibraryEntry,
 ];
