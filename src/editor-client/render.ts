@@ -181,6 +181,44 @@ export function fitZoom(ctx: EditorContext): void {
   fitToPage(ctx, null);
 }
 
+// Pan-only camera move: bring the named page's top-left corner into the
+// viewport at a small inset (PAD), preserving the current zoom. Used by
+// setActivePageImpl so every page switch (link popover Go-to, page-list
+// sidebar click, artboard label click, inactive-artboard click) brings
+// the new artboard into view without re-zooming. Falls through to
+// fitToPage when the page is too large to fit at the current zoom — that
+// is the only branch that touches camera.zoom.
+//
+// Math:
+//   worldToScreen says screen.x = world.x * zoom + camera.x + rect.left.
+//   We want the page's left edge (world.x = pos.x) to land at viewport
+//   left + PAD, i.e. screen.x = rect.left + PAD. Solving for camera.x:
+//     camera.x = PAD - pos.x * zoom
+//   Symmetric for y, with PAD against the viewport top.
+export function panToPage(ctx: EditorContext, pageId: string | null): void {
+  if (!ctx.viewport) return;
+  const pos = getPagePosition(ctx, pageId);
+  if (!pos) return;
+  const rect = ctx.viewport.getBoundingClientRect();
+  const pad = 64;
+  const zoom = ctx.camera.zoom;
+  // If the page is wider than the entire viewport at the current zoom,
+  // fall back to fit-to-page so the user can see the whole thing. The
+  // check intentionally ignores the inset — a page that's narrower than
+  // the viewport but wider than (viewport - 2*pad) still fits well
+  // enough at the requested inset and the right edge falls just past
+  // the viewport, which matches the editor's existing aesthetic (the
+  // initial-load home page sits with its right edge near the viewport
+  // edge too).
+  if (pos.width * zoom > rect.width) {
+    fitToPage(ctx, pageId);
+    return;
+  }
+  ctx.camera.x = pad - pos.x * zoom;
+  ctx.camera.y = pad - pos.y * zoom;
+  applyCameraTransform(ctx);
+}
+
 export function computePagePositions(ctx: EditorContext): void {
   if (!ctx.state || !ctx.state.pages) {
     ctx.pagePositions = [];

@@ -82,6 +82,7 @@ import type { CanvasPage } from '../canvas/schema.js';
 import { DEFAULT_PAGE_WIDTH_PX } from './editor-constants.js';
 import { isAllowedHref } from './href-utils.js';
 import { newPageId, newSectionId } from './ids.js';
+import { panToPage } from './render.js';
 
 export function setActivePageImpl(ctx: EditorContext, pageId: string | null): void {
   ctx.activePageId = pageId;
@@ -108,6 +109,14 @@ export function setActivePageImpl(ctx: EditorContext, pageId: string | null): vo
     }
   }
   refreshPageCrumbImpl(ctx);
+  // Bring the newly-activated artboard into the viewport. Without this the
+  // caller flips data-active on a page that may be sitting hundreds of
+  // pixels off-screen (pages laid out as a horizontal strip), so the user
+  // sees no visible change. panToPage preserves the current zoom and only
+  // falls through to fit-to-page when the page won't fit at that zoom.
+  // No-op when called before pagePositions is populated (createPage path
+  // calls renderAll + fitToPage afterwards, which handles the fresh page).
+  if (pageId) panToPage(ctx, pageId);
 }
 
 // -- Breadcrumb page chip + page switcher dropdown ----------------------
