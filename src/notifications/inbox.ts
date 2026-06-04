@@ -41,20 +41,24 @@ const MAX_LIMIT = 100;
 
 // Sites the customer can see notifs for: owned + accepted collaborator. Used
 // to scope the recipient-kind='site' branch of the inbox query.
+//
+// The two SELECTs are independent (each hits its own indexed column on a
+// different table), so we issue them in parallel — every saved Neon round
+// trip on this helper shaves ~50-200ms off the /api/notifications hot path,
+// which the dashboard polls.
 async function loadVisibleSiteIds(db: Db, customerId: string): Promise<string[]> {
-  const owned = await db
-    .select({ id: site.id })
-    .from(site)
-    .where(eq(site.customerId, customerId));
-  const collaborator = await db
-    .select({ id: siteCollaborator.siteId })
-    .from(siteCollaborator)
-    .where(
-      and(
-        eq(siteCollaborator.customerId, customerId),
-        isNotNull(siteCollaborator.acceptedAt),
+  const [owned, collaborator] = await Promise.all([
+    db.select({ id: site.id }).from(site).where(eq(site.customerId, customerId)),
+    db
+      .select({ id: siteCollaborator.siteId })
+      .from(siteCollaborator)
+      .where(
+        and(
+          eq(siteCollaborator.customerId, customerId),
+          isNotNull(siteCollaborator.acceptedAt),
+        ),
       ),
-    );
+  ]);
   const ids = new Set<string>();
   for (const r of owned) ids.add(r.id);
   for (const r of collaborator) ids.add(r.id);
