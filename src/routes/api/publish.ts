@@ -32,8 +32,19 @@ import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateEditableSite, validatePublishedSnapshot } from '../../canvas/validate';
+import {
+  materializeCollections,
+  type MaterializerEntry,
+} from '../../canvas/elements/collection-materializer';
 import { db, type Db } from '../../db/client';
-import { customer, ownerAsset, site, siteSearchEntry, siteSnapshot } from '../../db/schema';
+import {
+  collectionEntry,
+  customer,
+  ownerAsset,
+  site,
+  siteSearchEntry,
+  siteSnapshot,
+} from '../../db/schema';
 // Post-publish side effects that are part of the published-site contract:
 // version timeline capture, OG-image pre-rendering, and search indexing.
 import { captureOnPublish } from '../../version/capture';
@@ -535,13 +546,37 @@ publishApi.post('/sites/:siteId', async (c) => {
   }
   timeline.end('assetReachabilityCheck');
 
+  // ADR 0060 — materialize collection entries into the snapshot.
+  // Page-bound CollectionElements get their `entries[]` populated; pages
+  // marked `pageKind: 'collection-item-template'` are cloned once per
+  // matching published entry. Draft entries are filtered out here so the
+  // materializer sees only what will appear on the public site.
+  timeline.begin('materializeCollections');
+  const publishedEntryRows = await database
+    .select()
+    .from(collectionEntry)
+    .where(and(eq(collectionEntry.siteId, row.id), eq(collectionEntry.status, 'published')));
+  const materializerEntries: MaterializerEntry[] = publishedEntryRows.map((entry) => ({
+    slug: entry.slug,
+    title: entry.title,
+    excerpt: entry.excerpt,
+    body: entry.body,
+    publishedDate: entry.publishedDate,
+    author: entry.author,
+    category: entry.category,
+    tags: entry.tags,
+    ogImageAssetId: entry.ogImageAssetId,
+  }));
+  const materializedEditableState = materializeCollections(row.editableState, materializerEntries);
+  timeline.end('materializeCollections');
+
   // PublishedSnapshot = EditableSite & { version, publishedAt }. Every
   // EditableSite field — required and optional — is part of the published
   // contract, and validateSiteShape (invoked inside both validateEditableSite
-  // and validatePublishedSnapshot) gates each one. Spread the validated
+  // and validatePublishedSnapshot) gates each one. Spread the materialized
   // editable state and stamp the two publish-only fields on top.
   const snapshot: PublishedSnapshot = {
-    ...row.editableState,
+    ...materializedEditableState,
     version: row.publishedVersion + 1,
     publishedAt: new Date().toISOString(),
   };

@@ -13,6 +13,8 @@ import ogRoute from './og-image/route';
 import { scheduled } from './scheduled';
 import formsRouter from './forms/route';
 import formsInboxRoute from './routes/dashboard/forms-inbox';
+import { entriesRoute } from './routes/api/entries';
+import entriesDashboardRoute from './routes/dashboard/entries';
 import unlockRoute from './password/unlock-route';
 import passwordAdminRoute from './password/admin-route';
 import siteSettingsRoute from './routes/dashboard/site-settings';
@@ -110,6 +112,11 @@ app.route('/api/sites/:siteId/domains', customDomainRouter);
 app.route('/og', ogRoute);
 app.route('/api/forms', formsRouter);
 app.route('/dashboard', formsInboxRoute);
+// ADR 0060 — CMS-style entries: API on /api/sites/:siteId/entries, dashboard
+// tab at /dashboard/sites/:siteId/entries. Both gates re-use the same
+// Clerk + collaborator access logic as the rest of the per-site surface.
+app.route('/api/sites/:siteId/entries', entriesRoute);
+app.route('/dashboard', entriesDashboardRoute);
 app.route('/dashboard', siteSettingsRoute);
 app.route('/api/sites', themeRoute);
 app.route('/api/sites/:siteId/password', passwordAdminRoute);

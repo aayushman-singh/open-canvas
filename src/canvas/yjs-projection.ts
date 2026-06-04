@@ -39,6 +39,8 @@
 //   'canonical'?      -> string
 //   'noIndex'?        -> boolean
 //   'locale'?         -> string
+//   'pageKind'?       -> 'collection-index' | 'collection-item-template' (ADR 0060)
+//   'collectionSlug'? -> string                       (ADR 0060)
 //   'sections'        -> Y.Array<Y.Map<unknown>>     (CanvasSection[])
 //
 // Each CanvasSection Y.Map:
@@ -825,6 +827,8 @@ function encodePage(page: CanvasPage): Y.Map<unknown> {
     out.set('tags', tags);
   }
   setIfDefined(out, 'category', page.category);
+  setIfDefined(out, 'pageKind', page.pageKind);
+  setIfDefined(out, 'collectionSlug', page.collectionSlug);
   const sections = new Y.Array<Y.Map<unknown>>();
   for (const section of page.sections) sections.push([encodeSection(section)]);
   out.set('sections', sections);
@@ -1495,6 +1499,10 @@ function decodePage(map: Y.Map<unknown>): CanvasPage {
   if (map.has('author')) page.author = map.get('author') as string;
   if (map.has('tags')) page.tags = (map.get('tags') as Y.Array<string>).toArray();
   if (map.has('category')) page.category = map.get('category') as string;
+  if (map.has('pageKind')) {
+    page.pageKind = map.get('pageKind') as NonNullable<CanvasPage['pageKind']>;
+  }
+  if (map.has('collectionSlug')) page.collectionSlug = map.get('collectionSlug') as string;
   return page;
 }
 
