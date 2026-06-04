@@ -1917,6 +1917,26 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   outline-offset: -2px;
 }
 
+/* 8px snap-grid overlay. Painted only while drag-resize.ts has flagged
+   the active frame (section or tab-panel) with data-snap-overlay; the
+   attribute is removed on mouseup so the dots vanish on drop. Sits
+   beneath positioned elements (z-index 0, elements start at z >= 1)
+   and ignores pointer events so the gesture passes through. */
+[data-snap-overlay]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--opencanvas-accent) 35%, transparent) 1px,
+    transparent 1.5px
+  );
+  background-size: 8px 8px;
+  background-position: 0 0;
+}
+
 .opencanvas-section .section-toolbar {
   position: absolute;
   top: 8px;

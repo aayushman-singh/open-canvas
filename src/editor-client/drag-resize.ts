@@ -94,6 +94,18 @@ function wrapperScale(frameEl: Element): number {
  */
 const WRAPPER_MATRIX_RE = new RegExp('matrix\\(([^,]+),');
 
+/**
+ * 8px snap grid applied to free-form element positioning during drag/resize.
+ * Holding Alt during the gesture bypasses snap for pixel-precise nudges.
+ * The matching grid overlay is rendered by CSS on any frame element that
+ * carries the `data-snap-overlay` attribute (set on gesture start, removed
+ * on gesture end by beginDragImpl/beginResizeImpl).
+ */
+const SNAP_GRID_PX = 8;
+function snapTo(value: number, gridPx: number): number {
+  return Math.round(value / gridPx) * gridPx;
+}
+
 export function attachPointerHandlersImpl(ctx: EditorContext): void {
   const root = ctx.root;
   if (!root) return;
@@ -196,6 +208,8 @@ export function beginDragImpl(
     boundH = rect.height / scale;
   }
 
+  frameEl.setAttribute('data-snap-overlay', '');
+
   function onMove(ev: MouseEvent): void {
     const current = ctx.pointerToCanvas(ev, frameEl!);
     if (!current) return;
@@ -203,6 +217,10 @@ export function beginDragImpl(
     const dy = current.y - start!.y;
     let nx = originalBox.x + dx;
     let ny = originalBox.y + dy;
+    if (!ev.altKey) {
+      nx = snapTo(nx, SNAP_GRID_PX);
+      ny = snapTo(ny, SNAP_GRID_PX);
+    }
     if (nx < 0) nx = 0;
     if (ny < 0) ny = 0;
     if (nx + originalBox.w > boundW) nx = boundW - originalBox.w;
@@ -215,6 +233,7 @@ export function beginDragImpl(
   function onUp(): void {
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
+    frameEl!.removeAttribute('data-snap-overlay');
     ctx.scheduleSave();
   }
   window.addEventListener('mousemove', onMove);
@@ -258,6 +277,7 @@ export function beginResizeImpl(
   const moveY = dir.includes('s') || dir.includes('n');
   const fromLeft = dir.includes('w');
   const fromTop = dir.includes('n');
+  frameEl.setAttribute('data-snap-overlay', '');
 
   function onMove(ev: MouseEvent): void {
     const current = ctx.pointerToCanvas(ev, frameEl!);
@@ -282,6 +302,29 @@ export function beginResizeImpl(
         nh = ob.h - dy;
       } else {
         nh = ob.h + dy;
+      }
+    }
+    // Snap only the edge the user is dragging; the opposite edge stays where
+    // it started. Right/bottom edges snap via nx+nw / ny+nh so both edges
+    // end up on the grid, then we back-compute the new size.
+    if (!ev.altKey) {
+      if (moveX) {
+        if (fromLeft) {
+          const snapped = snapTo(nx, SNAP_GRID_PX);
+          nw = nx + nw - snapped;
+          nx = snapped;
+        } else {
+          nw = snapTo(nx + nw, SNAP_GRID_PX) - nx;
+        }
+      }
+      if (moveY) {
+        if (fromTop) {
+          const snapped = snapTo(ny, SNAP_GRID_PX);
+          nh = ny + nh - snapped;
+          ny = snapped;
+        } else {
+          nh = snapTo(ny + nh, SNAP_GRID_PX) - ny;
+        }
       }
     }
     if (nw < ctx.MIN_ELEMENT_SIZE_PX) {
@@ -314,6 +357,7 @@ export function beginResizeImpl(
   function onUp(): void {
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
+    frameEl!.removeAttribute('data-snap-overlay');
     ctx.scheduleSave();
   }
   window.addEventListener('mousemove', onMove);
