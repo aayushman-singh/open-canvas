@@ -80,6 +80,12 @@ notificationsApi.get('/notifications', async (c) => {
     unreadCount(database, customerId, siteIds),
   ]);
 
+  // Dashboard polls /api/notifications repeatedly; without a Cache-Control
+  // header every poll hits Neon. `private, max-age=10, stale-while-revalidate=30`
+  // lets the browser hold a fresh response for 10s and revalidate in the
+  // background for another 30s before forcing a network round trip. Private
+  // because the body is scoped to one Owner.
+  c.header('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
   return c.json({ notifications, unreadCount: unread });
 });
 

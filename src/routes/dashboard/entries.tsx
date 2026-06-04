@@ -893,6 +893,10 @@ entriesDashboardRoute.get('/sites/:siteId/entries', async (c) => {
         .orderBy(desc(collectionEntry.publishedDate))
     : [];
 
+  // Per-Owner HTML — never let shared caches store it. `max-age=0` keeps
+  // disk-cache hits cheap on back-button + reload but the must-revalidate
+  // forces the browser to recheck freshness before showing stale content.
+  c.header('Cache-Control', 'private, max-age=0, must-revalidate');
   return c.html(
     <DashboardShell
       title={`${owned.name} — entries`}
