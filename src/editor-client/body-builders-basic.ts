@@ -187,7 +187,11 @@ export function buildActionBodyImpl(ctx: EditorContext, element: ActionElement):
     element.iconKind !== undefined && isIconName(element.iconKind)
       ? renderIconSvg(element.iconKind)
       : '';
-  const labelHtml = element.label.map(renderInlineRun).join('');
+  // Mirror renderAction's icon-only contract: when every label run has
+  // empty text, skip the label container so the editor preview matches the
+  // deployed page (no stray `<span></span>` eating the flex gap).
+  const labelPlain = element.label.map((run) => run.text).join('');
+  const labelHtml = labelPlain.length === 0 ? '' : element.label.map(renderInlineRun).join('');
   node.innerHTML = iconHtml + labelHtml;
   return node;
 }

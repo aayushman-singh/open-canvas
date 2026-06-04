@@ -56,7 +56,14 @@ export type ActionElement = BaseElement & {
 
 export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] }): string {
   const iconHtml = element.iconKind !== undefined ? renderIconSvg(element.iconKind) : '';
-  const labelHtml = element.label.map(renderInlineRun).join('');
+  // Skip the label container entirely when every run has empty text — the
+  // "icon-only" affordance. renderInlineRun({text:''}) would otherwise emit
+  // `<span></span>`, which (a) reserves no visible content but (b) still
+  // participates in flex layout and consumes the gap, breaking the icon-only
+  // look. The label is still required to be a non-empty array at-rest per
+  // validator; the empty-text contract is `[{text:''}]`.
+  const labelPlain = element.label.map((run) => run.text).join('');
+  const labelHtml = labelPlain.length === 0 ? '' : element.label.map(renderInlineRun).join('');
   const innerHtml = `${iconHtml}${labelHtml}`;
   const variantAttr = escapeAttr(element.variant);
 

@@ -36,9 +36,17 @@ assert(
 assert(
   bodyBuilders.includes("import { renderInlineRun } from '../canvas/elements/render-utils.js';") &&
     bodyBuilders.includes("import { renderIconSvg, isIconName } from '../canvas/icons.js';") &&
-    bodyBuilders.includes('const labelHtml = element.label.map(renderInlineRun).join') &&
+    bodyBuilders.includes('element.label.map(renderInlineRun).join') &&
     bodyBuilders.includes('node.innerHTML = iconHtml + labelHtml'),
   'action body builder must render iconKind plus rich InlineRun label HTML instead of flattening label text',
+);
+// Icon-only contract: when every label run has empty text, the builder
+// must skip the label container so the editor preview matches the
+// deployed renderer (no stray `<span></span>` consuming the flex gap).
+assert(
+  bodyBuilders.includes('const labelPlain = element.label.map((run) => run.text).join') &&
+    bodyBuilders.includes("labelPlain.length === 0 ? '' :"),
+  'action body builder must skip the label container when every run has empty text (icon-only affordance)',
 );
 assert(
   bodyBuilders.includes("throw new Error('resolveActionHref: missing page id '"),

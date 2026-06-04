@@ -1896,6 +1896,7 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5em;
   width: 100%;
   height: 100%;
   padding: var(--opencanvas-kit-action-padding, 0 16px);
@@ -1904,6 +1905,20 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   color: var(--kit-bg);
   text-decoration: none;
   font-weight: 600;
+}
+/* Shrink-protect the icon so a narrow action (e.g. width 56px) keeps the
+ * 1em-sized SVG visible; the label span absorbs the squeeze instead.
+ * Without flex 0 0 auto, the SVG measured 0 width live on a 56px-wide
+ * action, collapsing the glyph entirely. */
+.opencanvas-action > .opencanvas-icon {
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+}
+.opencanvas-action > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .opencanvas-shape {
   width: 100%;
