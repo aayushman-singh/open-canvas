@@ -713,6 +713,16 @@ export const collectionEntry = pgTable(
       t.collectionSlug,
       t.publishedDate.desc(),
     ),
+    // Narrow 2-column btree for the dashboard entries route's
+    // `SELECT DISTINCT collection_slug ... WHERE site_id = ? GROUP BY
+    // collection_slug` lookup. The planner prefers this index over the
+    // wider 3-column one above for the GROUP BY rewrite because the page
+    // size is smaller. Added in drizzle/0016 — see that file for the perf
+    // motivation. Writes pay marginal extra btree maintenance.
+    siteCollectionIdx: index('collection_entry_site_collection_idx').on(
+      t.siteId,
+      t.collectionSlug,
+    ),
     siteCollectionSlugUnique: uniqueIndex('collection_entry_site_collection_slug_unique').on(
       t.siteId,
       t.collectionSlug,
