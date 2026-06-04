@@ -22,8 +22,13 @@
 //            - Ctrl/Cmd+S: force save (skip the 500ms debounce).
 //            - Space (no modifiers, not editing): temporary pan mode.
 //            - V (no modifiers, not editing): switch to select mode.
-//            - Delete/Backspace (not editing): delete the selected
-//              element OR delete the selected section.
+//            - Delete/Backspace (no modifiers, not editing): delete the
+//              selected element OR the selected page section. Routes
+//              through `handleDeleteShortcut` in delete-shortcut.ts —
+//              site-pinned header/footer cannot be deleted (toast); the
+//              last section on the active page cannot be deleted (toast
+//              from handleSectionAction); success surfaces a "Deleted
+//              {elementType}" / "Deleted section" toast.
 //            - 1: fit current page. 0: fit all pages.
 //          keyup-Space and window blur end the temporary-pan mode so
 //          a released-space outside the canvas still exits pan.
@@ -42,6 +47,7 @@
 import type { EditorContext } from './editor-context.js';
 import { fitToPage, fitAllPages } from './render.js';
 import { undo, redo } from './persist.js';
+import { handleDeleteShortcut } from './delete-shortcut.js';
 
 export function attachSaveButtonImpl(ctx: EditorContext): void {
   if (ctx.saveButton) {
@@ -125,20 +131,10 @@ export function attachSaveButtonImpl(ctx: EditorContext): void {
       ctx.setInteractionMode('select');
       return;
     }
-    if (
-      (ev.key === 'Delete' || ev.key === 'Backspace') &&
-      !ctx.editingElementId &&
-      !ctx.isEditableShortcutTarget(ev.target)
-    ) {
-      if (ctx.selectedElementId) {
+    if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      const outcome = handleDeleteShortcut(ctx, ev);
+      if (outcome !== 'none') {
         ev.preventDefault();
-        const found = ctx.findElement(ctx.selectedElementId);
-        if (found) ctx.deleteElement(found.section, found.element);
-        return;
-      }
-      if (ctx.selectedSectionId) {
-        ev.preventDefault();
-        ctx.handleSectionAction('delete-section', ctx.selectedSectionId);
         return;
       }
     }
