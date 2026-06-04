@@ -51,6 +51,7 @@
 import type { EditorContext } from './editor-context.js';
 import type { StyleKit } from '../canvas/schema.js';
 import { STYLE_KITS } from './shared-constants.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 
 const STYLE_KITS_LIST = STYLE_KITS as readonly string[];
 
@@ -125,6 +126,7 @@ export async function applySidebarStyleKit(
   ctx.captureForUndo();
   ctx.state.styleKit = kit as StyleKit;
   if (ctx.mainEl) ctx.mainEl.setAttribute('data-style-kit', kit);
+  applyCustomKitCss(ctx.state);
   ctx.syncSidebarStyleKitButtons(buttons);
   ctx.renderInspector();
   ctx.setStatus('Style kit: ' + kit, 'ok');
@@ -151,6 +153,7 @@ export async function applySidebarStyleKit(
       if (ctx.state.styleKit === kit) {
         ctx.state.styleKit = prevKit;
         if (ctx.mainEl) ctx.mainEl.setAttribute('data-style-kit', prevKit);
+        applyCustomKitCss(ctx.state);
         ctx.syncSidebarStyleKitButtons(buttons);
         ctx.renderInspector();
       }
@@ -160,6 +163,7 @@ export async function applySidebarStyleKit(
     if (ctx.state.styleKit === kit) {
       ctx.state.styleKit = prevKit;
       if (ctx.mainEl) ctx.mainEl.setAttribute('data-style-kit', prevKit);
+      applyCustomKitCss(ctx.state);
       ctx.syncSidebarStyleKitButtons(buttons);
       ctx.renderInspector();
     }

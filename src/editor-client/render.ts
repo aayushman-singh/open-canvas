@@ -77,6 +77,7 @@ import {
   ZOOM_MAX_MANUAL,
   ZOOM_MIN,
 } from './editor-constants.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 
 export function clampZoom(value: number, max?: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -308,6 +309,7 @@ export function renderAllImpl(ctx: EditorContext): void {
   if (ctx.mainEl && ctx.state.styleKit) {
     ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
   }
+  applyCustomKitCss(ctx.state);
   // Keep the sidebar style-kit chips in sync with state.styleKit so that
   // undo/redo (or any non-sidebar kit change) reflects in the chip row.
   const sidebarKitButtons = document.querySelectorAll('[data-sidebar-style-kit]');

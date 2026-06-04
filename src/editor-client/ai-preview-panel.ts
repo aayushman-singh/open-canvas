@@ -72,6 +72,7 @@
 import type { CanvasAgentOp } from '../agent/canvas-ops.js';
 import type { EditorContext } from './editor-context.js';
 import type { MediaElement } from '../canvas/elements/media.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 
 interface PreviewPayload {
   ops?: CanvasAgentOp[];
@@ -144,6 +145,7 @@ async function applyPreview(ctx: EditorContext, ops: CanvasAgentOp[]): Promise<v
     if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
       ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
     }
+    applyCustomKitCss(ctx.state);
     ctx.renderAll();
     ctx.closeAiPanel();
     ctx.setStatus('AI edit applied', 'ok');

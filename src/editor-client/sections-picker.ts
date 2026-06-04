@@ -50,6 +50,7 @@
 
 import { SECTION_CATEGORIES, type SectionCategory } from '../canvas/section-library/categories.js';
 import type { EditorContext } from './editor-context.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 import { migrateState } from './state-migration.js';
 import { escapeAttr, escapeHtml } from './html-escape.js';
 
@@ -470,6 +471,7 @@ export async function importPendingSectionAt(
     if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
       ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
     }
+    applyCustomKitCss(ctx.state);
     ctx.renderAll();
     renderSectionsPanelImpl(ctx);
     ctx.setStatus('Inserted section from ' + target.name, 'ok');
