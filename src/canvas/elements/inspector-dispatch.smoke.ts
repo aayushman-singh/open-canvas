@@ -186,6 +186,7 @@ const REGISTERED_MOUNTS = [
   'chart-data',
   'form-fields',
   'form-style',
+  'text-font-family',
 ] as const;
 
 function checkField(field: InspectorField, fixture: object, where: string): void {

@@ -33,6 +33,7 @@ import { bellStyles } from '../notifications/bell-styles';
 import { opencanvasModalScript } from '../ui/opencanvas-modal-script';
 import { db } from '../db/client';
 import { customer, site, siteCollaborator } from '../db/schema';
+import { fontPresetGoogleFontsLink } from '../fonts/preset-catalog';
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
 
 type Bindings = HostConfigEnv & {
@@ -240,6 +241,13 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <title>Open Canvas — editing {siteName}</title>
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
+        {/* Text-inspector font-family picker — preload the 11 curated
+            free fonts so selection in the dropdown is instant (no per-
+            pick network round-trip to fetch the WOFF2). Same `<link>`
+            ships on the published page so an Owner-selected preset
+            renders identically in the editor preview and on the live
+            site. */}
+        {raw(fontPresetGoogleFontsLink())}
         {raw(
           '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">' +
             '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous" onload="window.dispatchEvent(new Event(\'opencanvas-katex-ready\'))"></script>',

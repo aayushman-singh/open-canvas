@@ -40,6 +40,10 @@ import {
 import { mountFormFields, mountFormStyle } from './inspector-form-mounts.js';
 import { mountMediaAi, mountVideoPlayback } from './inspector-media-mounts.js';
 import {
+  mountTextFontFamily,
+  refreshCustomFontsImpl,
+} from './inspector-text-font-family.js';
+import {
   mountMediaPicker,
   mountNavLinks,
   mountNavLogo,
@@ -138,6 +142,7 @@ export function installRuntimeHelpers(ctx: EditorContext): void {
   ctx.generateImageForElement = (element, prompt) =>
     generateImageForElementImpl(ctx, element, prompt);
   ctx.isEditableShortcutTarget = (target) => isEditableShortcutTargetImpl(target);
+  ctx.refreshCustomFonts = () => refreshCustomFontsImpl(ctx);
 }
 
 export function currentPageImpl(ctx: EditorContext): CanvasPage | null {
@@ -586,6 +591,7 @@ function inspectorMountHandler(
     'chart-data': (element, host) => mountChartData(ctx, element as ChartElement, host),
     'form-fields': (element, host) => mountFormFields(ctx, element as FormElement, host),
     'form-style': (element, host) => mountFormStyle(ctx, element as FormElement, host),
+    'text-font-family': (element, host) => mountTextFontFamily(ctx, element, host),
   };
   return mounts[name] || null;
 }

@@ -60,7 +60,8 @@ import { getModeSetterScript, getDarkModeSetterScript } from '../themes/visitor-
 import { renderModeToggleHtml } from '../themes/visitor-mode/toggle-element';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
 import { prepareRender } from '../i18n/render-hook';
-import { emitFontFaceBlocks } from '../fonts/face-emit';
+import { emitAllSiteFontFaceBlocks, emitFontFaceBlocks } from '../fonts/face-emit';
+import { fontPresetGoogleFontsLink } from '../fonts/preset-catalog';
 import { makeFontLookup, resolveFontTokens } from '../fonts/resolve';
 // Wave 4 #17 — vanilla-JS hydration runtime for accordion + carousel elements.
 // Wrap is a no-op when no interactive elements present in the snapshot.
@@ -1139,7 +1140,20 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     })
     .from(siteFont)
     .where(eq(siteFont.siteId, siteRow.id));
-  const fontFaceCss = emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  // Validate that kit-referenced font hashes have matching rows by
+  // running the kit-token emitter for its throwing side-effect — same
+  // fail-loud contract as resolveFontFamilyValue (a dangling token must
+  // not silently render an empty face). The returned CSS is discarded
+  // because emitAllSiteFontFaceBlocks below is a strict superset:
+  // kit-referenced fonts ARE in fontRows.
+  emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  // Text-inspector font-family picker — emit one @font-face per uploaded
+  // font regardless of kit reference. The picker writes the chosen
+  // font's family chain directly into `pinnedStyle["font-family"]`, so
+  // the StyleKit-referenced subset is no longer sufficient on its own.
+  // Element-level pins need every uploaded face available on the page or
+  // the chain falls back to system-ui silently.
+  const fontFaceCss = emitAllSiteFontFaceBlocks(fontRows);
   const resolvedKit = resolveFontTokens(baseKit, makeFontLookup(fontRows));
   const customKitCss =
     pageRenderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
@@ -1207,6 +1221,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           ${raw(headMeta)} ${themeEmitsCss ? raw(`<script>${modeSetterScript}</script>`) : ''}
+          ${raw(fontPresetGoogleFontsLink())}
           ${snapshotHasMathRun(pageRenderSnapshot)
             ? raw(
                 '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">',

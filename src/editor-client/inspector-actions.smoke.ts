@@ -447,6 +447,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     attachRootEvents: () => {
       throw new Error('attachRootEvents stub: smoke does not exercise canvas root events');
     },
+    customFonts: [],
+    refreshCustomFonts: () => {
+      throw new Error('refreshCustomFonts stub: smoke does not exercise custom font catalog');
+    },
   };
   return { ctx, log };
 }
