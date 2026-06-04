@@ -103,9 +103,24 @@ const profileStyles = `
     grid-template-columns: 1fr 1fr;
     gap: 16px;
     margin-bottom: 16px;
+    align-items: start;
   }
-  .fieldset { display: grid; gap: 7px; }
-  .fieldset .hint { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+  .fieldset {
+    display: grid;
+    gap: 7px;
+    /* Row template: label / control / hint. Reserving the hint row even
+       when empty keeps neighbouring fieldsets in the same .grid2 row on
+       a shared baseline regardless of whether one column has helper
+       text and the other does not. */
+    grid-template-rows: auto auto auto;
+  }
+  .fieldset .hint {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 2px;
+    min-height: 16px;
+    line-height: 1.35;
+  }
   .fieldset textarea.field {
     min-height: 86px;
     resize: vertical;
@@ -281,6 +296,7 @@ profileRoute.get('/profile', async (c) => {
                 maxlength={100}
                 placeholder="How you want to be known"
               />
+              <span class="hint" aria-hidden="true"></span>
             </div>
             <div class="fieldset">
               <label class="lbl" for="email">Email</label>
@@ -311,10 +327,12 @@ profileRoute.get('/profile', async (c) => {
                   </option>
                 ))}
               </select>
+              <span class="hint" aria-hidden="true"></span>
             </div>
             <div class="fieldset">
-              <label class="lbl">Joined</label>
-              <input class="field" type="text" value={formatFullDate(profile.createdAt)} readonly />
+              <label class="lbl" for="joined">Joined</label>
+              <input class="field" type="text" id="joined" value={formatFullDate(profile.createdAt)} readonly />
+              <span class="hint" aria-hidden="true"></span>
             </div>
           </div>
 
