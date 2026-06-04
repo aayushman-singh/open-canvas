@@ -546,7 +546,8 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     refreshMarkToolbarFontSizeState: () => refreshMarkToolbarFontSizeStateImpl(ctx),
     buildMarkToolbar: (anchor) => buildMarkToolbarImpl(ctx, anchor),
     applyMark: (type: InlineMarkType) => applyMarkImpl(ctx, type),
-    beginTextEdit: (elementId) => beginTextEditImpl(ctx, elementId),
+    beginTextEdit: (elementId, clickedWrapper) =>
+      beginTextEditImpl(ctx, elementId, clickedWrapper),
 
     // ---- Link popover + paste normalization bridge -------------------
     forceOpenInspector: runtimeHelperNotInstalled('forceOpenInspector'),
