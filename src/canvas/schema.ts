@@ -491,6 +491,16 @@ export interface CanvasPage {
   suppressHeader?: boolean;
   /** When true, the site-level `EditableSite.footer` is not rendered on this page. Absent = show. */
   suppressFooter?: boolean;
+  // -- CMS collections (ADR 0060) --------------------------------------------
+  /** ADR 0060 — marks a page as a CMS collection surface.
+   *  'collection-index' = a list page whose page-bound CollectionElements
+   *  get hydrated from the entries table at publish.
+   *  'collection-item-template' = the ghost detail page; the publisher
+   *  clones it once per entry, substituting {{field}} placeholders.
+   *  Both kinds require `collectionSlug`. */
+  pageKind?: CollectionPageKind;
+  /** Which collection (e.g. 'blog') this template/index binds to. Required iff pageKind is set. */
+  collectionSlug?: string;
 }
 
 export interface EditableSite {
