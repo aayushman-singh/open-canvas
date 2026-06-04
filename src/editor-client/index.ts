@@ -135,6 +135,38 @@ import {
   exitPlacementModeImpl,
   setInteractionModeImpl,
 } from './drag-resize.js';
+import {
+  ensureSectionsPanelLoaded,
+  enterPlacementModeImpl,
+  importPendingSectionAt,
+  renderPlacementSlotsImpl,
+  renderSectionsPanelImpl,
+} from './sections-picker.js';
+import {
+  applySidebarStyleKit,
+  attachSidebarActions,
+  attachSidebarTabs,
+  buildKitSummary,
+  syncSidebarStyleKitButtonsImpl,
+} from './sidebar.js';
+import {
+  attachPublishButtonImpl,
+  publishSiteImpl,
+  updateVersionBadgeImpl,
+} from './publish.js';
+import {
+  attachVersionBadgeImpl,
+  closeVersionPillImpl,
+  openVersionPillImpl,
+} from './version-pill.js';
+import { attachSaveButtonImpl } from './save-wiring.js';
+import {
+  activateSidebarTabImpl,
+  ensureVersionsTabMountedImpl,
+  renderVersionsPanelImpl,
+} from './versions-panel.js';
+import { attachRootEventsImpl } from './canvas-root-events.js';
+import { deleteElement } from './inspector-actions.js';
 import { registerKeyboardHandlers } from './keyboard.js';
 import {
   removeLinkPopoverImpl,
@@ -201,21 +233,14 @@ void openConfirmModalImpl;
 void openAlertModalImpl;
 void openAiMediaModalImpl;
 void openNewPageModalImpl;
-void setBoxStyleImpl;
-void applyElementStyleImpl;
-void applyPinnedStyleImpl;
-void buildRunNodeImpl;
+// body-builder dispatch targets are kept void-referenced — the per-type
+// builders are consumed only inside buildElementBodyImpl, so the tree-shaker
+// needs an explicit liveness mark from the entry module.
 void buildTextBodyImpl;
 void buildMediaBodyImpl;
 void buildActionBodyImpl;
 void buildShapeBodyImpl;
 void buildContainerBodyImpl;
-void buildElementBodyImpl;
-void buildElementNodeImpl;
-void buildElementMenuImpl;
-void closeElementMenuImpl;
-void toggleElementMenuImpl;
-void rebuildElementImpl;
 void nextZInArray;
 void STYLE_KITS;
 void MOTION_PRESETS;
@@ -275,12 +300,14 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
       );
     };
   const siteBase = boot.apiBase + '/canvas/sites/' + boot.siteId;
-  // Phase 2q.m landed with an older base; the skeleton below is INCOMPLETE
-  // for ctx fields added by post-2q.f phases (2q.d/e/i/j/k/l) that the
-  // agent did not see. The remaining wirings (body builders, publish flow,
-  // sections picker, sidebar, root events, etc.) will be added in a follow-up
-  // pass before Phase 3 cutover. Until then, the cast at the closing brace
-  // bridges the gap — createEditor is dead code today.
+  // Every ctx field whose Ximpl exists in a sibling module is bound below.
+  // Fields whose implementations stay inline in canvas-client.ts through
+  // Phase 2 (the IIFE's free-closure helpers — pointerToCanvas,
+  // forceOpenInspector, renderInspectorSpec, etc.) keep the stub('Xname')
+  // thrower so a Phase-3 cutover that forgets to swap one surfaces loudly
+  // rather than silently no-oping. The Partial cast remains because
+  // optional fields (repaintRemoteCursors / onMarkToolbarReflow) are
+  // intentionally left undefined until their late-binding paths fire.
   const ctxPartial: Partial<EditorContext> = {
     // ---- Foundational state ------------------------------------------
     state: null,
@@ -292,14 +319,14 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     selectElement: (elementId) => selectElementImpl(ctx, elementId),
     captureForUndo: () => captureForUndoImpl(ctx),
     scheduleSave: () => scheduleSaveImpl(ctx),
-    closeElementMenu: stub('closeElementMenu'),
+    closeElementMenu: () => closeElementMenuImpl(ctx),
 
     // ---- Media inspector mounts --------------------------------------
     aiBusy: false,
     INSPECTOR_ACTION_HANDLERS: {},
 
     // ---- Form inspector mounts ---------------------------------------
-    rebuildElement: stub('rebuildElement'),
+    rebuildElement: (elementId) => rebuildElementImpl(ctx, elementId),
 
     // ---- Content inspector mounts ------------------------------------
     serializeContentToRuns: (rootNode) => serializeContentToRuns(rootNode),
@@ -374,9 +401,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     pagePositions: [],
     pendingImport: null,
     buildSectionNode: stub('buildSectionNode'),
-    syncSidebarStyleKitButtons: stub('syncSidebarStyleKitButtons'),
-    renderPlacementSlots: stub('renderPlacementSlots'),
-    setBoxStyle: stub('setBoxStyle'),
+    syncSidebarStyleKitButtons: (buttons) => syncSidebarStyleKitButtonsImpl(ctx, buttons),
+    renderPlacementSlots: () => renderPlacementSlotsImpl(ctx),
+    setBoxStyle: (wrapper, box) => setBoxStyleImpl(ctx, wrapper, box),
 
     // ---- Chat panel toggle + selection chip --------------------------
     chatToggleBtn: null,
@@ -434,7 +461,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     resolveElementWrapperAtPoint: stub('resolveElementWrapperAtPoint'),
     onCanvasLinkHover: (ev) => onCanvasLinkHoverImpl(ctx, ev),
     onCanvasLinkHoverLeave: (ev) => onCanvasLinkHoverLeaveImpl(ctx, ev),
-    renderSectionsPanel: stub('renderSectionsPanel'),
+    renderSectionsPanel: () => renderSectionsPanelImpl(ctx),
 
     // ---- Section toolbar + section orchestration ---------------------
     defaultBox: (section, w, h) => defaultBoxImpl(ctx, section, w, h),
@@ -531,7 +558,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
 
     // ---- Forward declarations consumed by Phase 2q.g (still inline) --
     forceOpenInspector: stub('forceOpenInspector'),
-    buildRunNode: stub('buildRunNode'),
+    buildRunNode: (run) => buildRunNodeImpl(ctx, run),
     marksEqual: (a: InlineMark[], b: InlineMark[]) => marksEqual(a, b),
     plainTextOf: (content: InlineRun[]) => plainTextOf(content),
     renderMathInScope: stub('renderMathInScope'),
@@ -539,6 +566,63 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     plainTextToFragmentHtml: stub('plainTextToFragmentHtml'),
     beginDrag: stub('beginDrag'),
     openLinkModal: stub('openLinkModal'),
+
+    // ---- Phase 2q.d: run + body builders + element menu --------------
+    // ICON_SVG_MAP is JSON-injected by the editor route at boot; until
+    // Phase 3 cutover wires the real source we ship an empty map. The
+    // buildShapeBody path no-ops on unknown iconKinds, so an empty map
+    // degrades to "icon-variant shapes render without their inner SVG"
+    // rather than throwing.
+    ICON_SVG_MAP: {},
+    openMenuElementId: null,
+    applyElementStyle: (wrapper, element) => applyElementStyleImpl(ctx, wrapper, element),
+    applyPinnedStyle: (wrapper, element) => applyPinnedStyleImpl(ctx, wrapper, element),
+    buildElementBody: (element) => buildElementBodyImpl(ctx, element),
+    buildElementNode: (element) => buildElementNodeImpl(ctx, element),
+    buildElementMenu: (element, section, wrapper) =>
+      buildElementMenuImpl(ctx, element, section, wrapper),
+    toggleElementMenu: (elementId, wrapper) => toggleElementMenuImpl(ctx, elementId, wrapper),
+
+    // ---- Phase 2q.e: forward-declared image generator (still inline) -
+    generateImageForElement: stub('generateImageForElement'),
+
+    // ---- Phase 2q.i: sections picker + sidebar wiring ----------------
+    sidebar: null,
+    activeTemplateFilter: 'all',
+    activeSearchQuery: '',
+    enterPlacementMode: (target) => enterPlacementModeImpl(ctx, target),
+    importPendingSectionAt: (insertAt) => importPendingSectionAt(ctx, insertAt),
+    attachSidebarTabs: () => attachSidebarTabs(ctx),
+    attachSidebarActions: () => attachSidebarActions(ctx),
+    applySidebarStyleKit: (kit, buttons) => applySidebarStyleKit(ctx, kit, buttons),
+    buildKitSummary: () => buildKitSummary(ctx),
+    ensureSectionsPanelLoaded: () => ensureSectionsPanelLoaded(ctx),
+
+    // ---- Phase 2q.j: publish + version pill + save + versions panel --
+    versionBadge: null,
+    versionPill: null,
+    versionPillOutsideHandler: null,
+    versionPillKeyHandler: null,
+    saveTemplateButton: null,
+    versionsLoaded: false,
+    versionsList: [],
+    // isEditableShortcutTarget stays inline through Phase 2 — the
+    // helper is a free closure in canvas-client.ts.
+    isEditableShortcutTarget: stub('isEditableShortcutTarget'),
+    deleteElement: (section, element) => deleteElement(ctx, section, element),
+    updateVersionBadge: (version) => updateVersionBadgeImpl(ctx, version),
+    publishSite: () => publishSiteImpl(ctx),
+    attachPublishButton: () => attachPublishButtonImpl(ctx),
+    closeVersionPill: () => closeVersionPillImpl(ctx),
+    openVersionPill: () => openVersionPillImpl(ctx),
+    attachVersionBadge: () => attachVersionBadgeImpl(ctx),
+    attachSaveButton: () => attachSaveButtonImpl(ctx),
+    activateSidebarTab: (tabName) => activateSidebarTabImpl(ctx, tabName),
+    ensureVersionsTabMounted: () => ensureVersionsTabMountedImpl(ctx),
+    renderVersionsPanel: () => renderVersionsPanelImpl(ctx),
+
+    // ---- Phase 2q.k: canvas root events ------------------------------
+    attachRootEvents: () => attachRootEventsImpl(ctx),
 
     // ---- Camera-reflow opt-in callbacks (kept undefined at boot) -----
     // repaintRemoteCursors + onMarkToolbarReflow are typeof-gated by the
@@ -580,8 +664,11 @@ export function createEditor(boot: EditorBoot): void {
   ctx.root = document.getElementById('canvas-root');
   ctx.inspector = document.getElementById('canvas-inspector');
   ctx.mainEl = document.querySelector('main.opencanvas-editor');
+  ctx.sidebar = document.getElementById('canvas-sidebar');
   ctx.saveButton = document.getElementById('canvas-save');
   ctx.publishButton = document.getElementById('canvas-publish') as HTMLButtonElement | null;
+  ctx.versionBadge = document.getElementById('canvas-version');
+  ctx.saveTemplateButton = document.getElementById('canvas-save-template');
   // The chat panel + selection chip refs are cached early — the toggle
   // wiring runs before the site-load promise resolves so an Owner can
   // open the chat panel during the boot wait.
@@ -639,9 +726,10 @@ export function createEditor(boot: EditorBoot): void {
         ctx.activePageId = ctx.state.pages[0]!.id;
       }
       // Version badge + initUndo + style-kit attribute (mirror IIFE).
-      // updateVersionBadge / attachVersionBadge stay inline at Phase 2;
-      // the calls go through ctx-method stubs that throw if reached —
-      // Phase 3 cutover wires the real impls.
+      ctx.updateVersionBadge(
+        typeof body.publishedVersion === 'number' ? body.publishedVersion : 0,
+      );
+      ctx.attachVersionBadge();
       initUndo(ctx);
       if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
         ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
@@ -656,18 +744,19 @@ export function createEditor(boot: EditorBoot): void {
       window.addEventListener('opencanvas-katex-ready', function () {
         if (ctx.root) ctx.renderMathInScope(ctx.root);
       });
-      // attachRootEvents / attachPointerHandlers / mountReel / attachGrip:
-      // pointer handlers + grip handlers + reel mount are extracted; the
-      // rest stay inline through Phase 2.
+      ctx.attachRootEvents();
       attachPointerHandlersImpl(ctx);
       mountReel(ctx);
       attachGripHandlersImpl(ctx);
+      ctx.attachSidebarTabs();
       attachPageCrumbImpl(ctx);
 
       // Sidebar-toggle / inspector-toggle wiring stay inline through
       // Phase 2 — these are pure DOM listeners with no extracted module.
       // Phase 3 cutover ports them onto createEditor's body.
 
+      ctx.ensureVersionsTabMounted();
+      ctx.attachSidebarActions();
       ctx.updatePageSidebar();
 
       // Page CRUD button wiring — the page-add button + page-list click
@@ -703,9 +792,12 @@ export function createEditor(boot: EditorBoot): void {
         });
       }
 
-      // attachSaveButton / attachPublishButton stay inline through Phase 2.
-      // attachCoEdit runs after the save-button wiring so the WS factory
-      // can disable the save button on socket failure.
+      // attachCoEdit runs AFTER the save-button wiring so the WS factory
+      // can disable the save button on socket failure (the order matters
+      // — the save button must exist before the WS open/close callbacks
+      // can flip its disabled state).
+      ctx.attachSaveButton();
+      ctx.attachPublishButton();
       ctx.attachCoEdit();
       ctx.setStatus('Ready', 'ok');
 
