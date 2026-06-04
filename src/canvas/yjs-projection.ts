@@ -836,6 +836,9 @@ function encodePage(page: CanvasPage): Y.Map<unknown> {
   // ADR 0059 — per-page suppression of the site-level header/footer.
   setIfDefined(out, 'suppressHeader', page.suppressHeader);
   setIfDefined(out, 'suppressFooter', page.suppressFooter);
+  // ADR 0060 — CMS collection template metadata.
+  setIfDefined(out, 'pageKind', page.pageKind);
+  setIfDefined(out, 'collectionSlug', page.collectionSlug);
   const sections = new Y.Array<Y.Map<unknown>>();
   for (const section of page.sections) sections.push([encodeSection(section)]);
   out.set('sections', sections);
@@ -1516,6 +1519,10 @@ function decodePage(map: Y.Map<unknown>): CanvasPage {
   if (map.has('collectionSlug')) page.collectionSlug = map.get('collectionSlug') as string;
   if (map.has('suppressHeader')) page.suppressHeader = map.get('suppressHeader') as boolean;
   if (map.has('suppressFooter')) page.suppressFooter = map.get('suppressFooter') as boolean;
+  if (map.has('pageKind')) {
+    page.pageKind = map.get('pageKind') as NonNullable<CanvasPage['pageKind']>;
+  }
+  if (map.has('collectionSlug')) page.collectionSlug = map.get('collectionSlug') as string;
   return page;
 }
 
