@@ -23,6 +23,7 @@ import { customTemplatesOwner } from './custom-templates';
 import notificationsApi from './notifications';
 import chatApi from '../../agent/chat/route';
 import { entriesRoute } from './entries';
+import { collectionsRoute } from './collections';
 import type { PublicEnv } from '../public';
 
 const ownerApi = new Hono<PublicEnv>();
@@ -43,5 +44,9 @@ ownerApi.route('/sites', chatApi);
 // entriesRoute paths are `/` and `/:entryId`; the `:siteId` parameter is
 // extracted from the mount path here.
 ownerApi.route('/sites/:siteId/entries', entriesRoute);
+// ADR 0060 F3 — "+ New collection" wizard. POST creates index + template
+// pages and a sample entry in one shot. Mounts alongside entries so the
+// dashboard's Entries tab can call it without an extra API base.
+ownerApi.route('/sites/:siteId/collections', collectionsRoute);
 
 export default ownerApi;

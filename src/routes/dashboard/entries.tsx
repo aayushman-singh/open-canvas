@@ -401,17 +401,20 @@ export function EntriesListView({
       <>
         <div class="entries-toolbar">
           <h1 style="margin:0;font-size:32px;letter-spacing:-.03em;">Entries</h1>
+          <div class="sp" />
+          <button type="button" class="btn btn-primary btn-sm" data-new-collection>
+            <PlusIcon />
+            New collection
+          </button>
         </div>
         <p class="sub">
           Content collections for <b>{siteName}</b>.
         </p>
         <div class="entries-table">
           <div class="empty">
-            No collections yet. Open the editor and add a page with{' '}
-            <code>pageKind: 'collection-index'</code> (or{' '}
-            <code>collection-item-template</code>) — that page's{' '}
-            <code>collectionSlug</code> shows up here, and you can start
-            writing entries.
+            No collections yet. Click <b>+ New collection</b> above to
+            scaffold an index page, a template page, and a sample entry —
+            ready to publish.
           </div>
         </div>
       </>
@@ -426,6 +429,10 @@ export function EntriesListView({
       <div class="entries-toolbar">
         <h1 style="margin:0;font-size:32px;letter-spacing:-.03em;">Entries</h1>
         <div class="sp" />
+        <button type="button" class="btn btn-outline btn-sm" data-new-collection>
+          <PlusIcon />
+          New collection
+        </button>
         <a href={newHref} class="btn btn-primary btn-sm">
           <PlusIcon />
           New entry
@@ -743,6 +750,60 @@ export function listClientScript(siteId: string): string {
   return String.raw`
 (() => {
   const SITE_ID = ${sid};
+  // ADR 0060 F3 — "+ New collection" wizard. Prompt for a slug via the shared
+  // modal, POST it to /api/sites/:siteId/collections, then navigate to the
+  // new collection's entries view. Server validates slug shape and collision
+  // and returns 409 with an error message on conflict.
+  function slugify(s) {
+    return String(s).toLowerCase().normalize('NFKD')
+      .replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  const newCollectionBtn = document.querySelector('[data-new-collection]');
+  if (newCollectionBtn) {
+    newCollectionBtn.addEventListener('click', async () => {
+      const raw = await window.__opencanvasModal.prompt(
+        'Pick a slug for this collection (e.g. "blog", "case-studies"). One word, lowercase.',
+        '',
+        'New collection',
+      );
+      if (raw === null) return;
+      const slug = slugify(raw);
+      if (slug.length === 0) {
+        await window.__opencanvasModal.alert(
+          'Slug must contain at least one lowercase letter or digit.',
+          'New collection',
+        );
+        return;
+      }
+      try {
+        const response = await fetch(
+          '/api/sites/' + encodeURIComponent(SITE_ID) + '/collections',
+          {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', accept: 'application/json' },
+            body: JSON.stringify({ slug }),
+          },
+        );
+        if (!response.ok) {
+          let detail = response.statusText;
+          try { const body = await response.json(); if (body && body.error) detail = body.error; } catch (_) {}
+          await window.__opencanvasModal.alert('Could not create collection: ' + detail, 'New collection');
+          return;
+        }
+        const data = await response.json().catch(() => null);
+        const redirect = data && typeof data.redirectTo === 'string'
+          ? data.redirectTo
+          : '/dashboard/sites/' + encodeURIComponent(SITE_ID) + '/entries?collection=' + encodeURIComponent(slug);
+        window.location.href = redirect;
+      } catch (e) {
+        await window.__opencanvasModal.alert(
+          'Network error: ' + (e && e.message ? e.message : String(e)),
+          'New collection',
+        );
+      }
+    });
+  }
+
   // Per-row delete buttons. The shared shell defines window.__opencanvasModal
   // (see shell.tsx) — we use its .confirm to gate the destructive call.
   document.querySelectorAll('[data-delete-entry]').forEach((btn) => {
