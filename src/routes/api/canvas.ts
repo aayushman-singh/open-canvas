@@ -7,6 +7,7 @@ import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { loadAccessibleSite, type SiteAccessRequirement } from '../../auth/accessible-site';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { getSeedAsset } from '../../canvas/seed-assets';
 import {
   STYLE_KITS,
   type CanvasPage,
@@ -854,6 +855,18 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   // The asset id may be a UUID (typical) or a content hash (when the
   // caller already speaks the ADR 0006 URL shape). Match either; require
   // Owner ownership in both branches.
+  //
+  // Seed-id fallback: pre-2026-06 sites still carry raw seed ids in their
+  // editable_state (e.g. `seed-hero-poster-1`) because they were created
+  // before `prepareSeedAssetsForCustomer` rewrote those references to the
+  // `seed-{customerId}-{seedId}` form. The owner_asset row for the raw
+  // seed-id doesn't exist for those Owners — but the row keyed by the
+  // seed's content_hash does, because two seed ids that share bytes share
+  // a row under the `(customer_id, content_hash)` unique index. When the
+  // caller asks for a known seed id, translate to its content hash so the
+  // existing row resolves instead of 404'ing.
+  const seedAsset = getSeedAsset(assetId);
+  const lookupContentHash = seedAsset?.contentHash;
   const rows = await database
     .select({
       id: ownerAsset.id,
@@ -866,7 +879,13 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
     .where(
       and(
         eq(ownerAsset.customerId, result.ownerCustomerId),
-        or(eq(ownerAsset.id, assetId), eq(ownerAsset.contentHash, assetId)),
+        lookupContentHash !== undefined
+          ? or(
+              eq(ownerAsset.id, assetId),
+              eq(ownerAsset.contentHash, assetId),
+              eq(ownerAsset.contentHash, lookupContentHash),
+            )
+          : or(eq(ownerAsset.id, assetId), eq(ownerAsset.contentHash, assetId)),
       ),
     )
     .limit(1);
