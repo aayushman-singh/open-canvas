@@ -36,20 +36,49 @@ import { newElementId } from './ids.js';
 import { applyZOrderAction, parentArrayFor } from './inspector-actions.js';
 import { nextZInArray } from './z-order.js';
 
+// Find the wrapper that currently owns the open 3-dot menu. Site-pinned
+// header/footer sections render one wrapper per artboard but share a
+// single element id, so a plain
+// `querySelector('[data-opencanvas-element="X"] .element-menu')` would
+// pick the FIRST matching wrapper — which is page 1's instance — even
+// when the menu was opened on page 3. We instead `querySelectorAll`
+// every wrapper carrying the id and pick the one that actually has a
+// `.element-menu` child (the menu is appended into the wrapper that
+// opened it). Returns null when no wrapper holds the menu, which is a
+// legitimate state (e.g. the menu's owner wrapper was rebuilt before
+// close ran).
+function findMenuOwnerWrapper(
+  ctx: EditorContext,
+  elementId: string,
+): HTMLElement | null {
+  if (!ctx.root) return null;
+  const wrappers = ctx.root.querySelectorAll(
+    '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
+  );
+  for (let i = 0; i < wrappers.length; i++) {
+    const wrapper = wrappers[i];
+    if (!(wrapper instanceof HTMLElement)) continue;
+    if (wrapper.querySelector(':scope > .element-menu')) return wrapper;
+  }
+  return null;
+}
+
 export function closeElementMenuImpl(ctx: EditorContext): void {
   if (!ctx.openMenuElementId) return;
   if (!ctx.root) {
     ctx.openMenuElementId = null;
     return;
   }
-  const prev = ctx.root.querySelector(
-    '[data-opencanvas-element="' + cssEscape(ctx.openMenuElementId) + '"] .element-menu',
-  );
-  if (prev) prev.remove();
-  const prevTrigger = ctx.root.querySelector(
-    '[data-opencanvas-element="' + cssEscape(ctx.openMenuElementId) + '"] .element-menu-trigger',
-  );
-  if (prevTrigger) prevTrigger.removeAttribute('data-menu-open');
+  // Find the SPECIFIC wrapper that owns the live menu (rather than the
+  // first wrapper carrying the id — site-pinned sections render one
+  // wrapper per artboard and the menu could be on any of them).
+  const owner = findMenuOwnerWrapper(ctx, ctx.openMenuElementId);
+  if (owner) {
+    const menu = owner.querySelector(':scope > .element-menu');
+    if (menu) menu.remove();
+    const trigger = owner.querySelector(':scope > .element-menu-trigger');
+    if (trigger) trigger.removeAttribute('data-menu-open');
+  }
   ctx.openMenuElementId = null;
 }
 

@@ -43,7 +43,6 @@
 
 import type { InlineRun, TextElement } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
-import { cssEscape } from './css-escape.js';
 import {
   buildMarkToolbarImpl,
   removeMarkToolbar,
@@ -56,24 +55,44 @@ import {
   removeLinkPopoverImpl,
   showLinkPopoverImpl,
 } from './link-popover.js';
+import { findElementWrapperInArtboardOf } from './selection.js';
 
-export function beginTextEditImpl(ctx: EditorContext, elementId: string): void {
+// `clickedWrapper` is the SPECIFIC `.opencanvas-element` DOM node the
+// canvas-root click handler resolved at the pointer — load-bearing for
+// site-pinned sections (header/footer) where the same element id renders
+// once per page artboard. Passing it through means the contenteditable
+// flip, mark-toolbar anchor, and every getBoundingClientRect-driven
+// affordance pin to the page the Owner actually clicked, not the first
+// match in document order. Optional so non-click callers (autopilot
+// flows, focus-via-keyboard) still work; those fall back to the helper's
+// first-match path.
+export function beginTextEditImpl(
+  ctx: EditorContext,
+  elementId: string,
+  clickedWrapper?: HTMLElement | null,
+): void {
   const found = ctx.findElement(elementId);
   if (!found || found.element.type !== 'text') return;
   if (!ctx.root) return;
   // Local alias so the text-narrowing survives closure capture in
   // restoreFromSnapshot / finish below.
   const textElement: TextElement = found.element;
-  const wrapper = ctx.root.querySelector(
-    '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
-  );
+  // Prefer the wrapper the caller resolved at the click point (it's
+  // already the right instance). When absent or stale, scope by artboard
+  // through findElementWrapperInArtboardOf — same behaviour the click
+  // path takes — so any context node the caller passes still pins us to
+  // the right page.
+  const wrapper =
+    clickedWrapper && clickedWrapper.isConnected
+      ? clickedWrapper
+      : findElementWrapperInArtboardOf(ctx, elementId, clickedWrapper ?? null);
   if (!wrapper) return;
   const inner = wrapper.querySelector<HTMLElement>('.opencanvas-text');
   if (!inner) return;
   const textH = inner.scrollHeight;
   if (textH > textElement.box.h) {
     textElement.box.h = textH;
-    ctx.setBoxStyle(wrapper as HTMLElement, textElement.box);
+    ctx.setBoxStyle(wrapper, textElement.box);
     ctx.scheduleSave();
   }
 
@@ -83,7 +102,7 @@ export function beginTextEditImpl(ctx: EditorContext, elementId: string): void {
   inner.setAttribute('contenteditable', 'true');
   inner.focus();
 
-  buildMarkToolbarImpl(ctx, wrapper as HTMLElement);
+  buildMarkToolbarImpl(ctx, wrapper);
 
   inner.addEventListener('mouseover', function (ev) {
     let node: Node | null = ev.target as Node | null;

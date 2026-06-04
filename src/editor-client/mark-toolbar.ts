@@ -52,8 +52,6 @@ import {
   INLINE_FONT_SIZE_PX_MIN,
   INLINE_FONT_SIZE_PX_MAX,
 } from './shared-constants.js';
-import { cssEscape } from './css-escape.js';
-
 // Standard preset list for the font-size select; mirrors the inline IIFE
 // twin verbatim. Owners rarely need a custom value — when they do, paste
 // from a styled source still lands a fresh px through normalizePastedHtml.
@@ -645,15 +643,21 @@ export function applyMarkImpl(ctx: EditorContext, type: InlineMarkType): void {
 // We mutate the data model AND mirror the new value into the live .opencanvas-text
 // inline style so the change is visible immediately without a rebuild — a
 // rebuild would tear down the contenteditable and drop the caret.
+//
+// Wrapper sourcing: we use ctx.markToolbarAnchor (the wrapper passed to
+// buildMarkToolbarImpl when the edit began). For site-pinned sections
+// the same element id renders once per artboard, so a fresh
+// `querySelector('[data-opencanvas-element=...]')` would always pick the
+// first DOM match — and the style mirror would land on page 1 even when
+// the Owner is editing page 3. rebuildElement still touches every
+// instance on save, so the model is canonical; this preview-mirror
+// just keeps the caret-bearing page visually in sync.
 function applyAlignToEditing(ctx: EditorContext, direction: TextAlign): void {
   if (!ctx.editingElementId) return;
   const found = ctx.findElement(ctx.editingElementId);
   if (!found || found.element.type !== 'text') return;
   found.element.align = direction;
-  if (!ctx.root) return;
-  const wrapper = ctx.root.querySelector(
-    '[data-opencanvas-element="' + cssEscape(ctx.editingElementId) + '"]',
-  );
+  const wrapper = ctx.markToolbarAnchor;
   const inner = wrapper ? wrapper.querySelector('.opencanvas-text') : null;
   if (inner) (inner as HTMLElement).style.textAlign = direction;
   refreshMarkToolbarAlignState(ctx);
@@ -663,6 +667,8 @@ function applyAlignToEditing(ctx: EditorContext, direction: TextAlign): void {
 // Element-level text color, applied via elementStyle.color — same field
 // the inspector "Style" block writes (see render.ts applyElementStyle).
 // Color inherits, so we set it on the wrapper to mirror the renderer.
+// Mirror lands on the active edit instance (ctx.markToolbarAnchor) for
+// the same reason applyAlignToEditing does — see that function's note.
 function applyTextColorToEditing(ctx: EditorContext, color: string): void {
   if (!ctx.editingElementId) return;
   const found = ctx.findElement(ctx.editingElementId);
@@ -686,11 +692,8 @@ function applyTextColorToEditing(ctx: EditorContext, color: string): void {
   } else {
     delete element.elementStyle;
   }
-  if (!ctx.root) return;
-  const wrapper = ctx.root.querySelector(
-    '[data-opencanvas-element="' + cssEscape(ctx.editingElementId) + '"]',
-  );
-  if (wrapper) (wrapper as HTMLElement).style.color = color || '';
+  const wrapper = ctx.markToolbarAnchor;
+  if (wrapper) wrapper.style.color = color || '';
   ctx.scheduleSave();
 }
 
@@ -746,14 +749,16 @@ export function buildMarkToolbarImpl(ctx: EditorContext, anchor: HTMLElement): v
     '</svg>';
   // mousedown.preventDefault() keeps the contenteditable selection alive
   // while we initiate the drag on the parent text element wrapper.
+  // We drag the wrapper that owns the active edit (ctx.markToolbarAnchor),
+  // NOT the first DOM match by id — site-pinned sections render one
+  // wrapper per artboard, so a fresh querySelector would always pick
+  // page 1's instance, dragging that one while the Owner edits page 3.
   dragBtn.addEventListener('mousedown', function (ev) {
     ev.preventDefault();
-    if (!ctx.editingElementId || !ctx.root) return;
-    const wrapper = ctx.root.querySelector(
-      '[data-opencanvas-element="' + cssEscape(ctx.editingElementId) + '"]',
-    );
+    if (!ctx.editingElementId) return;
+    const wrapper = ctx.markToolbarAnchor;
     if (!wrapper) return;
-    ctx.beginDrag(ev, wrapper as HTMLElement);
+    ctx.beginDrag(ev, wrapper);
   });
   bar.appendChild(dragBtn);
   // The inline-code mark is intentionally absent from the toolbar — owners

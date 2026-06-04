@@ -23,6 +23,19 @@
 // loop, so the highlight reflects on every page instead of just the
 // first match in document order.
 //
+// Affordance anchoring: c70240c propagated `data-selected` across every
+// repeated instance, but chrome that needs a single DOM rect (the inline
+// rich-text toolbar, drag/align affordances, inspector popovers that
+// position via getBoundingClientRect) still has to pick exactly one
+// wrapper. The helper `findElementWrapperInArtboardOf` scopes the lookup
+// to the artboard the user actually clicked into — so a click on page-3's
+// footer text spawns the RTE toolbar over page-3, not page-1. Callers
+// pass the clicked DOM node (or any descendant of it) as `contextEl`;
+// the helper walks up to `.opencanvas-artboard` and querySelectors WITHIN
+// that artboard. Falls back to the first DOM match only when no artboard
+// ancestor is found (defensive — every wrapper rendered by render.ts
+// lives inside an artboard).
+//
 // Action-element auto-pin: when the selected element is an `action`, the
 // inner <a.opencanvas-action> anchor gets a pinned link popover so the
 // Owner can navigate to the linked page without hunting for the
@@ -69,6 +82,44 @@ export function selectElement(ctx: EditorContext, elementId: string | null): voi
   }
   ctx.renderInspector();
   ctx.updateChatSelectionChip();
+}
+
+// Scope an element-id lookup to the artboard that contains `contextEl`.
+// Site-pinned header/footer sections materialise one wrapper per artboard
+// but share a single element id, so a plain `querySelector` always hands
+// back the first DOM match — meaning chrome anchored via
+// getBoundingClientRect (RTE toolbar, drag affordances, inspector popovers
+// that need a real screen rect) lands on page 1 no matter which page the
+// Owner actually clicked.
+//
+// The helper walks `contextEl` up to its `.opencanvas-artboard` ancestor,
+// then runs the wrapper lookup inside that artboard. The result is the
+// instance the click actually hit, not the one document order picked.
+//
+// Fallback: when `contextEl` is null OR no artboard ancestor exists OR
+// the artboard-scoped lookup misses, we fall back to the first
+// document-wide match. The fallback path is the same behaviour the
+// pre-fix code had — the helper degrades, it does not throw — but in
+// practice every wrapper rendered by render.ts lives inside an artboard,
+// so the fallback only fires when the caller passes a context node from
+// outside the canvas (e.g. a sidebar control re-selecting an element by
+// id without a click event to scope to).
+export function findElementWrapperInArtboardOf(
+  ctx: EditorContext,
+  elementId: string,
+  contextEl: Element | null,
+): HTMLElement | null {
+  if (!ctx.root) return null;
+  const selector = '[data-opencanvas-element="' + cssEscape(elementId) + '"]';
+  if (contextEl) {
+    const artboard = contextEl.closest('.opencanvas-artboard');
+    if (artboard) {
+      const scoped = artboard.querySelector(selector);
+      if (scoped instanceof HTMLElement) return scoped;
+    }
+  }
+  const fallback = ctx.root.querySelector(selector);
+  return fallback instanceof HTMLElement ? fallback : null;
 }
 
 export function selectSection(ctx: EditorContext, sectionId: string | null): void {

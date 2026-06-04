@@ -1352,8 +1352,16 @@ export interface EditorContext {
   /** Flip a text element into contenteditable mode and wire its
    *  blur/keydown/paste/mouseover/mouseout/mousedown event handlers + the
    *  document-level selectionchange handler. No-op when the element id
-   *  doesn't resolve or isn't a text element. */
-  beginTextEdit(elementId: string): void;
+   *  doesn't resolve or isn't a text element.
+   *
+   *  `clickedWrapper` is the specific `.opencanvas-element` DOM node the
+   *  click handler resolved at the pointer. Load-bearing for site-pinned
+   *  sections (header/footer): the same element id renders once per
+   *  artboard, so without the wrapper the contenteditable + mark toolbar
+   *  pin to page 1 regardless of which page the Owner actually clicked.
+   *  Optional so non-click callers (sidebar select-then-edit) still work
+   *  via the helper's artboard-scoped fallback. */
+  beginTextEdit(elementId: string, clickedWrapper?: HTMLElement | null): void;
 
   // -- Forward declarations consumed by the Phase 2q.g extraction --------
   // These functions stay inline in canvas-client.ts during Phase 2; the

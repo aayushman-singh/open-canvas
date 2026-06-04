@@ -90,7 +90,12 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
       if (elType === 'text') {
         if (ctx.editingElementId !== id) {
           ctx.selectElement(id);
-          ctx.beginTextEdit(id);
+          // Pass the specific clicked wrapper through so site-pinned
+          // sections (header/footer) anchor the contenteditable + mark
+          // toolbar to the page the Owner actually clicked, not the
+          // first DOM match. selectElement updates state on the canonical
+          // model; the clicked wrapper is purely a chrome anchor.
+          ctx.beginTextEdit(id, elementNode);
         }
         return;
       }
