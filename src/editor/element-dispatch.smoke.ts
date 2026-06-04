@@ -30,9 +30,14 @@ const dispatchEnd = source.indexOf(
   "throw new Error('unsupported editor element type: '",
   dispatchStart,
 );
+// Lower-bound the dispatch body so a quote-style flip on the throw sentence
+// (e.g. Prettier config drift switching single → double quotes) cannot
+// shrink dispatchBody to an empty slice and silently pass the missing-case
+// check below. 500 chars is a conservative floor — the live switch is
+// ~1.5 KB and shrinking past 500 means at least half the cases vanished.
 assert(
-  dispatchEnd > dispatchStart,
-  'buildElementBodyImpl throw-on-unknown sentinel missing — dispatch shape changed; update this smoke',
+  dispatchEnd > dispatchStart + 500,
+  "buildElementBodyImpl throw-on-unknown sentinel missing or dispatch body shrank below 500 chars — quote style flipped, switch was gutted, or the source shape changed; update this smoke",
 );
 const dispatchBody = source.slice(dispatchStart, dispatchEnd);
 

@@ -72,7 +72,21 @@ if (process.argv.includes('--dry-run')) {
 // `<script src="/_assets/index-<hash>.js">` 404s and the page stays
 // blank. Run the dev build (inline sourcemaps, unminified) synchronously
 // before spawning anything else.
+//
+// NOTE: this is a one-shot build, not a watcher. Editing any file under
+// src/editor-client/ (or its transitive deps under src/canvas/style-kits.ts
+// + src/ui/theme.ts for CSS changes) requires a manual rebuild:
+//   bun run editor-client:build:dev
+// then a browser reload. Wrangler dev DOES NOT watch the bundle source.
+// If the bundle source goes stale during a long dev session, the symptom
+// is "my edit isn't taking effect" — re-run the build.
 console.log('[dev:all] building editor-client bundle (dev mode)…');
+console.log(
+  '[dev:all] note: this is a one-shot build. Re-run `bun run editor-client:build:dev`',
+);
+console.log(
+  '[dev:all]       after editing any src/editor-client/ file, then reload the browser.',
+);
 const buildResult = spawnSync(
   bunCommand,
   ['run', 'editor-client:build:dev'],
