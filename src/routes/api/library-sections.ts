@@ -290,9 +290,15 @@ librarySectionsOwner.post('/sections', async (c) => {
   const manifest = await buildAssetManifest(database, customerId, loaded.section);
   const heading = firstHeadingPreview(loaded.section);
 
+  // ADR 0061 Phase A — baseSlug mirrors the row id for first-version inserts
+  // through this legacy route. Phase E will introduce save-as-new with an
+  // explicit parentId + bumped version against an existing baseSlug.
+  const newId = crypto.randomUUID();
+
   const [row] = await database
     .insert(librarySection)
     .values({
+      id: newId,
       customerId: parsed.visibility === 'global' ? null : customerId,
       visibility: parsed.visibility,
       name: parsed.name ?? loaded.section.name,
@@ -301,6 +307,7 @@ librarySectionsOwner.post('/sections', async (c) => {
       sectionData: loaded.section,
       assetManifest: manifest,
       headingPreview: heading.length > 0 ? heading : loaded.section.recipeId,
+      baseSlug: newId,
     })
     .returning({ id: librarySection.id });
 
@@ -362,9 +369,16 @@ librarySectionsAdmin.post('/sections', async (c) => {
   const manifest = await buildAssetManifest(database, customerId, loaded.section);
   const heading = firstHeadingPreview(loaded.section);
 
+  // ADR 0061 Phase A — admin-promoted global rows mirror the row id into
+  // baseSlug at first-version creation, same as the Owner POST path. The
+  // boot upsert in Phase B uses code-defined deterministic slugs instead;
+  // this route stays for admin-saved one-offs only.
+  const newId = crypto.randomUUID();
+
   const [row] = await database
     .insert(librarySection)
     .values({
+      id: newId,
       customerId: null,
       visibility: 'global',
       name: parsed.name ?? loaded.section.name,
@@ -373,6 +387,7 @@ librarySectionsAdmin.post('/sections', async (c) => {
       sectionData: loaded.section,
       assetManifest: manifest,
       headingPreview: heading.length > 0 ? heading : loaded.section.recipeId,
+      baseSlug: newId,
     })
     .returning({ id: librarySection.id });
 

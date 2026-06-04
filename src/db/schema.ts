@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   customType,
   index,
@@ -448,21 +449,55 @@ export interface AssetManifestEntry {
 export const LIBRARY_SECTION_VISIBILITY = ['global', 'private'] as const;
 export type LibrarySectionVisibility = (typeof LIBRARY_SECTION_VISIBILITY)[number];
 
-export const librarySection = pgTable('library_section', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
-  visibility: text('visibility').notNull().$type<LibrarySectionVisibility>(),
-  name: text('name').notNull(),
-  description: text('description').notNull().default(''),
-  recipeId: text('recipe_id').notNull(),
-  sectionData: jsonb('section_data').notNull().$type<CanvasSection>(),
-  assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
-  headingPreview: text('heading_preview').notNull().default(''),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+// ADR 0061 Decision 8 — closed enum gating the picker's category filter.
+// `'other'` is the explicit escape hatch for sections that don't fit any
+// of the seven content categories. Order here drives the picker dropdown
+// order (Header / Hero / Features / Testimonials / CTA / Gallery / Footer
+// / Other) — keep the user-facing reading order, not insertion order.
+export const SECTION_CATEGORIES = [
+  'header',
+  'hero',
+  'features',
+  'testimonials',
+  'cta',
+  'gallery',
+  'footer',
+  'other',
+] as const;
+export type SectionCategory = (typeof SECTION_CATEGORIES)[number];
+
+export const librarySection = pgTable(
+  'library_section',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    customerId: text('customer_id').references(() => customer.id, { onDelete: 'cascade' }),
+    visibility: text('visibility').notNull().$type<LibrarySectionVisibility>(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    recipeId: text('recipe_id').notNull(),
+    sectionData: jsonb('section_data').notNull().$type<CanvasSection>(),
+    assetManifest: jsonb('asset_manifest').notNull().$type<AssetManifestEntry[]>(),
+    headingPreview: text('heading_preview').notNull().default(''),
+    // ADR 0061 Decision 5 — origin-named slug (e.g. `home-template-hero`,
+    // `library-template-testimonial-quote`). Backfilled to `id` on
+    // pre-existing rows so the NOT NULL constraint holds without a code
+    // change to the legacy POST route.
+    baseSlug: text('base_slug').notNull(),
+    // ADR 0061 Decision 4 — lineage column. v2 = v1.version + 1; v1 stays
+    // referenced by every Template that pinned its exact id.
+    version: integer('version').notNull().default(1),
+    // Self-FK to the predecessor row when this row is a save-as-new of an
+    // existing section. text (not uuid) because library_section.id is text.
+    parentId: text('parent_id').references((): AnyPgColumn => librarySection.id),
+    // ADR 0061 Decision 8 — picker filter axis, orthogonal to recipeId.
+    category: text('category').notNull().default('other').$type<SectionCategory>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('library_section_base_slug_version_idx').on(table.baseSlug, table.version)],
+);
 
 export type LibrarySection = typeof librarySection.$inferSelect;
 export type NewLibrarySection = typeof librarySection.$inferInsert;
