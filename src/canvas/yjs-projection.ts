@@ -51,6 +51,7 @@
 //   'role'?             -> string
 //   'anchorId'?         -> string
 //   'backgroundEffect'? -> string
+//   'accentBorder'?     -> Y.Map<unknown>                (ADR 0062)
 //   'entrance'?         -> string
 //   'trigger'?          -> Y.Map<unknown>
 //   'backgroundVideo'?  -> string
@@ -793,6 +794,25 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
   setIfDefined(out, 'role', section.role);
   setIfDefined(out, 'anchorId', section.anchorId);
   setIfDefined(out, 'backgroundEffect', section.backgroundEffect);
+  // ADR 0062 — discriminated-union accent border. Encoded as a nested
+  // Y.Map keyed by the union's `type` discriminator plus the arm-specific
+  // fields. Mirrors the `trigger` encoding above.
+  if (section.accentBorder !== undefined) {
+    const ab = new Y.Map<unknown>();
+    ab.set('type', section.accentBorder.type);
+    ab.set('color', section.accentBorder.color);
+    if (section.accentBorder.type === 'solid') {
+      ab.set('width', section.accentBorder.width);
+    } else if (section.accentBorder.type === 'top' || section.accentBorder.type === 'left') {
+      ab.set('thickness', section.accentBorder.thickness);
+    } else {
+      ab.set('radius', section.accentBorder.radius);
+      if (section.accentBorder.spread !== undefined) {
+        ab.set('spread', section.accentBorder.spread);
+      }
+    }
+    out.set('accentBorder', ab);
+  }
   setIfDefined(out, 'entrance', section.entrance);
   if (section.trigger !== undefined) {
     const trigger = new Y.Map<unknown>();
@@ -1473,6 +1493,27 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
     section.backgroundEffect = map.get('backgroundEffect') as NonNullable<
       CanvasSection['backgroundEffect']
     >;
+  }
+  // ADR 0062 — decode discriminated-union accent border. Mirrors the
+  // trigger arm above.
+  if (map.has('accentBorder')) {
+    const ab = map.get('accentBorder') as Y.Map<unknown>;
+    const abType = ab.get('type') as NonNullable<CanvasSection['accentBorder']>['type'];
+    const color = ab.get('color') as string;
+    if (abType === 'solid') {
+      section.accentBorder = { type: 'solid', color, width: ab.get('width') as number };
+    } else if (abType === 'top' || abType === 'left') {
+      section.accentBorder = { type: abType, color, thickness: ab.get('thickness') as number };
+    } else {
+      const radius = ab.get('radius') as number;
+      const out: { type: 'glow'; color: string; radius: number; spread?: number } = {
+        type: 'glow',
+        color,
+        radius,
+      };
+      if (ab.has('spread')) out.spread = ab.get('spread') as number;
+      section.accentBorder = out;
+    }
   }
   if (map.has('entrance')) {
     section.entrance = map.get('entrance') as NonNullable<CanvasSection['entrance']>;

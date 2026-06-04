@@ -281,6 +281,38 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
   if (section.trigger) {
     styleEntries.push(['display', 'none']);
   }
+  // ADR 0062 — emit the accent-border variant as inline CSS on the section
+  // wrapper so per-section state stays self-contained. The four variants
+  // are mutually exclusive by construction, so we emit exactly one shape
+  // of CSS per call. All variants use box-shadow when possible — solid
+  // and top/left as `inset` shadows so they overlay any background-effect
+  // without affecting layout; glow as an outer (non-inset) shadow.
+  if (section.accentBorder) {
+    const ab = section.accentBorder;
+    const safeColor = escapeCssValue(ab.color);
+    if (safeColor) {
+      if (ab.type === 'solid') {
+        styleEntries.push(['border', `${String(ab.width)}px solid ${safeColor}`]);
+        styleEntries.push(['box-sizing', 'border-box']);
+      } else if (ab.type === 'top') {
+        styleEntries.push([
+          'box-shadow',
+          `inset 0 ${String(ab.thickness)}px 0 0 ${safeColor}`,
+        ]);
+      } else if (ab.type === 'left') {
+        styleEntries.push([
+          'box-shadow',
+          `inset ${String(ab.thickness)}px 0 0 0 ${safeColor}`,
+        ]);
+      } else {
+        const spread = ab.spread ?? 0;
+        styleEntries.push([
+          'box-shadow',
+          `0 0 ${String(ab.radius)}px ${String(spread)}px ${safeColor}`,
+        ]);
+      }
+    }
+  }
   const style = styleFromEntries(styleEntries);
   // Reading order = `section.elements[]` storage order. The renderer is the
   // contract: whatever order elements appear in the array is the order DOM
@@ -312,7 +344,13 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
     typeof section.instanceScope === 'string' && section.instanceScope.length > 0
       ? ` data-instance-scope="${escapeAttr(section.instanceScope)}"`
       : '';
-  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs}${scopeAttr} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
+  // ADR 0062 — accent-border type surfaces as a data attribute alongside
+  // data-bg-effect so editor smokes and CSS hooks can target the variant
+  // without re-parsing inline styles. Omitted when absent.
+  const accentAttr = section.accentBorder
+    ? ` data-accent-border="${escapeAttr(section.accentBorder.type)}"`
+    : '';
+  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs}${scopeAttr} data-bg-effect="${escapeAttr(bgEffect)}"${accentAttr} data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
 function renderPage(

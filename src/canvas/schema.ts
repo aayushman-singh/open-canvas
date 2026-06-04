@@ -189,6 +189,35 @@ export const BACKGROUND_EFFECTS = [
 ] as const;
 export type BackgroundEffect = (typeof BACKGROUND_EFFECTS)[number];
 
+/**
+ * ADR 0062 — Section accent border. A single-variant accent treatment
+ * applied to the section wrapper. Mutually exclusive by construction —
+ * picking one shape replaces whichever was previously set, and "no
+ * accent" is encoded as the field being absent rather than as a
+ * dedicated `{ type: 'none' }` arm.
+ *
+ *   - `solid`  — 1–2 px solid line around the section, corner-radius
+ *                matching the section wrapper (currently 0; renderer
+ *                honours border-radius if a future field adds one).
+ *   - `top`    — thin color stripe along the top edge only.
+ *   - `left`   — vertical color bar along the left edge only.
+ *   - `glow`   — soft outer box-shadow halo in the chosen color, no
+ *                hard edge. `radius` controls the blur radius; the
+ *                optional `spread` controls how far the halo extends.
+ *
+ * Color values are CSS color strings, validated through the same
+ * `validateInjectionSafeString` path as `elementStyle.backgroundColor`
+ * and `elementStyle.borderColor`.
+ */
+export const ACCENT_BORDER_TYPES = ['solid', 'top', 'left', 'glow'] as const;
+export type AccentBorderType = (typeof ACCENT_BORDER_TYPES)[number];
+
+export type AccentBorder =
+  | { type: 'solid'; color: string; width: number }
+  | { type: 'top'; color: string; thickness: number }
+  | { type: 'left'; color: string; thickness: number }
+  | { type: 'glow'; color: string; radius: number; spread?: number };
+
 export interface PositionedBox {
   x: number;
   y: number;
@@ -418,6 +447,12 @@ export interface CanvasSection {
   height: number;
   role?: SectionRole;
   backgroundEffect?: BackgroundEffect;
+  /**
+   * ADR 0062 — section accent border. Absent = no accent. The four
+   * variants are mutually exclusive by construction (discriminated
+   * union); setting one replaces whichever was previously set.
+   */
+  accentBorder?: AccentBorder;
   entrance?: MotionPreset;
   /**
    * Optional public DOM anchor target for the section wrapper. Same contract

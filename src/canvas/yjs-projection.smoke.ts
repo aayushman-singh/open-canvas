@@ -323,6 +323,11 @@ const syntheticSection: CanvasSection = {
   height: 3040,
   role: 'body',
   backgroundEffect: 'grid',
+  // ADR 0062 — exercise the glow arm here so the synthetic fixture covers
+  // the most-structured variant (color + radius + optional spread). The
+  // other three arms (solid / top / left) are covered by the dedicated
+  // section-accent-border.smoke.ts.
+  accentBorder: { type: 'glow', color: '#ff8800', radius: 48, spread: 8 },
   entrance: 'fade-up',
   elements: syntheticElements,
 };
