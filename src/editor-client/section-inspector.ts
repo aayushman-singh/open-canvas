@@ -17,7 +17,6 @@
 import type { EditorContext } from './editor-context.js';
 import type { BackgroundEffect, MotionPreset, SectionRole } from '../canvas/schema.js';
 import { MOTION_PRESETS } from '../canvas/schema.js';
-import { isPinnedSection } from './section-roles.js';
 import { selectInput } from './dom-builders.js';
 
 export function renderSectionInspector(ctx: EditorContext): void {
@@ -259,13 +258,11 @@ export function renderSectionInspector(ctx: EditorContext): void {
   const grid = document.createElement('div');
   grid.className = 'opencanvas-section-inspector-grid';
 
-  const pinned = isPinnedSection(section);
+  // ADR 0059 — page sections can never be pinned; duplicate/move always allowed.
   const defs: { label: string; action: string; tip: string; danger?: boolean }[] = [];
-  if (!pinned) {
-    defs.push({ label: 'Duplicate', action: 'duplicate-section', tip: 'Create a copy of this section' });
-    defs.push({ label: 'Move up', action: 'move-up', tip: 'Move this section up on the page' });
-    defs.push({ label: 'Move down', action: 'move-down', tip: 'Move this section down on the page' });
-  }
+  defs.push({ label: 'Duplicate', action: 'duplicate-section', tip: 'Create a copy of this section' });
+  defs.push({ label: 'Move up', action: 'move-up', tip: 'Move this section up on the page' });
+  defs.push({ label: 'Move down', action: 'move-down', tip: 'Move this section down on the page' });
   defs.push({
     label: 'Save to library',
     action: 'save-to-library',

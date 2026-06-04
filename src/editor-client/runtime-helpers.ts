@@ -63,7 +63,6 @@ import {
   handleViewportMousemove,
   schedulePublishLocalPresence,
 } from './co-edit.js';
-import { isPinnedSection } from './section-roles.js';
 import {
   SIDEBAR_FACTORIES,
   type SidebarFactoryName,
@@ -372,7 +371,6 @@ export function buildSectionNodeImpl(
   node.className = 'opencanvas-section';
   node.setAttribute('data-opencanvas-section', section.id);
   node.setAttribute('data-recipe', section.recipeId);
-  if (isPinnedSection(section) && section.role) node.setAttribute('data-section-role', section.role);
   if (section.backgroundEffect) node.setAttribute('data-bg-effect', section.backgroundEffect);
   if (section.entrance) node.setAttribute('data-entrance', section.entrance);
   node.style.position = 'relative';

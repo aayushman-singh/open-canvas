@@ -98,7 +98,6 @@
 //   - nextZInArray / nextZ are already in ./z-order.ts (Phase 2d). The
 //     inline twins at canvas-client.ts:11482-11493 are byte-identical
 //     to z-order.ts's nextZInArray; the extracted module just imports.
-//   - isPinnedSection / clampInsertIndex live in ./section-roles.ts
 //     (Phase 2d). Pure imports — no ctx forward decl needed.
 //   - newElementId / newSectionId live in ./ids.ts (Phase 2c). Pure imports.
 //
@@ -111,7 +110,6 @@ import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
 import { applyCameraTransform } from './render.js';
 import { newElementId, newSectionId } from './ids.js';
-import { clampInsertIndex, isPinnedSection } from './section-roles.js';
 import { nextZInArray } from './z-order.js';
 
 /**
@@ -261,10 +259,8 @@ export function addBlankSectionFromSidebarImpl(ctx: EditorContext): void {
   const selectedIndex = ctx.selectedSectionId
     ? page.sections.findIndex((candidate) => candidate.id === ctx.selectedSectionId)
     : -1;
-  const insertAt = clampInsertIndex(
-    page,
-    selectedIndex >= 0 ? selectedIndex + 1 : page.sections.length,
-  );
+  const raw = selectedIndex >= 0 ? selectedIndex + 1 : page.sections.length;
+  const insertAt = Math.max(0, Math.min(raw, page.sections.length));
   page.sections.splice(insertAt, 0, section);
   ctx.selectedSectionId = section.id;
   ctx.selectedElementId = null;
@@ -357,13 +353,9 @@ export function handleSectionActionImpl(
   if (action.indexOf('add-') === 0 && ctx.SIDEBAR_COMMANDS[action.slice(4)]) {
     ctx.insertElementForSidebarCommand(section, action.slice(4));
   } else if (action === 'duplicate-section') {
-    if (isPinnedSection(section)) return;
     const copy = JSON.parse(JSON.stringify(section)) as CanvasSection;
     copy.id = newSectionId();
     copy.name = section.name + ' copy';
-    // Same EOP rule as state.header/footer above: clear via delete rather
-    // than `= undefined`. Duplicating a header/footer always produces a
-    // body-role copy — the original keeps its pinned role.
     delete copy.role;
     for (const el of copy.elements) {
       el.id = newElementId();

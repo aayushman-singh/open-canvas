@@ -49,7 +49,6 @@
 
 import type { EditorContext } from './editor-context.js';
 import { cssEscape } from './css-escape.js';
-import { isPinnedSection } from './section-roles.js';
 import { buildSectionThumbnail, moveSectionToIndex } from './reel.js';
 
 interface CanvasDropTarget {
@@ -78,7 +77,6 @@ export function beginSectionDragImpl(
   const fromIdx = page.sections.findIndex((s) => s.id === sectionId);
   if (fromIdx < 0) return;
   const section = page.sections[fromIdx]!;
-  if (isPinnedSection(section)) return;
 
   const sectionElCandidate = root.querySelector(
     '[data-opencanvas-section="' + cssEscape(sectionId) + '"]',

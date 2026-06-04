@@ -44,14 +44,13 @@
 //     spawns a blank section at the clamped insertAt position on click.
 //
 //   - insertBlankSectionAt(ctx, insertAt) — splice a new blank section
-//     into currentPage().sections at clampInsertIndex(page, insertAt),
+//     into currentPage().sections at the clamped insertAt position,
 //     select it, re-render, schedule save, surface status. Used by the
 //     reel "+" affordances and mountReel's add-section button.
 //
 //   - moveSectionToIndex(ctx, fromIdx, toIdx) — reorder a body section,
-//     skipping no-ops (same position / off either pin boundary).
-//     isPinnedSection short-circuits — pinned sections cannot move.
-//     Called from section-drag.ts onUp.
+//     skipping no-ops (same position / off-array). ADR 0059: page sections
+//     are never pinned, so no pin-bound guards. Called from section-drag.ts.
 //
 //   - buildReelRoleSlot(ctx, role) — header / footer slot button. Click
 //     creates a new pinned section (defaulting to height 80 for header,
@@ -75,13 +74,6 @@
 import type { CanvasSection } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
 import { newSectionId } from './ids.js';
-import {
-  clampInsertIndex,
-  hasFooterSection,
-  hasHeaderSection,
-  isPinnedSection,
-  sectionDisplayName,
-} from './section-roles.js';
 import { beginReelDragImpl } from './section-drag.js';
 
 export function openReelImpl(ctx: EditorContext): void {
@@ -168,7 +160,7 @@ function buildReelInsertButton(ctx: EditorContext, insertAt: number): HTMLButton
 export function insertBlankSectionAt(ctx: EditorContext, insertAt: number): void {
   const page = ctx.currentPage();
   if (!page) return;
-  const clampedAt = clampInsertIndex(page, insertAt);
+  const clampedAt = Math.max(0, Math.min(insertAt, page.sections.length));
   const section: CanvasSection = {
     id: newSectionId(),
     recipeId: 'feature-grid',
@@ -194,11 +186,8 @@ export function moveSectionToIndex(
   if (fromIdx < 0 || fromIdx >= page.sections.length) return;
   if (fromIdx === toIdx || fromIdx + 1 === toIdx) return;
   const section = page.sections[fromIdx]!;
-  if (isPinnedSection(section)) return;
   const adjustedTo = toIdx > fromIdx ? toIdx - 1 : toIdx;
-  const min = hasHeaderSection(page) ? 1 : 0;
-  const max = hasFooterSection(page) ? page.sections.length - 2 : page.sections.length - 1;
-  if (adjustedTo < min || adjustedTo > max) return;
+  if (adjustedTo < 0 || adjustedTo > page.sections.length - 1) return;
   page.sections.splice(fromIdx, 1);
   page.sections.splice(adjustedTo, 0, section);
   ctx.renderAll();
@@ -301,18 +290,15 @@ export function renderReelImpl(ctx: EditorContext): void {
     body.appendChild(buildReelRoleSlot(ctx, 'header'));
   }
 
-  // -- Body section tiles (page.sections — no header/footer in array) ---
+  // -- Body section tiles. ADR 0059 — page sections are never pinned;
+  //    every tile gets an insert button before it and is draggable.
   for (let i = 0; i < page.sections.length; i++) {
     const section = page.sections[i]!;
-    const isPinned = isPinnedSection(section);
 
-    if (!isPinned) {
-      body.appendChild(buildReelInsertButton(ctx, i));
-    }
+    body.appendChild(buildReelInsertButton(ctx, i));
 
     const tile = document.createElement('div');
     tile.className = isTile ? 'reel-tile' : 'reel-list-item';
-    if (isPinned) tile.classList.add('reel-locked');
     tile.setAttribute('data-reel-section', section.id);
     tile.setAttribute('data-reel-index', String(i));
 
@@ -325,14 +311,14 @@ export function renderReelImpl(ctx: EditorContext): void {
     if (isTile) {
       const tLabel = document.createElement('div');
       tLabel.className = 'reel-tile-label';
-      tLabel.textContent = sectionDisplayName(section, section.recipeId);
+      tLabel.textContent = section.name || section.recipeId;
       tile.appendChild(tLabel);
     } else {
       const tInfo = document.createElement('div');
       tInfo.className = 'reel-list-info';
       const tName = document.createElement('div');
       tName.className = 'reel-list-name';
-      tName.textContent = sectionDisplayName(section, 'Untitled');
+      tName.textContent = section.name || 'Untitled';
       const tRecipe = document.createElement('div');
       tRecipe.className = 'reel-list-recipe';
       tRecipe.textContent = section.recipeId;
@@ -341,28 +327,18 @@ export function renderReelImpl(ctx: EditorContext): void {
       tile.appendChild(tInfo);
     }
 
-    if (!isPinned) {
-      const sectionId = section.id;
-      const idx = i;
-      tile.addEventListener('mousedown', (ev) => {
-        if (ev.button !== 0) return;
-        ev.preventDefault();
-        beginReelDragImpl(ctx, sectionId, idx, ev);
-      });
-    } else {
-      const sectionId = section.id;
-      tile.addEventListener('click', () => {
-        ctx.selectSection(sectionId);
-      });
-    }
+    const sectionId = section.id;
+    const idx = i;
+    tile.addEventListener('mousedown', (ev) => {
+      if (ev.button !== 0) return;
+      ev.preventDefault();
+      beginReelDragImpl(ctx, sectionId, idx, ev);
+    });
 
     body.appendChild(tile);
   }
 
-  const trailingInsertIdx = hasFooterSection(page)
-    ? page.sections.length - 1
-    : page.sections.length;
-  body.appendChild(buildReelInsertButton(ctx, trailingInsertIdx));
+  body.appendChild(buildReelInsertButton(ctx, page.sections.length));
 
   // -- Site-level footer tile or slot ------------------------------------
   if (ctx.state.footer) {

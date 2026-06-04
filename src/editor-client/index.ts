@@ -44,14 +44,6 @@ import { migrateState } from './state-migration.js';
 import { MARK_TAGS } from './mark-tags.js';
 import { newElementId, newPageId, newSectionId } from './ids.js';
 import { escapeAttr, escapeHtml } from './html-escape.js';
-import {
-  clampInsertIndex,
-  hasFooterSection,
-  hasHeaderSection,
-  isPinnedSection,
-  pinnedSectionLabel,
-  sectionDisplayName,
-} from './section-roles.js';
 import { findFontSizeMark, findLinkMark, hasMark } from './mark-queries.js';
 import { bringToFront, nextZInArray, nudgeZ, renormalizeZ, sendToBack } from './z-order.js';
 import { cssEscape } from './css-escape.js';
@@ -215,12 +207,6 @@ import {
 // directly, but the explicit re-exports document intent for the bundle.
 void field;
 void selectInput;
-void clampInsertIndex;
-void hasFooterSection;
-void hasHeaderSection;
-void isPinnedSection;
-void pinnedSectionLabel;
-void sectionDisplayName;
 void findFontSizeMark;
 void findLinkMark;
 void hasMark;
