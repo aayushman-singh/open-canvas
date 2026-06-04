@@ -1548,6 +1548,15 @@ export interface EditorContext {
    *  placeholder; subsequent calls render synchronously from
    *  ctx.versionsList. Bound impl lives in versions-panel.ts. */
   renderVersionsPanel(): void;
+
+  // -- Phase 2q.k: canvas root events -----------------------------------
+  /** Wire the canvas root + viewport + document click/dblclick/mousedown
+   *  listeners that drive selection state transitions: artboard label /
+   *  inactive artboard activation, element menu trigger, section toolbar
+   *  dispatch, element body click, section body click, background-click
+   *  deselect, and the document-level click-outside deselect. Run once
+   *  at boot. Implementation: attachRootEventsImpl in canvas-root-events.ts. */
+  attachRootEvents(): void;
 }
 
 /**

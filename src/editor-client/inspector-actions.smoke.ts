@@ -440,6 +440,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     attachSaveButton: () => {},
     ensureVersionsTabMounted: () => null,
     renderVersionsPanel: () => {},
+    attachRootEvents: () => {
+      throw new Error('attachRootEvents stub: smoke does not exercise canvas root events');
+    },
   };
   return { ctx, log };
 }
