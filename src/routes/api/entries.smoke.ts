@@ -7,8 +7,10 @@
 // or `parseUpdateEntryBody`, so exercising those covers every entry/exit
 // shape the API accepts and rejects.
 
+import type { CanvasPage } from '../../canvas/schema.js';
 import {
   ENTRY_SLUG_RE,
+  findConflictingSitePage,
   isValidSlug,
   parseCreateEntryBody,
   parseUpdateEntryBody,
@@ -175,5 +177,85 @@ assert(!updateBadOg.ok, 'empty-string ogImageAssetId must reject');
 
 const updateNonObject = parseUpdateEntryBody(42);
 assert(!updateNonObject.ok, 'non-object patch body must reject');
+
+// -- Slug-collision pre-check (ADR 0060 Pass 3) ------------------------------
+//
+// `findConflictingSitePage` is the pure helper the POST/PATCH handlers run
+// before insert/update so the Owner finds out at write time, not at publish.
+// Exercise the three meaningful shapes here.
+
+function makePage(overrides: Partial<CanvasPage>): CanvasPage {
+  return {
+    id: overrides.id ?? 'pg-test',
+    slug: overrides.slug ?? 'about',
+    title: overrides.title ?? 'About',
+    width: overrides.width ?? 1440,
+    sections: overrides.sections ?? [],
+    ...overrides,
+  };
+}
+
+// Static page at the materialized slug must be flagged.
+const staticAbout = makePage({
+  id: 'pg-blog-about-static',
+  slug: 'blog/about',
+  title: 'About Our Blog',
+});
+const conflict = findConflictingSitePage([staticAbout], 'blog', 'about');
+assert(conflict !== null, 'static page at blog/about must collide with entry blog/about');
+assert(
+  conflict?.title === 'About Our Blog',
+  'returned conflict must be the colliding page (for error body)',
+);
+assert(
+  conflict?.slug === 'blog/about',
+  'returned conflict slug must echo the materialized slug',
+);
+
+// A `collection-item-template` page for the SAME collection is the template
+// the materializer expands — not a static page. Must NOT be flagged even
+// though its slug shape can coincide.
+const templateAbout = makePage({
+  id: 'pg-blog-template',
+  slug: 'blog/about',
+  title: 'Blog Entry Template',
+  pageKind: 'collection-item-template',
+  collectionSlug: 'blog',
+});
+const templateConflict = findConflictingSitePage([templateAbout], 'blog', 'about');
+assert(
+  templateConflict === null,
+  'template page for the same collection must NOT count as a collision',
+);
+
+// A `collection-item-template` page for a DIFFERENT collection at the same
+// slug shape would still be a real conflict — the materializer would not own
+// that path.
+const templateOtherCollection = makePage({
+  id: 'pg-notes-template',
+  slug: 'blog/about',
+  title: 'Notes Template',
+  pageKind: 'collection-item-template',
+  collectionSlug: 'notes',
+});
+const crossCollectionConflict = findConflictingSitePage(
+  [templateOtherCollection],
+  'blog',
+  'about',
+);
+assert(
+  crossCollectionConflict !== null,
+  'template page for a different collection must still collide',
+);
+
+// Unrelated pages must pass through with no collision.
+const unrelated = makePage({ id: 'pg-home', slug: 'home', title: 'Home' });
+const otherEntry = makePage({ id: 'pg-blog-intro', slug: 'blog/intro', title: 'Intro' });
+const noConflict = findConflictingSitePage([unrelated, otherEntry], 'blog', 'about');
+assert(noConflict === null, 'no matching slug must report no collision');
+
+// Empty page list trivially does not collide.
+const emptyConflict = findConflictingSitePage([], 'blog', 'about');
+assert(emptyConflict === null, 'empty pages must not collide');
 
 console.log('[entries:smoke] OK');

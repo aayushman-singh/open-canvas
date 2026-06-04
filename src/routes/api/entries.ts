@@ -22,8 +22,10 @@ import { requireAuth } from '../../auth/require-auth.js';
 import {
   accessRoleMeetsRequirement,
   loadAccessibleSite,
+  type AccessibleSite,
   type SiteAccessRequirement,
 } from '../../auth/accessible-site.js';
+import type { CanvasPage } from '../../canvas/schema.js';
 import { db } from '../../db/client.js';
 import {
   COLLECTION_ENTRY_STATUSES,
@@ -257,6 +259,42 @@ export function parseUpdateEntryBody(raw: unknown): ParseResult<UpdateEntryPatch
   return { ok: true, value: patch };
 }
 
+// ADR 0060 Pass 3 — pre-check that an entry's materialized slug
+// (`<collectionSlug>/<entrySlug>`) does not collide with an existing
+// static page in the site's editable state. The materializer expands
+// `collection-item-template` pages into one page per entry at the same
+// slug shape; if the Owner has authored a normal page at that path the
+// validator would catch it post-materialization with a generic
+// "duplicate page slug" error at publish time. Checking here means the
+// Owner finds out the moment they write the entry, not at publish.
+//
+// Pure: takes a snapshot of pages, returns the conflicting page (or
+// null). The smoke covers it without needing a live DB.
+//
+// Edge case: a `collection-item-template` page for the SAME collection
+// IS the template the materializer expands. It does not ship as a real
+// static page at `<collectionSlug>/<entrySlug>` — so it is not a real
+// collision. We skip it explicitly.
+export function findConflictingSitePage(
+  pages: readonly CanvasPage[],
+  collectionSlug: string,
+  entrySlug: string,
+): CanvasPage | null {
+  const materializedSlug = `${collectionSlug}/${entrySlug}`;
+  for (const page of pages) {
+    if (page.slug !== materializedSlug) continue;
+    if (
+      page.pageKind === 'collection-item-template' &&
+      page.collectionSlug === collectionSlug
+    ) {
+      // This is the template page itself; not a static page. Skip.
+      continue;
+    }
+    return page;
+  }
+  return null;
+}
+
 function isUniqueViolation(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as { code?: unknown; message?: unknown; cause?: unknown };
@@ -267,13 +305,19 @@ function isUniqueViolation(err: unknown): boolean {
 }
 
 // Resolve the site-access role for the calling Clerk user against `siteId`.
-// Returns the role on success; on failure short-circuits the handler with
-// 404 so we do not leak the existence of sites the caller cannot reach.
+// Returns the role and the loaded site on success; on failure short-circuits
+// the handler with 404 so we do not leak the existence of sites the caller
+// cannot reach. The full site (incl. `editableState`) flows back so handlers
+// that need to walk `pages[]` (slug-collision pre-check) do not have to
+// reload it.
 async function resolveAccess(
   c: Context<Env>,
   siteId: string,
   requiredRole: SiteAccessRequirement,
-): Promise<{ ok: true; accessRole: 'owner' | 'viewer' | 'editor' } | { ok: false; response: Response }> {
+): Promise<
+  | { ok: true; accessRole: 'owner' | 'viewer' | 'editor'; site: AccessibleSite }
+  | { ok: false; response: Response }
+> {
   const auth = c.get('auth');
   if (!auth.userId) {
     throw new Error('entries api reached without authenticated user');
@@ -288,7 +332,7 @@ async function resolveAccess(
   if (!accessRoleMeetsRequirement(accessible.accessRole, requiredRole)) {
     return { ok: false, response: c.json({ error: 'forbidden' }, 403) };
   }
-  return { ok: true, accessRole: accessible.accessRole };
+  return { ok: true, accessRole: accessible.accessRole, site: accessible };
 }
 
 const entriesRoute = new Hono<Env>();
@@ -340,6 +384,28 @@ entriesRoute.post('/', async (c) => {
   const parsed = parseCreateEntryBody(raw);
   if (!parsed.ok) {
     return c.json({ error: parsed.error }, 400);
+  }
+
+  // ADR 0060 Pass 3 — fail loud at create time when the entry's
+  // materialized slug would collide with an existing static page in the
+  // site. Without this the Owner would only find out at publish, after
+  // writing the entry and clicking publish — the post-materialization
+  // validator surfaces a generic duplicate-slug error from publish, with
+  // no traceback to the entry that caused it.
+  const conflict = findConflictingSitePage(
+    access.site.editableState.pages,
+    parsed.value.collectionSlug,
+    parsed.value.slug,
+  );
+  if (conflict !== null) {
+    return c.json(
+      {
+        error: 'slug conflicts with existing site page',
+        conflictingPageSlug: conflict.slug,
+        conflictingPageTitle: conflict.title,
+      },
+      409,
+    );
   }
 
   const database = db(c.env);
@@ -430,6 +496,46 @@ entriesRoute.patch('/:entryId', async (c) => {
   }
 
   const database = db(c.env);
+
+  // ADR 0060 Pass 3 — when the patch changes `slug`, pre-check the
+  // collision against the site's editable pages. We need the existing
+  // row's `collectionSlug` (immutable) to know which materialized path
+  // the entry expands to; we also need its current slug so a PATCH that
+  // touches other fields without changing slug skips the check
+  // entirely. Same-slug PATCH (or a PATCH that omits slug) must not
+  // self-collide.
+  if (parsed.value.slug !== undefined) {
+    const existingRows = await database
+      .select({
+        slug: collectionEntry.slug,
+        collectionSlug: collectionEntry.collectionSlug,
+      })
+      .from(collectionEntry)
+      .where(and(eq(collectionEntry.id, entryId), eq(collectionEntry.siteId, siteId)))
+      .limit(1);
+    const existing = existingRows[0];
+    if (!existing) {
+      return c.json({ error: 'entry not found' }, 404);
+    }
+    if (parsed.value.slug !== existing.slug) {
+      const conflict = findConflictingSitePage(
+        access.site.editableState.pages,
+        existing.collectionSlug,
+        parsed.value.slug,
+      );
+      if (conflict !== null) {
+        return c.json(
+          {
+            error: 'slug conflicts with existing site page',
+            conflictingPageSlug: conflict.slug,
+            conflictingPageTitle: conflict.title,
+          },
+          409,
+        );
+      }
+    }
+  }
+
   // Existence + ownership check is part of the WHERE clause on UPDATE; we
   // can rely on the unique (site_id, id) primary-key + FK to surface 404
   // when `returning()` comes back empty.
