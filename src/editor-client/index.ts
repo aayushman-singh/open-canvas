@@ -176,6 +176,7 @@ import {
   setActivePageImpl,
   updatePageSidebarImpl,
 } from './page-crud.js';
+import { attachCollectionScaffoldButtonImpl } from './collection-scaffold.js';
 import { mountReel, openReelImpl, closeReelImpl, renderReelImpl, moveSectionToIndex as moveSectionToIndexImpl } from './reel.js';
 import { renderAllImpl, fitToPage as fitToPageImpl, fitAllPages as fitAllPagesImpl } from './render.js';
 import { attachGripHandlersImpl, beginSectionDragImpl } from './section-drag.js';
@@ -760,6 +761,11 @@ export function createEditor(boot: EditorBoot): void {
           void ctx.createPage();
         });
       }
+      // ADR 0060 F3 — "+ New Collection" scaffolds an index + template page
+      // and a sample entry in one POST. The wizard, refresh, and active-
+      // page switch live in collection-scaffold.ts; the wiring point is
+      // here so it sits alongside the other Pages-tab affordances.
+      attachCollectionScaffoldButtonImpl(ctx);
       const pageListEl = document.getElementById('canvas-page-list');
       if (pageListEl) {
         pageListEl.addEventListener('click', function (ev) {

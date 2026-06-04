@@ -477,6 +477,19 @@ export function editorPageJsx(opts: EditorPageOptions) {
               >
                 + New Page
               </button>
+              {/* ADR 0060 F3 — scaffold a new collection (index page +
+                  template page + sample entry) in one POST. The wizard
+                  prompts for a slug only; the endpoint derives the display
+                  title from the slug. See collection-scaffold.ts for the
+                  click handler. */}
+              <button
+                class="opencanvas-sidebar-action"
+                id="canvas-add-collection"
+                type="button"
+                title="Create a new content collection (e.g. blog, case-studies)"
+              >
+                + New Collection
+              </button>
             </div>
           </aside>
           <div id="canvas-root" data-site-id={siteId} />
