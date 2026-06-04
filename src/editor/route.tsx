@@ -30,6 +30,7 @@ import { CO_EDIT_BUNDLE } from '../live/co-edit/bundled';
 import { signEditToken } from '../auth/edit-token';
 import { notificationsInboxScript } from '../notifications/dashboard-inbox-script';
 import { bellStyles } from '../notifications/bell-styles';
+import { opencanvasModalScript } from '../ui/opencanvas-modal-script';
 import { db } from '../db/client';
 import { customer, site, siteCollaborator } from '../db/schema';
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
@@ -570,6 +571,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
         {raw(`<script>window.__opencanvasEditorBoot = ${editorBootJson};</script>`)}
         <script type="module" src={EDITOR_CLIENT_MANIFEST.canvasClientUrl}></script>
         <script>{raw(themeToggleScript)}</script>
+        <script>{raw(opencanvasModalScript)}</script>
         {raw(`<script>window.__opencanvasInboxApiBase = ${JSON.stringify(apiBase)};</script>`)}
         <script>{raw(notificationsInboxScript)}</script>
       </body>

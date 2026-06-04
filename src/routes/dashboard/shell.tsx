@@ -12,6 +12,7 @@ import {
 import type { Theme } from '../../ui';
 import { notificationsInboxScript } from '../../notifications/dashboard-inbox-script';
 import { bellStyles } from '../../notifications/bell-styles';
+import { opencanvasModalScript } from '../../ui/opencanvas-modal-script';
 
 // MIGRATION.md §4 — dashboard chrome wears the Open Canvas skin.
 //
@@ -565,38 +566,7 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
           </div>
         </div>
         <script>{raw(themeToggleScript)}</script>
-        <script>{raw(`(function(){
-  function _build(o){return new Promise(function(resolve){
-    var bd=document.createElement('div');bd.className='opencanvas-modal-backdrop';
-    var m=document.createElement('div');m.className='opencanvas-modal';
-    m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');
-    if(o.title){var h=document.createElement('h3');h.textContent=o.title;m.appendChild(h);}
-    if(o.message){var p=document.createElement('p');p.textContent=o.message;m.appendChild(p);}
-    var inp=null;
-    if(o.type==='prompt'){inp=document.createElement('input');inp.type='text';inp.value=o.defaultValue||'';m.appendChild(inp);}
-    var acts=document.createElement('div');acts.className='opencanvas-modal-actions';
-    var cancelBtn=null;
-    if(o.type!=='alert'){cancelBtn=document.createElement('button');cancelBtn.type='button';cancelBtn.className='opencanvas-modal-cancel';cancelBtn.textContent='Cancel';acts.appendChild(cancelBtn);}
-    var ok=document.createElement('button');ok.type='button';
-    ok.className=o.danger?'opencanvas-modal-danger':'opencanvas-modal-ok';
-    ok.textContent=o.confirmLabel||'OK';acts.appendChild(ok);m.appendChild(acts);bd.appendChild(m);
-    function close(v){document.removeEventListener('keydown',onKey,true);if(bd.parentNode)bd.parentNode.removeChild(bd);resolve(v);}
-    function onKey(e){
-      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(o.type==='confirm'?false:null);return;}
-      if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(o.type==='prompt')close(inp.value);else if(o.type==='confirm')close(true);else close(undefined);}
-    }
-    bd.addEventListener('click',function(e){if(e.target===bd)close(o.type==='confirm'?false:null);});
-    if(cancelBtn)cancelBtn.addEventListener('click',function(){close(o.type==='confirm'?false:null);});
-    ok.addEventListener('click',function(){if(o.type==='prompt')close(inp.value);else if(o.type==='confirm')close(true);else close(undefined);});
-    document.addEventListener('keydown',onKey,true);document.body.appendChild(bd);
-    if(inp){inp.focus();inp.select();}else{ok.focus();}
-  });}
-  window.__opencanvasModal={
-    alert:function(msg,title){return _build({type:'alert',message:msg,title:title||''});},
-    confirm:function(msg,opts){var o=opts||{};return _build({type:'confirm',message:msg,title:o.title||'',confirmLabel:o.confirmLabel,danger:o.danger});},
-    prompt:function(msg,def,title){return _build({type:'prompt',message:msg,defaultValue:def||'',title:title||''});}
-  };
-})();`)}</script>
+        <script>{raw(opencanvasModalScript)}</script>
         <script>{raw("window.__opencanvasInboxApiBase = '/api';")}</script>
         <script>{raw(notificationsInboxScript)}</script>
       </body>
