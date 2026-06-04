@@ -1,0 +1,73 @@
+{
+  "baseSlug": "library-template-testimonial-quote",
+  "category": "testimonials",
+  "name": "Testimonial — Quote",
+  "description": "A single large pulled quote with attribution. Drop-in for landing pages that need one strong customer voice without competing card layouts.",
+  "recipeId": "testimonial-row",
+  "headingPreview": "Building with Open Canvas changed how our team ships marketing pages.",
+  "sectionData": {
+    "id": "library-testimonial-quote",
+    "recipeId": "testimonial-row",
+    "name": "Testimonial — Quote",
+    "height": 480,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "tq-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 96,
+          "w": 200,
+          "h": 24,
+          "z": 2
+        },
+        "content": [{ "text": "TESTIMONIAL" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "tq-quote",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 144,
+          "w": 1280,
+          "h": 200,
+          "z": 2
+        },
+        "content": [
+          { "text": "“Building with Open Canvas changed how our team ships marketing pages.", "marks": [{ "type": "bold" }] },
+          { "text": " We went from a two-week back-and-forth with engineering to publishing a campaign on the same morning we sketched it.”" }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "tq-attribution",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 384,
+          "w": 800,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          { "text": "Jamie Chen", "marks": [{ "type": "bold" }] },
+          { "text": " · VP of Marketing, Aurora Labs" }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": null
+}

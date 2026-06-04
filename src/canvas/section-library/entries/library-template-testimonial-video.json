@@ -1,0 +1,111 @@
+{
+  "baseSlug": "library-template-testimonial-video",
+  "category": "testimonials",
+  "name": "Testimonial — Video",
+  "description": "A video clip on the left paired with a supporting pulled quote on the right. The video ships as a placeholder — swap in your own asset after dropping the section in.",
+  "recipeId": "testimonial-row",
+  "headingPreview": "See how Northwind ships in hours, not weeks.",
+  "sectionData": {
+    "id": "library-testimonial-video",
+    "recipeId": "testimonial-row",
+    "name": "Testimonial — Video",
+    "height": 560,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "tv-video",
+        "type": "media",
+        "mediaKind": "video",
+        "assetId": "__placeholder__",
+        "alt": "Customer testimonial video",
+        "fit": "cover",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 700,
+          "h": 400,
+          "z": 1
+        },
+        "playback": {
+          "controls": true,
+          "muted": true
+        }
+      },
+      {
+        "id": "tv-kicker",
+        "type": "text",
+        "box": {
+          "x": 820,
+          "y": 80,
+          "w": 540,
+          "h": 24,
+          "z": 2
+        },
+        "content": [{ "text": "VIDEO STORY" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "tv-heading",
+        "type": "text",
+        "box": {
+          "x": 820,
+          "y": 120,
+          "w": 540,
+          "h": 96,
+          "z": 2
+        },
+        "content": [
+          { "text": "See how Northwind ships in ", "marks": [] },
+          { "text": "hours, not weeks", "marks": [{ "type": "bold" }] },
+          { "text": "." }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "tv-quote",
+        "type": "text",
+        "box": {
+          "x": 820,
+          "y": 232,
+          "w": 540,
+          "h": 168,
+          "z": 2
+        },
+        "content": [
+          { "text": "“The first time we rolled out a campaign in 90 minutes, the room got quiet. We didn't ask engineering for anything. We just shipped.”" }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "tv-attribution",
+        "type": "text",
+        "box": {
+          "x": 820,
+          "y": 432,
+          "w": 540,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          { "text": "Priya Raman", "marks": [{ "type": "bold" }] },
+          { "text": " · Design Lead, Northwind" }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": null
+}

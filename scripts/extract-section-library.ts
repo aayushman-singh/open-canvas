@@ -12,7 +12,7 @@
 // Run with `bun run scripts/extract-section-library.ts` after editing
 // TemplateSeed content; regenerated output is what the registry serves.
 
-import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import type {
@@ -215,23 +215,56 @@ for (const seed of allTemplateSeeds) {
 
 // ---------------------------------------------------------------------------
 // Write outputs.
+//
+// Wipe is selective: anything NOT starting with `library-template-` is
+// considered auto-extracted and gets cleared; standalone fixtures
+// (`library-template-*`, e.g. the testimonial set from Phase F) survive.
+// Stale auto-extracted files that no longer correspond to any current
+// TemplateSeed section are removed; the manifest finally globs the
+// directory to discover both auto and standalone entries.
 
 if (existsSync(ENTRIES_DIR)) {
-  rmSync(ENTRIES_DIR, { recursive: true, force: true });
+  for (const name of readdirSync(ENTRIES_DIR)) {
+    if (!name.endsWith('.json')) continue;
+    if (name.startsWith('library-template-')) continue;
+    rmSync(join(ENTRIES_DIR, name), { force: true });
+  }
+} else {
+  mkdirSync(ENTRIES_DIR, { recursive: true });
 }
-mkdirSync(ENTRIES_DIR, { recursive: true });
 
 for (const entry of entries) {
   const file = join(ENTRIES_DIR, `${entry.baseSlug}.json`);
   writeFileSync(file, `${JSON.stringify(entry, null, 2)}\n`, 'utf8');
 }
 
+// Discover the full entry set on disk (auto-extracted just-written +
+// standalone library-template-*). The manifest enumerates this final
+// state so adding a new standalone fixture is just "drop a JSON file in
+// entries/" plus re-run.
+interface ManifestEntryRef {
+  baseSlug: string;
+  filename: string;
+}
+function discoverEntries(): ManifestEntryRef[] {
+  const refs: ManifestEntryRef[] = [];
+  for (const name of readdirSync(ENTRIES_DIR)) {
+    if (!name.endsWith('.json')) continue;
+    const parsed = JSON.parse(readFileSync(join(ENTRIES_DIR, name), 'utf8')) as { baseSlug?: string };
+    if (typeof parsed.baseSlug !== 'string' || parsed.baseSlug.length === 0) {
+      throw new Error(`extract-section-library: entries/${name} is missing baseSlug`);
+    }
+    refs.push({ baseSlug: parsed.baseSlug, filename: name });
+  }
+  return refs;
+}
+
 // Manifest barrel: explicit imports keep the bundler happy and put the
 // full registry on one navigable surface.
-function manifestSource(entries: ExtractedEntry[]): string {
-  const sorted = [...entries].sort((a, b) => a.baseSlug.localeCompare(b.baseSlug));
+function manifestSource(refs: ManifestEntryRef[]): string {
+  const sorted = [...refs].sort((a, b) => a.baseSlug.localeCompare(b.baseSlug));
   const importLines = sorted
-    .map((e, i) => `import e${String(i)} from './${e.baseSlug}.json' with { type: 'json' };`)
+    .map((e, i) => `import e${String(i)} from './${e.filename}' with { type: 'json' };`)
     .join('\n');
   const arrayLines = sorted.map((_, i) => `  e${String(i)} as SectionLibraryEntry,`).join('\n');
   return [
@@ -251,7 +284,7 @@ function manifestSource(entries: ExtractedEntry[]): string {
     '',
   ].join('\n');
 }
-writeFileSync(MANIFEST_FILE, manifestSource(entries), 'utf8');
+writeFileSync(MANIFEST_FILE, manifestSource(discoverEntries()), 'utf8');
 
 // Origin mapping module — Phase D's TemplateSeed rewrite uses this to
 // resolve `(templateId, oldSectionId)` to the new `(baseSlug, version)`.

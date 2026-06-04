@@ -1,0 +1,282 @@
+{
+  "baseSlug": "library-template-testimonial-cards",
+  "category": "testimonials",
+  "name": "Testimonials — Cards",
+  "description": "Three side-by-side container cards, each with an avatar, quote, and attribution. Use when you want to show variety of voices without picking a single hero quote.",
+  "recipeId": "testimonial-row",
+  "headingPreview": "What teams say about Open Canvas",
+  "sectionData": {
+    "id": "library-testimonial-cards",
+    "recipeId": "testimonial-row",
+    "name": "Testimonials — Cards",
+    "height": 640,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "tc-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 64,
+          "w": 400,
+          "h": 24,
+          "z": 2
+        },
+        "content": [{ "text": "WHAT TEAMS SAY" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "tc-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 100,
+          "w": 1280,
+          "h": 56,
+          "z": 2
+        },
+        "content": [{ "text": "What teams say about Open Canvas" }],
+        "role": "heading",
+        "fontSize": 36,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "tc-card1-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 200,
+          "w": 410,
+          "h": 380,
+          "z": 1
+        },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "tc-card1-avatar",
+        "type": "media",
+        "mediaKind": "image",
+        "assetId": "__placeholder__",
+        "alt": "Avatar",
+        "fit": "cover",
+        "box": {
+          "x": 112,
+          "y": 232,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        }
+      },
+      {
+        "id": "tc-card1-quote",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 308,
+          "w": 346,
+          "h": 168,
+          "z": 3
+        },
+        "content": [
+          { "text": "“The picker is finally fast enough that I stop fighting it. I just grab a section and move on.”" }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "tc-card1-name",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 504,
+          "w": 346,
+          "h": 24,
+          "z": 3
+        },
+        "content": [{ "text": "Priya Raman", "marks": [{ "type": "bold" }] }],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "tc-card1-title",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 532,
+          "w": 346,
+          "h": 20,
+          "z": 3
+        },
+        "content": [{ "text": "Design Lead, Northwind" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "tc-card2-bg",
+        "type": "container",
+        "box": {
+          "x": 515,
+          "y": 200,
+          "w": 410,
+          "h": 380,
+          "z": 1
+        },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "tc-card2-avatar",
+        "type": "media",
+        "mediaKind": "image",
+        "assetId": "__placeholder__",
+        "alt": "Avatar",
+        "fit": "cover",
+        "box": {
+          "x": 547,
+          "y": 232,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        }
+      },
+      {
+        "id": "tc-card2-quote",
+        "type": "text",
+        "box": {
+          "x": 547,
+          "y": 308,
+          "w": 346,
+          "h": 168,
+          "z": 3
+        },
+        "content": [
+          { "text": "“Our marketing team ships campaigns without filing tickets. The bottleneck moved from engineering to copywriting.”" }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "tc-card2-name",
+        "type": "text",
+        "box": {
+          "x": 547,
+          "y": 504,
+          "w": 346,
+          "h": 24,
+          "z": 3
+        },
+        "content": [{ "text": "Marcus Doyle", "marks": [{ "type": "bold" }] }],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "tc-card2-title",
+        "type": "text",
+        "box": {
+          "x": 547,
+          "y": 532,
+          "w": 346,
+          "h": 20,
+          "z": 3
+        },
+        "content": [{ "text": "Head of Growth, Helio" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "tc-card3-bg",
+        "type": "container",
+        "box": {
+          "x": 950,
+          "y": 200,
+          "w": 410,
+          "h": 380,
+          "z": 1
+        },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "tc-card3-avatar",
+        "type": "media",
+        "mediaKind": "image",
+        "assetId": "__placeholder__",
+        "alt": "Avatar",
+        "fit": "cover",
+        "box": {
+          "x": 982,
+          "y": 232,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        }
+      },
+      {
+        "id": "tc-card3-quote",
+        "type": "text",
+        "box": {
+          "x": 982,
+          "y": 308,
+          "w": 346,
+          "h": 168,
+          "z": 3
+        },
+        "content": [
+          { "text": "“Our last three product launches all started as a sketch in this editor. The picker keeps it honest — no scrolling past a hundred blocks.”" }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "tc-card3-name",
+        "type": "text",
+        "box": {
+          "x": 982,
+          "y": 504,
+          "w": 346,
+          "h": 24,
+          "z": 3
+        },
+        "content": [{ "text": "Hana Okafor", "marks": [{ "type": "bold" }] }],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "tc-card3-title",
+        "type": "text",
+        "box": {
+          "x": 982,
+          "y": 532,
+          "w": 346,
+          "h": 20,
+          "z": 3
+        },
+        "content": [{ "text": "Product Lead, Lumen" }],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": null
+}

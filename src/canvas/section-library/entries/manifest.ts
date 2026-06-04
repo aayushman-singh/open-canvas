@@ -50,45 +50,48 @@ import e40 from './launch-template-features.json' with { type: 'json' };
 import e41 from './launch-template-footer.json' with { type: 'json' };
 import e42 from './launch-template-header.json' with { type: 'json' };
 import e43 from './launch-template-hero.json' with { type: 'json' };
-import e44 from './local-template-cta.json' with { type: 'json' };
-import e45 from './local-template-features.json' with { type: 'json' };
-import e46 from './local-template-footer.json' with { type: 'json' };
-import e47 from './local-template-header.json' with { type: 'json' };
-import e48 from './local-template-hero.json' with { type: 'json' };
-import e49 from './portfolio-template-blog-hero.json' with { type: 'json' };
-import e50 from './portfolio-template-blog-list.json' with { type: 'json' };
-import e51 from './portfolio-template-explore.json' with { type: 'json' };
-import e52 from './portfolio-template-footer.json' with { type: 'json' };
-import e53 from './portfolio-template-header.json' with { type: 'json' };
-import e54 from './portfolio-template-hero.json' with { type: 'json' };
-import e55 from './portfolio-template-post1-body.json' with { type: 'json' };
-import e56 from './portfolio-template-post1-hero.json' with { type: 'json' };
-import e57 from './portfolio-template-post2-body.json' with { type: 'json' };
-import e58 from './portfolio-template-post2-hero.json' with { type: 'json' };
-import e59 from './portfolio-template-post3-body.json' with { type: 'json' };
-import e60 from './portfolio-template-post3-hero.json' with { type: 'json' };
-import e61 from './portfolio-template-post4-body.json' with { type: 'json' };
-import e62 from './portfolio-template-post4-hero.json' with { type: 'json' };
-import e63 from './press-template-cta.json' with { type: 'json' };
-import e64 from './press-template-features.json' with { type: 'json' };
-import e65 from './press-template-footer.json' with { type: 'json' };
-import e66 from './press-template-header.json' with { type: 'json' };
-import e67 from './press-template-hero.json' with { type: 'json' };
-import e68 from './starter-template-cta.json' with { type: 'json' };
-import e69 from './starter-template-features.json' with { type: 'json' };
-import e70 from './starter-template-footer.json' with { type: 'json' };
-import e71 from './starter-template-header.json' with { type: 'json' };
-import e72 from './starter-template-hero.json' with { type: 'json' };
-import e73 from './studio-template-cta.json' with { type: 'json' };
-import e74 from './studio-template-features.json' with { type: 'json' };
-import e75 from './studio-template-footer.json' with { type: 'json' };
-import e76 from './studio-template-header.json' with { type: 'json' };
-import e77 from './studio-template-hero.json' with { type: 'json' };
-import e78 from './violet-template-cta.json' with { type: 'json' };
-import e79 from './violet-template-features.json' with { type: 'json' };
-import e80 from './violet-template-footer.json' with { type: 'json' };
-import e81 from './violet-template-header.json' with { type: 'json' };
-import e82 from './violet-template-hero.json' with { type: 'json' };
+import e44 from './library-template-testimonial-cards.json' with { type: 'json' };
+import e45 from './library-template-testimonial-quote.json' with { type: 'json' };
+import e46 from './library-template-testimonial-video.json' with { type: 'json' };
+import e47 from './local-template-cta.json' with { type: 'json' };
+import e48 from './local-template-features.json' with { type: 'json' };
+import e49 from './local-template-footer.json' with { type: 'json' };
+import e50 from './local-template-header.json' with { type: 'json' };
+import e51 from './local-template-hero.json' with { type: 'json' };
+import e52 from './portfolio-template-blog-hero.json' with { type: 'json' };
+import e53 from './portfolio-template-blog-list.json' with { type: 'json' };
+import e54 from './portfolio-template-explore.json' with { type: 'json' };
+import e55 from './portfolio-template-footer.json' with { type: 'json' };
+import e56 from './portfolio-template-header.json' with { type: 'json' };
+import e57 from './portfolio-template-hero.json' with { type: 'json' };
+import e58 from './portfolio-template-post1-body.json' with { type: 'json' };
+import e59 from './portfolio-template-post1-hero.json' with { type: 'json' };
+import e60 from './portfolio-template-post2-body.json' with { type: 'json' };
+import e61 from './portfolio-template-post2-hero.json' with { type: 'json' };
+import e62 from './portfolio-template-post3-body.json' with { type: 'json' };
+import e63 from './portfolio-template-post3-hero.json' with { type: 'json' };
+import e64 from './portfolio-template-post4-body.json' with { type: 'json' };
+import e65 from './portfolio-template-post4-hero.json' with { type: 'json' };
+import e66 from './press-template-cta.json' with { type: 'json' };
+import e67 from './press-template-features.json' with { type: 'json' };
+import e68 from './press-template-footer.json' with { type: 'json' };
+import e69 from './press-template-header.json' with { type: 'json' };
+import e70 from './press-template-hero.json' with { type: 'json' };
+import e71 from './starter-template-cta.json' with { type: 'json' };
+import e72 from './starter-template-features.json' with { type: 'json' };
+import e73 from './starter-template-footer.json' with { type: 'json' };
+import e74 from './starter-template-header.json' with { type: 'json' };
+import e75 from './starter-template-hero.json' with { type: 'json' };
+import e76 from './studio-template-cta.json' with { type: 'json' };
+import e77 from './studio-template-features.json' with { type: 'json' };
+import e78 from './studio-template-footer.json' with { type: 'json' };
+import e79 from './studio-template-header.json' with { type: 'json' };
+import e80 from './studio-template-hero.json' with { type: 'json' };
+import e81 from './violet-template-cta.json' with { type: 'json' };
+import e82 from './violet-template-features.json' with { type: 'json' };
+import e83 from './violet-template-footer.json' with { type: 'json' };
+import e84 from './violet-template-header.json' with { type: 'json' };
+import e85 from './violet-template-hero.json' with { type: 'json' };
 
 export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e0 as SectionLibraryEntry,
@@ -174,4 +177,7 @@ export const EXTRACTED_ENTRIES: ReadonlyArray<SectionLibraryEntry> = [
   e80 as SectionLibraryEntry,
   e81 as SectionLibraryEntry,
   e82 as SectionLibraryEntry,
+  e83 as SectionLibraryEntry,
+  e84 as SectionLibraryEntry,
+  e85 as SectionLibraryEntry,
 ];
