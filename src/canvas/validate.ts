@@ -30,6 +30,7 @@ import {
   BACKGROUND_SIZES,
   COLLECTION_PAGE_KINDS,
   ELEMENT_TYPES,
+  INLINE_COLOR_HEX_RE,
   INLINE_FONT_SIZE_PX_MAX,
   INLINE_FONT_SIZE_PX_MIN,
   INLINE_MARK_TYPES,
@@ -773,6 +774,19 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
         if (mark.px < INLINE_FONT_SIZE_PX_MIN || mark.px > INLINE_FONT_SIZE_PX_MAX) {
           errors.push(
             `${markPath}.px ${String(mark.px)} out of range [${String(INLINE_FONT_SIZE_PX_MIN)}, ${String(INLINE_FONT_SIZE_PX_MAX)}]`,
+          );
+        }
+      }
+      if (mark.type === 'color') {
+        if (typeof mark.color !== 'string' || mark.color.length === 0) {
+          errors.push(
+            `${markPath}.color must be a non-empty string for color marks (got ${describe(mark.color)})`,
+          );
+          return;
+        }
+        if (!INLINE_COLOR_HEX_RE.test(mark.color)) {
+          errors.push(
+            `${markPath}.color ${describe(mark.color)} must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA)`,
           );
         }
       }

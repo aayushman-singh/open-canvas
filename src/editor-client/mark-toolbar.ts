@@ -39,12 +39,11 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type {
-  CanvasElement,
-  ElementStyle,
   InlineMark,
   InlineMarkType,
   InlineRun,
 } from '../canvas/schema.js';
+import { INLINE_COLOR_HEX_RE } from '../canvas/schema.js';
 import type { TextAlign } from '../canvas/elements/text.js';
 import type { EditorContext } from './editor-context.js';
 import { CANONICAL_MARK_ORDER } from './editor-constants.js';
@@ -579,6 +578,9 @@ function cloneMarksArr(marks: InlineMark[] | undefined): InlineMark[] {
     if (m.type === 'fontSize') {
       return { type: 'fontSize', px: m.px };
     }
+    if (m.type === 'color') {
+      return { type: 'color', color: m.color };
+    }
     // Boolean-only marks (bold/italic/underline/strike/code/highlight).
     return { type: m.type };
   });
@@ -660,38 +662,161 @@ function applyAlignToEditing(ctx: EditorContext, direction: TextAlign): void {
   ctx.scheduleSave();
 }
 
-// Element-level text color, applied via elementStyle.color — same field
-// the inspector "Style" block writes (see render.ts applyElementStyle).
-// Color inherits, so we set it on the wrapper to mirror the renderer.
-function applyTextColorToEditing(ctx: EditorContext, color: string): void {
-  if (!ctx.editingElementId) return;
-  const found = ctx.findElement(ctx.editingElementId);
-  if (!found || found.element.type !== 'text') return;
-  const element: CanvasElement = found.element;
-  const es: ElementStyle = element.elementStyle || {};
-  if (color) {
-    es.color = color;
-  } else {
-    delete es.color;
+// Apply (or clear) a `color` mark to the slice [start, end) of runs.
+// `color=null` removes the mark; otherwise replaces any existing color in
+// the slice with the new value. Mirrors `setFontSizeOnRuns` because both
+// marks carry a single attr payload — bold/italic/highlight toggle on/off
+// against a uniform predicate, but color values aren't toggleable, so the
+// semantics are "replace" not "toggle".
+//
+// Exported so `text-richtext-color.smoke.ts` can pin the run-splitting,
+// mark-replacement, and adjacent-run coalescing rules without spinning up
+// a fake DOM.
+export function setColorOnRuns(
+  ctx: EditorContext,
+  runs: InlineRun[],
+  start: number,
+  end: number,
+  color: string | null,
+): InlineRun[] {
+  const split: InlineRun[] = [];
+  let cum = 0;
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    if (!run) continue;
+    const text = typeof run.text === 'string' ? run.text : '';
+    const s = cum;
+    const e = cum + text.length;
+    const bps: number[] = [0];
+    if (start > s && start < e) bps.push(start - s);
+    if (end > s && end < e) bps.push(end - s);
+    bps.push(text.length);
+    for (let j = 0; j < bps.length - 1; j++) {
+      const a = bps[j]!;
+      const b = bps[j + 1]!;
+      if (b > a) {
+        split.push({ text: text.substring(a, b), marks: cloneMarksArr(run.marks) });
+      }
+    }
+    cum = e;
   }
-  let anyKey = false;
-  for (const k in es) {
-    if ((es as Record<string, unknown>)[k] !== undefined) {
-      anyKey = true;
-      break;
+
+  cum = 0;
+  for (let k = 0; k < split.length; k++) {
+    const sr = split[k]!;
+    const rs = cum;
+    const re = cum + sr.text.length;
+    cum = re;
+    if (re <= start || rs >= end) continue;
+    sr.marks = (sr.marks || []).filter((mm) => mm.type !== 'color');
+    if (color !== null) sr.marks.push({ type: 'color', color });
+  }
+
+  const merged: InlineRun[] = [];
+  for (let p = 0; p < split.length; p++) {
+    const cur = split[p]!;
+    const prev = merged.length > 0 ? merged[merged.length - 1] : null;
+    if (prev && ctx.marksEqual(prev.marks || [], cur.marks || [])) {
+      prev.text += cur.text;
+    } else {
+      const next: InlineRun = { text: cur.text };
+      if (cur.marks !== undefined) next.marks = cur.marks;
+      merged.push(next);
     }
   }
-  if (anyKey) {
-    element.elementStyle = es;
-  } else {
-    delete element.elementStyle;
+  return merged;
+}
+
+// Apply (or clear) a `color` mark across the current selection. Mirrors
+// `applyFontSizeMark`: maps the live DOM Selection range to character
+// offsets inside the editable, calls `setColorOnRuns` on the serialized
+// run array, rebuilds the editable's DOM from the result, and restores
+// the same character range.
+//
+// `color=null` removes the color mark from the slice (matches the
+// fontSize=null code path). Caret-only selections short-circuit with the
+// same status message bold/italic use because there is no range to apply.
+function applyColorMark(ctx: EditorContext, color: string | null): void {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) {
+    ctx.setStatus('Select some text first to change color', 'error');
+    return;
   }
-  if (!ctx.root) return;
-  const wrapper = ctx.root.querySelector(
-    '[data-opencanvas-element="' + cssEscape(ctx.editingElementId) + '"]',
-  );
-  if (wrapper) (wrapper as HTMLElement).style.color = color || '';
+  const inner = closestEditableRoot(range.commonAncestorContainer);
+  if (!inner) return;
+
+  const { start, end } = selectionCharBounds(inner, range);
+  if (start === end) return;
+
+  let runs: InlineRun[];
+  try {
+    runs = ctx.serializeContentToRuns(inner);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    ctx.setStatus('Color failed: ' + message, 'error');
+    return;
+  }
+
+  const nextRuns = setColorOnRuns(ctx, runs, start, end, color);
+
+  while (inner.firstChild) inner.removeChild(inner.firstChild);
+  for (let ri = 0; ri < nextRuns.length; ri++) {
+    const run = nextRuns[ri];
+    if (run) inner.appendChild(ctx.buildRunNode(run));
+  }
+
+  inner.focus();
+  selectByCharBounds(inner, start, end);
   ctx.scheduleSave();
+}
+
+// Read the inline `color:` style at the current Selection anchor by
+// walking ancestors up to the contenteditable root. Innermost wrap wins,
+// matching the natural CSS cascade — same convention
+// `refreshMarkToolbarFontSizeStateImpl` uses to read the active font size.
+// Returns null when no inline color is in scope; the caller falls back to
+// the default swatch colour.
+function activeColorAtSelection(): string | null {
+  const sel = document.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const node = sel.anchorNode;
+  if (!node) return null;
+  let cur: Node | null = node.nodeType === 1 ? node : node.parentNode;
+  while (cur && cur.nodeType === 1) {
+    const curEl = cur as HTMLElement;
+    if (
+      curEl.tagName === 'SPAN' &&
+      curEl.style &&
+      curEl.style.color &&
+      curEl.style.color.length > 0
+    ) {
+      return curEl.style.color;
+    }
+    if (curEl.getAttribute && curEl.getAttribute('contenteditable') === 'true') break;
+    cur = curEl.parentNode;
+  }
+  return null;
+}
+
+// Helper that mirrors the start/end computation used by applyLinkMark /
+// applyFontSizeMark / toggleSimpleMarkInSelection. Promoted to a single
+// function so applyColorMark doesn't duplicate the six-line preStart /
+// preEnd dance a fourth time.
+function selectionCharBounds(inner: HTMLElement, range: Range): { start: number; end: number } {
+  const preStart = document.createRange();
+  preStart.setStart(inner, 0);
+  preStart.setEnd(range.startContainer, range.startOffset);
+  const startOff = preStart.toString().length;
+  const preEnd = document.createRange();
+  preEnd.setStart(inner, 0);
+  preEnd.setEnd(range.endContainer, range.endOffset);
+  const endOff = preEnd.toString().length;
+  return {
+    start: Math.min(startOff, endOff),
+    end: Math.max(startOff, endOff),
+  };
 }
 
 function refreshMarkToolbarAlignState(ctx: EditorContext): void {
@@ -763,9 +888,12 @@ export function buildMarkToolbarImpl(ctx: EditorContext, anchor: HTMLElement): v
   // canvas agent or paste from a code-formatted source.
   // fontSize is handled by the size <select> below (not the per-mark loop)
   // because it carries a numeric payload rather than a boolean toggle.
+  // color is handled by the colour-wheel swatch + native <input type="color">
+  // further down, for the same reason — its payload is a hex string, not a
+  // toggle.
   for (let i = 0; i < CANONICAL_MARK_ORDER.length; i++) {
     const type = CANONICAL_MARK_ORDER[i];
-    if (!type || type === 'code' || type === 'fontSize') continue;
+    if (!type || type === 'code' || type === 'fontSize' || type === 'color') continue;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = MARK_BUTTON_LABELS[type] || '';
@@ -875,25 +1003,23 @@ export function buildMarkToolbarImpl(ctx: EditorContext, anchor: HTMLElement): v
   }
 
   // -- Text color block -------------------------------------------------
-  // Element-level color via elementStyle.color. The native <input type="color">
-  // is hidden behind the swatch button — clicking the swatch triggers the
-  // browser's color picker. The swatch fill mirrors the current color so
-  // the user can see the active value without opening the picker.
+  // Selection-scoped color via the InlineMark `color` arm. The native
+  // <input type="color"> is hidden behind the swatch button — clicking the
+  // swatch triggers the browser's color picker. The swatch fill mirrors
+  // the colour that lives at the current selection's anchor (matches the
+  // CSS cascade rule the serializer uses for innermost-wins) so the user
+  // can see the active value without opening the picker.
+  //
+  // The previous element-level write to `elementStyle.color` recoloured the
+  // whole TextElement instead of the selected range — that surfaced to
+  // owners as "I selected one word and the whole paragraph changed colour"
+  // and is the bug this block fixes.
   const sep2 = document.createElement('span');
   sep2.className = 'opencanvas-mark-sep';
   sep2.setAttribute('aria-hidden', 'true');
   bar.appendChild(sep2);
 
-  let initColor = '#222222';
-  const foundInit = ctx.editingElementId ? ctx.findElement(ctx.editingElementId) : null;
-  if (
-    foundInit &&
-    foundInit.element &&
-    foundInit.element.elementStyle &&
-    foundInit.element.elementStyle.color
-  ) {
-    initColor = foundInit.element.elementStyle.color;
-  }
+  const initColor = activeColorAtSelection() || '#222222';
   const colorBtn = document.createElement('button');
   colorBtn.type = 'button';
   colorBtn.className = 'opencanvas-mark-color';
@@ -936,7 +1062,11 @@ export function buildMarkToolbarImpl(ctx: EditorContext, anchor: HTMLElement): v
   colorInput.addEventListener('input', function () {
     const v = colorInput.value;
     if (colorDot) colorDot.setAttribute('fill', v);
-    applyTextColorToEditing(ctx, v);
+    // Normalise to lowercase so the schema-validated value matches the
+    // serializer-normalised value byte-for-byte (avoids spurious dirty
+    // diffs after save/reload round-trips).
+    const normalised = INLINE_COLOR_HEX_RE.test(v) ? v.toLowerCase() : v;
+    applyColorMark(ctx, normalised);
   });
   bar.appendChild(colorBtn);
 

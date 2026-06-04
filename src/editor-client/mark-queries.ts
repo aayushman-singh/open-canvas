@@ -9,6 +9,7 @@ import type { InlineRun, InlineMark, InlineMarkType } from '../canvas/schema.js'
 
 type LinkMark = Extract<InlineMark, { type: 'link' }>;
 type FontSizeMark = Extract<InlineMark, { type: 'fontSize' }>;
+type ColorMark = Extract<InlineMark, { type: 'color' }>;
 
 export function hasMark(run: InlineRun, type: InlineMarkType): boolean {
   if (!run.marks || !Array.isArray(run.marks)) return false;
@@ -27,6 +28,14 @@ export function findFontSizeMark(run: InlineRun): FontSizeMark | null {
   if (!run.marks || !Array.isArray(run.marks)) return null;
   for (const mark of run.marks) {
     if (mark.type === 'fontSize') return mark;
+  }
+  return null;
+}
+
+export function findColorMark(run: InlineRun): ColorMark | null {
+  if (!run.marks || !Array.isArray(run.marks)) return null;
+  for (const mark of run.marks) {
+    if (mark.type === 'color') return mark;
   }
   return null;
 }

@@ -125,9 +125,10 @@ export const SECTION_RECIPE_IDS = [...AGENT_RECIPE_IDS, 'custom'] as const;
 export type SectionRecipeId = (typeof SECTION_RECIPE_IDS)[number];
 
 // Inline rich-text marks for the rich text inside a TextElement. The set is
-// intentionally small: bold/italic/underline/strike/code/highlight/link. There
-// are no block-level nodes — a TextElement is always a single visual paragraph
-// whose box, alignment, font size, and role come from the surrounding fields.
+// intentionally small: bold/italic/underline/strike/code/highlight/link/
+// fontSize/color. There are no block-level nodes — a TextElement is always
+// a single visual paragraph whose box, alignment, font size, and role come
+// from the surrounding fields.
 export const INLINE_MARK_TYPES = [
   'bold',
   'italic',
@@ -137,6 +138,7 @@ export const INLINE_MARK_TYPES = [
   'highlight',
   'link',
   'fontSize',
+  'color',
 ] as const;
 export type InlineMarkType = (typeof INLINE_MARK_TYPES)[number];
 
@@ -149,6 +151,17 @@ export type InlineMarkType = (typeof INLINE_MARK_TYPES)[number];
 export const INLINE_FONT_SIZE_PX_MIN = 8;
 export const INLINE_FONT_SIZE_PX_MAX = 200;
 
+// `color` carries a CSS-colour payload (validated as `#RGB`, `#RRGGBB`, or
+// `#RRGGBBAA`) so an Owner can recolour a sub-range of a text element via
+// the mark toolbar without touching the element-level `elementStyle.color`.
+// The renderer stamps `color:<hex>` on the run's outer span — same wrapper
+// the `fontSize` mark stamps `font-size:Npx` onto.
+//
+// Hex-only on purpose: the native `<input type="color">` returns `#RRGGBB`,
+// keeping the payload to a single normalised shape avoids variance across
+// browsers and CSS named-colour aliases. Validator pattern below.
+export const INLINE_COLOR_HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
 export type InlineMark =
   | { type: 'bold' }
   | { type: 'italic' }
@@ -157,7 +170,8 @@ export type InlineMark =
   | { type: 'code' }
   | { type: 'highlight' }
   | { type: 'link'; href: string; target?: '_blank' }
-  | { type: 'fontSize'; px: number };
+  | { type: 'fontSize'; px: number }
+  | { type: 'color'; color: string };
 
 // Cap on the TeX source carried by a math run. Bounded so a malicious paste
 // can't shovel an arbitrary string through validation; KaTeX itself rejects

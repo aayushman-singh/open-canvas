@@ -86,13 +86,17 @@ export const ZOOM_STEP = 0.1;
  *  wraps every other mark so anchor styling stays intact; the typographic
  *  tags nest inside in this exact sequence so the editor preview matches
  *  the server renderer (src/canvas/render.ts) and the serializer's
- *  adjacent-run dedupe by JSON string stays reliable. `fontSize` sits
- *  outermost because it stamps a style attribute on the outer span
- *  rather than wrapping a tag. Derived from INLINE_MARK_TYPES in
- *  schema.ts but ordered differently — the editor's order is load-bearing
- *  for the DOM serializer's wrap() sequence. */
+ *  adjacent-run dedupe by JSON string stays reliable. `fontSize` and
+ *  `color` sit outermost because they stamp style attributes on the
+ *  outer span rather than wrapping a tag — they share a wrapper, so
+ *  the relative order between the two does not change the rendered
+ *  DOM, but their order versus the rest of the list is load-bearing.
+ *  Derived from INLINE_MARK_TYPES in schema.ts but ordered differently —
+ *  the editor's order is load-bearing for the DOM serializer's wrap()
+ *  sequence. */
 export const CANONICAL_MARK_ORDER = [
   'fontSize',
+  'color',
   'link',
   'bold',
   'italic',
