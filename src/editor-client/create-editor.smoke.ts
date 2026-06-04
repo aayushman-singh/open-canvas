@@ -15,6 +15,10 @@
 import type { EditorBoot } from './editor-context.js';
 import { createEditor } from './index.js';
 
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[create-editor:smoke] ${message}`);
 }
@@ -42,5 +46,71 @@ assert(boot.apiBase === '/api', 'apiBase fixture round-trips');
 assert(boot.wsToken === '', 'wsToken fixture round-trips');
 assert(boot.displayName === 'Smoke', 'displayName fixture round-trips');
 assert(boot.userId === 'user-smoke', 'userId fixture round-trips');
+
+// Phase 3 cutover guard: createEditor is now the production entrypoint, so
+// these ctx members must be live functions. A stub here means normal editor
+// boot or a first user action will throw "createEditor wiring pending..." in
+// the browser.
+const indexSource = await Bun.file(new URL('./index.ts', import.meta.url)).text();
+
+const forbiddenLiveStubs = [
+  'findElement',
+  'buildPickerThumb',
+  'postAssetUpload',
+  'setStatus',
+  'applyAssetIdToElement',
+  'runDeleteAsset',
+  'uploadMediaForElement',
+  'findSection',
+  'preserveInspectorScrollFor',
+  'revokePendingPreviews',
+  'selectableSectionRoles',
+  'currentPage',
+  'applyPageMotionAttributes',
+  'applyPageStyleProperties',
+  'pageRenderWidth',
+  'renderInspectorSpec',
+  'saveStateNow',
+  'buildSectionNode',
+  'flushPendingSave',
+  'pointerToCanvas',
+  'resolveElementWrapperAtPoint',
+  'insertElementForSidebarCommand',
+  'getPagePosition',
+  'uploadGeneratedBlobToElement',
+  'forceOpenInspector',
+  'renderMathInScope',
+  'normalizePastedHtml',
+  'plainTextToFragmentHtml',
+  'beginDrag',
+  'openLinkModal',
+  'generateImageForElement',
+  'isEditableShortcutTarget',
+] as const;
+
+for (const name of forbiddenLiveStubs) {
+  assert(
+    !indexSource.includes(`${name}: stub('${name}')`),
+    `${name} must not remain a Phase 3 createEditor stub`,
+  );
+}
+
+const requiredBootNeedles = [
+  'mountViewportImpl(ctx);',
+  'if (window.katex && ctx.root) ctx.renderMathInScope(ctx.root);',
+  'attachChromeToggles(ctx);',
+  'ctx.localPresence = loadPresenceIdentity(ctx.presenceDisplayName);',
+  'wireCoEditPresenceListeners(ctx);',
+  'ctx.onMarkToolbarReflow = () => onMarkToolbarReflowImpl(ctx);',
+] as const;
+
+for (const needle of requiredBootNeedles) {
+  assert(indexSource.includes(needle), `createEditor boot must contain ${needle}`);
+}
+
+assert(
+  !indexSource.includes('registerKeyboardHandlers(ctx);'),
+  'createEditor must not register duplicate global keyboard handlers',
+);
 
 console.log('[create-editor:smoke] OK');
