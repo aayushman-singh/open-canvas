@@ -9,9 +9,17 @@ import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
 import type { CanvasSection, EditableSite, MediaKind } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
-import { customer, customTemplate, ownerAsset, site, type BillingPlan } from '../../db/schema';
+import {
+  collectionEntry,
+  customer,
+  customTemplate,
+  ownerAsset,
+  site,
+  type BillingPlan,
+} from '../../db/schema';
 import { canReadScopedLibraryRow } from './library-access';
 import { getTemplateSeed } from '../../templates/registry';
+import { TEMPLATE_SEED_ENTRIES } from '../../templates/portfolio-seed-entries';
 
 type Bindings = {
   CLERK_PUBLISHABLE_KEY: string;
@@ -506,6 +514,21 @@ sites.post('/', async (c) => {
   }
 
   const newSiteId = crypto.randomUUID();
+  const seedEntryDefs = TEMPLATE_SEED_ENTRIES[templateId] ?? [];
+  const seedEntryRows = seedEntryDefs.map((entry) => ({
+    siteId: newSiteId,
+    collectionSlug: entry.collectionSlug,
+    slug: entry.slug,
+    title: entry.title,
+    excerpt: entry.excerpt,
+    body: entry.body,
+    publishedDate: entry.publishedDate,
+    author: entry.author,
+    category: entry.category,
+    tags: entry.tags,
+    ogImageAssetId: entry.ogImageAssetId,
+    status: entry.status,
+  }));
   try {
     const siteInsert = database.insert(site).values({
       id: newSiteId,
@@ -517,11 +540,18 @@ sites.post('/', async (c) => {
       publishedSnapshot: null,
       publishedVersion: 0,
     });
-    if (assetRows.length === 0) {
+    if (assetRows.length === 0 && seedEntryRows.length === 0) {
       await siteInsert;
-    } else {
+    } else if (assetRows.length > 0 && seedEntryRows.length > 0) {
+      const assetInsert = database.insert(ownerAsset).values(assetRows).onConflictDoNothing();
+      const entryInsert = database.insert(collectionEntry).values(seedEntryRows);
+      await database.batch([siteInsert, assetInsert, entryInsert]);
+    } else if (assetRows.length > 0) {
       const assetInsert = database.insert(ownerAsset).values(assetRows).onConflictDoNothing();
       await database.batch([siteInsert, assetInsert]);
+    } else {
+      const entryInsert = database.insert(collectionEntry).values(seedEntryRows);
+      await database.batch([siteInsert, entryInsert]);
     }
   } catch (err) {
     if (isSiteLimitViolation(err)) {

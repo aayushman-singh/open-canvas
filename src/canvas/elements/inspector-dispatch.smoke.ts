@@ -72,7 +72,6 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     fontWeight: 600,
     align: 'left',
     lineHeight: 1.2,
-    isRichText: false,
   },
   action: {
     id: 'fx-action',

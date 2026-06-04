@@ -294,8 +294,14 @@ function applyFieldBindings(
 }
 
 /** Substitute placeholders and field bindings for an entry across a list of
- *  cloned cardTemplate elements. The clone has already been deep-cloned by
- *  the caller, so binding can mutate in place. */
+ *  cloned cardTemplate elements, then suffix every element id with the
+ *  entry slug. The id-suffix step is required because the materializer
+ *  produces N clones of the same cardTemplate within a single page, and the
+ *  validator's element-id-unique-within-page rule (page-routing.ts) would
+ *  otherwise fail on the first multi-entry index page. The suffix runs
+ *  AFTER `applyFieldBindings` because that lookup is keyed by the original
+ *  element id. The clone has already been deep-cloned by the caller, so
+ *  binding can mutate in place. */
 function substituteCardTemplate(
   cardTemplate: CanvasElement[],
   fieldBindings: CollectionElement['fieldBindings'],
@@ -303,6 +309,9 @@ function substituteCardTemplate(
 ): CanvasElement[] {
   const substituted = substituteInValue(cardTemplate, entry);
   applyFieldBindings(substituted, fieldBindings, entry);
+  walkElements(substituted, (el) => {
+    el.id = `${el.id}--${entry.slug}`;
+  });
   return substituted;
 }
 
