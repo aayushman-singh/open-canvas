@@ -4,6 +4,8 @@
 // Single owner of the text element type, including the constraints on
 // fontSize / fontWeight / align that the editor inspector enforces.
 
+import MarkdownIt from 'markdown-it';
+
 import type { JsonSchema } from '../../agent/llm.js';
 import type { AgentToolSpec } from './agent-tool-spec.js';
 import type { InspectorSpec } from './inspector-spec.js';
@@ -107,9 +109,61 @@ export interface TextElement extends BaseElement {
    * the structured fallback only.
    */
   fluidSize?: FluidSize;
+  /**
+   * ADR 0060 F1. When true, the renderer treats `content[0].text` as
+   * CommonMark Markdown and emits it as HTML inside a `<div>` wrapper.
+   * Inline runs beyond the first, marks, math, and the `role`-driven
+   * `<h1>`/`<p>`/`<span>` tag selection are all ignored on flagged
+   * elements — the rendered HTML may contain its own block-level structure
+   * (`<h1>..<h6>`, `<p>`, `<ul>`, `<blockquote>`, `<pre>`, `<code>`) which
+   * cannot legally nest inside `<p>` or `<h1>`. Raw HTML in the source is
+   * escaped, not passed through, so a malicious paste cannot inject markup.
+   * Intended for CMS entry bodies surfaced via `{{body}}` placeholders that
+   * the materializer substitutes pre-publish — but any text element can opt
+   * in via the inspector.
+   */
+  isRichText?: boolean;
+}
+
+// Single shared MarkdownIt instance — pure CommonMark + line-break-as-<br>,
+// no raw HTML, no autolink. The set of emitted tags is fixed by the
+// CommonMark grammar (no plugins enabled) and is HTML-safe by construction:
+// `<h1>`-`<h6>`, `<p>`, `<ul>`, `<ol>`, `<li>`, `<blockquote>`, `<pre>`,
+// `<code>`, `<em>`, `<strong>`, `<a>` (href escaped), `<hr>`, `<br>`. No
+// `<script>`, `<style>`, `<iframe>` paths exist with `html: false`.
+const RICH_TEXT_MD = new MarkdownIt({
+  html: false,
+  linkify: false,
+  breaks: true,
+  typographer: false,
+});
+
+function renderRichText(element: TextElement): string {
+  const source = element.content[0]?.text ?? '';
+  const entries: [string, string][] = [
+    ['font-size', `${String(element.fontSize)}px`],
+    ['font-weight', String(element.fontWeight)],
+    ['text-align', element.align],
+    ['margin', '0'],
+  ];
+  if (element.letterSpacing !== undefined) {
+    entries.push(['letter-spacing', escapeCssValue(element.letterSpacing)]);
+  }
+  if (element.lineHeight !== undefined) {
+    entries.push(['line-height', String(element.lineHeight)]);
+  }
+  if (element.textTransform !== undefined) {
+    entries.push(['text-transform', element.textTransform]);
+  }
+  const innerStyle = styleFromEntries(entries);
+  const html = RICH_TEXT_MD.render(source);
+  return `<div class="opencanvas-text opencanvas-richtext" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${html}</div>`;
 }
 
 export function renderText(element: TextElement): string {
+  if (element.isRichText === true) {
+    return renderRichText(element);
+  }
   const tag = element.role === 'heading' ? 'h1' : element.role === 'body' ? 'p' : 'span';
   // ADR 0050 dec 1 — fluid font sizing takes precedence over the static
   // fontSize when present. fontSize remains the structured-fallback contract
@@ -194,6 +248,7 @@ export const textInspectorSpec: InspectorSpec = {
       placeholder: 'uppercase | lowercase | capitalize',
       emptyOmits: true,
     },
+    { kind: 'checkbox', label: 'Markdown body', path: 'isRichText' },
   ],
 };
 
@@ -449,6 +504,11 @@ export const textAgentToolSpec: AgentToolSpec = {
       },
       required: ['min', 'max', 'vw'],
     },
+    isRichText: {
+      type: 'boolean',
+      description:
+        'When true, the renderer treats content[0].text as CommonMark Markdown and emits HTML. Text elements only. ADR 0060 F1 — used for CMS entry bodies surfaced via {{body}}.',
+    },
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -504,6 +564,12 @@ export const textAgentToolSpec: AgentToolSpec = {
     }
     if (args.fluidSize !== undefined) {
       patch.fluidSize = parseFluidSize(args.fluidSize);
+    }
+    if (args.isRichText !== undefined) {
+      if (typeof args.isRichText !== 'boolean') {
+        throw new Error('isRichText must be a boolean');
+      }
+      patch.isRichText = args.isRichText;
     }
     return patch;
   },

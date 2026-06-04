@@ -979,6 +979,7 @@ function validateElement(
           }
         }
       }
+      assertOptionalBoolean(element.isRichText, `${basePath}.isRichText`, errors);
       break;
     }
     case 'media': {

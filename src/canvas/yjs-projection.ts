@@ -65,6 +65,7 @@
 //   'content'?    -> Y.Array<Y.Map<unknown>>         (TextElement.content :: InlineRun[])
 //                    Per ADR 0007 "Out of scope" item 1, each run is an
 //                    opaque Y.Map; per-character text CRDT is a future ADR.
+//   'isRichText'? -> boolean                          (TextElement only; ADR 0060 F1)
 //
 // InlineRun Y.Map:
 //   'text'   -> string
@@ -332,6 +333,7 @@ function encodeTextElement(el: TextElement): Y.Map<unknown> {
     fluid.set('vw', el.fluidSize.vw);
     out.set('fluidSize', fluid);
   }
+  setIfDefined(out, 'isRichText', el.isRichText);
   return out;
 }
 
@@ -1049,6 +1051,7 @@ function decodeTextElement(map: Y.Map<unknown>, base: BaseElement): TextElement 
       vw: fluid.get('vw') as number,
     };
   }
+  if (map.has('isRichText')) out.isRichText = map.get('isRichText') as boolean;
   return out;
 }
 
