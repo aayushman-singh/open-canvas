@@ -634,3 +634,66 @@ export const notificationRead = pgTable(
 
 export type NotificationRead = typeof notificationRead.$inferSelect;
 export type NewNotificationRead = typeof notificationRead.$inferInsert;
+
+// -- collectionEntry (ADR 0060 — CMS-style entries) --------------------------
+//
+// One row per content entry (blog post, case study, etc.) for a given
+// collection on a given site. The canvas only ships `collection-index` and
+// `collection-item-template` pages; this table holds the actual content. A
+// publish-time `materializeCollections` pass clones the template per
+// published row in the matching collection.
+//
+// `collectionSlug` is the user-facing name ("blog", "notes") and groups
+// entries within a site. Per-entry `slug` is unique within (site,
+// collectionSlug) — the unique index in the migration enforces this and the
+// API surfaces collisions as 409.
+//
+// `publishedDate` is an ISO date string (not a timestamp) because entries
+// represent editorial dates the Owner controls, not row mutation times. The
+// row mutation timestamp is `updatedAt` and is the tie-breaker for the
+// last-writer-wins collaboration model documented in the ADR.
+//
+// `tags` is a `string[]` stored as jsonb — typed at the Drizzle layer with
+// `$type<string[]>().default([])` so callers never see `unknown`.
+export const COLLECTION_ENTRY_STATUSES = ['draft', 'published'] as const;
+export type CollectionEntryStatus = (typeof COLLECTION_ENTRY_STATUSES)[number];
+
+export const collectionEntry = pgTable(
+  'collection_entry',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => site.id, { onDelete: 'cascade' }),
+    collectionSlug: text('collection_slug').notNull(),
+    slug: text('slug').notNull(),
+    title: text('title').notNull(),
+    excerpt: text('excerpt').notNull().default(''),
+    body: text('body').notNull().default(''),
+    publishedDate: text('published_date').notNull(),
+    author: text('author').notNull().default(''),
+    category: text('category').notNull().default(''),
+    tags: jsonb('tags').notNull().$type<string[]>().default([]),
+    ogImageAssetId: text('og_image_asset_id'),
+    status: text('status').notNull().$type<CollectionEntryStatus>().default('draft'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    siteCollectionPublishedIdx: index('collection_entry_site_collection_published_idx').on(
+      t.siteId,
+      t.collectionSlug,
+      t.publishedDate.desc(),
+    ),
+    siteCollectionSlugUnique: uniqueIndex('collection_entry_site_collection_slug_unique').on(
+      t.siteId,
+      t.collectionSlug,
+      t.slug,
+    ),
+  }),
+);
+
+export type CollectionEntry = typeof collectionEntry.$inferSelect;
+export type NewCollectionEntry = typeof collectionEntry.$inferInsert;
