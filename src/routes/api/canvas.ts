@@ -845,6 +845,22 @@ canvasApi.post('/sites/:siteId/assets/generate', async (c) => {
   });
 });
 
+// Cache-Control for owner-gated 404 asset responses. Without this, the
+// browser re-hits Neon on every render cycle that emits the same
+// `<img src>` for a non-resolving assetId (raw seed-ids in legacy
+// editable_state, deleted assets, etc.). 60s mirrors the customer-row
+// memo TTL — long enough to coalesce a cold-load's repeated fetches,
+// short enough that a re-upload to fix the broken asset is visible
+// without a hard refresh. `private` because the route is owner-gated,
+// so a 404 for one Owner must never be cached for another Owner.
+const ASSET_NOT_FOUND_CACHE_CONTROL = 'private, max-age=60';
+
+function assetNotFoundResponse(c: Context<Env>): Response {
+  return c.json({ error: 'asset not found' }, 404, {
+    'Cache-Control': ASSET_NOT_FOUND_CACHE_CONTROL,
+  });
+}
+
 // Owner-gated preview endpoint. The editor uses this for editable-state
 // previews of media the Owner has uploaded but not yet published. The
 // resolution is scoped to the current Owner (not the site) so the editor
@@ -867,7 +883,7 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   // with the save validator's `loadAssetKindsWithSeedFallback`.
   const row = await resolveAssetRowForCustomer(database, result.ownerCustomerId, assetId);
   if (!row) {
-    return c.json({ error: 'asset not found' }, 404);
+    return assetNotFoundResponse(c);
   }
   // Reuse the public readOwnerAsset helper for transform handling; we pass
   // a one-row select shim so the lookup is skipped.
@@ -893,12 +909,12 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
       { addr: assetId, url: requestUrl },
     );
     if (!response) {
-      return c.json({ error: 'asset not found' }, 404);
+      return assetNotFoundResponse(c);
     }
     return response;
   } catch (error) {
     console.error('[canvas/assets] legacy bridge failed:', error);
-    return c.json({ error: 'asset not found' }, 404);
+    return assetNotFoundResponse(c);
   }
 });
 
