@@ -34,6 +34,13 @@ export interface InboxQueryOptions {
   limit?: number;
   /** Only return rows whose createdAt is strictly after this ISO timestamp. */
   since?: string;
+  /**
+   * Pre-computed visibility set from `loadVisibleSiteIds`. When provided we
+   * skip the in-function load — the route handler computes this once per
+   * request and passes it to both `listInbox` and `unreadCount`, halving the
+   * Neon round trips on the /api/notifications hot path.
+   */
+  siteIds?: string[];
 }
 
 const DEFAULT_LIMIT = 30;
@@ -46,7 +53,11 @@ const MAX_LIMIT = 100;
 // different table), so we issue them in parallel — every saved Neon round
 // trip on this helper shaves ~50-200ms off the /api/notifications hot path,
 // which the dashboard polls.
-async function loadVisibleSiteIds(db: Db, customerId: string): Promise<string[]> {
+//
+// Exported so the route handler can compute the set ONCE and pass it into
+// both `listInbox` and `unreadCount` instead of paying for the same two
+// SELECTs twice per request.
+export async function loadVisibleSiteIds(db: Db, customerId: string): Promise<string[]> {
   const [owned, collaborator] = await Promise.all([
     db.select({ id: site.id }).from(site).where(eq(site.customerId, customerId)),
     db
@@ -89,7 +100,7 @@ export async function listInbox(
   options: InboxQueryOptions = {},
 ): Promise<InboxItem[]> {
   const limit = Math.min(Math.max(1, options.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
-  const siteIds = await loadVisibleSiteIds(db, customerId);
+  const siteIds = options.siteIds ?? (await loadVisibleSiteIds(db, customerId));
 
   const conds: SQL[] = [buildVisibilityWhere(customerId, siteIds)];
   if (options.since !== undefined) {
@@ -133,8 +144,16 @@ export async function listInbox(
 }
 
 // Unread count over the same visibility scope. One round-trip; counts in SQL.
-export async function unreadCount(db: Db, customerId: string): Promise<number> {
-  const siteIds = await loadVisibleSiteIds(db, customerId);
+//
+// `siteIds` is the visibility set produced by `loadVisibleSiteIds`. The route
+// handler passes this in to share the resolved set with `listInbox`; callers
+// that don't have one yet pass `undefined` and we load it ourselves.
+export async function unreadCount(
+  db: Db,
+  customerId: string,
+  siteIds?: string[],
+): Promise<number> {
+  const visibleSiteIds = siteIds ?? (await loadVisibleSiteIds(db, customerId));
 
   // Unread = customer-kind addressed to me with no readAt, OR site-kind
   // visible to me with no matching notification_read row.
@@ -144,13 +163,13 @@ export async function unreadCount(db: Db, customerId: string): Promise<number> {
     isNull(notification.readAt),
   );
   const unreadFilter: SQL =
-    siteIds.length === 0
+    visibleSiteIds.length === 0
       ? (customerUnread as SQL)
       : (or(
           customerUnread,
           and(
             eq(notification.recipientKind, 'site'),
-            inArray(notification.recipientId, siteIds),
+            inArray(notification.recipientId, visibleSiteIds),
             isNull(notificationRead.readAt),
           ),
         ) as SQL);
