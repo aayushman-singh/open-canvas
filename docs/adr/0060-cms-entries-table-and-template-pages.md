@@ -140,6 +140,8 @@ The four items below were deliberately descoped from the shipping pass (2026-06-
 
 **Why deferred:** UX flow needs sketching against the dashboard's existing modal patterns; not a one-shot agent task.
 
+**Follow-up shipped:** scaffold wizard surfaced as `+ New Collection` in the editor's Pages sidebar — slug-only prompt that calls `POST /api/sites/:siteId/collections`, then refreshes editor state and switches the active page to the freshly-minted index. See `src/editor-client/collection-scaffold.ts` and `src/editor-client/collection-scaffold.smoke.ts`.
+
 ### F4 — Per-entry OG image
 
 **Decision space:** the `og_image_asset_id` column exists on `collection_entry` and the materializer copies it onto the cloned page when set. But the OG generation path (per ADR 0041, "OG image fresh render per page") renders OG cards from page metadata server-side at publish — there's no path yet that takes an entry-supplied `ogImageAssetId` and produces the visitor-facing card.
