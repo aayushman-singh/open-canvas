@@ -72,7 +72,7 @@ function handleSessionExpired(ctx: EditorContext): void {
   // multiple in-flight 401s collapse into a single reload.
   setSaveBusy(ctx, true);
   ctx.setAiBusy(true);
-  if (ctx.publishButton) (ctx.publishButton as HTMLButtonElement).disabled = true;
+  if (ctx.publishButton) ctx.publishButton.disabled = true;
   setTimeout(() => {
     location.reload();
   }, 1500);
@@ -88,7 +88,7 @@ function handleAccessRevoked(ctx: EditorContext): void {
   // 403. The modal CTAs let them navigate away on their own terms.
   setSaveBusy(ctx, true);
   ctx.setAiBusy(true);
-  if (ctx.publishButton) (ctx.publishButton as HTMLButtonElement).disabled = true;
+  if (ctx.publishButton) ctx.publishButton.disabled = true;
   showAccessRemovedModal();
 }
 
