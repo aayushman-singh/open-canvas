@@ -30,6 +30,7 @@
 
 import type { EditorContext } from './editor-context.js';
 import { cssEscape } from './css-escape.js';
+import { mountResizeHandles, unmountResizeHandles } from './element-menu.js';
 
 export function selectElement(ctx: EditorContext, elementId: string | null): void {
   if (ctx.selectedElementId === elementId) return;
@@ -39,7 +40,17 @@ export function selectElement(ctx: EditorContext, elementId: string | null): voi
     const prev = ctx.root?.querySelectorAll(
       '[data-opencanvas-element="' + cssEscape(ctx.selectedElementId) + '"]',
     );
-    if (prev) for (let i = 0; i < prev.length; i++) prev[i]!.removeAttribute('data-selected');
+    if (prev) {
+      for (let i = 0; i < prev.length; i++) {
+        const prevEl = prev[i] as HTMLElement | undefined;
+        if (!prevEl) continue;
+        prevEl.removeAttribute('data-selected');
+        // Strip the resize handle quad from the previously-selected wrapper
+        // so the DOM only ever carries one set of 8 handles at a time. See
+        // element-menu.ts for the rationale (descendant-cascade bug).
+        unmountResizeHandles(prevEl);
+      }
+    }
   }
   ctx.selectedElementId = elementId;
   ctx.chatSelectionDropped = false;
@@ -52,7 +63,19 @@ export function selectElement(ctx: EditorContext, elementId: string | null): voi
     const next = ctx.root?.querySelectorAll(
       '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
     );
-    if (next) for (let i = 0; i < next.length; i++) next[i]!.setAttribute('data-selected', 'true');
+    if (next) {
+      for (let i = 0; i < next.length; i++) {
+        const nextEl = next[i] as HTMLElement | undefined;
+        if (!nextEl) continue;
+        nextEl.setAttribute('data-selected', 'true');
+        // Mount the resize handle quad on every matching wrapper. Repeated
+        // site-pinned sections render one wrapper per artboard but share a
+        // single element id; mounting on each keeps handle behaviour
+        // consistent across pages instead of clinging to the first match
+        // in document order.
+        mountResizeHandles(nextEl);
+      }
+    }
     const found = ctx.findElement(elementId);
     if (found) selectSection(ctx, found.section.id);
     // Action elements get an auto-pinned link popover so the Owner can
