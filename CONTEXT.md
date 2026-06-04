@@ -13,8 +13,8 @@ A person who views the published site at its public address.
 _Avoid_: Customer, anonymous user, end user
 
 **Template Seed**:
-A starting site shape copied into a new editable site.
-_Avoid_: Template app, theme, preset
+A curated composition that produces a new Editable Site. It references the Section Library by section id rather than embedding section data, and carries a Theme Choice, an optional site-pinned Header Section ref, an optional site-pinned Footer Section ref, and an ordered list of body Section Instances per page. Each Section Instance may carry a Section Override.
+_Avoid_: Template app, theme, preset, starter kit
 
 **Editable Site**:
 The owner-controlled site state that can be changed before publishing.
@@ -73,8 +73,24 @@ One bounded unit of work in which the Agent processes one Owner ask — from the
 _Avoid_: Iteration, conversation round, message exchange, prompt cycle
 
 **Section Recipe**:
-A constrained canvas section shape the agent may use when creating a new section.
+A constrained canvas section shape the agent may use when creating a new section. Also serves as a categorisation column on every Section in the Section Library.
 _Avoid_: Freeform layout, arbitrary generation, template
+
+**Section Library**:
+The canonical pool of reusable Section definitions. Every built-in Section, every Owner-saved Section, and every standalone library fixture lives in the Section Library. A Template references the Section Library; it does not embed Section data of its own.
+_Avoid_: Section catalog, section pool, section registry, snippet library
+
+**Section Category**:
+A high-level bucket assigned to each Section in the Section Library that determines where the Section lives in the rendered site and how the picker surfaces it. Categories: header, hero, features, testimonials, cta, gallery, footer, other. Orthogonal to Section Recipe (which is a structural constraint) and to visibility (which is an auth concern).
+_Avoid_: Section type, section kind, section tag, section role
+
+**Section Instance**:
+A usage of a Section inside a Template Seed or an Editable Site. Carries an instance scope so the same Section can appear multiple times in one page without identity collision between its elements and anchors. May carry a Section Override.
+_Avoid_: Section copy, section embed, section reference
+
+**Section Override**:
+A sparse per-instance edit to a Section's fields, applied when the Section is instantiated. Only the fields the override touches differ from the Section's canonical shape. Authored at the Template Seed level or the Editable Site level.
+_Avoid_: Customisation, patch, modifier, theme override
 
 **Owned-Domain Subdomain**:
 A published address adapter where an owner-chosen name under the owner's domain resolves to a published site.
@@ -89,19 +105,19 @@ A page made of ordered canvas sections rather than flow-based document content.
 _Avoid_: Prose document, webpage DOM, slide deck
 
 **Section Role**:
-A designation that determines a section's placement rule within a page: header (pinned to top), footer (pinned to bottom), or body (freely reorderable between them). Orthogonal to the section's layout shape or recipe.
+A designation on a page section that marks it as a body section, the only remaining role since ADR 0059 removed inline header/footer roles in favour of site-pinned Header Section and Footer Section.
 _Avoid_: Section type, section kind, section category
 
 **Section**:
-An interchangeable page region the owner can insert, remove, reorder, or replace. A body-role section; the default.
-_Avoid_: Component, template slice
+A reusable structural unit in the Section Library, identified by a stable section id and base slug. A Section is data only. When a Template Seed or an Editable Site uses a Section, it does so via a Section Instance — never by embedding the Section's data.
+_Avoid_: Component, template slice, layout block, snippet
 
 **Header Section**:
-A site-wide section with the header role, rendered before every canvas page. At most one per editable site. Cannot be reordered into page body sections or duplicated.
+A site-pinned Section Instance rendered before every Canvas Page. Sourced from the Section Library; the Editable Site holds the section id, not the section data. At most one per Editable Site. Cannot be reordered into page body sections or duplicated.
 _Avoid_: Nav bar, site chrome, header component
 
 **Footer Section**:
-A site-wide section with the footer role, rendered after every canvas page. At most one per editable site. Cannot be reordered into page body sections or duplicated.
+A site-pinned Section Instance rendered after every Canvas Page. Sourced from the Section Library; the Editable Site holds the section id, not the section data. At most one per Editable Site.
 _Avoid_: Bottom bar, footer component
 
 **Canvas Section**:
@@ -135,10 +151,24 @@ _Avoid_: Undo stack, version history, asset trail
 - An **Editable Site** may have one **Header Section** and one **Footer Section** shared by every **Canvas Page**
 - A **Canvas Page** contains one or more **Canvas Sections**
 - A **Canvas Page** contains body sections; shared header/footer sections live on the **Editable Site**
-- Every **Section** has a **Section Role** (`body` by default)
 - Every visible **Section** in the POC is a **Canvas Section**
 - A **Section** contains one or more **Content Elements**
 - A **Canvas Section** contains one or more **Positioned Elements**
+
+### Section Library
+
+- Every **Section** has exactly one entry in the **Section Library**
+- A **Section** is identified by a stable section id and a base slug; later edits create new entries via the lineage chain rather than mutating the original
+- A **Section** has exactly one **Section Recipe** and exactly one **Section Category**
+- A **Section** has exactly one visibility: `private` (owner-only) or `global` (built-in)
+- A **Template Seed** is a composition of **Section Instances**; it never embeds **Section** data
+- A **Template Seed** declares an ordered list of body **Section Instances** per **Canvas Page** plus optional Header and Footer **Section Instance** refs
+- A **Section Instance** belongs to exactly one **Section** in the **Section Library**
+- A **Section Instance** may carry one **Section Override**
+- A **Section Override** is sparse — only the fields it touches differ from the referenced **Section**
+- The same **Section** may be used as multiple **Section Instances** in the same **Canvas Page**; their instance scope keeps Content Element identity from colliding
+- Editing a private **Section** in place is allowed; saving as a new version creates a successor **Section** with `parentId` linking to the predecessor
+- A `global` **Section** is immutable from the UI; only a code-managed deploy may upsert it
 - A **Published Site** is backed by exactly one current **Published Snapshot**
 - A **Published Snapshot** is promoted from the whole **Editable Site**
 - A **Published Snapshot** reflects the owner's live editable state at the moment publish is requested

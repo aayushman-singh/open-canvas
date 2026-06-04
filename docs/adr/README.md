@@ -63,6 +63,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0058 | EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally | Proposed | [`docs/adr/0058-editor-context-as-iife-closure-mirror.md`](0058-editor-context-as-iife-closure-mirror.md) |
 | 0059 | Site header/footer is the only canonical pinned section; pages opt-in or opt-out | Accepted | [`docs/adr/0059-site-header-footer-is-only-canonical-pin.md`](0059-site-header-footer-is-only-canonical-pin.md) |
 | 0060 | CMS-style entries live in a dedicated table; the canvas holds template pages, not individual entries | Accepted | [`docs/adr/0060-cms-entries-table-and-template-pages.md`](0060-cms-entries-table-and-template-pages.md) |
+| 0061 | Section Library is the canonical pool; Template Seeds are compositions of Section Instances | Proposed | [`docs/adr/0061-section-library-is-canonical-pool-templates-are-compositions.md`](0061-section-library-is-canonical-pool-templates-are-compositions.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
