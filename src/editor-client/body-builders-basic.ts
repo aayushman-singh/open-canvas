@@ -25,6 +25,8 @@ import type {
   TextElement,
 } from '../canvas/schema.js';
 import type { ActionHref } from '../canvas/elements/action.js';
+import { renderInlineRun } from '../canvas/elements/render-utils.js';
+import { renderIconSvg, isIconName } from '../canvas/icons.js';
 
 import type { EditorContext } from './editor-context.js';
 import { isAllowedHref } from './href-utils.js';
@@ -173,12 +175,20 @@ export function buildActionBodyImpl(ctx: EditorContext, element: ActionElement):
     });
     node = anchor;
   }
-  let labelText = '';
-  for (let li = 0; li < element.label.length; li++) {
-    const run = element.label[li];
-    if (run !== undefined) labelText += run.text;
-  }
-  node.textContent = labelText;
+  // Mirror src/canvas/elements/action.ts:renderAction so the editor
+  // preview matches the deployed render byte-for-byte: optional icon SVG
+  // first, then each label InlineRun rendered with its full mark set
+  // (bold/italic/inline link/etc.). Setting innerHTML on the wrapper is
+  // safe because both helpers escape every owner-controlled string at the
+  // boundary (renderInlineRun via escapeHtml/escapeAttr; renderIconSvg
+  // emits a fixed inline registry). The previous `textContent = labelText`
+  // dropped both the icon AND every mark — see ADR 0051 dec 1+2.
+  const iconHtml =
+    element.iconKind !== undefined && isIconName(element.iconKind)
+      ? renderIconSvg(element.iconKind)
+      : '';
+  const labelHtml = element.label.map(renderInlineRun).join('');
+  node.innerHTML = iconHtml + labelHtml;
   return node;
 }
 
@@ -204,10 +214,12 @@ export function buildShapeBodyImpl(ctx: EditorContext, element: ShapeElement): H
   return node;
 }
 
-export function buildContainerBodyImpl(_ctx: EditorContext, element: ContainerElement): HTMLElement {
+export function buildContainerBodyImpl(
+  _ctx: EditorContext,
+  element: ContainerElement,
+): HTMLElement {
   const node = document.createElement('div');
   node.className = 'opencanvas-surface';
   node.setAttribute('data-variant', element.variant);
   return node;
 }
-

@@ -38,7 +38,8 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     id: 'fx-shape',
     type: 'shape',
     box: { x: 0, y: 0, w: 100, h: 100, z: 0 },
-    variant: 'rect',
+    variant: 'icon',
+    iconKind: 'check',
   },
   container: {
     id: 'fx-container',
@@ -80,6 +81,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     box: { x: 0, y: 0, w: 120, h: 40, z: 0 },
     label: [{ text: 'Click me' }],
     variant: 'solid',
+    iconKind: 'arrow-up-right',
     href: { type: 'external', url: 'https://example.com' },
   },
   media: {
@@ -245,6 +247,8 @@ function checkField(field: InspectorField, fixture: object, where: string): void
       );
       return;
     case 'text':
+      return;
+    case 'icon':
       return;
     case 'textarea':
       if (field.rows !== undefined) {

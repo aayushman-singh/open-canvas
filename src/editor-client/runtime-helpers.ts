@@ -12,12 +12,7 @@ import { SIDEBAR_DISPATCH } from '../canvas/elements/index.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import type { SidebarCommandSpec } from '../canvas/elements/sidebar-spec.js';
 import type { Tab } from '../canvas/elements/tabs.js';
-import type {
-  CanvasElement,
-  CanvasPage,
-  CanvasSection,
-  EditableSite,
-} from '../canvas/schema.js';
+import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from '../canvas/schema.js';
 import type { FindElementResult } from './editor-context-types.js';
 import type { EditorContext } from './editor-context.js';
 import {
@@ -34,6 +29,7 @@ import { isAllowedHref } from './href-utils.js';
 import { newElementId } from './ids.js';
 import { mountChartData } from './inspector-chart-mount.js';
 import { renderActionHrefField } from './inspector-action-href.js';
+import { renderIconField } from './inspector-icon-picker.js';
 import {
   mountAccordionItems,
   mountCarouselSlides,
@@ -60,14 +56,8 @@ import {
   setZoom,
   zoomAtPoint,
 } from './render.js';
-import {
-  handleViewportMousemove,
-  schedulePublishLocalPresence,
-} from './co-edit.js';
-import {
-  SIDEBAR_FACTORIES,
-  type SidebarFactoryName,
-} from './sidebar-factories.js';
+import { handleViewportMousemove, schedulePublishLocalPresence } from './co-edit.js';
+import { SIDEBAR_FACTORIES, type SidebarFactoryName } from './sidebar-factories.js';
 
 type ElementRecord = Record<string, unknown>;
 type CropperSelection = HTMLElement & {
@@ -121,9 +111,9 @@ export function installRuntimeHelpers(ctx: EditorContext): void {
   ctx.revokePendingPreviews = () => revokePendingPreviewsImpl(ctx);
   ctx.selectableSectionRoles = (section) => selectableSectionRolesImpl(ctx, section);
   ctx.currentPage = () => currentPageImpl(ctx);
-  ctx.applyPageMotionAttributes = (article, page) =>
-    applyPageMotionAttributesImpl(article, page);
-  ctx.applyPageStyleProperties = (article, page) => applyPageStylePropertiesImpl(ctx, article, page);
+  ctx.applyPageMotionAttributes = (article, page) => applyPageMotionAttributesImpl(article, page);
+  ctx.applyPageStyleProperties = (article, page) =>
+    applyPageStylePropertiesImpl(ctx, article, page);
   ctx.pageRenderWidth = (page) => pageRenderWidthImpl(page);
   ctx.renderInspectorSpec = (spec, element) => renderInspectorSpecImpl(ctx, spec, element);
   ctx.saveStateNow = () => saveStateNowImpl(ctx);
@@ -177,10 +167,7 @@ export function findSectionImpl(
   return null;
 }
 
-function findElementIn(
-  section: CanvasSection,
-  elementId: string,
-): FindElementResult | null {
+function findElementIn(section: CanvasSection, elementId: string): FindElementResult | null {
   function searchArray(
     arr: CanvasElement[],
     kind: FindElementResult['parentKind'],
@@ -199,10 +186,7 @@ function findElementIn(
           const hit = searchArray(tab.elements, 'tab-panel', { tabsElement: el, tab });
           if (hit) return hit;
         }
-      } else if (
-        el.type === 'collection' &&
-        Array.isArray((el as { entries?: unknown }).entries)
-      ) {
+      } else if (el.type === 'collection' && Array.isArray((el as { entries?: unknown }).entries)) {
         const entries = (el as { entries: unknown[] }).entries;
         for (let ei = 0; ei < entries.length; ei++) {
           const entry = entries[ei];
@@ -221,10 +205,7 @@ function findElementIn(
   return searchArray(section.elements, 'section', null);
 }
 
-export function findElementImpl(
-  ctx: EditorContext,
-  elementId: string,
-): FindElementResult | null {
+export function findElementImpl(ctx: EditorContext, elementId: string): FindElementResult | null {
   if (!ctx.state) return null;
   if (ctx.state.header) {
     const hitH = findElementIn(ctx.state.header, elementId);
@@ -298,10 +279,7 @@ export function revokePendingPreviewsImpl(ctx: EditorContext): void {
   }
 }
 
-export function selectableSectionRolesImpl(
-  _ctx: EditorContext,
-  _section: CanvasSection,
-): string[] {
+export function selectableSectionRolesImpl(_ctx: EditorContext, _section: CanvasSection): string[] {
   // ADR 0059 — page sections can only carry the implicit `'body'` role;
   // header/footer pinning is gone. The role-selector UI follows in Phase 5.
   return ['body'];
@@ -547,7 +525,9 @@ export function renderInspectorSpecImpl(
       if (f.busyFlag === 'aiBusy' && ctx.aiBusy) btn.disabled = true;
       const handler = ctx.INSPECTOR_ACTION_HANDLERS[f.action];
       if (typeof handler !== 'function') {
-        throw new Error('renderInspectorSpec: no action handler registered for ' + JSON.stringify(f.action));
+        throw new Error(
+          'renderInspectorSpec: no action handler registered for ' + JSON.stringify(f.action),
+        );
       }
       btn.addEventListener('click', () => {
         handler(element.id);
@@ -559,10 +539,16 @@ export function renderInspectorSpecImpl(
       renderActionHrefField(ctx, f, element as ActionElement);
       return;
     }
+    if (f.kind === 'icon') {
+      renderIconField(ctx, f, element);
+      return;
+    }
     if (f.kind === 'custom-mount') {
       const mount = inspectorMountHandler(ctx, f.name);
       if (typeof mount !== 'function') {
-        throw new Error('renderInspectorSpec: no mount handler registered for ' + JSON.stringify(f.name));
+        throw new Error(
+          'renderInspectorSpec: no mount handler registered for ' + JSON.stringify(f.name),
+        );
       }
       mount(element, ctx.inspector!);
       return;
@@ -598,10 +584,7 @@ function inspectorMountHandler(
   return mounts[name] || null;
 }
 
-async function persistStateSnapshot(
-  ctx: EditorContext,
-  snapshot: EditableSite,
-): Promise<boolean> {
+async function persistStateSnapshot(ctx: EditorContext, snapshot: EditableSite): Promise<boolean> {
   if (ctx.accessRevoked || ctx.sessionExpired) return false;
   ctx.setStatus('Saving...');
   try {
@@ -927,7 +910,9 @@ function loadCropper(): Promise<unknown> {
     cropperLoadPromise = (async () => {
       const response = await fetch(CROPPER_CDN, { cache: 'force-cache' });
       if (!response.ok) {
-        throw new Error('Cropper.js fetch failed: HTTP ' + response.status + ' from ' + CROPPER_CDN);
+        throw new Error(
+          'Cropper.js fetch failed: HTTP ' + response.status + ' from ' + CROPPER_CDN,
+        );
       }
       const bytes = await response.arrayBuffer();
       const digest = await crypto.subtle.digest('SHA-384', bytes);
@@ -1053,17 +1038,18 @@ function runCropperModal(
       const outType = reEncodableTypes.includes(sourceMediaType) ? sourceMediaType : 'image/png';
       selection
         .$toCanvas({ width: outWidth, height: outHeight })
-        .then((cv) =>
-          new Promise<{ blob: Blob; mediaType: string }>((res, rej) => {
-            cv.toBlob(
-              (blob) => {
-                if (blob) res({ blob, mediaType: outType });
-                else rej(new Error('canvas toBlob returned null'));
-              },
-              outType,
-              0.92,
-            );
-          }),
+        .then(
+          (cv) =>
+            new Promise<{ blob: Blob; mediaType: string }>((res, rej) => {
+              cv.toBlob(
+                (blob) => {
+                  if (blob) res({ blob, mediaType: outType });
+                  else rej(new Error('canvas toBlob returned null'));
+                },
+                outType,
+                0.92,
+              );
+            }),
         )
         .then((out) => {
           teardown();
@@ -1098,7 +1084,9 @@ async function extractVideoFirstFrame(file: File): Promise<Blob> {
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   const timeout = new Promise<Blob>((_res, rej) => {
     timeoutHandle = setTimeout(() => {
-      rej(new Error('video poster extraction timed out after ' + POSTER_EXTRACTION_TIMEOUT_MS + 'ms'));
+      rej(
+        new Error('video poster extraction timed out after ' + POSTER_EXTRACTION_TIMEOUT_MS + 'ms'),
+      );
     }, POSTER_EXTRACTION_TIMEOUT_MS);
   });
   const work = (async () => {
@@ -1276,7 +1264,8 @@ function showGeneratePreview(
   const img = document.createElement('img');
   img.src = objectUrl;
   img.alt = altValue;
-  img.style.cssText = 'max-width:100%;display:block;border:1px solid var(--opencanvas-border,#ccc);';
+  img.style.cssText =
+    'max-width:100%;display:block;border:1px solid var(--opencanvas-border,#ccc);';
   wrap.appendChild(img);
 
   const buttons = document.createElement('div');
@@ -1298,7 +1287,17 @@ function showGeneratePreview(
     'background:transparent;color:var(--ink-2,#555);border:1px solid var(--line,#ccc);';
 
   applyBtn.addEventListener('click', () => {
-    void applyGeneratePreview(ctx, element, blob, mediaType, altValue, wrap, applyBtn, discardBtn, objectUrl);
+    void applyGeneratePreview(
+      ctx,
+      element,
+      blob,
+      mediaType,
+      altValue,
+      wrap,
+      applyBtn,
+      discardBtn,
+      objectUrl,
+    );
   });
   discardBtn.addEventListener('click', () => {
     URL.revokeObjectURL(objectUrl);
@@ -1622,9 +1621,7 @@ export function resolveElementWrapperAtPointImpl(
   return best;
 }
 
-function resolveNestedInsertionTarget(
-  ctx: EditorContext,
-): { elements: CanvasElement[] } | null {
+function resolveNestedInsertionTarget(ctx: EditorContext): { elements: CanvasElement[] } | null {
   if (!ctx.selectedElementId) return null;
   const found = ctx.findElement(ctx.selectedElementId);
   if (!found) return null;
@@ -1670,7 +1667,9 @@ export function insertElementForSidebarCommandImpl(
 ): void {
   const command = ctx.SIDEBAR_COMMANDS[commandKey] as SidebarCommandSpec | undefined;
   if (!command) {
-    throw new Error('insertElementForSidebarCommand: unknown command key ' + JSON.stringify(commandKey));
+    throw new Error(
+      'insertElementForSidebarCommand: unknown command key ' + JSON.stringify(commandKey),
+    );
   }
   const factory = SIDEBAR_FACTORIES[command.factoryName as SidebarFactoryName];
   if (typeof factory !== 'function') {

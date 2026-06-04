@@ -37,6 +37,7 @@ export type InspectorField =
   | NumberField
   | ButtonActionField
   | ActionHrefField
+  | IconField
   | CustomMountField;
 
 /**
@@ -172,6 +173,26 @@ export interface ActionHrefField {
   valueLabel: string;
   /** Top-level path where the href DU lives (e.g. "href"). */
   path: string;
+}
+
+/**
+ * Visual grid picker over the curated icon registry (src/canvas/icons.ts).
+ * Renders one selectable tile per registered IconName plus a "None" tile
+ * that clears the field. Both ActionElement.iconKind and the iconKind on
+ * ShapeElement variant 'icon' use this — when a third consumer lands, the
+ * picker stays one shape.
+ *
+ * `showWhen` makes the field conditional on another property of the same
+ * element. Used by Shape so the picker only appears when `variant === 'icon'`
+ * (mirroring the schema's "iconKind is required when variant='icon',
+ * ignored otherwise" contract). When omitted, the field always renders.
+ */
+export interface IconField {
+  kind: 'icon';
+  label: string;
+  path: string;
+  /** Hide the picker unless `element[showWhen.path] === showWhen.equals`. */
+  showWhen?: { path: string; equals: string };
 }
 
 /**

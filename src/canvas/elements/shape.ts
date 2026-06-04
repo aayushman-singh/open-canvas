@@ -31,7 +31,19 @@ export function renderShape(element: ShapeElement): string {
 }
 
 export const shapeInspectorSpec: InspectorSpec = {
-  fields: [{ kind: 'select', label: 'Variant', path: 'variant', options: SHAPE_VARIANTS }],
+  fields: [
+    { kind: 'select', label: 'Variant', path: 'variant', options: SHAPE_VARIANTS },
+    // Picker only mounts when the shape is an icon variant — mirrors the
+    // schema's "iconKind required when variant='icon', ignored otherwise".
+    // Before this field landed, owners couldn't change a shape's glyph at
+    // all once the template seeded it.
+    {
+      kind: 'icon',
+      label: 'Icon',
+      path: 'iconKind',
+      showWhen: { path: 'variant', equals: 'icon' },
+    },
+  ],
 };
 
 export const shapeSidebarSpec: SidebarSpec = {

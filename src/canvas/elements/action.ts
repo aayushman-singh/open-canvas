@@ -52,10 +52,7 @@ export type ActionElement = BaseElement & {
   label: InlineRun[];
   variant: ActionVariant;
   iconKind?: IconName;
-} & (
-    | { href: ActionHref; behavior?: undefined }
-    | { href?: undefined; behavior: ActionBehavior }
-  );
+} & ({ href: ActionHref; behavior?: undefined } | { href?: undefined; behavior: ActionBehavior });
 
 export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] }): string {
   const iconHtml = element.iconKind !== undefined ? renderIconSvg(element.iconKind) : '';
@@ -85,13 +82,7 @@ export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] 
 export const actionInspectorSpec: InspectorSpec = {
   fields: [
     { kind: 'select', label: 'Variant', path: 'variant', options: ACTION_VARIANTS },
-    {
-      kind: 'text',
-      label: 'Icon',
-      path: 'iconKind',
-      placeholder: ICON_NAMES.join(' | '),
-      emptyOmits: true,
-    },
+    { kind: 'icon', label: 'Icon', path: 'iconKind' },
     {
       kind: 'action-href',
       discriminatorLabel: 'Link Type',
@@ -171,7 +162,8 @@ function parseActionBehavior(value: unknown, fieldName: string): ActionBehavior 
  */
 function parseActionLabel(value: unknown): InlineRun[] {
   if (typeof value === 'string') {
-    if (value.length === 0) throw new Error('label must be a non-empty string when given as a string');
+    if (value.length === 0)
+      throw new Error('label must be a non-empty string when given as a string');
     return [{ text: value }];
   }
   const parsed = parseTextInlineRuns(value);

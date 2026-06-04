@@ -34,6 +34,13 @@ assert(
   'href actions must still resolve external/page hrefs through the local resolver',
 );
 assert(
+  bodyBuilders.includes("import { renderInlineRun } from '../canvas/elements/render-utils.js';") &&
+    bodyBuilders.includes("import { renderIconSvg, isIconName } from '../canvas/icons.js';") &&
+    bodyBuilders.includes('const labelHtml = element.label.map(renderInlineRun).join') &&
+    bodyBuilders.includes('node.innerHTML = iconHtml + labelHtml'),
+  'action body builder must render iconKind plus rich InlineRun label HTML instead of flattening label text',
+);
+assert(
   bodyBuilders.includes("throw new Error('resolveActionHref: missing page id '"),
   'page href resolver must throw loudly when the referenced page is missing',
 );
@@ -73,7 +80,11 @@ assert(
   'selection.ts must NOT use singular querySelector for data-opencanvas-section/element — repeated site-pinned wrappers need querySelectorAll',
 );
 assert(
-  (selection.match(/ctx\.root\?\.querySelectorAll\(\s*['"]\[data-opencanvas-(section|element)=/g) || []).length >= 4,
+  (
+    selection.match(
+      /ctx\.root\?\.querySelectorAll\(\s*['"]\[data-opencanvas-(section|element)=/g,
+    ) || []
+  ).length >= 4,
   'selection.ts must querySelectorAll all four section/element add+remove paths',
 );
 
