@@ -78,6 +78,40 @@ export interface FaceEmitInput {
 }
 
 /**
+ * The shape one site-font row contributes to the per-site `@font-face`
+ * emit. Re-exported (not just re-aliased) so callers like the editor route
+ * and the public renderer share one type instead of inlining `SiteFontRef`
+ * imports across modules that don't otherwise know about the resolver.
+ */
+export type SiteFontFaceRow = SiteFontRef;
+
+/**
+ * Emit a single `@font-face` block per uploaded site font. Used when the
+ * renderer cannot (or does not want to) walk the snapshot to figure out
+ * which families are referenced — per-element `elementStyle.fontFamily`
+ * can point at any of the site's uploaded fonts, so the safest path is to
+ * ship every face. Browsers do not download a WOFF2 until a CSS rule
+ * actually references the family, so the cost of an unused @font-face
+ * block is one declaration in the stylesheet, not a wasted byte over the
+ * wire.
+ *
+ * Stable order: sorted by content hash so the emitted CSS is deterministic
+ * across calls and across page renders (matters for snapshot diffs).
+ */
+export function emitAllFontFaceBlocks(fonts: ReadonlyArray<SiteFontRef>): string {
+  if (fonts.length === 0) return '';
+  // Sort by contentHash so re-renders with the same set of fonts produce
+  // byte-identical CSS — the snapshot-replay smoke and any HTML-diff tests
+  // require deterministic output.
+  const sorted = [...fonts].sort((a, b) => a.contentHash.localeCompare(b.contentHash));
+  const blocks: string[] = [];
+  for (const font of sorted) {
+    blocks.push(emitSingleFontFace(font));
+  }
+  return blocks.join('\n');
+}
+
+/**
  * Emit the full set of `@font-face` blocks the public renderer needs for a
  * given site. Returns the empty string when no `font:<hash>` references
  * appear in the kit's font tokens — the public renderer concatenates this

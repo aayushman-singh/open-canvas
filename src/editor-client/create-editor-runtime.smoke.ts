@@ -473,6 +473,7 @@ const boot = {
   wsToken: '',
   displayName: 'Smoke',
   userId: 'user-runtime-smoke',
+  siteFonts: [],
 };
 stubWindow.__opencanvasEditorBoot = boot;
 

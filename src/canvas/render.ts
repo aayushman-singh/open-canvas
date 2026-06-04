@@ -71,6 +71,10 @@ function applyElementStyle(
   if (es.overflow) {
     entries.push(['overflow', es.overflow]);
   }
+  if (es.fontFamily) {
+    const v = escapeCssValue(es.fontFamily);
+    if (v) entries.push(['font-family', v]);
+  }
 }
 
 function buildElementStyleDataAttrs(es: ElementStyle | undefined): string {

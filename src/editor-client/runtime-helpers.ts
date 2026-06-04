@@ -37,6 +37,7 @@ import {
 } from './inspector-content-mounts.js';
 import { mountFormFields, mountFormStyle } from './inspector-form-mounts.js';
 import { mountMediaAi, mountVideoPlayback } from './inspector-media-mounts.js';
+import { mountTextFontFamily } from './inspector-text-font-family.js';
 import {
   mountMediaPicker,
   mountNavLinks,
@@ -580,6 +581,7 @@ function inspectorMountHandler(
     'chart-data': (element, host) => mountChartData(ctx, element as ChartElement, host),
     'form-fields': (element, host) => mountFormFields(ctx, element as FormElement, host),
     'form-style': (element, host) => mountFormStyle(ctx, element as FormElement, host),
+    'text-font-family': (element, host) => mountTextFontFamily(ctx, element, host),
   };
   return mounts[name] || null;
 }

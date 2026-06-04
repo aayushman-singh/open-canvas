@@ -132,6 +132,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     },
     apiBase: '/api',
     siteId: 'site-smoke',
+    siteFonts: [],
     applyAssetIdToElement: () => {
       throw new Error('applyAssetIdToElement stub: smoke does not exercise picker apply');
     },

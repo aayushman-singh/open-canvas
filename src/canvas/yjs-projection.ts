@@ -281,6 +281,7 @@ function encodeElementStyle(style: ElementStyle): Y.Map<unknown> {
   setIfDefined(out, 'boxShadow', style.boxShadow);
   setIfDefined(out, 'color', style.color);
   setIfDefined(out, 'overflow', style.overflow);
+  setIfDefined(out, 'fontFamily', style.fontFamily);
   return out;
 }
 
@@ -299,6 +300,7 @@ function decodeElementStyle(map: Y.Map<unknown>): ElementStyle {
   if (map.has('color')) out.color = map.get('color') as string;
   if (map.has('overflow'))
     out.overflow = map.get('overflow') as NonNullable<ElementStyle['overflow']>;
+  if (map.has('fontFamily')) out.fontFamily = map.get('fontFamily') as string;
   return out;
 }
 

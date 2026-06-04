@@ -329,6 +329,12 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
       init === undefined ? authFetchImpl(ctx, input) : authFetchImpl(ctx, input, init),
     apiBase: boot.apiBase,
     siteId: boot.siteId,
+    // Defensive copy: the boot payload is a frozen-feel JSON-from-server
+    // object; the inspector's font-family mount mutates this list on
+    // upload/delete, so we want a fresh array we control. The fallback
+    // empty array covers boot payloads from older route handlers that
+    // predate the SSR pre-fetch.
+    siteFonts: boot.siteFonts ? boot.siteFonts.slice() : [],
     applyAssetIdToElement: runtimeHelperNotInstalled('applyAssetIdToElement'),
     runDeleteAsset: runtimeHelperNotInstalled('runDeleteAsset'),
     uploadMediaForElement: runtimeHelperNotInstalled('uploadMediaForElement'),

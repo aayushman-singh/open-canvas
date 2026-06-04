@@ -31,7 +31,25 @@ import { signEditToken } from '../auth/edit-token';
 import { notificationsInboxScript } from '../notifications/dashboard-inbox-script';
 import { bellStyles } from '../notifications/bell-styles';
 import { db } from '../db/client';
-import { customer, site, siteCollaborator } from '../db/schema';
+import { customer, site, siteCollaborator, siteFont } from '../db/schema';
+import { fontPresetGoogleFontsLink } from '../fonts/preset-catalog';
+import { emitAllFontFaceBlocks } from '../fonts/face-emit';
+
+/**
+ * One row in the SSR-pre-fetched site-fonts list. Carries the inspector
+ * fields (`id` for DELETE, `name` for the dropdown label + CSS family)
+ * plus the @font-face fields (`contentHash`, `weight`, `style`). The same
+ * row shape is consumed by the editor bundle (via `EditorBoot.siteFonts`)
+ * and by the page-shell SSR @font-face emitter.
+ */
+interface EditorBootSiteFontRow {
+  id: string;
+  name: string;
+  family: string;
+  weight: number;
+  style: 'normal' | 'italic';
+  contentHash: string;
+}
 import { appDomain, appOrigin, type HostConfigEnv } from '../host-config';
 
 type Bindings = HostConfigEnv & {
@@ -104,6 +122,16 @@ export interface EditorPageOptions {
   // The `| undefined` keeps callers free of conditional spread under
   // exactOptionalPropertyTypes.
   theme?: Theme | undefined;
+  /**
+   * Custom fonts uploaded to this site, pre-fetched server-side so the
+   * first paint of the editor already has the `@font-face` blocks
+   * declared. Without SSR the editor would need a client-side fetch +
+   * style injection cycle on every cold load — the SSR shortcut keeps
+   * cold-load TTI low and avoids a flash of fallback-then-custom font.
+   * Empty list is a valid no-op (a site with no uploaded fonts emits
+   * nothing).
+   */
+  siteFonts?: ReadonlyArray<EditorBootSiteFontRow>;
 }
 
 async function lookupOwnedSite(
@@ -169,6 +197,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
     clerkFrontendApiHost: clerkHost,
     wsToken,
     theme,
+    siteFonts = [],
   } = opts;
   if (clerkPublishableKey && !clerkHost) {
     throw new Error('editorPageJsx requires clerkFrontendApiHost when clerkPublishableKey is set');
@@ -186,6 +215,10 @@ export function editorPageJsx(opts: EditorPageOptions) {
     wsToken: wsToken ?? '',
     displayName: customerDisplayName ?? '',
     userId: presenceUserId ?? '',
+    // Pre-seed the editor's custom-font catalog so the inspector dropdown
+    // renders the uploaded fonts without a client-side fetch round-trip
+    // on first selection. Refreshed after every successful upload.
+    siteFonts,
   };
   const editorBootJson = JSON.stringify(editorBoot);
   const publicAddress = `${subdomain}.${apex}`;
@@ -239,12 +272,24 @@ export function editorPageJsx(opts: EditorPageOptions) {
         <title>Open Canvas — editing {siteName}</title>
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
+        {raw(fontPresetGoogleFontsLink())}
         {raw(
           '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">' +
             '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous" onload="window.dispatchEvent(new Event(\'opencanvas-katex-ready\'))"></script>',
         )}
         <link rel="stylesheet" href={EDITOR_CLIENT_MANIFEST.canvasStylesUrl} />
         <style>{raw(bellStyles)}</style>
+        {/* SSR @font-face blocks for the site's uploaded custom fonts.
+            Without this the first paint of any text element whose
+            elementStyle.fontFamily references a custom name would render
+            in the system fallback until the editor bundle finished its
+            client-side font-list fetch + style-tag injection cycle.
+            Empty when the site has no uploaded fonts — no extra bytes. */}
+        {siteFonts.length > 0 && (
+          <style id="opencanvas-editor-custom-fonts">
+            {raw(emitAllFontFaceBlocks(siteFonts))}
+          </style>
+        )}
         {clerkPublishableKey &&
           raw(`<script>
 (function(){
@@ -609,6 +654,22 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
     c.env.UNLOCK_SIGNING_SECRET,
   );
 
+  // Pre-fetch the site's custom fonts so the editor SSR emits @font-face
+  // declarations on first paint and the inspector's dropdown is populated
+  // without a client-side round-trip. Same scope as the GET /sites/:id/fonts
+  // route handler — single source of shape.
+  const fontRows = await database
+    .select({
+      id: siteFont.id,
+      contentHash: siteFont.contentHash,
+      name: siteFont.name,
+      family: siteFont.family,
+      weight: siteFont.weight,
+      style: siteFont.style,
+    })
+    .from(siteFont)
+    .where(eq(siteFont.siteId, owned.id));
+
   const { publishableKey } = resolveClerkKeys(c.env);
   return c.html(
     editorPageJsx({
@@ -623,6 +684,7 @@ canvasEditor.get('/sites/:siteId/edit', async (c) => {
       context: 'dashboard',
       clerkPublishableKey: publishableKey,
       clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, c.env.CLERK_FRONTEND_API_URL),
+      siteFonts: fontRows,
       wsToken,
       theme: readThemeCookie(c),
     }),

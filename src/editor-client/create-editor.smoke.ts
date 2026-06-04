@@ -31,6 +31,7 @@ const boot: EditorBoot = {
   wsToken: '',
   displayName: 'Smoke',
   userId: 'user-smoke',
+  siteFonts: [],
 };
 
 // Pull a reference to createEditor so the import doesn't tree-shake away

@@ -36,6 +36,28 @@ import type { SiteSnapshot } from './persist.js';
 import type { PendingImport, SectionsCatalogEntry } from './sections-picker.js';
 
 /**
+ * One uploaded site-font row, mirrored from `GET /api/sites/:id/fonts`.
+ * Carries the minimum fields the editor inspector + the @font-face
+ * stylesheet emitter need; the full DB row carries additional metadata
+ * (createdAt, byteSize, id) the editor doesn't read.
+ *
+ * `name` is the value the inspector writes into
+ * `element.elementStyle.fontFamily` when the Owner picks this font from
+ * the dropdown.
+ */
+export interface SiteFontEntry {
+  /** Stable id used by DELETE /api/sites/:id/fonts/:id. */
+  id: string;
+  /** Owner-visible display label; used as CSS `font-family`. */
+  name: string;
+  /** Classification — 'sans' / 'serif' / 'mono' / whatever the upload form set. */
+  family: string;
+  weight: number;
+  style: 'normal' | 'italic';
+  contentHash: string;
+}
+
+/**
  * Shape of the boot payload the editor route emits as
  * `window.__opencanvasEditorBoot`. Phase 3 cutover wires this; Phase 2
  * extractions reference the shape but do not yet consume a real boot.
@@ -46,6 +68,13 @@ export interface EditorBoot {
   wsToken: string;
   displayName: string;
   userId: string;
+  /**
+   * Pre-fetched list of the site's uploaded custom fonts. Server SSR
+   * populates this so the inspector dropdown can render the custom
+   * options on first paint without a client-side fetch. Refreshed after
+   * every successful upload via `POST /api/sites/:id/fonts`.
+   */
+  siteFonts: ReadonlyArray<SiteFontEntry>;
 }
 
 /**
@@ -176,6 +205,13 @@ export interface EditorContext {
    *  raw string so media-picker URL construction is `s/<closure-var>/
    *  ctx.<closure-var>/g` from the inline twin without restructuring. */
   siteId: string;
+  /** Cached list of the site's uploaded custom fonts. Seeded from the
+   *  boot payload (server-pre-fetched), refreshed in place after every
+   *  successful POST /api/sites/:id/fonts and DELETE /api/sites/:id/
+   *  fonts/:id so the inspector's "Font family" dropdown re-renders
+   *  against the latest set without a round-trip on each open. Mutable
+   *  by the inspector's font-family mount; everywhere else reads only. */
+  siteFonts: SiteFontEntry[];
   /** Mutates element.assetId (+ optional element.mediaKind), re-renders,
    *  schedules a save, then upserts the chosen asset into the slot-history
    *  ledger (PUT /sites/<id>/elements/<id>/history/<assetId>). Awaits

@@ -60,8 +60,9 @@ import { getModeSetterScript, getDarkModeSetterScript } from '../themes/visitor-
 import { renderModeToggleHtml } from '../themes/visitor-mode/toggle-element';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
 import { prepareRender } from '../i18n/render-hook';
-import { emitFontFaceBlocks } from '../fonts/face-emit';
+import { emitAllFontFaceBlocks, emitFontFaceBlocks } from '../fonts/face-emit';
 import { makeFontLookup, resolveFontTokens } from '../fonts/resolve';
+import { fontPresetGoogleFontsLink } from '../fonts/preset-catalog';
 // Wave 4 #17 — vanilla-JS hydration runtime for accordion + carousel elements.
 // Wrap is a no-op when no interactive elements present in the snapshot.
 import { injectInteractiveRuntime } from '../interactive/inject';
@@ -385,6 +386,9 @@ export async function buildOnSiteEditorOptions(
     clerkFrontendApiHost: clerkFrontendApiHost(publishableKey, env.CLERK_FRONTEND_API_URL),
     wsToken,
     presenceUserId: payload.clerkUserId,
+    // siteFonts intentionally omitted here — the calling route handler
+    // attaches it after the DB fetch so the token-shape smoke
+    // (src/live/editor-auth.smoke.ts) doesn't gain a DB dependency.
   };
 }
 
@@ -558,6 +562,23 @@ async function handleOnSiteEdit<P extends string, I extends Input>(
   if (presenceName) opts.customerDisplayName = presenceName;
   const theme = readThemeCookie(c);
   if (theme) opts.theme = theme;
+  // Pre-fetch the custom-font catalog so the on-site editor surface
+  // (collaborator click-to-edit from the published page) gets the same
+  // SSR @font-face + inspector dropdown priming as the dashboard
+  // editor. DB call lives at the route handler — NOT in
+  // buildOnSiteEditorOptions — so the token-shape smoke
+  // (src/live/editor-auth.smoke.ts) doesn't gain a DB dependency.
+  opts.siteFonts = await db(c.env)
+    .select({
+      id: siteFont.id,
+      contentHash: siteFont.contentHash,
+      name: siteFont.name,
+      family: siteFont.family,
+      weight: siteFont.weight,
+      style: siteFont.style,
+    })
+    .from(siteFont)
+    .where(eq(siteFont.siteId, siteRow.id));
   return c.html(editorPageJsx(opts));
 }
 
@@ -1139,7 +1160,21 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     })
     .from(siteFont)
     .where(eq(siteFont.siteId, siteRow.id));
-  const fontFaceCss = emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  // Pre-flight the kit's font tokens through emitFontFaceBlocks for its
+  // dangling-reference check — a kit that points at a deleted upload
+  // must throw at render time, not silently degrade to the system
+  // fallback. We discard the resolved CSS because the catalog-wide emit
+  // below is the source of truth for what gets shipped.
+  emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  // emitAllFontFaceBlocks emits one block per uploaded site-font row,
+  // regardless of whether the kit references it. Required because
+  // per-element `elementStyle.fontFamily` can pick any uploaded font by
+  // name — without the catalog-wide emit, an Owner who picks a custom
+  // font on a single element via the inspector would see the published
+  // page render in the system fallback. Browsers don't download the
+  // WOFF2 until a CSS rule uses the family, so unused blocks cost one
+  // declaration in the stylesheet — not a wasted byte over the wire.
+  const fontFaceCss = emitAllFontFaceBlocks(fontRows);
   const resolvedKit = resolveFontTokens(baseKit, makeFontLookup(fontRows));
   const customKitCss =
     pageRenderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
@@ -1207,6 +1242,7 @@ export async function handlePublicRequest<P extends string, I extends Input>(
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           ${raw(headMeta)} ${themeEmitsCss ? raw(`<script>${modeSetterScript}</script>`) : ''}
+          ${raw(fontPresetGoogleFontsLink())}
           ${snapshotHasMathRun(pageRenderSnapshot)
             ? raw(
                 '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">',

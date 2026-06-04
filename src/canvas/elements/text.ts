@@ -205,6 +205,15 @@ export const textInspectorSpec: InspectorSpec = {
       busyFlag: 'aiBusy',
     },
     { kind: 'select', label: 'Role', path: 'role', options: TEXT_ROLES },
+    // The Font family picker is mounted imperatively because its option
+    // list mixes static curated presets (FONT_PRESETS) with dynamically
+    // loaded site-fonts (fetched once at editor boot, refreshed on each
+    // upload), and the "+ Upload custom font…" sentinel triggers a
+    // multipart POST + list refresh — none of which fits the declarative
+    // SelectField / SelectMappedField shape. The mount lives at the top
+    // of the typography group so the family choice anchors the rest of
+    // the type stack (size, weight, align…).
+    { kind: 'custom-mount', name: 'text-font-family' },
     {
       kind: 'number',
       label: 'Font size',

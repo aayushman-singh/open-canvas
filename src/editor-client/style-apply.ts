@@ -105,4 +105,5 @@ export function applyElementStyleImpl(ctx: EditorContext, wrapper: HTMLElement, 
   }
   if (es.color) wrapper.style.color = es.color;
   if (es.overflow) wrapper.style.overflow = es.overflow;
+  if (es.fontFamily) wrapper.style.fontFamily = es.fontFamily;
 }

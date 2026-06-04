@@ -517,6 +517,9 @@ function validateElementStyle(value: unknown, basePath: string, errors: string[]
   if (value.overflow !== undefined) {
     assertOneOf<OverflowValue>(value.overflow, OVERFLOW_VALUES, `${p}.overflow`, errors);
   }
+  if (value.fontFamily !== undefined) {
+    validateInjectionSafeString(value.fontFamily, 'fontFamily', p, errors);
+  }
 }
 
 // Per-form visual customisation. Every field optional; numeric fields must be

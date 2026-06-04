@@ -249,6 +249,27 @@ export interface ElementStyle {
   boxShadow?: string;
   color?: string;
   overflow?: OverflowValue;
+  /**
+   * Per-element `font-family` override. The renderer emits this as a raw
+   * CSS `font-family` declaration on the wrapper — typography that uses
+   * `inherit` (text element body, action label, accordion title etc.)
+   * then picks it up via the cascade. Persists across style-kit changes,
+   * same lifecycle as the other `elementStyle` fields.
+   *
+   * Population: the editor's text inspector "Font family" picker writes
+   * EITHER one of the curated free-preset chains (e.g.
+   * `"'Inter', system-ui, sans-serif"`) OR the `name` field of an
+   * uploaded `siteFont` row (e.g. `"Logo Font"`). For uploaded fonts,
+   * the matching `@font-face` declaration is shipped on the same page so
+   * the font-family name resolves; absent uploads degrade to the chain's
+   * fallback (per the All-or-Nothing policy, that degradation is loud:
+   * the upload itself fails rather than silently dropping the row).
+   *
+   * Validator: same `validateInjectionSafeString` as `color` and
+   * `boxShadow` — refuses `;`, `:`, `{`, `}` so the value cannot break
+   * out of the declaration the renderer emits.
+   */
+  fontFamily?: string;
 }
 
 /**
