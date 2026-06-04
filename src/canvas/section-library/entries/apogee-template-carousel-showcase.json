@@ -1,0 +1,121 @@
+{
+  "baseSlug": "apogee-template-carousel-showcase",
+  "category": "gallery",
+  "name": "Customer showcase",
+  "description": "Apogee Showcase body section — gallery-strip recipe.",
+  "recipeId": "gallery-strip",
+  "headingPreview": "Explore what teams are building.",
+  "sectionData": {
+    "id": "wf-carousel-showcase",
+    "recipeId": "gallery-strip",
+    "name": "Customer showcase",
+    "height": 560,
+    "entrance": "blur-in",
+    "elements": [
+      {
+        "id": "wf-carousel-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 60,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "SEE IT IN ACTION"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-carousel-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 100,
+          "w": 700,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Explore what teams are "
+          },
+          {
+            "text": "building",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 40
+        }
+      },
+      {
+        "id": "wf-carousel-gallery",
+        "type": "carousel",
+        "box": {
+          "x": 80,
+          "y": 200,
+          "w": 1280,
+          "h": 320,
+          "z": 2
+        },
+        "slides": [
+          {
+            "id": "slide-1",
+            "assetId": "seed-hero-poster-1",
+            "caption": "IDEO redesigned their global presence with Apogee"
+          },
+          {
+            "id": "slide-2",
+            "assetId": "seed-feature-canvas-1",
+            "caption": "monday.com ships 3x faster with visual development"
+          },
+          {
+            "id": "slide-3",
+            "assetId": "seed-hero-poster-1",
+            "caption": "TED built an interactive media hub on Apogee"
+          },
+          {
+            "id": "slide-4",
+            "assetId": "seed-feature-canvas-1",
+            "caption": "DocuSign launched 20 localized sites in one sprint"
+          },
+          {
+            "id": "slide-5",
+            "assetId": "seed-hero-poster-1",
+            "caption": "Lattice drove 20% conversion lift with Apogee Optimize"
+          }
+        ],
+        "showArrows": true,
+        "showDots": true,
+        "motion": {
+          "preset": "scale-in",
+          "delayMs": 80
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

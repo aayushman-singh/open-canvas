@@ -1,0 +1,103 @@
+{
+  "baseSlug": "apogee-template-blog-newsletter",
+  "category": "cta",
+  "name": "Newsletter CTA",
+  "description": "Apogee Showcase body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "Stay in the flow",
+  "sectionData": {
+    "id": "wf-blog-newsletter",
+    "recipeId": "cta-band",
+    "name": "Newsletter CTA",
+    "height": 400,
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "wf-newsletter-bg",
+        "type": "container",
+        "box": {
+          "x": 200,
+          "y": 60,
+          "w": 1040,
+          "h": 280,
+          "z": 0
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-newsletter-heading",
+        "type": "text",
+        "box": {
+          "x": 320,
+          "y": 108,
+          "w": 800,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Stay in the "
+          },
+          {
+            "text": "flow",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "center"
+      },
+      {
+        "id": "wf-newsletter-body",
+        "type": "text",
+        "box": {
+          "x": 380,
+          "y": 180,
+          "w": 680,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Get the latest on web design, product updates, and building for the modern web. Delivered weekly."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-newsletter-cta",
+        "type": "action",
+        "box": {
+          "x": 600,
+          "y": 248,
+          "w": 240,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Subscribe to the blog"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#subscribe"
+        },
+        "variant": "solid"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

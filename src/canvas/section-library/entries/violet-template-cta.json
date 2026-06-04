@@ -1,0 +1,82 @@
+{
+  "baseSlug": "violet-template-cta",
+  "category": "cta",
+  "name": "Call to action",
+  "description": "Violet Launch body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "Make the launch list before launch day.",
+  "sectionData": {
+    "id": "section-cta",
+    "recipeId": "cta-band",
+    "name": "Call to action",
+    "height": 620,
+    "backgroundEffect": "soft-light",
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "cta-heading",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 160,
+          "w": 1000,
+          "h": 160,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Make the launch list before launch day."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 56,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "cta-primary",
+        "type": "action",
+        "box": {
+          "x": 540,
+          "y": 360,
+          "w": 220,
+          "h": 64,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Join the waitlist"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://opencanvas.example.com/edit"
+        },
+        "variant": "pill"
+      },
+      {
+        "id": "cta-secondary",
+        "type": "action",
+        "box": {
+          "x": 780,
+          "y": 360,
+          "w": 220,
+          "h": 64,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Email us"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@opencanvas.example.com"
+        },
+        "variant": "underline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "violet-launch"
+}

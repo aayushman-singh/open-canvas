@@ -1,0 +1,100 @@
+{
+  "baseSlug": "local-template-footer",
+  "category": "footer",
+  "name": "Footer",
+  "description": "Local Business footer — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "custom",
+  "sectionData": {
+    "id": "section-footer",
+    "recipeId": "custom",
+    "name": "Footer",
+    "height": 120,
+    "elements": [
+      {
+        "id": "footer-brand",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 24,
+          "w": 200,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Open Canvas"
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "footer-copy",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 64,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "© 2026 Open Canvas. All rights reserved."
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "footer-link-1",
+        "type": "action",
+        "box": {
+          "x": 1100,
+          "y": 24,
+          "w": 100,
+          "h": 32,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Privacy"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/privacy"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "footer-link-2",
+        "type": "action",
+        "box": {
+          "x": 1220,
+          "y": 24,
+          "w": 100,
+          "h": 32,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Terms"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/terms"
+        },
+        "variant": "ghost"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "local-canvas"
+}

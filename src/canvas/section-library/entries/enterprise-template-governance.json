@@ -1,0 +1,269 @@
+{
+  "baseSlug": "enterprise-template-governance",
+  "category": "features",
+  "name": "Governance",
+  "description": "Enterprise Scale body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "Governance that keeps pace with creative work.",
+  "sectionData": {
+    "id": "enterprise-governance",
+    "recipeId": "feature-grid",
+    "name": "Governance",
+    "height": 780,
+    "backgroundEffect": "glass",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "enterprise-governance-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 96,
+          "w": 560,
+          "h": 150,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Governance that keeps pace with creative work."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 48,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-body",
+        "type": "text",
+        "box": {
+          "x": 84,
+          "y": 292,
+          "w": 520,
+          "h": 102,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Use this band for permissions, review workflows, audit trails, privacy posture, and the controls enterprise buyers expect before adoption."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-action",
+        "type": "action",
+        "box": {
+          "x": 84,
+          "y": 446,
+          "w": 196,
+          "h": 54,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Review controls"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#enterprise-success"
+        },
+        "variant": "outline"
+      },
+      {
+        "id": "enterprise-governance-card-one",
+        "type": "container",
+        "box": {
+          "x": 760,
+          "y": 96,
+          "w": 520,
+          "h": 130,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-governance-card-one-title",
+        "type": "text",
+        "box": {
+          "x": 798,
+          "y": 128,
+          "w": 330,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Role-aware publishing"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-card-one-body",
+        "type": "text",
+        "box": {
+          "x": 798,
+          "y": 176,
+          "w": 420,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Keep creation broad and final approval explicit."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-card-two",
+        "type": "container",
+        "box": {
+          "x": 760,
+          "y": 266,
+          "w": 520,
+          "h": 130,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-governance-card-two-title",
+        "type": "text",
+        "box": {
+          "x": 798,
+          "y": 298,
+          "w": 330,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Approvals and staging"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-card-two-body",
+        "type": "text",
+        "box": {
+          "x": 798,
+          "y": 346,
+          "w": 420,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Make the process legible before it becomes a meeting."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-card-three",
+        "type": "container",
+        "box": {
+          "x": 760,
+          "y": 436,
+          "w": 520,
+          "h": 130,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-governance-card-three-title",
+        "type": "text",
+        "box": {
+          "x": 798,
+          "y": 468,
+          "w": 330,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Audit-ready history"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-card-three-body",
+        "type": "text",
+        "box": {
+          "x": 798,
+          "y": 516,
+          "w": 420,
+          "h": 34,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Show buyers how changes stay attributable and recoverable."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-governance-line",
+        "type": "shape",
+        "box": {
+          "x": 84,
+          "y": 602,
+          "w": 520,
+          "h": 4,
+          "z": 2
+        },
+        "variant": "line"
+      },
+      {
+        "id": "enterprise-governance-note",
+        "type": "text",
+        "box": {
+          "x": 84,
+          "y": 640,
+          "w": 540,
+          "h": 54,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "The visual language is controlled by a Style Kit; the exact claims and controls stay editable."
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "enterprise-scale-canvas"
+}

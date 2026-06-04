@@ -1,0 +1,99 @@
+{
+  "baseSlug": "press-template-features",
+  "category": "features",
+  "name": "Features",
+  "description": "Press Canvas body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "The page, in service of the words.",
+  "sectionData": {
+    "id": "section-features",
+    "recipeId": "feature-grid",
+    "name": "Features",
+    "height": 720,
+    "backgroundEffect": "paper",
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "features-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 800,
+          "h": 90,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "The page, in service of the words."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "feature-1-image",
+        "type": "media",
+        "box": {
+          "x": 80,
+          "y": 220,
+          "w": 380,
+          "h": 280,
+          "z": 2
+        },
+        "mediaKind": "image",
+        "assetId": "seed-feature-canvas-1",
+        "alt": "Canvas editing surface",
+        "fit": "cover"
+      },
+      {
+        "id": "feature-1-label",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 520,
+          "w": 380,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Position freely"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 500,
+        "align": "left"
+      },
+      {
+        "id": "feature-2-frame",
+        "type": "container",
+        "box": {
+          "x": 520,
+          "y": 220,
+          "w": 380,
+          "h": 360,
+          "z": 1
+        },
+        "variant": "editorial-frame"
+      },
+      {
+        "id": "feature-3-shape",
+        "type": "shape",
+        "box": {
+          "x": 960,
+          "y": 240,
+          "w": 360,
+          "h": 320,
+          "z": 2
+        },
+        "variant": "blob"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "press-canvas"
+}

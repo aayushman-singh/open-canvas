@@ -1,0 +1,413 @@
+{
+  "baseSlug": "portfolio-template-footer",
+  "category": "footer",
+  "name": "Footer",
+  "description": "Engineer Portfolio footer — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Need a\nproduct-minded engineer?",
+  "sectionData": {
+    "id": "pf-site-footer",
+    "recipeId": "custom",
+    "name": "Footer",
+    "height": 420,
+    "elements": [
+      {
+        "id": "pf-footer-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 420,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#16140f"
+        }
+      },
+      {
+        "id": "pf-footer-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-footer-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 820,
+          "h": 220,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Need a\nproduct-minded engineer?"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 88,
+        "fontWeight": 400,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 0
+        },
+        "responsive": {
+          "tablet": {
+            "w": 720,
+            "h": 200
+          },
+          "phone": {
+            "x": 24,
+            "w": 340,
+            "h": 240
+          }
+        }
+      },
+      {
+        "id": "pf-footer-cta-text",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 312,
+          "w": 200,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "let's talk →"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5b94ff"
+        }
+      },
+      {
+        "id": "pf-footer-social-github-tile",
+        "type": "container",
+        "box": {
+          "x": 312,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 2
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 12
+        }
+      },
+      {
+        "id": "pf-footer-social-github",
+        "type": "action",
+        "box": {
+          "x": 312,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "GH"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://github.com/aayushman-singh"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "pf-footer-social-github-handle",
+        "type": "text",
+        "box": {
+          "x": 290,
+          "y": 360,
+          "w": 100,
+          "h": 20,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "/aayushman-singh"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 500,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      },
+      {
+        "id": "pf-footer-social-linkedin-tile",
+        "type": "container",
+        "box": {
+          "x": 408,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 2
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 12
+        }
+      },
+      {
+        "id": "pf-footer-social-linkedin",
+        "type": "action",
+        "box": {
+          "x": 408,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "in"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://www.linkedin.com/in/aayushman-singh-zz/"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "pf-footer-social-linkedin-handle",
+        "type": "text",
+        "box": {
+          "x": 380,
+          "y": 360,
+          "w": 112,
+          "h": 20,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "/in/aayushman-singh-zz"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 500,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      },
+      {
+        "id": "pf-footer-social-x-tile",
+        "type": "container",
+        "box": {
+          "x": 504,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 2
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 12
+        }
+      },
+      {
+        "id": "pf-footer-social-x",
+        "type": "action",
+        "box": {
+          "x": 504,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "𝕏"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://x.com/aayushman2703"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "pf-footer-social-x-handle",
+        "type": "text",
+        "box": {
+          "x": 482,
+          "y": 360,
+          "w": 100,
+          "h": 20,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "@aayushman2703"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 500,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      },
+      {
+        "id": "pf-footer-social-email-tile",
+        "type": "container",
+        "box": {
+          "x": 600,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 2
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 12
+        }
+      },
+      {
+        "id": "pf-footer-social-email",
+        "type": "action",
+        "box": {
+          "x": 600,
+          "y": 296,
+          "w": 56,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "@"
+          }
+        ],
+        "variant": "ghost",
+        "behavior": {
+          "type": "copy",
+          "value": "aayushman2702@gmail.com"
+        },
+        "iconKind": "mail"
+      },
+      {
+        "id": "pf-footer-social-email-handle",
+        "type": "text",
+        "box": {
+          "x": 552,
+          "y": 360,
+          "w": 152,
+          "h": 20,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "aayushman2702@gmail.com"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 500,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      },
+      {
+        "id": "pf-footer-meta-line-1",
+        "type": "text",
+        "box": {
+          "x": 1080,
+          "y": 296,
+          "w": 280,
+          "h": 22,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "aayushman singh"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 500,
+        "align": "right",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        }
+      },
+      {
+        "id": "pf-footer-meta-line-2",
+        "type": "text",
+        "box": {
+          "x": 1080,
+          "y": 322,
+          "w": 280,
+          "h": 22,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "engineer · researcher · builder"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "right",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      },
+      {
+        "id": "pf-footer-meta-line-3",
+        "type": "text",
+        "box": {
+          "x": 1080,
+          "y": 348,
+          "w": 280,
+          "h": 22,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "advisory · consulting · select roles"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "right",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      }
+    ],
+    "anchorId": "contact"
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

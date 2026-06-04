@@ -1,0 +1,599 @@
+{
+  "baseSlug": "apogee-template-cust-grid",
+  "category": "features",
+  "name": "Customer stories",
+  "description": "Apogee Showcase body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "32 global sites launched in 10 days",
+  "sectionData": {
+    "id": "wf-cust-grid",
+    "recipeId": "feature-grid",
+    "name": "Customer stories",
+    "height": 960,
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "wf-cust-card1-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 620,
+          "h": 420,
+          "z": 1
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 24,
+          "borderColor": "rgba(181, 70, 47, 0.2)",
+          "borderWidth": 1,
+          "boxShadow": "0 16px 48px rgba(23, 22, 20, 0.11)"
+        }
+      },
+      {
+        "id": "wf-cust-card1-company",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 40,
+          "w": 540,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "VERIFONE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-cust-card1-stat",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 80,
+          "w": 540,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "32 global sites launched in 10 days",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-cust-card1-quote",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 160,
+          "w": 540,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "\"We were shackled by older technology and we needed to tell the story of the modern Verifone. Apogee let us execute quickly and at scale.\""
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card1-author",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 280,
+          "w": 540,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Rob Alfano",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": " - VP of Digital Marketing"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card1-cta",
+        "type": "action",
+        "box": {
+          "x": 120,
+          "y": 324,
+          "w": 160,
+          "h": 32,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Read story →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-cust-card2-bg",
+        "type": "container",
+        "box": {
+          "x": 740,
+          "y": 0,
+          "w": 620,
+          "h": 420,
+          "z": 1
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 24,
+          "borderColor": "rgba(45, 107, 71, 0.22)",
+          "borderWidth": 1,
+          "opacity": 0.98,
+          "boxShadow": "0 16px 48px rgba(23, 22, 20, 0.11)"
+        }
+      },
+      {
+        "id": "wf-cust-card2-company",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 40,
+          "w": 540,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "LATTICE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#2D6B47"
+        }
+      },
+      {
+        "id": "wf-cust-card2-stat",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 80,
+          "w": 540,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "20% increase in site-wide conversion",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-cust-card2-quote",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 160,
+          "w": 540,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "With Apogee, we have significantly improved organic traffic, SEO, and conversions. From my perspective as CMO, that is a huge win because our brand is reaching more people."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card2-author",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 280,
+          "w": 540,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Elizabeth Walton Egan",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": " - CMO"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card2-cta",
+        "type": "action",
+        "box": {
+          "x": 780,
+          "y": 324,
+          "w": 160,
+          "h": 32,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Read story →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-cust-card3-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 460,
+          "w": 400,
+          "h": 440,
+          "z": 1
+        },
+        "variant": "glass",
+        "elementStyle": {
+          "backgroundColor": "rgba(176, 122, 26, 0.06)",
+          "borderRadius": 20,
+          "borderColor": "rgba(176, 122, 26, 0.28)",
+          "borderWidth": 1
+        }
+      },
+      {
+        "id": "wf-cust-card3-company",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 500,
+          "w": 320,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "ORANGETHEORY"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B07A1A"
+        }
+      },
+      {
+        "id": "wf-cust-card3-stat",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 540,
+          "w": 320,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "$6M in annual cost savings",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-cust-card3-quote",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 620,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "We've reinvested those savings in other areas like website optimization and localization - that's been really powerful."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card3-author",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 740,
+          "w": 320,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Malcolm Greene",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": " - CIO"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card4-bg",
+        "type": "container",
+        "box": {
+          "x": 520,
+          "y": 460,
+          "w": 400,
+          "h": 440,
+          "z": 1
+        },
+        "variant": "glass",
+        "elementStyle": {
+          "borderRadius": 20,
+          "boxShadow": "0 24px 64px rgba(181, 70, 47, 0.25)",
+          "color": "#171614"
+        }
+      },
+      {
+        "id": "wf-cust-card4-company",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 500,
+          "w": 320,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "SAMSARA"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-cust-card4-stat",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 540,
+          "w": 320,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "50% lift in conversion rate",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-cust-card4-quote",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 620,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "On-page form experiments drove a 50% lift in conversion rate - results we could measure from day one."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-card5-bg",
+        "type": "container",
+        "box": {
+          "x": 960,
+          "y": 460,
+          "w": 400,
+          "h": 440,
+          "z": 1
+        },
+        "variant": "glass",
+        "elementStyle": {
+          "borderRadius": 20,
+          "borderColor": "rgba(45, 107, 71, 0.32)",
+          "borderWidth": 1,
+          "opacity": 0.94
+        }
+      },
+      {
+        "id": "wf-cust-card5-company",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 500,
+          "w": 320,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "VEO"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#2D6B47"
+        }
+      },
+      {
+        "id": "wf-cust-card5-stat",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 540,
+          "w": 320,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "170% increase in demo bookings",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-cust-card5-quote",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 620,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Apogee's visual CMS and optimization tools helped us nearly triple our demo pipeline in under a quarter."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

@@ -1,0 +1,116 @@
+{
+  "baseSlug": "apogee-template-cust-cta",
+  "category": "cta",
+  "name": "Customers CTA",
+  "description": "Apogee Showcase body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "Join 300,000+ teams on Apogee",
+  "sectionData": {
+    "id": "wf-cust-cta",
+    "recipeId": "cta-band",
+    "name": "Customers CTA",
+    "height": 400,
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "wf-cust-cta-bg",
+        "type": "container",
+        "box": {
+          "x": 200,
+          "y": 60,
+          "w": 1040,
+          "h": 280,
+          "z": 0
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-cust-cta-heading",
+        "type": "text",
+        "box": {
+          "x": 320,
+          "y": 108,
+          "w": 800,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Join 300,000+ teams on Apogee"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "center"
+      },
+      {
+        "id": "wf-cust-cta-body",
+        "type": "text",
+        "box": {
+          "x": 380,
+          "y": 180,
+          "w": 680,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Try Apogee for free and see why the world's best teams choose us."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cust-cta-primary",
+        "type": "action",
+        "box": {
+          "x": 480,
+          "y": 244,
+          "w": 240,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Get started - it's free"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "brutalist"
+      },
+      {
+        "id": "wf-cust-cta-secondary",
+        "type": "action",
+        "box": {
+          "x": 740,
+          "y": 244,
+          "w": 200,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Contact sales"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@example.com"
+        },
+        "variant": "glass"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

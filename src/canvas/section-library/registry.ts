@@ -7,10 +7,13 @@
 // the structural source of truth per Decision 2 — admin in-DB edits to
 // `global` rows are intentionally ephemeral and overwritten on next deploy.
 //
-// Phase B intentionally leaves this array empty — the upsert mechanism
-// ships first. Phase C populates ~50 entries extracted from the nine
-// TemplateSeeds; Phase F adds three standalone testimonial fixtures.
+// Phase C populated the registry from the 9 TemplateSeeds via
+// `scripts/extract-section-library.ts`. Re-run that script after editing
+// any TemplateSeed content or adding new entries/*.json files. Phase F
+// adds standalone testimonial fixtures as JSON files under `entries/`
+// and the manifest picks them up automatically on re-run.
 
+import { EXTRACTED_ENTRIES } from './entries/manifest.js';
 import type { SectionLibraryEntry } from './types.js';
 
-export const SECTION_LIBRARY: ReadonlyArray<SectionLibraryEntry> = [];
+export const SECTION_LIBRARY: ReadonlyArray<SectionLibraryEntry> = EXTRACTED_ENTRIES;

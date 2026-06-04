@@ -1,0 +1,894 @@
+{
+  "baseSlug": "apogee-template-pricing-tiers",
+  "category": "features",
+  "name": "Site plans",
+  "description": "Apogee Showcase body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "Starter",
+  "sectionData": {
+    "id": "wf-pricing-tiers",
+    "recipeId": "feature-grid",
+    "name": "Site plans",
+    "height": 800,
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "wf-pricing-label",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 20,
+          "w": 200,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "SITE PLANS"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-pricing-free-card",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 68,
+          "w": 310,
+          "h": 680,
+          "z": 1
+        },
+        "variant": "outlined",
+        "elementStyle": {
+          "borderRadius": 20,
+          "borderColor": "rgba(23, 22, 20, 0.12)",
+          "borderWidth": 1
+        }
+      },
+      {
+        "id": "wf-pricing-free-name",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 100,
+          "w": 246,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Starter"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 22,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-free-price",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 144,
+          "w": 246,
+          "h": 56,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Free",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-free-desc",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 216,
+          "w": 246,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "For exploring and experimenting with Apogee."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-free-cta",
+        "type": "action",
+        "box": {
+          "x": 112,
+          "y": 284,
+          "w": 246,
+          "h": 44,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Start for free"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "outline"
+      },
+      {
+        "id": "wf-pricing-free-f1",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 360,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Apogee.io domain"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-free-f2",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 392,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  2 static pages"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-free-f3",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 424,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  1 GB bandwidth"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-free-f4",
+        "type": "text",
+        "box": {
+          "x": 112,
+          "y": 456,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Apogee AI + MCP server"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-card",
+        "type": "container",
+        "box": {
+          "x": 420,
+          "y": 68,
+          "w": 310,
+          "h": 680,
+          "z": 1
+        },
+        "variant": "outlined",
+        "elementStyle": {
+          "borderRadius": 20,
+          "borderColor": "rgba(23, 22, 20, 0.14)",
+          "borderWidth": 1,
+          "boxShadow": "0 8px 24px rgba(23, 22, 20, 0.08)"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-name",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 100,
+          "w": 246,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Basic"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 22,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-basic-price",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 144,
+          "w": 246,
+          "h": 56,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "$15",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": "/mo"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-basic-billing",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 200,
+          "w": 246,
+          "h": 20,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "billed yearly"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-desc",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 228,
+          "w": 246,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "For simple sites that don't need a CMS."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-cta",
+        "type": "action",
+        "box": {
+          "x": 452,
+          "y": 284,
+          "w": 246,
+          "h": 44,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Add plan"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-pricing-basic-f1",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 360,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Custom domain"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-f2",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 392,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  300 static pages"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-f3",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 424,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  10 GB bandwidth"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-basic-f4",
+        "type": "text",
+        "box": {
+          "x": 452,
+          "y": 456,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Unlimited form submissions"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-card",
+        "type": "container",
+        "box": {
+          "x": 760,
+          "y": 68,
+          "w": 310,
+          "h": 680,
+          "z": 1
+        },
+        "variant": "raised",
+        "pinnedStyle": {
+          "border": "1px solid #B5462F"
+        },
+        "elementStyle": {
+          "backgroundColor": "#EDE6D6",
+          "borderRadius": 24,
+          "borderColor": "#B5462F",
+          "borderWidth": 2,
+          "boxShadow": "0 32px 80px rgba(181, 70, 47, 0.35)"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-badge",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 80,
+          "w": 100,
+          "h": 20,
+          "z": 4
+        },
+        "content": [
+          {
+            "text": "POPULAR"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-name",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 100,
+          "w": 246,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Premium"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 22,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-premium-price",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 144,
+          "w": 246,
+          "h": 56,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "$25",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": "/mo"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-premium-billing",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 200,
+          "w": 246,
+          "h": 20,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "billed yearly"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-desc",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 228,
+          "w": 246,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "For content-rich sites with robust CMS and traffic needs."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-cta",
+        "type": "action",
+        "box": {
+          "x": 792,
+          "y": 284,
+          "w": 246,
+          "h": 44,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Add plan"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-pricing-premium-f1",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 360,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Everything in Basic"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-f2",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 392,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Apogee CMS"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-f3",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 424,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Up to 2.5 TB bandwidth"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-premium-f4",
+        "type": "text",
+        "box": {
+          "x": 792,
+          "y": 456,
+          "w": 246,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Code components + site search"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-enterprise-card",
+        "type": "container",
+        "box": {
+          "x": 1100,
+          "y": 68,
+          "w": 260,
+          "h": 680,
+          "z": 1
+        },
+        "variant": "glass",
+        "elementStyle": {
+          "borderRadius": 20,
+          "borderColor": "rgba(181, 70, 47, 0.3)",
+          "borderWidth": 1,
+          "opacity": 0.96,
+          "boxShadow": "0 16px 48px rgba(23, 22, 20, 0.11)"
+        }
+      },
+      {
+        "id": "wf-pricing-enterprise-name",
+        "type": "text",
+        "box": {
+          "x": 1128,
+          "y": 100,
+          "w": 204,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Enterprise"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 22,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-enterprise-price",
+        "type": "text",
+        "box": {
+          "x": 1128,
+          "y": 144,
+          "w": 204,
+          "h": 56,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Custom",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-pricing-enterprise-desc",
+        "type": "text",
+        "box": {
+          "x": 1128,
+          "y": 216,
+          "w": 204,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Flexible, fully customizable solution for organizations."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-enterprise-cta",
+        "type": "action",
+        "box": {
+          "x": 1128,
+          "y": 284,
+          "w": 204,
+          "h": 44,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Talk to us"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-enterprise"
+        },
+        "variant": "outline"
+      },
+      {
+        "id": "wf-pricing-enterprise-f1",
+        "type": "text",
+        "box": {
+          "x": 1128,
+          "y": 360,
+          "w": 204,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Granular permissions"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-enterprise-f2",
+        "type": "text",
+        "box": {
+          "x": 1128,
+          "y": 392,
+          "w": 204,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Custom SLAs"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-enterprise-f3",
+        "type": "text",
+        "box": {
+          "x": 1128,
+          "y": 424,
+          "w": 204,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "✓  Dedicated account mgr"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

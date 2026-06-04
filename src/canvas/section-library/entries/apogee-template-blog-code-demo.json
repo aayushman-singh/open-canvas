@@ -1,0 +1,188 @@
+{
+  "baseSlug": "apogee-template-blog-code-demo",
+  "category": "other",
+  "name": "Developer preview",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "First-class API and MCP support.",
+  "sectionData": {
+    "id": "wf-blog-code-demo",
+    "recipeId": "custom",
+    "name": "Developer preview",
+    "height": 640,
+    "backgroundEffect": "grid",
+    "entrance": "fade-right",
+    "elements": [
+      {
+        "id": "wf-code-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 60,
+          "w": 300,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "FOR DEVELOPERS"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#2D6B47"
+        }
+      },
+      {
+        "id": "wf-code-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 100,
+          "w": 500,
+          "h": 72,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "First-class "
+          },
+          {
+            "text": "API",
+            "marks": [
+              {
+                "type": "code"
+              }
+            ]
+          },
+          {
+            "text": " and "
+          },
+          {
+            "text": "MCP",
+            "marks": [
+              {
+                "type": "code"
+              }
+            ]
+          },
+          {
+            "text": " support."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 36,
+        "fontWeight": 600,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 0
+        }
+      },
+      {
+        "id": "wf-code-body",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 188,
+          "w": 500,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Use the "
+          },
+          {
+            "text": "Apogee REST API",
+            "marks": [
+              {
+                "type": "link",
+                "href": "https://developers.apogee.dev"
+              }
+            ]
+          },
+          {
+            "text": " or connect via "
+          },
+          {
+            "text": "MCP",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "highlight"
+              }
+            ]
+          },
+          {
+            "text": " to let AI assistants manage your site programmatically. Ship a component from your terminal in "
+          },
+          {
+            "text": "seconds",
+            "marks": [
+              {
+                "type": "strike"
+              }
+            ]
+          },
+          {
+            "text": " milliseconds."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-code-cta",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 292,
+          "w": 200,
+          "h": 44,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Read the docs →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://developers.apogee.dev"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "showcase-code-snippet",
+        "type": "code",
+        "box": {
+          "x": 640,
+          "y": 60,
+          "w": 720,
+          "h": 520,
+          "z": 2
+        },
+        "language": "typescript",
+        "source": "import { Apogee } from 'apogee-sdk';\n\nconst wf = new Apogee({ accessToken: WF_TOKEN });\nconst sites = await wf.sites.list();\nconsole.log(`Managing ${sites.length} sites`);",
+        "showLineNumbers": true,
+        "motion": {
+          "preset": "slide-left",
+          "delayMs": 60
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

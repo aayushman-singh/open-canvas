@@ -1,0 +1,74 @@
+{
+  "baseSlug": "portfolio-template-header",
+  "category": "header",
+  "name": "Navigation",
+  "description": "Engineer Portfolio header — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "custom",
+  "sectionData": {
+    "id": "pf-site-header",
+    "recipeId": "custom",
+    "name": "Navigation",
+    "height": 64,
+    "elements": [
+      {
+        "id": "pf-header-nav",
+        "type": "nav",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 64,
+          "z": 3
+        },
+        "logoAssetId": "seed-feature-canvas-1",
+        "links": [
+          {
+            "label": "About",
+            "href": "#about",
+            "kind": "external"
+          },
+          {
+            "label": "Work",
+            "href": "#work",
+            "kind": "external"
+          },
+          {
+            "label": "Notes",
+            "href": "blog",
+            "kind": "internal"
+          },
+          {
+            "label": "Contact",
+            "href": "#contact",
+            "kind": "external"
+          }
+        ],
+        "layout": "left-center-right",
+        "sticky": true,
+        "pinnedStyle": {
+          "color": "#f1ece0",
+          "background": "rgba(22, 20, 15, 0.76)",
+          "backdrop-filter": "blur(14px) saturate(1.2)"
+        }
+      },
+      {
+        "id": "pf-header-divider",
+        "type": "shape",
+        "box": {
+          "x": 0,
+          "y": 62,
+          "w": 1440,
+          "h": 2,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

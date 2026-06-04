@@ -1,0 +1,139 @@
+{
+  "baseSlug": "portfolio-template-blog-hero",
+  "category": "other",
+  "name": "Blog hero",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Notes for builders, by a builder.",
+  "sectionData": {
+    "id": "pf-blog-hero",
+    "recipeId": "custom",
+    "name": "Blog hero",
+    "height": 360,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "pf-blog-hero-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 360,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#16140f"
+        }
+      },
+      {
+        "id": "pf-blog-back",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 64,
+          "w": 100,
+          "h": 28,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "back home"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-pf-home"
+        },
+        "variant": "underline",
+        "iconKind": "arrow-left"
+      },
+      {
+        "id": "pf-blog-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 116,
+          "w": 200,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "NOTES"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#5b94ff"
+        },
+        "letterSpacing": "0.18em"
+      },
+      {
+        "id": "pf-blog-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 150,
+          "w": 1100,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Notes for builders, "
+          },
+          {
+            "text": "by a builder",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 80,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif"
+        },
+        "letterSpacing": "-0.02em",
+        "lineHeight": 1.04
+      },
+      {
+        "id": "pf-blog-subhead",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 280,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Long-form writing on the work I do and the principles behind it. Updated when something is worth saying."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

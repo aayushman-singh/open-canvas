@@ -1,0 +1,202 @@
+{
+  "baseSlug": "portfolio-template-blog-list",
+  "category": "other",
+  "name": "All posts",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "All posts",
+  "sectionData": {
+    "id": "pf-blog-list",
+    "recipeId": "custom",
+    "name": "All posts",
+    "height": 760,
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "pf-blog-list-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-blog-list-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 56,
+          "w": 300,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "All posts"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-blog-collection",
+        "type": "collection",
+        "box": {
+          "x": 80,
+          "y": 124,
+          "w": 1280,
+          "h": 600,
+          "z": 1
+        },
+        "mode": "page-bound",
+        "entryTemplate": [],
+        "entries": [],
+        "filter": {
+          "category": "notes",
+          "limit": 12
+        },
+        "sort": {
+          "field": "publishedDate",
+          "order": "desc"
+        },
+        "fieldBindings": {
+          "title": "title",
+          "excerpt": "description",
+          "publishedDate": "publishedDate",
+          "tag": "category"
+        },
+        "cardTemplate": [
+          {
+            "id": "tmpl-bg",
+            "type": "container",
+            "box": {
+              "x": 0,
+              "y": 0,
+              "w": 408,
+              "h": 280,
+              "z": 1
+            },
+            "variant": "raised",
+            "elementStyle": {
+              "borderRadius": 18
+            }
+          },
+          {
+            "id": "tmpl-tag",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 24,
+              "w": 200,
+              "h": 22,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "{{tag}}"
+              }
+            ],
+            "role": "label",
+            "fontSize": 11,
+            "fontWeight": 700,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#5b94ff"
+            },
+            "letterSpacing": "0.16em",
+            "textTransform": "uppercase"
+          },
+          {
+            "id": "tmpl-title",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 60,
+              "w": 360,
+              "h": 96,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "{{title}}"
+              }
+            ],
+            "role": "heading",
+            "fontSize": 22,
+            "fontWeight": 500,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#f1ece0"
+            },
+            "lineHeight": 1.2
+          },
+          {
+            "id": "tmpl-excerpt",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 166,
+              "w": 360,
+              "h": 56,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "{{excerpt}}"
+              }
+            ],
+            "role": "body",
+            "fontSize": 14,
+            "fontWeight": 400,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#b5aea2"
+            },
+            "lineHeight": 1.5
+          },
+          {
+            "id": "tmpl-date",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 234,
+              "w": 360,
+              "h": 22,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "{{publishedDate}}"
+              }
+            ],
+            "role": "label",
+            "fontSize": 13,
+            "fontWeight": 400,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#b5aea2"
+            }
+          }
+        ],
+        "layout": {
+          "columns": 3,
+          "gap": 28
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

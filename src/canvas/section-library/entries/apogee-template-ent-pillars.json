@@ -1,0 +1,275 @@
+{
+  "baseSlug": "apogee-template-ent-pillars",
+  "category": "features",
+  "name": "Enterprise pillars",
+  "description": "Apogee Showcase body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "Enterprise-grade, at every layer.",
+  "sectionData": {
+    "id": "wf-ent-pillars",
+    "recipeId": "feature-grid",
+    "name": "Enterprise pillars",
+    "height": 700,
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "wf-ent-pillars-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 800,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Enterprise-grade, "
+          },
+          {
+            "text": "at every layer",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-p1-card",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 210,
+          "w": 400,
+          "h": 420,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-ent-p1-icon",
+        "type": "shape",
+        "box": {
+          "x": 120,
+          "y": 250,
+          "w": 44,
+          "h": 44,
+          "z": 3
+        },
+        "variant": "rect",
+        "pinnedStyle": {
+          "background": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-ent-p1-title",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 314,
+          "w": 320,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Scalability",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-p1-body",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 364,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "CMS at scale, global optimization, and high-volume automation. Enterprise traffic scaling with AWS-backed infrastructure and global CDN."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-p2-card",
+        "type": "container",
+        "box": {
+          "x": 520,
+          "y": 210,
+          "w": 400,
+          "h": 420,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-ent-p2-icon",
+        "type": "shape",
+        "box": {
+          "x": 560,
+          "y": 250,
+          "w": 44,
+          "h": 44,
+          "z": 3
+        },
+        "variant": "rect",
+        "pinnedStyle": {
+          "background": "#2D6B47"
+        }
+      },
+      {
+        "id": "wf-ent-p2-title",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 314,
+          "w": 320,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Governance",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-p2-body",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 364,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Granular permissions, enterprise workflows, compliance and audit logs. SOC 2 Type II certified with SSO, SCIM, and SIEM integration."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-p3-card",
+        "type": "container",
+        "box": {
+          "x": 960,
+          "y": 210,
+          "w": 400,
+          "h": 420,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-ent-p3-icon",
+        "type": "shape",
+        "box": {
+          "x": 1000,
+          "y": 250,
+          "w": 44,
+          "h": 44,
+          "z": 3
+        },
+        "variant": "rect",
+        "pinnedStyle": {
+          "background": "#B07A1A"
+        }
+      },
+      {
+        "id": "wf-ent-p3-title",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 314,
+          "w": 320,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Security",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-p3-body",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 364,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "TLS/SSL encryption, DDoS mitigation via AWS and Cloudflare, audit log API, custom certificates. 24/7 monitoring with enterprise Whistic profile."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

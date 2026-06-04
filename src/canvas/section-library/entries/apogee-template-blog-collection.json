@@ -1,0 +1,549 @@
+{
+  "baseSlug": "apogee-template-blog-collection",
+  "category": "other",
+  "name": "Latest posts",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Latest posts",
+  "sectionData": {
+    "id": "wf-blog-collection",
+    "recipeId": "custom",
+    "name": "Latest posts",
+    "height": 620,
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "wf-blog-collection-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 40,
+          "w": 300,
+          "h": 36,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Latest posts"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-blog-collection-grid",
+        "type": "collection",
+        "box": {
+          "x": 80,
+          "y": 110,
+          "w": 1280,
+          "h": 460,
+          "z": 1
+        },
+        "mode": "manual",
+        "entryTemplate": [
+          {
+            "id": "tmpl-card-bg",
+            "type": "container",
+            "box": {
+              "x": 0,
+              "y": 0,
+              "w": 400,
+              "h": 440,
+              "z": 1
+            },
+            "variant": "raised"
+          },
+          {
+            "id": "tmpl-card-image",
+            "type": "media",
+            "box": {
+              "x": 0,
+              "y": 0,
+              "w": 400,
+              "h": 220,
+              "z": 2
+            },
+            "mediaKind": "image",
+            "assetId": "seed-hero-poster-1",
+            "alt": "Blog post cover",
+            "fit": "cover"
+          },
+          {
+            "id": "tmpl-card-tag",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 236,
+              "w": 120,
+              "h": 22,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "DESIGN"
+              }
+            ],
+            "role": "label",
+            "fontSize": 11,
+            "fontWeight": 700,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#B5462F"
+            }
+          },
+          {
+            "id": "tmpl-card-title",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 264,
+              "w": 352,
+              "h": 72,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "Article title",
+                "marks": [
+                  {
+                    "type": "bold"
+                  }
+                ]
+              }
+            ],
+            "role": "heading",
+            "fontSize": 20,
+            "fontWeight": 700,
+            "align": "left"
+          },
+          {
+            "id": "tmpl-card-excerpt",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 344,
+              "w": 352,
+              "h": 52,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "Article excerpt goes here."
+              }
+            ],
+            "role": "body",
+            "fontSize": 14,
+            "fontWeight": 400,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#6B6359"
+            }
+          },
+          {
+            "id": "tmpl-card-meta",
+            "type": "text",
+            "box": {
+              "x": 24,
+              "y": 404,
+              "w": 240,
+              "h": 22,
+              "z": 3
+            },
+            "content": [
+              {
+                "text": "Date  ·  X min read"
+              }
+            ],
+            "role": "label",
+            "fontSize": 12,
+            "fontWeight": 400,
+            "align": "left",
+            "pinnedStyle": {
+              "color": "#9E9587"
+            }
+          }
+        ],
+        "entries": [
+          [
+            {
+              "id": "e1-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 440,
+                "z": 1
+              },
+              "variant": "raised"
+            },
+            {
+              "id": "e1-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 220,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-hero-poster-1",
+              "alt": "Design systems article cover",
+              "fit": "cover"
+            },
+            {
+              "id": "e1-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 236,
+                "w": 120,
+                "h": 22,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "DESIGN"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#B5462F"
+              }
+            },
+            {
+              "id": "e1-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 264,
+                "w": 352,
+                "h": 72,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "Design systems that actually scale: lessons from 100+ enterprise sites",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ],
+              "role": "heading",
+              "fontSize": 20,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "e1-excerpt",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 344,
+                "w": 352,
+                "h": 52,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "How enterprise teams are using composable design systems to ship faster without sacrificing brand consistency."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#6B6359"
+              }
+            },
+            {
+              "id": "e1-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 404,
+                "w": 240,
+                "h": 22,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "May 18, 2026  ·  6 min read"
+                }
+              ],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#9E9587"
+              }
+            }
+          ],
+          [
+            {
+              "id": "e2-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 440,
+                "z": 1
+              },
+              "variant": "raised"
+            },
+            {
+              "id": "e2-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 220,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-feature-canvas-1",
+              "alt": "MCP server article cover",
+              "fit": "cover"
+            },
+            {
+              "id": "e2-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 236,
+                "w": 140,
+                "h": 22,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "ENGINEERING"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#2D6B47"
+              }
+            },
+            {
+              "id": "e2-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 264,
+                "w": 352,
+                "h": 72,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "How we built the Apogee MCP server for Cursor and Claude",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ],
+              "role": "heading",
+              "fontSize": 20,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "e2-excerpt",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 344,
+                "w": 352,
+                "h": 52,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "A deep dive into building an MCP server that lets AI assistants generate and manage Apogee components natively."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#6B6359"
+              }
+            },
+            {
+              "id": "e2-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 404,
+                "w": 240,
+                "h": 22,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "May 14, 2026  ·  12 min read"
+                }
+              ],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#9E9587"
+              }
+            }
+          ],
+          [
+            {
+              "id": "e3-bg",
+              "type": "container",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 440,
+                "z": 1
+              },
+              "variant": "raised"
+            },
+            {
+              "id": "e3-img",
+              "type": "media",
+              "box": {
+                "x": 0,
+                "y": 0,
+                "w": 400,
+                "h": 220,
+                "z": 2
+              },
+              "mediaKind": "image",
+              "assetId": "seed-hero-poster-1",
+              "alt": "AEO article cover",
+              "fit": "cover"
+            },
+            {
+              "id": "e3-tag",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 236,
+                "w": 140,
+                "h": 22,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "STRATEGY"
+                }
+              ],
+              "role": "label",
+              "fontSize": 11,
+              "fontWeight": 700,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#B07A1A"
+              }
+            },
+            {
+              "id": "e3-title",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 264,
+                "w": 352,
+                "h": 72,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "AEO vs SEO: why your site needs to speak to machines and humans",
+                  "marks": [
+                    {
+                      "type": "bold"
+                    }
+                  ]
+                }
+              ],
+              "role": "heading",
+              "fontSize": 20,
+              "fontWeight": 700,
+              "align": "left"
+            },
+            {
+              "id": "e3-excerpt",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 344,
+                "w": 352,
+                "h": 52,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "AI engine optimization is the new frontier. Here's how forward-thinking marketing teams are preparing their web presence."
+                }
+              ],
+              "role": "body",
+              "fontSize": 14,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#6B6359"
+              }
+            },
+            {
+              "id": "e3-meta",
+              "type": "text",
+              "box": {
+                "x": 24,
+                "y": 404,
+                "w": 240,
+                "h": 22,
+                "z": 3
+              },
+              "content": [
+                {
+                  "text": "May 10, 2026  ·  5 min read"
+                }
+              ],
+              "role": "label",
+              "fontSize": 12,
+              "fontWeight": 400,
+              "align": "left",
+              "pinnedStyle": {
+                "color": "#9E9587"
+              }
+            }
+          ]
+        ],
+        "layout": {
+          "columns": 3,
+          "gap": 32
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

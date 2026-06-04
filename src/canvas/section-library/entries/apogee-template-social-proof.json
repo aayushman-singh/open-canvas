@@ -1,0 +1,294 @@
+{
+  "baseSlug": "apogee-template-social-proof",
+  "category": "testimonials",
+  "name": "Social proof",
+  "description": "Apogee Showcase body section — testimonial-row recipe.",
+  "recipeId": "testimonial-row",
+  "headingPreview": "300,000+ brands move the needle with Apogee.",
+  "sectionData": {
+    "id": "wf-social-proof",
+    "recipeId": "testimonial-row",
+    "name": "Social proof",
+    "height": 700,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-proof-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "CUSTOMER STORIES"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-proof-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 900,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "300,000+ brands",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": " move the needle with Apogee."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-proof-card1-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 260,
+          "w": 620,
+          "h": 380,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-proof-card1-stat",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 300,
+          "w": 540,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "32 global sites launched in 10 days",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-proof-card1-quote",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 380,
+          "w": 540,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "\"Before Apogee, we had a rigid, brittle CMS that wouldn't allow us to execute quickly or at scale. We were shackled by older technology.\""
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-proof-card1-author",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 520,
+          "w": 540,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Rob Alfano",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": ", VP of Digital Marketing - Verifone"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-proof-card1-link",
+        "type": "action",
+        "box": {
+          "x": 120,
+          "y": 564,
+          "w": 180,
+          "h": 32,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Read customer story →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-proof-card2-bg",
+        "type": "container",
+        "box": {
+          "x": 740,
+          "y": 260,
+          "w": 620,
+          "h": 380,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-proof-card2-stat",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 300,
+          "w": 540,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "20% increase in site-wide conversion",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-proof-card2-quote",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 380,
+          "w": 540,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "\"With Apogee, we've significantly improved organic traffic, SEO, and conversions. From my perspective as CMO, that's a huge win.\""
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-proof-card2-author",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 520,
+          "w": 540,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Elizabeth Walton Egan",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": ", CMO - Lattice"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-proof-card2-link",
+        "type": "action",
+        "box": {
+          "x": 780,
+          "y": 564,
+          "w": 180,
+          "h": 32,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Read customer story →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

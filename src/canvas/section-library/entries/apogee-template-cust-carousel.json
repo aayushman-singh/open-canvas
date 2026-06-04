@@ -1,0 +1,109 @@
+{
+  "baseSlug": "apogee-template-cust-carousel",
+  "category": "gallery",
+  "name": "Customer reel",
+  "description": "Apogee Showcase body section — gallery-strip recipe.",
+  "recipeId": "gallery-strip",
+  "headingPreview": "A few of the 300,000+ teams on Apogee.",
+  "sectionData": {
+    "id": "wf-cust-carousel",
+    "recipeId": "gallery-strip",
+    "name": "Customer reel",
+    "height": 480,
+    "backgroundEffect": "glass",
+    "entrance": "bounce-in",
+    "elements": [
+      {
+        "id": "wf-cust-reel-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 48,
+          "w": 600,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "A few of the "
+          },
+          {
+            "text": "300,000+",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": " teams on Apogee."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 600,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 0
+        }
+      },
+      {
+        "id": "wf-cust-reel-carousel",
+        "type": "carousel",
+        "box": {
+          "x": 80,
+          "y": 130,
+          "w": 1280,
+          "h": 300,
+          "z": 2
+        },
+        "slides": [
+          {
+            "id": "cust-slide-1",
+            "assetId": "seed-hero-poster-1",
+            "caption": "Spotify — global marketing hub",
+            "href": "#"
+          },
+          {
+            "id": "cust-slide-2",
+            "assetId": "seed-feature-canvas-1",
+            "caption": "Dropbox — product launch pages",
+            "href": "#"
+          },
+          {
+            "id": "cust-slide-3",
+            "assetId": "seed-hero-poster-1",
+            "caption": "Discord — community portal",
+            "href": "#"
+          },
+          {
+            "id": "cust-slide-4",
+            "assetId": "seed-feature-canvas-1",
+            "caption": "Upwork — enterprise careers site",
+            "href": "#"
+          },
+          {
+            "id": "cust-slide-5",
+            "assetId": "seed-hero-poster-1",
+            "caption": "Greenhouse — recruiting platform",
+            "href": "#"
+          },
+          {
+            "id": "cust-slide-6",
+            "assetId": "seed-feature-canvas-1",
+            "caption": "Reddit — advertiser portal",
+            "href": "#"
+          }
+        ],
+        "showArrows": true,
+        "showDots": true,
+        "motion": {
+          "preset": "parallax-soft"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

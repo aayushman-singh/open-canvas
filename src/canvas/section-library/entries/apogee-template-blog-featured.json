@@ -1,0 +1,187 @@
+{
+  "baseSlug": "apogee-template-blog-featured",
+  "category": "other",
+  "name": "Featured post",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Introducing Apogee AEO: Own your visibility in AI search",
+  "sectionData": {
+    "id": "wf-blog-featured",
+    "recipeId": "custom",
+    "name": "Featured post",
+    "height": 520,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-blog-feat-card",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 460,
+          "z": 1
+        },
+        "variant": "sticker",
+        "elementStyle": {
+          "borderRadius": 28,
+          "borderColor": "rgba(23, 22, 20, 0.10)",
+          "borderWidth": 1,
+          "boxShadow": "0 24px 64px rgba(23, 22, 20, 0.10)",
+          "overflow": "hidden"
+        }
+      },
+      {
+        "id": "wf-blog-feat-image",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 640,
+          "h": 460,
+          "z": 2
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#F1ECDF"
+        }
+      },
+      {
+        "id": "wf-blog-feat-media",
+        "type": "media",
+        "box": {
+          "x": 100,
+          "y": 20,
+          "w": 600,
+          "h": 420,
+          "z": 3
+        },
+        "mediaKind": "image",
+        "assetId": "seed-feature-canvas-1",
+        "alt": "Apogee AEO product screenshot",
+        "fit": "cover",
+        "elementStyle": {
+          "borderRadius": 20,
+          "overflow": "hidden"
+        }
+      },
+      {
+        "id": "wf-blog-feat-tag",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 48,
+          "w": 200,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "FEATURED"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-blog-feat-title",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 88,
+          "w": 520,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Introducing Apogee AEO: Own your visibility in AI search",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 32,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-blog-feat-excerpt",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 210,
+          "w": 520,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "AI search is changing how people discover brands. Apogee AEO gives your marketing team the tools to control how AI models see, cite, and recommend your content - without writing a line of code."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-blog-feat-meta",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 340,
+          "w": 300,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "May 20, 2026  ·  8 min read"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-blog-feat-cta",
+        "type": "action",
+        "box": {
+          "x": 780,
+          "y": 388,
+          "w": 160,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Read more →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

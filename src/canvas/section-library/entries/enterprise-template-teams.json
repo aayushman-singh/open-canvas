@@ -1,0 +1,355 @@
+{
+  "baseSlug": "enterprise-template-teams",
+  "category": "features",
+  "name": "Team needs",
+  "description": "Enterprise Scale body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "Built for the teams that own growth.",
+  "sectionData": {
+    "id": "enterprise-teams",
+    "recipeId": "feature-grid",
+    "name": "Team needs",
+    "height": 820,
+    "backgroundEffect": "soft-light",
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "enterprise-teams-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 660,
+          "h": 128,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Built for the teams that "
+          },
+          {
+            "text": "own growth",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 50,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-teams-body",
+        "type": "text",
+        "box": {
+          "x": 810,
+          "y": 92,
+          "w": 500,
+          "h": 92,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Arrange the same page around marketing, design, engineering, agency, or operations buyers without changing the underlying primitives."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-team-pill-one",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 250,
+          "w": 180,
+          "h": 54,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-team-pill-one-text",
+        "type": "text",
+        "box": {
+          "x": 104,
+          "y": 266,
+          "w": 130,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Marketing"
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "enterprise-team-pill-two",
+        "type": "container",
+        "box": {
+          "x": 282,
+          "y": 250,
+          "w": 160,
+          "h": 54,
+          "z": 1
+        },
+        "variant": "outlined"
+      },
+      {
+        "id": "enterprise-team-pill-two-text",
+        "type": "text",
+        "box": {
+          "x": 304,
+          "y": 266,
+          "w": 116,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Design"
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "enterprise-team-pill-three",
+        "type": "container",
+        "box": {
+          "x": 462,
+          "y": 250,
+          "w": 190,
+          "h": 54,
+          "z": 1
+        },
+        "variant": "outlined"
+      },
+      {
+        "id": "enterprise-team-pill-three-text",
+        "type": "text",
+        "box": {
+          "x": 486,
+          "y": 266,
+          "w": 142,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Engineering"
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "enterprise-team-pill-four",
+        "type": "container",
+        "box": {
+          "x": 674,
+          "y": 250,
+          "w": 150,
+          "h": 54,
+          "z": 1
+        },
+        "variant": "outlined"
+      },
+      {
+        "id": "enterprise-team-pill-four-text",
+        "type": "text",
+        "box": {
+          "x": 696,
+          "y": 266,
+          "w": 106,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Agency"
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "enterprise-team-feature-one",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 370,
+          "w": 380,
+          "h": 300,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-team-feature-one-title",
+        "type": "text",
+        "box": {
+          "x": 116,
+          "y": 412,
+          "w": 300,
+          "h": 68,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Move quickly without losing review discipline"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-team-feature-one-body",
+        "type": "text",
+        "box": {
+          "x": 116,
+          "y": 514,
+          "w": 304,
+          "h": 96,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Give owners a page shape that already makes space for approvals, proof, metrics, and escalation paths."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-team-feature-two",
+        "type": "container",
+        "box": {
+          "x": 530,
+          "y": 370,
+          "w": 380,
+          "h": 300,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-team-feature-two-title",
+        "type": "text",
+        "box": {
+          "x": 566,
+          "y": 412,
+          "w": 304,
+          "h": 68,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Turn traffic into qualified demand"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-team-feature-two-body",
+        "type": "text",
+        "box": {
+          "x": 566,
+          "y": 514,
+          "w": 304,
+          "h": 96,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Pair buyer proof with direct actions so visitors always know where the next conversation starts."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-team-feature-three",
+        "type": "container",
+        "box": {
+          "x": 980,
+          "y": 370,
+          "w": 360,
+          "h": 300,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-team-feature-three-title",
+        "type": "text",
+        "box": {
+          "x": 1016,
+          "y": 412,
+          "w": 284,
+          "h": 68,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Reduce overhead with shared primitives"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-team-feature-three-body",
+        "type": "text",
+        "box": {
+          "x": 1016,
+          "y": 514,
+          "w": 276,
+          "h": 96,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "The layout is rich, but every piece is still plain canvas state an owner can edit or replace."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "enterprise-scale-canvas"
+}

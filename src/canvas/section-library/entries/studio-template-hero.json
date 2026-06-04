@@ -1,0 +1,136 @@
+{
+  "baseSlug": "studio-template-hero",
+  "category": "hero",
+  "name": "Hero",
+  "description": "Studio Portfolio body section — hero-split recipe.",
+  "recipeId": "hero-split",
+  "headingPreview": "Show the work with teeth.",
+  "sectionData": {
+    "id": "section-hero",
+    "recipeId": "hero-split",
+    "name": "Hero",
+    "height": 760,
+    "backgroundEffect": "grain",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "hero-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 600,
+          "h": 180,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Show the work "
+          },
+          {
+            "text": "with teeth",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 64,
+        "fontWeight": 700,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 50
+        }
+      },
+      {
+        "id": "hero-body",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 320,
+          "w": 540,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Frame a point of view, then let the project imagery carry the page."
+          }
+        ],
+        "role": "body",
+        "fontSize": 20,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "hero-action",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 480,
+          "w": 200,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "View the work"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/edit"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "hero-media",
+        "type": "media",
+        "box": {
+          "x": 760,
+          "y": 80,
+          "w": 600,
+          "h": 600,
+          "z": 2
+        },
+        "mediaKind": "image",
+        "assetId": "seed-hero-poster-1",
+        "alt": "Editable site loop",
+        "fit": "cover"
+      },
+      {
+        "id": "hero-orb",
+        "type": "shape",
+        "box": {
+          "x": 700,
+          "y": 40,
+          "w": 120,
+          "h": 120,
+          "z": 4,
+          "rotation": 12
+        },
+        "variant": "circle"
+      },
+      {
+        "id": "hero-card",
+        "type": "container",
+        "box": {
+          "x": 60,
+          "y": 100,
+          "w": 640,
+          "h": 460,
+          "z": 1
+        },
+        "variant": "soft-panel"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "studio-canvas"
+}

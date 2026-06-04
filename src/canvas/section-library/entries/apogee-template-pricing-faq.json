@@ -1,0 +1,137 @@
+{
+  "baseSlug": "apogee-template-pricing-faq",
+  "category": "other",
+  "name": "Pricing FAQ",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Common questions, clear answers.",
+  "sectionData": {
+    "id": "wf-pricing-faq",
+    "recipeId": "custom",
+    "name": "Pricing FAQ",
+    "height": 720,
+    "backgroundEffect": "paper",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-faq-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 60,
+          "w": 300,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "FAQ"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-faq-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 100,
+          "w": 600,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Common "
+          },
+          {
+            "text": "questions",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": ", clear answers."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-faq-accordion",
+        "type": "accordion",
+        "box": {
+          "x": 80,
+          "y": 200,
+          "w": 1280,
+          "h": 460,
+          "z": 2
+        },
+        "items": [
+          {
+            "id": "faq-1",
+            "title": "Can I switch plans later?",
+            "body": [
+              {
+                "text": "Yes. Upgrade, downgrade, or cancel at any time from your site dashboard. Changes take effect at the start of your next billing cycle. No penalties, no lock-in."
+              }
+            ]
+          },
+          {
+            "id": "faq-2",
+            "title": "What happens when I exceed my bandwidth limit?",
+            "body": [
+              {
+                "text": "Your site stays live. We will notify you and offer an automatic plan upgrade so visitors never see downtime. Overages are billed at fair, transparent rates."
+              }
+            ]
+          },
+          {
+            "id": "faq-3",
+            "title": "Is there a free trial for Premium?",
+            "body": [
+              {
+                "text": "All paid plans include a 14-day free trial with full access to every feature. If you cancel before the trial ends, you will not be charged."
+              }
+            ]
+          },
+          {
+            "id": "faq-4",
+            "title": "Do I need to know code to use Apogee?",
+            "body": [
+              {
+                "text": "No. Apogee is a visual-first platform — you design directly in the browser. For teams that want code-level control, we also offer a full REST API and MCP server integration."
+              }
+            ]
+          },
+          {
+            "id": "faq-5",
+            "title": "What is AEO and how does it differ from SEO?",
+            "body": [
+              {
+                "text": "AI Engine Optimization (AEO) helps your content appear in AI-generated answers and citations — not just traditional search rankings. Premium and Enterprise plans include native AEO tooling."
+              }
+            ]
+          }
+        ],
+        "allowMultipleOpen": false,
+        "motion": {
+          "preset": "stagger-children",
+          "delayMs": 0
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

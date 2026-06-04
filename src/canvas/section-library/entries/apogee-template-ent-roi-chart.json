@@ -1,0 +1,212 @@
+{
+  "baseSlug": "apogee-template-ent-roi-chart",
+  "category": "other",
+  "name": "ROI metrics",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "The numbers speak for themselves.",
+  "sectionData": {
+    "id": "wf-ent-roi-chart",
+    "recipeId": "custom",
+    "name": "ROI metrics",
+    "height": 640,
+    "entrance": "flip-in",
+    "elements": [
+      {
+        "id": "wf-roi-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 60,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "PROVEN RESULTS"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-roi-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 100,
+          "w": 600,
+          "h": 72,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "The numbers "
+          },
+          {
+            "text": "speak for themselves",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 0
+        }
+      },
+      {
+        "id": "wf-roi-bar-chart",
+        "type": "chart",
+        "box": {
+          "x": 80,
+          "y": 210,
+          "w": 800,
+          "h": 380,
+          "z": 2
+        },
+        "kind": "bar",
+        "series": [
+          {
+            "label": "Before Apogee",
+            "values": [
+              45,
+              62,
+              28
+            ]
+          },
+          {
+            "label": "After Apogee",
+            "values": [
+              92,
+              84,
+              71
+            ]
+          }
+        ],
+        "categories": [
+          "Speed to market",
+          "Conversion rate",
+          "Content velocity"
+        ],
+        "xAxisTitle": "Metric",
+        "yAxisTitle": "Score",
+        "showLegend": true,
+        "motion": {
+          "preset": "stagger-children",
+          "delayMs": 40
+        }
+      },
+      {
+        "id": "wf-roi-callout-bg",
+        "type": "container",
+        "box": {
+          "x": 940,
+          "y": 210,
+          "w": 420,
+          "h": 380,
+          "z": 1
+        },
+        "variant": "editorial-frame"
+      },
+      {
+        "id": "wf-roi-callout-num",
+        "type": "text",
+        "box": {
+          "x": 980,
+          "y": 260,
+          "w": 340,
+          "h": 80,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "332%",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 64,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-roi-callout-label",
+        "type": "text",
+        "box": {
+          "x": 980,
+          "y": 350,
+          "w": 340,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "average ROI reported by enterprise customers in independent analysis."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-roi-area-chart",
+        "type": "chart",
+        "box": {
+          "x": 980,
+          "y": 420,
+          "w": 340,
+          "h": 160,
+          "z": 2
+        },
+        "kind": "area",
+        "series": [
+          {
+            "label": "Growth trend",
+            "values": [
+              10,
+              32,
+              65,
+              100
+            ]
+          }
+        ],
+        "categories": [
+          "Q1",
+          "Q2",
+          "Q3",
+          "Q4"
+        ],
+        "showLegend": false
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

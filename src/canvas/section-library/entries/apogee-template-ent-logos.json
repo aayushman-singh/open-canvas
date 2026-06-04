@@ -1,0 +1,218 @@
+{
+  "baseSlug": "apogee-template-ent-logos",
+  "category": "other",
+  "name": "Enterprise logos",
+  "description": "Apogee Showcase body section — logo-strip recipe.",
+  "recipeId": "logo-strip",
+  "headingPreview": "logo-strip",
+  "sectionData": {
+    "id": "wf-ent-logos",
+    "recipeId": "logo-strip",
+    "name": "Enterprise logos",
+    "height": 240,
+    "entrance": "fade-in",
+    "elements": [
+      {
+        "id": "wf-ent-logos-heading",
+        "type": "text",
+        "box": {
+          "x": 320,
+          "y": 32,
+          "w": 800,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Trusted by the world's most innovative companies"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-logos-strip",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 1280,
+          "h": 64,
+          "z": 1
+        },
+        "variant": "outlined",
+        "pinnedStyle": {
+          "background": "rgba(23, 22, 20, 0.03)"
+        }
+      },
+      {
+        "id": "wf-ent-logo-1",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 96,
+          "w": 100,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Spotify"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-ent-logo-2",
+        "type": "text",
+        "box": {
+          "x": 280,
+          "y": 96,
+          "w": 100,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Dropbox"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-ent-logo-3",
+        "type": "text",
+        "box": {
+          "x": 440,
+          "y": 96,
+          "w": 100,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Discord"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-ent-logo-4",
+        "type": "text",
+        "box": {
+          "x": 600,
+          "y": 96,
+          "w": 100,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Upwork"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-ent-logo-5",
+        "type": "text",
+        "box": {
+          "x": 760,
+          "y": 96,
+          "w": 100,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Reddit"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-ent-logo-6",
+        "type": "text",
+        "box": {
+          "x": 920,
+          "y": 96,
+          "w": 120,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Greenhouse"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-ent-logo-7",
+        "type": "text",
+        "box": {
+          "x": 1100,
+          "y": 96,
+          "w": 120,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Lattice"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

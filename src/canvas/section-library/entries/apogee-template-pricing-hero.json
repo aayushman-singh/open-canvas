@@ -1,0 +1,73 @@
+{
+  "baseSlug": "apogee-template-pricing-hero",
+  "category": "other",
+  "name": "Pricing hero",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Create powerful, custom websites with your team.",
+  "sectionData": {
+    "id": "wf-pricing-hero",
+    "recipeId": "custom",
+    "name": "Pricing hero",
+    "height": 280,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-pricing-heading",
+        "type": "text",
+        "box": {
+          "x": 200,
+          "y": 80,
+          "w": 1040,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Create powerful, custom websites "
+          },
+          {
+            "text": "with your team",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 52,
+        "fontWeight": 600,
+        "align": "center"
+      },
+      {
+        "id": "wf-pricing-subhead",
+        "type": "text",
+        "box": {
+          "x": 300,
+          "y": 184,
+          "w": 840,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Start building for free and add a paid plan later to unlock premium hosting, design, and collaboration features."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

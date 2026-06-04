@@ -1,0 +1,573 @@
+{
+  "baseSlug": "portfolio-template-hero",
+  "category": "hero",
+  "name": "Hero",
+  "description": "Engineer Portfolio body section — hero-split recipe.",
+  "recipeId": "hero-split",
+  "headingPreview": "Aayushman\nSingh.",
+  "sectionData": {
+    "id": "pf-hero",
+    "recipeId": "hero-split",
+    "name": "Hero",
+    "height": 760,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "pf-hero-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 760,
+          "z": 0
+        },
+        "variant": "flat",
+        "pinnedStyle": {
+          "background": "#16140f"
+        }
+      },
+      {
+        "id": "pf-hero-kicker-left",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 220,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "AI full-stack engineer"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "motion": {
+          "preset": "fade-in",
+          "delayMs": 0
+        },
+        "letterSpacing": "0.03em"
+      },
+      {
+        "id": "pf-hero-kicker-sep",
+        "type": "text",
+        "box": {
+          "x": 312,
+          "y": 80,
+          "w": 16,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "/"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#b5aea2",
+          "opacity": "0.5"
+        }
+      },
+      {
+        "id": "pf-hero-kicker-right",
+        "type": "text",
+        "box": {
+          "x": 340,
+          "y": 80,
+          "w": 220,
+          "h": 24,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "autonomous agents"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "letterSpacing": "0.03em"
+      },
+      {
+        "id": "pf-hero-name",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 128,
+          "w": 760,
+          "h": 256,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Aayushman\nSingh"
+          },
+          {
+            "text": ".",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 124,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif"
+        },
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 80
+        },
+        "responsive": {
+          "tablet": {
+            "w": 640,
+            "h": 232
+          },
+          "phone": {
+            "x": 24,
+            "w": 340,
+            "h": 280
+          }
+        },
+        "letterSpacing": "-0.02em",
+        "lineHeight": 1.02,
+        "fluidSize": {
+          "min": 64,
+          "max": 132,
+          "vw": 9
+        }
+      },
+      {
+        "id": "pf-hero-name-period",
+        "type": "shape",
+        "box": {
+          "x": 360,
+          "y": 332,
+          "w": 18,
+          "h": 18,
+          "z": 4
+        },
+        "variant": "circle",
+        "pinnedStyle": {
+          "background": "#5b94ff"
+        },
+        "motion": {
+          "preset": "fade-in",
+          "delayMs": 200
+        }
+      },
+      {
+        "id": "pf-hero-summary",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 410,
+          "w": 580,
+          "h": 124,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "AI full-stack engineer building autonomous agents, developer tools, and production-grade web systems. SIH '24 winner; OSINT work deployed by India's National Investigation Agency."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        },
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 120
+        },
+        "lineHeight": 1.6
+      },
+      {
+        "id": "pf-hero-reach-pill-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 558,
+          "w": 92,
+          "h": 26,
+          "z": 2
+        },
+        "variant": "outlined",
+        "elementStyle": {
+          "borderRadius": 999,
+          "borderColor": "#2e2920",
+          "borderWidth": 1
+        },
+        "pinnedStyle": {
+          "background": "#1a1812"
+        }
+      },
+      {
+        "id": "pf-hero-reach-pill",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 558,
+          "w": 92,
+          "h": 26,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Reach me"
+          }
+        ],
+        "role": "label",
+        "fontSize": 11,
+        "fontWeight": 500,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#d8d2c6",
+          "line-height": "26px"
+        },
+        "letterSpacing": "0.08em",
+        "textTransform": "uppercase"
+      },
+      {
+        "id": "pf-hero-cta-resume",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 604,
+          "w": 226,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "résumé · pdf"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/aayushman_singh_resume.pdf"
+        },
+        "variant": "ghost",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 180
+        },
+        "iconKind": "download"
+      },
+      {
+        "id": "pf-hero-cta-github",
+        "type": "action",
+        "box": {
+          "x": 314,
+          "y": 604,
+          "w": 226,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "github · /aayushman-singh"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://github.com/aayushman-singh"
+        },
+        "variant": "ghost",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 200
+        },
+        "iconKind": "external"
+      },
+      {
+        "id": "pf-hero-cta-linkedin",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 664,
+          "w": 226,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "linkedin · /in/aayushman-singh-zz"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://www.linkedin.com/in/aayushman-singh-zz/"
+        },
+        "variant": "ghost",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 220
+        },
+        "iconKind": "external"
+      },
+      {
+        "id": "pf-hero-cta-x",
+        "type": "action",
+        "box": {
+          "x": 314,
+          "y": 664,
+          "w": 226,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "x · @aayushman2703"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "https://x.com/aayushman2703"
+        },
+        "variant": "ghost",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 240
+        },
+        "iconKind": "external"
+      },
+      {
+        "id": "pf-hero-portrait-card",
+        "type": "container",
+        "box": {
+          "x": 880,
+          "y": 80,
+          "w": 480,
+          "h": 640,
+          "z": 1
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "borderRadius": 18
+        },
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 100
+        },
+        "stickyOffset": 80
+      },
+      {
+        "id": "pf-hero-portrait-frame",
+        "type": "container",
+        "box": {
+          "x": 894,
+          "y": 94,
+          "w": 452,
+          "h": 472,
+          "z": 2
+        },
+        "variant": "flat",
+        "elementStyle": {
+          "borderRadius": 14,
+          "backgroundColor": "#1d1a14",
+          "overflow": "hidden"
+        }
+      },
+      {
+        "id": "pf-hero-portrait-image",
+        "type": "media",
+        "box": {
+          "x": 894,
+          "y": 94,
+          "w": 452,
+          "h": 472,
+          "z": 3
+        },
+        "mediaKind": "image",
+        "assetId": "seed-portrait-placeholder",
+        "alt": "Stylised figure portrait placeholder",
+        "fit": "cover",
+        "elementStyle": {
+          "borderRadius": 14,
+          "overflow": "hidden"
+        }
+      },
+      {
+        "id": "pf-hero-portrait-meta1-label",
+        "type": "text",
+        "box": {
+          "x": 906,
+          "y": 588,
+          "w": 88,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "based"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        },
+        "letterSpacing": "0.03em"
+      },
+      {
+        "id": "pf-hero-portrait-meta1-value",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 588,
+          "w": 340,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "India · UTC+5:30 · ships globally"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "right",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-hero-portrait-meta2-label",
+        "type": "text",
+        "box": {
+          "x": 906,
+          "y": 618,
+          "w": 88,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "signals"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        },
+        "letterSpacing": "0.03em"
+      },
+      {
+        "id": "pf-hero-portrait-meta2-dot",
+        "type": "shape",
+        "box": {
+          "x": 1006,
+          "y": 624,
+          "w": 8,
+          "h": 8,
+          "z": 4
+        },
+        "variant": "circle",
+        "pinnedStyle": {
+          "background": "#6db088"
+        }
+      },
+      {
+        "id": "pf-hero-portrait-meta2-value",
+        "type": "text",
+        "box": {
+          "x": 1022,
+          "y": 618,
+          "w": 318,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "consulting · advisory · select roles"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "right",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-hero-portrait-meta3-label",
+        "type": "text",
+        "box": {
+          "x": 906,
+          "y": 648,
+          "w": 100,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "recognition"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#b5aea2"
+        },
+        "letterSpacing": "0.03em"
+      },
+      {
+        "id": "pf-hero-portrait-meta3-value",
+        "type": "text",
+        "box": {
+          "x": 1020,
+          "y": 648,
+          "w": 320,
+          "h": 22,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "SIH '24 · NIA · FacTech"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "right",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        }
+      }
+    ],
+    "anchorId": "top"
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

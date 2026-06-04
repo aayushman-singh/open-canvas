@@ -1,0 +1,128 @@
+{
+  "baseSlug": "apogee-template-cta-band",
+  "category": "cta",
+  "name": "Final CTA",
+  "description": "Apogee Showcase body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "Make your website your competitive edge.",
+  "sectionData": {
+    "id": "wf-cta-band",
+    "recipeId": "cta-band",
+    "name": "Final CTA",
+    "height": 560,
+    "backgroundEffect": "soft-light",
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "wf-cta-bg",
+        "type": "container",
+        "box": {
+          "x": 160,
+          "y": 80,
+          "w": 1120,
+          "h": 400,
+          "z": 0
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-cta-heading",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 140,
+          "w": 960,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Make your website your "
+          },
+          {
+            "text": "competitive edge",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 52,
+        "fontWeight": 600,
+        "align": "center"
+      },
+      {
+        "id": "wf-cta-body",
+        "type": "text",
+        "box": {
+          "x": 340,
+          "y": 280,
+          "w": 760,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Build a brand people trust and pipeline you can measure, all with one powerful platform."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-cta-primary",
+        "type": "action",
+        "box": {
+          "x": 500,
+          "y": 360,
+          "w": 220,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Get started - it's free"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-cta-secondary",
+        "type": "action",
+        "box": {
+          "x": 740,
+          "y": 360,
+          "w": 180,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Talk to sales"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@example.com"
+        },
+        "variant": "pill"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

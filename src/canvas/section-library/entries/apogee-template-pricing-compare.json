@@ -1,0 +1,200 @@
+{
+  "baseSlug": "apogee-template-pricing-compare",
+  "category": "other",
+  "name": "Feature comparison",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Compare every feature, side by side.",
+  "sectionData": {
+    "id": "wf-pricing-compare",
+    "recipeId": "custom",
+    "name": "Feature comparison",
+    "height": 680,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-compare-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 60,
+          "w": 800,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Compare "
+          },
+          {
+            "text": "every feature",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": ", side by side."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 0
+        }
+      },
+      {
+        "id": "wf-compare-table",
+        "type": "table",
+        "box": {
+          "x": 80,
+          "y": 160,
+          "w": 1280,
+          "h": 460,
+          "z": 2
+        },
+        "columns": [
+          {
+            "id": "col-feature",
+            "header": "Feature",
+            "align": "left"
+          },
+          {
+            "id": "col-starter",
+            "header": "Starter",
+            "align": "center"
+          },
+          {
+            "id": "col-basic",
+            "header": "Basic",
+            "align": "center"
+          },
+          {
+            "id": "col-premium",
+            "header": "Premium",
+            "align": "center"
+          },
+          {
+            "id": "col-enterprise",
+            "header": "Enterprise",
+            "align": "center"
+          }
+        ],
+        "rows": [
+          {
+            "id": "row-pages",
+            "cells": {
+              "col-feature": "Static pages",
+              "col-starter": "2",
+              "col-basic": "300",
+              "col-premium": "Unlimited",
+              "col-enterprise": "Unlimited"
+            }
+          },
+          {
+            "id": "row-cms",
+            "cells": {
+              "col-feature": "CMS items",
+              "col-starter": "—",
+              "col-basic": "—",
+              "col-premium": "10,000",
+              "col-enterprise": "Unlimited"
+            }
+          },
+          {
+            "id": "row-bandwidth",
+            "cells": {
+              "col-feature": "Bandwidth",
+              "col-starter": "1 GB",
+              "col-basic": "10 GB",
+              "col-premium": "2.5 TB",
+              "col-enterprise": "Custom"
+            }
+          },
+          {
+            "id": "row-domain",
+            "cells": {
+              "col-feature": "Custom domain",
+              "col-starter": "—",
+              "col-basic": "✓",
+              "col-premium": "✓",
+              "col-enterprise": "✓"
+            }
+          },
+          {
+            "id": "row-ai",
+            "cells": {
+              "col-feature": "Apogee AI",
+              "col-starter": "✓",
+              "col-basic": "✓",
+              "col-premium": "✓",
+              "col-enterprise": "✓"
+            }
+          },
+          {
+            "id": "row-seo",
+            "cells": {
+              "col-feature": "SEO controls",
+              "col-starter": "Basic",
+              "col-basic": "Full",
+              "col-premium": "Full + AEO",
+              "col-enterprise": "Full + AEO"
+            }
+          },
+          {
+            "id": "row-analytics",
+            "cells": {
+              "col-feature": "Analytics",
+              "col-starter": "—",
+              "col-basic": "Basic",
+              "col-premium": "Advanced",
+              "col-enterprise": "Enterprise"
+            }
+          },
+          {
+            "id": "row-forms",
+            "cells": {
+              "col-feature": "Form submissions",
+              "col-starter": "50",
+              "col-basic": "Unlimited",
+              "col-premium": "Unlimited",
+              "col-enterprise": "Unlimited"
+            }
+          },
+          {
+            "id": "row-sso",
+            "cells": {
+              "col-feature": "SSO / SCIM",
+              "col-starter": "—",
+              "col-basic": "—",
+              "col-premium": "—",
+              "col-enterprise": "✓"
+            }
+          },
+          {
+            "id": "row-sla",
+            "cells": {
+              "col-feature": "SLA",
+              "col-starter": "—",
+              "col-basic": "—",
+              "col-premium": "99.9%",
+              "col-enterprise": "99.99%"
+            }
+          }
+        ],
+        "zebra": true,
+        "collapseOnPhone": true,
+        "motion": {
+          "preset": "stagger-children",
+          "delayMs": 0
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

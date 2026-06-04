@@ -1,0 +1,256 @@
+{
+  "baseSlug": "enterprise-template-proof",
+  "category": "other",
+  "name": "Enterprise proof",
+  "description": "Enterprise Scale body section — logo-strip recipe.",
+  "recipeId": "logo-strip",
+  "headingPreview": "Trusted patterns for complex organizations.",
+  "sectionData": {
+    "id": "enterprise-proof",
+    "recipeId": "logo-strip",
+    "name": "Enterprise proof",
+    "height": 460,
+    "backgroundEffect": "none",
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "enterprise-proof-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 74,
+          "w": 570,
+          "h": 86,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Trusted patterns for complex organizations."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 42,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-body",
+        "type": "text",
+        "box": {
+          "x": 760,
+          "y": 82,
+          "w": 560,
+          "h": 78,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Use this as a starting point for sales-led SaaS, infrastructure, fintech, security, and operations pages."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-logo-one",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 216,
+          "w": 210,
+          "h": 44,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Northstar Systems"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-logo-two",
+        "type": "text",
+        "box": {
+          "x": 330,
+          "y": 216,
+          "w": 190,
+          "h": 44,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Meridian Works"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-logo-three",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 216,
+          "w": 180,
+          "h": 44,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Orbit Grid"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-logo-four",
+        "type": "text",
+        "box": {
+          "x": 780,
+          "y": 216,
+          "w": 190,
+          "h": 44,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Civic Atlas"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-logo-five",
+        "type": "text",
+        "box": {
+          "x": 1010,
+          "y": 216,
+          "w": 210,
+          "h": 44,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Pattern Retail"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-card-one",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 304,
+          "w": 380,
+          "h": 94,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-proof-card-one-text",
+        "type": "text",
+        "box": {
+          "x": 108,
+          "y": 330,
+          "w": 316,
+          "h": 46,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Brand systems, regional launches, and content governance in one editable site."
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 500,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-card-two",
+        "type": "container",
+        "box": {
+          "x": 530,
+          "y": 304,
+          "w": 380,
+          "h": 94,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-proof-card-two-text",
+        "type": "text",
+        "box": {
+          "x": 558,
+          "y": 330,
+          "w": 316,
+          "h": 46,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Proof-heavy sections give buyers the evidence they need without burying the CTA."
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 500,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-proof-card-three",
+        "type": "container",
+        "box": {
+          "x": 980,
+          "y": 304,
+          "w": 360,
+          "h": 94,
+          "z": 1
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-proof-card-three-text",
+        "type": "text",
+        "box": {
+          "x": 1008,
+          "y": 330,
+          "w": 300,
+          "h": 46,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Every line, stat, surface, and CTA is an editable canvas primitive."
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 500,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "enterprise-scale-canvas"
+}

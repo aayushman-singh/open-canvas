@@ -1,0 +1,107 @@
+{
+  "baseSlug": "apogee-template-blog-hero",
+  "category": "other",
+  "name": "Blog hero",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Insights for builders, by builders.",
+  "sectionData": {
+    "id": "wf-blog-hero",
+    "recipeId": "custom",
+    "name": "Blog hero",
+    "height": 340,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-blog-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 200,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "THE BLOG"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-blog-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 800,
+          "h": 100,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Insights for builders, "
+          },
+          {
+            "text": "by builders",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 56,
+        "fontWeight": 600,
+        "align": "left",
+        "responsive": {
+          "tablet": {
+            "w": 600,
+            "h": 120
+          },
+          "phone": {
+            "x": 24,
+            "w": 340,
+            "h": 140
+          }
+        }
+      },
+      {
+        "id": "wf-blog-subhead",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 240,
+          "w": 600,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Design thinking, engineering depth, and product strategy from the team building the modern web."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

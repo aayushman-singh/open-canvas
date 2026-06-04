@@ -1,0 +1,201 @@
+{
+  "baseSlug": "portfolio-template-post2-body",
+  "category": "other",
+  "name": "Post body",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Tier 0: the runner workhorse",
+  "sectionData": {
+    "id": "pf-post2-body",
+    "recipeId": "custom",
+    "name": "Post body",
+    "height": 980,
+    "elements": [
+      {
+        "id": "pf-post2-body-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-post2-lead",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 80,
+          "w": 720,
+          "h": 140,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Most autonomous agent designs fall over in the same place: the agent gets to decide. Mine doesn't. The runner LLM grinds implementation against tests I wrote. Claude reviews. I merge. Nobody in this loop is allowed to ship without a check from the next person up."
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        },
+        "lineHeight": 1.55
+      },
+      {
+        "id": "pf-post2-h2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 248,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Tier 0: the runner workhorse"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post2-p1",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 320,
+          "w": 720,
+          "h": 156,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Tier 0 sees TASK.md and your tests. It picks a model per task — Sonnet for most things, Opus when the spec is gnarly, Haiku for plumbing. The runner writes code, runs the tests, eats the failures, tries again. It is allowed to fail. It is not allowed to decide what to ship."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      },
+      {
+        "id": "pf-post2-h3",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 510,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Tier 1: review before the PR"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post2-p2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 582,
+          "w": 720,
+          "h": 156,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Tier 1 is Claude in review mode, fresh context, no access to the runner's prior turns. The runner produces a patch; Claude reads the diff against the spec, flags drift, asks for revisions in a tone that does not negotiate. Only when the review passes does the patch land on an agent/ branch."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      },
+      {
+        "id": "pf-post2-h4",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 770,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Tier 2: you merge"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post2-p3",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 842,
+          "w": 720,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "The agent never merges. That's not paranoia — it's design. Safety here doesn't come from trust, it comes from constraints. The agent earns autonomy on the parts you've already mechanised: tests, lint, review. Everything else still routes through a human."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

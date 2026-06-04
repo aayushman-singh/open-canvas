@@ -1,0 +1,422 @@
+{
+  "baseSlug": "apogee-template-footer",
+  "category": "footer",
+  "name": "Footer",
+  "description": "Apogee Showcase footer — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Apogee",
+  "sectionData": {
+    "id": "wf-site-footer",
+    "recipeId": "custom",
+    "name": "Footer",
+    "height": 320,
+    "elements": [
+      {
+        "id": "wf-footer-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 320,
+          "z": 0
+        },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "wf-footer-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 2
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(23, 22, 20, 0.12)"
+        }
+      },
+      {
+        "id": "wf-footer-brand",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 48,
+          "w": 200,
+          "h": 36,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Apogee",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 20,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-tagline",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 92,
+          "w": 320,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "The site you want, without the dev you don't."
+          }
+        ],
+        "role": "body",
+        "fontSize": 14,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-footer-col1-heading",
+        "type": "text",
+        "box": {
+          "x": 540,
+          "y": 48,
+          "w": 160,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Product"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-col1-link1",
+        "type": "action",
+        "box": {
+          "x": 540,
+          "y": 84,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Designer"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col1-link2",
+        "type": "action",
+        "box": {
+          "x": 540,
+          "y": 116,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "CMS"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col1-link3",
+        "type": "action",
+        "box": {
+          "x": 540,
+          "y": 148,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Hosting"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col2-heading",
+        "type": "text",
+        "box": {
+          "x": 760,
+          "y": 48,
+          "w": 160,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Resources"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-col2-link1",
+        "type": "action",
+        "box": {
+          "x": 760,
+          "y": 84,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Blog"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-blog"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col2-link2",
+        "type": "action",
+        "box": {
+          "x": 760,
+          "y": 116,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "University"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col2-link3",
+        "type": "action",
+        "box": {
+          "x": 760,
+          "y": 148,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Community"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col3-heading",
+        "type": "text",
+        "box": {
+          "x": 980,
+          "y": 48,
+          "w": 160,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Company"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-footer-col3-link1",
+        "type": "action",
+        "box": {
+          "x": 980,
+          "y": 84,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Customers"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-customers"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col3-link2",
+        "type": "action",
+        "box": {
+          "x": 980,
+          "y": 116,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Enterprise"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-enterprise"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-col3-link3",
+        "type": "action",
+        "box": {
+          "x": 980,
+          "y": 148,
+          "w": 120,
+          "h": 28,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Pricing"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-pricing"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-copyright",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 264,
+          "w": 400,
+          "h": 24,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "© 2026 Apogee, Inc. All rights reserved."
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      },
+      {
+        "id": "wf-footer-legal-privacy",
+        "type": "action",
+        "box": {
+          "x": 1100,
+          "y": 264,
+          "w": 80,
+          "h": 24,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Privacy"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/privacy"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-legal-terms",
+        "type": "action",
+        "box": {
+          "x": 1200,
+          "y": 264,
+          "w": 80,
+          "h": 24,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Terms"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/terms"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "wf-footer-decorative-pill",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 172,
+          "w": 300,
+          "h": 6,
+          "z": 1
+        },
+        "variant": "pill",
+        "pinnedStyle": {
+          "background": "rgba(181, 70, 47, 0.2)"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

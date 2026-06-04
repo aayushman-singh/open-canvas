@@ -1,0 +1,354 @@
+{
+  "baseSlug": "apogee-template-ent-hero",
+  "category": "hero",
+  "name": "Enterprise hero",
+  "description": "Apogee Showcase body section — hero-split recipe.",
+  "recipeId": "hero-split",
+  "headingPreview": "Build better enterprise websites - faster.",
+  "sectionData": {
+    "id": "wf-ent-hero",
+    "recipeId": "hero-split",
+    "name": "Enterprise hero",
+    "height": 720,
+    "backgroundEffect": "grain",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-ent-hero-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 720,
+          "z": 0
+        },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "wf-ent-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 300,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "APOGEE ENTERPRISE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-ent-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 124,
+          "w": 700,
+          "h": 200,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Build better enterprise websites - "
+          },
+          {
+            "text": "faster",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 64,
+        "fontWeight": 700,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 40
+        }
+      },
+      {
+        "id": "wf-ent-body",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 352,
+          "w": 580,
+          "h": 80,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "See how enterprises achieve a 332% ROI with Apogee. Enterprise-grade scalability, security, and support - with a unified dashboard for your entire team."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-cta-primary",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 472,
+          "w": 180,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Contact sales"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@example.com"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-ent-cta-secondary",
+        "type": "action",
+        "box": {
+          "x": 280,
+          "y": 472,
+          "w": 180,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Watch demo"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#demo"
+        },
+        "variant": "outline"
+      },
+      {
+        "id": "wf-ent-stat-panel",
+        "type": "container",
+        "box": {
+          "x": 800,
+          "y": 100,
+          "w": 560,
+          "h": 520,
+          "z": 2
+        },
+        "variant": "raised",
+        "motion": {
+          "preset": "slide-left",
+          "delayMs": 100
+        }
+      },
+      {
+        "id": "wf-ent-stat1-card",
+        "type": "container",
+        "box": {
+          "x": 832,
+          "y": 140,
+          "w": 240,
+          "h": 140,
+          "z": 4
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-ent-stat1-num",
+        "type": "text",
+        "box": {
+          "x": 860,
+          "y": 160,
+          "w": 184,
+          "h": 56,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "332%",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-stat1-label",
+        "type": "text",
+        "box": {
+          "x": 860,
+          "y": 220,
+          "w": 184,
+          "h": 40,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "ROI achieved by enterprises"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-stat2-card",
+        "type": "container",
+        "box": {
+          "x": 1092,
+          "y": 140,
+          "w": 240,
+          "h": 140,
+          "z": 4
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-ent-stat2-num",
+        "type": "text",
+        "box": {
+          "x": 1120,
+          "y": 160,
+          "w": 184,
+          "h": 56,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "99.99%",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-stat2-label",
+        "type": "text",
+        "box": {
+          "x": 1120,
+          "y": 220,
+          "w": 184,
+          "h": 40,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "uptime SLA guaranteed"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-stat3-card",
+        "type": "container",
+        "box": {
+          "x": 832,
+          "y": 300,
+          "w": 500,
+          "h": 140,
+          "z": 4
+        },
+        "variant": "outlined"
+      },
+      {
+        "id": "wf-ent-stat3-num",
+        "type": "text",
+        "box": {
+          "x": 860,
+          "y": 320,
+          "w": 440,
+          "h": 56,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "$6M",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": " annual savings"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 36,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-ent-stat3-label",
+        "type": "text",
+        "box": {
+          "x": 860,
+          "y": 380,
+          "w": 440,
+          "h": 40,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "OrangeTheory Fitness saved by consolidating on Apogee"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

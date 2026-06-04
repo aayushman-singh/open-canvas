@@ -1,0 +1,128 @@
+{
+  "baseSlug": "apogee-template-ent-cta",
+  "category": "cta",
+  "name": "Enterprise CTA",
+  "description": "Apogee Showcase body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "Ready to see Apogee at enterprise scale?",
+  "sectionData": {
+    "id": "wf-ent-cta",
+    "recipeId": "cta-band",
+    "name": "Enterprise CTA",
+    "height": 440,
+    "backgroundEffect": "soft-light",
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "wf-ent-cta-bg",
+        "type": "container",
+        "box": {
+          "x": 160,
+          "y": 60,
+          "w": 1120,
+          "h": 320,
+          "z": 0
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-ent-cta-heading",
+        "type": "text",
+        "box": {
+          "x": 280,
+          "y": 108,
+          "w": 880,
+          "h": 80,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Ready to see Apogee "
+          },
+          {
+            "text": "at enterprise scale",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": "?"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "center"
+      },
+      {
+        "id": "wf-ent-cta-body",
+        "type": "text",
+        "box": {
+          "x": 360,
+          "y": 200,
+          "w": 720,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Talk to our enterprise team about custom pricing, SLAs, and a personalized onboarding plan."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-ent-final-primary",
+        "type": "action",
+        "box": {
+          "x": 540,
+          "y": 268,
+          "w": 180,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Contact sales"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@example.com"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-ent-final-secondary",
+        "type": "action",
+        "box": {
+          "x": 740,
+          "y": 268,
+          "w": 180,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Watch demo"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#demo"
+        },
+        "variant": "outline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

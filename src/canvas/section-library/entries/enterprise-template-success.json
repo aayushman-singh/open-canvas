@@ -1,0 +1,170 @@
+{
+  "baseSlug": "enterprise-template-success",
+  "category": "cta",
+  "name": "Success CTA",
+  "description": "Enterprise Scale body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "A partner story, support offer, and sales CTA in one final frame.",
+  "sectionData": {
+    "id": "enterprise-success",
+    "recipeId": "cta-band",
+    "name": "Success CTA",
+    "height": 660,
+    "backgroundEffect": "soft-light",
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "enterprise-success-frame",
+        "type": "container",
+        "box": {
+          "x": 120,
+          "y": 86,
+          "w": 1200,
+          "h": 488,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-success-heading",
+        "type": "text",
+        "box": {
+          "x": 250,
+          "y": 146,
+          "w": 940,
+          "h": 130,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "A partner story, support offer, and sales CTA in one final frame."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 48,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "enterprise-success-body",
+        "type": "text",
+        "box": {
+          "x": 354,
+          "y": 310,
+          "w": 730,
+          "h": 72,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Close the page by naming the implementation help, migration support, and operating model buyers need to feel safe moving forward."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "center"
+      },
+      {
+        "id": "enterprise-success-primary",
+        "type": "action",
+        "box": {
+          "x": 484,
+          "y": 434,
+          "w": 210,
+          "h": 58,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Contact sales"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@example.com"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "enterprise-success-secondary",
+        "type": "action",
+        "box": {
+          "x": 724,
+          "y": 434,
+          "w": 232,
+          "h": 58,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Read the guide"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#enterprise-hero"
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-success-badge",
+        "type": "shape",
+        "box": {
+          "x": 222,
+          "y": 422,
+          "w": 94,
+          "h": 94,
+          "z": 3,
+          "rotation": 12
+        },
+        "variant": "circle"
+      },
+      {
+        "id": "enterprise-success-badge-text",
+        "type": "text",
+        "box": {
+          "x": 242,
+          "y": 452,
+          "w": 54,
+          "h": 34,
+          "z": 4
+        },
+        "content": [
+          {
+            "text": "24/7"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#06070A"
+        }
+      },
+      {
+        "id": "enterprise-success-note",
+        "type": "text",
+        "box": {
+          "x": 1036,
+          "y": 430,
+          "w": 180,
+          "h": 58,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Dedicated guidance for complex launches."
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 600,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "enterprise-scale-canvas"
+}

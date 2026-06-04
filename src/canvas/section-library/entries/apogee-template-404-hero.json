@@ -1,0 +1,202 @@
+{
+  "baseSlug": "apogee-template-404-hero",
+  "category": "other",
+  "name": "404 hero",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "This page is lost in the wilds.",
+  "sectionData": {
+    "id": "wf-404-hero",
+    "recipeId": "custom",
+    "name": "404 hero",
+    "height": 720,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-404-blob",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 280,
+          "h": 280,
+          "z": 1,
+          "rotation": -12
+        },
+        "variant": "blob",
+        "pinnedStyle": {
+          "background": "rgba(181, 70, 47, 0.18)"
+        },
+        "motion": {
+          "preset": "slow-drift"
+        }
+      },
+      {
+        "id": "wf-404-blob-2",
+        "type": "shape",
+        "box": {
+          "x": 1080,
+          "y": 360,
+          "w": 320,
+          "h": 320,
+          "z": 1,
+          "rotation": 18
+        },
+        "variant": "blob",
+        "pinnedStyle": {
+          "background": "rgba(176, 122, 26, 0.12)"
+        },
+        "motion": {
+          "preset": "parallax-soft"
+        }
+      },
+      {
+        "id": "wf-404-eyebrow",
+        "type": "text",
+        "box": {
+          "x": 360,
+          "y": 200,
+          "w": 720,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "ERROR 404"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 700,
+        "align": "center",
+        "elementStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-404-heading",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 240,
+          "w": 960,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "This page is "
+          },
+          {
+            "text": "lost in the wilds",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "highlight"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 80,
+        "fontWeight": 700,
+        "align": "center"
+      },
+      {
+        "id": "wf-404-body",
+        "type": "text",
+        "box": {
+          "x": 360,
+          "y": 376,
+          "w": 720,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "The link you followed doesn't exist anymore — but we can get you back to something useful."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-404-cta-primary",
+        "type": "action",
+        "box": {
+          "x": 520,
+          "y": 472,
+          "w": 180,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Back to home"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-home"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-404-cta-secondary",
+        "type": "action",
+        "box": {
+          "x": 720,
+          "y": 472,
+          "w": 180,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Read the blog"
+          }
+        ],
+        "href": {
+          "type": "page",
+          "pageId": "page-wf-blog"
+        },
+        "variant": "outline"
+      },
+      {
+        "id": "wf-404-helper",
+        "type": "text",
+        "box": {
+          "x": 360,
+          "y": 568,
+          "w": 720,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Or jump straight to pricing, enterprise, or customer stories from the nav above."
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#9E9587"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

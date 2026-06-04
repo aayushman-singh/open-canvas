@@ -1,0 +1,362 @@
+{
+  "baseSlug": "apogee-template-platform",
+  "category": "features",
+  "name": "Platform pillars",
+  "description": "Apogee Showcase body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "The agentic web marketing platform for high-performing brands.",
+  "sectionData": {
+    "id": "wf-platform",
+    "recipeId": "feature-grid",
+    "name": "Platform pillars",
+    "height": 900,
+    "backgroundEffect": "grid",
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "wf-platform-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "THE PLATFORM"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-platform-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 800,
+          "h": 120,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "The agentic web marketing platform for "
+          },
+          {
+            "text": "high-performing brands",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 48,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-platform-card1-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 300,
+          "w": 400,
+          "h": 520,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-platform-card1-icon",
+        "type": "shape",
+        "box": {
+          "x": 120,
+          "y": 340,
+          "w": 48,
+          "h": 48,
+          "z": 3
+        },
+        "variant": "rect",
+        "pinnedStyle": {
+          "background": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-platform-card1-title",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 410,
+          "w": 320,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Build together",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-platform-card1-body",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 460,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Bring team members and AI agents into one shared workspace, with design systems to keep everything on brand."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-platform-card1-cta",
+        "type": "action",
+        "box": {
+          "x": 120,
+          "y": 580,
+          "w": 160,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Start building →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-platform-card2-bg",
+        "type": "container",
+        "box": {
+          "x": 520,
+          "y": 300,
+          "w": 400,
+          "h": 520,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-platform-card2-icon",
+        "type": "shape",
+        "box": {
+          "x": 560,
+          "y": 340,
+          "w": 48,
+          "h": 48,
+          "z": 3
+        },
+        "variant": "rect",
+        "pinnedStyle": {
+          "background": "#2D6B47"
+        }
+      },
+      {
+        "id": "wf-platform-card2-title",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 410,
+          "w": 320,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Publish at scale",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-platform-card2-body",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 460,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Create and manage content in a visual, composable CMS - with built-in SEO and AEO to reach humans and machines alike."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-platform-card2-cta",
+        "type": "action",
+        "box": {
+          "x": 560,
+          "y": 580,
+          "w": 180,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Start publishing →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-platform-card3-bg",
+        "type": "container",
+        "box": {
+          "x": 960,
+          "y": 300,
+          "w": 400,
+          "h": 520,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-platform-card3-icon",
+        "type": "shape",
+        "box": {
+          "x": 1000,
+          "y": 340,
+          "w": 48,
+          "h": 48,
+          "z": 3
+        },
+        "variant": "rect",
+        "pinnedStyle": {
+          "background": "#B07A1A"
+        }
+      },
+      {
+        "id": "wf-platform-card3-title",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 410,
+          "w": 320,
+          "h": 36,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Optimize for growth",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 24,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-platform-card3-body",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 460,
+          "w": 320,
+          "h": 100,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Turn every page into a revenue driver with native analytics and AI that show you what's working and help you scale it."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-platform-card3-cta",
+        "type": "action",
+        "box": {
+          "x": 1000,
+          "y": 580,
+          "w": 180,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Start optimizing →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "underline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

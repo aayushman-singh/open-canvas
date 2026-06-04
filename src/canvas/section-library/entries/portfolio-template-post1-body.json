@@ -1,0 +1,177 @@
+{
+  "baseSlug": "portfolio-template-post1-body",
+  "category": "other",
+  "name": "Post body",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "What week three actually measures",
+  "sectionData": {
+    "id": "pf-post1-body",
+    "recipeId": "custom",
+    "name": "Post body",
+    "height": 980,
+    "elements": [
+      {
+        "id": "pf-post1-body-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-post1-lead",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 80,
+          "w": 720,
+          "h": 140,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Most demos work. That's the trap. A demo is a controlled environment with a known input, a friendly audience, and a fifteen-minute attention budget. It tells you almost nothing about whether the thing will survive contact with a real user."
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        },
+        "lineHeight": 1.55
+      },
+      {
+        "id": "pf-post1-p1",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 248,
+          "w": 720,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Week three is when the honest signal arrives. By then the launch energy has burned off, the bug surface has not, and the user has discovered all the affordances you forgot to build. If the thing is still in their workflow at week three, you built something. If it isn't, the demo lied."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      },
+      {
+        "id": "pf-post1-h2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 408,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "What week three actually measures"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post1-p2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 480,
+          "w": 720,
+          "h": 156,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "The fact that the user returned to do real work — not curiosity, not novelty, not the same five clicks they did the first time. It measures whether the edges of the product hold up: the empty state, the error case, the upgrade path, the boring repeat task on a Tuesday afternoon. None of that shows up in a launch demo. All of it shows up at week three."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      },
+      {
+        "id": "pf-post1-h3",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 668,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "How to build for it"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post1-p3",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 740,
+          "w": 720,
+          "h": 180,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Ship the boring parts first. The thing that loads when the database is empty. The error that fires when the third-party API is down. The path the user takes after they finish the canonical flow and need to do it again. If your demo skips these, you've built a trailer, not a product."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

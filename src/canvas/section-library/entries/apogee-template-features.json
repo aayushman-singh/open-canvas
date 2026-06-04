@@ -1,0 +1,430 @@
+{
+  "baseSlug": "apogee-template-features",
+  "category": "features",
+  "name": "Feature showcase",
+  "description": "Apogee Showcase body section — feature-grid recipe.",
+  "recipeId": "feature-grid",
+  "headingPreview": "From idea to impact, faster.",
+  "sectionData": {
+    "id": "wf-features",
+    "recipeId": "feature-grid",
+    "name": "Feature showcase",
+    "height": 860,
+    "backgroundEffect": "paper",
+    "entrance": "stagger-children",
+    "elements": [
+      {
+        "id": "wf-feat-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "FROM IDEA TO IMPACT"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-feat-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 700,
+          "h": 80,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "From idea to impact, "
+          },
+          {
+            "text": "faster",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 48,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-feat-subhead",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 210,
+          "w": 700,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Apogee's agentic AI works alongside your team - drafting copy, generating pages, running experiments - with the guardrails enterprise teams need."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-feat-build-panel",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 320,
+          "w": 420,
+          "h": 480,
+          "z": 1
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "backgroundColor": "#F1ECDF",
+          "borderRadius": 20,
+          "borderColor": "rgba(181, 70, 47, 0.16)",
+          "borderWidth": 1,
+          "boxShadow": "0 12px 40px rgba(23, 22, 20, 0.11)"
+        }
+      },
+      {
+        "id": "wf-feat-build-badge",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 360,
+          "w": 80,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "BUILD"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-feat-build-title",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 400,
+          "w": 340,
+          "h": 64,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Design without limits",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-feat-build-body",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 480,
+          "w": 340,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Design directly in the browser - no redlines, no translation layer. What you design is what ships, pixel for pixel. Generate clean code components using your existing design system."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-feat-build-cta",
+        "type": "action",
+        "box": {
+          "x": 120,
+          "y": 620,
+          "w": 200,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Discover Apogee AI →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-feat-manage-panel",
+        "type": "container",
+        "box": {
+          "x": 520,
+          "y": 320,
+          "w": 420,
+          "h": 480,
+          "z": 1
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "backgroundColor": "#F1ECDF",
+          "borderRadius": 20,
+          "borderColor": "rgba(45, 107, 71, 0.16)",
+          "borderWidth": 1,
+          "boxShadow": "0 12px 40px rgba(23, 22, 20, 0.11)"
+        }
+      },
+      {
+        "id": "wf-feat-manage-badge",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 360,
+          "w": 100,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "MANAGE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#2D6B47"
+        }
+      },
+      {
+        "id": "wf-feat-manage-title",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 400,
+          "w": 340,
+          "h": 64,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Publish without the handoff tax",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-feat-manage-body",
+        "type": "text",
+        "box": {
+          "x": 560,
+          "y": 480,
+          "w": 340,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Generate copy and CMS collection items individually or in bulk to keep your site fresh, drive traffic, and strengthen your brand presence across channels."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-feat-manage-cta",
+        "type": "action",
+        "box": {
+          "x": 560,
+          "y": 620,
+          "w": 160,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Explore CMS →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      },
+      {
+        "id": "wf-feat-optimize-panel",
+        "type": "container",
+        "box": {
+          "x": 960,
+          "y": 320,
+          "w": 400,
+          "h": 480,
+          "z": 1
+        },
+        "variant": "raised",
+        "elementStyle": {
+          "backgroundColor": "#F1ECDF",
+          "borderRadius": 20,
+          "borderColor": "rgba(176, 122, 26, 0.18)",
+          "borderWidth": 1,
+          "boxShadow": "0 12px 40px rgba(23, 22, 20, 0.11)"
+        }
+      },
+      {
+        "id": "wf-feat-optimize-badge",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 360,
+          "w": 100,
+          "h": 28,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "OPTIMIZE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 12,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B07A1A"
+        }
+      },
+      {
+        "id": "wf-feat-optimize-title",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 400,
+          "w": 320,
+          "h": 64,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Turn traffic into revenue",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "wf-feat-optimize-body",
+        "type": "text",
+        "box": {
+          "x": 1000,
+          "y": 480,
+          "w": 320,
+          "h": 120,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Native tools run experiments, personalize by audience, and optimize for traditional search and LLMs. AI-powered A/B testing helps prove ROI on every page."
+          }
+        ],
+        "role": "body",
+        "fontSize": 15,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-feat-optimize-cta",
+        "type": "action",
+        "box": {
+          "x": 1000,
+          "y": 620,
+          "w": 180,
+          "h": 40,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "See analytics →"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#"
+        },
+        "variant": "underline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

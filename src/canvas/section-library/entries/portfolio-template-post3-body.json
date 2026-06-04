@@ -1,0 +1,153 @@
+{
+  "baseSlug": "portfolio-template-post3-body",
+  "category": "other",
+  "name": "Post body",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "The honesty test",
+  "sectionData": {
+    "id": "pf-post3-body",
+    "recipeId": "custom",
+    "name": "Post body",
+    "height": 860,
+    "elements": [
+      {
+        "id": "pf-post3-body-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-post3-lead",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 80,
+          "w": 720,
+          "h": 140,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Software that needs a server to start is a thin client. Software that needs a server to save is a thin client with delusions. Local-first is just the position that your data and your runtime should keep working when the network goes away — because the network always, eventually, goes away."
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        },
+        "lineHeight": 1.55
+      },
+      {
+        "id": "pf-post3-h2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 248,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "The honesty test"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post3-p1",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 320,
+          "w": 720,
+          "h": 156,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Turn off your wifi. Open the app. Does it load? Can you make a change? Does the change persist after a restart? If three answers are yes, you have software. If one is no, you have a marketing claim wrapped around someone else's database."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      },
+      {
+        "id": "pf-post3-h3",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 510,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Sync is a feature, not the substrate"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post3-p2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 582,
+          "w": 720,
+          "h": 200,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Local-first does not mean offline-only. It means the local copy is the authoritative one, and sync is an additive convenience — a CRDT, a log shipped to a server, a peer-to-peer pull from a friend. The substrate is your machine; the cloud is a participant. Once you frame it that way, half the failure modes that haunt modern apps stop being problems and start being design choices."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

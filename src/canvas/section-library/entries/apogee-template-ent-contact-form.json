@@ -1,0 +1,223 @@
+{
+  "baseSlug": "apogee-template-ent-contact-form",
+  "category": "other",
+  "name": "Enterprise contact",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Talk to our enterprise team.",
+  "sectionData": {
+    "id": "wf-ent-contact-form",
+    "recipeId": "custom",
+    "name": "Enterprise contact",
+    "height": 860,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-form-bg",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 40,
+          "w": 1280,
+          "h": 780,
+          "z": 0
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "wf-form-kicker",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 80,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "GET IN TOUCH"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-form-heading",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 120,
+          "w": 500,
+          "h": 72,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Talk to our "
+          },
+          {
+            "text": "enterprise team",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-form-body",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 204,
+          "w": 500,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Fill out the form and a solutions engineer will reach out within one business day to discuss your needs, pricing, and custom onboarding."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-form-media",
+        "type": "media",
+        "box": {
+          "x": 120,
+          "y": 300,
+          "w": 500,
+          "h": 320,
+          "z": 2
+        },
+        "mediaKind": "image",
+        "assetId": "seed-hero-poster-1",
+        "alt": "Enterprise team collaboration",
+        "fit": "cover",
+        "motion": {
+          "preset": "slow-drift"
+        }
+      },
+      {
+        "id": "wf-form-decorative-blob",
+        "type": "shape",
+        "box": {
+          "x": 520,
+          "y": 560,
+          "w": 100,
+          "h": 100,
+          "z": 1,
+          "rotation": 25
+        },
+        "variant": "blob",
+        "pinnedStyle": {
+          "background": "rgba(181, 70, 47, 0.1)"
+        }
+      },
+      {
+        "id": "wf-form-element",
+        "type": "form",
+        "box": {
+          "x": 700,
+          "y": 80,
+          "w": 600,
+          "h": 680,
+          "z": 2
+        },
+        "fields": [
+          {
+            "id": "field-name",
+            "label": "Full name",
+            "kind": "text",
+            "required": true,
+            "placeholder": "Jane Smith"
+          },
+          {
+            "id": "field-email",
+            "label": "Work email",
+            "kind": "email",
+            "required": true,
+            "placeholder": "jane@company.com"
+          },
+          {
+            "id": "field-company",
+            "label": "Company",
+            "kind": "text",
+            "required": true,
+            "placeholder": "Acme Corp"
+          },
+          {
+            "id": "field-size",
+            "label": "Team size",
+            "kind": "select",
+            "required": true,
+            "options": [
+              {
+                "value": "1-10",
+                "label": "1-10 employees"
+              },
+              {
+                "value": "11-50",
+                "label": "11-50 employees"
+              },
+              {
+                "value": "51-200",
+                "label": "51-200 employees"
+              },
+              {
+                "value": "201-1000",
+                "label": "201-1,000 employees"
+              },
+              {
+                "value": "1000+",
+                "label": "1,000+ employees"
+              }
+            ]
+          },
+          {
+            "id": "field-message",
+            "label": "What are you looking to build?",
+            "kind": "textarea",
+            "required": false,
+            "placeholder": "Tell us about your project..."
+          },
+          {
+            "id": "field-consent",
+            "label": "I agree to receive communications from Apogee",
+            "kind": "checkbox",
+            "required": true
+          }
+        ],
+        "submitLabel": "Request a demo",
+        "successMessage": "Thanks! A solutions engineer will be in touch within one business day.",
+        "motion": {
+          "preset": "slide-left",
+          "delayMs": 80
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

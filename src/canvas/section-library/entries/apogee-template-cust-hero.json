@@ -1,0 +1,96 @@
+{
+  "baseSlug": "apogee-template-cust-hero",
+  "category": "other",
+  "name": "Customers hero",
+  "description": "Apogee Showcase body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Built by the best, proven by results.",
+  "sectionData": {
+    "id": "wf-cust-hero",
+    "recipeId": "custom",
+    "name": "Customers hero",
+    "height": 340,
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "wf-cust-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 80,
+          "w": 300,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "CUSTOMER STORIES"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-cust-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 120,
+          "w": 900,
+          "h": 100,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Built by the best, "
+          },
+          {
+            "text": "proven by results",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 56,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "wf-cust-subhead",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 240,
+          "w": 700,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "See how enterprises, agencies, and fast-growing teams use Apogee to ship faster, convert more, and cut costs."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

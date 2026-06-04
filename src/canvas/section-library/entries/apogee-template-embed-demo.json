@@ -1,0 +1,93 @@
+{
+  "baseSlug": "apogee-template-embed-demo",
+  "category": "hero",
+  "name": "Product demo",
+  "description": "Apogee Showcase body section — video-hero recipe.",
+  "recipeId": "video-hero",
+  "headingPreview": "See the platform in motion",
+  "sectionData": {
+    "id": "wf-embed-demo",
+    "recipeId": "video-hero",
+    "name": "Product demo",
+    "height": 700,
+    "backgroundEffect": "grain",
+    "entrance": "zoom-out",
+    "elements": [
+      {
+        "id": "wf-embed-kicker",
+        "type": "text",
+        "box": {
+          "x": 400,
+          "y": 48,
+          "w": 640,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "WATCH THE DEMO"
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#B5462F"
+        }
+      },
+      {
+        "id": "wf-embed-heading",
+        "type": "text",
+        "box": {
+          "x": 220,
+          "y": 84,
+          "w": 1000,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "See the platform in "
+          },
+          {
+            "text": "motion",
+            "marks": [
+              {
+                "type": "italic"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 600,
+        "align": "center",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 0
+        }
+      },
+      {
+        "id": "wf-embed-player",
+        "type": "embed",
+        "box": {
+          "x": 120,
+          "y": 180,
+          "w": 1200,
+          "h": 480,
+          "z": 2
+        },
+        "url": "",
+        "title": "Apogee product walkthrough",
+        "aspectRatio": 1.7778,
+        "motion": {
+          "preset": "scale-in",
+          "delayMs": 100
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

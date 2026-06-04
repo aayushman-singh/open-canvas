@@ -1,0 +1,70 @@
+{
+  "baseSlug": "apogee-template-ent-demo-embed",
+  "category": "hero",
+  "name": "Platform walkthrough",
+  "description": "Apogee Showcase body section — video-hero recipe.",
+  "recipeId": "video-hero",
+  "headingPreview": "See enterprise features in action",
+  "sectionData": {
+    "id": "wf-ent-demo-embed",
+    "recipeId": "video-hero",
+    "name": "Platform walkthrough",
+    "height": 600,
+    "backgroundEffect": "glass",
+    "entrance": "zoom-out",
+    "elements": [
+      {
+        "id": "wf-ent-demo-heading",
+        "type": "text",
+        "box": {
+          "x": 320,
+          "y": 48,
+          "w": 800,
+          "h": 60,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "See enterprise features "
+          },
+          {
+            "text": "in action",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          }
+        ],
+        "role": "heading",
+        "fontSize": 36,
+        "fontWeight": 600,
+        "align": "center",
+        "motion": {
+          "preset": "fade-down",
+          "delayMs": 0
+        }
+      },
+      {
+        "id": "wf-ent-demo-video",
+        "type": "embed",
+        "box": {
+          "x": 160,
+          "y": 140,
+          "w": 1120,
+          "h": 420,
+          "z": 2
+        },
+        "url": "",
+        "title": "Apogee Enterprise walkthrough",
+        "aspectRatio": 1.7778,
+        "motion": {
+          "preset": "scale-in",
+          "delayMs": 60
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

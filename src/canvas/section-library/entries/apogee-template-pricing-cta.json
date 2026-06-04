@@ -1,0 +1,116 @@
+{
+  "baseSlug": "apogee-template-pricing-cta",
+  "category": "cta",
+  "name": "Pricing CTA",
+  "description": "Apogee Showcase body section — cta-band recipe.",
+  "recipeId": "cta-band",
+  "headingPreview": "Get started for free",
+  "sectionData": {
+    "id": "wf-pricing-cta",
+    "recipeId": "cta-band",
+    "name": "Pricing CTA",
+    "height": 400,
+    "entrance": "scale-in",
+    "elements": [
+      {
+        "id": "wf-pricing-cta-bg",
+        "type": "container",
+        "box": {
+          "x": 200,
+          "y": 60,
+          "w": 1040,
+          "h": 280,
+          "z": 0
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "wf-pricing-cta-heading",
+        "type": "text",
+        "box": {
+          "x": 320,
+          "y": 108,
+          "w": 800,
+          "h": 60,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Get started for free"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 40,
+        "fontWeight": 600,
+        "align": "center"
+      },
+      {
+        "id": "wf-pricing-cta-body",
+        "type": "text",
+        "box": {
+          "x": 380,
+          "y": 180,
+          "w": 680,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Try Apogee for as long as you like with our free Starter plan. No credit card required."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#6B6359"
+        }
+      },
+      {
+        "id": "wf-pricing-cta-primary",
+        "type": "action",
+        "box": {
+          "x": 520,
+          "y": 244,
+          "w": 220,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Get started - it's free"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/signup"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "wf-pricing-cta-secondary",
+        "type": "action",
+        "box": {
+          "x": 760,
+          "y": 244,
+          "w": 160,
+          "h": 52,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Watch demo"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#demo"
+        },
+        "variant": "outline"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "apogee-showcase"
+}

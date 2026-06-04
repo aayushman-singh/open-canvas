@@ -1,0 +1,153 @@
+{
+  "baseSlug": "portfolio-template-post4-body",
+  "category": "other",
+  "name": "Post body",
+  "description": "Engineer Portfolio body section — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "Outputs that survive court",
+  "sectionData": {
+    "id": "pf-post4-body",
+    "recipeId": "custom",
+    "name": "Post body",
+    "height": 860,
+    "elements": [
+      {
+        "id": "pf-post4-body-divider",
+        "type": "shape",
+        "box": {
+          "x": 80,
+          "y": 0,
+          "w": 1280,
+          "h": 1,
+          "z": 1
+        },
+        "variant": "line",
+        "pinnedStyle": {
+          "background": "rgba(241, 236, 224, 0.08)"
+        }
+      },
+      {
+        "id": "pf-post4-lead",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 80,
+          "w": 720,
+          "h": 140,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Shipping for a department instead of a user changes the product. The user is one investigator with six hours to file a report. The department is the chain of custody, the procurement officer, the audit log, and the constitutional limit nobody reads but everybody enforces. Both are real. Neither is optional."
+          }
+        ],
+        "role": "body",
+        "fontSize": 22,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#f1ece0"
+        },
+        "lineHeight": 1.55
+      },
+      {
+        "id": "pf-post4-h2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 248,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Outputs that survive court"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post4-p1",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 320,
+          "w": 720,
+          "h": 156,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Every artifact your tool produces will end up in front of a defence lawyer who is paid to take it apart. That means hashes at every stage, timestamps that match the device clock, raw blobs alongside the parsed views, and a written description of the pipeline that doesn't change between releases. Anything less and the report is suggestive, not evidentiary."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      },
+      {
+        "id": "pf-post4-h3",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 510,
+          "w": 720,
+          "h": 48,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Constraints come first"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 28,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "font-family": "'Instrument Serif', Georgia, serif",
+          "color": "#f1ece0"
+        }
+      },
+      {
+        "id": "pf-post4-p2",
+        "type": "text",
+        "box": {
+          "x": 240,
+          "y": 582,
+          "w": 720,
+          "h": 200,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Air-gapped install. No telemetry. Per-user keys with rotation logs. The temptation in a startup is to defer all of this and ship features. The State will not deploy the result. Build the constraints first, then put features on top of them; the order is load-bearing and switching it costs you the customer."
+          }
+        ],
+        "role": "body",
+        "fontSize": 17,
+        "fontWeight": 400,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#d8d2c6"
+        },
+        "lineHeight": 1.7
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "portfolio-showcase"
+}

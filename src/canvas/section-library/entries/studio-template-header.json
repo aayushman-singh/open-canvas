@@ -1,0 +1,52 @@
+{
+  "baseSlug": "studio-template-header",
+  "category": "header",
+  "name": "Header",
+  "description": "Studio Portfolio header — custom recipe.",
+  "recipeId": "custom",
+  "headingPreview": "custom",
+  "sectionData": {
+    "id": "section-header",
+    "recipeId": "custom",
+    "name": "Header",
+    "height": 72,
+    "elements": [
+      {
+        "id": "header-nav",
+        "type": "nav",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 72,
+          "z": 2
+        },
+        "siteTitle": "Open Canvas",
+        "links": [
+          {
+            "label": "Features",
+            "href": "#features",
+            "kind": "anchor"
+          },
+          {
+            "label": "Pricing",
+            "href": "#pricing",
+            "kind": "anchor"
+          }
+        ],
+        "primaryAction": {
+          "label": "Get started",
+          "href": "/edit",
+          "kind": "external"
+        },
+        "layout": "left-right",
+        "sticky": false,
+        "pinnedStyle": {
+          "padding": "0 80px"
+        }
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "studio-canvas"
+}

@@ -1,0 +1,406 @@
+{
+  "baseSlug": "enterprise-template-hero",
+  "category": "hero",
+  "name": "Enterprise hero",
+  "description": "Enterprise Scale body section — hero-split recipe.",
+  "recipeId": "hero-split",
+  "headingPreview": "Launch governed sites at market speed.",
+  "sectionData": {
+    "id": "enterprise-hero",
+    "recipeId": "hero-split",
+    "name": "Enterprise hero",
+    "height": 840,
+    "backgroundEffect": "grid",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "enterprise-hero-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 840,
+          "z": 0
+        },
+        "variant": "soft-panel"
+      },
+      {
+        "id": "enterprise-hero-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 84,
+          "w": 500,
+          "h": 32,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Enterprise website operations"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#DEFF6E"
+        }
+      },
+      {
+        "id": "enterprise-hero-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 142,
+          "w": 700,
+          "h": 260,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Launch governed sites at "
+          },
+          {
+            "text": "market speed",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "text": "."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 76,
+        "fontWeight": 700,
+        "align": "left",
+        "motion": {
+          "preset": "fade-up",
+          "delayMs": 40
+        }
+      },
+      {
+        "id": "enterprise-hero-body",
+        "type": "text",
+        "box": {
+          "x": 84,
+          "y": 432,
+          "w": 620,
+          "h": 126,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "A native canvas template for large teams that need "
+          },
+          {
+            "text": "brand control",
+            "marks": [
+              {
+                "type": "highlight"
+              }
+            ]
+          },
+          {
+            "text": ", faster publishing, and one clear system for campaigns, regions, and stakeholders."
+          }
+        ],
+        "role": "body",
+        "fontSize": 20,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-primary",
+        "type": "action",
+        "box": {
+          "x": 80,
+          "y": 608,
+          "w": 180,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "Talk to sales"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "mailto:hello@example.com"
+        },
+        "variant": "solid"
+      },
+      {
+        "id": "enterprise-hero-secondary",
+        "type": "action",
+        "box": {
+          "x": 284,
+          "y": 608,
+          "w": 190,
+          "h": 56,
+          "z": 3
+        },
+        "label": [
+          {
+            "text": "View platform"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "#enterprise-scale"
+        },
+        "variant": "outline"
+      },
+      {
+        "id": "enterprise-hero-proof",
+        "type": "text",
+        "box": {
+          "x": 84,
+          "y": 720,
+          "w": 520,
+          "h": 40,
+          "z": 3
+        },
+        "content": [
+          {
+            "text": "Built for global marketing, design, and operations teams."
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 500,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#7A8290"
+        }
+      },
+      {
+        "id": "enterprise-hero-panel",
+        "type": "container",
+        "box": {
+          "x": 770,
+          "y": 108,
+          "w": 570,
+          "h": 580,
+          "z": 2
+        },
+        "variant": "raised",
+        "motion": {
+          "preset": "slide-left",
+          "delayMs": 120
+        }
+      },
+      {
+        "id": "enterprise-hero-panel-glass",
+        "type": "container",
+        "box": {
+          "x": 814,
+          "y": 150,
+          "w": 482,
+          "h": 88,
+          "z": 4
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-hero-panel-title",
+        "type": "text",
+        "box": {
+          "x": 844,
+          "y": 170,
+          "w": 360,
+          "h": 40,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "Launch command center"
+          }
+        ],
+        "role": "label",
+        "fontSize": 18,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-panel-status",
+        "type": "text",
+        "box": {
+          "x": 1180,
+          "y": 172,
+          "w": 94,
+          "h": 32,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "LIVE"
+          }
+        ],
+        "role": "label",
+        "fontSize": 14,
+        "fontWeight": 700,
+        "align": "center",
+        "pinnedStyle": {
+          "color": "#DEFF6E"
+        }
+      },
+      {
+        "id": "enterprise-hero-stat-one-card",
+        "type": "container",
+        "box": {
+          "x": 814,
+          "y": 274,
+          "w": 220,
+          "h": 150,
+          "z": 4
+        },
+        "variant": "outlined"
+      },
+      {
+        "id": "enterprise-hero-stat-one",
+        "type": "text",
+        "box": {
+          "x": 842,
+          "y": 300,
+          "w": 164,
+          "h": 58,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "4.8x"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-stat-one-label",
+        "type": "text",
+        "box": {
+          "x": 842,
+          "y": 366,
+          "w": 160,
+          "h": 42,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "faster campaign launch cycles"
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 500,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-stat-two-card",
+        "type": "container",
+        "box": {
+          "x": 1074,
+          "y": 274,
+          "w": 220,
+          "h": 150,
+          "z": 4
+        },
+        "variant": "outlined"
+      },
+      {
+        "id": "enterprise-hero-stat-two",
+        "type": "text",
+        "box": {
+          "x": 1102,
+          "y": 300,
+          "w": 164,
+          "h": 58,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "42%"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 44,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-stat-two-label",
+        "type": "text",
+        "box": {
+          "x": 1102,
+          "y": 366,
+          "w": 160,
+          "h": 42,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "fewer handoff loops before publish"
+          }
+        ],
+        "role": "label",
+        "fontSize": 15,
+        "fontWeight": 500,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-flow-card",
+        "type": "container",
+        "box": {
+          "x": 814,
+          "y": 466,
+          "w": 480,
+          "h": 150,
+          "z": 4
+        },
+        "variant": "glass"
+      },
+      {
+        "id": "enterprise-hero-flow-copy",
+        "type": "text",
+        "box": {
+          "x": 844,
+          "y": 494,
+          "w": 410,
+          "h": 70,
+          "z": 5
+        },
+        "content": [
+          {
+            "text": "Brand system approved. Regional variants queued. Audit trail ready."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 500,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-hero-accent",
+        "type": "shape",
+        "box": {
+          "x": 1248,
+          "y": 628,
+          "w": 100,
+          "h": 100,
+          "z": 6,
+          "rotation": 18
+        },
+        "variant": "badge"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "enterprise-scale-canvas"
+}

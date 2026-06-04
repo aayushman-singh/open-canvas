@@ -1,0 +1,311 @@
+{
+  "baseSlug": "enterprise-template-outcomes",
+  "category": "testimonials",
+  "name": "Outcome cards",
+  "description": "Enterprise Scale body section — testimonial-row recipe.",
+  "recipeId": "testimonial-row",
+  "headingPreview": "Make the business case visible before the demo call.",
+  "sectionData": {
+    "id": "enterprise-outcomes",
+    "recipeId": "testimonial-row",
+    "name": "Outcome cards",
+    "height": 780,
+    "backgroundEffect": "grain",
+    "entrance": "fade-up",
+    "elements": [
+      {
+        "id": "enterprise-outcomes-bg",
+        "type": "container",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 780,
+          "z": 0
+        },
+        "variant": "flat"
+      },
+      {
+        "id": "enterprise-outcomes-kicker",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 82,
+          "w": 420,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Measurable impact"
+          }
+        ],
+        "role": "label",
+        "fontSize": 16,
+        "fontWeight": 700,
+        "align": "left",
+        "pinnedStyle": {
+          "color": "#DEFF6E"
+        }
+      },
+      {
+        "id": "enterprise-outcomes-heading",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 132,
+          "w": 760,
+          "h": 118,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Make the business case visible before the demo call."
+          }
+        ],
+        "role": "heading",
+        "fontSize": 48,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcomes-body",
+        "type": "text",
+        "box": {
+          "x": 880,
+          "y": 142,
+          "w": 440,
+          "h": 92,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Outcome cards are built for editable stats, short customer proof, and clear routes into longer stories."
+          }
+        ],
+        "role": "body",
+        "fontSize": 18,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-card-one",
+        "type": "container",
+        "box": {
+          "x": 80,
+          "y": 318,
+          "w": 386,
+          "h": 340,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-outcome-one-stat",
+        "type": "text",
+        "box": {
+          "x": 118,
+          "y": 356,
+          "w": 220,
+          "h": 76,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "3.2M"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 58,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-one-label",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 452,
+          "w": 290,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "in tooling and agency spend avoided"
+          }
+        ],
+        "role": "label",
+        "fontSize": 17,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-one-body",
+        "type": "text",
+        "box": {
+          "x": 120,
+          "y": 532,
+          "w": 292,
+          "h": 70,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Consolidate launch surfaces while keeping brand review and publishing ownership close to the team."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-card-two",
+        "type": "container",
+        "box": {
+          "x": 526,
+          "y": 318,
+          "w": 386,
+          "h": 340,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-outcome-two-stat",
+        "type": "text",
+        "box": {
+          "x": 564,
+          "y": 356,
+          "w": 220,
+          "h": 76,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "68%"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 58,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-two-label",
+        "type": "text",
+        "box": {
+          "x": 566,
+          "y": 452,
+          "w": 290,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "more pages shipped by non-engineering teams"
+          }
+        ],
+        "role": "label",
+        "fontSize": 17,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-two-body",
+        "type": "text",
+        "box": {
+          "x": 566,
+          "y": 532,
+          "w": 292,
+          "h": 70,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Give trusted operators a clear system for launching pages without creating hidden implementation drift."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-card-three",
+        "type": "container",
+        "box": {
+          "x": 972,
+          "y": 318,
+          "w": 368,
+          "h": 340,
+          "z": 1
+        },
+        "variant": "raised"
+      },
+      {
+        "id": "enterprise-outcome-three-stat",
+        "type": "text",
+        "box": {
+          "x": 1010,
+          "y": 356,
+          "w": 220,
+          "h": 76,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "12d"
+          }
+        ],
+        "role": "heading",
+        "fontSize": 58,
+        "fontWeight": 700,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-three-label",
+        "type": "text",
+        "box": {
+          "x": 1012,
+          "y": 452,
+          "w": 270,
+          "h": 48,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "from signed brief to governed launch"
+          }
+        ],
+        "role": "label",
+        "fontSize": 17,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "enterprise-outcome-three-body",
+        "type": "text",
+        "box": {
+          "x": 1012,
+          "y": 532,
+          "w": 268,
+          "h": 70,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Replace scattered launch checklists with a page structure built around decisions, evidence, and control."
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 400,
+        "align": "left"
+      }
+    ]
+  },
+  "assetManifest": [],
+  "originTemplateId": "enterprise-scale-canvas"
+}
