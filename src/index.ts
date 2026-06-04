@@ -40,6 +40,8 @@ import profileApi from './routes/api/profile';
 // both /api/* and /__api/*; admin tooling stays on /api/* only.
 import { librarySectionsAdmin } from './routes/api/library-sections';
 import { customTemplatesAdmin } from './routes/api/custom-templates';
+import { ensureSectionLibraryUpserted } from './canvas/section-library';
+import { db } from './db/client';
 import { editTokenAuth } from './auth/middleware';
 import editTokenRefreshRoute from './auth/refresh-route';
 import signOutRoute from './auth/sign-out-route';
@@ -58,6 +60,20 @@ const app = new Hono<PublicEnv>();
 app.use('*', async (c, next) => {
   const handled = await handlePublicRequest(c);
   if (handled) return handled;
+  await next();
+});
+
+// ADR 0061 Decision 2 — boot-time Section Library upsert.
+//
+// Mirrors a traditional "server boot hook" on Cloudflare Workers:
+// fires once per isolate cold-start, memoized inside
+// `ensureSectionLibraryUpserted`. `waitUntil` keeps the isolate alive
+// past the response so the upsert can finish without slowing the first
+// request handler. Public-host visitor requests short-circuit above
+// and never reach here, so the upsert never piggybacks on visitor
+// traffic — only owner/dashboard/api requests trigger it.
+app.use('*', async (c, next) => {
+  c.executionCtx.waitUntil(ensureSectionLibraryUpserted(db(c.env)));
   await next();
 });
 
