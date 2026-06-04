@@ -25,6 +25,7 @@ import {
 } from './editor-constants.js';
 import { field, selectInput } from './dom-builders.js';
 import { beginDragImpl } from './drag-resize.js';
+import { maybeExpandEmbedShortLink } from './embed-shortlink.js';
 import { isAllowedHref } from './href-utils.js';
 import { newElementId } from './ids.js';
 import { mountChartData } from './inspector-chart-mount.js';
@@ -449,6 +450,9 @@ export function renderInspectorSpecImpl(
         }
         if (!f.noRebuild) ctx.rebuildElement(element.id);
         ctx.scheduleSave();
+        if (element.type === 'embed' && f.path === 'url') {
+          void maybeExpandEmbedShortLink(ctx, element, ti);
+        }
       });
       ctx.inspector!.appendChild(field(f.label, ti));
       return;
