@@ -1412,16 +1412,23 @@ export interface EditorContext {
    *  (kept inline) resets to `null` after a successful save so the next
    *  panel open re-fetches and surfaces the new entry. */
   sectionsCatalog: SectionsCatalogEntry[] | null;
-  /** Sections-picker template-source filter ("all" / "seed" / "library").
-   *  Mirrored from the <select data-section-picker-filter> control;
-   *  renderSectionsPickerGrid reads it to filter the catalog. Defaults
-   *  to "all" at boot. */
-  activeTemplateFilter: string;
+  /** ADR 0061 Decision 11 — sections-picker category filter ("all" or
+   *  one of SECTION_CATEGORIES: header / hero / features / testimonials
+   *  / cta / gallery / footer / other). Mirrored from the
+   *  <select data-section-picker-filter> control; renderSectionsPickerGrid
+   *  reads it to filter the catalog. Defaults to "all" at boot. Replaces
+   *  the pre-Phase-E `activeTemplateFilter` (source-based) gate. */
+  activeCategoryFilter: string;
   /** Sections-picker search box value. Mirrored from the
    *  <input data-section-picker-search> control; renderSectionsPickerGrid
    *  reads it (case-insensitive substring) to filter the catalog.
    *  Defaults to "" at boot. */
   activeSearchQuery: string;
+  /** ADR 0061 Decision 11 — sections-picker sort mode toggle:
+   *  - `'a-z'` (default): alphabetical by entry.name.
+   *  - `'recent'`: by entry.createdAt DESC (DB rows first, seed rows
+   *    after the 1970 sentinel). */
+  activeSortMode: 'a-z' | 'recent';
   /** Re-render the Sections-picker panel (controls shell on first call,
    *  grid-only on subsequent calls so the search input keeps focus).
    *  Bound impl lives in sections-picker.ts (renderSectionsPanelImpl);

@@ -449,22 +449,13 @@ export interface AssetManifestEntry {
 export const LIBRARY_SECTION_VISIBILITY = ['global', 'private'] as const;
 export type LibrarySectionVisibility = (typeof LIBRARY_SECTION_VISIBILITY)[number];
 
-// ADR 0061 Decision 8 — closed enum gating the picker's category filter.
-// `'other'` is the explicit escape hatch for sections that don't fit any
-// of the seven content categories. Order here drives the picker dropdown
-// order (Header / Hero / Features / Testimonials / CTA / Gallery / Footer
-// / Other) — keep the user-facing reading order, not insertion order.
-export const SECTION_CATEGORIES = [
-  'header',
-  'hero',
-  'features',
-  'testimonials',
-  'cta',
-  'gallery',
-  'footer',
-  'other',
-] as const;
-export type SectionCategory = (typeof SECTION_CATEGORIES)[number];
+// ADR 0061 Decision 8 — the closed Section Category enum lives in a slim
+// module so the editor-client bundle can import it for the picker
+// dropdown without pulling in `drizzle-orm/pg-core`. Re-exported here so
+// existing server-side imports from `db/schema` keep working.
+import { SECTION_CATEGORIES, type SectionCategory } from '../canvas/section-library/categories.js';
+export { SECTION_CATEGORIES };
+export type { SectionCategory };
 
 export const librarySection = pgTable(
   'library_section',

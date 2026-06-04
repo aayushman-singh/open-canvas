@@ -20,6 +20,7 @@ import type {
   EditableSite,
 } from '../src/canvas/schema.js';
 import type { AssetManifestEntry, SectionCategory } from '../src/db/schema.js';
+import { categoryForRecipe } from '../src/canvas/section-library/category.js';
 import { allTemplateSeeds } from '../src/templates/registry.js';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -107,23 +108,7 @@ type SectionPosition = 'header' | 'footer' | 'body';
 function categoryFor(section: CanvasSection, position: SectionPosition): SectionCategory {
   if (position === 'header') return 'header';
   if (position === 'footer') return 'footer';
-  switch (section.recipeId) {
-    case 'hero-split':
-    case 'video-hero':
-      return 'hero';
-    case 'feature-grid':
-      return 'features';
-    case 'cta-band':
-      return 'cta';
-    case 'testimonial-row':
-      return 'testimonials';
-    case 'gallery-strip':
-      return 'gallery';
-    case 'logo-strip':
-    case 'custom':
-    default:
-      return 'other';
-  }
+  return categoryForRecipe(section.recipeId);
 }
 
 // ---------------------------------------------------------------------------

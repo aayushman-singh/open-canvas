@@ -17,6 +17,7 @@ import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
+import { categoryForRecipe, ORIGIN_TO_BASE_SLUG } from '../../canvas/section-library/index.js';
 import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
@@ -26,6 +27,8 @@ import {
   LIBRARY_SECTION_VISIBILITY,
   type LibrarySectionVisibility,
   ownerAsset,
+  SECTION_CATEGORIES,
+  type SectionCategory,
   site,
   type AssetManifestEntry,
 } from '../../db/schema.js';
@@ -162,6 +165,18 @@ export interface LibraryCatalogEntry {
   recipeId: string;
   headingPreview: string;
   visibility: 'global' | 'private';
+  /** ADR 0061 Decision 8 — closed-enum category drives the picker dropdown. */
+  category: SectionCategory;
+  /** ADR 0061 Decision 11 — searchable in the picker haystack. */
+  description: string;
+  /** Origin-named pool slug per Decision 5. Carried for haystack search. */
+  baseSlug: string;
+  /**
+   * ISO timestamp the picker uses for the `Recently added` sort. Library
+   * rows carry the row's `created_at`; seed rows synthesize a fixed
+   * pre-deploy time so they sort below any Owner-saved row.
+   */
+  createdAt: string;
   templateId?: string;
   templateName?: string;
   sectionId?: string;
@@ -170,7 +185,25 @@ export interface LibraryCatalogEntry {
   thumbnail: string;
 }
 
+/**
+ * Sentinel pre-deploy timestamp for seed entries. Any real `created_at`
+ * on a `library_section` row will sort above this, so the picker's
+ * `Recently added` mode surfaces Owner-saved sections first.
+ */
+const SEED_CREATED_AT_SENTINEL = '1970-01-01T00:00:00.000Z';
+
 function seedEntryToCatalog(entry: SectionCatalogEntry): LibraryCatalogEntry {
+  // Origin map covers every TemplateSeed section after Phase C. The
+  // extraction smoke gates this invariant at build time; a runtime miss
+  // means a developer added a TemplateSeed without re-running
+  // scripts/extract-section-library.ts. Fail loud per "no fallbacks".
+  const originKey = `${entry.templateId}:${entry.sectionId}`;
+  const mappedSlug = ORIGIN_TO_BASE_SLUG[originKey];
+  if (mappedSlug === undefined) {
+    throw new Error(
+      `seedEntryToCatalog: origin map missing entry for ${originKey} — re-run scripts/extract-section-library.ts and commit the regenerated entries/manifest + origin-mapping`,
+    );
+  }
   return {
     source: 'seed',
     id: `${entry.templateId}:${entry.sectionId}`,
@@ -178,6 +211,10 @@ function seedEntryToCatalog(entry: SectionCatalogEntry): LibraryCatalogEntry {
     recipeId: entry.recipeId,
     headingPreview: entry.headingPreview,
     visibility: 'global',
+    category: categoryForRecipe(entry.recipeId),
+    description: '',
+    baseSlug: mappedSlug,
+    createdAt: SEED_CREATED_AT_SENTINEL,
     templateId: entry.templateId,
     templateName: entry.templateName,
     sectionId: entry.sectionId,
@@ -210,10 +247,14 @@ librarySectionsOwner.get('/sections', async (c) => {
     .select({
       id: librarySection.id,
       name: librarySection.name,
+      description: librarySection.description,
       recipeId: librarySection.recipeId,
       headingPreview: librarySection.headingPreview,
       visibility: librarySection.visibility,
       sectionData: librarySection.sectionData,
+      baseSlug: librarySection.baseSlug,
+      category: librarySection.category,
+      createdAt: librarySection.createdAt,
     })
     .from(librarySection)
     .where(whereClause);
@@ -226,6 +267,10 @@ librarySectionsOwner.get('/sections', async (c) => {
       recipeId: row.recipeId,
       headingPreview: row.headingPreview,
       visibility: row.visibility,
+      category: row.category,
+      description: row.description,
+      baseSlug: row.baseSlug,
+      createdAt: row.createdAt.toISOString(),
       librarySectionId: row.id,
       thumbnail: buildSectionThumbnailSvg(row.sectionData),
     });
@@ -240,6 +285,14 @@ interface SaveBody {
   name: string | undefined;
   description: string;
   visibility: LibrarySectionVisibility;
+  /** ADR 0061 Decision 8 — required, validated against SECTION_CATEGORIES. */
+  category: SectionCategory;
+  /**
+   * ADR 0061 Decision 4 — when set, signals save-as-new on an existing
+   * lineage. The handler resolves the parent row and bumps `version` while
+   * inheriting `baseSlug`. When unset, the row is a v1 with no parent.
+   */
+  parentId: string | undefined;
 }
 
 function parseSaveBody(value: unknown): SaveBody | { error: string } {
@@ -251,6 +304,12 @@ function parseSaveBody(value: unknown): SaveBody | { error: string } {
   if (typeof v.sectionId !== 'string' || v.sectionId.length === 0) {
     return { error: 'sectionId is required' };
   }
+  if (typeof v.category !== 'string') {
+    return { error: `category is required and must be one of ${SECTION_CATEGORIES.join(', ')}` };
+  }
+  if (!SECTION_CATEGORIES.includes(v.category as SectionCategory)) {
+    return { error: `category must be one of ${SECTION_CATEGORIES.join(', ')}` };
+  }
   const name = typeof v.name === 'string' && v.name.length > 0 ? v.name : undefined;
   const description = typeof v.description === 'string' ? v.description : '';
   let visibility: LibrarySectionVisibility = 'private';
@@ -260,7 +319,59 @@ function parseSaveBody(value: unknown): SaveBody | { error: string } {
     }
     visibility = v.visibility as LibrarySectionVisibility;
   }
-  return { siteId: v.siteId, sectionId: v.sectionId, name, description, visibility };
+  const parentId = typeof v.parentId === 'string' && v.parentId.length > 0 ? v.parentId : undefined;
+  return {
+    siteId: v.siteId,
+    sectionId: v.sectionId,
+    name,
+    description,
+    visibility,
+    category: v.category as SectionCategory,
+    parentId,
+  };
+}
+
+/**
+ * ADR 0061 Decision 4 — save-as-new path.
+ *
+ * Looks up the parent row and derives the new row's `baseSlug` + `version`
+ * from it. The scope (private vs global) is checked against the
+ * `expectedVisibility` argument so an Owner cannot bump-version a global
+ * section as if it were their own, and admins cannot accidentally bump a
+ * private row through the admin route.
+ */
+interface ParentLineage {
+  baseSlug: string;
+  version: number;
+  parentId: string;
+}
+
+async function resolveParentLineage(
+  database: ReturnType<typeof db>,
+  parentId: string,
+  expectedVisibility: LibrarySectionVisibility,
+  customerId: string | null,
+): Promise<ParentLineage | { error: string; status: 403 | 404 }> {
+  const rows = await database
+    .select({
+      id: librarySection.id,
+      baseSlug: librarySection.baseSlug,
+      version: librarySection.version,
+      visibility: librarySection.visibility,
+      customerId: librarySection.customerId,
+    })
+    .from(librarySection)
+    .where(eq(librarySection.id, parentId))
+    .limit(1);
+  const parent = rows[0];
+  if (!parent) return { error: 'parent section not found', status: 404 };
+  if (parent.visibility !== expectedVisibility) {
+    return { error: `parent visibility mismatch (parent is ${parent.visibility}, request is ${expectedVisibility})`, status: 403 };
+  }
+  if (expectedVisibility === 'private' && parent.customerId !== customerId) {
+    return { error: 'parent section belongs to another customer', status: 403 };
+  }
+  return { baseSlug: parent.baseSlug, version: parent.version + 1, parentId: parent.id };
 }
 
 librarySectionsOwner.post('/sections', async (c) => {
@@ -290,10 +401,19 @@ librarySectionsOwner.post('/sections', async (c) => {
   const manifest = await buildAssetManifest(database, customerId, loaded.section);
   const heading = firstHeadingPreview(loaded.section);
 
-  // ADR 0061 Phase A — baseSlug mirrors the row id for first-version inserts
-  // through this legacy route. Phase E will introduce save-as-new with an
-  // explicit parentId + bumped version against an existing baseSlug.
+  // ADR 0061 Decision 4 — save-as-new vs first-version.
+  // `parentId` set: this row is v(parent.version+1) on parent.baseSlug.
+  // `parentId` unset: this row is v1 with baseSlug mirroring the row id
+  // (kept from Phase A — the legacy "save private section" flow).
   const newId = crypto.randomUUID();
+  let lineage: { baseSlug: string; version: number; parentId: string | null };
+  if (parsed.parentId !== undefined) {
+    const resolved = await resolveParentLineage(database, parsed.parentId, parsed.visibility, parsed.visibility === 'private' ? customerId : null);
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    lineage = resolved;
+  } else {
+    lineage = { baseSlug: newId, version: 1, parentId: null };
+  }
 
   const [row] = await database
     .insert(librarySection)
@@ -307,11 +427,94 @@ librarySectionsOwner.post('/sections', async (c) => {
       sectionData: loaded.section,
       assetManifest: manifest,
       headingPreview: heading.length > 0 ? heading : loaded.section.recipeId,
-      baseSlug: newId,
+      baseSlug: lineage.baseSlug,
+      version: lineage.version,
+      parentId: lineage.parentId,
+      category: parsed.category,
     })
     .returning({ id: librarySection.id });
 
   return c.json({ ok: true, id: row!.id });
+});
+
+/**
+ * ADR 0061 Decision 4 — in-place edit for `visibility:'private'` rows.
+ * Global rows are immutable through this route (the boot upsert is the
+ * structural source of truth per Decision 2); admin-saved one-offs that
+ * need editing go through save-as-new (POST with `parentId`).
+ */
+interface PutBody {
+  name?: string;
+  description?: string;
+  category?: SectionCategory;
+}
+
+function parsePutBody(value: unknown): PutBody | { error: string } {
+  if (!value || typeof value !== 'object') return { error: 'body must be an object' };
+  const v = value as Record<string, unknown>;
+  const out: PutBody = {};
+  if (v.name !== undefined) {
+    if (typeof v.name !== 'string' || v.name.length === 0) return { error: 'name must be a non-empty string' };
+    out.name = v.name;
+  }
+  if (v.description !== undefined) {
+    if (typeof v.description !== 'string') return { error: 'description must be a string' };
+    out.description = v.description;
+  }
+  if (v.category !== undefined) {
+    if (typeof v.category !== 'string' || !SECTION_CATEGORIES.includes(v.category as SectionCategory)) {
+      return { error: `category must be one of ${SECTION_CATEGORIES.join(', ')}` };
+    }
+    out.category = v.category as SectionCategory;
+  }
+  if (Object.keys(out).length === 0) return { error: 'body must include at least one of name, description, category' };
+  return out;
+}
+
+librarySectionsOwner.put('/sections/:id', async (c) => {
+  const auth = c.get('auth');
+  if (!auth.userId) throw new Error('library sections reached without auth');
+
+  const database = db(c.env);
+  const customerId = await resolveCustomerId(database, auth.userId);
+  if (!customerId) return c.json({ error: 'no customer row' }, 409);
+
+  const raw: unknown = await c.req.json().catch(() => null);
+  const parsed = parsePutBody(raw);
+  if ('error' in parsed) return c.json({ error: parsed.error }, 400);
+
+  // Existence + ownership + visibility check, all in one round trip.
+  const rows = await database
+    .select({
+      id: librarySection.id,
+      visibility: librarySection.visibility,
+      customerId: librarySection.customerId,
+    })
+    .from(librarySection)
+    .where(eq(librarySection.id, c.req.param('id')))
+    .limit(1);
+  const row = rows[0];
+  if (!row) return c.json({ error: 'section not found' }, 404);
+  if (row.visibility === 'global') {
+    return c.json({ error: 'global sections are immutable through this route (use POST with parentId to save-as-new)' }, 403);
+  }
+  if (row.customerId !== customerId) {
+    return c.json({ error: 'section belongs to another customer' }, 403);
+  }
+
+  const updated = await database
+    .update(librarySection)
+    .set({
+      ...(parsed.name !== undefined ? { name: parsed.name } : {}),
+      ...(parsed.description !== undefined ? { description: parsed.description } : {}),
+      ...(parsed.category !== undefined ? { category: parsed.category } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(librarySection.id, row.id))
+    .returning({ id: librarySection.id });
+
+  if (updated.length === 0) return c.json({ error: 'section not found' }, 404);
+  return c.json({ ok: true, id: updated[0]!.id });
 });
 
 librarySectionsOwner.delete('/sections/:id', async (c) => {
@@ -369,11 +572,18 @@ librarySectionsAdmin.post('/sections', async (c) => {
   const manifest = await buildAssetManifest(database, customerId, loaded.section);
   const heading = firstHeadingPreview(loaded.section);
 
-  // ADR 0061 Phase A — admin-promoted global rows mirror the row id into
-  // baseSlug at first-version creation, same as the Owner POST path. The
-  // boot upsert in Phase B uses code-defined deterministic slugs instead;
-  // this route stays for admin-saved one-offs only.
+  // Admin-promoted globals follow the same lineage rules as private rows
+  // (Decision 4) — `parentId` set ⇒ bumped version on parent.baseSlug;
+  // `parentId` unset ⇒ v1 with baseSlug mirroring the row id.
   const newId = crypto.randomUUID();
+  let lineage: { baseSlug: string; version: number; parentId: string | null };
+  if (parsed.parentId !== undefined) {
+    const resolved = await resolveParentLineage(database, parsed.parentId, 'global', null);
+    if ('error' in resolved) return c.json({ error: resolved.error }, resolved.status);
+    lineage = resolved;
+  } else {
+    lineage = { baseSlug: newId, version: 1, parentId: null };
+  }
 
   const [row] = await database
     .insert(librarySection)
@@ -387,7 +597,10 @@ librarySectionsAdmin.post('/sections', async (c) => {
       sectionData: loaded.section,
       assetManifest: manifest,
       headingPreview: heading.length > 0 ? heading : loaded.section.recipeId,
-      baseSlug: newId,
+      baseSlug: lineage.baseSlug,
+      version: lineage.version,
+      parentId: lineage.parentId,
+      category: parsed.category,
     })
     .returning({ id: librarySection.id });
 

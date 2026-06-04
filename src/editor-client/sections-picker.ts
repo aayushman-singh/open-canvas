@@ -48,9 +48,22 @@
 // reads and writes, the field narrows to PendingImport | null. The
 // camera module's truthiness gate stays valid under the narrower type.
 
+import { SECTION_CATEGORIES, type SectionCategory } from '../canvas/section-library/categories.js';
 import type { EditorContext } from './editor-context.js';
 import { migrateState } from './state-migration.js';
 import { escapeAttr, escapeHtml } from './html-escape.js';
+
+const CATEGORY_LABEL: Record<SectionCategory | 'all', string> = {
+  all: 'All sections',
+  header: 'Header',
+  hero: 'Hero',
+  features: 'Features',
+  testimonials: 'Testimonials',
+  cta: 'CTA',
+  gallery: 'Gallery',
+  footer: 'Footer',
+  other: 'Other',
+};
 
 /**
  * Catalog entry returned by `GET /api/library/sections`. Mirrors the
@@ -67,6 +80,14 @@ export interface SectionsCatalogEntry {
   recipeId: string;
   headingPreview: string;
   visibility: 'global' | 'private';
+  /** ADR 0061 Decision 8 — picker filter axis. */
+  category: SectionCategory;
+  /** ADR 0061 Decision 11 — surfaced in card body + included in haystack. */
+  description: string;
+  /** Origin-named pool slug. Included in haystack. */
+  baseSlug: string;
+  /** ISO timestamp; drives `Recently added` sort. Seed rows use a 1970 sentinel. */
+  createdAt: string;
   templateId?: string;
   templateName?: string;
   sectionId?: string;
@@ -129,10 +150,19 @@ export function renderSectionsPanelImpl(ctx: EditorContext): void {
 }
 
 function renderSectionsPickerShell(ctx: EditorContext, root: Element): void {
+  // ADR 0061 Decision 11 — category filter replaces the source filter
+  // ("All / Built-in / Library") because Owners care about *what the
+  // section is*, not where it came from. Order mirrors SECTION_CATEGORIES
+  // so reading order stays Header → Hero → Features → … → Footer → Other.
   const filterOptions = [
-    '<option value="all">All sections</option>',
-    '<option value="seed">Built-in</option>',
-    '<option value="library">Library</option>',
+    `<option value="all">${CATEGORY_LABEL.all}</option>`,
+    ...SECTION_CATEGORIES.map((category) => `<option value="${category}">${CATEGORY_LABEL[category]}</option>`),
+  ].join('');
+
+  // ADR 0061 Decision 11 — sort toggle: A-Z (default) vs Recently added.
+  const sortOptions = [
+    '<option value="a-z">A-Z</option>',
+    '<option value="recent">Recently added</option>',
   ].join('');
 
   root.innerHTML =
@@ -141,17 +171,31 @@ function renderSectionsPickerShell(ctx: EditorContext, root: Element): void {
     'value="' +
     escapeAttr(ctx.activeSearchQuery) +
     '" data-section-picker-search />' +
-    '<select class="opencanvas-section-picker-filter" data-section-picker-filter>' +
+    '<select class="opencanvas-section-picker-filter" data-section-picker-filter aria-label="Filter by category">' +
     filterOptions +
+    '</select>' +
+    '<select class="opencanvas-section-picker-sort" data-section-picker-sort aria-label="Sort order">' +
+    sortOptions +
     '</select>' +
     '</div>' +
     '<div data-section-picker-grid-container></div>';
 
   const filter = root.querySelector('[data-section-picker-filter]');
   if (filter instanceof HTMLSelectElement) {
-    filter.value = ctx.activeTemplateFilter;
+    filter.value = ctx.activeCategoryFilter;
     filter.addEventListener('change', () => {
-      ctx.activeTemplateFilter = filter.value;
+      ctx.activeCategoryFilter = filter.value;
+      const grid = root.querySelector('[data-section-picker-grid-container]');
+      if (grid) renderSectionsPickerGrid(ctx, grid);
+    });
+  }
+  const sort = root.querySelector('[data-section-picker-sort]');
+  if (sort instanceof HTMLSelectElement) {
+    sort.value = ctx.activeSortMode;
+    sort.addEventListener('change', () => {
+      if (sort.value === 'a-z' || sort.value === 'recent') {
+        ctx.activeSortMode = sort.value;
+      }
       const grid = root.querySelector('[data-section-picker-grid-container]');
       if (grid) renderSectionsPickerGrid(ctx, grid);
     });
@@ -166,23 +210,59 @@ function renderSectionsPickerShell(ctx: EditorContext, root: Element): void {
   }
 }
 
+/**
+ * ADR 0061 Decision 11 — pure filter+sort over the catalog. Exposed for
+ * the picker smoke so filter/search/sort behaviour can be tested without
+ * a DOM. The grid renderer below just feeds the ctx fields into this and
+ * renders the result; behaviour stays in lockstep.
+ */
+export function filterAndSortCatalog(
+  catalog: ReadonlyArray<SectionsCatalogEntry>,
+  options: { category: string; query: string; sort: 'a-z' | 'recent' },
+): SectionsCatalogEntry[] {
+  const filtered = catalog.filter((entry) => {
+    if (options.category !== 'all' && entry.category !== options.category) {
+      return false;
+    }
+    if (options.query.length > 0) {
+      // Pre-Phase-E haystack excluded recipeId and slug, which made
+      // "testimonial" miss `library-template-testimonial-quote`. The
+      // widened haystack covers slug + name + recipeId + category +
+      // headingPreview + originTemplateName + description.
+      const haystack = [
+        entry.name,
+        entry.headingPreview,
+        entry.recipeId,
+        entry.category,
+        entry.baseSlug,
+        entry.description,
+        entry.templateName ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      if (!haystack.includes(options.query.toLowerCase())) return false;
+    }
+    return true;
+  });
+
+  // A-Z is default; Recently added uses ISO createdAt DESC. Seed entries
+  // carry a 1970 sentinel so they sort after any real Owner-saved row in
+  // `recent` mode.
+  if (options.sort === 'a-z') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    filtered.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+  }
+  return filtered;
+}
+
 function renderSectionsPickerGrid(ctx: EditorContext, gridContainer: Element): void {
   if (ctx.sectionsCatalog === null) return;
 
-  const filtered = ctx.sectionsCatalog.filter((entry) => {
-    if (ctx.activeTemplateFilter !== 'all' && entry.source !== ctx.activeTemplateFilter)
-      return false;
-    if (ctx.activeSearchQuery.length > 0) {
-      const haystack = (
-        entry.name +
-        ' ' +
-        entry.headingPreview +
-        ' ' +
-        (entry.templateName || '')
-      ).toLowerCase();
-      if (!haystack.includes(ctx.activeSearchQuery.toLowerCase())) return false;
-    }
-    return true;
+  const filtered = filterAndSortCatalog(ctx.sectionsCatalog, {
+    category: ctx.activeCategoryFilter,
+    query: ctx.activeSearchQuery,
+    sort: ctx.activeSortMode,
   });
 
   const cards = filtered

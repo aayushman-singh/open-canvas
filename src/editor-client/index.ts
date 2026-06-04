@@ -579,8 +579,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
 
     // ---- Phase 2q.i: sections picker + sidebar wiring ----------------
     sidebar: null,
-    activeTemplateFilter: 'all',
+    activeCategoryFilter: 'all',
     activeSearchQuery: '',
+    activeSortMode: 'a-z',
     enterPlacementMode: (target) => enterPlacementModeImpl(ctx, target),
     importPendingSectionAt: (insertAt) => importPendingSectionAt(ctx, insertAt),
     attachSidebarTabs: () => attachSidebarTabs(ctx),

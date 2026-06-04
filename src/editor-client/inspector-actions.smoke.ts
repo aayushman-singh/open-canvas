@@ -392,8 +392,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     openLinkModal: () => {
       throw new Error('openLinkModal stub: smoke does not exercise modals');
     },
-    activeTemplateFilter: 'all',
+    activeCategoryFilter: 'all',
     activeSearchQuery: '',
+    activeSortMode: 'a-z',
     enterPlacementMode: () => {},
     importPendingSectionAt: () => {
       throw new Error('importPendingSectionAt stub: smoke does not exercise section import');

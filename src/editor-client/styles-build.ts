@@ -1222,13 +1222,17 @@ body.opencanvas-modal-open {
   color: var(--opencanvas-fg);
   font: inherit;
 }
-.opencanvas-section-picker-filter {
+.opencanvas-section-picker-filter,
+.opencanvas-section-picker-sort {
   padding: 6px 10px;
   border: 1px solid var(--opencanvas-hairline);
   border-radius: 6px;
   background: var(--opencanvas-bg);
   color: var(--opencanvas-fg);
   font: inherit;
+}
+.opencanvas-section-picker-sort {
+  min-width: 120px;
 }
 .opencanvas-section-picker-grid {
   list-style: none;

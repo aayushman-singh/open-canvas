@@ -15,10 +15,11 @@
 // time (see CanvasSection.instanceScope in src/canvas/schema.ts — added
 // in Phase D).
 
-import type { AssetManifestEntry, SectionCategory } from '../../db/schema.js';
+import type { AssetManifestEntry } from '../../db/schema.js';
 import type { CanvasElement, CanvasSection } from '../schema.js';
 
-export type { SectionCategory };
+export type { SectionCategory } from './categories.js';
+import type { SectionCategory } from './categories.js';
 
 export interface SectionLibraryEntry {
   /** Origin-named slug per ADR 0061 dec 5 — e.g. `home-template-hero`, `library-template-testimonial-quote`. */
