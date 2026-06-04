@@ -1709,6 +1709,17 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   cursor: text;
   user-select: text;
 }
+/* Text element wrappers clip overflow by default so a long line typed into
+   a small text box stops at the wrapper's right edge instead of spilling
+   past the declared width/height. The inspector's Overflow control still
+   wins: when it emits inline overflow:visible on the wrapper, the inline
+   declaration outranks this stylesheet rule. During inline edit the
+   wrapper carries data-editing="true" so the caret never gets clipped by
+   the box while the Owner is typing — beginTextEditImpl adds the flag and
+   finish() removes it. */
+.opencanvas-element[data-element-type="text"]:not([data-editing="true"]) {
+  overflow: hidden;
+}
 /* Selection (.selbox in editor.html) — 2px red outline + slight inset so
    it reads as a frame around the element, not a stroke. */
 .opencanvas-element[data-selected="true"] {
