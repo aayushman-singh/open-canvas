@@ -1,8 +1,9 @@
 # ADR 0059 — Site header/footer is the only canonical pinned section; pages opt-in or opt-out
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-04
 **Author:** Aayushman Singh
+**Shipped:** 2e83f12 (schema/validator cutover + drizzle 0014 + replay smoke + fixtures + editor shims), f39fc04 (renderer + anchor validator respect suppress flags), ca23468 (Yjs page-map codec for suppress flags), b419cc4 (section-roles.ts deleted, editor callers cleaned)
 
 ## Context
 
