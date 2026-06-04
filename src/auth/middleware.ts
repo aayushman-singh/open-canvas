@@ -60,6 +60,71 @@ function isNonEmptyString(value: string | undefined): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
+// Module-scope cache for the `clerkUserId → customer` row lookup. Lives in
+// the isolate's memory only; never shared across isolates and never
+// persisted. Cloudflare Workers reuse warm isolates aggressively for the
+// same script binding, so a frequently-used Owner sees near-zero Neon
+// latency for this query after the first hit.
+//
+// `private, max-age=0, must-revalidate` on the dashboard HTML combined with
+// session-pinned routing means the same Owner's requests tend to land on
+// the same warm isolate during a browsing session — exactly where the cache
+// is hottest.
+//
+// Why not Cloudflare KV? KV reads cost ~30-50ms themselves; Postgres
+// indexed lookups on `customer.clerk_user_id` are ~5-15ms. Module-scope
+// memory cache is sub-millisecond. KV only wins for cross-isolate sharing,
+// which we don't need: a cold isolate falls back to Neon on first hit and
+// warms up after one request.
+//
+// Invalidation: writes that change a customer row (display name / plan /
+// email refresh) MUST call `invalidateCustomerCache` for the affected
+// clerkUserId so the next read sees fresh data. The 60s TTL is the
+// staleness bound when invalidation is missed.
+type CachedCustomer = { row: Customer; expiresAt: number };
+const customerCacheTtlMs = 60_000;
+// Bucketed by DATABASE_URL so a smoke that points at a temp Neon branch
+// never picks up a hit from the prod URL's cache and vice versa.
+const customerCache = new Map<string, Map<string, CachedCustomer>>();
+
+function customerCacheBucket(databaseUrl: string): Map<string, CachedCustomer> {
+  let bucket = customerCache.get(databaseUrl);
+  if (bucket === undefined) {
+    bucket = new Map();
+    customerCache.set(databaseUrl, bucket);
+  }
+  return bucket;
+}
+
+function readCachedCustomer(databaseUrl: string, clerkUserId: string): Customer | null {
+  const bucket = customerCache.get(databaseUrl);
+  if (bucket === undefined) return null;
+  const entry = bucket.get(clerkUserId);
+  if (entry === undefined) return null;
+  if (entry.expiresAt < Date.now()) {
+    bucket.delete(clerkUserId);
+    return null;
+  }
+  return entry.row;
+}
+
+function writeCachedCustomer(databaseUrl: string, clerkUserId: string, row: Customer): void {
+  customerCacheBucket(databaseUrl).set(clerkUserId, {
+    row,
+    expiresAt: Date.now() + customerCacheTtlMs,
+  });
+}
+
+/**
+ * Drop the cached customer row for a given Clerk user id. Mutations to the
+ * underlying row (display-name / plan / email-refresh writers) call this so
+ * subsequent reads bypass the stale cache. The bucket parameter accepts the
+ * DATABASE_URL so callers don't have to reach into env structure shape.
+ */
+export function invalidateCustomerCache(databaseUrl: string, clerkUserId: string): void {
+  customerCache.get(databaseUrl)?.delete(clerkUserId);
+}
+
 // Accepted origins, public-host suffix, and the dev-public-origin override
 // all derive from env (`AUTHORIZED_PARTIES`, `APP_DOMAIN`, `DEV_PUBLIC_HOST`)
 // via `src/host-config.ts` per ADR 0013. Local constants used to mirror these
@@ -277,24 +342,38 @@ export function clerkAuth() {
     // path); a passive email rotation in Clerk is not propagated until the
     // next first-sign-up-style cold path or an explicit refresh, which is
     // acceptable for a non-transactional surface.
+    //
+    // Cache layer: module-scope memo of (clerkUserId → Customer) with a 60s
+    // TTL. Warm isolates skip the Neon round trip entirely for any Owner
+    // who's hit this isolate in the last minute — the single biggest TTFB
+    // win on /dashboard and the polling /api/notifications path. Writes
+    // that mutate the customer row must call `invalidateCustomerCache` (see
+    // src/routes/api/profile.ts).
     const database = db(c.env);
-    const existing = await database
-      .select()
-      .from(customer)
-      .where(eq(customer.clerkUserId, auth.userId))
-      .limit(1);
-    let customerRow = existing[0] ?? null;
+    let customerRow: Customer | null = readCachedCustomer(c.env.DATABASE_URL, auth.userId);
     if (customerRow === null) {
-      // First sign-up / unsynced row — fetch the Clerk user once, upsert,
-      // and stash the User on the context so downstream handlers that need
-      // it on the same request don't re-fetch.
-      const user = await clerk.users.getUser(auth.userId);
-      c.set('user', user);
-      customerRow = await upsertCustomerFromClerk(database, user);
+      const existing = await database
+        .select()
+        .from(customer)
+        .where(eq(customer.clerkUserId, auth.userId))
+        .limit(1);
+      customerRow = existing[0] ?? null;
+      if (customerRow === null) {
+        // First sign-up / unsynced row — fetch the Clerk user once, upsert,
+        // and stash the User on the context so downstream handlers that need
+        // it on the same request don't re-fetch.
+        const user = await clerk.users.getUser(auth.userId);
+        c.set('user', user);
+        customerRow = await upsertCustomerFromClerk(database, user);
+      } else {
+        // Fast path: user details aren't needed; routes that actually want the
+        // Clerk User must call `getClerkUser(c)` so the cost is paid per-route
+        // instead of per-request.
+        c.set('user', null);
+      }
+      writeCachedCustomer(c.env.DATABASE_URL, auth.userId, customerRow);
     } else {
-      // Fast path: user details aren't needed; routes that actually want the
-      // Clerk User must call `getClerkUser(c)` so the cost is paid per-route
-      // instead of per-request.
+      // Cache hit — same fast-path semantics as the fresh-SELECT branch.
       c.set('user', null);
     }
     c.set('customer', customerRow);
