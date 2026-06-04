@@ -85,8 +85,15 @@ import { newPageId, newSectionId } from './ids.js';
 
 export function setActivePageImpl(ctx: EditorContext, pageId: string | null): void {
   ctx.activePageId = pageId;
-  ctx.selectedSectionId = null;
-  ctx.selectedElementId = null;
+  // Route clears through the selection helpers so the DOM data-selected
+  // attribute is scrubbed from every artboard's copy of a site-pinned
+  // section. Direct null-assignment leaves stale highlights on header/
+  // footer wrappers in the prior page, which then survive into the next
+  // selectSection/selectElement call (the "remove prev" branch is skipped
+  // because the model already reads null). Order: element first so its
+  // re-entrancy into selectSection is a no-op.
+  ctx.selectElement(null);
+  ctx.selectSection(null);
   ctx.renderInspector();
   ctx.renderReel();
 

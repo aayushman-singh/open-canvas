@@ -14,8 +14,14 @@
 // the next id matches the active selection), inspector re-render order
 // preserved (selectElement re-renders inspector AFTER selectSection
 // mutates selectedSectionId), no silent fallback for missing DOM nodes —
-// the querySelector path simply skips the data-selected toggle when the
-// wrapper isn't live, matching the IIFE twin.
+// the querySelectorAll path simply skips the data-selected toggle when
+// no wrappers are live.
+//
+// Multi-instance DOM: site-pinned sections (header/footer) are repeated
+// per artboard (render.ts:285-295) and share a single section/element id.
+// Both selectSection and selectElement therefore querySelectorAll and
+// loop, so the highlight reflects on every page instead of just the
+// first match in document order.
 //
 // Action-element auto-pin: when the selected element is an `action`, the
 // inner <a.opencanvas-action> anchor gets a pinned link popover so the
@@ -28,10 +34,12 @@ import { cssEscape } from './css-escape.js';
 export function selectElement(ctx: EditorContext, elementId: string | null): void {
   if (ctx.selectedElementId === elementId) return;
   if (ctx.selectedElementId) {
-    const prev = ctx.root?.querySelector(
+    // Site-pinned sections (header/footer) materialise one DOM wrapper per
+    // artboard but share a single element id, so we must scrub every match.
+    const prev = ctx.root?.querySelectorAll(
       '[data-opencanvas-element="' + cssEscape(ctx.selectedElementId) + '"]',
     );
-    if (prev) prev.removeAttribute('data-selected');
+    if (prev) for (let i = 0; i < prev.length; i++) prev[i]!.removeAttribute('data-selected');
   }
   ctx.selectedElementId = elementId;
   ctx.chatSelectionDropped = false;
@@ -41,18 +49,21 @@ export function selectElement(ctx: EditorContext, elementId: string | null): voi
   if (ctx.linkPopoverPinned) ctx.removeLinkPopover();
   if (elementId) {
     if (ctx.isReelOpen) ctx.closeReel();
-    const next = ctx.root?.querySelector(
+    const next = ctx.root?.querySelectorAll(
       '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
     );
-    if (next) next.setAttribute('data-selected', 'true');
+    if (next) for (let i = 0; i < next.length; i++) next[i]!.setAttribute('data-selected', 'true');
     const found = ctx.findElement(elementId);
     if (found) selectSection(ctx, found.section.id);
     // Action elements get an auto-pinned link popover so the Owner can
     // navigate to the linked page (or open the external URL) without
     // hunting for the inspector's href field. The wrapper's inner anchor
-    // is the popover anchor.
-    if (found && found.element && found.element.type === 'action' && next) {
-      const actionAnchor = next.querySelector('a.opencanvas-action');
+    // is the popover anchor. With repeated section instances we still pin
+    // to a single anchor (the popover is single-instance) — the first
+    // match is fine since all instances point at the same href.
+    const firstNext = next && next.length > 0 ? next[0]! : null;
+    if (found && found.element && found.element.type === 'action' && firstNext) {
+      const actionAnchor = firstNext.querySelector('a.opencanvas-action');
       if (actionAnchor) ctx.showLinkPopover(actionAnchor as HTMLElement, { pinned: true });
     }
   }
@@ -63,17 +74,17 @@ export function selectElement(ctx: EditorContext, elementId: string | null): voi
 export function selectSection(ctx: EditorContext, sectionId: string | null): void {
   if (ctx.selectedSectionId === sectionId) return;
   if (ctx.selectedSectionId) {
-    const prev = ctx.root?.querySelector(
+    const prev = ctx.root?.querySelectorAll(
       '[data-opencanvas-section="' + cssEscape(ctx.selectedSectionId) + '"]',
     );
-    if (prev) prev.removeAttribute('data-selected');
+    if (prev) for (let i = 0; i < prev.length; i++) prev[i]!.removeAttribute('data-selected');
   }
   ctx.selectedSectionId = sectionId;
   if (sectionId) {
-    const next = ctx.root?.querySelector(
+    const next = ctx.root?.querySelectorAll(
       '[data-opencanvas-section="' + cssEscape(sectionId) + '"]',
     );
-    if (next) next.setAttribute('data-selected', 'true');
+    if (next) for (let i = 0; i < next.length; i++) next[i]!.setAttribute('data-selected', 'true');
   }
   if (!ctx.selectedElementId) ctx.renderInspector();
   if (ctx.isReelOpen) ctx.renderReel();

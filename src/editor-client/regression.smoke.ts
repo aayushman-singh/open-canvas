@@ -61,6 +61,39 @@ for (const [file, serverNeedle] of flushBeforeServerFiles) {
   );
 }
 
+// Site-pinned sections (header/footer) render one DOM wrapper per
+// artboard but share a single section/element id. selectSection and
+// selectElement must querySelectorAll + loop so the data-selected
+// highlight reflects on every page, not just the first DOM match.
+// Regression: pre-fix code used querySelector singular, leaving Page B's
+// footer un-highlighted and Page A's stale.
+const selection = await source('./selection.ts');
+assert(
+  !/ctx\.root\?\.querySelector\(\s*['"]\[data-opencanvas-(section|element)=/.test(selection),
+  'selection.ts must NOT use singular querySelector for data-opencanvas-section/element — repeated site-pinned wrappers need querySelectorAll',
+);
+assert(
+  (selection.match(/ctx\.root\?\.querySelectorAll\(\s*['"]\[data-opencanvas-(section|element)=/g) || []).length >= 4,
+  'selection.ts must querySelectorAll all four section/element add+remove paths',
+);
+
+// setActivePage clears selection — must route through selectElement/
+// selectSection so the DOM data-selected attribute is scrubbed on every
+// artboard, not just nulled in the model.
+const pageCrud = await source('./page-crud.ts');
+assert(
+  /ctx\.selectElement\(null\)/.test(pageCrud) && /ctx\.selectSection\(null\)/.test(pageCrud),
+  'page-crud setActivePageImpl must clear selection via selectElement(null)+selectSection(null) so DOM data-selected is scrubbed on page switch',
+);
+assert(
+  !/ctx\.selectedSectionId\s*=\s*null/.test(pageCrud),
+  'page-crud must NOT null ctx.selectedSectionId directly — routes around the DOM cleanup',
+);
+assert(
+  !/ctx\.selectedElementId\s*=\s*null/.test(pageCrud),
+  'page-crud must NOT null ctx.selectedElementId directly — routes around the DOM cleanup',
+);
+
 const linkPopover = await source('./link-popover.ts');
 assert(
   linkPopover.includes("window.open(href, '_blank', 'noopener,noreferrer')"),
