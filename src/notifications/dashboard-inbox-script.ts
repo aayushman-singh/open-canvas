@@ -126,6 +126,8 @@ export const notificationsInboxScript = `(function(){
     items.forEach(function(n) {
       var d = describe(n);
       var li = document.createElement('li');
+      li.className = 'notif-item-row' + (n.isRead ? '' : ' is-unread');
+      li.setAttribute('data-id', n.id);
       var a = document.createElement('a');
       a.className = 'notif-item' + (n.isRead ? '' : ' unread');
       a.href = d.href;
@@ -145,6 +147,40 @@ export const notificationsInboxScript = `(function(){
       txt(time, fmtTime(n.createdAt));
       a.appendChild(time);
       li.appendChild(a);
+      // Action cluster — siblings of the <a> so clicks don't bubble through
+      // the row's navigation handler. Whole row stays an <a> for keyboard
+      // nav + middle-click-to-open; the cluster is hidden until row hover
+      // (CSS .notif-item-actions in bell-styles.ts).
+      var actions = document.createElement('div');
+      actions.className = 'notif-item-actions';
+      // Tick — mark just this notif read. Hidden once the row is read so
+      // only unread rows expose it.
+      var tick = document.createElement('button');
+      tick.type = 'button';
+      tick.className = 'notif-item-action notif-item-tick';
+      tick.setAttribute('aria-label', 'Mark as read');
+      tick.setAttribute('data-notif-action', 'mark-read');
+      tick.setAttribute('data-id', n.id);
+      tick.setAttribute('title', 'Mark as read');
+      tick.hidden = n.isRead;
+      // U+2713 CHECK MARK as textContent so we keep the no-innerHTML
+      // contract from the file header. Visually styled in bell-styles.ts.
+      tick.textContent = '✓';
+      actions.appendChild(tick);
+      // Trash — delete this notif on the server + DOM. Always visible on
+      // hover regardless of read state.
+      var trash = document.createElement('button');
+      trash.type = 'button';
+      trash.className = 'notif-item-action notif-item-trash';
+      trash.setAttribute('aria-label', 'Delete notification');
+      trash.setAttribute('data-notif-action', 'delete');
+      trash.setAttribute('data-id', n.id);
+      trash.setAttribute('title', 'Delete notification');
+      // U+2715 MULTIPLICATION X — recognisable as a "remove" glyph and
+      // distinguishable from the tick. Styled red on hover via CSS.
+      trash.textContent = '✕';
+      actions.appendChild(trash);
+      li.appendChild(actions);
       list.appendChild(li);
     });
   }
@@ -284,6 +320,83 @@ export const notificationsInboxScript = `(function(){
   list.addEventListener('click', function(e) {
     var target = e.target;
     if (!(target instanceof Element)) return;
+    // Action buttons (tick / trash) live as siblings of the <a>. Handle
+    // them BEFORE the row-navigation branch so a click on tick/trash never
+    // navigates. e.stopPropagation() on the action also short-circuits the
+    // outside-click → close-panel handler.
+    var actionBtn = target.closest('button.notif-item-action');
+    if (actionBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      var actionId = actionBtn.getAttribute('data-id');
+      if (!actionId) return;
+      var actionKind = actionBtn.getAttribute('data-notif-action');
+      if (actionKind === 'mark-read') {
+        actionBtn.disabled = true;
+        fetch(apiBase + '/notifications/' + encodeURIComponent(actionId) + '/read', {
+          method: 'POST',
+          credentials: 'include',
+        })
+          .then(function(r) {
+            if (r.ok) return r.json();
+            return r.text().then(function(body) {
+              throw new Error('POST mark-read failed: ' + r.status + ' ' + body);
+            });
+          })
+          .then(function() {
+            // Update the DOM optimistically so the row is no longer styled
+            // as unread and the tick disappears immediately; the fetchInbox
+            // re-render below will redo this from the fresh server state.
+            var row = actionBtn.closest('li.notif-item-row');
+            if (row) {
+              row.classList.remove('is-unread');
+              var link = row.querySelector('a.notif-item');
+              if (link) link.classList.remove('unread');
+            }
+            actionBtn.hidden = true;
+            return fetchInbox();
+          })
+          .catch(function(err) {
+            toast('Could not mark notification as read.', 'error');
+            reportFailure('inline mark-read', err);
+          })
+          .then(function() { actionBtn.disabled = false; });
+        return;
+      }
+      if (actionKind === 'delete') {
+        actionBtn.disabled = true;
+        fetch(apiBase + '/notifications/' + encodeURIComponent(actionId), {
+          method: 'DELETE',
+          credentials: 'include',
+        })
+          .then(function(r) {
+            if (r.ok) return r.json();
+            return r.text().then(function(body) {
+              throw new Error('DELETE notification failed: ' + r.status + ' ' + body);
+            });
+          })
+          .then(function() {
+            // Drop the row from the DOM optimistically; fetchInbox will
+            // re-render from the authoritative server state and update the
+            // badge. Also evict from the local cache so we don't resurface
+            // the row on the next render.
+            var row = actionBtn.closest('li.notif-item-row');
+            if (row && row.parentNode) row.parentNode.removeChild(row);
+            if (inboxById[actionId]) {
+              delete inboxById[actionId];
+              inboxItems = inboxItems.filter(function(item) { return item.id !== actionId; });
+            }
+            return fetchInbox();
+          })
+          .catch(function(err) {
+            toast('Could not delete notification.', 'error');
+            reportFailure('inline delete', err);
+          })
+          .then(function() { actionBtn.disabled = false; });
+        return;
+      }
+      return;
+    }
     var a = target.closest('a.notif-item');
     if (!a) return;
     var id = a.getAttribute('data-id');
