@@ -205,6 +205,15 @@ export const textInspectorSpec: InspectorSpec = {
       busyFlag: 'aiBusy',
     },
     { kind: 'select', label: 'Role', path: 'role', options: TEXT_ROLES },
+    // Font family picker — custom-mount because the option list is dynamic
+    // (built from FONT_PRESETS + ctx.customFonts at render time) and can't
+    // be expressed with the static select / select-mapped specs. Lives at
+    // the top of the typography group so the surface reads top-down:
+    // family → size → weight → align. Writes into
+    // pinnedStyle["font-family"] (NOT a structured ElementStyle field) —
+    // BaseElement.pinnedStyle's docblock explicitly names font-family as
+    // a typography-ornament key that lives there.
+    { kind: 'custom-mount', name: 'text-font-family' },
     {
       kind: 'number',
       label: 'Font size',
