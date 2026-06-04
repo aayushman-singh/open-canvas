@@ -16,9 +16,17 @@
 //      same, so the preview must too).
 //   5. Empty string input + empty entry fields produce an empty string.
 //   6. Multi-line text is preserved across substitutions.
+//   7. DOM preview restore handles multiple text nodes under one parent.
+//   8. Preview entry helpers filter drafts and key cache by page+collection.
 
 import {
+  filterPublishedTemplatePreviewEntries,
+  isTemplatePreviewFetchCurrent,
+  shouldRevertTemplatePreviewOnRender,
   substituteTemplatePlaceholderString,
+  substituteTemplatePreviewInDom,
+  templatePreviewCacheKey,
+  revertTemplatePreviewInDom,
   type TemplatePreviewEntry,
 } from './page-inspector.js';
 
@@ -131,6 +139,139 @@ function makeEntry(overrides: Partial<TemplatePreviewEntry> = {}): TemplatePrevi
   assert(
     substituteTemplatePlaceholderString(input, entry) === expected,
     'multi-line layout must survive substitution',
+  );
+}
+
+// 7. DOM preview restore handles multiple sibling text nodes under one parent.
+{
+  class FakeText {
+    nodeType = 3;
+    parentElement: FakeElement | null = null;
+    constructor(public nodeValue: string | null) {}
+  }
+
+  class FakeElement {
+    ownerDocument: FakeDocument;
+    childNodes: Array<FakeText | FakeElement> = [];
+    private attrs = new Map<string, string>();
+
+    constructor(doc: FakeDocument) {
+      this.ownerDocument = doc;
+    }
+
+    appendText(value: string): FakeText {
+      const text = new FakeText(value);
+      text.parentElement = this;
+      this.childNodes.push(text);
+      return text;
+    }
+
+    hasAttribute(name: string): boolean {
+      return this.attrs.has(name);
+    }
+
+    setAttribute(name: string, value: string): void {
+      this.attrs.set(name, value);
+    }
+
+    getAttribute(name: string): string | null {
+      return this.attrs.get(name) ?? null;
+    }
+
+    removeAttribute(name: string): void {
+      this.attrs.delete(name);
+    }
+
+    querySelectorAll(selector: string): FakeElement[] {
+      assert(
+        selector === '[data-opencanvas-placeholder-original]',
+        'fake DOM only supports placeholder-original query',
+      );
+      const out: FakeElement[] = [];
+      const visit = (node: FakeText | FakeElement): void => {
+        if (node instanceof FakeElement) {
+          if (node.hasAttribute('data-opencanvas-placeholder-original')) out.push(node);
+          for (const child of node.childNodes) visit(child);
+        }
+      };
+      visit(this);
+      return out;
+    }
+  }
+
+  class FakeDocument {
+    createTreeWalker(scope: FakeElement): { nextNode(): FakeText | null } {
+      const textNodes: FakeText[] = [];
+      const visit = (node: FakeText | FakeElement): void => {
+        if (node instanceof FakeText) {
+          textNodes.push(node);
+          return;
+        }
+        for (const child of node.childNodes) visit(child);
+      };
+      visit(scope);
+      let idx = 0;
+      return {
+        nextNode(): FakeText | null {
+          const next = textNodes[idx] ?? null;
+          idx += 1;
+          return next;
+        },
+      };
+    }
+  }
+
+  const doc = new FakeDocument();
+  const root = new FakeElement(doc);
+  const parent = new FakeElement(doc);
+  root.childNodes.push(parent);
+  parent.appendText('{{title}}');
+  parent.appendText(' by {{author}}');
+
+  const entry = makeEntry({ title: 'Preview title', author: 'Preview author' });
+  substituteTemplatePreviewInDom(root as unknown as Element, entry);
+  assert(
+    (parent.childNodes[0] as FakeText).nodeValue === 'Preview title' &&
+      (parent.childNodes[1] as FakeText).nodeValue === ' by Preview author',
+    'DOM preview must substitute every matching text node',
+  );
+  revertTemplatePreviewInDom(root as unknown as Element);
+  assert(
+    (parent.childNodes[0] as FakeText).nodeValue === '{{title}}' &&
+      (parent.childNodes[1] as FakeText).nodeValue === ' by {{author}}',
+    'DOM preview revert must restore every substituted text node',
+  );
+}
+
+// 8. Preview helpers keep publish parity and avoid cache leakage.
+{
+  const published = makeEntry({ id: 'published', status: 'published' });
+  const draft = { ...makeEntry({ id: 'draft' }), status: 'draft' };
+  const missingStatus = makeEntry({ id: 'missing-status' });
+  const filtered = filterPublishedTemplatePreviewEntries([published, draft, missingStatus]);
+  assert(
+    filtered.length === 1 && filtered[0]!.id === 'published',
+    'preview entries must exclude drafts',
+  );
+
+  assert(
+    templatePreviewCacheKey('page-1', 'blog') !== templatePreviewCacheKey('page-1', 'notes'),
+    'preview cache key must include collectionSlug',
+  );
+  assert(
+    isTemplatePreviewFetchCurrent({ id: 'page-1', collectionSlug: 'blog' }, 'page-1', 'blog'),
+    'fetch result must be current when page and collection match',
+  );
+  assert(
+    !isTemplatePreviewFetchCurrent({ id: 'page-1', collectionSlug: 'notes' }, 'page-1', 'blog'),
+    'fetch result must be stale when collection changed on the same page',
+  );
+  assert(
+    shouldRevertTemplatePreviewOnRender('page-1', {
+      id: 'page-1',
+      pageKind: 'collection-item-template',
+    }),
+    'active preview must revert before same-page inspector re-render',
   );
 }
 

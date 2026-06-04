@@ -24,9 +24,9 @@
 //     only `status: 'published'` rows should be passed in by the caller
 //     (see ADR 0060 §3 — "Draft entries are excluded").
 //   * Entry → page binding rule: an entry matches a page when
-//       entry.category === page.collectionSlug
-//     (modulo a `CollectionElement.filter.category` override on index pages,
-//     which takes precedence if the element pins a different category).
+//       entry.collectionSlug === page.collectionSlug
+//     (`CollectionElement.filter.category` can further narrow index entries
+//     inside that collection).
 //   * Index-page entries are also filtered by `element.filter.tags` (entry
 //     must include every listed tag) and capped by `element.filter.limit`.
 //   * Default sort on index pages is `publishedDate desc` when no
@@ -41,13 +41,17 @@ import type {
   CanvasPage,
   CanvasSection,
   EditableSite,
+  InlineRun,
+  MediaElement,
+  TextElement,
 } from '../schema.js';
-import type { CollectionElement } from './collection.js';
+import type { CollectionElement, PageMetadataField } from './collection.js';
 
 /** Row shape consumed by the materializer. Mirrors the published projection of
  *  the `collection_entry` table (ADR 0060 §1). The caller is responsible for
  *  excluding `status: 'draft'` rows before passing in this array. */
 export interface MaterializerEntry {
+  collectionSlug: string;
   slug: string;
   title: string;
   excerpt: string;
@@ -103,6 +107,25 @@ function placeholderValue(entry: MaterializerEntry, field: PlaceholderField): st
   }
 }
 
+function metadataFieldValue(entry: MaterializerEntry, field: PageMetadataField): string {
+  switch (field) {
+    case 'title':
+      return entry.title;
+    case 'description':
+      return entry.excerpt;
+    case 'ogImage':
+      return entry.ogImageAssetId ?? '';
+    case 'publishedDate':
+      return entry.publishedDate;
+    case 'author':
+      return entry.author;
+    case 'tags':
+      return entry.tags.join(', ');
+    case 'category':
+      return entry.category;
+  }
+}
+
 /** Replace every `{{field}}` token in a single string with its entry value.
  *  Unknown tokens are left intact so unrelated mustache-shaped text (rare,
  *  but possible in user-authored copy) survives. */
@@ -132,9 +155,7 @@ function substituteInValue<T>(value: T, entry: MaterializerEntry): T {
     return substituteString(value, entry) as T;
   }
   if (Array.isArray(value)) {
-    const mapped: unknown[] = value.map((item: unknown): unknown =>
-      substituteInValue(item, entry),
-    );
+    const mapped: unknown[] = value.map((item: unknown): unknown => substituteInValue(item, entry));
     return mapped as T;
   }
   if (value !== null && typeof value === 'object') {
@@ -184,16 +205,13 @@ function filterEntriesForElement(
   pageCollectionSlug: string,
   entries: MaterializerEntry[],
 ): MaterializerEntry[] {
-  // Element filter pins a category override; otherwise bind by the index
-  // page's `collectionSlug`. The filter takes precedence so a single index
-  // page can host multiple per-category strips (e.g. "blog" page with a
-  // "design" strip and a "engineering" strip).
-  const category = element.filter?.category ?? pageCollectionSlug;
+  const category = element.filter?.category;
   const requiredTags = element.filter?.tags ?? [];
   const limit = element.filter?.limit;
 
   const matched = entries.filter((entry) => {
-    if (entry.category !== category) return false;
+    if (entry.collectionSlug !== pageCollectionSlug) return false;
+    if (category !== undefined && entry.category !== category) return false;
     if (requiredTags.length > 0) {
       for (const tag of requiredTags) {
         if (!entry.tags.includes(tag)) return false;
@@ -210,10 +228,7 @@ function filterEntriesForElement(
  *  Returns each element in a flat order so the index-page pass can find every
  *  `CollectionElement` regardless of nesting depth (collections inside tabs,
  *  collections inside collections via `entryTemplate`, etc.). */
-function walkElements(
-  elements: CanvasElement[],
-  visit: (el: CanvasElement) => void,
-): void {
+function walkElements(elements: CanvasElement[], visit: (el: CanvasElement) => void): void {
   for (const el of elements) {
     visit(el);
     if (el.type === 'tabs') {
@@ -235,22 +250,65 @@ function walkElements(
   }
 }
 
-/** Substitute placeholders for an entry across every string in a list of
+function replaceTextElementContent(element: TextElement, value: string): void {
+  const first = element.content[0];
+  const next: InlineRun = { text: value };
+  if (first?.marks !== undefined) {
+    next.marks = deepClone(first.marks);
+  }
+  element.content = [next];
+}
+
+function replaceMediaElementAsset(element: MediaElement, entry: MaterializerEntry): void {
+  if (entry.ogImageAssetId === null || entry.ogImageAssetId.length === 0) {
+    throw new Error(
+      `collection materializer: media field binding for entry ${JSON.stringify(entry.slug)} requires ogImageAssetId`,
+    );
+  }
+  element.assetId = entry.ogImageAssetId;
+  element.alt = entry.title;
+}
+
+function applyFieldBindings(
+  elements: CanvasElement[],
+  fieldBindings: CollectionElement['fieldBindings'],
+  entry: MaterializerEntry,
+): void {
+  if (fieldBindings === undefined) return;
+  walkElements(elements, (el) => {
+    const field = fieldBindings[el.id];
+    if (field === undefined) return;
+    if (el.type === 'text') {
+      replaceTextElementContent(el, metadataFieldValue(entry, field));
+      return;
+    }
+    if (el.type === 'media') {
+      if (field !== 'ogImage') {
+        throw new Error(
+          `collection materializer: media element ${JSON.stringify(el.id)} is bound to non-media field ${JSON.stringify(field)}`,
+        );
+      }
+      replaceMediaElementAsset(el, entry);
+    }
+  });
+}
+
+/** Substitute placeholders and field bindings for an entry across a list of
  *  cloned cardTemplate elements. The clone has already been deep-cloned by
- *  the caller, so the substitution can mutate in place. */
+ *  the caller, so binding can mutate in place. */
 function substituteCardTemplate(
   cardTemplate: CanvasElement[],
+  fieldBindings: CollectionElement['fieldBindings'],
   entry: MaterializerEntry,
 ): CanvasElement[] {
-  return substituteInValue(cardTemplate, entry);
+  const substituted = substituteInValue(cardTemplate, entry);
+  applyFieldBindings(substituted, fieldBindings, entry);
+  return substituted;
 }
 
 /** Hydrate every page-bound CollectionElement under an index page. Mutates
  *  the (already-cloned) page in place. */
-function hydrateIndexPage(
-  page: CanvasPage,
-  entries: MaterializerEntry[],
-): void {
+function hydrateIndexPage(page: CanvasPage, entries: MaterializerEntry[]): void {
   const pageCollectionSlug = page.collectionSlug;
   if (pageCollectionSlug === undefined) return;
   for (const section of page.sections) {
@@ -279,17 +337,14 @@ function hydrateIndexSection(
     const matched = filterEntriesForElement(collEl, pageCollectionSlug, entries);
     collEl.entries = matched.map((entry) => {
       const cloned = deepClone(collEl.cardTemplate ?? []);
-      return substituteCardTemplate(cloned, entry);
+      return substituteCardTemplate(cloned, collEl.fieldBindings, entry);
     });
   });
 }
 
 /** Build one concrete page from a template page + an entry. Strips
  *  `pageKind`/`collectionSlug` so the output is an ordinary canvas page. */
-function clonePageForEntry(
-  template: CanvasPage,
-  entry: MaterializerEntry,
-): CanvasPage {
+function clonePageForEntry(template: CanvasPage, entry: MaterializerEntry): CanvasPage {
   // Deep-clone the template first so substituteInValue can walk every string.
   const cloned = deepClone(template);
   // Substitute placeholders across the section/element subtree only — page
@@ -345,7 +400,7 @@ export function materializeCollections(
         continue;
       }
       const matched = sortEntries(
-        entries.filter((entry) => entry.category === collectionSlug),
+        entries.filter((entry) => entry.collectionSlug === collectionSlug),
         undefined,
       );
       for (const entry of matched) {

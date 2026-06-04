@@ -38,11 +38,7 @@ import type {
   MotionPreset,
   ScrollTriggerMode,
 } from '../canvas/schema.js';
-import {
-  COLLECTION_PAGE_KINDS,
-  MOTION_PRESETS,
-  SCROLL_TRIGGER_MODES,
-} from '../canvas/schema.js';
+import { COLLECTION_PAGE_KINDS, MOTION_PRESETS, SCROLL_TRIGGER_MODES } from '../canvas/schema.js';
 import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 import { cssEscape } from './css-escape.js';
@@ -61,7 +57,10 @@ export interface TemplatePreviewEntry {
   author: string;
   category: string;
   tags: string[];
+  status?: string;
 }
+
+const PLACEHOLDER_ORIGINAL_ATTR = 'data-opencanvas-placeholder-original';
 
 const TEMPLATE_PREVIEW_FIELDS: ReadonlyArray<
   'title' | 'excerpt' | 'body' | 'publishedDate' | 'author' | 'category' | 'tag' | 'slug'
@@ -110,6 +109,83 @@ export function substituteTemplatePlaceholderString(
   return out;
 }
 
+export function templatePreviewCacheKey(pageId: string, collectionSlug: string): string {
+  return pageId + '::' + collectionSlug;
+}
+
+export function filterPublishedTemplatePreviewEntries(
+  entries: TemplatePreviewEntry[],
+): TemplatePreviewEntry[] {
+  return entries.filter((entry) => entry.status === 'published');
+}
+
+export function isTemplatePreviewFetchCurrent(
+  page: Pick<CanvasPage, 'id' | 'collectionSlug'> | null,
+  fetchPageId: string,
+  fetchCollectionSlug: string,
+): boolean {
+  return page !== null && page.id === fetchPageId && page.collectionSlug === fetchCollectionSlug;
+}
+
+export function shouldRevertTemplatePreviewOnRender(
+  activePageId: string | null,
+  _page: Pick<CanvasPage, 'id' | 'pageKind'>,
+): boolean {
+  return activePageId !== null;
+}
+
+function directTextNodeValues(element: Element): string[] {
+  const values: string[] = [];
+  for (let i = 0; i < element.childNodes.length; i++) {
+    const child = element.childNodes[i]!;
+    if (child.nodeType === /* Node.TEXT_NODE */ 3) {
+      values.push(child.nodeValue ?? '');
+    }
+  }
+  return values;
+}
+
+function snapshotDirectTextNodes(element: Element): string {
+  return JSON.stringify({ textNodes: directTextNodeValues(element) });
+}
+
+function parseTextNodeSnapshot(value: string): string[] | null {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (parsed === null || typeof parsed !== 'object') return null;
+    const textNodes = (parsed as { textNodes?: unknown }).textNodes;
+    if (!Array.isArray(textNodes)) return null;
+    if (!textNodes.every((node) => typeof node === 'string')) return null;
+    return textNodes;
+  } catch {
+    return null;
+  }
+}
+
+function restoreDirectTextNodes(element: HTMLElement, original: string): void {
+  const snapshot = parseTextNodeSnapshot(original);
+  if (snapshot !== null) {
+    let textIdx = 0;
+    for (let i = 0; i < element.childNodes.length; i++) {
+      const child = element.childNodes[i]!;
+      if (child.nodeType !== /* Node.TEXT_NODE */ 3) continue;
+      const next = snapshot[textIdx];
+      if (next !== undefined) {
+        child.nodeValue = next;
+      }
+      textIdx++;
+    }
+    return;
+  }
+  for (let j = 0; j < element.childNodes.length; j++) {
+    const child = element.childNodes[j]!;
+    if (child.nodeType === /* Node.TEXT_NODE */ 3) {
+      child.nodeValue = original;
+      break;
+    }
+  }
+}
+
 /** Walk every text-bearing node under `scope` and substitute `{{field}}`
  *  placeholders for the entry's values. Each touched node stashes its
  *  pre-substitution text under `data-opencanvas-placeholder-original` on the
@@ -136,8 +212,8 @@ export function substituteTemplatePreviewInDom(scope: Element, entry: TemplatePr
     if (replaced === original) continue;
     // Stash original on the parent element (text nodes don't carry attributes).
     const parent = textNode.parentElement;
-    if (parent !== null && !parent.hasAttribute('data-opencanvas-placeholder-original')) {
-      parent.setAttribute('data-opencanvas-placeholder-original', original);
+    if (parent !== null && !parent.hasAttribute(PLACEHOLDER_ORIGINAL_ATTR)) {
+      parent.setAttribute(PLACEHOLDER_ORIGINAL_ATTR, snapshotDirectTextNodes(parent));
     }
     textNode.nodeValue = replaced;
   }
@@ -147,25 +223,13 @@ export function substituteTemplatePreviewInDom(scope: Element, entry: TemplatePr
  *  `scope` back to its pre-preview text. Pairs with
  *  `substituteTemplatePreviewInDom`. */
 export function revertTemplatePreviewInDom(scope: Element): void {
-  const dirty = scope.querySelectorAll('[data-opencanvas-placeholder-original]');
+  const dirty = scope.querySelectorAll('[' + PLACEHOLDER_ORIGINAL_ATTR + ']');
   for (let i = 0; i < dirty.length; i++) {
     const el = dirty[i] as HTMLElement;
-    const original = el.getAttribute('data-opencanvas-placeholder-original');
+    const original = el.getAttribute(PLACEHOLDER_ORIGINAL_ATTR);
     if (original === null) continue;
-    // Find the text node descendant that carries the substituted text. The
-    // substitution above replaced a single text node value, so the parent
-    // should have exactly one text child that needs restoring. We restore by
-    // resetting textContent — that collapses any whitespace siblings, which
-    // matches the original since the walker only touched text nodes.
-    // Walk children: find the first text node and restore.
-    for (let j = 0; j < el.childNodes.length; j++) {
-      const child = el.childNodes[j]!;
-      if (child.nodeType === /* Node.TEXT_NODE */ 3) {
-        child.nodeValue = original;
-        break;
-      }
-    }
-    el.removeAttribute('data-opencanvas-placeholder-original');
+    restoreDirectTextNodes(el, original);
+    el.removeAttribute(PLACEHOLDER_ORIGINAL_ATTR);
   }
 }
 
@@ -173,9 +237,8 @@ export function revertTemplatePreviewInDom(scope: Element): void {
 // an active preview, so a page switch (or a render that clears pageKind) can
 // revert in-place before the new inspector takes over.
 let activePreviewPageId: string | null = null;
-// Cache of entries by page id, so we don't refetch on every re-render of the
-// same page inspector (e.g. when a different field is edited). Cleared per
-// page id when the inspector mounts a fresh page.
+// Cache of published preview entries by page id + collection slug so changing
+// a template from one collection to another cannot reuse the old options.
 const entriesCache = new Map<string, TemplatePreviewEntry[]>();
 
 export function replayAnimations(ctx: EditorContext, scope: string): void {
@@ -210,7 +273,8 @@ export function replayAnimations(ctx: EditorContext, scope: string): void {
   }
   for (let i = 0; i < targets.length; i++) {
     const t = targets[i] as HTMLElement;
-    const preset = t.getAttribute('data-motion-preset') || t.getAttribute('data-entrance-animation');
+    const preset =
+      t.getAttribute('data-motion-preset') || t.getAttribute('data-entrance-animation');
     if (!preset || preset === 'none') continue;
     t.removeAttribute('data-motion-preset');
     // Force layout so the browser restarts the CSS animation. Reading
@@ -242,6 +306,7 @@ export function renderPageInspector(ctx: EditorContext): void {
   if (!ctx.inspector) return;
   const pageLookup = ctx.currentPage();
   if (!pageLookup) {
+    revertActivePreview(ctx);
     ctx.inspector.hidden = true;
     ctx.inspector.replaceChildren();
     ctx.inspectorRenderSubject = null;
@@ -250,14 +315,10 @@ export function renderPageInspector(ctx: EditorContext): void {
   // Local non-null alias so callback closures keep the narrowed type
   // without re-asserting on every read.
   const page = pageLookup;
-  // ADR 0060 Pass 2 — drop any active template preview when the inspector
-  // re-mounts for a different page OR when the current page is no longer
-  // marked as a template/index. The preview is a visual overlay on the
-  // artboard DOM; leaving it stale would mean the Owner sees substituted
-  // text on a page that no longer claims to be a template.
-  if (activePreviewPageId !== null && activePreviewPageId !== page.id) {
-    revertActivePreview(ctx);
-  } else if (activePreviewPageId === page.id && page.pageKind === undefined) {
+  // ADR 0060 Pass 2 — preview is a visual overlay on the artboard DOM. Any
+  // inspector re-render rebuilds the controls from state, so clear the overlay
+  // first instead of letting the artboard and dropdown drift apart.
+  if (shouldRevertTemplatePreviewOnRender(activePreviewPageId, page)) {
     revertActivePreview(ctx);
   }
   ctx.preserveInspectorScrollFor('page:' + page.id);
@@ -765,6 +826,7 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   if (page.pageKind === undefined) return;
 
   const collectionSlug = page.collectionSlug ?? '';
+  const cacheKey = templatePreviewCacheKey(page.id, collectionSlug);
 
   // B1. Badge + entry counts + Manage entries link ------------------------
   const groupBadge = document.createElement('div');
@@ -800,8 +862,7 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   groupChips.appendChild(hChips);
 
   const chipRow = document.createElement('div');
-  chipRow.style.cssText =
-    'display:flex; flex-wrap:wrap; gap:6px; align-items:center;';
+  chipRow.style.cssText = 'display:flex; flex-wrap:wrap; gap:6px; align-items:center;';
   const PLACEHOLDER_TOKENS: ReadonlyArray<string> = [
     '{{title}}',
     '{{excerpt}}',
@@ -862,7 +923,7 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
     // raw placeholders rather than substituting on already-substituted text.
     revertActivePreview(ctx);
     if (next.length === 0) return;
-    const cached = entriesCache.get(page.id);
+    const cached = entriesCache.get(cacheKey);
     if (cached === undefined) return;
     const entry = cached.find(function (e) {
       return e.id === next;
@@ -878,6 +939,7 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   // Fire the fetch — auth-gated via cookie. The currentPageId capture lets the
   // resolver ignore a response that arrives after the user navigated away.
   const fetchPageId = page.id;
+  const fetchCollectionSlug = collectionSlug;
   const url =
     '/__api/sites/' +
     encodeURIComponent(ctx.siteId) +
@@ -886,9 +948,7 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   void fetch(url, { credentials: 'include' })
     .then(function (res) {
       if (!res.ok) {
-        throw new Error(
-          'GET ' + url + ' returned ' + String(res.status) + ' ' + res.statusText,
-        );
+        throw new Error('GET ' + url + ' returned ' + String(res.status) + ' ' + res.statusText);
       }
       return res.json() as Promise<{ entries: TemplatePreviewEntry[] }>;
     })
@@ -896,23 +956,22 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
       // Stale guard — if the page changed while the fetch was in flight, drop
       // the result rather than mutating an inspector for a different page.
       const stillCurrent = ctx.currentPage();
-      if (stillCurrent === null || stillCurrent.id !== fetchPageId) return;
+      if (!isTemplatePreviewFetchCurrent(stillCurrent, fetchPageId, fetchCollectionSlug)) return;
       const entries = Array.isArray(body.entries) ? body.entries : [];
-      entriesCache.set(fetchPageId, entries);
+      const publishedEntries = filterPublishedTemplatePreviewEntries(entries);
+      entriesCache.set(cacheKey, publishedEntries);
       let published = 0;
       let drafts = 0;
       for (const entry of entries) {
-        const status = (entry as { status?: string }).status;
-        if (status === 'published') published++;
-        else if (status === 'draft') drafts++;
+        if (entry.status === 'published') published++;
+        else if (entry.status === 'draft') drafts++;
       }
-      countsLine.textContent =
-        String(published) + ' published · ' + String(drafts) + ' drafts';
+      countsLine.textContent = String(published) + ' published · ' + String(drafts) + ' drafts';
       // Repopulate the preview dropdown. Clear all but the placeholder opt.
       while (previewSelect.children.length > 1) {
         previewSelect.removeChild(previewSelect.children[previewSelect.children.length - 1]!);
       }
-      for (const entry of entries) {
+      for (const entry of publishedEntries) {
         if (entry.id === undefined) continue;
         const opt = document.createElement('option');
         opt.value = entry.id;
@@ -922,13 +981,18 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
     })
     .catch(function (err: unknown) {
       const stillCurrent = ctx.currentPage();
-      if (stillCurrent === null || stillCurrent.id !== fetchPageId) return;
+      if (!isTemplatePreviewFetchCurrent(stillCurrent, fetchPageId, fetchCollectionSlug)) return;
       // ADR-aligned loud-failure path: surface the breakage and log details.
       // The inspector keeps rendering — only the count line and preview list
       // remain in their loading state, which is the smallest visible change.
       countsLine.textContent = '(failed to load)';
-       
-      console.error('[page-inspector] failed to load entries for', fetchPageId, err);
+
+      console.error(
+        '[page-inspector] failed to load entries for',
+        fetchPageId,
+        fetchCollectionSlug,
+        err,
+      );
     });
 }
 
@@ -962,7 +1026,7 @@ function insertOrCopyPlaceholder(ctx: EditorContext, token: string): void {
       })
       .catch(function (err: unknown) {
         ctx.setStatus('Could not copy ' + token, 'error');
-         
+
         console.error('[page-inspector] clipboard write failed for', token, err);
       });
     return;

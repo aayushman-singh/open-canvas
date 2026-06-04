@@ -119,10 +119,7 @@ async function emitPublishNotif(params: {
       .select({ customerId: siteCollaborator.customerId })
       .from(siteCollaborator)
       .where(
-        and(
-          eq(siteCollaborator.siteId, params.siteId),
-          isNotNull(siteCollaborator.acceptedAt),
-        ),
+        and(eq(siteCollaborator.siteId, params.siteId), isNotNull(siteCollaborator.acceptedAt)),
       );
     const recipientIds = Array.from(
       new Set<string>([params.actorCustomerId, ...collabRows.map((r) => r.customerId)]),
@@ -428,8 +425,7 @@ publishApi.post('/sites/:siteId', async (c) => {
   if (!customerId) {
     return attachTimings(c.json({ error: 'site not found' }, 404));
   }
-  const actorDisplayName =
-    customerRow[0]?.displayName ?? customerRow[0]?.email ?? 'A teammate';
+  const actorDisplayName = customerRow[0]?.displayName ?? customerRow[0]?.email ?? 'A teammate';
 
   timeline.begin('db.siteSelect');
   const siteRow = await database
@@ -557,6 +553,7 @@ publishApi.post('/sites/:siteId', async (c) => {
     .from(collectionEntry)
     .where(and(eq(collectionEntry.siteId, row.id), eq(collectionEntry.status, 'published')));
   const materializerEntries: MaterializerEntry[] = publishedEntryRows.map((entry) => ({
+    collectionSlug: entry.collectionSlug,
     slug: entry.slug,
     title: entry.title,
     excerpt: entry.excerpt,

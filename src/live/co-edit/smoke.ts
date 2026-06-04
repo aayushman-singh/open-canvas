@@ -39,16 +39,8 @@ import {
   encodeBytesField,
 } from '../site-room-protocol.js';
 
-import {
-  type Awareness,
-  applyAwareness,
-  createAwareness,
-  encodeAwareness,
-} from './awareness.js';
-import {
-  type WebSocketLike,
-  connectCoEdit,
-} from './client.js';
+import { type Awareness, applyAwareness, createAwareness, encodeAwareness } from './awareness.js';
+import { type WebSocketLike, connectCoEdit } from './client.js';
 import { CO_EDIT_BUNDLE } from './bundled.js';
 import {
   Y_SYNC_REMOTE_ORIGIN,
@@ -86,6 +78,10 @@ assert(
     CO_EDIT_BUNDLE.includes('iconKind') &&
     CO_EDIT_BUNDLE.includes('linkHref'),
   'browser bundle preserves action expressiveness fields through Yjs projection',
+);
+assert(
+  CO_EDIT_BUNDLE.includes('pageKind') && CO_EDIT_BUNDLE.includes('collectionSlug'),
+  'browser bundle preserves ADR 0060 collection page metadata through Yjs projection',
 );
 assert(
   !CO_EDIT_BUNDLE.includes('darkModeEnabled'),
@@ -217,15 +213,7 @@ class StubSiteRoom {
 
     this.awareness.on(
       'update',
-      ({
-        added,
-        updated,
-        removed,
-      }: {
-        added: number[];
-        updated: number[];
-        removed: number[];
-      }) => {
+      ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }) => {
         const changed = added.concat(updated).concat(removed);
         const update = encodeAwareness(this.awareness, changed);
         const envelope: AwarenessUpdateEnvelope = {
@@ -458,16 +446,24 @@ const nextStateAfterA: EditableSite = {
 
 connA.applyLocalState(nextStateAfterA);
 
-await waitFor(() => {
-  const projected = decodeYDoc(connB.doc);
-  return projected.pages[0]?.sections[0]?.elements.length === 1;
-}, 500, 'B receives A insert within 500ms');
+await waitFor(
+  () => {
+    const projected = decodeYDoc(connB.doc);
+    return projected.pages[0]?.sections[0]?.elements.length === 1;
+  },
+  500,
+  'B receives A insert within 500ms',
+);
 
 const elapsedMs = Date.now() - insertedAt;
 assert(elapsedMs < 500, `B received insert in ${String(elapsedMs)}ms (<500ms)`);
 
 // 2. Project both docs and assert deep-equal.
-assertDeepEqual(decodeYDoc(connA.doc), decodeYDoc(connB.doc), 'A and B projections match after insert');
+assertDeepEqual(
+  decodeYDoc(connA.doc),
+  decodeYDoc(connB.doc),
+  'A and B projections match after insert',
+);
 
 // ----------------------------------------------------------------------------
 // 3. Client B disconnects; A keeps editing; autosave fires; persisted state

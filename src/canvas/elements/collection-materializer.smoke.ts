@@ -14,6 +14,8 @@
 //   6. Default sort is `publishedDate desc` when `element.sort` is unset.
 //   7. The input EditableSite is not mutated (purity contract).
 //   8. Template-page clone ids are deterministic across replays.
+//   9. Collection membership binds to collectionSlug, not category.
+//  10. fieldBindings can populate text cards even without literal placeholders.
 
 import type {
   CanvasElement,
@@ -23,10 +25,7 @@ import type {
   TextElement,
 } from '../schema.js';
 import type { CollectionElement } from './collection.js';
-import {
-  materializeCollections,
-  type MaterializerEntry,
-} from './collection-materializer.js';
+import { materializeCollections, type MaterializerEntry } from './collection-materializer.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[collection-materializer:smoke] ${message}`);
@@ -124,6 +123,7 @@ function makeSite(pages: CanvasPage[]): EditableSite {
 
 function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): MaterializerEntry {
   return {
+    collectionSlug: 'blog',
     title: 'Post title',
     excerpt: 'Post excerpt',
     body: 'Post body',
@@ -163,7 +163,10 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   const indexPage = out.pages[0]!;
   assert(indexPage.id === 'page-blog', '(1) index page preserved at slot 0');
   const collEl = indexPage.sections[0]!.elements[0]! as CollectionElement;
-  assert(collEl.entries.length === 2, `(1) expected 2 entries, got ${String(collEl.entries.length)}`);
+  assert(
+    collEl.entries.length === 2,
+    `(1) expected 2 entries, got ${String(collEl.entries.length)}`,
+  );
 
   // Default sort is publishedDate desc → Second post (May 15) before First (May 1).
   const firstEntryTitleText = (collEl.entries[0]![0]! as TextElement).content[0]!.text;
@@ -239,7 +242,10 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   const out = materializeCollections(site, []);
 
   // Index page survives with empty entries[]; template drops; ordinary stays.
-  assert(out.pages.length === 2, `(3) template drops when no entries (got ${String(out.pages.length)})`);
+  assert(
+    out.pages.length === 2,
+    `(3) template drops when no entries (got ${String(out.pages.length)})`,
+  );
   assert(out.pages[0]!.id === 'page-blog', '(3) index page retained');
   assert(out.pages[1]!.id === 'page-about', '(3) ordinary page retained');
   const indexCollEl = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
@@ -276,11 +282,12 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   ];
   const out = materializeCollections(makeSite([index]), entries);
   const hydrated = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
-  assert(hydrated.entries.length === 2, `(5) only entries with all tags match (got ${String(hydrated.entries.length)})`);
+  assert(
+    hydrated.entries.length === 2,
+    `(5) only entries with all tags match (got ${String(hydrated.entries.length)})`,
+  );
 
-  const matchedTitles = hydrated.entries
-    .map((e) => (e[0]! as TextElement).content[0]!.text)
-    .sort();
+  const matchedTitles = hydrated.entries.map((e) => (e[0]! as TextElement).content[0]!.text).sort();
   assert(
     matchedTitles[0] === 'A' && matchedTitles[1] === 'D',
     `(5) matched A and D, got ${JSON.stringify(matchedTitles)}`,
@@ -302,7 +309,10 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   ];
   const out = materializeCollections(makeSite([index]), entries);
   const hydrated = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
-  assert(hydrated.entries.length === 2, `(6) limit caps to 2 (got ${String(hydrated.entries.length)})`);
+  assert(
+    hydrated.entries.length === 2,
+    `(6) limit caps to 2 (got ${String(hydrated.entries.length)})`,
+  );
   const first = (hydrated.entries[0]![0]! as TextElement).content[0]!.text;
   const second = (hydrated.entries[1]![0]! as TextElement).content[0]!.text;
   assert(first === 'Newest', `(6) newest first (got ${first})`);
@@ -338,6 +348,75 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   assert(
     JSON.stringify(a) === JSON.stringify(b),
     '(8) two runs on the same input produce byte-equal output',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (9) Collection membership binds to collectionSlug, not category
+// ---------------------------------------------------------------------------
+
+{
+  const entries: MaterializerEntry[] = [
+    makeEntry({
+      slug: 'engineering-note',
+      title: 'Engineering note',
+      collectionSlug: 'blog',
+      category: 'engineering',
+    }),
+    makeEntry({
+      slug: 'case-study',
+      title: 'Case study',
+      collectionSlug: 'work',
+      category: 'blog',
+    }),
+  ];
+  const out = materializeCollections(makeSite([makeIndexPage(), makeTemplatePage()]), entries);
+  const index = out.pages[0]!;
+  const hydrated = index.sections[0]!.elements[0]! as CollectionElement;
+  assert(
+    hydrated.entries.length === 1,
+    `(9) index page must include only blog collection entries, got ${String(hydrated.entries.length)}`,
+  );
+  assert(
+    (hydrated.entries[0]![0]! as TextElement).content[0]!.text === 'Engineering note',
+    '(9) index page must include blog entry even when category differs',
+  );
+  assert(
+    out.pages.some((page) => page.slug === 'blog/engineering-note'),
+    '(9) template page must clone blog collection entry even when category differs',
+  );
+  assert(
+    !out.pages.some((page) => page.slug === 'blog/case-study'),
+    '(9) template page must not clone entries from another collection even when category matches',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (10) fieldBindings populate text cards without literal placeholders
+// ---------------------------------------------------------------------------
+
+{
+  const index = makeIndexPage();
+  const collEl = index.sections[0]!.elements[0]! as CollectionElement;
+  collEl.cardTemplate = [
+    makeText('bound-title', 'Static title'),
+    makeText('bound-description', 'Static description'),
+  ];
+  collEl.fieldBindings = {
+    'bound-title': 'title',
+    'bound-description': 'description',
+  };
+  const out = materializeCollections(makeSite([index]), [
+    makeEntry({ slug: 'bound', title: 'Bound title', excerpt: 'Bound excerpt' }),
+  ]);
+  const hydrated = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
+  assert(
+    (hydrated.entries[0]![0]! as TextElement).content[0]!.text === 'Bound title',
+    '(10) fieldBindings title must replace text content',
+  );
+  assert(
+    (hydrated.entries[0]![1]! as TextElement).content[0]!.text === 'Bound excerpt',
+    '(10) fieldBindings description must map to entry excerpt',
   );
 }
 
