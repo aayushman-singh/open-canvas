@@ -32,11 +32,151 @@
 //     renderAll().
 
 import type { EditorContext } from './editor-context.js';
-import type { CanvasPage, MotionPreset, ScrollTriggerMode } from '../canvas/schema.js';
-import { MOTION_PRESETS, SCROLL_TRIGGER_MODES } from '../canvas/schema.js';
+import type {
+  CanvasPage,
+  CollectionPageKind,
+  MotionPreset,
+  ScrollTriggerMode,
+} from '../canvas/schema.js';
+import {
+  COLLECTION_PAGE_KINDS,
+  MOTION_PRESETS,
+  SCROLL_TRIGGER_MODES,
+} from '../canvas/schema.js';
 import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 import { cssEscape } from './css-escape.js';
+
+// ADR 0060 Pass 2 — placeholder fields the entry-preview substitutor knows
+// about. Same set as the publish-time materializer (collection-materializer.ts)
+// so the editor preview matches what the published page will render. `tag`
+// resolves to the entry's first tag.
+export interface TemplatePreviewEntry {
+  id?: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  publishedDate: string;
+  author: string;
+  category: string;
+  tags: string[];
+}
+
+const TEMPLATE_PREVIEW_FIELDS: ReadonlyArray<
+  'title' | 'excerpt' | 'body' | 'publishedDate' | 'author' | 'category' | 'tag' | 'slug'
+> = ['title', 'excerpt', 'body', 'publishedDate', 'author', 'category', 'tag', 'slug'];
+
+function templatePreviewValue(
+  entry: TemplatePreviewEntry,
+  field: 'title' | 'excerpt' | 'body' | 'publishedDate' | 'author' | 'category' | 'tag' | 'slug',
+): string {
+  switch (field) {
+    case 'title':
+      return entry.title;
+    case 'excerpt':
+      return entry.excerpt;
+    case 'body':
+      return entry.body;
+    case 'publishedDate':
+      return entry.publishedDate;
+    case 'author':
+      return entry.author;
+    case 'category':
+      return entry.category;
+    case 'tag':
+      return entry.tags[0] ?? '';
+    case 'slug':
+      return entry.slug;
+  }
+}
+
+/** Pure string substitution — replaces every `{{field}}` token with the entry
+ *  value. Unknown tokens are left intact so unrelated mustache-shaped copy
+ *  survives. Exported so the smoke can exercise it without a DOM. Mirrors the
+ *  publish-time substituter in `collection-materializer.ts` so the editor
+ *  preview matches what publish will render. */
+export function substituteTemplatePlaceholderString(
+  input: string,
+  entry: TemplatePreviewEntry,
+): string {
+  let out = input;
+  for (const field of TEMPLATE_PREVIEW_FIELDS) {
+    const token = '{{' + field + '}}';
+    if (out.includes(token)) {
+      out = out.split(token).join(templatePreviewValue(entry, field));
+    }
+  }
+  return out;
+}
+
+/** Walk every text-bearing node under `scope` and substitute `{{field}}`
+ *  placeholders for the entry's values. Each touched node stashes its
+ *  pre-substitution text under `data-opencanvas-placeholder-original` on the
+ *  closest containing element so `revertTemplatePreviewInDom` can restore it.
+ *
+ *  This is VISUAL ONLY — it never mutates state. ADR 0060 §3 says the editor
+ *  edits pages, not entries; the preview lets the Owner see what publish will
+ *  produce without dirtying the document. */
+export function substituteTemplatePreviewInDom(scope: Element, entry: TemplatePreviewEntry): void {
+  // Collect text nodes first so the walker doesn't see substituted nodes again.
+  const doc = scope.ownerDocument;
+  if (!doc) return;
+  const walker = doc.createTreeWalker(scope, /* NodeFilter.SHOW_TEXT */ 0x04, null);
+  const textNodes: Text[] = [];
+  let current: Node | null = walker.nextNode();
+  while (current !== null) {
+    textNodes.push(current as Text);
+    current = walker.nextNode();
+  }
+  for (const textNode of textNodes) {
+    const original = textNode.nodeValue;
+    if (original === null) continue;
+    const replaced = substituteTemplatePlaceholderString(original, entry);
+    if (replaced === original) continue;
+    // Stash original on the parent element (text nodes don't carry attributes).
+    const parent = textNode.parentElement;
+    if (parent !== null && !parent.hasAttribute('data-opencanvas-placeholder-original')) {
+      parent.setAttribute('data-opencanvas-placeholder-original', original);
+    }
+    textNode.nodeValue = replaced;
+  }
+}
+
+/** Revert every `data-opencanvas-placeholder-original` substitution under
+ *  `scope` back to its pre-preview text. Pairs with
+ *  `substituteTemplatePreviewInDom`. */
+export function revertTemplatePreviewInDom(scope: Element): void {
+  const dirty = scope.querySelectorAll('[data-opencanvas-placeholder-original]');
+  for (let i = 0; i < dirty.length; i++) {
+    const el = dirty[i] as HTMLElement;
+    const original = el.getAttribute('data-opencanvas-placeholder-original');
+    if (original === null) continue;
+    // Find the text node descendant that carries the substituted text. The
+    // substitution above replaced a single text node value, so the parent
+    // should have exactly one text child that needs restoring. We restore by
+    // resetting textContent — that collapses any whitespace siblings, which
+    // matches the original since the walker only touched text nodes.
+    // Walk children: find the first text node and restore.
+    for (let j = 0; j < el.childNodes.length; j++) {
+      const child = el.childNodes[j]!;
+      if (child.nodeType === /* Node.TEXT_NODE */ 3) {
+        child.nodeValue = original;
+        break;
+      }
+    }
+    el.removeAttribute('data-opencanvas-placeholder-original');
+  }
+}
+
+// Module-private state — tracks the page id whose artboard currently carries
+// an active preview, so a page switch (or a render that clears pageKind) can
+// revert in-place before the new inspector takes over.
+let activePreviewPageId: string | null = null;
+// Cache of entries by page id, so we don't refetch on every re-render of the
+// same page inspector (e.g. when a different field is edited). Cleared per
+// page id when the inspector mounts a fresh page.
+const entriesCache = new Map<string, TemplatePreviewEntry[]>();
 
 export function replayAnimations(ctx: EditorContext, scope: string): void {
   // scope: "page" replays all, or an element id replays just that one.
@@ -110,6 +250,16 @@ export function renderPageInspector(ctx: EditorContext): void {
   // Local non-null alias so callback closures keep the narrowed type
   // without re-asserting on every read.
   const page = pageLookup;
+  // ADR 0060 Pass 2 — drop any active template preview when the inspector
+  // re-mounts for a different page OR when the current page is no longer
+  // marked as a template/index. The preview is a visual overlay on the
+  // artboard DOM; leaving it stale would mean the Owner sees substituted
+  // text on a page that no longer claims to be a template.
+  if (activePreviewPageId !== null && activePreviewPageId !== page.id) {
+    revertActivePreview(ctx);
+  } else if (activePreviewPageId === page.id && page.pageKind === undefined) {
+    revertActivePreview(ctx);
+  }
   ctx.preserveInspectorScrollFor('page:' + page.id);
   ctx.revokePendingPreviews();
   ctx.inspector.replaceChildren();
@@ -486,6 +636,338 @@ export function renderPageInspector(ctx: EditorContext): void {
   seoLink.title = 'Edit title, description, share-card image and search settings';
   seoGroup.appendChild(seoLink);
   ctx.inspector.appendChild(seoGroup);
+
+  // -- ADR 0060 Pass 2: Page kind + template controls -------------------
+  renderTemplateControls(ctx, page);
+}
+
+// ---------------------------------------------------------------------------
+// ADR 0060 Pass 2 — template controls (page-kind picker + template panel).
+// ---------------------------------------------------------------------------
+
+/** Page-kind selector dropdown values. The schema accepts only
+ *  COLLECTION_PAGE_KINDS or undefined; the UI exposes 'standard' as the
+ *  delete-the-field sentinel so the user has a single dropdown rather than a
+ *  pair of checkbox + select. */
+const PAGE_KIND_UI_VALUES = ['standard', ...COLLECTION_PAGE_KINDS] as const;
+
+function pageKindLabel(value: string): string {
+  if (value === 'standard') return 'Standard';
+  if (value === 'collection-index') return 'Collection index';
+  if (value === 'collection-item-template') return 'Collection item template';
+  return value;
+}
+
+function templateBadgeText(page: CanvasPage): string {
+  if (page.pageKind === 'collection-index') return 'Index for: ' + (page.collectionSlug ?? '');
+  if (page.pageKind === 'collection-item-template')
+    return 'Template for: ' + (page.collectionSlug ?? '');
+  return '';
+}
+
+/** Revert any active artboard preview back to the placeholder text. Resets
+ *  module state so the next preview cycle starts clean. */
+function revertActivePreview(ctx: EditorContext): void {
+  if (activePreviewPageId === null) return;
+  if (ctx.root !== null) {
+    const artboard = ctx.root.querySelector(
+      '[data-page-id="' + cssEscape(activePreviewPageId) + '"]',
+    );
+    if (artboard !== null) {
+      revertTemplatePreviewInDom(artboard);
+    }
+  }
+  activePreviewPageId = null;
+}
+
+/** Render the page-kind picker + (when a kind is set) the template-context
+ *  panel: badge with entry counts, placeholder chips, preview-as-entry. */
+function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
+  if (!ctx.inspector) return;
+
+  // Divider above the section so the picker visually separates from SEO.
+  const dividerTop = document.createElement('div');
+  dividerTop.className = 'opencanvas-page-inspector-divider';
+  ctx.inspector.appendChild(dividerTop);
+
+  // -- Page kind selector --------------------------------------------------
+  const groupKind = document.createElement('div');
+  groupKind.className = 'opencanvas-page-inspector-group';
+  const hKind = document.createElement('h4');
+  hKind.textContent = 'Page kind';
+  groupKind.appendChild(hKind);
+
+  const kindSelect = document.createElement('select');
+  for (const value of PAGE_KIND_UI_VALUES) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = pageKindLabel(value);
+    if ((page.pageKind ?? 'standard') === value) opt.selected = true;
+    kindSelect.appendChild(opt);
+  }
+  groupKind.appendChild(kindSelect);
+  ctx.inspector.appendChild(groupKind);
+
+  // -- Collection slug input (shown only when a kind is set) ---------------
+  const groupSlug = document.createElement('div');
+  groupSlug.className = 'opencanvas-page-inspector-group';
+  const hSlug = document.createElement('h4');
+  hSlug.textContent = 'Collection';
+  groupSlug.appendChild(hSlug);
+  const slugInput = document.createElement('input');
+  slugInput.type = 'text';
+  slugInput.placeholder = 'blog';
+  slugInput.value = page.collectionSlug ?? '';
+  slugInput.setAttribute('aria-label', 'Collection slug');
+  groupSlug.appendChild(slugInput);
+  if (page.pageKind === undefined) {
+    groupSlug.style.display = 'none';
+  }
+  ctx.inspector.appendChild(groupSlug);
+
+  kindSelect.addEventListener('change', function () {
+    const next = kindSelect.value;
+    ctx.captureForUndo();
+    if (next === 'standard') {
+      delete page.pageKind;
+      delete page.collectionSlug;
+      // Drop any active preview — the page is no longer a template surface.
+      revertActivePreview(ctx);
+    } else {
+      page.pageKind = next as CollectionPageKind;
+      // Default the slug to whatever exists, falling back to 'blog' so
+      // validate.ts doesn't reject the save (collectionSlug is required when
+      // pageKind is set).
+      if (page.collectionSlug === undefined || page.collectionSlug.length === 0) {
+        page.collectionSlug = 'blog';
+      }
+    }
+    ctx.scheduleSave();
+    renderPageInspector(ctx);
+  });
+
+  slugInput.addEventListener('change', function () {
+    const next = slugInput.value.trim();
+    if (next.length === 0) {
+      // Empty slug + set pageKind would fail validation; refuse the edit.
+      ctx.setStatus('Collection slug cannot be empty while page kind is set', 'error');
+      slugInput.value = page.collectionSlug ?? '';
+      return;
+    }
+    if (next === page.collectionSlug) return;
+    ctx.captureForUndo();
+    page.collectionSlug = next;
+    ctx.scheduleSave();
+    renderPageInspector(ctx);
+  });
+
+  // -- Template-context panel (visible only when pageKind is set) ---------
+  if (page.pageKind === undefined) return;
+
+  const collectionSlug = page.collectionSlug ?? '';
+
+  // B1. Badge + entry counts + Manage entries link ------------------------
+  const groupBadge = document.createElement('div');
+  groupBadge.className = 'opencanvas-page-inspector-group';
+  const hBadge = document.createElement('h4');
+  hBadge.textContent = templateBadgeText(page);
+  groupBadge.appendChild(hBadge);
+
+  const countsLine = document.createElement('div');
+  countsLine.style.cssText = 'font-size:12px; color:var(--opencanvas-fg-mute, #888);';
+  countsLine.textContent = '— published · — drafts';
+  groupBadge.appendChild(countsLine);
+
+  const manageLink = document.createElement('a');
+  manageLink.href =
+    '/dashboard/sites/' +
+    encodeURIComponent(ctx.siteId) +
+    '/entries?collection=' +
+    encodeURIComponent(collectionSlug);
+  manageLink.target = '_blank';
+  manageLink.rel = 'noopener';
+  manageLink.className = 'opencanvas-page-inspector-link';
+  manageLink.textContent = 'Manage entries →';
+  manageLink.title = 'Open the Entries dashboard tab for this collection';
+  groupBadge.appendChild(manageLink);
+  ctx.inspector.appendChild(groupBadge);
+
+  // B2. Placeholder chips --------------------------------------------------
+  const groupChips = document.createElement('div');
+  groupChips.className = 'opencanvas-page-inspector-group';
+  const hChips = document.createElement('h4');
+  hChips.textContent = 'Insert placeholder';
+  groupChips.appendChild(hChips);
+
+  const chipRow = document.createElement('div');
+  chipRow.style.cssText =
+    'display:flex; flex-wrap:wrap; gap:6px; align-items:center;';
+  const PLACEHOLDER_TOKENS: ReadonlyArray<string> = [
+    '{{title}}',
+    '{{excerpt}}',
+    '{{body}}',
+    '{{publishedDate}}',
+    '{{author}}',
+    '{{category}}',
+    '{{tag}}',
+    '{{slug}}',
+  ];
+  for (const token of PLACEHOLDER_TOKENS) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.textContent = token;
+    chip.style.cssText =
+      'font-family:var(--mono, monospace); font-size:12px; padding:3px 8px; ' +
+      'border:1px solid var(--opencanvas-hairline, var(--line, #2a2a2a)); ' +
+      'border-radius:14px; background:transparent; color:inherit; cursor:pointer;';
+    chip.addEventListener('mouseenter', function () {
+      chip.style.background = 'var(--opencanvas-bg-hover, rgba(255,255,255,0.06))';
+    });
+    chip.addEventListener('mouseleave', function () {
+      chip.style.background = 'transparent';
+    });
+    chip.addEventListener('click', function () {
+      insertOrCopyPlaceholder(ctx, token);
+    });
+    chipRow.appendChild(chip);
+  }
+  groupChips.appendChild(chipRow);
+
+  const chipHelp = document.createElement('div');
+  chipHelp.style.cssText = 'font-size:11px; color:var(--opencanvas-fg-mute, #888); margin-top:4px;';
+  chipHelp.textContent =
+    'Click to insert at cursor or copy. The publish step replaces these with the entry’s content.';
+  groupChips.appendChild(chipHelp);
+  ctx.inspector.appendChild(groupChips);
+
+  // B3. Preview-as-entry dropdown -----------------------------------------
+  const groupPreview = document.createElement('div');
+  groupPreview.className = 'opencanvas-page-inspector-group';
+  const hPreview = document.createElement('h4');
+  hPreview.textContent = 'Preview with';
+  groupPreview.appendChild(hPreview);
+
+  const previewSelect = document.createElement('select');
+  const placeholderOpt = document.createElement('option');
+  placeholderOpt.value = '';
+  placeholderOpt.textContent = '— Show placeholders —';
+  placeholderOpt.selected = true;
+  previewSelect.appendChild(placeholderOpt);
+  groupPreview.appendChild(previewSelect);
+  ctx.inspector.appendChild(groupPreview);
+
+  previewSelect.addEventListener('change', function () {
+    const next = previewSelect.value;
+    // Always revert first so a switch from entry A → entry B starts from the
+    // raw placeholders rather than substituting on already-substituted text.
+    revertActivePreview(ctx);
+    if (next.length === 0) return;
+    const cached = entriesCache.get(page.id);
+    if (cached === undefined) return;
+    const entry = cached.find(function (e) {
+      return e.id === next;
+    });
+    if (entry === undefined) return;
+    if (ctx.root === null) return;
+    const artboard = ctx.root.querySelector('[data-page-id="' + cssEscape(page.id) + '"]');
+    if (artboard === null) return;
+    substituteTemplatePreviewInDom(artboard, entry);
+    activePreviewPageId = page.id;
+  });
+
+  // Fire the fetch — auth-gated via cookie. The currentPageId capture lets the
+  // resolver ignore a response that arrives after the user navigated away.
+  const fetchPageId = page.id;
+  const url =
+    '/__api/sites/' +
+    encodeURIComponent(ctx.siteId) +
+    '/entries?collection=' +
+    encodeURIComponent(collectionSlug);
+  void fetch(url, { credentials: 'include' })
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error(
+          'GET ' + url + ' returned ' + String(res.status) + ' ' + res.statusText,
+        );
+      }
+      return res.json() as Promise<{ entries: TemplatePreviewEntry[] }>;
+    })
+    .then(function (body) {
+      // Stale guard — if the page changed while the fetch was in flight, drop
+      // the result rather than mutating an inspector for a different page.
+      const stillCurrent = ctx.currentPage();
+      if (stillCurrent === null || stillCurrent.id !== fetchPageId) return;
+      const entries = Array.isArray(body.entries) ? body.entries : [];
+      entriesCache.set(fetchPageId, entries);
+      let published = 0;
+      let drafts = 0;
+      for (const entry of entries) {
+        const status = (entry as { status?: string }).status;
+        if (status === 'published') published++;
+        else if (status === 'draft') drafts++;
+      }
+      countsLine.textContent =
+        String(published) + ' published · ' + String(drafts) + ' drafts';
+      // Repopulate the preview dropdown. Clear all but the placeholder opt.
+      while (previewSelect.children.length > 1) {
+        previewSelect.removeChild(previewSelect.children[previewSelect.children.length - 1]!);
+      }
+      for (const entry of entries) {
+        if (entry.id === undefined) continue;
+        const opt = document.createElement('option');
+        opt.value = entry.id;
+        opt.textContent = entry.title.length > 0 ? entry.title : entry.slug;
+        previewSelect.appendChild(opt);
+      }
+    })
+    .catch(function (err: unknown) {
+      const stillCurrent = ctx.currentPage();
+      if (stillCurrent === null || stillCurrent.id !== fetchPageId) return;
+      // ADR-aligned loud-failure path: surface the breakage and log details.
+      // The inspector keeps rendering — only the count line and preview list
+      // remain in their loading state, which is the smallest visible change.
+      countsLine.textContent = '(failed to load)';
+       
+      console.error('[page-inspector] failed to load entries for', fetchPageId, err);
+    });
+}
+
+/** Insert `{{field}}` at the cursor when an editable contenteditable in the
+ *  active artboard owns focus; otherwise copy to clipboard and surface a
+ *  status line. Falls back to clipboard when execCommand isn't supported
+ *  (older browsers don't all wire up `insertText`). */
+function insertOrCopyPlaceholder(ctx: EditorContext, token: string): void {
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  if (
+    active !== null &&
+    active instanceof HTMLElement &&
+    active.isContentEditable &&
+    ctx.root !== null &&
+    ctx.root.contains(active)
+  ) {
+    const ok = document.execCommand('insertText', false, token);
+    if (ok) {
+      ctx.setStatus('Inserted ' + token, 'ok');
+      return;
+    }
+  }
+  // Clipboard fallback. `navigator.clipboard` is async but we don't need to
+  // surface a "failed to copy" path beyond the status line — the user can
+  // retry. Loud-failure rule still applies: log the error so it's debuggable.
+  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    void navigator.clipboard
+      .writeText(token)
+      .then(function () {
+        ctx.setStatus('Copied ' + token + ' to clipboard', 'ok');
+      })
+      .catch(function (err: unknown) {
+        ctx.setStatus('Could not copy ' + token, 'error');
+         
+        console.error('[page-inspector] clipboard write failed for', token, err);
+      });
+    return;
+  }
+  ctx.setStatus('Could not copy ' + token, 'error');
 }
 
 // Live-apply page-level visual properties on the artboard.
