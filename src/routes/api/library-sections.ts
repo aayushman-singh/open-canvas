@@ -17,7 +17,6 @@ import { Hono } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
 import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
-import { categoryForRecipe, ORIGIN_TO_BASE_SLUG } from '../../canvas/section-library/index.js';
 import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
@@ -32,7 +31,6 @@ import {
   site,
   type AssetManifestEntry,
 } from '../../db/schema.js';
-import { SECTION_CATALOG, type SectionCatalogEntry } from '../../templates/section-catalog.js';
 import { buildSectionThumbnailSvg } from '../../templates/section-thumbnail.js';
 
 type Bindings = {
@@ -158,8 +156,15 @@ async function loadOwnedSection(
 // Catalog response type (merged seed + library sections)
 // ---------------------------------------------------------------------------
 
+/**
+ * ADR 0061 Phase G — single-lane catalog shape. Pre-Phase-G this union
+ * also carried `source:'seed'` rows projected from a boot-time walk of
+ * every TemplateSeed; the seed merge retired with `section-catalog.ts`
+ * once the boot upsert started writing those entries into
+ * `library_section`. Every row now flows through the DB.
+ */
 export interface LibraryCatalogEntry {
-  source: 'seed' | 'library';
+  source: 'library';
   id: string;
   name: string;
   recipeId: string;
@@ -171,55 +176,11 @@ export interface LibraryCatalogEntry {
   description: string;
   /** Origin-named pool slug per Decision 5. Carried for haystack search. */
   baseSlug: string;
-  /**
-   * ISO timestamp the picker uses for the `Recently added` sort. Library
-   * rows carry the row's `created_at`; seed rows synthesize a fixed
-   * pre-deploy time so they sort below any Owner-saved row.
-   */
+  /** ISO timestamp from `library_section.created_at`; drives `Recently added` sort. */
   createdAt: string;
-  templateId?: string;
-  templateName?: string;
-  sectionId?: string;
-  librarySectionId?: string;
+  librarySectionId: string;
   /** Schematic SVG of the section's element layout. See templates/section-thumbnail.ts. */
   thumbnail: string;
-}
-
-/**
- * Sentinel pre-deploy timestamp for seed entries. Any real `created_at`
- * on a `library_section` row will sort above this, so the picker's
- * `Recently added` mode surfaces Owner-saved sections first.
- */
-const SEED_CREATED_AT_SENTINEL = '1970-01-01T00:00:00.000Z';
-
-function seedEntryToCatalog(entry: SectionCatalogEntry): LibraryCatalogEntry {
-  // Origin map covers every TemplateSeed section after Phase C. The
-  // extraction smoke gates this invariant at build time; a runtime miss
-  // means a developer added a TemplateSeed without re-running
-  // scripts/extract-section-library.ts. Fail loud per "no fallbacks".
-  const originKey = `${entry.templateId}:${entry.sectionId}`;
-  const mappedSlug = ORIGIN_TO_BASE_SLUG[originKey];
-  if (mappedSlug === undefined) {
-    throw new Error(
-      `seedEntryToCatalog: origin map missing entry for ${originKey} — re-run scripts/extract-section-library.ts and commit the regenerated entries/manifest + origin-mapping`,
-    );
-  }
-  return {
-    source: 'seed',
-    id: `${entry.templateId}:${entry.sectionId}`,
-    name: entry.sectionName,
-    recipeId: entry.recipeId,
-    headingPreview: entry.headingPreview,
-    visibility: 'global',
-    category: categoryForRecipe(entry.recipeId),
-    description: '',
-    baseSlug: mappedSlug,
-    createdAt: SEED_CREATED_AT_SENTINEL,
-    templateId: entry.templateId,
-    templateName: entry.templateName,
-    sectionId: entry.sectionId,
-    thumbnail: entry.thumbnail,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +198,10 @@ librarySectionsOwner.get('/sections', async (c) => {
   const database = db(c.env);
   const customerId = await resolveCustomerId(database, auth.userId);
 
-  const catalog: LibraryCatalogEntry[] = SECTION_CATALOG.map(seedEntryToCatalog);
+  // ADR 0061 Phase G — single-lane catalog. Every section the picker
+  // shows comes from `library_section`; built-ins land there via the
+  // boot upsert seeded by `SECTION_LIBRARY`.
+  const catalog: LibraryCatalogEntry[] = [];
 
   const whereClause = customerId
     ? or(eq(librarySection.visibility, 'global'), eq(librarySection.customerId, customerId))

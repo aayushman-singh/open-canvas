@@ -1,9 +1,14 @@
 // src/routes/api/sections.ts
 //
-// Owner-facing endpoints for cross-template section reuse.
-// - GET  /api/templates/sections — owner-only catalog from all template seeds.
-// - POST /api/sites/:siteId/sections/import — clone a section from a template
-//   seed into the owner's site at a chosen slot, materialising seed media.
+// Owner-facing endpoint for cross-template section reuse:
+// - POST /api/sites/:siteId/sections/import — clone a section from a
+//   template seed into the owner's site at a chosen slot, materialising
+//   seed media.
+//
+// ADR 0061 Phase G retired the GET /api/templates/sections endpoint
+// alongside `templates/section-catalog.ts`. Owners get the same data
+// (and richer fields — category, baseSlug, description) from
+// GET /api/library/sections, which is now the single picker source.
 
 import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
@@ -17,7 +22,6 @@ import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { librarySection, ownerAsset, site } from '../../db/schema';
 import { allTemplateSeeds, instantiateTemplate } from '../../templates/registry';
-import { SECTION_CATALOG } from '../../templates/section-catalog';
 import { canReadScopedLibraryRow } from './library-access';
 
 type Bindings = {
@@ -32,10 +36,6 @@ const sections = new Hono<Env>();
 
 sections.use('*', clerkAuth());
 sections.use('*', requireAuth());
-
-sections.get('/templates/sections', (c) => {
-  return c.json({ sections: SECTION_CATALOG });
-});
 
 type SeedImportBody = { source: 'seed'; templateId: string; sectionId: string; insertAt: number };
 type LibraryImportBody = { source: 'library'; librarySectionId: string; insertAt: number };
