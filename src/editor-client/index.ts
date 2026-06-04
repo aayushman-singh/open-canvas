@@ -200,6 +200,7 @@ import {
   wireCoEditPresenceListeners,
   wireMarkToolbarReflowListeners,
 } from './runtime-helpers.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 
 // Re-export side-effecting / utility imports so the bundle's tree-shaker
 // keeps them. These were void-referenced in the Phase 2a stub; with
@@ -724,6 +725,7 @@ export function createEditor(boot: EditorBoot): void {
       if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
         ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
       }
+      applyCustomKitCss(ctx.state);
       ctx.onMarkToolbarReflow = () => onMarkToolbarReflowImpl(ctx);
       wireMarkToolbarReflowListeners(ctx);
       // mountViewport MUST precede renderAll so #canvas-root is in its

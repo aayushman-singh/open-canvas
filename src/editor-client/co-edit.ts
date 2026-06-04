@@ -110,6 +110,7 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { EditorContext, RemoteCursorEntry } from './editor-context.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 import {
   COEDIT_RECONNECT_BASE_DELAY_MS,
   COEDIT_RECONNECT_MAX_ATTEMPTS,
@@ -640,6 +641,7 @@ export function attachCoEditImpl(ctx: EditorContext): void {
     if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
       ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
     }
+    applyCustomKitCss(ctx.state);
     ctx.renderAll();
     // renderAll replaces element wrappers, invalidating cached caret
     // rects. Re-resolve them against the fresh DOM so remote cursors

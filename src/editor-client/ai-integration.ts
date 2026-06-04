@@ -65,6 +65,7 @@
 
 import type { EditorContext } from './editor-context.js';
 import type { EditableSite } from '../canvas/schema.js';
+import { applyCustomKitCss } from './custom-kit-css.js';
 import { cssEscape } from './css-escape.js';
 import { applyCameraTransform } from './render.js';
 import { migrateState } from './state-migration.js';
@@ -802,6 +803,7 @@ export function applyAgentOpsImpl(
           if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
             ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
           }
+          applyCustomKitCss(ctx.state);
           ctx.renderAll();
           if (suggestions) {
             const consumedDeferredIds = { elements: {}, sections: {}, pages: {} };
@@ -894,6 +896,7 @@ export function revertAgentEntryImpl(ctx: EditorContext, entry: SuggestionEntry 
           if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
             ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
           }
+          applyCustomKitCss(ctx.state);
           ctx.renderAll();
           // Re-arm the card. Owner can Accept again; that path will
           // recompute a fresh inverse against the new pre-state.
