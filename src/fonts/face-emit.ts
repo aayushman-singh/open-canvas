@@ -104,3 +104,20 @@ export function emitFontFaceBlocks(input: FaceEmitInput): string {
   }
   return blocks.join('\n');
 }
+
+/**
+ * Emit one `@font-face` block per supplied site font, regardless of whether
+ * the Style Kit's font tokens reference them. The text-inspector font-family
+ * picker writes the chosen font's *name* directly into a text element's
+ * `pinnedStyle["font-family"]` (so the renderer-side `font:<hash>` resolver
+ * never sees it). The public renderer therefore needs every uploaded font's
+ * face declaration available on the page so element-level pins can resolve.
+ *
+ * Returns the empty string when `fonts` is empty so the renderer can
+ * concatenate the result unconditionally. Output is ordered by the input
+ * array's order so callers can pre-sort for stable CSS diffs.
+ */
+export function emitAllSiteFontFaceBlocks(fonts: ReadonlyArray<SiteFontRef>): string {
+  if (fonts.length === 0) return '';
+  return fonts.map(emitSingleFontFace).join('\n');
+}

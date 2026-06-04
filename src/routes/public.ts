@@ -60,7 +60,7 @@ import { getModeSetterScript, getDarkModeSetterScript } from '../themes/visitor-
 import { renderModeToggleHtml } from '../themes/visitor-mode/toggle-element';
 import { resolveStyleKitWithCustom } from '../themes/custom-resolve';
 import { prepareRender } from '../i18n/render-hook';
-import { emitFontFaceBlocks } from '../fonts/face-emit';
+import { emitAllSiteFontFaceBlocks, emitFontFaceBlocks } from '../fonts/face-emit';
 import { makeFontLookup, resolveFontTokens } from '../fonts/resolve';
 // Wave 4 #17 — vanilla-JS hydration runtime for accordion + carousel elements.
 // Wrap is a no-op when no interactive elements present in the snapshot.
@@ -1139,7 +1139,26 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     })
     .from(siteFont)
     .where(eq(siteFont.siteId, siteRow.id));
-  const fontFaceCss = emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  // Two emission paths feed the visitor page's @font-face block:
+  //
+  //   1. emitFontFaceBlocks(tokens, fonts) walks the kit's `font:<hash>`
+  //      tokens. It throws when a token references a hash that no
+  //      siteFont row covers — a dangling-token failure mode we want to
+  //      keep surfacing loudly per the all-or-nothing policy.
+  //   2. emitAllSiteFontFaceBlocks(fonts) ships one face per uploaded row
+  //      so the text-inspector font-family picker's element-level
+  //      `pinnedStyle["font-family"]` pins actually resolve at visit time
+  //      (the picker writes the font *name*, not a `font:<hash>` token,
+  //      so the resolver in (1) never sees it).
+  //
+  // The first call's contract — fail loudly when a kit token is dangling —
+  // stays load-bearing. The second call is the superset for element-level
+  // pins. Duplicate `@font-face` declarations for the same triple are
+  // CSS-legal (last one wins) so emitting both costs a few bytes when the
+  // kit and an element pin reference the same font, never a render bug.
+  const kitFontFaceCss = emitFontFaceBlocks({ tokens: baseKit, fonts: fontRows });
+  const allFontFaceCss = emitAllSiteFontFaceBlocks(fontRows);
+  const fontFaceCss = [kitFontFaceCss, allFontFaceCss].filter((s) => s.length > 0).join('\n');
   const resolvedKit = resolveFontTokens(baseKit, makeFontLookup(fontRows));
   const customKitCss =
     pageRenderSnapshot.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolvedKit)}` : '';
