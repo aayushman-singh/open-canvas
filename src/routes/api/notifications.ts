@@ -17,9 +17,10 @@
 
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { db } from '../../db/client.js';
 import { customer } from '../../db/schema.js';
-import { listInbox, unreadCount } from '../../notifications/inbox.js';
+import { listInbox, loadVisibleSiteIds, unreadCount } from '../../notifications/inbox.js';
 import { markAllNotificationsRead, markNotificationRead } from '../../notifications/writer.js';
 import type { PublicEnv } from '../public.js';
 
@@ -29,10 +30,15 @@ import type { PublicEnv } from '../public.js';
 // so resolveCustomerId works identically at either mount.
 const notificationsApi = new Hono<PublicEnv>();
 
-async function resolveCustomerId(c: {
-  get: (k: 'auth') => { userId: string | null };
-  env: { DATABASE_URL: string };
-}): Promise<string | null> {
+// Hot-path customer-id resolver. `clerkAuth()` populates `c.get('customer')`
+// on the /api/* mount (see src/auth/middleware.ts), so we just read the id
+// from the request context — no extra Neon round trip. The /__api/* edit-
+// token mount deliberately leaves `customer` as null (the on-site edit popup
+// flow operates by siteId, not customerId); for that branch we fall back to
+// the clerkUserId SELECT.
+async function resolveCustomerId(c: Context<PublicEnv>): Promise<string | null> {
+  const cached = c.get('customer');
+  if (cached) return cached.id;
   const auth = c.get('auth');
   if (!auth.userId) return null;
   const database = db(c.env);
@@ -60,12 +66,18 @@ notificationsApi.get('/notifications', async (c) => {
   const limit = Number.isFinite(limitParsed) && limitParsed > 0 ? limitParsed : undefined;
 
   const database = db(c.env);
+  // Resolve the visibility set ONCE per request and hand it to both reads.
+  // Previously each of listInbox / unreadCount fired their own pair of site
+  // + siteCollaborator SELECTs — duplicate work on the dashboard's polling
+  // hot path. One load, two consumers.
+  const siteIds = await loadVisibleSiteIds(database, customerId);
   const [notifications, unread] = await Promise.all([
     listInbox(database, customerId, {
+      siteIds,
       ...(since !== undefined ? { since } : {}),
       ...(limit !== undefined ? { limit } : {}),
     }),
-    unreadCount(database, customerId),
+    unreadCount(database, customerId, siteIds),
   ]);
 
   return c.json({ notifications, unreadCount: unread });
