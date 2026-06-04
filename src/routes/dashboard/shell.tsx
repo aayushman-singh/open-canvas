@@ -348,6 +348,12 @@ type Props = {
   // explicit `| undefined` matches exactOptionalPropertyTypes so callers
   // can pass `readThemeCookie(c)` directly without conditional spread.
   theme?: Theme | undefined;
+  // Extra <head> children (e.g. <link rel="preload"> hints). Rendered after
+  // the theme + fonts + page styles so the preload-scanner sees them on
+  // first parse. Same-origin asset URLs requested here populate the HTTP
+  // cache that same-origin iframes (e.g. site-card srcdoc previews) read
+  // from — see ADR 0038 + dashboard index.tsx for the iframe shape.
+  headLinks?: Child;
   children?: Child;
 };
 
@@ -415,7 +421,7 @@ function BackArrowIcon() {
   );
 }
 
-export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta, siteNav, theme, children }: Props) {
+export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta, siteNav, theme, headLinks, children }: Props) {
   // theme.css tokens go FIRST so the alias block re-points
   // --bg/--panel/--text/--accent/... onto Open Canvas palette before any
   // chrome rule reads them. Per-page <style> blocks (pageStyles) win last
@@ -489,6 +495,7 @@ export function DashboardShell({ title, crumbs, activePath, pageStyles, userMeta
         <script>{raw(themeBootScript)}</script>
         {raw(themeFontHeadHtml)}
         <style>{raw(css)}</style>
+        {headLinks}
       </head>
       <body>
         <div class="app">

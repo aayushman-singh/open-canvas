@@ -14,6 +14,7 @@ import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
+import { collectReferencedAssets } from '../../assets/site-assets';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -1196,6 +1197,28 @@ dashboard.get('/', async (c) => {
   const publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
   const storageBytes = Number(sb[0]?.total ?? 0);
 
+  // Preload the FIRST image asset each site's iframe will fetch. Same-origin
+  // iframes (the card thumbnails live on this Worker's origin) share the
+  // browser's HTTP cache with their parent document for matching cache keys
+  // (Chrome's partitioned cache uses top-frame-origin + iframe-origin; both
+  // are this Worker), so the preload populates the cache that the iframe's
+  // <img> requests then read from. One link per site — the document-order
+  // first reference is what visitors see above the card title, and chasing
+  // every referenced asset would just trade one slow waterfall for a slower
+  // parallel storm.
+  const preloadLinks = rows.flatMap((row) => {
+    const referenced = collectReferencedAssets(row.editableState);
+    const firstImage = referenced.find((ref) => ref.expectedKind === 'image');
+    if (!firstImage) return [];
+    return [
+      <link
+        rel="preload"
+        as="image"
+        href={`/api/canvas/sites/${row.id}/assets/${firstImage.assetId}`}
+      />,
+    ];
+  });
+
   const siteLimit = siteLimitForPlan(customerPlan);
   const ownedSiteCount = ownedRows.length;
   // siteLimit gates CREATION, so it counts only owned sites — collaborator
@@ -1218,6 +1241,7 @@ dashboard.get('/', async (c) => {
       pageStyles={cardStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
       theme={readThemeCookie(c)}
+      headLinks={preloadLinks}
     >
       <div class="page-head">
         <div>
