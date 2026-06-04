@@ -224,7 +224,7 @@
             "kind": "external"
           }
         ],
-        "layout": "centered",
+        "layout": "left-center-right",
         "sticky": true,
         "pinnedStyle": {
           "color": "#f1ece0",

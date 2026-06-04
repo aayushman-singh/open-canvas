@@ -143,11 +143,21 @@ html, body {
 }
 .opencanvas-nav {
   gap: 4px;
+  position: relative;
 }
 .opencanvas-nav-slot {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.opencanvas-nav-slot[data-slot="right"] {
+  margin-left: auto;
+}
+.opencanvas-nav-slot[data-slot="center"] {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 .opencanvas-nav-logo {
   height: 28px;
