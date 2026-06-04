@@ -231,6 +231,92 @@ export async function markNotificationRead(
   await notifyOwnerLive(ctx.env, customerId, { kind: 'read-state-changed', id: notificationId });
 }
 
+// `deleteNotification` removes a single notification row visible to the
+// caller. Same visibility semantics as `markNotificationRead`:
+//   - customer-kind: caller must be the recipient.
+//   - site-kind: caller must own the site OR be an accepted collaborator.
+// Same 404-leak posture: throws "is not the recipient" on a hit-but-not-yours
+// row so the route surfaces it as 404 alongside the genuine not-found case.
+//
+// Hard-delete consistent with ADR 0043's nightly retention sweep
+// (`runNotificationRetention` in `./retention.ts` already does
+// `db.delete(notification)`). `notification_read` join rows cascade via the
+// FK in the schema, so this is one round-trip.
+//
+// Pushes a `read-state-changed` event to the per-Customer DO so other tabs
+// refetch and drop the row from their cached list. We reuse the read-state
+// event rather than introducing a new wire kind: the client refetches
+// `/api/notifications` either way and `since=` is unaffected (a deleted row
+// just doesn't reappear).
+export async function deleteNotification(
+  ctx: WriteNotificationCtx,
+  notificationId: string,
+  customerId: string,
+): Promise<void> {
+  const [row] = await ctx.db
+    .select({
+      id: notification.id,
+      recipientKind: notification.recipientKind,
+      recipientId: notification.recipientId,
+    })
+    .from(notification)
+    .where(eq(notification.id, notificationId));
+
+  if (!row) {
+    throw new Error(`deleteNotification: notification ${notificationId} not found`);
+  }
+
+  if (row.recipientKind === 'customer') {
+    if (row.recipientId !== customerId) {
+      throw new Error(
+        `deleteNotification: customer ${customerId} is not the recipient of ${notificationId}`,
+      );
+    }
+  } else {
+    // site-kind — verify the customer can see the site before dropping the
+    // row. A site-kind notif belongs to every collaborator on the site, so a
+    // delete here removes the row for every visible collaborator (no per-
+    // recipient delete is supported in v1 — the notification table holds one
+    // row per site event, not one row per collaborator). The trade-off is
+    // named in `docs/adr/0043-*.md` Follow-ups below.
+    const siteId = row.recipientId;
+    const ownsRows = await ctx.db
+      .select({ id: site.id })
+      .from(site)
+      .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
+      .limit(1);
+    let visible = ownsRows.length > 0;
+    if (!visible) {
+      const collabRows = await ctx.db
+        .select({ id: siteCollaborator.id })
+        .from(siteCollaborator)
+        .where(
+          and(
+            eq(siteCollaborator.siteId, siteId),
+            eq(siteCollaborator.customerId, customerId),
+            isNotNull(siteCollaborator.acceptedAt),
+          ),
+        )
+        .limit(1);
+      visible = collabRows.length > 0;
+    }
+    if (!visible) {
+      throw new Error(
+        `deleteNotification: customer ${customerId} is not the recipient of ${notificationId}`,
+      );
+    }
+  }
+
+  // FK ON DELETE CASCADE on notification_read.notification_id collects the
+  // joined per-customer read rows automatically.
+  await ctx.db.delete(notification).where(eq(notification.id, notificationId));
+
+  // Fan out a read-state-changed hint to the caller's other tabs so they
+  // refetch and drop the row. Re-uses the existing event kind because the
+  // client effect is identical: refetch the inbox.
+  await notifyOwnerLive(ctx.env, customerId, { kind: 'read-state-changed', id: notificationId });
+}
+
 // Bulk mark-read for the calling Customer. Two writes (one per recipient
 // kind) in a single round-trip per kind. The customer-kind branch updates
 // every unread customer-recipient row addressed to the caller; the site-kind

@@ -20,7 +20,11 @@ import { Hono } from 'hono';
 import { db } from '../../db/client.js';
 import { customer } from '../../db/schema.js';
 import { listInbox, unreadCount } from '../../notifications/inbox.js';
-import { markAllNotificationsRead, markNotificationRead } from '../../notifications/writer.js';
+import {
+  deleteNotification,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../../notifications/writer.js';
 import type { PublicEnv } from '../public.js';
 
 // Mounted inside `ownerApi`, which lives at `/api/*` (Clerk session) and
@@ -89,6 +93,35 @@ notificationsApi.post('/notifications/:id/read', async (c) => {
     // The writer throws on either "not found" or "not your row". Both surface
     // to the client as 404 — leaking "exists but not yours" is itself a small
     // info leak.
+    if (message.includes('not found') || message.includes('is not the recipient')) {
+      return c.json({ error: 'notification not found' }, 404);
+    }
+    throw err;
+  }
+
+  return c.json({ ok: true });
+});
+
+// Per-row delete. Mirrors the /read endpoint's auth + 404-leak posture: a
+// row that does not exist OR does not belong to the caller both surface as
+// 404. The writer hard-deletes (consistent with the nightly retention sweep
+// in src/notifications/retention.ts); FK ON DELETE CASCADE on
+// notification_read collects the joined per-customer read rows.
+notificationsApi.delete('/notifications/:id', async (c) => {
+  const customerId = await resolveCustomerId(c);
+  if (!customerId) {
+    return c.json({ error: 'account not found' }, 404);
+  }
+  const notificationId = c.req.param('id');
+  if (!notificationId) {
+    return c.json({ error: 'notification id required' }, 400);
+  }
+
+  const database = db(c.env);
+  try {
+    await deleteNotification({ db: database, env: c.env }, notificationId, customerId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     if (message.includes('not found') || message.includes('is not the recipient')) {
       return c.json({ error: 'notification not found' }, 404);
     }
