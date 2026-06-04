@@ -25,6 +25,7 @@ import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from '.
 // implementation lives in ./action-href.js — see the comment block there.
 export { isAllowedHref };
 import {
+  ACCENT_BORDER_TYPES,
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
   BACKGROUND_SIZES,
@@ -43,6 +44,7 @@ import {
   SHAPE_VARIANTS,
   STYLE_KITS,
   SURFACE_VARIANTS,
+  type AccentBorderType,
   type ActionVariant,
   type BackgroundEffect,
   type BackgroundSize,
@@ -1401,6 +1403,7 @@ function validateSection(
       errors,
     );
   }
+  validateAccentBorder(section.accentBorder, pathJoin(basePath, 'accentBorder'), errors);
   if (section.entrance !== undefined) {
     assertOneOf<MotionPreset>(section.entrance, MOTION_PRESETS, `${basePath}.entrance`, errors);
   }
@@ -1442,6 +1445,50 @@ function validateSection(
       localIds,
     );
   });
+}
+
+// ADR 0062 — discriminated-union accent border. Mirrors the validateSectionTrigger
+// shape: arm the type first, then validate the arm-specific fields. The color is
+// validated through the same `validateInjectionSafeString` path used by
+// `elementStyle.borderColor` and `elementStyle.backgroundColor` so any color
+// string the user can already type into a color picker passes here.
+function validateAccentBorder(value: unknown, basePath: string, errors: string[]): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    errors.push(`${basePath} must be an object when present`);
+    return;
+  }
+  if (!assertOneOf<AccentBorderType>(value.type, ACCENT_BORDER_TYPES, `${basePath}.type`, errors)) {
+    return;
+  }
+  validateInjectionSafeString(value.color, 'color', basePath, errors);
+  if (value.type === 'solid') {
+    if (!isFiniteNumber(value.width) || value.width <= 0) {
+      errors.push(`${basePath}.width must be a positive finite number for solid accent borders`);
+    }
+    if ('thickness' in value || 'radius' in value || 'spread' in value) {
+      errors.push(`${basePath} must not carry thickness/radius/spread on a solid accent border`);
+    }
+  } else if (value.type === 'top' || value.type === 'left') {
+    if (!isFiniteNumber(value.thickness) || value.thickness <= 0) {
+      errors.push(
+        `${basePath}.thickness must be a positive finite number for ${value.type} accent borders`,
+      );
+    }
+    if ('width' in value || 'radius' in value || 'spread' in value) {
+      errors.push(`${basePath} must not carry width/radius/spread on a ${value.type} accent border`);
+    }
+  } else if (value.type === 'glow') {
+    if (!isFiniteNumber(value.radius) || value.radius <= 0) {
+      errors.push(`${basePath}.radius must be a positive finite number for glow accent borders`);
+    }
+    if (value.spread !== undefined && (!isFiniteNumber(value.spread) || value.spread < 0)) {
+      errors.push(`${basePath}.spread must be a non-negative finite number when present`);
+    }
+    if ('width' in value || 'thickness' in value) {
+      errors.push(`${basePath} must not carry width/thickness on a glow accent border`);
+    }
+  }
 }
 
 function validateSectionTrigger(trigger: unknown, basePath: string, errors: string[]): void {

@@ -15,9 +15,15 @@
 // re-renders that need updated derived state) → scheduleSave.
 
 import type { EditorContext } from './editor-context.js';
-import type { BackgroundEffect, MotionPreset, SectionRole } from '../canvas/schema.js';
+import type {
+  AccentBorder,
+  BackgroundEffect,
+  MotionPreset,
+  SectionRole,
+} from '../canvas/schema.js';
 import { MOTION_PRESETS } from '../canvas/schema.js';
 import { selectInput } from './dom-builders.js';
+import { buildColorRow } from './inspector-leaf-builders.js';
 
 export function renderSectionInspector(ctx: EditorContext): void {
   if (!ctx.inspector) return;
@@ -168,6 +174,185 @@ export function renderSectionInspector(ctx: EditorContext): void {
   bgVideoRow.appendChild(bgVideoFileInput);
   groupBg.appendChild(bgVideoRow);
   ctx.inspector.appendChild(groupBg);
+
+  // -- Accent border (ADR 0062) --------------------------------------
+  // Discriminated-union field; four variants are mutually exclusive by
+  // construction. Type-picker first; then variant-specific controls
+  // (color + thickness/width/radius/spread) render conditionally so the
+  // shape of the form matches the shape of the data exactly.
+  const groupAccent = document.createElement('div');
+  groupAccent.className = 'opencanvas-page-inspector-group';
+  const hAccent = document.createElement('h4');
+  hAccent.textContent = 'Accent border';
+  groupAccent.appendChild(hAccent);
+
+  const accentTypeLabel = document.createElement('label');
+  accentTypeLabel.textContent = 'Style';
+  accentTypeLabel.style.cssText =
+    'display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin-bottom:4px';
+  groupAccent.appendChild(accentTypeLabel);
+
+  // Display values map to the user-facing labels in the spec; storage
+  // values stay aligned with AccentBorder['type'] + 'none' for absence.
+  const ACCENT_DISPLAY: Array<{ value: 'none' | AccentBorder['type']; label: string }> = [
+    { value: 'none', label: 'None' },
+    { value: 'solid', label: 'Solid' },
+    { value: 'top', label: 'Top stripe' },
+    { value: 'left', label: 'Left bar' },
+    { value: 'glow', label: 'Glow' },
+  ];
+  const currentAccent = section.accentBorder ? section.accentBorder.type : 'none';
+  const accentTypeSel = document.createElement('select');
+  for (const opt of ACCENT_DISPLAY) {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    if (opt.value === currentAccent) o.selected = true;
+    accentTypeSel.appendChild(o);
+  }
+  accentTypeSel.addEventListener('change', function () {
+    const next = accentTypeSel.value as 'none' | AccentBorder['type'];
+    const prevColor = section.accentBorder ? section.accentBorder.color : '#3b82f6';
+    if (next === 'none') {
+      delete section.accentBorder;
+    } else if (next === 'solid') {
+      section.accentBorder = { type: 'solid', color: prevColor, width: 1 };
+    } else if (next === 'top') {
+      section.accentBorder = { type: 'top', color: prevColor, thickness: 3 };
+    } else if (next === 'left') {
+      section.accentBorder = { type: 'left', color: prevColor, thickness: 3 };
+    } else {
+      section.accentBorder = { type: 'glow', color: prevColor, radius: 48 };
+    }
+    ctx.captureForUndo();
+    ctx.renderAll();
+    // Re-render the inspector so the variant-specific controls update.
+    renderSectionInspector(ctx);
+    ctx.scheduleSave();
+  });
+  groupAccent.appendChild(accentTypeSel);
+
+  if (section.accentBorder) {
+    const ab = section.accentBorder;
+
+    // Color row — reuses buildColorRow so the picker, hex entry, and
+    // reset story match the rest of the inspector.
+    const colorLabel = document.createElement('label');
+    colorLabel.textContent = 'Color';
+    colorLabel.style.cssText =
+      'display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin:10px 0 4px';
+    groupAccent.appendChild(colorLabel);
+    const colorRow = buildColorRow({
+      getValue: function () {
+        return section.accentBorder ? section.accentBorder.color : null;
+      },
+      setValue: function (v) {
+        if (section.accentBorder) section.accentBorder.color = v;
+      },
+      clearValue: function () {
+        // The accent group as a whole has its own "None" type-pick to
+        // remove the field; the per-row clear button reverts color to
+        // the default rather than dropping the accent altogether.
+        if (section.accentBorder) section.accentBorder.color = '#3b82f6';
+      },
+      onChange: function () {
+        ctx.captureForUndo();
+        ctx.renderAll();
+        ctx.scheduleSave();
+      },
+      enabledTitle: 'Use a custom accent color',
+      swatchDefault: '#3b82f6',
+    });
+    groupAccent.appendChild(colorRow);
+
+    // Variant-specific numeric control. Type-narrowed locally so each
+    // arm only writes the field it owns.
+    const numericLabel = document.createElement('label');
+    numericLabel.style.cssText =
+      'display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin:10px 0 4px';
+    const numericInput = document.createElement('input');
+    numericInput.type = 'number';
+    numericInput.min = '1';
+    numericInput.style.cssText = 'width:100%';
+
+    if (ab.type === 'solid') {
+      numericLabel.textContent = 'Width (px)';
+      numericInput.value = String(ab.width);
+      numericInput.max = '12';
+      numericInput.addEventListener('change', function () {
+        const v = parseInt(numericInput.value, 10);
+        if (!isNaN(v) && v > 0 && section.accentBorder && section.accentBorder.type === 'solid') {
+          section.accentBorder.width = v;
+          ctx.captureForUndo();
+          ctx.renderAll();
+          ctx.scheduleSave();
+        }
+      });
+    } else if (ab.type === 'top' || ab.type === 'left') {
+      numericLabel.textContent = 'Thickness (px)';
+      numericInput.value = String(ab.thickness);
+      numericInput.max = '24';
+      numericInput.addEventListener('change', function () {
+        const v = parseInt(numericInput.value, 10);
+        if (
+          !isNaN(v) &&
+          v > 0 &&
+          section.accentBorder &&
+          (section.accentBorder.type === 'top' || section.accentBorder.type === 'left')
+        ) {
+          section.accentBorder.thickness = v;
+          ctx.captureForUndo();
+          ctx.renderAll();
+          ctx.scheduleSave();
+        }
+      });
+    } else {
+      // glow
+      numericLabel.textContent = 'Radius (px)';
+      numericInput.value = String(ab.radius);
+      numericInput.max = '200';
+      numericInput.addEventListener('change', function () {
+        const v = parseInt(numericInput.value, 10);
+        if (!isNaN(v) && v > 0 && section.accentBorder && section.accentBorder.type === 'glow') {
+          section.accentBorder.radius = v;
+          ctx.captureForUndo();
+          ctx.renderAll();
+          ctx.scheduleSave();
+        }
+      });
+    }
+    groupAccent.appendChild(numericLabel);
+    groupAccent.appendChild(numericInput);
+
+    if (ab.type === 'glow') {
+      const spreadLabel = document.createElement('label');
+      spreadLabel.textContent = 'Spread (px, optional)';
+      spreadLabel.style.cssText =
+        'display:block;font-size:12px;color:var(--opencanvas-fg-mute);margin:10px 0 4px';
+      const spreadInput = document.createElement('input');
+      spreadInput.type = 'number';
+      spreadInput.min = '0';
+      spreadInput.max = '100';
+      spreadInput.style.cssText = 'width:100%';
+      spreadInput.value = ab.spread !== undefined ? String(ab.spread) : '';
+      spreadInput.addEventListener('change', function () {
+        if (!section.accentBorder || section.accentBorder.type !== 'glow') return;
+        const raw = spreadInput.value.trim();
+        if (raw === '') {
+          delete section.accentBorder.spread;
+        } else {
+          const v = parseInt(raw, 10);
+          if (!isNaN(v) && v >= 0) section.accentBorder.spread = v;
+        }
+        ctx.captureForUndo();
+        ctx.renderAll();
+        ctx.scheduleSave();
+      });
+      groupAccent.appendChild(spreadLabel);
+      groupAccent.appendChild(spreadInput);
+    }
+  }
+  ctx.inspector.appendChild(groupAccent);
 
   // -- Motion ---------------------------------------------------------
   const groupMotion = document.createElement('div');

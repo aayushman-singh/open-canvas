@@ -64,6 +64,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0059 | Site header/footer is the only canonical pinned section; pages opt-in or opt-out | Accepted | [`docs/adr/0059-site-header-footer-is-only-canonical-pin.md`](0059-site-header-footer-is-only-canonical-pin.md) |
 | 0060 | CMS-style entries live in a dedicated table; the canvas holds template pages, not individual entries | Accepted | [`docs/adr/0060-cms-entries-table-and-template-pages.md`](0060-cms-entries-table-and-template-pages.md) |
 | 0061 | Section Library is the canonical pool; Template Seeds are compositions of Section Instances | Proposed | [`docs/adr/0061-section-library-is-canonical-pool-templates-are-compositions.md`](0061-section-library-is-canonical-pool-templates-are-compositions.md) |
+| 0062 | Section accent border is a single discriminated-union field with four mutually exclusive variants | Proposed | [`docs/adr/0062-section-accent-border.md`](0062-section-accent-border.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
