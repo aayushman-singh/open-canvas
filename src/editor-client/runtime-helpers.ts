@@ -29,6 +29,7 @@ import { isAllowedHref } from './href-utils.js';
 import { newElementId } from './ids.js';
 import { mountChartData } from './inspector-chart-mount.js';
 import { renderActionHrefField } from './inspector-action-href.js';
+import { mountActionLabel } from './inspector-action-label.js';
 import { renderIconField } from './inspector-icon-picker.js';
 import {
   mountAccordionItems,
@@ -562,6 +563,7 @@ function inspectorMountHandler(
   name: string,
 ): ((element: CanvasElement, host: HTMLElement) => void) | null {
   const mounts: Record<string, (element: CanvasElement, host: HTMLElement) => void> = {
+    'action-label': (element, host) => mountActionLabel(ctx, element as ActionElement, host),
     'media-ai': (element, host) => mountMediaAi(ctx, element as MediaElement, host),
     'media-picker': (element, host) => mountMediaPicker(ctx, element as MediaElement, host),
     'video-playback': (element, host) => mountVideoPlayback(ctx, element as MediaElement, host),

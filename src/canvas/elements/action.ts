@@ -82,12 +82,20 @@ export function renderAction(element: ActionElement, ctx: { pages: CanvasPage[] 
   return `<a class="opencanvas-action" data-variant="${variantAttr}" href="${escapeAttr(resolved)}">${innerHtml}</a>`;
 }
 
-// Inspector — variant + iconKind + href (link case). Rich-text label editor
-// + behaviour editor land in the inspector follow-up PR per ADR 0051's
-// follow-ups bullet. Authors editing copy-variant actions go through the
-// agent tool or the JSON in the interim.
+// Inspector — label + variant + iconKind + href (link case). Rich-text
+// behaviour editor still lands in a follow-up; today the agent tool covers
+// the copy-variant authoring path.
+//
+// Label sits BEFORE Variant on purpose: editing the visible text is the
+// single most common action-element edit, and the live bug observed
+// 2026-06-04 was that the inspector exposed no Label field at all so the
+// only way to retitle a button was the agent tool. The `action-label`
+// custom-mount renders an `<input>` bound to label[0].text plus a Clear
+// affordance that collapses the label to [{text:''}] (the icon-only
+// at-rest contract).
 export const actionInspectorSpec: InspectorSpec = {
   fields: [
+    { kind: 'custom-mount', name: 'action-label' },
     { kind: 'select', label: 'Variant', path: 'variant', options: ACTION_VARIANTS },
     { kind: 'icon', label: 'Icon', path: 'iconKind' },
     {
