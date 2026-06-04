@@ -18,7 +18,7 @@ import {
   type BillingPlan,
 } from '../../db/schema';
 import { canReadScopedLibraryRow } from './library-access';
-import { getTemplateSeed } from '../../templates/registry';
+import { getTemplateSeed, instantiateTemplate } from '../../templates/registry';
 import { TEMPLATE_SEED_ENTRIES } from '../../templates/portfolio-seed-entries';
 
 type Bindings = {
@@ -419,7 +419,11 @@ sites.post('/', async (c) => {
       .from(ownerAsset)
       .where(eq(ownerAsset.customerId, customerId));
     const existingByHash = new Map(existingAssets.map((r) => [r.contentHash, r.id]));
-    const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seed.state, existingByHash);
+    // ADR 0061 Phase D — materialise the TemplateSeed composition to an
+    // EditableSite once, then feed both the asset-manifest pass and
+    // editableState assignment from the same instance.
+    const seedState = instantiateTemplate(seed.id);
+    const preparedSeedAssets = prepareSeedAssetsForCustomer(customerId, seedState, existingByHash);
     if (!preparedSeedAssets.ok) {
       return c.json(
         {

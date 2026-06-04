@@ -5,7 +5,7 @@
 // catalog is built statically at module load.
 
 import type { CanvasSection } from '../canvas/schema.js';
-import { allTemplateSeeds } from './registry.js';
+import { allTemplateSeeds, instantiateTemplate } from './registry.js';
 import { buildSectionThumbnailSvg } from './section-thumbnail.js';
 
 export interface SectionCatalogEntry {
@@ -33,7 +33,11 @@ function firstHeadingPreview(section: CanvasSection): string {
 function buildCatalog(): SectionCatalogEntry[] {
   const entries: SectionCatalogEntry[] = [];
   for (const seed of allTemplateSeeds) {
-    const page = seed.state.pages[0];
+    // ADR 0061 Phase D — TemplateSeeds are compositions now; materialise
+    // each to read the body sections. This walks only the first page,
+    // matching the pre-Phase-D behaviour the picker relied on.
+    const state = instantiateTemplate(seed.id);
+    const page = state.pages[0];
     if (!page) continue;
     for (const section of page.sections) {
       const heading = firstHeadingPreview(section);

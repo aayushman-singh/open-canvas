@@ -35,7 +35,12 @@ import {
 } from './routes/api/sites';
 import { canReadScopedLibraryRow, escapeHtmlText } from './routes/api/library-access';
 import { getAddon } from './addons/registry';
-import { allTemplateSeeds, getTemplateSeed, starterTemplate } from './templates/registry';
+import { allTemplateSeeds, getTemplateSeed, instantiateTemplate, starterTemplate } from './templates/registry';
+
+// ADR 0061 Phase D — materialise once, reuse the EditableSite shape
+// throughout. Pre-Phase-D code that read `.state` on a TemplateSeed now
+// reads from this `starterState` (and per-id materialisations below).
+const starterState = instantiateTemplate(starterTemplate.id);
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
@@ -224,14 +229,14 @@ assert(
 );
 
 // Multipage invariant: a two-page state is valid when page ids/slugs are unique.
-const secondStarterPage = structuredClone(starterTemplate.state.pages[0]);
+const secondStarterPage = structuredClone(starterState.pages[0]);
 if (!secondStarterPage) throw new Error('starterTemplate must have at least one page');
 secondStarterPage.id = 'page-review-second';
 secondStarterPage.slug = 'review-second';
 secondStarterPage.title = 'Review Second';
 const twoPageStarter = {
-  ...starterTemplate.state,
-  pages: [structuredClone(starterTemplate.state.pages[0]), secondStarterPage],
+  ...starterState,
+  pages: [structuredClone(starterState.pages[0]), secondStarterPage],
 };
 const twoPageResult = validateEditableSite(twoPageStarter);
 assert(
@@ -414,14 +419,15 @@ for (const seed of allTemplateSeeds) {
   assert(!templateIds.has(seed.id), `expected template id ${seed.id} to be unique`);
   templateIds.add(seed.id);
   assert(getTemplateSeed(seed.id) === seed, `expected getTemplateSeed to resolve ${seed.id}`);
-  const seedStateResult = validateEditableSite(seed.state);
+  const seedState = instantiateTemplate(seed.id);
+  const seedStateResult = validateEditableSite(seedState);
   assert(
     seedStateResult.valid,
     seedStateResult.valid
       ? ''
       : `expected template ${seed.id} to pass canvas validation: ${seedStateResult.errors.join('; ')}`,
   );
-  const seedAssetResult = validateSeedFixture(seed.state);
+  const seedAssetResult = validateSeedFixture(seedState);
   assert(
     seedAssetResult.valid,
     seedAssetResult.valid
@@ -673,7 +679,7 @@ assert(
   enterpriseTemplate.name === 'Enterprise Scale',
   `expected enterprise-scale-canvas name to be Enterprise Scale (got ${enterpriseTemplate.name})`,
 );
-const enterprisePage = enterpriseTemplate.state.pages[0];
+const enterprisePage = instantiateTemplate(enterpriseTemplate.id).pages[0];
 assert(enterprisePage !== undefined, 'expected enterprise template to contain one canvas page');
 assert(
   enterprisePage.title === 'Enterprise Scale',
@@ -1244,8 +1250,8 @@ try {
     customerId: seededCustomerId,
     name: 'smoke',
     subdomain: SMOKE_SUB,
-    styleKit: starterTemplate.state.styleKit,
-    editableState: starterTemplate.state,
+    styleKit: starterState.styleKit,
+    editableState: starterState,
     publishedSnapshot: null,
     publishedVersion: 0,
   });
@@ -1263,8 +1269,8 @@ try {
   const publishedSnapshot = {
     version: 1,
     publishedAt: new Date().toISOString(),
-    styleKit: starterTemplate.state.styleKit,
-    pages: starterTemplate.state.pages,
+    styleKit: starterState.styleKit,
+    pages: starterState.pages,
   };
   await smokeDb
     .update(site)
@@ -1358,18 +1364,18 @@ try {
 // -- Task 6: seed-asset registry + site-creation materialisation ----------
 // Positive case: the bundled fixture passes validateSeedFixture (every media
 // `assetId` and `posterAssetId` resolves in SEED_ASSET_REGISTRY).
-const seedOk = validateSeedFixture(starterTemplate.state);
+const seedOk = validateSeedFixture(starterState);
 assert(
   seedOk.valid,
   seedOk.valid
     ? ''
-    : `expected validateSeedFixture(starterTemplate.state) to pass: ${seedOk.errors.join('; ')}`,
+    : `expected validateSeedFixture(starterState) to pass: ${seedOk.errors.join('; ')}`,
 );
 
 // Negative case: a fixture whose media references an unregistered assetId is
 // rejected, with the rejection message mentioning the offending id.
 const T6_BOGUS_ID = 't6-bogus-asset-id';
-const bogusFixture: EditableSite = structuredClone(starterTemplate.state);
+const bogusFixture: EditableSite = structuredClone(starterState);
 const bogusPage = bogusFixture.pages[0];
 if (!bogusPage) throw new Error('starterTemplate must have at least one page');
 const bogusSection = bogusPage.sections.find((s) => s.id === 'section-hero');
@@ -1389,7 +1395,7 @@ assert(
   `expected validateSeedFixture rejection to mention the offending id ${T6_BOGUS_ID}`,
 );
 
-const kindMismatchFixture: EditableSite = structuredClone(starterTemplate.state);
+const kindMismatchFixture: EditableSite = structuredClone(starterState);
 const kindMismatchPage = kindMismatchFixture.pages[0];
 if (!kindMismatchPage) throw new Error('starterTemplate must have at least one page');
 const kindMismatchSection = kindMismatchPage.sections.find((s) => s.id === 'section-hero');
@@ -1411,7 +1417,7 @@ assert(
   'expected seed kind mismatch rejection to mention the image asset id',
 );
 
-const posterReferenceState: EditableSite = structuredClone(starterTemplate.state);
+const posterReferenceState: EditableSite = structuredClone(starterState);
 const posterReferencePage = posterReferenceState.pages[0];
 if (!posterReferencePage) throw new Error('starterTemplate must have at least one page');
 const posterReferenceSection = posterReferencePage.sections.find((s) => s.id === 'section-hero');
@@ -1476,25 +1482,25 @@ for (const [assetId, asset] of Object.entries(SEED_ASSET_REGISTRY)) {
 
 // Site-creation materialisation: after creating a smoke site, the count of
 // `ownerAsset` rows for that Owner MUST equal the count of seed asset ids
-// referenced by `starterTemplate.state`. Per ADR 0004 the asset root is
+// referenced by `starterState`. Per ADR 0004 the asset root is
 // the Owner — two sites under the same Owner share seed rows; we exercise
 // only the single-Owner path here so the row count comparison stays
 // straightforward.
 const T6_CLERK_USER = 'smoke-t6-' + crypto.randomUUID().slice(0, 8);
 const T6_SUB = 't6-' + crypto.randomUUID().slice(0, 8).toLowerCase();
-const referencedSeedIds = [...collectReferencedAssetIds(starterTemplate.state)];
+const referencedSeedIds = [...collectReferencedAssetIds(starterState)];
 assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
 const preparedForCustomerA = prepareSeedAssetsForCustomer(
   'customer-a',
-  starterTemplate.state,
+  starterState,
   new Map(),
 );
 const preparedForCustomerB = prepareSeedAssetsForCustomer(
   'customer-b',
-  starterTemplate.state,
+  starterState,
   new Map(),
 );
 assert(preparedForCustomerA.ok, 'expected seed asset preparation for customer-a to succeed');
@@ -1543,7 +1549,7 @@ try {
   );
 
   t6SiteId = crypto.randomUUID();
-  const preparedT6 = prepareSeedAssetsForCustomer(t6CustomerId, starterTemplate.state, new Map());
+  const preparedT6 = prepareSeedAssetsForCustomer(t6CustomerId, starterState, new Map());
   assert(preparedT6.ok, 'expected T6 seed asset preparation to succeed');
   await smokeDb.insert(site).values({
     id: t6SiteId,
@@ -1586,7 +1592,7 @@ try {
 // preview/apply LLM call is exercised only when GEMINI_API_KEY is set; the
 // route shell mount is what we verify below.
 
-const baseT7State: EditableSite = structuredClone(starterTemplate.state);
+const baseT7State: EditableSite = structuredClone(starterState);
 const baseT7Page = baseT7State.pages[0];
 if (!baseT7Page) throw new Error('starterTemplate must have at least one page');
 const baseT7Section = baseT7Page.sections.find(

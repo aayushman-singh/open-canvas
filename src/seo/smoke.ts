@@ -17,7 +17,12 @@
 // callers rely on (one head meta block per page, in render order).
 
 import type { CanvasPage, PublishedSnapshot } from '../canvas/schema.js';
-import { apogeeShowcaseTemplate } from '../templates/registry.js';
+import { apogeeShowcaseTemplate, instantiateTemplate } from '../templates/registry.js';
+
+// ADR 0061 Phase D — TemplateSeeds are compositions; materialise once
+// and reuse across the SEO assertions below. The cached state behaves
+// like the pre-Phase-D `apogeeShowcaseTemplate.state` for these checks.
+const apogeeState = instantiateTemplate(apogeeShowcaseTemplate.id);
 import { emitPageMeta, renderCanvasHead, resolveLang, resolveNoIndex } from './meta-emit.js';
 import { resolveOgUrl } from './og-resolve.js';
 
@@ -457,7 +462,7 @@ assert(
 
 // The fixture itself must not carry any per-page canonical or
 // ogImageAssetId — the runtime path is the single source of truth.
-for (const fixturePage of apogeeShowcaseTemplate.state.pages) {
+for (const fixturePage of apogeeState.pages) {
   assert(
     fixturePage.canonical === undefined || fixturePage.canonical.length === 0,
     `apogee fixture: page "${fixturePage.slug}" must not carry a pre-baked canonical (ADR 0040)`,
@@ -483,8 +488,8 @@ const APEX_LITERALS = [
 ];
 const BRIAR_HOST = 'briar.opencanvas.aayushman.dev';
 const APOGEE_SITE_ID = 'site-apogee-smoke';
-const apogeeSnapshot = makeSnapshot(apogeeShowcaseTemplate.state.pages);
-for (const fixturePage of apogeeShowcaseTemplate.state.pages) {
+const apogeeSnapshot = makeSnapshot(apogeeState.pages);
+for (const fixturePage of apogeeState.pages) {
   const metaApogee = emitPageMeta(fixturePage, {
     siteId: APOGEE_SITE_ID,
     host: BRIAR_HOST,

@@ -303,7 +303,16 @@ function renderSection(section: CanvasSection, pageWidth: number, ctx: ElementRe
     typeof section.anchorId === 'string' && section.anchorId.length > 0
       ? ` id="${escapeAttr(section.anchorId)}"`
       : '';
-  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
+  // ADR 0061 Decision 7 — Section Instance scope is exposed as a wrapper
+  // attribute so anchor-rewriting and per-instance behaviour (e.g. two
+  // hero instances on one page) can target the right subtree. The
+  // attribute is omitted entirely for sections without a scope (Library
+  // rows and pre-Phase-D persisted state).
+  const scopeAttr =
+    typeof section.instanceScope === 'string' && section.instanceScope.length > 0
+      ? ` data-instance-scope="${escapeAttr(section.instanceScope)}"`
+      : '';
+  return `<section class="opencanvas-section"${idAttr} data-opencanvas-section="${escapeAttr(section.id)}" data-recipe="${escapeAttr(section.recipeId)}"${roleAttr}${triggerAttrs}${scopeAttr} data-bg-effect="${escapeAttr(bgEffect)}" data-entrance="${escapeAttr(entrance)}" style="${style}">${bgVideoHtml}${elementsHtml}</section>`;
 }
 
 function renderPage(

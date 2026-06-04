@@ -436,6 +436,20 @@ export interface CanvasSection {
     | { type: 'scroll'; /** Vertical scroll percentage in [0, 100]. */ value: number };
   /** Owner asset id of an MP4/webm clip played behind the section. Same `*AssetId` shape as image/poster references. */
   backgroundVideoAssetId?: string;
+  /**
+   * ADR 0061 Decision 7 — Section Instance scope.
+   *
+   * Set at instantiation time when a TemplateSeed composition resolves a
+   * `SectionInstanceRef` into a concrete `CanvasSection`. Matches the ref's
+   * `instanceId` (`/^[a-z][a-z0-9]*$/`). The Section Library row itself
+   * never carries this field; it is added only when the Section is
+   * materialised into an EditableSite.
+   *
+   * The renderer emits it as `data-instance-scope` on the section wrapper
+   * so anchor href rewriting can scope `#anchor` lookups per instance. The
+   * Yjs codec encodes it so post-instantiation state round-trips cleanly.
+   */
+  instanceScope?: string;
   elements: CanvasElement[];
 }
 

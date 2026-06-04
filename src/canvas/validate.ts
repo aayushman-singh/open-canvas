@@ -1411,6 +1411,16 @@ function validateSection(
     errors,
   );
   validateAnchorId(section.anchorId, basePath, errors);
+  // ADR 0061 Decision 7 — instanceScope is set at instantiation time and
+  // must satisfy `/^[a-z][a-z0-9]*$/`. Optional — Library rows never carry
+  // it; only sections materialised from a TemplateSeed composition do.
+  if (section.instanceScope !== undefined) {
+    if (typeof section.instanceScope !== 'string' || !/^[a-z][a-z0-9]*$/.test(section.instanceScope)) {
+      errors.push(
+        `${basePath}.instanceScope must match /^[a-z][a-z0-9]*$/ (got ${describe(section.instanceScope)})`,
+      );
+    }
+  }
   if (!Array.isArray(section.elements)) {
     errors.push(`${basePath}.elements must be an array`);
     return;

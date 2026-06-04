@@ -803,6 +803,10 @@ function encodeSection(section: CanvasSection): Y.Map<unknown> {
     out.set('trigger', trigger);
   }
   setIfDefined(out, 'backgroundVideoAssetId', section.backgroundVideoAssetId);
+  // ADR 0061 Decision 7 — instanceScope round-trips so post-instantiation
+  // state survives Yjs encode/decode. Library rows never carry it; only
+  // sections materialised via instantiateTemplate do.
+  setIfDefined(out, 'instanceScope', section.instanceScope);
   const elements = new Y.Array<Y.Map<unknown>>();
   for (const el of section.elements) elements.push([encodeElement(el)]);
   out.set('elements', elements);
@@ -1484,6 +1488,9 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
   }
   if (map.has('backgroundVideoAssetId')) {
     section.backgroundVideoAssetId = map.get('backgroundVideoAssetId') as string;
+  }
+  if (map.has('instanceScope')) {
+    section.instanceScope = map.get('instanceScope') as string;
   }
   return section;
 }

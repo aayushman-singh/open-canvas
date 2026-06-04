@@ -6,7 +6,7 @@
 // and assert the new asset rows match the registry contents. Run with
 // `bun.cmd run section-import:smoke`.
 
-import { allTemplateSeeds } from '../templates/registry.js';
+import { allTemplateSeeds, instantiateTemplate } from '../templates/registry.js';
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { importLibrarySectionIntoSite } from './library-section-import.js';
 import { importSectionIntoSite } from './section-import.js';
@@ -20,7 +20,7 @@ const targetCustomerId = 'test-target-customer-id';
 const existingAssetIds = new Set<string>();
 
 for (const seed of allTemplateSeeds) {
-  const sourceSection = seed.state.pages[0]?.sections[0];
+  const sourceSection = instantiateTemplate(seed.id).pages[0]?.sections[0];
   assert(sourceSection !== undefined, `${seed.id} missing page[0].sections[0]`);
 
   const result = importSectionIntoSite({
@@ -65,8 +65,8 @@ for (const seed of allTemplateSeeds) {
 
 // Dedup check: same registry asset referenced from a fresh import after
 // existingAssetIds is primed should not produce a duplicate row.
-const seed = allTemplateSeeds[0];
-const firstSection = seed.state.pages[0]!.sections[0]!;
+const seed = allTemplateSeeds[0]!;
+const firstSection = instantiateTemplate(seed.id).pages[0]!.sections[0]!;
 const firstImport = importSectionIntoSite({
   targetCustomerId,
   sourceSection: firstSection,
@@ -210,8 +210,8 @@ if (firstImport.ok) {
 // previous /^[a-z0-9]{4,}$/i bug that stripped words like "heading" and
 // "primary").
 {
-  const heroSeed = allTemplateSeeds[0];
-  const heroSection = heroSeed.state.pages[0]!.sections[0]!;
+  const heroSeed = allTemplateSeeds[0]!;
+  const heroSection = instantiateTemplate(heroSeed.id).pages[0]!.sections[0]!;
   const out = importSectionIntoSite({
     targetCustomerId,
     sourceSection: heroSection,

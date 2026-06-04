@@ -1,67 +1,67 @@
 // src/canvas/section-library/extraction.smoke.ts
 //
-// ADR 0061 Phase C — extraction completeness smoke.
+// ADR 0061 — Section Library coverage smoke. Originally Phase C verified
+// origin-map coverage against the pre-Phase-D `seed.state` shape. After
+// Phase D's TemplateSeed→composition rewrite, the load-bearing invariants
+// shift onto the composition refs themselves:
 //
-// Three invariants the extraction script must keep true between runs.
-// Without these, Phase D's TemplateSeed rewrite would silently drop
-// sections or fail to resolve refs at instantiation time.
-//
-//   1. Every section in `allTemplateSeeds` (state.header, state.footer,
-//      state.pages[*].sections[*]) has an `(templateId, sectionId)` row
-//      in `ORIGIN_TO_BASE_SLUG`. If a section is missing, the rewrite
-//      can't find its pool slug.
-//   2. Every entry in `ORIGIN_TO_BASE_SLUG` resolves to a real
-//      `SectionLibraryEntry` in `SECTION_LIBRARY`. If the origin map
-//      points at a non-existent slug, the boot upsert can't materialise
-//      it and the renderer fails loudly.
-//   3. Every `SectionLibraryEntry.baseSlug` is unique. Two entries
-//      sharing a slug would collide on the `(base_slug, version)`
-//      unique index in Phase A's migration.
-//
-// The smoke runs against the live extraction artefacts (the JSON files
-// + manifest + origin map) so re-running the extraction script with new
-// templates is enough to keep coverage in sync.
+//   1. Every TemplateSeed composition ref (headerRef + footerRef +
+//      pages[*].bodyRefs[*]) resolves to a real `SectionLibraryEntry`
+//      via its deterministic `${baseSlug}-v1` row id (see
+//      `entryRowId`). A miss would crash `instantiateTemplate` at
+//      runtime.
+//   2. Every entry in `ORIGIN_TO_BASE_SLUG` still resolves to a
+//      SECTION_LIBRARY entry — kept as a documentation aid (the table
+//      is the audit trail of which pool entry came from which legacy
+//      (templateId, sectionId) pair). Phase G can drop this.
+//   3. `baseSlug` uniqueness — two entries with the same baseSlug
+//      would collide on the `(base_slug, version)` unique index from
+//      Phase A's migration.
 //
 // Run with `bun run section-library-extraction:smoke`.
 
 import { allTemplateSeeds } from '../../templates/registry.js';
-import { ORIGIN_TO_BASE_SLUG, resolveBaseSlug } from './origin-mapping.js';
+import { entryRowId } from './boot-upsert.js';
+import { ORIGIN_TO_BASE_SLUG } from './origin-mapping.js';
 import { SECTION_LIBRARY } from './registry.js';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[section-library-extraction:smoke] ${message}`);
 }
 
-// -- Invariant 1: every TemplateSeed section is in the origin map --------------
+// Build the rowId index once — every composition ref's `sectionId` must
+// be a key in this map for instantiateTemplate to succeed.
+const rowIdIndex = new Map<string, number>();
+const slugIndex = new Map<string, number>();
+for (let i = 0; i < SECTION_LIBRARY.length; i += 1) {
+  const entry = SECTION_LIBRARY[i]!;
+  rowIdIndex.set(entryRowId(entry), i);
+  slugIndex.set(entry.baseSlug, i);
+}
 
-const missingOriginRefs: string[] = [];
+// -- Invariant 1: every composition ref resolves to a SECTION_LIBRARY entry ---
+
+const unresolvedRefs: string[] = [];
 for (const seed of allTemplateSeeds) {
-  const checkSection = (sectionId: string): void => {
-    const key = `${seed.id}:${sectionId}`;
-    if (!(key in ORIGIN_TO_BASE_SLUG)) {
-      missingOriginRefs.push(key);
-    }
-  };
-  if (seed.state.header) checkSection(seed.state.header.id);
-  if (seed.state.footer) checkSection(seed.state.footer.id);
-  for (const page of seed.state.pages ?? []) {
-    for (const section of page.sections) {
-      checkSection(section.id);
+  const refIds: string[] = [];
+  if (seed.headerRef) refIds.push(seed.headerRef.sectionId);
+  if (seed.footerRef) refIds.push(seed.footerRef.sectionId);
+  for (const page of seed.pages) {
+    for (const ref of page.bodyRefs) refIds.push(ref.sectionId);
+  }
+  for (const sectionId of refIds) {
+    if (!rowIdIndex.has(sectionId)) {
+      unresolvedRefs.push(`${seed.id} → ${sectionId}`);
     }
   }
 }
 
 assert(
-  missingOriginRefs.length === 0,
-  `${String(missingOriginRefs.length)} TemplateSeed sections have no origin map entry — re-run scripts/extract-section-library.ts:\n  ${missingOriginRefs.join('\n  ')}`,
+  unresolvedRefs.length === 0,
+  `${String(unresolvedRefs.length)} composition refs do not resolve to a SECTION_LIBRARY entry — either the entries/*.json file is missing or the composition's sectionId is stale:\n  ${unresolvedRefs.join('\n  ')}`,
 );
 
-// -- Invariant 2: every origin map entry resolves to a SECTION_LIBRARY row -----
-
-const slugIndex = new Map<string, number>();
-for (let i = 0; i < SECTION_LIBRARY.length; i += 1) {
-  slugIndex.set(SECTION_LIBRARY[i]!.baseSlug, i);
-}
+// -- Invariant 2: every origin map entry still resolves -----------------------
 
 const danglingOrigins: string[] = [];
 for (const [key, baseSlug] of Object.entries(ORIGIN_TO_BASE_SLUG)) {
@@ -94,15 +94,6 @@ assert(
   `${String(duplicateSlugs.length)} duplicate baseSlugs in SECTION_LIBRARY — would collide on (base_slug, version) unique index:\n  ${duplicateSlugs.join('\n  ')}`,
 );
 
-// -- Bonus: resolveBaseSlug surface-test on a known-existing key ---------------
-
-if (SECTION_LIBRARY.length > 0) {
-  const firstKey = Object.keys(ORIGIN_TO_BASE_SLUG)[0]!;
-  const [templateId, sectionId] = firstKey.split(':');
-  const resolved = resolveBaseSlug(templateId!, sectionId!);
-  assert(slugIndex.has(resolved), `resolveBaseSlug('${templateId}', '${sectionId}') returned '${resolved}' which is not in SECTION_LIBRARY`);
-}
-
 console.log(
-  `[section-library-extraction:smoke] OK — ${String(SECTION_LIBRARY.length)} entries, ${String(Object.keys(ORIGIN_TO_BASE_SLUG).length)} origin refs, all consistent`,
+  `[section-library-extraction:smoke] OK — ${String(SECTION_LIBRARY.length)} entries, ${String(allTemplateSeeds.length)} compositions resolve, ${String(Object.keys(ORIGIN_TO_BASE_SLUG).length)} origin refs intact`,
 );

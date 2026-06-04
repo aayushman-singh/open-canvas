@@ -16,7 +16,7 @@ import type { CanvasPage } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import { librarySection, ownerAsset, site } from '../../db/schema';
-import { allTemplateSeeds } from '../../templates/registry';
+import { allTemplateSeeds, instantiateTemplate } from '../../templates/registry';
 import { SECTION_CATALOG } from '../../templates/section-catalog';
 import { canReadScopedLibraryRow } from './library-access';
 
@@ -178,7 +178,10 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     if (!seed) {
       return c.json({ error: `unknown templateId: ${body.templateId}` }, 404);
     }
-    const sourceSection = seed.state.pages[0]?.sections.find((s) => s.id === body.sectionId);
+    // ADR 0061 Phase D — materialise the composition to walk the first
+    // page's sections, the same shape the pre-Phase-D seed.state had.
+    const seedState = instantiateTemplate(seed.id);
+    const sourceSection = seedState.pages[0]?.sections.find((s) => s.id === body.sectionId);
     if (!sourceSection) {
       return c.json({ error: `unknown sectionId in template: ${body.sectionId}` }, 404);
     }

@@ -12,7 +12,7 @@ import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
 import { customTemplate, site } from '../../db/schema';
-import { allTemplateSeeds, getTemplateSeed, type TemplateSeed } from '../../templates/registry';
+import { allTemplateSeeds, getTemplateSeed, instantiateTemplate, type TemplateSeed } from '../../templates/registry';
 import { SUBDOMAIN_RE } from '../api/sites';
 import { DashboardShell } from './shell';
 import { Button, readThemeCookie } from '../../ui';
@@ -336,14 +336,18 @@ function PreviewPage({
   template: TemplateSeed;
   turnstileSiteKey: string;
 }) {
+  // ADR 0061 Phase D — instantiate the composition to get an EditableSite
+  // shape the snapshot renderer accepts. Each preview re-materialises, so
+  // pool edits between deploys surface on the next preview render.
+  const state = instantiateTemplate(template.id);
   const snapshot: PublishedSnapshot = {
     version: 1,
     publishedAt: '2026-05-22T00:00:00.000Z',
-    styleKit: template.state.styleKit,
-    pages: template.state.pages,
-    ...(template.state.header ? { header: template.state.header } : {}),
-    ...(template.state.footer ? { footer: template.state.footer } : {}),
-    ...(template.state.customStyleKit ? { customStyleKit: template.state.customStyleKit } : {}),
+    styleKit: state.styleKit,
+    pages: state.pages,
+    ...(state.header ? { header: state.header } : {}),
+    ...(state.footer ? { footer: state.footer } : {}),
+    ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
   };
   // Template previews have no backing site yet — forms inside a preview
   // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass
@@ -473,7 +477,7 @@ function Page({
                       <b>{template.name}</b>
                       <p>{template.tagline}</p>
                       <span class="meta">
-                        <span class="kit">{template.state.styleKit}</span>
+                        <span class="kit">{template.styleKit}</span>
                       </span>
                     </span>
                   </span>
