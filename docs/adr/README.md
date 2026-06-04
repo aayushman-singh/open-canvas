@@ -24,7 +24,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0012 | `canvas/validate.ts` is the only write gate; consumers trust its output | Accepted | [`docs/adr/0012-validation-write-gate.md`](0012-validation-write-gate.md) |
 | 0013 | Apex host is environment-driven; production code reads it through one helper | Accepted | [`docs/adr/0013-host-config-from-environment.md`](0013-host-config-from-environment.md) |
 | 0014 | Compile-time data substitution for template-literal-bound client scripts | Rejected (superseded by 0015 without implementation) | [`docs/adr/0014-template-literal-data-substitution.md`](0014-template-literal-data-substitution.md) |
-| 0015 | Editor client ships as a built, cached, separately-fetched asset | Proposed | [`docs/adr/0015-editor-client-asset-pipeline.md`](0015-editor-client-asset-pipeline.md) |
+| 0015 | Editor client ships as a built, cached, separately-fetched asset | Accepted | [`docs/adr/0015-editor-client-asset-pipeline.md`](0015-editor-client-asset-pipeline.md) |
 | 0016 | Fake discriminated-union patterns become real TS discriminated unions | Proposed | [`docs/adr/0016-fake-discriminated-unions-to-real.md`](0016-fake-discriminated-unions-to-real.md) |
 | 0017 | Cookie name prefix is environment-driven | Accepted | [`docs/adr/0017-cookie-name-prefix-from-env.md`](0017-cookie-name-prefix-from-env.md) |
 | 0018 | Email sender address is environment-driven | Accepted | [`docs/adr/0018-email-sender-from-env.md`](0018-email-sender-from-env.md) |

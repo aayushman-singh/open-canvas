@@ -5,7 +5,10 @@
 // src/_assets/manifest.generated.ts so the editor route consumes them as
 // a typed import.
 //
-// Run: bun run scripts/build-editor-client.ts
+// Run:
+//   bun run scripts/build-editor-client.ts            # production build
+//   bun run scripts/build-editor-client.ts --dev      # dev build w/ inline
+//                                                      sourcemaps + no minify
 //
 // Two-phase build:
 //   1. Import canvasEditorStyles from src/editor-client/styles-build.ts
@@ -16,6 +19,13 @@
 //   2. Run Bun.build against src/editor-client/index.ts; the entry's
 //      `import './styles.css'` picks up the freshly-written CSS, and
 //      Bun emits hashed JS + CSS sibling artifacts under dist/_assets/.
+//
+// Dev vs prod (ADR 0015 Decision 4):
+//   - Dev (--dev): sourcemap = 'inline', minify = false. Browser dev
+//     tools resolve errors to original TS files; the bundle is larger
+//     but never reaches a real Owner.
+//   - Prod (default): sourcemap = 'none', minify = true. No source leak
+//     into the deployed Worker; cache-friendly minified output.
 //
 // Modelled on scripts/bundle-co-edit.ts — the existing Bun.build
 // precedent in this repo. The output URL prefix is /_assets/ (matching
@@ -30,6 +40,8 @@ const OUT_DIR = resolve(ROOT, 'dist/_assets');
 const MANIFEST_PATH = resolve(ROOT, 'src/_assets/manifest.generated.ts');
 const STYLES_CSS_PATH = resolve(ROOT, 'src/editor-client/styles.css');
 const ASSET_URL_PREFIX = '/_assets';
+
+const isDev = process.argv.includes('--dev');
 
 async function main(): Promise<void> {
   mkdirSync(OUT_DIR, { recursive: true });
@@ -53,9 +65,9 @@ async function main(): Promise<void> {
     outdir: OUT_DIR,
     target: 'browser',
     format: 'esm',
-    minify: true,
+    minify: !isDev,
     naming: '[name]-[hash].[ext]',
-    sourcemap: 'none',
+    sourcemap: isDev ? 'inline' : 'none',
   });
 
   if (!result.success) {
@@ -103,6 +115,8 @@ export const EDITOR_CLIENT_MANIFEST = {
 `;
 
   writeFileSync(MANIFEST_PATH, manifestBody, 'utf-8');
+  const mode = isDev ? 'dev (inline sourcemaps, unminified)' : 'prod (minified, no sourcemaps)';
+  console.log(`[build-editor-client] mode: ${mode}`);
   console.log(`[build-editor-client] wrote ${canvasClientUrl}`);
   console.log(`[build-editor-client] wrote ${canvasStylesUrl}`);
   console.log(`[build-editor-client] manifest at ${MANIFEST_PATH}`);
