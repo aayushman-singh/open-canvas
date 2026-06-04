@@ -385,6 +385,33 @@ process.stdout.write('[notifications:smoke] writer failure contracts OK\n');
     'notification click must wait for mark-read before navigating',
   );
 
+  // Cold-load perf — the initial /api/notifications fetch is NOT eager; it
+  // schedules via requestIdleCallback (with a setTimeout fallback) so the
+  // editor's first paint isn't gated on the inbox query. The bell-open path
+  // still triggers the fetch synchronously so the panel doesn't sit on the
+  // "Loading..." sentinel. Regression-guard against a future inline edit
+  // putting fetchInbox().catch back at module-top.
+  assert(
+    notificationsInboxScript.includes('kickInitialFetch') &&
+      notificationsInboxScript.includes("requestIdleCallback") &&
+      notificationsInboxScript.includes("kickInitialFetch('idle')") &&
+      notificationsInboxScript.includes("kickInitialFetch('bell-open')"),
+    'initial inbox fetch must be deferred to requestIdleCallback / first bell-open (not eager at module top)',
+  );
+  // Defensive — exactly one top-level invocation of the initial fetch should
+  // exist (the idle scheduler). The bell-open path goes through openPanel,
+  // not the top-level invocation. Any literal `fetchInbox().catch` at the
+  // module top (not inside a function) means the deferral got dropped.
+  {
+    const idleInvocations = (notificationsInboxScript.match(
+      /idleScheduler\(function\(\)\s*\{\s*kickInitialFetch\('idle'\)/g,
+    ) || []).length;
+    assert(
+      idleInvocations === 1,
+      'expected exactly one idleScheduler invocation that kicks the initial inbox fetch',
+    );
+  }
+
   const publicRoute = readFileSync(join(process.cwd(), 'src', 'routes', 'public.ts'), 'utf8');
   assert(
     publicRoute.includes("buildSiteNotif('collaborator_event'"),
