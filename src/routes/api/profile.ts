@@ -2,7 +2,12 @@ import { Hono } from 'hono';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { customer, BILLING_PLANS, type BillingPlan } from '../../db/schema';
-import { clerkAuth, getClerkUser, type ClerkAuthVariables } from '../../auth/middleware';
+import {
+  clerkAuth,
+  getClerkUser,
+  invalidateCustomerCache,
+  type ClerkAuthVariables,
+} from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 
 type Bindings = {
@@ -93,6 +98,10 @@ profileApi.patch('/', async (c) => {
   if (!updatedRows[0]) {
     return c.json({ error: 'customer not found' }, 404);
   }
+
+  // Drop the module-scope cache entry so the next request reads the fresh
+  // row from Neon instead of the pre-mutation copy.
+  invalidateCustomerCache(c.env.DATABASE_URL, auth.userId!);
 
   return c.json({ ok: true });
 });
