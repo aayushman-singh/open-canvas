@@ -205,13 +205,15 @@ export const navInspectorSpec: InspectorSpec = {
       placeholder: 'Brand wordmark (optional)',
       emptyOmits: true,
     },
-    {
-      kind: 'text',
-      label: 'Logo asset',
-      path: 'logoAssetId',
-      placeholder: 'Logo asset ID (optional)',
-      emptyOmits: true,
-    },
+    // Header icon picker — three-row media picker (current / upload + clear /
+    // gallery) filtered to image-kind assets. Imperative because the upload
+    // path needs to round-trip through ctx.postAssetUpload before flipping
+    // element.logoAssetId, and the gallery row needs an async refresh that
+    // declarative kinds don't model. A future "asset-picker" declarative kind
+    // covering "single asset slot with upload + gallery" would generalise this
+    // (and the action.iconAssetId case if one ever lands) — wait for the
+    // second consumer.
+    { kind: 'custom-mount', name: 'nav-logo' },
   ],
 };
 

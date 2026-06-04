@@ -476,56 +476,106 @@ export function buildTableBodyImpl(_ctx: EditorContext, element: TableElement): 
   return table;
 }
 
+// Build one <a> for a NavLink-shaped link, with the editor's click handler
+// (preventDefault + route through ctx.goToHrefOnCanvas for internal hops,
+// window.open for external, no-op for anchor). Used for both nav-bar links
+// and the primary-action CTA so the click semantics stay identical.
+function buildNavLinkAnchor(
+  ctx: EditorContext,
+  link: { label: string; href: string; kind: string },
+  className: string,
+): HTMLAnchorElement {
+  const a = document.createElement('a');
+  a.className = className;
+  const kind = link.kind === 'external' || link.kind === 'anchor' ? link.kind : 'internal';
+  a.setAttribute('data-opencanvas-nav-link-kind', kind);
+  let resolvedHref = typeof link.href === 'string' ? link.href : '';
+  if (kind === 'internal' && resolvedHref.length > 0 && resolvedHref.charAt(0) !== '/') {
+    resolvedHref = '/' + resolvedHref;
+  }
+  a.setAttribute('href', resolvedHref.length > 0 ? resolvedHref : '#');
+  if (kind === 'external') {
+    a.setAttribute('target', '_blank');
+    a.setAttribute('rel', 'noopener');
+  }
+  a.textContent = link.label || 'Link';
+  const capturedHref = resolvedHref;
+  const capturedKind = kind;
+  a.addEventListener('click', function (ev: MouseEvent) {
+    ev.preventDefault();
+    if (ev.altKey) return;
+    if (capturedKind === 'internal') {
+      ctx.goToHrefOnCanvas(capturedHref);
+      return;
+    }
+    if (capturedKind === 'external') {
+      if (isAllowedHref(capturedHref)) {
+        window.open(capturedHref, '_blank', 'noopener,noreferrer');
+      }
+      return;
+    }
+  });
+  return a;
+}
+
 export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLElement {
+  // Mirrors src/canvas/elements/nav.ts renderNav exactly so kit CSS selectors
+  // matching .opencanvas-nav[data-opencanvas-nav-layout] and the slot rules
+  // in editor styles fire on the editor preview the same way they fire on the
+  // published page. The prior implementation emitted .opencanvas-nav-preview
+  // with no slot structure, which is why layout / siteTitle / primaryAction /
+  // logo changes never reflected live in the editor.
   const nav = document.createElement('nav');
-  nav.className = 'opencanvas-nav-preview';
-  nav.style.display = 'flex';
-  nav.style.alignItems = 'center';
-  nav.style.gap = '12px';
+  nav.className = 'opencanvas-nav';
+  const layout = element.layout === 'left-right' ? 'left-right' : 'left-center-right';
+  nav.setAttribute('data-opencanvas-nav-layout', layout);
+  nav.setAttribute('data-opencanvas-nav-sticky', element.sticky ? 'true' : 'false');
+  nav.style.position = 'relative';
   nav.style.width = '100%';
   nav.style.height = '100%';
+  nav.style.display = 'flex';
+  nav.style.alignItems = 'center';
+
+  const leftSlot = document.createElement('div');
+  leftSlot.className = 'opencanvas-nav-slot';
+  leftSlot.setAttribute('data-slot', 'left');
+  if (typeof element.logoAssetId === 'string' && element.logoAssetId.length > 0) {
+    const logo = document.createElement('img');
+    logo.className = 'opencanvas-nav-logo';
+    logo.src = ctx.siteBase + '/assets/' + encodeURIComponent(element.logoAssetId);
+    logo.alt = '';
+    leftSlot.appendChild(logo);
+  }
+  if (typeof element.siteTitle === 'string' && element.siteTitle.length > 0) {
+    const title = document.createElement('span');
+    title.className = 'opencanvas-nav-site-title';
+    title.textContent = element.siteTitle;
+    leftSlot.appendChild(title);
+  }
+  nav.appendChild(leftSlot);
+
+  const linksSlotName = layout === 'left-right' ? 'right' : 'center';
+  const linksSlot = document.createElement('div');
+  linksSlot.className = 'opencanvas-nav-slot';
+  linksSlot.setAttribute('data-slot', linksSlotName);
   const links = Array.isArray(element.links) ? element.links : [];
   for (let i = 0; i < links.length; i++) {
     const link = links[i];
     if (!link) continue;
-    const a = document.createElement('a');
-    a.className = 'opencanvas-nav-link';
-    const kind = link.kind === 'external' || link.kind === 'anchor' ? link.kind : 'internal';
-    a.setAttribute('data-opencanvas-nav-link-kind', kind);
-    let resolvedHref = typeof link.href === 'string' ? link.href : '';
-    if (kind === 'internal' && resolvedHref.length > 0 && resolvedHref.charAt(0) !== '/') {
-      resolvedHref = '/' + resolvedHref;
-    }
-    a.setAttribute('href', resolvedHref.length > 0 ? resolvedHref : '#');
-    if (kind === 'external') {
-      a.setAttribute('target', '_blank');
-      a.setAttribute('rel', 'noopener');
-    }
-    a.textContent = link.label || 'Link';
-    // Capture href/kind per-iteration so the click handler doesn't see the
-    // last loop value (the surrounding for-loop uses let but the closure is
-    // attached via addEventListener, which is fine — explicit locals make
-    // the intent obvious and survive refactors).
-    (function (capturedHref: string, capturedKind: 'internal' | 'external' | 'anchor') {
-      a.addEventListener('click', function (ev: MouseEvent) {
-        ev.preventDefault();
-        if (ev.altKey) return;
-        if (capturedKind === 'internal') {
-          ctx.goToHrefOnCanvas(capturedHref);
-          return;
-        }
-        if (capturedKind === 'external') {
-          if (isAllowedHref(capturedHref)) {
-            window.open(capturedHref, '_blank', 'noopener,noreferrer');
-          }
-          return;
-        }
-        // anchor: in-page fragments have no canvas-side destination; the
-        // public renderer scrolls, the editor stays put.
-      });
-    })(resolvedHref, kind);
-    nav.appendChild(a);
+    linksSlot.appendChild(buildNavLinkAnchor(ctx, link, 'opencanvas-nav-link'));
   }
+  nav.appendChild(linksSlot);
+
+  if (element.primaryAction !== undefined && element.primaryAction !== null) {
+    const primarySlot = document.createElement('div');
+    primarySlot.className = 'opencanvas-nav-slot';
+    primarySlot.setAttribute('data-slot', 'primary');
+    primarySlot.appendChild(
+      buildNavLinkAnchor(ctx, element.primaryAction, 'opencanvas-nav-primary-action'),
+    );
+    nav.appendChild(primarySlot);
+  }
+
   return nav;
 }
 

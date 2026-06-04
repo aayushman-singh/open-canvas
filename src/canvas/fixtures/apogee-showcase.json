@@ -180,6 +180,7 @@
           "z": 3
         },
         "logoAssetId": "seed-hero-poster-1",
+        "siteTitle": "Apogee",
         "links": [
           {
             "label": "Solutions",
@@ -200,13 +201,13 @@
             "label": "Pricing",
             "href": "pricing",
             "kind": "internal"
-          },
-          {
-            "label": "Get started",
-            "href": "/signup",
-            "kind": "external"
           }
         ],
+        "primaryAction": {
+          "label": "Get started",
+          "href": "/signup",
+          "kind": "external"
+        },
         "layout": "left-right",
         "sticky": true,
         "pinnedStyle": {

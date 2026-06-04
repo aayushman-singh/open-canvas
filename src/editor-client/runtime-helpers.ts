@@ -44,6 +44,7 @@ import { mountMediaAi, mountVideoPlayback } from './inspector-media-mounts.js';
 import {
   mountMediaPicker,
   mountNavLinks,
+  mountNavLogo,
   mountNavPrimaryAction,
 } from './inspector-nav-media-picker-mounts.js';
 import {
@@ -588,6 +589,8 @@ function inspectorMountHandler(
       mountNavLinks(ctx, element as Parameters<typeof mountNavLinks>[1], host),
     'nav-primary-action': (element, host) =>
       mountNavPrimaryAction(ctx, element as Parameters<typeof mountNavPrimaryAction>[1], host),
+    'nav-logo': (element, host) =>
+      mountNavLogo(ctx, element as Parameters<typeof mountNavLogo>[1], host),
     'chart-data': (element, host) => mountChartData(ctx, element as ChartElement, host),
     'form-fields': (element, host) => mountFormFields(ctx, element as FormElement, host),
     'form-style': (element, host) => mountFormStyle(ctx, element as FormElement, host),

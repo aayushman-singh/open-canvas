@@ -72,6 +72,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
     fontWeight: 600,
     align: 'left',
     lineHeight: 1.2,
+    isRichText: false,
   },
   action: {
     id: 'fx-action',
@@ -178,6 +179,7 @@ const REGISTERED_MOUNTS = [
   'table-grid',
   'nav-links',
   'nav-primary-action',
+  'nav-logo',
   'chart-data',
   'form-fields',
   'form-style',

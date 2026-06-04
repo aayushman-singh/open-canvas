@@ -170,6 +170,167 @@ export function mountNavLinks(
   host.appendChild(field('Links', linkListHost));
 }
 
+// Logo picker for the nav element. Same shape as mountMediaPicker minus the
+// per-slot history row — the nav logo is a single brand asset, not a slot
+// that gets swapped across versions. Three sections:
+//   Current   — thumb of element.logoAssetId + Upload / Clear actions.
+//   Your gallery — filtered to image-kind assets; click to assign.
+// Upload routes through ctx.postAssetUpload directly (the typed
+// uploadMediaForElement path assumes a MediaElement with .assetId, which
+// NavElement is not — postAssetUpload returns { assetId, kind } and we
+// assign element.logoAssetId ourselves).
+export function mountNavLogo(
+  ctx: EditorContext,
+  element: NavElement,
+  host: HTMLElement,
+): void {
+  const pickerWrap = document.createElement('div');
+  pickerWrap.className = 'media-picker';
+
+  const currentRowLabel = document.createElement('div');
+  currentRowLabel.className = 'picker-row-label';
+  currentRowLabel.textContent = 'Current';
+  pickerWrap.appendChild(currentRowLabel);
+
+  const currentRow = document.createElement('div');
+  currentRow.className = 'picker-current-row';
+  pickerWrap.appendChild(currentRow);
+
+  const currentAssetId = typeof element.logoAssetId === 'string' ? element.logoAssetId : '';
+  let currentThumb = ctx.buildPickerThumb(currentAssetId, currentAssetId, () => {});
+  currentRow.appendChild(currentThumb);
+
+  const actionsCol = document.createElement('div');
+  actionsCol.className = 'picker-current-actions';
+  currentRow.appendChild(actionsCol);
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'image/*';
+
+  const uploadBtn = document.createElement('button');
+  uploadBtn.type = 'button';
+  uploadBtn.textContent = 'Upload logo';
+  uploadBtn.addEventListener('click', () => {
+    fileInput.value = '';
+    fileInput.click();
+  });
+  actionsCol.appendChild(uploadBtn);
+  actionsCol.appendChild(fileInput);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.type = 'button';
+  clearBtn.textContent = 'Clear';
+  clearBtn.title = 'Remove logo';
+  clearBtn.addEventListener('click', () => {
+    if (typeof element.logoAssetId !== 'string' || element.logoAssetId.length === 0) return;
+    delete element.logoAssetId;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+    void refreshAll();
+  });
+  actionsCol.appendChild(clearBtn);
+
+  const galleryLabel = document.createElement('div');
+  galleryLabel.className = 'picker-row-label';
+  galleryLabel.textContent = 'Your gallery';
+  pickerWrap.appendChild(galleryLabel);
+
+  const galleryGrid = document.createElement('div');
+  galleryGrid.className = 'picker-gallery-grid';
+  pickerWrap.appendChild(galleryGrid);
+
+  host.appendChild(pickerWrap);
+
+  function refreshCurrentThumb(): void {
+    const id = typeof element.logoAssetId === 'string' ? element.logoAssetId : '';
+    const nextThumb = ctx.buildPickerThumb(id, id, () => {});
+    currentRow.replaceChild(nextThumb, currentThumb);
+    currentThumb = nextThumb;
+  }
+
+  function assignLogo(nextAssetId: string): void {
+    element.logoAssetId = nextAssetId;
+    ctx.rebuildElement(element.id);
+    ctx.scheduleSave();
+    void refreshAll();
+  }
+
+  async function refreshGalleryGrid(): Promise<void> {
+    galleryGrid.replaceChildren();
+    let entries: Array<{ id?: string; assetId?: string; kind?: string }>;
+    try {
+      const resp = await ctx.authFetch(ctx.apiBase + '/owner/assets');
+      if (!resp.ok) {
+        console.error('logo gallery fetch failed', resp.status);
+        return;
+      }
+      const body = (await resp.json()) as {
+        assets?: Array<{ id?: string; assetId?: string; kind?: string }>;
+      };
+      entries = Array.isArray(body.assets)
+        ? body.assets.filter((entry) => entry && entry.kind === 'image')
+        : [];
+    } catch (err) {
+      console.error('logo gallery fetch failed', err);
+      return;
+    }
+    const selected = typeof element.logoAssetId === 'string' ? element.logoAssetId : '';
+    for (const entry of entries) {
+      const assetId = typeof entry.id === 'string' ? entry.id : entry.assetId;
+      if (typeof assetId !== 'string' || assetId.length === 0) continue;
+      const cell = document.createElement('div');
+      cell.className = 'picker-gallery-cell';
+
+      const thumb = ctx.buildPickerThumb(assetId, selected, (id: string) => assignLogo(id));
+      cell.appendChild(thumb);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'picker-delete';
+      delBtn.type = 'button';
+      delBtn.textContent = 'x';
+      delBtn.title = 'Delete asset';
+      delBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        void ctx.runDeleteAsset(assetId, refreshAll);
+      });
+      cell.appendChild(delBtn);
+
+      galleryGrid.appendChild(cell);
+    }
+    if (entries.length === 0) {
+      const hint = document.createElement('span');
+      hint.style.cssText =
+        'font-size:11px;color:var(--opencanvas-fg-faint);font-family:var(--opencanvas-font-mono);grid-column:1/-1;';
+      hint.textContent = 'No images yet';
+      galleryGrid.appendChild(hint);
+    }
+  }
+
+  function refreshAll(): Promise<unknown> {
+    refreshCurrentThumb();
+    return refreshGalleryGrid();
+  }
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    ctx.setStatus('Uploading logo…', 'info');
+    void ctx
+      .postAssetUpload(file, '', element.id)
+      .then(({ assetId }) => {
+        assignLogo(assetId);
+        ctx.setStatus('Logo uploaded', 'ok');
+      })
+      .catch((err: unknown) => {
+        const detail = err instanceof Error ? err.message : 'upload failed';
+        ctx.setStatus('Logo upload failed: ' + detail, 'error');
+      });
+  });
+
+  void refreshGalleryGrid();
+}
+
 export function mountNavPrimaryAction(
   ctx: EditorContext,
   element: NavElement,

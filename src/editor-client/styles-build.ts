@@ -1947,6 +1947,62 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   color: var(--opencanvas-fg-mute);
 }
 
+/* Nav element preview — mirrors src/canvas/public-styles.ts nav block so
+   layout=left-right / left-center-right, siteTitle, primaryAction, and logo
+   all reflect live in the editor canvas. Without these rules the slot divs
+   would stack at default block flow and layout changes would do nothing
+   visible. */
+.opencanvas-nav { gap: 4px; }
+.opencanvas-nav-slot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.opencanvas-nav-slot[data-slot="right"] { margin-left: auto; }
+.opencanvas-nav-slot[data-slot="center"] {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.opencanvas-nav-slot[data-slot="primary"] { margin-left: auto; }
+.opencanvas-nav-slot[data-slot="right"] + .opencanvas-nav-slot[data-slot="primary"] {
+  margin-left: 8px;
+}
+.opencanvas-nav-link {
+  color: inherit;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 6px 12px;
+}
+.opencanvas-nav-link:hover {
+  color: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+}
+.opencanvas-nav-logo {
+  height: 28px;
+  width: auto;
+}
+.opencanvas-nav-site-title {
+  font-family: var(--opencanvas-kit-font-display, var(--opencanvas-kit-font-body, inherit));
+  font-size: 18px;
+  font-weight: 700;
+  color: inherit;
+  letter-spacing: -0.01em;
+}
+.opencanvas-nav-primary-action {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--opencanvas-kit-action-padding, 8px 16px);
+  border-radius: var(--opencanvas-kit-action-radius, 8px);
+  background: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+  color: var(--opencanvas-kit-accent-text, var(--kit-bg, #fff));
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+.opencanvas-nav-primary-action:hover { filter: brightness(1.08); }
+
 .opencanvas-tabs {
   width: 100%;
   height: 100%;

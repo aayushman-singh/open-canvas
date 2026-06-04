@@ -201,6 +201,7 @@
           "z": 3
         },
         "logoAssetId": "seed-feature-canvas-1",
+        "siteTitle": "Aayushman Singh",
         "links": [
           {
             "label": "About",
@@ -216,13 +217,13 @@
             "label": "Notes",
             "href": "blog",
             "kind": "internal"
-          },
-          {
-            "label": "Contact",
-            "href": "#contact",
-            "kind": "external"
           }
         ],
+        "primaryAction": {
+          "label": "Get in touch",
+          "href": "#contact",
+          "kind": "anchor"
+        },
         "layout": "left-center-right",
         "sticky": true,
         "pinnedStyle": {
