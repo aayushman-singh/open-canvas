@@ -104,6 +104,64 @@ export const bellStyles = `
   line-height: 1.5;
 }
 .notif-list li:last-child { border-bottom: none; }
+
+/* Row wrapper for the inline action cluster. The cluster (tick + trash)
+   sits absolutely-positioned in the row's right gutter; the row itself
+   keeps the same padding so the link content position doesn't shift on
+   hover. The action cluster is opacity-hidden until hover so resting
+   rows stay calm. */
+.notif-list li.notif-item-row { position: relative; padding-right: 70px; }
+.notif-item-actions {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.notif-list li.notif-item-row:hover .notif-item-actions,
+.notif-list li.notif-item-row:focus-within .notif-item-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.notif-item-action {
+  appearance: none;
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background-color 0.12s;
+}
+.notif-item-action:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+.notif-item-action:disabled { opacity: 0.55; cursor: progress; }
+.notif-item-action[hidden] { display: none; }
+.notif-item-tick:hover {
+  border-color: var(--green, #16a34a);
+  color: var(--green, #16a34a);
+}
+.notif-item-trash:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
 .notif-list .notif-empty {
   color: var(--ink-3);
   text-align: center;
