@@ -11,6 +11,7 @@ import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { loadAccessibleSite, type SiteAccessRequirement } from '../../auth/accessible-site';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
+import { getSeedAsset } from '../../canvas/seed-assets';
 import {
   STYLE_KITS,
   type CanvasPage,
