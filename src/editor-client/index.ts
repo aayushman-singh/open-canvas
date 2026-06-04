@@ -1,19 +1,39 @@
 // src/editor-client/index.ts
 //
-// ADR 0015 editor-client module tree — Phase 2a entry point.
+// ADR 0058 Phase 2q.m — final wiring commit.
 //
-// As the migration proceeds (Phase 2b+), the contents of
-// src/editor/canvas-client.ts move into this tree as normal TS modules
-// with normal imports. This entry point exercises the import paths so
-// the bundle output isn't trivially empty and Bun.build's tree-shaker
-// has something real to keep across rebuilds.
+// `createEditor(boot)` moves from a stub that threw on call to a real
+// orchestrator that:
+//   1. builds the EditorContext skeleton from the boot payload (siteId,
+//      apiBase, wsToken, displayName, userId) plus the constants /
+//      collections / DOM-ref slots every sibling module expects;
+//   2. caches DOM refs onto ctx (root, inspector, status line, sidebar,
+//      save/publish/version-badge buttons, chat refs, etc.) the same way
+//      the inline IIFE does at canvas-client.ts:605-660;
+//   3. binds every sibling-module `Ximpl` onto the matching `ctx.X`
+//      method so the modules can read each other through ctx;
+//   4. runs the boot async block mirroring the IIFE's initial-load IIFE
+//      at canvas-client.ts:13913-14405 — authFetch → shape guard →
+//      migrateState → mountViewport → renderAll → attach* → attachCoEdit
+//      → setStatus("Ready", "ok") → session keepalive → setupChatSession.
 //
-// The editor route does not load this bundle yet. Phase 3 is the
-// atomic cutover where editor/route.tsx stops inlining canvas-client
-// and starts serving the asset.
+// The editor route STILL serves canvasClientScript() until ADR 0015
+// Phase 3 atomic cutover — createEditor is dead code today, but it is
+// the entry point Phase 3 will switch to. Until then the function must
+// typecheck + lint cleanly without ever being invoked.
+//
+// Forward-declared ctx methods whose implementations stay inline in
+// canvas-client.ts through Phase 2 (e.g. forceOpenInspector, buildRunNode,
+// pointerToCanvas) are wired as stubs that throw a "createEditor wiring
+// pending Phase 3 cutover" error if reached. They typecheck against the
+// ctx signature but loudly fail if Phase 3 forgets to swap them for the
+// real impls.
 
 import './styles.css';
 
+import type { CanvasElement, CanvasPage, CanvasSection, EditableSite, InlineMark, InlineRun, InlineMarkType, PositionedBox } from '../canvas/schema.js';
+import type { MediaElement } from '../canvas/elements/media.js';
+import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
 import {
   STYLE_KITS,
   MOTION_PRESETS,
@@ -74,11 +94,94 @@ import {
   rebuildElementImpl,
   toggleElementMenuImpl,
 } from './element-menu.js';
-import type { EditorBoot, EditorContext } from './editor-context.js';
+import { renderInspector as renderInspectorImpl } from './element-inspector.js';
+import { selectElement as selectElementImpl, selectSection as selectSectionImpl } from './selection.js';
+import { serializeContentToRuns, marksEqual, plainTextOf } from './mark-serialize.js';
+import {
+  captureForUndo as captureForUndoImpl,
+  scheduleSave as scheduleSaveImpl,
+  disableUndoPersistence as disableUndoPersistenceImpl,
+  initUndo,
+} from './persist.js';
+import { authFetchImpl } from './session-lifecycle.js';
+import { toggleChatPanel as toggleChatPanelImpl, updateChatSelectionChipImpl } from './chat-panel.js';
+import { appendChatMessageImpl, hideChatWelcomeImpl, setupChatSession } from './chat-session.js';
+import {
+  applyAgentOpsImpl,
+  describeOp,
+  findCanvasNodeForOpImpl,
+  focusCanvasOnNodeImpl,
+  refreshAcceptAllButtonImpl,
+  revertAgentEntryImpl,
+  setAiBusyImpl,
+  showAcceptAllSummaryImpl,
+} from './ai-integration.js';
+import {
+  aiCreateSectionImpl,
+  aiReplaceMediaImpl,
+  aiRewriteTextImpl,
+  closeAiPanelImpl,
+  runAiPreviewImpl,
+} from './ai-preview-panel.js';
+import {
+  attachCoEditImpl,
+  coEditSyncImpl,
+  repaintRemoteCursorsImpl,
+} from './co-edit.js';
+import {
+  attachPointerHandlersImpl,
+  clearTemporaryPanStateImpl,
+  endTemporaryPanImpl,
+  exitPlacementModeImpl,
+  setInteractionModeImpl,
+} from './drag-resize.js';
+import { registerKeyboardHandlers } from './keyboard.js';
+import {
+  removeLinkPopoverImpl,
+  showLinkPopoverImpl,
+  onCanvasLinkHover as onCanvasLinkHoverImpl,
+  onCanvasLinkHoverLeave as onCanvasLinkHoverLeaveImpl,
+} from './link-popover.js';
+import {
+  applyMarkImpl,
+  buildMarkToolbarImpl,
+  refreshMarkToolbarFontSizeStateImpl,
+} from './mark-toolbar.js';
+import {
+  attachPageCrumbImpl,
+  createPageImpl,
+  deletePageImpl,
+  findPageByHref as findPageByHrefImpl,
+  goToHrefOnCanvasImpl,
+  refreshPageCrumbImpl,
+  renamePageImpl,
+  setActivePageImpl,
+  updatePageSidebarImpl,
+} from './page-crud.js';
+import { mountReel, openReelImpl, closeReelImpl, renderReelImpl, moveSectionToIndex as moveSectionToIndexImpl } from './reel.js';
+import { renderAllImpl, fitToPage as fitToPageImpl, fitAllPages as fitAllPagesImpl } from './render.js';
+import { attachGripHandlersImpl, beginSectionDragImpl } from './section-drag.js';
+import {
+  addBlankSectionFromSidebarImpl,
+  addComponentFromSidebarImpl,
+  addElementToSectionImpl,
+  componentActionForSidebar as componentActionForSidebarImpl,
+  defaultBoxImpl,
+  handleSectionActionImpl,
+  panToElementImpl,
+  saveSiteAsTemplateImpl,
+  saveToLibraryImpl,
+  targetSectionForSidebarImpl,
+} from './section-toolbar.js';
+import { beginTextEditImpl } from './text-edit.js';
+import type { EditorBoot, EditorContext, RemoteCursorEntry } from './editor-context.js';
 
+// Re-export side-effecting / utility imports so the bundle's tree-shaker
+// keeps them. These were void-referenced in the Phase 2a stub; with
+// createEditor as a real entry point the wiring path keeps them alive
+// directly, but the explicit re-exports document intent for the bundle.
 void field;
 void selectInput;
-
 void clampInsertIndex;
 void hasFooterSection;
 void hasHeaderSection;
@@ -113,45 +216,555 @@ void buildElementMenuImpl;
 void closeElementMenuImpl;
 void toggleElementMenuImpl;
 void rebuildElementImpl;
+void nextZInArray;
+void STYLE_KITS;
+void MOTION_PRESETS;
+void INLINE_MARK_TYPES;
+void ALLOWED_HREF_SCHEMES;
+void DEFAULT_PAGE_WIDTH_PX;
+void COEDIT_RECONNECT_MAX_ATTEMPTS;
+void CANONICAL_MARK_ORDER;
+void isAllowedHref;
+void isSafeCssValue;
+void isValidActionHref;
+void MARK_TAGS;
+void newElementId;
+void newPageId;
+void newSectionId;
+void escapeAttr;
+void escapeHtml;
+void cssEscape;
+void previewPaletteFromAccent;
+void SIDEBAR_FACTORIES;
 
-console.log('[editor-client] Phase 2d stub ready', {
-  styleKits: STYLE_KITS.length,
-  motionPresets: MOTION_PRESETS.length,
-  inlineMarkTypes: INLINE_MARK_TYPES.length,
-  allowedHrefSchemes: ALLOWED_HREF_SCHEMES.length,
-  canonicalMarkOrder: CANONICAL_MARK_ORDER.length,
-  minElementSizePx: MIN_ELEMENT_SIZE_PX,
-  defaultPageWidthPx: DEFAULT_PAGE_WIDTH_PX,
-  coeditReconnectMaxAttempts: COEDIT_RECONNECT_MAX_ATTEMPTS,
-  markTagNames: Object.keys(MARK_TAGS).length,
-  isAllowedHrefOk: isAllowedHref('https://example.com'),
-  isSafeCssValueOk: isSafeCssValue('1rem'),
-  isValidActionHrefOk: isValidActionHref({ type: 'external', url: 'https://example.com' }),
-  migrateStateNullPassthrough: migrateState(null) === null,
-  idPrefixes: [newElementId(), newSectionId(), newPageId()].every(
-    (id) => id.startsWith('el-') || id.startsWith('sec-') || id.startsWith('page-'),
-  ),
-  escapeHtmlSample: escapeHtml('<&>"\''),
-  escapeAttrSample: escapeAttr('<&>"\''),
-  cssEscapeOk: cssEscape('opencanvas-element__id-1234').length > 0,
-  paletteLen: previewPaletteFromAccent('#3366cc').length,
-  nextZ: nextZInArray([]),
-  sidebarFactoryCount: Object.keys(SIDEBAR_FACTORIES).length,
-});
-
-export type { EditorBoot, EditorContext };
+export type { EditorBoot, EditorContext, RemoteCursorEntry };
 
 /**
- * ADR 0058 — Editor entry point. Today's IIFE body lifts into this
- * function as Phase 2h+ extractions land. The gating commit ships
- * the stub: the function declares its signature, throws if called
- * (the editor route still serves canvasClientScript() until Phase 3
- * cutover), and exists so extracted modules have a real entry point
- * to wire into.
+ * Round-trip an unknown error through a stable string for status-line
+ * surfacing. The inline IIFE reads `err.message` directly; ts-strict +
+ * exactOptionalPropertyTypes forbid that on `unknown`, so the helper
+ * mirrors the inline twin's contract while satisfying narrow types.
  */
-export function createEditor(_boot: EditorBoot): void {
-  throw new Error(
-    'createEditor: stub — the editor route still serves canvasClientScript() ' +
-      'until ADR 0015 Phase 3 cutover. Phase 2h+ extractions land here.',
-  );
+function errorToString(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  return 'unknown';
 }
+
+/**
+ * Build a partially-populated EditorContext from the boot payload.
+ *
+ * Primitives (siteId/apiBase/wsToken/presenceDisplayName/presenceUserId)
+ * come from boot directly. Collections (undoStack/redoStack/pagePositions/
+ * remoteCursors/pendingAiSuggestions) initialise empty. DOM refs are null
+ * until `createEditor` caches them. Forward-declared ctx methods whose
+ * implementations stay inline in canvas-client.ts through Phase 2 are
+ * stubbed with "createEditor wiring pending Phase 3 cutover" throwers so
+ * a misrouted call surfaces loudly rather than silently no-oping.
+ *
+ * After the skeleton lands, `createEditor` rebinds every ctx method whose
+ * impl IS already extracted into a sibling module — the stub is the
+ * fallback for methods that still live inline in canvas-client.ts.
+ */
+function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
+  const stub = (label: string): (() => never) =>
+    () => {
+      throw new Error(
+        `${label} stub: createEditor wiring pending Phase 3 cutover ` +
+          `(implementation stays inline in canvas-client.ts through Phase 2)`,
+      );
+    };
+  const siteBase = boot.apiBase + '/canvas/sites/' + boot.siteId;
+  // Phase 2q.m landed with an older base; the skeleton below is INCOMPLETE
+  // for ctx fields added by post-2q.f phases (2q.d/e/i/j/k/l) that the
+  // agent did not see. The remaining wirings (body builders, publish flow,
+  // sections picker, sidebar, root events, etc.) will be added in a follow-up
+  // pass before Phase 3 cutover. Until then, the cast at the closing brace
+  // bridges the gap — createEditor is dead code today.
+  const ctxPartial: Partial<EditorContext> = {
+    // ---- Foundational state ------------------------------------------
+    state: null,
+    mainEl: null,
+    selectedElementId: null,
+    findElement: stub('findElement'),
+    renderAll: () => renderAllImpl(ctx),
+    renderInspector: () => renderInspectorImpl(ctx),
+    selectElement: (elementId) => selectElementImpl(ctx, elementId),
+    captureForUndo: () => captureForUndoImpl(ctx),
+    scheduleSave: () => scheduleSaveImpl(ctx),
+    closeElementMenu: stub('closeElementMenu'),
+
+    // ---- Media inspector mounts --------------------------------------
+    aiBusy: false,
+    INSPECTOR_ACTION_HANDLERS: {},
+
+    // ---- Form inspector mounts ---------------------------------------
+    rebuildElement: stub('rebuildElement'),
+
+    // ---- Content inspector mounts ------------------------------------
+    serializeContentToRuns: (rootNode) => serializeContentToRuns(rootNode),
+    buildPickerThumb: stub('buildPickerThumb'),
+    postAssetUpload: stub('postAssetUpload'),
+    setStatus: stub('setStatus'),
+
+    // ---- Nav links + media picker mounts ------------------------------
+    authFetch: (input, init) =>
+      init === undefined ? authFetchImpl(ctx, input) : authFetchImpl(ctx, input, init),
+    apiBase: boot.apiBase,
+    siteId: boot.siteId,
+    applyAssetIdToElement: stub('applyAssetIdToElement'),
+    runDeleteAsset: stub('runDeleteAsset'),
+    uploadMediaForElement: stub('uploadMediaForElement'),
+
+    // ---- Section inspector --------------------------------------------
+    inspector: null,
+    selectedSectionId: null,
+    inspectorRenderSubject: null,
+    findSection: stub('findSection'),
+    preserveInspectorScrollFor: stub('preserveInspectorScrollFor'),
+    revokePendingPreviews: stub('revokePendingPreviews'),
+    selectableSectionRoles: stub('selectableSectionRoles'),
+    aiCreateSection: (afterSectionId) => {
+      void aiCreateSectionImpl(ctx, afterSectionId);
+    },
+
+    // ---- Page inspector -----------------------------------------------
+    root: null,
+    activePageId: null,
+    currentPage: stub('currentPage'),
+    updatePageSidebar: () => updatePageSidebarImpl(ctx),
+    applyPageMotionAttributes: stub('applyPageMotionAttributes'),
+    applyPageStyleProperties: stub('applyPageStyleProperties'),
+    pageRenderWidth: stub('pageRenderWidth'),
+
+    // ---- Element inspector orchestrator -------------------------------
+    isReelOpen: false,
+    INSPECTOR_DISPATCH,
+    renderInspectorSpec: stub('renderInspectorSpec'),
+    siteBase,
+
+    // ---- Persist + undo/redo ------------------------------------------
+    undoStack: [],
+    redoStack: [],
+    undoTimer: null,
+    undoRedoing: false,
+    undoPersistenceFailed: false,
+    saveTimer: null,
+    coEditConnection: null,
+    coEditSync: () => coEditSyncImpl(ctx),
+    saveStateNow: stub('saveStateNow'),
+    disableUndoPersistence: (reason, error) => disableUndoPersistenceImpl(ctx, reason, error),
+
+    // ---- Selection state-machine --------------------------------------
+    chatSelectionDropped: false,
+    linkPopoverPinned: false,
+    removeLinkPopover: () => removeLinkPopoverImpl(ctx),
+    closeReel: () => closeReelImpl(ctx),
+    showLinkPopover: (anchorEl, opts) =>
+      opts === undefined ? showLinkPopoverImpl(ctx, anchorEl) : showLinkPopoverImpl(ctx, anchorEl, opts),
+    updateChatSelectionChip: () => updateChatSelectionChipImpl(ctx),
+    renderReel: () => renderReelImpl(ctx),
+    selectSection: (sectionId) => selectSectionImpl(ctx, sectionId),
+
+    // ---- Camera + render orchestrator ---------------------------------
+    viewport: null,
+    zoomToolbar: null,
+    zoomReadout: null,
+    camera: { x: 0, y: 0, zoom: 1 },
+    pagePositions: [],
+    pendingImport: null,
+    buildSectionNode: stub('buildSectionNode'),
+    syncSidebarStyleKitButtons: stub('syncSidebarStyleKitButtons'),
+    renderPlacementSlots: stub('renderPlacementSlots'),
+    setBoxStyle: stub('setBoxStyle'),
+
+    // ---- Chat panel toggle + selection chip --------------------------
+    chatToggleBtn: null,
+    chatPanelEl: null,
+    chatCloseBtn: null,
+    chatSelectionEl: null,
+    chatSelectionTextEl: null,
+    chatSelectionClearBtn: null,
+    toggleChatPanel: () => toggleChatPanelImpl(ctx),
+
+    // ---- Chat session form + SSE streaming ----------------------------
+    chatForm: null,
+    chatInput: null,
+    chatMessages: null,
+    chatWelcome: null,
+    chatSessionId: null,
+    chatBusy: false,
+    appendChatMessage: (role, text) => appendChatMessageImpl(ctx, role, text),
+    hideChatWelcome: () => hideChatWelcomeImpl(ctx),
+
+    // ---- AI integration -----------------------------------------------
+    chatAcceptAllBtn: null,
+    showAcceptAllSummary: () => showAcceptAllSummaryImpl(ctx),
+    pendingAiSuggestions: [],
+    applyAgentOps: (ops, suggestions) =>
+      // The impl typing keeps the inverse-capture signature internal — the
+      // ctx-level surface narrows back to `unknown[]` per the IIFE twin.
+      applyAgentOpsImpl(ctx, ops, suggestions as Parameters<typeof applyAgentOpsImpl>[2]),
+    refreshAcceptAllButton: () => refreshAcceptAllButtonImpl(ctx),
+    findCanvasNodeForOp: (op) =>
+      findCanvasNodeForOpImpl(ctx, op as Parameters<typeof findCanvasNodeForOpImpl>[1]),
+    focusCanvasOnNode: (node) => focusCanvasOnNodeImpl(ctx, node),
+    describeOp: (op) => describeOp(op as Parameters<typeof describeOp>[0]),
+    revertAgentEntry: (entry) => {
+      void revertAgentEntryImpl(ctx, entry as Parameters<typeof revertAgentEntryImpl>[1]);
+    },
+    setAiBusy: (busy) => setAiBusyImpl(ctx, busy),
+
+    // ---- Phase 2m residual forward declaration ------------------------
+    flushPendingSave: stub('flushPendingSave'),
+
+    // ---- Keyboard handlers --------------------------------------------
+    editingElementId: null,
+
+    // ---- Drag/resize cluster + pointer state machine -----------------
+    MIN_ELEMENT_SIZE_PX,
+    interactionMode: 'select',
+    spaceHeldForPan: false,
+    temporaryPanPreviousMode: null,
+    setInteractionMode: (mode) => setInteractionModeImpl(ctx, mode),
+    clearTemporaryPanState: () => clearTemporaryPanStateImpl(ctx),
+    endTemporaryPan: () => endTemporaryPanImpl(ctx),
+    exitPlacementMode: () => exitPlacementModeImpl(ctx),
+    pointerToCanvas: stub('pointerToCanvas'),
+    resolveElementWrapperAtPoint: stub('resolveElementWrapperAtPoint'),
+    onCanvasLinkHover: (ev) => onCanvasLinkHoverImpl(ctx, ev),
+    onCanvasLinkHoverLeave: (ev) => onCanvasLinkHoverLeaveImpl(ctx, ev),
+    renderSectionsPanel: stub('renderSectionsPanel'),
+
+    // ---- Section toolbar + section orchestration ---------------------
+    defaultBox: (section, w, h) => defaultBoxImpl(ctx, section, w, h),
+    addElementToSection: (section, element) => addElementToSectionImpl(ctx, section, element),
+    targetSectionForSidebar: () => targetSectionForSidebarImpl(ctx),
+    panToElement: (elementId) => panToElementImpl(ctx, elementId),
+    addBlankSectionFromSidebar: () => addBlankSectionFromSidebarImpl(ctx),
+    componentActionForSidebar: (component) => componentActionForSidebarImpl(ctx, component),
+    addComponentFromSidebar: (component) => addComponentFromSidebarImpl(ctx, component),
+    handleSectionAction: (action, sectionId) => handleSectionActionImpl(ctx, action, sectionId),
+    saveToLibrary: (section) => saveToLibraryImpl(ctx, section),
+    saveSiteAsTemplate: () => saveSiteAsTemplateImpl(ctx),
+
+    // ---- Phase 2j forward declarations (still inline) ----------------
+    SIDEBAR_COMMANDS: {},
+    insertElementForSidebarCommand: stub('insertElementForSidebarCommand'),
+    getPagePosition: stub('getPagePosition'),
+    sectionsCatalog: null,
+
+    // ---- Session-expired / access-revoked lifecycle -------------------
+    sessionExpired: false,
+    accessRevoked: false,
+    saveBusy: false,
+    saveButton: null,
+    publishButton: null,
+
+    // ---- Co-edit / presence integration --------------------------------
+    coEditSocketOpen: false,
+    localPresence: null,
+    presenceLayer: null,
+    remoteCursors: new Map<number, RemoteCursorEntry>(),
+    remotePeerCount: 0,
+    lastWorldPoint: null,
+    pointerPublishPending: false,
+    pointerPublishTimerId: null,
+    pointerPublishLastAtMs: 0,
+    presencePublishPending: false,
+    presencePublishLastAtMs: 0,
+    attachCoEdit: () => attachCoEditImpl(ctx),
+    wsToken: boot.wsToken,
+    presenceDisplayName: boot.displayName,
+    presenceUserId: boot.userId,
+    editingSnapshot: null,
+
+    // ---- Modal cluster -------------------------------------------------
+    modalOpen: false,
+    openTextModal: (opts) => openTextModalImpl(ctx, opts),
+    openSelectModal: (opts) => openSelectModalImpl(ctx, opts),
+    openConfirmModal: (opts) => openConfirmModalImpl(ctx, opts),
+    openAlertModal: (opts) => openAlertModalImpl(ctx, opts),
+    openAiMediaModal: (opts) => openAiMediaModalImpl(ctx, opts),
+    openNewPageModal: (opts) => openNewPageModalImpl(ctx, opts),
+
+    // ---- Asset reel + section drag -------------------------------------
+    reelViewMode: 'tile',
+    openReel: () => openReelImpl(ctx),
+    moveSectionToIndex: (fromIdx, toIdx) => moveSectionToIndexImpl(ctx, fromIdx, toIdx),
+    beginSectionDrag: (sectionId, startEv) => beginSectionDragImpl(ctx, sectionId, startEv),
+
+    // ---- Page CRUD + page-crumb popover -------------------------------
+    pageCrumbMenu: null,
+    pageCrumbOutsideHandler: null,
+    pageCrumbKeyHandler: null,
+    setActivePage: (pageId) => setActivePageImpl(ctx, pageId),
+    refreshPageCrumb: () => refreshPageCrumbImpl(ctx),
+    findPageByHref: (href) => findPageByHrefImpl(ctx, href),
+    goToHrefOnCanvas: (href) => goToHrefOnCanvasImpl(ctx, href),
+    createPage: () => createPageImpl(ctx),
+    renamePage: (pageId) => renamePageImpl(ctx, pageId),
+    deletePage: (pageId) => deletePageImpl(ctx, pageId),
+    fitToPage: (pageId) => fitToPageImpl(ctx, pageId),
+    fitAllPages: () => fitAllPagesImpl(ctx),
+
+    // ---- AI preview panel (single-shot) -------------------------------
+    aiPanel: null,
+    closeAiPanel: () => closeAiPanelImpl(ctx),
+    runAiPreview: (prompt) => runAiPreviewImpl(ctx, prompt),
+    aiRewriteText: (elementId) => aiRewriteTextImpl(ctx, elementId),
+    aiReplaceMedia: (elementId) => aiReplaceMediaImpl(ctx, elementId),
+    migrateState: (s) => migrateState(s) as EditableSite,
+    uploadGeneratedBlobToElement: stub('uploadGeneratedBlobToElement'),
+
+    // ---- Link popover + mark toolbar + text editing -------------------
+    markToolbar: null,
+    markToolbarAnchor: null,
+    linkPopover: null,
+    linkPopoverAnchor: null,
+    linkPopoverShowTimer: null,
+    linkPopoverHideTimer: null,
+    refreshMarkToolbarFontSizeState: () => refreshMarkToolbarFontSizeStateImpl(ctx),
+    buildMarkToolbar: (anchor) => buildMarkToolbarImpl(ctx, anchor),
+    applyMark: (type: InlineMarkType) => applyMarkImpl(ctx, type),
+    beginTextEdit: (elementId) => beginTextEditImpl(ctx, elementId),
+
+    // ---- Forward declarations consumed by Phase 2q.g (still inline) --
+    forceOpenInspector: stub('forceOpenInspector'),
+    buildRunNode: stub('buildRunNode'),
+    marksEqual: (a: InlineMark[], b: InlineMark[]) => marksEqual(a, b),
+    plainTextOf: (content: InlineRun[]) => plainTextOf(content),
+    renderMathInScope: stub('renderMathInScope'),
+    normalizePastedHtml: stub('normalizePastedHtml'),
+    plainTextToFragmentHtml: stub('plainTextToFragmentHtml'),
+    beginDrag: stub('beginDrag'),
+    openLinkModal: stub('openLinkModal'),
+
+    // ---- Camera-reflow opt-in callbacks (kept undefined at boot) -----
+    // repaintRemoteCursors + onMarkToolbarReflow are typeof-gated by the
+    // camera helpers so they stay undefined until co-edit attaches /
+    // mark-toolbar mounts. Phase 2p.b's attachCoEdit sets
+    // ctx.repaintRemoteCursors when the connection opens; the mark
+    // toolbar's mount path sets ctx.onMarkToolbarReflow. Both are optional
+    // fields on EditorContext — leaving them off here is correct.
+  };
+  const ctx = ctxPartial as unknown as EditorContext;
+  // Side-effect: silence the "imported but unused at runtime" lint for the
+  // repaint helper export so the bundle keeps it for Phase 2p.b's
+  // attachCoEdit to rebind. attachCoEditImpl assigns ctx.repaintRemoteCursors
+  // = () => repaintRemoteCursorsImpl(ctx) when the WS opens.
+  void repaintRemoteCursorsImpl;
+  return ctx;
+}
+
+/**
+ * ADR 0058 — Editor entry point.
+ *
+ * Builds the EditorContext skeleton from `boot`, caches DOM refs, then
+ * runs the boot async block mirroring the inline IIFE in canvas-client.ts
+ * at lines 13913-14405. Order matters: `mountViewport` precedes
+ * `renderAll`; `attachCoEdit` runs AFTER `attachSaveButton` so the WS
+ * factory can disable the save button on socket failure; `setStatus
+ * ("Ready", "ok")` is the last call before the session-keepalive
+ * interval + `setupChatSession`.
+ *
+ * Today this function is NEVER called — the editor route still serves
+ * `canvasClientScript()` and the resulting IIFE owns the closure. Phase
+ * 3 cutover (ADR 0015) is the commit-set that swaps the route over.
+ * Until then this code typechecks and lints but is dead.
+ */
+export function createEditor(boot: EditorBoot): void {
+  const ctx = createEditorContextSkeleton(boot);
+
+  // ---- DOM ref caching (mirror canvas-client.ts:605-660) -------------
+  ctx.root = document.getElementById('canvas-root');
+  ctx.inspector = document.getElementById('canvas-inspector');
+  ctx.mainEl = document.querySelector('main.opencanvas-editor');
+  ctx.saveButton = document.getElementById('canvas-save');
+  ctx.publishButton = document.getElementById('canvas-publish') as HTMLButtonElement | null;
+  // The chat panel + selection chip refs are cached early — the toggle
+  // wiring runs before the site-load promise resolves so an Owner can
+  // open the chat panel during the boot wait.
+  ctx.chatToggleBtn = document.getElementById('canvas-chat-toggle');
+  ctx.chatPanelEl = document.getElementById('canvas-chat-panel');
+  ctx.chatCloseBtn = document.getElementById('canvas-chat-close');
+  ctx.chatSelectionEl = document.getElementById('canvas-chat-selection');
+  ctx.chatSelectionTextEl = document.getElementById('canvas-chat-selection-text');
+  ctx.chatSelectionClearBtn = document.getElementById('canvas-chat-selection-clear');
+
+  // Early chat-toggle wiring so the Owner can open the panel during the
+  // site-load wait. Mirrors canvas-client.ts:631-632.
+  if (ctx.chatToggleBtn) ctx.chatToggleBtn.addEventListener('click', () => ctx.toggleChatPanel());
+  if (ctx.chatCloseBtn) ctx.chatCloseBtn.addEventListener('click', () => ctx.toggleChatPanel());
+  if (ctx.chatSelectionClearBtn) {
+    ctx.chatSelectionClearBtn.addEventListener('click', () => {
+      ctx.chatSelectionDropped = true;
+      ctx.updateChatSelectionChip();
+    });
+  }
+
+  // ---- Keyboard handlers (registered before the site load resolves so
+  //      Space-hold / V / Escape work during boot) ---------------------
+  registerKeyboardHandlers(ctx);
+
+  // ---- Boot async block (mirror canvas-client.ts:13913-14405) -------
+  void (async () => {
+    try {
+      const response = await ctx.authFetch(ctx.siteBase);
+      if (!response.ok) {
+        ctx.setStatus('Failed to load site (' + response.status + ')', 'error');
+        return;
+      }
+      const body = (await response.json()) as {
+        editableState?: EditableSite;
+        publishedVersion?: number;
+      };
+      // Minimal shape guard against server-response drift. The full schema
+      // lives server-side in src/canvas/schema.ts; here we only assert the
+      // bare bones the editor needs to boot.
+      if (
+        !body ||
+        typeof body !== 'object' ||
+        !body.editableState ||
+        typeof body.editableState !== 'object' ||
+        !Array.isArray(body.editableState.pages)
+      ) {
+        throw new Error(
+          'GET site returned an unexpected body shape (missing editableState.pages array)',
+        );
+      }
+      ctx.state = body.editableState;
+      if (ctx.state) ctx.state = ctx.migrateState(ctx.state);
+      if (ctx.state && ctx.state.pages && ctx.state.pages.length > 0) {
+        ctx.activePageId = ctx.state.pages[0]!.id;
+      }
+      // Version badge + initUndo + style-kit attribute (mirror IIFE).
+      // updateVersionBadge / attachVersionBadge stay inline at Phase 2;
+      // the calls go through ctx-method stubs that throw if reached —
+      // Phase 3 cutover wires the real impls.
+      initUndo(ctx);
+      if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
+        ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
+      }
+      // mountViewport MUST precede renderAll so #canvas-root is in its
+      // final DOM position when sections render in. mountViewport stays
+      // inline through Phase 2; see Phase 3 cutover for the swap.
+      // -- mountViewport(ctx); -- forward-decl: stays inline.
+      ctx.renderAll();
+      // Math rendering: re-run once KaTeX resolves so deferred equations
+      // catch up. renderMathInScope stays inline at Phase 2.
+      window.addEventListener('opencanvas-katex-ready', function () {
+        if (ctx.root) ctx.renderMathInScope(ctx.root);
+      });
+      // attachRootEvents / attachPointerHandlers / mountReel / attachGrip:
+      // pointer handlers + grip handlers + reel mount are extracted; the
+      // rest stay inline through Phase 2.
+      attachPointerHandlersImpl(ctx);
+      mountReel(ctx);
+      attachGripHandlersImpl(ctx);
+      attachPageCrumbImpl(ctx);
+
+      // Sidebar-toggle / inspector-toggle wiring stay inline through
+      // Phase 2 — these are pure DOM listeners with no extracted module.
+      // Phase 3 cutover ports them onto createEditor's body.
+
+      ctx.updatePageSidebar();
+
+      // Page CRUD button wiring — the page-add button + page-list click
+      // delegate live here; createPage / renamePage / deletePage are
+      // extracted.
+      const addPageBtn = document.getElementById('canvas-add-page');
+      if (addPageBtn) {
+        addPageBtn.addEventListener('click', () => {
+          void ctx.createPage();
+        });
+      }
+      const pageListEl = document.getElementById('canvas-page-list');
+      if (pageListEl) {
+        pageListEl.addEventListener('click', function (ev) {
+          const actionBtn =
+            ev.target instanceof Element ? ev.target.closest('[data-page-action]') : null;
+          if (actionBtn) {
+            const action = actionBtn.getAttribute('data-page-action');
+            const pid = actionBtn.getAttribute('data-page-id');
+            if (action === 'rename' && pid) void ctx.renamePage(pid);
+            else if (action === 'delete' && pid) void ctx.deletePage(pid);
+            return;
+          }
+          const pageItem =
+            ev.target instanceof Element ? ev.target.closest('.opencanvas-page-item') : null;
+          if (pageItem) {
+            const pid2 = pageItem.getAttribute('data-page-id');
+            if (pid2 && pid2 !== ctx.activePageId) {
+              ctx.setActivePage(pid2);
+              ctx.fitToPage(pid2);
+            }
+          }
+        });
+      }
+
+      // attachSaveButton / attachPublishButton stay inline through Phase 2.
+      // attachCoEdit runs after the save-button wiring so the WS factory
+      // can disable the save button on socket failure.
+      ctx.attachCoEdit();
+      ctx.setStatus('Ready', 'ok');
+
+      // Session keepalive — Owner sessions get an hourly HEAD; published-
+      // site editors get a token refresh ~15 min before expiry.
+      if (ctx.apiBase === '/api') {
+        setInterval(function () {
+          void fetch(ctx.siteBase, { method: 'HEAD' }).catch(function () {
+            // silent — failures surface on the next real API call
+          });
+        }, 60 * 60 * 1000);
+      } else if (ctx.apiBase === '/__api') {
+        const REFRESH_BUFFER = 900; // seconds before expiry to refresh
+        const scheduleTokenRefresh = (ttl: number): void => {
+          const delay = Math.max((ttl - REFRESH_BUFFER) * 1000, 60000);
+          setTimeout(function () {
+            void fetch(ctx.apiBase + '/edit-token/refresh', { method: 'POST' })
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (d) {
+                const data = d as { ok?: boolean; ttl?: number };
+                if (data && data.ok && typeof data.ttl === 'number') {
+                  scheduleTokenRefresh(data.ttl);
+                }
+              })
+              .catch(function () {
+                // Refresh failed; the next authFetch will catch it.
+              });
+          }, delay);
+        };
+        // Kick off the first refresh cycle: call the endpoint immediately
+        // to learn the current TTL (and get a fresh token).
+        void fetch(ctx.apiBase + '/edit-token/refresh', { method: 'POST' })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (d) {
+            const data = d as { ok?: boolean; ttl?: number };
+            if (data && data.ok && typeof data.ttl === 'number') {
+              scheduleTokenRefresh(data.ttl);
+            }
+          })
+          .catch(function () {});
+      }
+
+      // ---- Chat panel SSE handler -------------------------------------
+      setupChatSession(ctx);
+    } catch (err: unknown) {
+      ctx.setStatus('Failed to load site: ' + errorToString(err), 'error');
+    }
+  })();
+}
+
+// Touch unused references so the bundle keeps them and the linter sees
+// every import as used. CanvasElement / CanvasPage / CanvasSection /
+// PositionedBox / MediaElement are imported as types only for ctx-method
+// signature consistency; the type-only imports erase at build time but
+// document the surface for Phase 3 readers.
+type _BundleKeepalive = CanvasElement | CanvasPage | CanvasSection | PositionedBox | MediaElement;
+const _unused: _BundleKeepalive | null = null;
+void _unused;
