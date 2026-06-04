@@ -5,7 +5,7 @@
 // canvas-client.ts:3650-3844. The inline IIFE twin remains the production
 // source-of-truth until ADR 0015 Phase 3 atomic cutover.
 //
-// Five functions:
+// Functions:
 //   - closeElementMenuImpl: pop the menu DOM, clear the menu trigger's
 //     open marker, reset the openMenuElementId state on ctx.
 //   - buildElementMenuImpl: assemble the menu rows (bring-to-front /
@@ -17,10 +17,21 @@
 //     behaviour the verbs themselves do not encode.
 //   - toggleElementMenuImpl: open-or-close idempotent toggle.
 //   - buildElementNodeImpl: assemble the per-element wrapper — data-attrs,
-//     position/style application, body, resize handles, menu trigger.
+//     position/style application, body, resize handles (selected element
+//     only), menu trigger.
 //   - rebuildElementImpl: re-render just the named element's DOM in
 //     place after a mutation. Forward-declared on ctx since Phase 2h.2.b;
 //     this commit collapses the forward decl into the real implementation.
+//   - mountResizeHandles / unmountResizeHandles: append or remove the
+//     8-direction resize-handle quad from a wrapper. Only the currently-
+//     selected element's wrapper carries handles in the DOM — gating
+//     emission (not just CSS visibility) avoids a descendant-cascade bug
+//     where selecting a container revealed every nested child's handles
+//     because the previous CSS `.opencanvas-element[data-selected] .resize-handle`
+//     rule used a descendant combinator. With handles only emitted on
+//     the selected wrapper, the DOM carries 0 handles when nothing is
+//     selected and exactly 8 when a single element is selected, regardless
+//     of element-tree depth.
 //
 // Failure mode preserved: querySelector lookups silently no-op when the
 // wrapper isn't live (rebuildElement falls back to a full renderAll when
@@ -35,6 +46,53 @@ import type { EditorContext } from './editor-context.js';
 import { newElementId } from './ids.js';
 import { applyZOrderAction, parentArrayFor } from './inspector-actions.js';
 import { nextZInArray } from './z-order.js';
+
+/**
+ * Eight-direction resize-handle layout (N/S/E/W + four corners). Order is
+ * stable so the smoke can assert on the resulting class names without
+ * coupling to insertion order. Kept module-private and re-used by the
+ * mount helper below — duplicating the literal across buildElementNodeImpl
+ * and the mount helper would drift the smoke's count assertion the next
+ * time someone added a ninth direction.
+ */
+const RESIZE_HANDLE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
+
+/**
+ * Append the 8-direction resize-handle quad to a wrapper as direct
+ * children. Idempotent: bails when the wrapper already has any
+ * `[data-resize-handle]` child so a stray double-call from selectElement
+ * + buildElementNode (when the selected element is being rebuilt) doesn't
+ * stack 16 handles. Handles are positioned absolutely by CSS using the
+ * wrapper as the offset parent — that's why they must be direct children,
+ * not nested inside the body.
+ */
+export function mountResizeHandles(wrapper: HTMLElement): void {
+  if (wrapper.querySelector(':scope > [data-resize-handle]')) return;
+  for (let di = 0; di < RESIZE_HANDLE_DIRS.length; di++) {
+    const dir = RESIZE_HANDLE_DIRS[di]!;
+    const rh = document.createElement('div');
+    rh.className = 'resize-handle resize-handle-' + dir;
+    rh.setAttribute('data-resize-handle', 'true');
+    rh.setAttribute('data-resize-dir', dir);
+    wrapper.appendChild(rh);
+  }
+}
+
+/**
+ * Remove every direct-child `[data-resize-handle]` from a wrapper. Used
+ * by selectElement when the selection moves away from this wrapper so the
+ * DOM doesn't accumulate stale handles. Direct children only — never
+ * recurse into the body, because a nested selected element's wrapper may
+ * legitimately carry its own handles (during deep-selection edge cases
+ * the inner wrapper's handles must survive the outer wrapper's cleanup).
+ */
+export function unmountResizeHandles(wrapper: HTMLElement): void {
+  const handles = wrapper.querySelectorAll(':scope > [data-resize-handle]');
+  for (let i = 0; i < handles.length; i++) {
+    const h = handles[i];
+    if (h && h.parentNode === wrapper) wrapper.removeChild(h);
+  }
+}
 
 export function closeElementMenuImpl(ctx: EditorContext): void {
   if (!ctx.openMenuElementId) return;
@@ -193,13 +251,15 @@ export function buildElementNodeImpl(ctx: EditorContext, element: CanvasElement)
   ctx.applyElementStyle(wrapper, element);
   ctx.applyPinnedStyle(wrapper, element);
   wrapper.appendChild(ctx.buildElementBody(element));
-  const dirs = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
-  for (let di = 0; di < dirs.length; di++) {
-    const rh = document.createElement('div');
-    rh.className = 'resize-handle resize-handle-' + dirs[di];
-    rh.setAttribute('data-resize-handle', 'true');
-    rh.setAttribute('data-resize-dir', dirs[di] as string);
-    wrapper.appendChild(rh);
+  // Resize handles render ONLY on the currently-selected element's wrapper.
+  // Previously every wrapper carried 8 handles and CSS gated visibility, but
+  // the visibility selector used a descendant combinator — selecting a
+  // container surfaced every nested child's handles too (264 elements ×
+  // 8 handles = 2112 visible handles in the worst case). Emitting only on
+  // selection keeps DOM count at 8 max, and selection.ts mounts/unmounts
+  // handles on selection-change so we don't have to rebuild the wrapper.
+  if (ctx.selectedElementId === element.id) {
+    mountResizeHandles(wrapper);
   }
   const trigger = document.createElement('button');
   trigger.type = 'button';
