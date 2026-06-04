@@ -109,6 +109,7 @@ import type {
   TextElement,
   VideoMediaElement,
 } from './schema.js';
+import { SECTION_ROLES } from './schema.js';
 import type {
   AccordionElement,
   AccordionItem,
@@ -1453,7 +1454,13 @@ function decodeSection(map: Y.Map<unknown>): CanvasSection {
     elements: (map.get('elements') as Y.Array<Y.Map<unknown>>).map(decodeElement),
   };
   if (map.has('role')) {
-    section.role = map.get('role') as NonNullable<CanvasSection['role']>;
+    // ADR 0059 — legacy Yjs snapshots may carry role='header' | 'footer' on the
+    // pinned slots. SECTION_ROLES is now ['body']; anything else is dropped so
+    // the rehydrated state passes publish validation.
+    const role = map.get('role') as string;
+    if ((SECTION_ROLES as readonly string[]).includes(role)) {
+      section.role = role as NonNullable<CanvasSection['role']>;
+    }
   }
   if (map.has('anchorId')) {
     section.anchorId = map.get('anchorId') as string;
