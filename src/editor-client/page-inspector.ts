@@ -307,6 +307,10 @@ export function renderPageInspector(ctx: EditorContext): void {
   const pageLookup = ctx.currentPage();
   if (!pageLookup) {
     revertActivePreview(ctx);
+    // ADR 0060 Pass 3 follow-up #7 — remove the banner so it doesn't linger
+    // when state clears (boot abort, fatal load failure). syncTemplateBanner
+    // reads ctx.currentPage() and tears down when null.
+    syncTemplateBanner(ctx);
     ctx.inspector.hidden = true;
     ctx.inspector.replaceChildren();
     ctx.inspectorRenderSubject = null;
@@ -700,6 +704,13 @@ export function renderPageInspector(ctx: EditorContext): void {
 
   // -- ADR 0060 Pass 2: Page kind + template controls -------------------
   renderTemplateControls(ctx, page);
+
+  // ADR 0060 Pass 3 follow-up #7 — canvas-top banner that mirrors the
+  // template-context cue so the Owner doesn't lose the signal when the
+  // right sidebar is closed. Run last so any mutation above (kind picker
+  // defaulting collectionSlug to 'blog' on first set) is reflected in the
+  // banner label on the same render pass.
+  syncTemplateBanner(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -1032,6 +1043,215 @@ function insertOrCopyPlaceholder(ctx: EditorContext, token: string): void {
     return;
   }
   ctx.setStatus('Could not copy ' + token, 'error');
+}
+
+// ---------------------------------------------------------------------------
+// ADR 0060 Pass 3 follow-up #7 — canvas-top template banner.
+//
+// A small floating strip above the artboard surface that surfaces the
+// template-context cue (the same one the right inspector shows as a badge).
+// Sidebar can be closed, the badge can be off-screen — this banner keeps the
+// "you are editing a TEMPLATE, not a regular page" signal visible.
+//
+// DOM: single <div id="opencanvas-template-banner"> mounted as a child of
+// ctx.viewport (NOT ctx.root, which renderAll wipes via replaceChildren).
+// Position: absolute, top of viewport. Survives renderAll, and the banner
+// id makes the sync idempotent (existing element is reused, never stacked).
+//
+// Lifecycle:
+//   - syncTemplateBanner runs on every renderPageInspector tick.
+//   - Active page with pageKind set + non-dismissed → banner is created
+//     or updated in-place.
+//   - Active page with no pageKind → banner is removed.
+//   - Dismissed pages set a localStorage flag scoped per page id so the
+//     same template page doesn't keep re-showing; switching to a different
+//     template page reappears because the flag is keyed on that page's id.
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_BANNER_ID = 'opencanvas-template-banner';
+const TEMPLATE_BANNER_DISMISS_PREFIX = 'cms-template-banner-dismissed-';
+
+function templateBannerDismissKey(pageId: string): string {
+  return TEMPLATE_BANNER_DISMISS_PREFIX + pageId;
+}
+
+function isTemplateBannerDismissed(pageId: string): boolean {
+  // localStorage may be unavailable (server-side render path, blocked third-
+  // party storage, private window). Loud-failure rule: log + treat as "not
+  // dismissed" so the cue surfaces; we don't want a quota error to silently
+  // hide an Owner-facing affordance.
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    return localStorage.getItem(templateBannerDismissKey(pageId)) === '1';
+  } catch (err) {
+    console.error('[page-inspector] localStorage read failed for template banner', pageId, err);
+    return false;
+  }
+}
+
+function markTemplateBannerDismissed(pageId: string): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(templateBannerDismissKey(pageId), '1');
+  } catch (err) {
+    console.error('[page-inspector] localStorage write failed for template banner', pageId, err);
+  }
+}
+
+/** Pure: the banner label for a template page. Exported so the smoke can
+ *  pin both index and item-template phrasings without spinning up a DOM. */
+export function templateBannerLabelText(page: Pick<CanvasPage, 'pageKind' | 'collectionSlug'>): string {
+  const slug = page.collectionSlug ?? '';
+  if (page.pageKind === 'collection-index') return 'Index for ' + slug;
+  if (page.pageKind === 'collection-item-template') return 'Template for ' + slug;
+  return '';
+}
+
+/** Pure: the URL the "Manage entries" link points at. Exported so the smoke
+ *  can pin the path shape without parsing DOM. */
+export function templateBannerManageHref(siteId: string, collectionSlug: string): string {
+  return (
+    '/dashboard/sites/' +
+    encodeURIComponent(siteId) +
+    '/entries?collection=' +
+    encodeURIComponent(collectionSlug)
+  );
+}
+
+function removeTemplateBanner(host: HTMLElement): void {
+  // querySelector is on every Element; no instanceof guard needed since the
+  // caller only passes ctx.viewport (an HTMLElement) or short-circuits.
+  const existing = host.querySelector('#' + TEMPLATE_BANNER_ID);
+  if (existing !== null && existing.parentNode !== null) {
+    existing.parentNode.removeChild(existing);
+  }
+}
+
+/** Idempotently create, update, or remove the canvas-top template banner
+ *  based on the active page's pageKind / collectionSlug / dismissal state.
+ *  Safe to call repeatedly — the banner DOM node is keyed by id and reused
+ *  in place rather than stacked.
+ *
+ *  ADR 0060 Pass 3 follow-up #7. */
+export function syncTemplateBanner(ctx: EditorContext): void {
+  // Host is the viewport (parent of #canvas-root). renderAll wipes ctx.root's
+  // children via replaceChildren, so a banner under ctx.root would vanish on
+  // every full re-render. Living under ctx.viewport means the banner survives
+  // canvas rerenders and only this function rewrites it.
+  const host = ctx.viewport;
+  if (host === null) return;
+
+  const page = ctx.currentPage();
+
+  // No page → no banner. Same exit path covers state===null at boot abort.
+  if (page === null || page.pageKind === undefined) {
+    removeTemplateBanner(host);
+    return;
+  }
+
+  // Dismissed for this specific page id → no banner. The dismissal is
+  // scoped to the page id so switching to a different template page shows
+  // its banner without an explicit reset.
+  if (isTemplateBannerDismissed(page.id)) {
+    removeTemplateBanner(host);
+    return;
+  }
+
+  const collectionSlug = page.collectionSlug ?? '';
+  const labelText = templateBannerLabelText(page);
+  const manageHref = templateBannerManageHref(ctx.siteId, collectionSlug);
+
+  // Reuse an existing banner DOM node if present — prevents stacking when
+  // renderPageInspector fires multiple times for the same page.
+  let banner = host.querySelector<HTMLElement>('#' + TEMPLATE_BANNER_ID);
+  let labelEl: HTMLSpanElement;
+  let linkEl: HTMLAnchorElement;
+  let dismissBtn: HTMLButtonElement;
+  if (banner === null) {
+    banner = document.createElement('div');
+    banner.id = TEMPLATE_BANNER_ID;
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
+    // Inline styles — banner ships independent of styles-build.ts (per scope
+    // rules). CSS vars degrade to tasteful neutrals when the editor's design
+    // tokens aren't loaded (e.g. error-page fallback host).
+    banner.style.cssText = [
+      'position:absolute',
+      'top:0',
+      'left:0',
+      'right:0',
+      'height:28px',
+      'display:flex',
+      'align-items:center',
+      'justify-content:center',
+      'gap:12px',
+      'padding:0 12px',
+      'background:var(--surface, #ffffff)',
+      'color:var(--ink-2, #555)',
+      'border-bottom:1px solid var(--line, #e5e5e5)',
+      'font-family:var(--sans, system-ui, sans-serif)',
+      'font-size:12px',
+      'z-index:140',
+      'pointer-events:auto',
+      'box-sizing:border-box',
+    ].join(';');
+
+    labelEl = document.createElement('span');
+    labelEl.setAttribute('data-template-banner-label', '');
+    banner.appendChild(labelEl);
+
+    linkEl = document.createElement('a');
+    linkEl.setAttribute('data-template-banner-link', '');
+    linkEl.target = '_blank';
+    linkEl.rel = 'noopener';
+    linkEl.style.cssText = 'color:inherit;text-decoration:underline;';
+    linkEl.textContent = 'Manage entries →';
+    banner.appendChild(linkEl);
+
+    dismissBtn = document.createElement('button');
+    dismissBtn.type = 'button';
+    dismissBtn.setAttribute('aria-label', 'Dismiss banner');
+    dismissBtn.setAttribute('data-template-banner-dismiss', '');
+    dismissBtn.textContent = '✕';
+    dismissBtn.style.cssText = [
+      'position:absolute',
+      'right:8px',
+      'top:50%',
+      'transform:translateY(-50%)',
+      'appearance:none',
+      'background:transparent',
+      'border:none',
+      'color:inherit',
+      'cursor:pointer',
+      'font-size:14px',
+      'line-height:1',
+      'padding:2px 6px',
+    ].join(';');
+    // Closure captures `banner` (current node) and `ctx`. The handler
+    // re-resolves the active page at click time — if the Owner switched
+    // pages between mount and click, dismissal pins to whatever page is
+    // currently showing the banner (which by construction is the page id
+    // the label was rendered for, since switching pages re-runs sync).
+    dismissBtn.addEventListener('click', function () {
+      const current = ctx.currentPage();
+      if (current === null) return;
+      markTemplateBannerDismissed(current.id);
+      if (ctx.viewport !== null) removeTemplateBanner(ctx.viewport);
+    });
+    banner.appendChild(dismissBtn);
+
+    host.appendChild(banner);
+  } else {
+    // Re-resolve the in-place children we already know exist on the banner.
+    // Querying by data-* attribute keeps the lookup robust to style edits.
+    labelEl = banner.querySelector('[data-template-banner-label]') as HTMLSpanElement;
+    linkEl = banner.querySelector('[data-template-banner-link]') as HTMLAnchorElement;
+  }
+
+  // Update mutable content. Setting textContent / href every tick is cheap
+  // and lets a collectionSlug change reflect without re-mounting.
+  labelEl.textContent = labelText;
+  linkEl.href = manageHref;
 }
 
 // Live-apply page-level visual properties on the artboard.

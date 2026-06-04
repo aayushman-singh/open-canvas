@@ -25,6 +25,9 @@ import {
   shouldRevertTemplatePreviewOnRender,
   substituteTemplatePlaceholderString,
   substituteTemplatePreviewInDom,
+  syncTemplateBanner,
+  templateBannerLabelText,
+  templateBannerManageHref,
   templatePreviewCacheKey,
   revertTemplatePreviewInDom,
   type TemplatePreviewEntry,
@@ -273,6 +276,51 @@ function makeEntry(overrides: Partial<TemplatePreviewEntry> = {}): TemplatePrevi
     }),
     'active preview must revert before same-page inspector re-render',
   );
+}
+
+// 9. ADR 0060 Pass 3 follow-up #7 — canvas-top template banner.
+//    Pure helpers are exercised here (label + href shape). DOM-side
+//    behaviour (idempotent mount, dismissal, removal) is verified
+//    indirectly by typechecking the exported function signature so the
+//    bare-Bun smoke stays DOM-free.
+{
+  assert(
+    templateBannerLabelText({
+      pageKind: 'collection-item-template',
+      collectionSlug: 'blog',
+    }) === 'Template for blog',
+    'item-template banner label must read "Template for <slug>"',
+  );
+  assert(
+    templateBannerLabelText({
+      pageKind: 'collection-index',
+      collectionSlug: 'notes',
+    }) === 'Index for notes',
+    'index banner label must read "Index for <slug>"',
+  );
+  assert(
+    templateBannerLabelText({}) === '',
+    'banner label is empty when pageKind is unset',
+  );
+  assert(
+    templateBannerManageHref('site_abc', 'blog') ===
+      '/dashboard/sites/site_abc/entries?collection=blog',
+    'manage href must point at the dashboard entries tab for the collection',
+  );
+  assert(
+    templateBannerManageHref('site/with/slash', 'tag with space') ===
+      '/dashboard/sites/site%2Fwith%2Fslash/entries?collection=tag%20with%20space',
+    'siteId and collection slug must be URL-encoded in the manage href',
+  );
+  // syncTemplateBanner is DOM-bound — exercising the function in bare Bun
+  // only confirms the export shape. Calling with a stub ctx whose viewport
+  // is null is the exit path the function takes when DOM isn't mounted.
+  assert(typeof syncTemplateBanner === 'function', 'syncTemplateBanner must be exported');
+  syncTemplateBanner({
+    viewport: null,
+    currentPage: () => null,
+    siteId: 'site_test',
+  } as unknown as Parameters<typeof syncTemplateBanner>[0]);
 }
 
 console.log('[page-inspector-template:smoke] OK');
