@@ -1,7 +1,11 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { createR2Client } from '../../assets/r2-client';
 import { readOwnerAsset, type CfImageFetcher } from '../../assets/read';
+import {
+  loadAssetKindsWithSeedFallback,
+  resolveAssetRowForCustomer,
+} from '../../assets/seed-id-fallback';
 import { collectReferencedAssetIds, findAssetReferenceErrors } from '../../assets/site-assets';
 import { uploadOwnerAsset, UploadAssetError } from '../../assets/upload';
 import { loadAccessibleSite, type SiteAccessRequirement } from '../../auth/accessible-site';
@@ -255,15 +259,18 @@ canvasApi.put('/sites/:siteId', async (c) => {
   const referenced = collectReferencedAssetIds(nextState);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
-    const presentRows = await database
-      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
-      .from(ownerAsset)
-      .where(
-        and(
-          eq(ownerAsset.customerId, result.ownerCustomerId),
-          inArray(ownerAsset.id, referencedList),
-        ),
-      );
+    // Apply the same seed-id content-hash fallback the read path uses
+    // (`resolveAssetRowForCustomer`). Pre-2026-06 editable states still
+    // reference bare seed ids (`seed-project-thumb-neutral`) even though
+    // the materialised row is keyed by the seed's content hash under a
+    // `seed-{customerId}-{seedId}` id. Without this fallback, every save
+    // against such a state 400s as "missing assets" — see PR
+    // `fix(api): save validator uses same seed-id fallback as read path`.
+    const presentRows = await loadAssetKindsWithSeedFallback(
+      database,
+      result.ownerCustomerId,
+      referencedList,
+    );
     const referenceErrors = findAssetReferenceErrors(nextState, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
@@ -851,26 +858,13 @@ canvasApi.get('/sites/:siteId/assets/:assetId', async (c) => {
   }
 
   const database = db(c.env);
-  // The asset id may be a UUID (typical) or a content hash (when the
-  // caller already speaks the ADR 0006 URL shape). Match either; require
-  // Owner ownership in both branches.
-  const rows = await database
-    .select({
-      id: ownerAsset.id,
-      r2Key: ownerAsset.r2Key,
-      mediaType: ownerAsset.mediaType,
-      kind: ownerAsset.kind,
-      contentHash: ownerAsset.contentHash,
-    })
-    .from(ownerAsset)
-    .where(
-      and(
-        eq(ownerAsset.customerId, result.ownerCustomerId),
-        or(eq(ownerAsset.id, assetId), eq(ownerAsset.contentHash, assetId)),
-      ),
-    )
-    .limit(1);
-  const row = rows[0];
+  // The asset id may be a UUID (typical), a content hash (when the
+  // caller already speaks the ADR 0006 URL shape), or a bare seed id
+  // for pre-2026-06 sites whose editable_state still carries raw seed
+  // references. The shared helper covers all three branches and applies
+  // the seed-id content-hash fallback so the read path stays in lockstep
+  // with the save validator's `loadAssetKindsWithSeedFallback`.
+  const row = await resolveAssetRowForCustomer(database, result.ownerCustomerId, assetId);
   if (!row) {
     return c.json({ error: 'asset not found' }, 404);
   }
