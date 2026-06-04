@@ -1652,12 +1652,14 @@ function validatePageAnchorIdUniqueness(
       visitElementTree(el, elementPath);
     });
   };
-  visitSection(header, 'state.header');
+  // ADR 0059 — pages that suppress the site header/footer do not render it,
+  // so its anchor ids do not participate in the per-page uniqueness check.
+  if (page.suppressHeader !== true) visitSection(header, 'state.header');
   page.sections.forEach((section, sIdx) => {
     const sectionPath = pathJoin(pathJoin(basePath, 'sections'), sIdx);
     visitSection(section, sectionPath);
   });
-  visitSection(footer, 'state.footer');
+  if (page.suppressFooter !== true) visitSection(footer, 'state.footer');
 }
 
 function validatePageCardinality(pages: unknown[], errors: string[]): void {

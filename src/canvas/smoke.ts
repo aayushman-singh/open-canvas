@@ -751,6 +751,78 @@ assert(
   'expected bad-section-role rejection to mention the allowed roles',
 );
 
+// ADR 0059 — page-level suppress flags hide the site header/footer on that
+// page; absent flag (default) renders the site header/footer.
+const suppressFixture: PublishedSnapshot = {
+  version: 1,
+  publishedAt: '2026-06-04T00:00:00.000Z',
+  styleKit: 'charcoal',
+  header: {
+    id: 'pin-header',
+    recipeId: 'custom',
+    name: 'Header',
+    height: 72,
+    elements: [],
+  },
+  footer: {
+    id: 'pin-footer',
+    recipeId: 'custom',
+    name: 'Footer',
+    height: 96,
+    elements: [],
+  },
+  pages: [
+    {
+      id: 'page-default',
+      slug: 'default',
+      title: 'Default',
+      width: 1440,
+      sections: [{ id: 'body-default', recipeId: 'custom', name: 'Body', height: 240, elements: [] }],
+    },
+    {
+      id: 'page-suppressed',
+      slug: 'suppressed',
+      title: 'Suppressed',
+      width: 1440,
+      suppressHeader: true,
+      suppressFooter: true,
+      sections: [{ id: 'body-suppressed', recipeId: 'custom', name: 'Body', height: 240, elements: [] }],
+    },
+  ],
+};
+const suppressHtml = renderCanvasSnapshot(suppressFixture, '/assets', 'suppress-site', {
+  turnstileSiteKey: TURNSTILE_TEST_KEY,
+});
+// Scope the search to each page's <article> body (not the responsive <style>
+// preamble at the top of the document, which lists all sections for breakpoint
+// overrides regardless of per-page suppression).
+function articleBlock(html: string, pageId: string): string {
+  const marker = `data-opencanvas-page="${pageId}"`;
+  // Slice into article-tag chunks; chunks[0] is the doc preamble (which
+  // contains the responsive <style> block that mentions every pageId for
+  // breakpoint overrides) — skip it and only inspect article bodies.
+  const chunks = html.split('<article');
+  for (let i = 1; i < chunks.length; i++) {
+    const chunk = chunks[i]!;
+    if (!chunk.includes(marker)) continue;
+    const end = chunk.indexOf('</article>');
+    return '<article' + (end >= 0 ? chunk.slice(0, end + '</article>'.length) : chunk);
+  }
+  throw new Error(`articleBlock: no <article> body contains ${marker}`);
+}
+const defaultArticle = articleBlock(suppressHtml, 'page-default');
+const suppressedArticle = articleBlock(suppressHtml, 'page-suppressed');
+assert(
+  defaultArticle.includes('data-opencanvas-section="pin-header"') &&
+    defaultArticle.includes('data-opencanvas-section="pin-footer"'),
+  'default page must render the site header and footer',
+);
+assert(
+  !suppressedArticle.includes('data-opencanvas-section="pin-header"') &&
+    !suppressedArticle.includes('data-opencanvas-section="pin-footer"'),
+  'suppressed page must omit the site header and footer',
+);
+
 // -- Task 6: seed-asset registry gating -----------------------------------
 // The bundled fixture's media `assetId` and `posterAssetId` values must all
 // resolve in SEED_ASSET_REGISTRY. Production validators stay registry-free;

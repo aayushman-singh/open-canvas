@@ -331,11 +331,14 @@ function renderPage(
   if (page.maxWidth != null) entries.push(['max-width', `${String(page.maxWidth)}px`]);
   const style = styleFromEntries(entries);
   const pageCtx: ElementRenderCtx = { ...ctx, pageSlug: page.slug };
-  const headerHtml = header ? renderSection(header, renderWidth, pageCtx) : '';
+  // ADR 0059 — page may opt out of the site-level header/footer.
+  const headerHtml =
+    header && page.suppressHeader !== true ? renderSection(header, renderWidth, pageCtx) : '';
   const sectionsHtml = page.sections
     .map((section) => renderSection(section, renderWidth, pageCtx))
     .join('');
-  const footerHtml = footer ? renderSection(footer, renderWidth, pageCtx) : '';
+  const footerHtml =
+    footer && page.suppressFooter !== true ? renderSection(footer, renderWidth, pageCtx) : '';
   const hasEntrance = page.entranceAnimation !== undefined && page.entranceAnimation !== 'none';
   const triggerMode = page.scrollTriggerMode ?? 'on-load';
   const motionAttr =
