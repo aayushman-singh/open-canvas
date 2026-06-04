@@ -51,12 +51,14 @@ import { previewPaletteFromAccent } from './palette.js';
 import { SIDEBAR_FACTORIES } from './sidebar-factories.js';
 import { field, selectInput } from './dom-builders.js';
 import {
+  installOpencanvasModalGlobalImpl,
   openAiMediaModalImpl,
   openAlertModalImpl,
   openConfirmModalImpl,
   openNewPageModalImpl,
   openSelectModalImpl,
   openTextModalImpl,
+  type OpencanvasModalGlobal,
 } from './modals.js';
 import {
   applyElementStyleImpl,
@@ -655,6 +657,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
 export function createEditor(boot: EditorBoot): void {
   const ctx = createEditorContextSkeleton(boot);
   installRuntimeHelpers(ctx);
+  installOpencanvasModalGlobalImpl(ctx);
 
   // ---- DOM ref caching (mirror canvas-client.ts:605-660) -------------
   ctx.root = document.getElementById('canvas-root');
@@ -878,6 +881,7 @@ void _unused;
 declare global {
   interface Window {
     __opencanvasEditorBoot?: EditorBoot;
+    __opencanvasModal?: OpencanvasModalGlobal;
   }
 }
 

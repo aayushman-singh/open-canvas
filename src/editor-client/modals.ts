@@ -60,12 +60,12 @@
 // rather than two stacked dialogs.
 //
 // The window.__opencanvasModal global registration (canvas-client.ts:
-// 1953-1957) is NOT extracted — it stays inline at the IIFE boundary so
-// the boot order remains identical. After Phase 3 cutover, createEditor
-// will perform the registration against the bound ctx methods.
-//
-// Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
-// Phase 3 cutover destination, not a live call site yet.
+// 1953-1957 in the pre-cutover IIFE) is now performed by
+// installOpencanvasModalGlobalImpl below, called from createEditor right
+// after ctx.openTextModal / openConfirmModal / openAlertModal are bound.
+// Consumers on the editor surface — most notably the notifications inbox
+// IIFE's confirmStylized() — depend on this global being present at first
+// dispatch.
 
 import type { EditorContext } from './editor-context.js';
 
@@ -996,4 +996,48 @@ export function openAlertModalImpl(
     document.body.appendChild(backdrop);
     ok.focus();
   });
+}
+
+// ---- window.__opencanvasModal registration ----------------------------
+
+export interface OpencanvasModalConfirmOpts {
+  title?: string;
+  confirmLabel?: string;
+  danger?: boolean;
+}
+
+export interface OpencanvasModalGlobal {
+  confirm(msg: string, opts?: OpencanvasModalConfirmOpts): Promise<boolean>;
+  alert(msg: string, title?: string): Promise<void>;
+  prompt(title: string, label: string, def?: string): Promise<string | null>;
+}
+
+/** Mirrors canvas-client.ts:1953-1957 in the pre-cutover IIFE. The
+ *  notifications inbox script (src/notifications/dashboard-inbox-script.ts)
+ *  expects window.__opencanvasModal.confirm to be present before its first
+ *  dispatch, and rejects loudly when it isn't — see confirmStylized() in
+ *  that file. Calling this from createEditor at boot keeps "Mark all read"
+ *  working on the editor surface, parity with the inline IIFE behaviour. */
+export function installOpencanvasModalGlobalImpl(ctx: EditorContext): void {
+  window.__opencanvasModal = {
+    confirm(msg, opts) {
+      const o = opts || {};
+      return ctx.openConfirmModal({
+        title: o.title || '',
+        message: msg,
+        confirmLabel: o.confirmLabel,
+        danger: o.danger,
+      });
+    },
+    alert(msg, title) {
+      return ctx.openAlertModal({ title: title || '', message: msg });
+    },
+    prompt(title, label, def) {
+      return ctx.openTextModal({
+        title: title || '',
+        label: label || '',
+        defaultValue: def || '',
+      });
+    },
+  };
 }
