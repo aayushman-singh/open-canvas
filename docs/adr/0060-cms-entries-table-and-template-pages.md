@@ -102,6 +102,53 @@ DELETE /api/sites/:siteId/entries/:entryId              → 204
 
 ## Follow-ups
 
-- Add a renderer pass that converts entry body Markdown into safe HTML at materialization time.
-- Add a fixture-migration ADR that flips portfolio-showcase from page-stored entries to template-page + entries-table.
-- Add OG image-by-entry support once OG generation is reworked (currently per-page; entries will inherit until then).
+The four items below were deliberately descoped from the shipping pass (2026-06-04) because each is its own decision, not a mechanical addition. Each entry below is the next session's brief — what the decision is, what it touches, and why it didn't fit in this ADR's scope.
+
+### F1 — Entry-body Markdown rendering at materialization time
+
+**Decision space:** the `body` column stores Markdown but the materializer substitutes `{{body}}` as a raw string. The published article therefore renders as plain text with `#` and `*` characters visible. Three live options:
+
+1. Substitute pre-rendered HTML when `{{body}}` is the *only* content of a text element. Convention-driven, no schema change, but brittle (any neighboring whitespace breaks the rule).
+2. Add an `isRichText: true` flag on `TextElement` and route `{{body}}` substitution through a Markdown→HTML pass only on flagged elements. Requires schema migration, validator update, Yjs round-trip.
+3. Introduce a new `RichTextElement` type with its own dispatch entries (inspector, sidebar, agent tool, Yjs encode/decode). Cleanest model match; biggest surface change.
+
+**Touches:** new dependency (likely `markdown-it` for the CommonMark + sanitiser combo; `marked` is lighter but ships HTML by default), `collection-materializer.ts`, possibly `schema.ts` / `validate.ts` / element dispatch / Yjs projection.
+
+**Why deferred:** library choice + element-shape decision is real ADR work. Wrong to bolt one approach in mid-stream.
+
+### F2 — Fixture migration: portfolio-showcase to template+entries pattern
+
+**Decision space:** `src/canvas/fixtures/portfolio-showcase.json` still ships four mock blog post pages (`page-pf-post-*`) as members of `pages[]`. This was the pre-ADR-0060 pattern. New sites using the portfolio template inherit those four pages and the Owner has to delete them manually before authoring real entries.
+
+**Real options:**
+
+1. Strip the four pages from the fixture, add a `collection-item-template` page + a `collection-index` page, AND seed four `collection_entry` rows when a site is created from this template. Requires changes to the template-instantiation path that builds a new `Site` row.
+2. Same as above but skip the seeded entries — new site starts empty. Cleaner state but breaks the demo-feel of the template.
+3. Leave the fixture as-is. Document for Owners that older templates predate the CMS pattern. No code change.
+
+**Touches:** `src/canvas/fixtures/portfolio-showcase.json`, the template instantiation flow (search `customTemplate` + `Site` insert paths), possibly a seed step in `src/routes/api/sites.ts` site-create, and fixture-based smokes that count `pages[]`.
+
+**Why deferred:** seeding entries requires a careful "is this site being created from a template?" hook in the site-create path; getting that wrong leaks demo data into every new site.
+
+### F3 — "Create new collection" wizard
+
+**Decision space:** today the Owner marks an existing page as `collection-index` or `collection-item-template` via the page-inspector dropdown. To set up a working blog they have to mark TWO pages (the index + the template) and remember to use the same `collectionSlug` for both. Easy to misalign.
+
+**Direction:** a `+ New collection` button (placed either in the pages sidebar of the editor OR in the Entries dashboard tab) that opens a small modal — collection slug, optional starter layout — then creates both pages with matching `pageKind`/`collectionSlug` pre-filled. Possibly also creates a sample entry so the Owner sees the preview working immediately.
+
+**Touches:** editor pages-sidebar (or Entries dashboard tab), new modal, page-creation API. No schema changes — pure UX layer.
+
+**Why deferred:** UX flow needs sketching against the dashboard's existing modal patterns; not a one-shot agent task.
+
+### F4 — Per-entry OG image
+
+**Decision space:** the `og_image_asset_id` column exists on `collection_entry` and the materializer copies it onto the cloned page when set. But the OG generation path (per ADR 0041, "OG image fresh render per page") renders OG cards from page metadata server-side at publish — there's no path yet that takes an entry-supplied `ogImageAssetId` and produces the visitor-facing card.
+
+**Real work:** trace the OG render path (`src/og-image/`) and decide whether per-entry OG images are
+1. The Owner-uploaded asset surfaced verbatim (no fresh render),
+2. Fed into the OG template as one of the inputs (fresh render with the asset as background),
+3. Skipped — entry pages always inherit the template page's OG card.
+
+**Touches:** `src/og-image/on-publish.ts`, possibly the materializer to ensure the cloned page carries the right hint, and an ADR pinning the choice.
+
+**Why deferred:** the decision is upstream of code; needs the OG generation path's behaviour to be the anchor, not a guess.
