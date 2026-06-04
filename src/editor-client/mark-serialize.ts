@@ -42,6 +42,7 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { InlineMark, InlineRun } from '../canvas/schema.js';
+import { INLINE_COLOR_HEX_RE } from '../canvas/schema.js';
 import { CANONICAL_MARK_ORDER } from './editor-constants.js';
 import { isAllowedHref } from './href-utils.js';
 import { MARK_TAGS } from './mark-tags.js';
@@ -49,6 +50,58 @@ import {
   INLINE_FONT_SIZE_PX_MAX,
   INLINE_FONT_SIZE_PX_MIN,
 } from './shared-constants.js';
+
+/** Normalise a CSS `color` string read from `HTMLElement.style.color`
+ *  into the lowercase `#RRGGBB`/`#RRGGBBAA` shape the schema validates.
+ *
+ *  Browsers store inline `color:` declarations in their parsed form, so a
+ *  span we authored as `style="color:#ff6600"` typically reads back as
+ *  `rgb(255, 102, 0)`. Returning to hex keeps the round-trip
+ *  serialise → save → reload → serialise stable, and keeps the validator
+ *  happy (`INLINE_COLOR_HEX_RE`).
+ *
+ *  Returns `null` when the input doesn't parse into a stable hex
+ *  (e.g. transparent, currentcolor, malformed rgb) — caller drops the
+ *  mark in that case rather than smuggling an unvalidatable value. */
+function normaliseInlineColor(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return null;
+  if (INLINE_COLOR_HEX_RE.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  const rgbMatch = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\)$/i.exec(
+    trimmed,
+  );
+  if (rgbMatch) {
+    const r = clampByte(parseInt(rgbMatch[1] ?? '0', 10));
+    const g = clampByte(parseInt(rgbMatch[2] ?? '0', 10));
+    const b = clampByte(parseInt(rgbMatch[3] ?? '0', 10));
+    const alphaRaw = rgbMatch[4];
+    if (alphaRaw !== undefined) {
+      const a = parseFloat(alphaRaw);
+      if (!Number.isFinite(a)) return null;
+      if (a >= 0.999) {
+        return `#${byteToHex(r)}${byteToHex(g)}${byteToHex(b)}`;
+      }
+      const ab = clampByte(Math.round(Math.max(0, Math.min(1, a)) * 255));
+      return `#${byteToHex(r)}${byteToHex(g)}${byteToHex(b)}${byteToHex(ab)}`;
+    }
+    return `#${byteToHex(r)}${byteToHex(g)}${byteToHex(b)}`;
+  }
+  return null;
+}
+
+function clampByte(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  if (n < 0) return 0;
+  if (n > 255) return 255;
+  return Math.round(n);
+}
+
+function byteToHex(n: number): string {
+  const h = n.toString(16);
+  return h.length === 1 ? '0' + h : h;
+}
 
 /** Walk up from `node` until `stopAt` (exclusive), collect each
  *  mark-tagged ancestor (MARK_TAGS lookup + A → link / SPAN[style="font-size:…"]
@@ -103,6 +156,21 @@ export function activeMarksFor(node: Node, stopAt: Node): InlineMark[] {
           }
         }
       }
+      if (!seen.has('color') && tag === 'SPAN') {
+        // Inline `color:` style carried by the run's outer span
+        // (renderInlineRun / buildRunNode). Innermost wrap wins, matching
+        // the CSS cascade — so a span nested inside another with a different
+        // color takes priority just as the browser would render it.
+        const styleEl = el as HTMLElement;
+        const rawColor = styleEl.style && styleEl.style.color ? styleEl.style.color : '';
+        if (rawColor) {
+          const normalised = normaliseInlineColor(rawColor);
+          if (normalised !== null) {
+            seen.add('color');
+            marks.push({ type: 'color', color: normalised });
+          }
+        }
+      }
     }
     cur = cur.parentNode;
   }
@@ -134,6 +202,9 @@ export function marksEqual(a: InlineMark[], b: InlineMark[]): boolean {
       if ((ai.target || '') !== (bi.target || '')) return false;
     }
     if (ai.type === 'fontSize' && bi.type === 'fontSize' && ai.px !== bi.px) {
+      return false;
+    }
+    if (ai.type === 'color' && bi.type === 'color' && ai.color !== bi.color) {
       return false;
     }
   }

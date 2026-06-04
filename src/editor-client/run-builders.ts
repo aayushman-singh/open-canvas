@@ -26,7 +26,7 @@ import type { InlineRun, InlineMarkType } from '../canvas/schema.js';
 
 import { CANONICAL_MARK_ORDER } from './editor-constants.js';
 import type { EditorContext } from './editor-context.js';
-import { findFontSizeMark, findLinkMark, hasMark } from './mark-queries.js';
+import { findColorMark, findFontSizeMark, findLinkMark, hasMark } from './mark-queries.js';
 
 declare global {
   interface Window {
@@ -146,5 +146,7 @@ export function buildRunNodeImpl(ctx: EditorContext, run: InlineRun): HTMLElemen
   span.appendChild(inner);
   const fontSize = findFontSizeMark(run);
   if (fontSize) span.style.fontSize = String(fontSize.px) + 'px';
+  const colorMark = findColorMark(run);
+  if (colorMark) span.style.color = colorMark.color;
   return span;
 }

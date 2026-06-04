@@ -85,6 +85,17 @@ export function findFontSizeMark(
   return null;
 }
 
+/** Find the color mark in a run (zero or one). */
+export function findColorMark(
+  run: InlineRun,
+): Extract<InlineMark, { type: 'color' }> | null {
+  if (!run.marks) return null;
+  for (const mark of run.marks) {
+    if (mark.type === 'color') return mark;
+  }
+  return null;
+}
+
 export function hasMark(run: InlineRun, type: InlineMark['type']): boolean {
   if (!run.marks) return false;
   for (const mark of run.marks) {
@@ -131,8 +142,10 @@ export function renderInlineRun(run: InlineRun): string {
       mathInner = `<a class="opencanvas-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${mathInner}</a>`;
     }
     const fontSize = findFontSizeMark(run);
-    if (fontSize) {
-      return `<span style="font-size:${String(fontSize.px)}px">${mathInner}</span>`;
+    const color = findColorMark(run);
+    const mathStyle = outerSpanStyle(fontSize?.px ?? null, color?.color ?? null);
+    if (mathStyle.length > 0) {
+      return `<span style="${mathStyle}">${mathInner}</span>`;
     }
     return `<span>${mathInner}</span>`;
   }
@@ -155,8 +168,30 @@ export function renderInlineRun(run: InlineRun): string {
     inner = `<a class="opencanvas-inline-link" href="${escapeAttr(link.href)}"${targetAttr}>${inner}</a>`;
   }
   const fontSize = findFontSizeMark(run);
-  if (fontSize) {
-    return `<span style="font-size:${String(fontSize.px)}px">${inner}</span>`;
+  const color = findColorMark(run);
+  const outerStyle = outerSpanStyle(fontSize?.px ?? null, color?.color ?? null);
+  if (outerStyle.length > 0) {
+    return `<span style="${outerStyle}">${inner}</span>`;
   }
   return `<span>${inner}</span>`;
+}
+
+/**
+ * Build the inline `style="…"` payload for an InlineRun's outer span when
+ * a fontSize and/or color mark is present. Both marks live on the run's
+ * outermost wrapper because they stamp CSS properties rather than wrap
+ * tags. The color value passes through `escapeCssValue` — the validator
+ * has already constrained it to `INLINE_COLOR_HEX_RE`, but defence in
+ * depth keeps a malformed payload from breaking out of the declaration.
+ */
+function outerSpanStyle(fontSizePx: number | null, color: string | null): string {
+  const parts: string[] = [];
+  if (fontSizePx !== null) {
+    parts.push(`font-size:${String(fontSizePx)}px`);
+  }
+  if (color !== null) {
+    const safe = escapeCssValue(color);
+    if (safe.length > 0) parts.push(`color:${safe}`);
+  }
+  return parts.join(';');
 }

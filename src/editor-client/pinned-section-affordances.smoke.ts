@@ -7,9 +7,9 @@
 // `document.querySelector('[data-opencanvas-element="..."]')` which
 // always returned the FIRST match in document order, so any affordance
 // that anchors via getBoundingClientRect (the rich-text toolbar, the
-// inline drag handle, the per-element text-color preview mirror,
-// alignment preview) landed on page 1 even when the Owner clicked a
-// footer text on page 3.
+// inline drag handle, alignment preview) landed on page 1 even when the
+// Owner clicked a footer text on page 3. (PR #32 removed the per-element
+// text-color preview mirror in favour of per-run color InlineMarks.)
 //
 // c70240c fixed selection rings (querySelectorAll loops every instance)
 // but left the singular-anchor affordances broken. This smoke locks in
@@ -22,11 +22,12 @@
 //      click handler passes the wrapper it already resolved via
 //      resolveElementWrapperAtPoint, so the editor lights up on the
 //      clicked page.
-//   3. mark-toolbar.ts's edit-time affordances (align mirror, color
-//      mirror, drag handle) read `ctx.markToolbarAnchor` — the wrapper
-//      captured at beginTextEdit — rather than re-querying by id. No
-//      affordance may regress to `querySelector('[data-opencanvas-
-//      element=...]')` from inside the edit flow.
+//   3. mark-toolbar.ts's edit-time affordances (align mirror, drag
+//      handle) read `ctx.markToolbarAnchor` — the wrapper captured at
+//      beginTextEdit — rather than re-querying by id. No affordance may
+//      regress to `querySelector('[data-opencanvas-element=...]')` from
+//      inside the edit flow. (The color mirror that used to live here
+//      was retired by PR #32 in favour of per-run color InlineMarks.)
 //   4. The selection-propagation fix (c70240c) stays intact —
 //      selection.ts still uses querySelectorAll for the four
 //      add/remove paths on selectedSection / selectedElement so every
@@ -125,8 +126,8 @@ const markToolbar = await source('./mark-toolbar.ts');
 assert(
   !/ctx\.root\.querySelector\(\s*\n?\s*['"]\[data-opencanvas-element=/.test(markToolbar),
   'mark-toolbar.ts must NOT use ctx.root.querySelector to find the edit wrapper — that returns the ' +
-    'first DOM match and the affordances (align mirror, color mirror, drag handle) anchor to page 1 ' +
-    'no matter which page the Owner is editing. Use ctx.markToolbarAnchor instead.',
+    'first DOM match and the affordances (align mirror, drag handle) anchor to page 1 no matter which ' +
+    'page the Owner is editing. Use ctx.markToolbarAnchor instead.',
 );
 // The three load-bearing affordance functions must source the wrapper
 // from ctx.markToolbarAnchor (the wrapper buildMarkToolbarImpl captured
@@ -137,12 +138,11 @@ assert(
   'applyAlignToEditing must read its wrapper from ctx.markToolbarAnchor so the textAlign mirror ' +
     'lands on the edit instance, not page 1',
 );
-const colorWrapperPattern = /function applyTextColorToEditing[\s\S]*?const wrapper = ctx\.markToolbarAnchor;/;
-assert(
-  colorWrapperPattern.test(markToolbar),
-  'applyTextColorToEditing must read its wrapper from ctx.markToolbarAnchor so the color mirror ' +
-    'lands on the edit instance, not page 1',
-);
+// Color-mirror assertion removed: PR #32 replaces the element-level
+// applyTextColorToEditing helper with per-selection `color` InlineMarks
+// (setColorOnRuns + applyColorMark). There is no longer a wrapper-level
+// color preview to pin to ctx.markToolbarAnchor; the new color path rewrites
+// the editable's runs directly and the renderer paints from those.
 const dragWrapperPattern = /dragBtn\.addEventListener\(\s*['"]mousedown['"][\s\S]*?const wrapper = ctx\.markToolbarAnchor;/;
 assert(
   dragWrapperPattern.test(markToolbar),

@@ -73,8 +73,11 @@
 //   'marks'? -> Y.Array<Y.Map<unknown>>              (InlineMark[])
 //
 // InlineMark Y.Map:
-//   'type' -> string         (one of INLINE_MARK_TYPES)
-//   'href' -> string         (only when type === 'link')
+//   'type'  -> string        (one of INLINE_MARK_TYPES)
+//   'href'  -> string        (only when type === 'link')
+//   'target'-> '_blank'      (only when type === 'link' and target is set)
+//   'px'    -> number        (only when type === 'fontSize')
+//   'color' -> string        (only when type === 'color'; hex per INLINE_COLOR_HEX_RE)
 //
 // Determinism rule: encoding the same state twice yields byte-equal updates
 // (modulo client id) because we walk fields in a stable order — defined by
@@ -244,6 +247,9 @@ function encodeInlineMark(mark: InlineMark): Y.Map<unknown> {
   }
   if (mark.type === 'fontSize') {
     out.set('px', mark.px);
+  }
+  if (mark.type === 'color') {
+    out.set('color', mark.color);
   }
   return out;
 }
@@ -1008,6 +1014,9 @@ function decodeInlineMark(map: Y.Map<unknown>): InlineMark {
   }
   if (type === 'fontSize') {
     return { type, px: map.get('px') as number };
+  }
+  if (type === 'color') {
+    return { type, color: map.get('color') as string };
   }
   return { type };
 }

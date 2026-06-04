@@ -12,6 +12,7 @@ import type { InspectorSpec } from './inspector-spec.js';
 import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, escapeCssValue, renderInlineRun, styleFromEntries } from './render-utils.js';
 import {
+  INLINE_COLOR_HEX_RE,
   INLINE_FONT_SIZE_PX_MAX,
   INLINE_FONT_SIZE_PX_MIN,
   INLINE_MARK_TYPES,
@@ -303,6 +304,15 @@ function parseInlineMark(value: unknown, runIdx: number, markIdx: number): Inlin
     }
     return { type: 'fontSize', px: value.px };
   }
+  if (value.type === 'color') {
+    if (typeof value.color !== 'string' || value.color.length === 0) {
+      return `mark[${String(runIdx)}][${String(markIdx)}] color mark requires a non-empty color string`;
+    }
+    if (!INLINE_COLOR_HEX_RE.test(value.color)) {
+      return `mark[${String(runIdx)}][${String(markIdx)}] color ${JSON.stringify(value.color)} must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA)`;
+    }
+    return { type: 'color', color: value.color };
+  }
   return { type: value.type as InlineMark['type'] } as InlineMark;
 }
 
@@ -392,9 +402,11 @@ const inlineMarkSchema: JsonSchema = {
     '  { "type": "bold" } | { "type": "italic" } | { "type": "underline" } |\n' +
     '  { "type": "strike" } | { "type": "code" } | { "type": "highlight" } |\n' +
     '  { "type": "link", "href": "https://example.com" } |\n' +
-    '  { "type": "fontSize", "px": 24 }\n' +
+    '  { "type": "fontSize", "px": 24 } |\n' +
+    '  { "type": "color", "color": "#ff6600" }\n' +
     'For link marks, `href` MUST be http:, https:, mailto:, tel:, /relative, or #anchor — javascript: and data: are rejected. ' +
-    `For fontSize marks, \`px\` is required and bounded [${String(INLINE_FONT_SIZE_PX_MIN)}, ${String(INLINE_FONT_SIZE_PX_MAX)}].`,
+    `For fontSize marks, \`px\` is required and bounded [${String(INLINE_FONT_SIZE_PX_MIN)}, ${String(INLINE_FONT_SIZE_PX_MAX)}]. ` +
+    'For color marks, `color` is required and must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA).',
   properties: {
     type: {
       type: 'string',
@@ -409,6 +421,11 @@ const inlineMarkSchema: JsonSchema = {
     px: {
       type: 'number',
       description: `Required ONLY when type=="fontSize". Pixel size, ${String(INLINE_FONT_SIZE_PX_MIN)}-${String(INLINE_FONT_SIZE_PX_MAX)}.`,
+    },
+    color: {
+      type: 'string',
+      description:
+        'Required ONLY when type=="color". Hex colour (#RGB, #RRGGBB, or #RRGGBBAA).',
     },
   },
   required: ['type'],
