@@ -173,6 +173,7 @@ const FIXTURES: { [K in CanvasElement['type']]?: Extract<CanvasElement, { type: 
 const REGISTERED_ACTIONS = ['rewrite-text', 'replace-media'] as const;
 const REGISTERED_BUSY_FLAGS = ['aiBusy'] as const;
 const REGISTERED_MOUNTS = [
+  'action-label',
   'media-picker',
   'media-ai',
   'video-playback',
