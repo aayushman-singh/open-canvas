@@ -177,6 +177,7 @@ const REGISTERED_MOUNTS = [
   'carousel-slides',
   'table-grid',
   'nav-links',
+  'nav-primary-action',
   'chart-data',
   'form-fields',
   'form-style',

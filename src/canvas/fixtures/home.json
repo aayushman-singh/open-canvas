@@ -1,5 +1,137 @@
 {
   "styleKit": "charcoal",
+  "header": {
+    "id": "section-header",
+    "recipeId": "custom",
+    "name": "Header",
+    "height": 72,
+    "elements": [
+      {
+        "id": "header-nav",
+        "type": "nav",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "w": 1440,
+          "h": 72,
+          "z": 2
+        },
+        "siteTitle": "Open Canvas",
+        "links": [
+          {
+            "label": "Features",
+            "href": "#features",
+            "kind": "anchor"
+          },
+          {
+            "label": "Pricing",
+            "href": "#pricing",
+            "kind": "anchor"
+          }
+        ],
+        "primaryAction": {
+          "label": "Get started",
+          "href": "/edit",
+          "kind": "external"
+        },
+        "layout": "left-right",
+        "sticky": false,
+        "pinnedStyle": {
+          "padding": "0 80px"
+        }
+      }
+    ]
+  },
+  "footer": {
+    "id": "section-footer",
+    "recipeId": "custom",
+    "name": "Footer",
+    "height": 120,
+    "elements": [
+      {
+        "id": "footer-brand",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 24,
+          "w": 200,
+          "h": 32,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "Open Canvas"
+          }
+        ],
+        "role": "body",
+        "fontSize": 16,
+        "fontWeight": 600,
+        "align": "left"
+      },
+      {
+        "id": "footer-copy",
+        "type": "text",
+        "box": {
+          "x": 80,
+          "y": 64,
+          "w": 400,
+          "h": 28,
+          "z": 2
+        },
+        "content": [
+          {
+            "text": "© 2026 Open Canvas. All rights reserved."
+          }
+        ],
+        "role": "label",
+        "fontSize": 13,
+        "fontWeight": 400,
+        "align": "left"
+      },
+      {
+        "id": "footer-link-1",
+        "type": "action",
+        "box": {
+          "x": 1100,
+          "y": 24,
+          "w": 100,
+          "h": 32,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Privacy"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/privacy"
+        },
+        "variant": "ghost"
+      },
+      {
+        "id": "footer-link-2",
+        "type": "action",
+        "box": {
+          "x": 1220,
+          "y": 24,
+          "w": 100,
+          "h": 32,
+          "z": 2
+        },
+        "label": [
+          {
+            "text": "Terms"
+          }
+        ],
+        "href": {
+          "type": "external",
+          "url": "/terms"
+        },
+        "variant": "ghost"
+      }
+    ]
+  },
   "pages": [
     {
       "id": "page-home",
@@ -7,103 +139,6 @@
       "title": "Home",
       "width": 1440,
       "sections": [
-        {
-          "id": "section-header",
-          "recipeId": "custom",
-          "name": "Header",
-          "height": 72,
-          "role": "header",
-          "elements": [
-            {
-              "id": "header-logo",
-              "type": "text",
-              "box": {
-                "x": 80,
-                "y": 16,
-                "w": 200,
-                "h": 40,
-                "z": 2
-              },
-              "content": [
-                {
-                  "text": "Open Canvas",
-                  "marks": [
-                    {
-                      "type": "bold"
-                    }
-                  ]
-                }
-              ],
-              "role": "label",
-              "fontSize": 22,
-              "fontWeight": 700,
-              "align": "left"
-            },
-            {
-              "id": "header-nav-1",
-              "type": "action",
-              "box": {
-                "x": 1020,
-                "y": 18,
-                "w": 100,
-                "h": 36,
-                "z": 2
-              },
-              "label": [
-                {
-                  "text": "Features"
-                }
-              ],
-              "href": {
-                "type": "external",
-                "url": "#features"
-              },
-              "variant": "ghost"
-            },
-            {
-              "id": "header-nav-2",
-              "type": "action",
-              "box": {
-                "x": 1130,
-                "y": 18,
-                "w": 100,
-                "h": 36,
-                "z": 2
-              },
-              "label": [
-                {
-                  "text": "Pricing"
-                }
-              ],
-              "href": {
-                "type": "external",
-                "url": "#pricing"
-              },
-              "variant": "ghost"
-            },
-            {
-              "id": "header-cta",
-              "type": "action",
-              "box": {
-                "x": 1260,
-                "y": 18,
-                "w": 120,
-                "h": 36,
-                "z": 2
-              },
-              "label": [
-                {
-                  "text": "Get started"
-                }
-              ],
-              "href": {
-                "type": "external",
-                "url": "/edit"
-              },
-              "variant": "solid"
-            }
-          ]
-        },
         {
           "id": "section-hero",
           "recipeId": "hero-split",
@@ -411,97 +446,6 @@
                 "url": "mailto:hello@opencanvas.example.com"
               },
               "variant": "underline"
-            }
-          ]
-        },
-        {
-          "id": "section-footer",
-          "recipeId": "custom",
-          "name": "Footer",
-          "height": 120,
-          "role": "footer",
-          "elements": [
-            {
-              "id": "footer-brand",
-              "type": "text",
-              "box": {
-                "x": 80,
-                "y": 24,
-                "w": 200,
-                "h": 32,
-                "z": 2
-              },
-              "content": [
-                {
-                  "text": "Open Canvas"
-                }
-              ],
-              "role": "body",
-              "fontSize": 16,
-              "fontWeight": 600,
-              "align": "left"
-            },
-            {
-              "id": "footer-copy",
-              "type": "text",
-              "box": {
-                "x": 80,
-                "y": 64,
-                "w": 400,
-                "h": 28,
-                "z": 2
-              },
-              "content": [
-                {
-                  "text": "© 2026 Open Canvas. All rights reserved."
-                }
-              ],
-              "role": "label",
-              "fontSize": 13,
-              "fontWeight": 400,
-              "align": "left"
-            },
-            {
-              "id": "footer-link-1",
-              "type": "action",
-              "box": {
-                "x": 1100,
-                "y": 24,
-                "w": 100,
-                "h": 32,
-                "z": 2
-              },
-              "label": [
-                {
-                  "text": "Privacy"
-                }
-              ],
-              "href": {
-                "type": "external",
-                "url": "/privacy"
-              },
-              "variant": "ghost"
-            },
-            {
-              "id": "footer-link-2",
-              "type": "action",
-              "box": {
-                "x": 1220,
-                "y": 24,
-                "w": 100,
-                "h": 32,
-                "z": 2
-              },
-              "label": [
-                {
-                  "text": "Terms"
-                }
-              ],
-              "href": {
-                "type": "external",
-                "url": "/terms"
-              },
-              "variant": "ghost"
             }
           ]
         }

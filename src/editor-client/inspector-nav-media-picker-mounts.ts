@@ -170,6 +170,104 @@ export function mountNavLinks(
   host.appendChild(field('Links', linkListHost));
 }
 
+export function mountNavPrimaryAction(
+  ctx: EditorContext,
+  element: NavElement,
+  host: HTMLElement,
+): void {
+  const wrap = document.createElement('div');
+
+  function validatePrimaryActionEdit(kind: string, href: string): boolean {
+    if (kind === 'anchor' && (typeof href !== 'string' || href.charAt(0) !== '#')) {
+      ctx.setStatus('Anchor targets must start with #.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  function renderBody(): void {
+    wrap.replaceChildren();
+    if (element.primaryAction === undefined) {
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'opencanvas-inspector-add';
+      addBtn.textContent = 'Add primary action';
+      addBtn.addEventListener('click', function () {
+        element.primaryAction = { label: 'Get started', href: '/', kind: 'internal' };
+        renderBody();
+        ctx.rebuildElement(element.id);
+        ctx.scheduleSave();
+      });
+      wrap.appendChild(addBtn);
+      return;
+    }
+
+    const pa = element.primaryAction;
+    const card = document.createElement('div');
+    card.className = 'inspector-list-card';
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.value = pa.label;
+    labelInput.placeholder = 'Label';
+    labelInput.addEventListener('change', function () {
+      pa.label = labelInput.value;
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    card.appendChild(field('Label', labelInput));
+
+    const hrefInput = document.createElement('input');
+    hrefInput.type = 'text';
+    hrefInput.value = pa.href;
+    hrefInput.placeholder =
+      pa.kind === 'anchor' ? '#section' : pa.kind === 'external' ? 'https://...' : '/page';
+    hrefInput.addEventListener('change', function () {
+      if (!validatePrimaryActionEdit(pa.kind, hrefInput.value)) {
+        hrefInput.value = pa.href;
+        return;
+      }
+      pa.href = hrefInput.value;
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    card.appendChild(field('Href', hrefInput));
+
+    const kindSel = selectInput(['internal', 'external', 'anchor'], pa.kind);
+    kindSel.addEventListener('change', function () {
+      if (!validatePrimaryActionEdit(kindSel.value, pa.href)) {
+        kindSel.value = pa.kind;
+        return;
+      }
+      pa.kind = kindSel.value as typeof pa.kind;
+      hrefInput.placeholder =
+        pa.kind === 'anchor' ? '#section' : pa.kind === 'external' ? 'https://...' : '/page';
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    card.appendChild(field('Kind', kindSel));
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'opencanvas-inspector-remove';
+    removeBtn.textContent = '\\u00d7';
+    removeBtn.title = 'Remove primary action';
+    removeBtn.setAttribute('aria-label', 'Remove primary action');
+    removeBtn.addEventListener('click', function () {
+      delete element.primaryAction;
+      renderBody();
+      ctx.rebuildElement(element.id);
+      ctx.scheduleSave();
+    });
+    card.appendChild(removeBtn);
+
+    wrap.appendChild(card);
+  }
+
+  renderBody();
+  host.appendChild(field('Primary action', wrap));
+}
+
 export function mountMediaPicker(
   ctx: EditorContext,
   element: MediaElement,

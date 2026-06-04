@@ -468,9 +468,12 @@ assert(
 
 const pageLinkState: EditableSite = structuredClone(twoPageState);
 const linkSection = pageLinkState.pages[0]!.sections[0]!;
-const linkElement = linkSection.elements.find((el) => el.id === 'header-cta');
+// ADR 0059 — header/footer moved off page sections; sections[0] is now the
+// hero. Use `hero-action` as the action-element handle for the page-link
+// assertions below; any action element in the fixture would do.
+const linkElement = linkSection.elements.find((el) => el.id === 'hero-action');
 if (!linkElement || linkElement.type !== 'action') {
-  throw new Error('fixture header must contain action element header-cta');
+  throw new Error('fixture hero must contain action element hero-action');
 }
 linkElement.href = { type: 'page', pageId: 'page-second', anchor: 'pricing' };
 const pageLinkResult = validateEditableSite(pageLinkState);

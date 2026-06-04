@@ -18,6 +18,7 @@ import {
 import { ICON_NAMES, isIconName } from './icons.js';
 import { TABS_DEFAULT_BAR_HEIGHT } from './elements/tabs.js';
 import { CAROUSEL_MODES } from './elements/carousel.js';
+import { NAV_LAYOUTS, NAV_LINK_KINDS, type NavLayout, type NavLinkKind } from './elements/nav.js';
 
 // Re-export the canonical href allowlist so existing consumers (agent
 // parsers, etc.) that import from './canvas/validate.js' keep working. The
@@ -214,6 +215,37 @@ function validateActionHref(
     }
   } else {
     errors.push(basePath + '.type must be "external" or "page" (got ' + describe(h.type) + ')');
+  }
+}
+
+/**
+ * Validate one NavLink ({ label, href, kind }). Shared between `links[]` and
+ * the optional `primaryAction` because both reuse NavLink. Per-kind href rules:
+ *   - anchor   → must start with '#' (mirrors mountNavLinks's client check)
+ *   - external → must pass isAllowedHref (http/https/mailto/tel/relative/#)
+ *   - internal → any non-empty string (renderer normalises to '/<slug>')
+ */
+function validateNavLink(link: unknown, basePath: string, errors: string[]): void {
+  if (!isRecord(link)) {
+    errors.push(`${basePath} must be an object`);
+    return;
+  }
+  if (!isNonEmptyString(link.label)) {
+    errors.push(`${basePath}.label must be a non-empty string (got ${describe(link.label)})`);
+  }
+  const hrefOk = isNonEmptyString(link.href);
+  if (!hrefOk) {
+    errors.push(`${basePath}.href must be a non-empty string (got ${describe(link.href)})`);
+  }
+  if (!assertOneOf<NavLinkKind>(link.kind, NAV_LINK_KINDS, `${basePath}.kind`, errors)) return;
+  if (!hrefOk) return;
+  const href = link.href as string;
+  if (link.kind === 'anchor' && href.charAt(0) !== '#') {
+    errors.push(`${basePath}.href must start with "#" when kind === "anchor" (got "${href}")`);
+  } else if (link.kind === 'external' && !isAllowedHref(href)) {
+    errors.push(
+      `${basePath}.href "${href}" is not allowed (must be http:, https:, mailto:, tel:, /relative, or #anchor)`,
+    );
   }
 }
 
@@ -1206,6 +1238,33 @@ function validateElement(
             }
           }
         }
+      }
+      break;
+    }
+    case 'nav': {
+      assertOneOf<NavLayout>(element.layout, NAV_LAYOUTS, `${basePath}.layout`, errors);
+      if (typeof element.sticky !== 'boolean') {
+        errors.push(`${basePath}.sticky must be a boolean (got ${describe(element.sticky)})`);
+      }
+      if (element.logoAssetId !== undefined && !isAssetIdLike(element.logoAssetId)) {
+        errors.push(
+          `${basePath}.logoAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(element.logoAssetId)})`,
+        );
+      }
+      if (element.siteTitle !== undefined && !isNonEmptyString(element.siteTitle)) {
+        errors.push(
+          `${basePath}.siteTitle must be a non-empty string when present (got ${describe(element.siteTitle)})`,
+        );
+      }
+      if (!Array.isArray(element.links)) {
+        errors.push(`${basePath}.links must be an array`);
+      } else {
+        element.links.forEach((link, idx) => {
+          validateNavLink(link, `${basePath}.links[${String(idx)}]`, errors);
+        });
+      }
+      if (element.primaryAction !== undefined) {
+        validateNavLink(element.primaryAction, `${basePath}.primaryAction`, errors);
       }
       break;
     }

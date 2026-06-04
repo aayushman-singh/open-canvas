@@ -159,9 +159,40 @@ html, body {
   top: 50%;
   transform: translate(-50%, -50%);
 }
+/* Primary CTA defaults to margin-left:auto so it sits at the right edge in
+   layouts without a right slot (left-center-right). When a right slot
+   precedes it (layout=left-right), the adjacent-sibling rule kills the auto
+   margin so right + primary stay grouped together at the far right. */
+.opencanvas-nav-slot[data-slot="primary"] {
+  margin-left: auto;
+}
+.opencanvas-nav-slot[data-slot="right"] + .opencanvas-nav-slot[data-slot="primary"] {
+  margin-left: 8px;
+}
 .opencanvas-nav-logo {
   height: 28px;
   width: auto;
+}
+.opencanvas-nav-site-title {
+  font-family: var(--opencanvas-kit-font-display, var(--opencanvas-kit-font-body, inherit));
+  font-size: 18px;
+  font-weight: 700;
+  color: inherit;
+  letter-spacing: -0.01em;
+}
+.opencanvas-nav-primary-action {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--opencanvas-kit-action-padding, 8px 16px);
+  border-radius: var(--opencanvas-kit-action-radius, 8px);
+  background: var(--opencanvas-kit-accent, var(--kit-accent, currentColor));
+  color: var(--opencanvas-kit-accent-text, var(--kit-bg, #fff));
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+.opencanvas-nav-primary-action:hover {
+  filter: brightness(1.08);
 }
 
 /* Presence indicator — a tiny pill that lives in the top-right of the

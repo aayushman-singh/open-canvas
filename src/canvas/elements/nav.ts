@@ -37,7 +37,8 @@ import type { SidebarSpec } from './sidebar-spec.js';
 import type { BaseElement } from '../schema.js';
 import { escapeAttr, escapeHtml, styleFromEntries } from './render-utils.js';
 
-export type NavLinkKind = 'internal' | 'external' | 'anchor';
+export const NAV_LINK_KINDS = ['internal', 'external', 'anchor'] as const;
+export type NavLinkKind = (typeof NAV_LINK_KINDS)[number];
 
 export interface NavLink {
   label: string;
@@ -45,12 +46,28 @@ export interface NavLink {
   kind: NavLinkKind;
 }
 
-export type NavLayout = 'left-center-right' | 'left-right';
+export const NAV_LAYOUTS = ['left-center-right', 'left-right'] as const;
+export type NavLayout = (typeof NAV_LAYOUTS)[number];
 
 export interface NavElement extends Omit<BaseElement, 'sticky'> {
   type: 'nav';
   logoAssetId?: string;
+  /**
+   * Text wordmark shown in the left slot. Independent of `logoAssetId` so a
+   * brand can ship a glyph + wordmark together, or either on its own. Typography
+   * is kit-driven via the `.opencanvas-nav-site-title` class — there is no
+   * per-instance fontSize/fontWeight knob because the kit owns header type.
+   */
+  siteTitle?: string;
   links: NavLink[];
+  /**
+   * Optional call-to-action rendered as a styled button at the right edge of
+   * the nav. Distinct from `links` because its visual is a solid kit-accent
+   * button, not a ghost link, and its slot positioning is the trailing-right
+   * regardless of layout. Reuses NavLink for the {label, href, kind} shape so
+   * the same kind-vs-href validation rules apply.
+   */
+  primaryAction?: NavLink;
   layout: NavLayout;
   sticky: boolean;
 }
@@ -84,11 +101,32 @@ function renderNavLink(link: NavLink): string {
   );
 }
 
-/** Build the logo container — empty when no asset id is set. */
+/** Build the logo image — empty when no asset id is set. */
 function renderNavLogo(logoAssetId: string | undefined, assetBasePath: string): string {
   if (typeof logoAssetId !== 'string' || logoAssetId.length === 0) return '';
   const src = `${assetBasePath}/${logoAssetId}`;
   return `<img class="opencanvas-nav-logo" src="${escapeAttr(src)}" alt="" />`;
+}
+
+/** Build the text wordmark — empty when no siteTitle is set. */
+function renderNavSiteTitle(siteTitle: string | undefined): string {
+  if (typeof siteTitle !== 'string' || siteTitle.length === 0) return '';
+  return `<span class="opencanvas-nav-site-title">${escapeHtml(siteTitle)}</span>`;
+}
+
+/** Build the trailing CTA — empty when no primaryAction is set. */
+function renderNavPrimaryAction(primaryAction: NavLink | undefined): string {
+  if (primaryAction === undefined) return '';
+  const href = navLinkHref(primaryAction);
+  const target =
+    primaryAction.kind === 'external' ? ' target="_blank" rel="noopener noreferrer"' : '';
+  return (
+    `<a class="opencanvas-nav-primary-action" ` +
+    `data-opencanvas-nav-link-kind="${escapeAttr(primaryAction.kind)}" ` +
+    `href="${escapeAttr(href)}"${target}>` +
+    `${escapeHtml(primaryAction.label)}` +
+    `</a>`
+  );
 }
 
 export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
@@ -98,7 +136,9 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
   void ctx.styleKit;
 
   const logoHtml = renderNavLogo(el.logoAssetId, ctx.assetBasePath);
+  const siteTitleHtml = renderNavSiteTitle(el.siteTitle);
   const linksHtml = el.links.map(renderNavLink).join('');
+  const primaryActionHtml = renderNavPrimaryAction(el.primaryAction);
 
   const navStyleEntries: Array<[string, string]> = [];
   if (el.sticky) {
@@ -111,15 +151,25 @@ export function renderNav(el: NavElement, ctx: NavRenderCtx): string {
   navStyleEntries.push(['align-items', 'center']);
   const navStyle = styleFromEntries(navStyleEntries);
 
+  // Left slot bundles logo + siteTitle so both ride a single flex item; either
+  // or both may be empty, but the slot itself is always emitted so the CSS
+  // selector targets stay stable.
   const linksSlotName = el.layout === 'left-right' ? 'right' : 'center';
-  const logoSlot = `<div class="opencanvas-nav-slot" data-slot="left">${logoHtml}</div>`;
+  const leftSlot = `<div class="opencanvas-nav-slot" data-slot="left">${logoHtml}${siteTitleHtml}</div>`;
   const linksSlot = `<div class="opencanvas-nav-slot" data-slot="${linksSlotName}">${linksHtml}</div>`;
+  // Primary slot is conditionally emitted; CSS handles the margin-left:auto
+  // dance via an adjacent-sibling override when `right` precedes `primary`
+  // (see public-styles.ts) so the two trailing slots stay adjacent.
+  const primarySlot =
+    primaryActionHtml === ''
+      ? ''
+      : `<div class="opencanvas-nav-slot" data-slot="primary">${primaryActionHtml}</div>`;
 
   return (
     `<nav class="opencanvas-nav" data-opencanvas-nav-layout="${escapeAttr(el.layout)}" ` +
     `data-opencanvas-nav-sticky="${el.sticky ? 'true' : 'false'}" ` +
     `style="${navStyle}">` +
-    `${logoSlot}${linksSlot}` +
+    `${leftSlot}${linksSlot}${primarySlot}` +
     `</nav>`
   );
 }
@@ -136,6 +186,10 @@ export const navInspectorSpec: InspectorSpec = {
     // discriminator" would generalize this with action-href; we wait
     // until a second consumer asks for that shape.
     { kind: 'custom-mount', name: 'nav-links' },
+    // Single-link variant of `nav-links` for the optional primaryAction CTA.
+    // Same per-kind href rule applies; renders an "Add primary action" button
+    // when undefined and a remove button when set.
+    { kind: 'custom-mount', name: 'nav-primary-action' },
     {
       kind: 'select',
       label: 'Layout',
@@ -144,6 +198,13 @@ export const navInspectorSpec: InspectorSpec = {
       defaultValue: 'left-right',
     },
     { kind: 'checkbox', label: 'Sticky', path: 'sticky' },
+    {
+      kind: 'text',
+      label: 'Site title',
+      path: 'siteTitle',
+      placeholder: 'Brand wordmark (optional)',
+      emptyOmits: true,
+    },
     {
       kind: 'text',
       label: 'Logo asset',
@@ -194,6 +255,22 @@ export const navAgentToolSpec: AgentToolSpec = {
       type: 'string',
       description: 'Optional logo asset id. Nav elements only.',
     },
+    siteTitle: {
+      type: 'string',
+      description:
+        'Optional text wordmark shown in the left slot. Independent of logoAssetId. Nav elements only.',
+    },
+    primaryAction: {
+      type: 'object',
+      description:
+        'Optional call-to-action button at the right edge. Distinct from links — styled as a solid kit-accent button. Nav elements only.',
+      properties: {
+        label: { type: 'string' },
+        href: { type: 'string' },
+        kind: { type: 'string', enum: ['internal', 'external', 'anchor'] },
+      },
+      required: ['label', 'href', 'kind'],
+    },
   },
   parsePatch: (args) => {
     const patch: Record<string, unknown> = {};
@@ -212,6 +289,16 @@ export const navAgentToolSpec: AgentToolSpec = {
     if (args.logoAssetId !== undefined) {
       if (typeof args.logoAssetId !== 'string') throw new Error('logoAssetId must be a string');
       patch.logoAssetId = args.logoAssetId;
+    }
+    if (args.siteTitle !== undefined) {
+      if (typeof args.siteTitle !== 'string') throw new Error('siteTitle must be a string');
+      patch.siteTitle = args.siteTitle;
+    }
+    if (args.primaryAction !== undefined) {
+      if (typeof args.primaryAction !== 'object' || args.primaryAction === null) {
+        throw new Error('primaryAction must be an object');
+      }
+      patch.primaryAction = args.primaryAction;
     }
     return patch;
   },
