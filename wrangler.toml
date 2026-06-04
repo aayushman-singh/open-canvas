@@ -91,6 +91,17 @@ new_sqlite_classes = ["NotificationOwnerRoom"]
 binding = "ASSETS_BUCKET"
 bucket_name = "rev01-assets"
 
+# ADR 0015 Phase 3 — editor-client static asset binding. The build script
+# (scripts/build-editor-client.ts) writes the hashed JS + CSS bundles to
+# ./dist/_assets/index-<hash>.{js,css}; requests to /_assets/<filename>
+# resolve to those files. Any path that does not match a file falls through
+# to the Worker (default not_found_handling), preserving the existing
+# /dashboard, /__live, /api/* etc. routing. No binding is exported — the
+# Worker never reaches into the asset store programmatically, only via
+# Cloudflare's static-asset edge cache.
+[assets]
+directory = "./dist"
+
 # Phase 0 scaffold — sensitive env vars declared here for documentation. The
 # real values are NEVER committed; the deploy operator sets each via
 # `wrangler secret put <NAME>`. Code reads via `c.env.<NAME>`.

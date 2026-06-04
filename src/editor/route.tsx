@@ -2,8 +2,9 @@
 //
 // Server-renders the desktop Canvas Editor shell: header (crumbs, address
 // chip, style-kit toggles, Save, Publish), canvas area (#canvas-root), the
-// inspector (#canvas-inspector), and the status line. The browser bootstrap
-// is shipped inline via canvasClientScript and takes over from there.
+// inspector (#canvas-inspector), and the status line. The browser bundle is
+// shipped via Wrangler's [assets] binding (ADR 0015) and bootstraps itself
+// from window.__opencanvasEditorBoot.
 //
 // Owner auth is required: the route looks up the customer for the current
 // Clerk user, then the site scoped to that customer. Missing or unowned sites
@@ -17,8 +18,7 @@ import { clerkFrontendApiHost, requireAuth } from '../auth/require-auth';
 import { BUILT_IN_STYLE_KITS, type StyleKit } from '../canvas/schema';
 import { SIDEBAR_DISPATCH } from '../canvas/elements';
 import { SITE_ID_RE } from '../canvas/validate';
-import { canvasClientScript } from './canvas-client';
-import { canvasEditorStyles } from './canvas-styles';
+import { EDITOR_CLIENT_MANIFEST } from '../_assets/manifest.generated';
 import {
   themeBootScript,
   themeFontHeadHtml,
@@ -174,13 +174,20 @@ export function editorPageJsx(opts: EditorPageOptions) {
     throw new Error('editorPageJsx requires clerkFrontendApiHost when clerkPublishableKey is set');
   }
   const apiBase = context === 'public' ? '/__api' : '/api';
-  const inlineScript = canvasClientScript({
+  // ADR 0015 Phase 3 — boot payload. The editor bundle reads
+  // window.__opencanvasEditorBoot at module-top and calls createEditor().
+  // Every field MUST be present (the EditorBoot interface in the bundle
+  // expects required strings); empty defaults match the inline IIFE's
+  // prior defaults so anonymous / edit-token / no-Clerk sessions still
+  // boot cleanly.
+  const editorBoot = {
     siteId,
     apiBase,
-    ...(wsToken ? { wsToken } : {}),
-    ...(customerDisplayName ? { displayName: customerDisplayName } : {}),
-    ...(presenceUserId ? { userId: presenceUserId } : {}),
-  });
+    wsToken: wsToken ?? '',
+    displayName: customerDisplayName ?? '',
+    userId: presenceUserId ?? '',
+  };
+  const editorBootJson = JSON.stringify(editorBoot);
   const publicAddress = `${subdomain}.${apex}`;
   const settingsPath = `/dashboard/sites/${encodeURIComponent(siteId)}/settings`;
   const settingsHref =
@@ -236,7 +243,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
           '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css" crossorigin="anonymous">' +
             '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous" onload="window.dispatchEvent(new Event(\'opencanvas-katex-ready\'))"></script>',
         )}
-        <style>{raw(canvasEditorStyles)}</style>
+        <link rel="stylesheet" href={EDITOR_CLIENT_MANIFEST.canvasStylesUrl} />
         <style>{raw(bellStyles)}</style>
         {clerkPublishableKey &&
           raw(`<script>
@@ -560,7 +567,8 @@ export function editorPageJsx(opts: EditorPageOptions) {
           </footer>
         </main>
         {raw(`<script>${CO_EDIT_BUNDLE}</script>`)}
-        {raw(`<script type="module">${inlineScript}</script>`)}
+        {raw(`<script>window.__opencanvasEditorBoot = ${editorBootJson};</script>`)}
+        <script type="module" src={EDITOR_CLIENT_MANIFEST.canvasClientUrl}></script>
         <script>{raw(themeToggleScript)}</script>
         {raw(`<script>window.__opencanvasInboxApiBase = ${JSON.stringify(apiBase)};</script>`)}
         <script>{raw(notificationsInboxScript)}</script>

@@ -1,8 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
-import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { app } from './index';
 import { applyCanvasAgentOp } from './agent/canvas-ops';
 import { CANVAS_AGENT_TOOLS } from './agent/canvas-tools';
@@ -26,7 +24,6 @@ import {
 } from './canvas/validate';
 import { db } from './db/client';
 import { customer, ownerAsset, site } from './db/schema';
-import { canvasClientScript } from './editor/canvas-client';
 import { signEditToken } from './auth/edit-token';
 import { buildLocalSignInUrl, buildSignInUrl } from './auth/require-auth';
 import { resolveLocalSignInRedirect } from './auth/sign-in-route';
@@ -843,7 +840,6 @@ try {
 // wired even though review-smoke does not boot a browser.
 
 const canvasIndexSource = await readSource('./editor/route.tsx');
-const canvasClientSource = await readSource('./editor/canvas-client.ts');
 const signInRouteSource = await readSource('./auth/sign-in-route.tsx');
 const canvasApiSource = await readSource('./routes/api/canvas.ts');
 const publishApiSource = await readSource('./routes/api/publish.ts');
@@ -875,15 +871,10 @@ assert(
   !/<button\s+id="canvas-publish"[^>]*\sdisabled\b/.test(canvasIndexSource),
   'expected Publish button to be enabled in the canvas editor shell',
 );
-assert(
-  canvasClientSource.includes('const publishButton = document.getElementById("canvas-publish")'),
-  'expected canvas client to look up #canvas-publish',
-);
-assert(
-  canvasClientSource.includes("console.error('[opencanvas-undo] persist failed'") &&
-    canvasClientSource.includes('Undo history could not be saved across reloads'),
-  'expected undo persistence failure to log and surface a status instead of silently degrading',
-);
+// Canvas-client source-level grep was retired by ADR 0015 Phase 3 — the
+// inline IIFE is gone; ./editor-client/* module smokes (inspector-actions,
+// page-crud, create-editor, snapshot-replay, yjs-projection, etc.) carry
+// the behavioural assertions that used to live as string-greps here.
 for (const [docPath, docSource] of activeContractDocs) {
   assert(
     !docSource.includes(legacySignatureHeader) &&
@@ -908,29 +899,6 @@ assert(
   'expected editorPageJsx to throw when Clerk publishable key is present without a resolved frontend host',
 );
 assert(
-  canvasClientSource.includes('API_BASE + "/publish/sites/" + SITE_ID'),
-  'expected canvas client to POST to the selected publish API base for :siteId',
-);
-assert(
-  canvasClientSource.includes('function localPresenceTextOffset') &&
-    canvasClientSource.includes('range.setStart(editable, 0);') &&
-    canvasClientSource.includes('range.setEnd(anchorNode, boundedOffset);') &&
-    canvasClientSource.includes(
-      'var textOffset = localPresenceTextOffset(editable, sel.anchorNode, sel.anchorOffset, elementId);',
-    ) &&
-    !canvasClientSource.includes('offset: sel.anchorOffset | 0'),
-  'expected co-edit presence to publish cumulative editable text offsets, not node-local Selection.anchorOffset values',
-);
-assert(
-  canvasClientSource.includes('saveBusy = busy || sessionExpired || accessRevoked;') &&
-    canvasClientSource.includes('aiBusy = busy || sessionExpired || accessRevoked;') &&
-    canvasClientSource.includes(
-      'if (!accessRevoked && !sessionExpired) publishButton.disabled = false;',
-    ) &&
-    canvasClientSource.includes('if (!saved && !accessRevoked && !sessionExpired)'),
-  'expected revoked-access/session-expired locks to survive save, AI, and publish cleanup paths',
-);
-assert(
   canvasApiSource.includes('cannot save: missing assets'),
   'expected canvas save API to reject stale editable states that reference deleted assets',
 );
@@ -951,45 +919,6 @@ assert(
 assert(
   !/const\s+fullPagesSnapshot\s*=\s*\{\s*\.\.\.snapshot/.test(publishApiSource),
   'expected published page rendering to keep the original snapshot identity for responsive CSS memoization',
-);
-const resolveActionHrefStart = canvasClientSource.indexOf('function resolveActionHref(href)');
-assert(resolveActionHrefStart >= 0, 'expected editor client to define resolveActionHref');
-const buildActionBodyStart = canvasClientSource.indexOf(
-  'function buildActionBody',
-  resolveActionHrefStart,
-);
-assert(buildActionBodyStart >= 0, 'expected editor client to define buildActionBody');
-const resolveActionHrefSource = canvasClientSource.slice(
-  resolveActionHrefStart,
-  buildActionBodyStart,
-);
-assert(
-  resolveActionHrefSource.includes('throw new Error') &&
-    resolveActionHrefSource.includes('resolveActionHref: missing page id') &&
-    resolveActionHrefSource.includes('href.anchor ? base + "#" + href.anchor : base'),
-  'expected editor resolveActionHref mirror to throw on missing pages and preserve page anchors',
-);
-// ADR 0051 dec 3 — ActionElement is a one-of: { href } OR { behavior }. The
-// editor IIFE's buildActionBody must branch before calling resolveActionHref
-// so a behavior-arm element (no href) doesn't crash editor load. Reverting
-// the branch unconditionally calls resolveActionHref(element.href) on a
-// behavior-arm element → "resolveActionHref: unknown href shape" → editor
-// surfaces "Failed to load site". This guard lights up red if that revert
-// ever sneaks back in.
-const buildShapeBodyStart = canvasClientSource.indexOf(
-  'function buildShapeBody',
-  buildActionBodyStart,
-);
-assert(buildShapeBodyStart >= 0, 'expected editor client to define buildShapeBody');
-const buildActionBodySource = canvasClientSource.slice(
-  buildActionBodyStart,
-  buildShapeBodyStart,
-);
-assert(
-  buildActionBodySource.includes('element.behavior !== undefined') &&
-    buildActionBodySource.includes('createElement("button")') &&
-    buildActionBodySource.includes('data-opencanvas-copy'),
-  'expected buildActionBody to branch on element.behavior (ADR 0051 dec 3) and emit a copy button for the behavior arm',
 );
 assert(
   yjsProjectionSource.includes('[canvas:yjs-projection] autosave persist failed') &&
@@ -1068,59 +997,6 @@ for (const invalidConfig of [{}, { measurementId: '' }, { measurementId: 'UA-123
   assert(threw, 'expected Google Analytics emitter to throw for missing or invalid measurementId');
 }
 assert(
-  canvasClientSource.includes('API_BASE + "/owner/assets"'),
-  'expected media picker delete/gallery flow to use the selected owner asset API base',
-);
-assert(
-  canvasClientSource.includes("window.open(href, '_blank', 'noopener,noreferrer')"),
-  'expected link popover Open to sever window.opener for new-tab launches',
-);
-assert(
-  canvasClientSource.includes('focusAfterClose.focus({ preventScroll: true })'),
-  'expected link modal to restore contenteditable focus so blur serialization still commits edits',
-);
-assert(
-  canvasClientSource.includes('a.setAttribute("rel", "noopener noreferrer")') &&
-    canvasClientSource.includes("anchorEl.setAttribute('rel', 'noopener noreferrer')"),
-  'expected editor inline links with target=_blank to carry rel=noopener noreferrer',
-);
-assert(
-  !canvasClientSource.includes('/api/me/assets'),
-  'expected media picker not to call the retired /api/me/assets route after main asset-pipeline merge',
-);
-assert(
-  canvasClientSource.includes('function clearDeletedAssetFromLocalState'),
-  'expected media picker delete success to clear every local reference before any later full-state save',
-);
-assert(
-  canvasClientSource.includes(
-    'Live published sites that will show missing media until you re-publish',
-  ),
-  'expected media picker delete confirmation to distinguish published breakage from editable clearing',
-);
-assert(
-  canvasClientSource.includes('async function flushPendingSave()'),
-  'expected canvas client to expose a flushPendingSave helper before server-derived edits',
-);
-assert(
-  /async function runAiPreview[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
-  'expected AI preview to flush pending local saves before asking the server',
-);
-assert(
-  /async function applyPreview[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
-  'expected AI apply to flush pending local saves before applying server ops',
-);
-assert(
-  /async function publishSite[\s\S]*await flushPendingSave\(\)/.test(canvasClientSource),
-  'expected publish to flush pending local saves before snapshotting editable state',
-);
-assert(
-  /async function importPendingSectionAt[\s\S]*const saved = await flushPendingSave\(\);[\s\S]*if \(!saved\) return;/.test(
-    canvasClientSource,
-  ),
-  'expected section import to flush pending local saves before asking the server',
-);
-assert(
   canvasIndexSource.includes('id="canvas-sidebar"'),
   'expected canvas editor shell to include the left add/style sidebar',
 );
@@ -1159,75 +1035,12 @@ assert(
   !canvasIndexSource.includes('<span class="style-kits"'),
   'expected style-kit controls to move out of the editor header',
 );
-assert(
-  canvasClientSource.includes('const sidebar = document.getElementById("canvas-sidebar")'),
-  'expected canvas client to look up #canvas-sidebar',
-);
-assert(
-  canvasClientSource.includes('function attachSidebarActions()'),
-  'expected canvas client to wire sidebar add/style actions',
-);
-// `renderSidebarSelection` + its `#canvas-sidebar-selection` host were removed
-// in be7d083 when the text-colour picker moved to the floating RTE mark
-// toolbar. Assertions for those identifiers would now light up forever.
-// The mark-toolbar colour-picker has its own coverage via the
-// `opencanvas-mark-color` selectors elsewhere; the negative assertion below
-// pins the prior `appendPinnedColor` exit from the right inspector.
-assert(
-  !canvasClientSource.includes('appendPinnedColor(element);'),
-  'expected text color control to move out of the right inspector',
-);
-assert(
-  canvasClientSource.includes('function addBlankSectionFromSidebar()'),
-  'expected canvas client to add blank sections from the sidebar',
-);
-assert(
-  canvasClientSource.includes("querySelectorAll('[data-sidebar-style-kit]')"),
-  'expected style-kit click handling to bind sidebar style-kit buttons',
-);
-const inlineCanvasClient = canvasClientScript({ siteId: 'site-smoke' });
-const inlineCanvasClientParseDir = await mkdtemp(join(tmpdir(), 'opencanvas-canvas-client-'));
-const inlineCanvasClientParsePath = join(inlineCanvasClientParseDir, 'client.mjs');
-try {
-  await writeFile(inlineCanvasClientParsePath, `if (false) {\n${inlineCanvasClient}\n}\n`);
-  await import(pathToFileURL(inlineCanvasClientParsePath).href);
-} finally {
-  await rm(inlineCanvasClientParseDir, { recursive: true, force: true });
-}
-assert(
-  inlineCanvasClient.includes("querySelectorAll('[data-sidebar-style-kit]')"),
-  'expected style-kit click handling to bind sidebar style-kit buttons',
-);
-assert(
-  !inlineCanvasClient.includes("querySelectorAll('[data-style-kit]')"),
-  'expected style-kit click handling not to bind generic data-style-kit nodes',
-);
-assert(
-  inlineCanvasClient.includes('function isEditableShortcutTarget('),
-  'expected canvas interaction shortcuts to ignore inputs, textareas, selects, buttons, and contenteditable targets',
-);
-assert(
-  inlineCanvasClient.includes('temporaryPanPreviousMode'),
-  'expected temporary Space pan to restore the previous interaction mode instead of always selecting',
-);
-assert(
-  inlineCanvasClient.includes('window.addEventListener("blur"'),
-  'expected temporary Space pan to recover if the window loses focus before keyup',
-);
-assert(
-  inlineCanvasClient.includes('mbtn.setAttribute("aria-label"'),
-  'expected icon-only interaction-mode toolbar buttons to expose accessible labels',
-);
-assert(
-  canvasClientSource.includes('payload.selectedElementId = selectedElementId'),
-  'expected chat POST payload to include the currently selected element id',
-);
-assert(
-  canvasClientSource.includes('function updateChatSelectionChip()') &&
-    canvasClientSource.includes('chatSelectionClearBtn.addEventListener("click"') &&
-    canvasClientSource.includes('chatSelectionDropped = false;'),
-  'expected chat selected-element pill to render and clear the same selection context sent to chat',
-);
+// Canvas-client source-level greps + the inline IIFE parse round-trip used
+// to live here. ADR 0015 Phase 3 retired them — the inline IIFE is gone;
+// the editor ships as a built bundle through scripts/build-editor-client.ts
+// and structural invariants are now covered by the per-module smokes under
+// src/editor-client/ (inspector-actions, page-crud, create-editor,
+// snapshot-replay, yjs-projection, etc.).
 
 // -- File-input discipline -----------------------------------------------
 //
@@ -1315,7 +1128,21 @@ assert(
   `file-input-discipline lint self-test failed: expected 1 violation for "inp", got ${JSON.stringify(fileInputLintSelfTest)}`,
 );
 
-const fileInputErrors = scanFileInputDiscipline(canvasClientSource, 'canvas-client.ts');
+// ADR 0015 Phase 3 — file-input discipline walks the editor-client module
+// tree now that the inline IIFE is retired. Every TS source (excluding
+// .smoke.ts harnesses + the build-time-only styles-build.ts) gets scanned;
+// any file-input violation surfaces with its module name in the message
+// so the offender is grep-able.
+const editorClientDirPath = join(import.meta.dirname, 'editor-client');
+const editorClientFiles = await readdir(editorClientDirPath);
+const fileInputErrors: string[] = [];
+for (const file of editorClientFiles) {
+  if (!file.endsWith('.ts')) continue;
+  if (file.endsWith('.smoke.ts')) continue;
+  if (file === 'styles-build.ts') continue;
+  const src = await readSource(`./editor-client/${file}`);
+  fileInputErrors.push(...scanFileInputDiscipline(src, `editor-client/${file}`));
+}
 assert(
   fileInputErrors.length === 0,
   `file-input discipline violations:\n  ` + fileInputErrors.join('\n  '),

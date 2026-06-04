@@ -34,6 +34,7 @@ import './styles.css';
 import type { CanvasElement, CanvasPage, CanvasSection, EditableSite, InlineMark, InlineRun, InlineMarkType, PositionedBox } from '../canvas/schema.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
+import { ICON_NAMES, renderIconSvg } from '../canvas/icons.js';
 import {
   STYLE_KITS,
   MOTION_PRESETS,
@@ -263,6 +264,13 @@ void previewPaletteFromAccent;
 void SIDEBAR_FACTORIES;
 
 export type { EditorBoot, EditorContext, RemoteCursorEntry };
+
+// Build the icon → SVG-markup map once at module load. The inline IIFE
+// JSON-injected this from the route handler; the bundle owns the lookup
+// directly so the editor route is free of icon-registry knowledge.
+const ICON_SVG_MAP_VALUE: Record<string, string> = Object.fromEntries(
+  ICON_NAMES.map((name) => [name, renderIconSvg(name, { inline: false })]),
+);
 
 /**
  * Round-trip an unknown error through a stable string for status-line
@@ -568,12 +576,12 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     openLinkModal: stub('openLinkModal'),
 
     // ---- Phase 2q.d: run + body builders + element menu --------------
-    // ICON_SVG_MAP is JSON-injected by the editor route at boot; until
-    // Phase 3 cutover wires the real source we ship an empty map. The
-    // buildShapeBody path no-ops on unknown iconKinds, so an empty map
-    // degrades to "icon-variant shapes render without their inner SVG"
-    // rather than throwing.
-    ICON_SVG_MAP: {},
+    // ICON_SVG_MAP is imported directly from the icon registry now that
+    // the editor ships as a bundle (Phase 3 cutover). The inline IIFE
+    // used to JSON-inject this map from the route handler; the bundle
+    // owns the build-time lookup, eliminating the route's knowledge of
+    // the icon registry shape.
+    ICON_SVG_MAP: ICON_SVG_MAP_VALUE,
     openMenuElementId: null,
     applyElementStyle: (wrapper, element) => applyElementStyleImpl(ctx, wrapper, element),
     applyPinnedStyle: (wrapper, element) => applyPinnedStyleImpl(ctx, wrapper, element),
@@ -860,3 +868,32 @@ export function createEditor(boot: EditorBoot): void {
 type _BundleKeepalive = CanvasElement | CanvasPage | CanvasSection | PositionedBox | MediaElement;
 const _unused: _BundleKeepalive | null = null;
 void _unused;
+
+// ADR 0015 Phase 3 — bundle bootstrap. The editor route's HTML shell
+// inlines `<script>window.__opencanvasEditorBoot = {...}</script>`
+// before loading this bundle's `<script type="module" src="...">`, so
+// the global is set by the time this top-level executes. Missing boot
+// global means the route forgot to inject it — fail loudly via
+// console.error rather than silently no-oping, in line with the
+// project's no-fallback rule.
+//
+// The `typeof window` guard is for Bun/Node import paths (smokes,
+// typecheck, tooling) where `window` is undefined. In the browser this
+// is always-true, so the runtime cost is one identifier check.
+declare global {
+  interface Window {
+    __opencanvasEditorBoot?: EditorBoot;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  const opencanvasBoot = window.__opencanvasEditorBoot;
+  if (opencanvasBoot) {
+    createEditor(opencanvasBoot);
+  } else {
+    console.error(
+      'opencanvas: window.__opencanvasEditorBoot missing — editor will not boot. ' +
+        'The HTML shell must inline the boot JSON before loading this bundle.',
+    );
+  }
+}

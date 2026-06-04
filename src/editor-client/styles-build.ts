@@ -1,9 +1,15 @@
-// src/editor/canvas-styles.ts
+// src/editor-client/styles-build.ts
 //
-// Stylesheet for the desktop Canvas Editor. Inlined into the editor route
-// via raw(canvasEditorStyles). The chrome wears the Open Canvas skin
-// (warm-neutral surfaces, brand-red accent, hairlines) and follows the
-// theme attribute on <html> for light/dark.
+// Stylesheet for the desktop Canvas Editor. ADR 0015 Phase 3 — the build
+// script (scripts/build-editor-client.ts) imports `canvasEditorStyles`
+// at build time and writes the resolved CSS string to
+// src/editor-client/styles.css, which Bun.build then emits as the hashed
+// /_assets/index-<hash>.css sibling of the JS bundle. This file is
+// build-time only — it never ships to the browser as TypeScript.
+//
+// The chrome wears the Open Canvas skin (warm-neutral surfaces,
+// brand-red accent, hairlines) and follows the theme attribute on
+// <html> for light/dark.
 //
 // The visitor renderer (src/canvas/public-styles.ts) and this editor preview
 // share a single source of truth for kit tokens, variants, and motion:
