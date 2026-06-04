@@ -2740,6 +2740,9 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   transition: height 120ms ease;
   border-radius: 2px;
 }
+.reel-body[data-dragging="true"] .reel-insert-btn {
+  display: none;
+}
 .reel-insert-btn:hover {
   height: 24px;
   background: var(--opencanvas-accent-soft);

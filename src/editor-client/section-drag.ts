@@ -51,6 +51,23 @@ import type { EditorContext } from './editor-context.js';
 import { cssEscape } from './css-escape.js';
 import { buildSectionThumbnail, moveSectionToIndex } from './reel.js';
 
+// ADR 0059 — film-reel drag state machine. The `.reel-insert-btn` plus
+// affordances fight the drop zones during a drag, so we mark the reel
+// body with `data-dragging="true"` for the duration of the gesture and
+// the CSS rule `.reel-body[data-dragging="true"] .reel-insert-btn`
+// hides them. Exported so the smoke can prove the mechanism wires up.
+export function setReelDragging(active: boolean): void {
+  const reelEl = document.getElementById('canvas-reel');
+  if (!reelEl) return;
+  const body = reelEl.querySelector('.reel-body');
+  if (!body) return;
+  if (active) {
+    body.setAttribute('data-dragging', 'true');
+  } else {
+    body.removeAttribute('data-dragging');
+  }
+}
+
 interface CanvasDropTarget {
   zone: 'canvas';
   insertAt: number;
@@ -99,6 +116,8 @@ export function beginSectionDragImpl(
   dropLine.hidden = true;
   document.body.appendChild(dropLine);
 
+  setReelDragging(true);
+
   let dropTarget: DropTarget | null = null;
 
   function pointInsideRect(clientX: number, clientY: number, rect: DOMRect): boolean {
@@ -115,7 +134,10 @@ export function beginSectionDragImpl(
     if (reelEl && !reelEl.hidden) {
       const reelRect = reelEl.getBoundingClientRect();
       if (pointInsideRect(clientX, clientY, reelRect)) {
-        const tiles = Array.from(reelEl.querySelectorAll('[data-reel-section]'));
+        // ADR 0059 — only body tiles carry `data-reel-index`; pinned
+        // header/footer tiles are excluded so insertAt lives in
+        // `page.sections` space (not DOM-tile space).
+        const tiles = Array.from(reelEl.querySelectorAll('[data-reel-index]'));
         for (let i = 0; i < tiles.length; i++) {
           const rect = tiles[i]!.getBoundingClientRect();
           const midY = rect.top + rect.height / 2;
@@ -194,6 +216,7 @@ export function beginSectionDragImpl(
     window.removeEventListener('mouseup', onUp);
     ghost.remove();
     dropLine.remove();
+    setReelDragging(false);
     if (sectionEl) sectionEl.style.opacity = '';
     if (dropTarget) {
       moveSectionToIndex(ctx, fromIdx, dropTarget.insertAt);
@@ -242,6 +265,8 @@ export function beginReelDragImpl(
       dropLine.className = 'reel-drop-indicator';
       dropLine.hidden = true;
       document.body.appendChild(dropLine);
+
+      setReelDragging(true);
     }
 
     ghost!.style.left = ev.clientX - 50 + 'px';
@@ -264,7 +289,10 @@ export function beginReelDragImpl(
       dropTarget = null;
       return;
     }
-    const tiles = Array.from(reelEl.querySelectorAll('[data-reel-section]'));
+    // ADR 0059 — only body tiles carry `data-reel-index`; pinned
+    // header/footer tiles are excluded so insertAt lives in
+    // `page.sections` space, matching fromIdx.
+    const tiles = Array.from(reelEl.querySelectorAll('[data-reel-index]'));
     let insertAt = tiles.length;
     for (let i = 0; i < tiles.length; i++) {
       const rect = tiles[i]!.getBoundingClientRect();
@@ -299,6 +327,7 @@ export function beginReelDragImpl(
     window.removeEventListener('mouseup', onUp);
     if (ghost) ghost.remove();
     if (dropLine) dropLine.remove();
+    if (hasMoved) setReelDragging(false);
     if (hasMoved && dropTarget) {
       moveSectionToIndex(ctx, fromIdx, dropTarget.insertAt);
     }
