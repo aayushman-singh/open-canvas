@@ -28,6 +28,7 @@ import {
   ACTION_VARIANTS,
   BACKGROUND_EFFECTS,
   BACKGROUND_SIZES,
+  COLLECTION_PAGE_KINDS,
   ELEMENT_TYPES,
   INLINE_FONT_SIZE_PX_MAX,
   INLINE_FONT_SIZE_PX_MIN,
@@ -1537,6 +1538,26 @@ function validatePage(
   }
   assertOptionalNonEmptyString(page.category, `${basePath}.category`, errors);
   assertOptionalNonEmptyString(page.description, `${basePath}.description`, errors);
+  // ADR 0060 — pageKind + collectionSlug must be both-set-or-both-absent. When
+  // present, pageKind must be one of the canonical kinds and collectionSlug
+  // must be a non-empty string. The publish-time materializer relies on this
+  // invariant to map index/template pages to their entries.
+  if (page.pageKind !== undefined) {
+    assertOneOf(page.pageKind, COLLECTION_PAGE_KINDS, `${basePath}.pageKind`, errors);
+    if (page.collectionSlug === undefined) {
+      errors.push(
+        `${basePath}.collectionSlug is required when pageKind is set (ADR 0060: a CMS-marked page must name its collection)`,
+      );
+    }
+  }
+  if (page.collectionSlug !== undefined) {
+    assertOptionalNonEmptyString(page.collectionSlug, `${basePath}.collectionSlug`, errors);
+    if (page.pageKind === undefined) {
+      errors.push(
+        `${basePath}.pageKind is required when collectionSlug is set (ADR 0060: collectionSlug is template metadata, not page metadata)`,
+      );
+    }
+  }
   if (page.ogImageAssetId !== undefined && !isAssetIdLike(page.ogImageAssetId)) {
     errors.push(
       `${basePath}.ogImageAssetId must be an asset id matching /^[A-Za-z0-9._-]+$/ when present (got ${describe(page.ogImageAssetId)})`,

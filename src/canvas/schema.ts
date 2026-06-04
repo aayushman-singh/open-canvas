@@ -102,6 +102,14 @@ export type MotionPreset = (typeof MOTION_PRESETS)[number];
 export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;
 export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 
+// ADR 0060 — CMS collection page kinds. Marks a `CanvasPage` as either the
+// index list page (whose page-bound CollectionElements get hydrated from the
+// `collection_entry` table at publish) or the ghost detail template page
+// (cloned once per entry, with `{{field}}` placeholders substituted). Pages
+// without `pageKind` are ordinary canvas pages.
+export const COLLECTION_PAGE_KINDS = ['collection-index', 'collection-item-template'] as const;
+export type CollectionPageKind = (typeof COLLECTION_PAGE_KINDS)[number];
+
 export const AGENT_RECIPE_IDS = [
   'hero-split',
   'feature-grid',
@@ -376,21 +384,21 @@ export type CanvasElement =
 // type-check on one of these two consts. Split into two checks instead of
 // an intersection so `@typescript-eslint/no-duplicate-type-constituents`
 // doesn't flatten the bidirectional pair.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const _ELEMENT_TYPES_COVERS_UNION: Exclude<ElementType, CanvasElement['type']> extends never
   ? true
   : never = true;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const _UNION_COVERS_ELEMENT_TYPES: Exclude<CanvasElement['type'], ElementType> extends never
   ? true
   : never = true;
 
 // Same invariants for inline mark types ↔ InlineMark variants.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const _MARK_TYPES_COVERS_UNION: Exclude<InlineMarkType, InlineMark['type']> extends never
   ? true
   : never = true;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const _UNION_COVERS_MARK_TYPES: Exclude<InlineMark['type'], InlineMarkType> extends never
   ? true
   : never = true;
@@ -464,6 +472,15 @@ export interface CanvasPage {
   author?: string;
   tags?: string[];
   category?: string;
+  /** ADR 0060 — marks a page as a CMS collection surface.
+   *  'collection-index' = a list page whose page-bound CollectionElements
+   *  get hydrated from the entries table at publish.
+   *  'collection-item-template' = the ghost detail page; the publisher
+   *  clones it once per entry, substituting {{field}} placeholders.
+   *  Both kinds require `collectionSlug`. */
+  pageKind?: CollectionPageKind;
+  /** Which collection (e.g. 'blog') this template/index binds to. Required iff pageKind is set. */
+  collectionSlug?: string;
 }
 
 export interface EditableSite {
