@@ -141,6 +141,17 @@ export interface EditorContext {
     altValue: string,
     elementId: string,
   ): Promise<{ assetId: string; kind: string }>;
+  /** Status DOM ref (`#canvas-status`), cached at boot. setStatusImpl
+   *  writes into this node. Null when the route omits the affordance;
+   *  setStatus no-ops on null. Forward-declared here so runtime-helpers.ts
+   *  can install setStatusImpl against the cached ref without ctx-shape
+   *  drift. ADR 0015 Phase 3.1. */
+  statusEl: HTMLElement | null;
+  /** Idle-reset timer handle for setStatus. Null when no reset is pending.
+   *  Each setStatus call clears the prior timer and arms a 4s "Saved"
+   *  reset so transient toasts fade back to the synced baseline. ADR
+   *  0015 Phase 3.1. */
+  statusTimer: ReturnType<typeof setTimeout> | null;
   /** Writes a status line to the editor's status DOM ref, with optional
    *  tone ("ok" / "error" / "info" / undefined). Auto-decorates trailing
    *  "…" with a spinner. Carousel upload UI calls this to mark in-progress
@@ -335,6 +346,11 @@ export interface EditorContext {
    *  is pending. flushPendingSave (kept inline) clears this synchronously
    *  before forcing an immediate save. */
   saveTimer: ReturnType<typeof setTimeout> | null;
+  /** Serialisation queue for saveStateNow. Every snapshot save chains its
+   *  PUT through `.then(persistStateSnapshot)` against the previous
+   *  save's promise so concurrent calls serialise instead of racing.
+   *  Starts at `Promise.resolve(true)`. ADR 0015 Phase 3.1. */
+  saveQueue: Promise<boolean>;
   /** Live co-edit handle, or null when WS isn't attached. scheduleSave
    *  branches on this — present means Yjs autosave drives persistence;
    *  null means the HTTP PUT debounce is the save path. */

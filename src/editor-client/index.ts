@@ -1,6 +1,6 @@
 // src/editor-client/index.ts
 //
-// ADR 0058 Phase 2q.m — final wiring commit.
+// ADR 0058 Phase 2q.m + ADR 0015 Phase 3 — editor-client entrypoint.
 //
 // `createEditor(boot)` moves from a stub that threw on call to a real
 // orchestrator that:
@@ -17,17 +17,9 @@
 //      migrateState → mountViewport → renderAll → attach* → attachCoEdit
 //      → setStatus("Ready", "ok") → session keepalive → setupChatSession.
 //
-// The editor route STILL serves canvasClientScript() until ADR 0015
-// Phase 3 atomic cutover — createEditor is dead code today, but it is
-// the entry point Phase 3 will switch to. Until then the function must
-// typecheck + lint cleanly without ever being invoked.
-//
-// Forward-declared ctx methods whose implementations stay inline in
-// canvas-client.ts through Phase 2 (e.g. forceOpenInspector, buildRunNode,
-// pointerToCanvas) are wired as stubs that throw a "createEditor wiring
-// pending Phase 3 cutover" error if reached. They typecheck against the
-// ctx signature but loudly fail if Phase 3 forgets to swap them for the
-// real impls.
+// The editor route now serves this bundle. The context skeleton is
+// immediately patched by installRuntimeHelpers(ctx) so any remaining
+// unbound guard is a boot-ordering bug and fails loudly.
 
 import './styles.css';
 
@@ -127,6 +119,7 @@ import {
 import {
   attachCoEditImpl,
   coEditSyncImpl,
+  loadPresenceIdentity,
   repaintRemoteCursorsImpl,
 } from './co-edit.js';
 import {
@@ -168,7 +161,6 @@ import {
 } from './versions-panel.js';
 import { attachRootEventsImpl } from './canvas-root-events.js';
 import { deleteElement } from './inspector-actions.js';
-import { registerKeyboardHandlers } from './keyboard.js';
 import {
   removeLinkPopoverImpl,
   showLinkPopoverImpl,
@@ -178,6 +170,7 @@ import {
 import {
   applyMarkImpl,
   buildMarkToolbarImpl,
+  onMarkToolbarReflowImpl,
   refreshMarkToolbarFontSizeStateImpl,
 } from './mark-toolbar.js';
 import {
@@ -208,6 +201,13 @@ import {
 } from './section-toolbar.js';
 import { beginTextEditImpl } from './text-edit.js';
 import type { EditorBoot, EditorContext, RemoteCursorEntry } from './editor-context.js';
+import {
+  attachChromeToggles,
+  installRuntimeHelpers,
+  mountViewportImpl,
+  wireCoEditPresenceListeners,
+  wireMarkToolbarReflowListeners,
+} from './runtime-helpers.js';
 
 // Re-export side-effecting / utility imports so the bundle's tree-shaker
 // keeps them. These were void-referenced in the Phase 2a stub; with
@@ -291,37 +291,31 @@ function errorToString(err: unknown): string {
  * come from boot directly. Collections (undoStack/redoStack/pagePositions/
  * remoteCursors/pendingAiSuggestions) initialise empty. DOM refs are null
  * until `createEditor` caches them. Forward-declared ctx methods whose
- * implementations stay inline in canvas-client.ts through Phase 2 are
- * stubbed with "createEditor wiring pending Phase 3 cutover" throwers so
- * a misrouted call surfaces loudly rather than silently no-oping.
+ * helpers that used to live in the IIFE closure are patched onto ctx by
+ * installRuntimeHelpers(ctx) before boot starts. The skeleton keeps loud
+ * runtime-helper-not-installed guards only for impossible boot-order bugs.
  *
  * After the skeleton lands, `createEditor` rebinds every ctx method whose
  * impl IS already extracted into a sibling module — the stub is the
  * fallback for methods that still live inline in canvas-client.ts.
  */
 function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
-  const stub = (label: string): (() => never) =>
+  const runtimeHelperNotInstalled = (label: string): (() => never) =>
     () => {
       throw new Error(
-        `${label} stub: createEditor wiring pending Phase 3 cutover ` +
-          `(implementation stays inline in canvas-client.ts through Phase 2)`,
+        `${label}: runtime helper was not installed before createEditor boot`,
       );
     };
   const siteBase = boot.apiBase + '/canvas/sites/' + boot.siteId;
-  // Every ctx field whose Ximpl exists in a sibling module is bound below.
-  // Fields whose implementations stay inline in canvas-client.ts through
-  // Phase 2 (the IIFE's free-closure helpers — pointerToCanvas,
-  // forceOpenInspector, renderInspectorSpec, etc.) keep the stub('Xname')
-  // thrower so a Phase-3 cutover that forgets to swap one surfaces loudly
-  // rather than silently no-oping. The Partial cast remains because
-  // optional fields (repaintRemoteCursors / onMarkToolbarReflow) are
-  // intentionally left undefined until their late-binding paths fire.
+  // The Partial cast remains because optional fields (repaintRemoteCursors
+  // / onMarkToolbarReflow) are intentionally left undefined until their
+  // late-binding paths fire.
   const ctxPartial: Partial<EditorContext> = {
     // ---- Foundational state ------------------------------------------
     state: null,
     mainEl: null,
     selectedElementId: null,
-    findElement: stub('findElement'),
+    findElement: runtimeHelperNotInstalled('findElement'),
     renderAll: () => renderAllImpl(ctx),
     renderInspector: () => renderInspectorImpl(ctx),
     selectElement: (elementId) => selectElementImpl(ctx, elementId),
@@ -338,27 +332,29 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
 
     // ---- Content inspector mounts ------------------------------------
     serializeContentToRuns: (rootNode) => serializeContentToRuns(rootNode),
-    buildPickerThumb: stub('buildPickerThumb'),
-    postAssetUpload: stub('postAssetUpload'),
-    setStatus: stub('setStatus'),
+    buildPickerThumb: runtimeHelperNotInstalled('buildPickerThumb'),
+    postAssetUpload: runtimeHelperNotInstalled('postAssetUpload'),
+    statusEl: null,
+    statusTimer: null,
+    setStatus: runtimeHelperNotInstalled('setStatus'),
 
     // ---- Nav links + media picker mounts ------------------------------
     authFetch: (input, init) =>
       init === undefined ? authFetchImpl(ctx, input) : authFetchImpl(ctx, input, init),
     apiBase: boot.apiBase,
     siteId: boot.siteId,
-    applyAssetIdToElement: stub('applyAssetIdToElement'),
-    runDeleteAsset: stub('runDeleteAsset'),
-    uploadMediaForElement: stub('uploadMediaForElement'),
+    applyAssetIdToElement: runtimeHelperNotInstalled('applyAssetIdToElement'),
+    runDeleteAsset: runtimeHelperNotInstalled('runDeleteAsset'),
+    uploadMediaForElement: runtimeHelperNotInstalled('uploadMediaForElement'),
 
     // ---- Section inspector --------------------------------------------
     inspector: null,
     selectedSectionId: null,
     inspectorRenderSubject: null,
-    findSection: stub('findSection'),
-    preserveInspectorScrollFor: stub('preserveInspectorScrollFor'),
-    revokePendingPreviews: stub('revokePendingPreviews'),
-    selectableSectionRoles: stub('selectableSectionRoles'),
+    findSection: runtimeHelperNotInstalled('findSection'),
+    preserveInspectorScrollFor: runtimeHelperNotInstalled('preserveInspectorScrollFor'),
+    revokePendingPreviews: runtimeHelperNotInstalled('revokePendingPreviews'),
+    selectableSectionRoles: runtimeHelperNotInstalled('selectableSectionRoles'),
     aiCreateSection: (afterSectionId) => {
       void aiCreateSectionImpl(ctx, afterSectionId);
     },
@@ -366,16 +362,16 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     // ---- Page inspector -----------------------------------------------
     root: null,
     activePageId: null,
-    currentPage: stub('currentPage'),
+    currentPage: runtimeHelperNotInstalled('currentPage'),
     updatePageSidebar: () => updatePageSidebarImpl(ctx),
-    applyPageMotionAttributes: stub('applyPageMotionAttributes'),
-    applyPageStyleProperties: stub('applyPageStyleProperties'),
-    pageRenderWidth: stub('pageRenderWidth'),
+    applyPageMotionAttributes: runtimeHelperNotInstalled('applyPageMotionAttributes'),
+    applyPageStyleProperties: runtimeHelperNotInstalled('applyPageStyleProperties'),
+    pageRenderWidth: runtimeHelperNotInstalled('pageRenderWidth'),
 
     // ---- Element inspector orchestrator -------------------------------
     isReelOpen: false,
     INSPECTOR_DISPATCH,
-    renderInspectorSpec: stub('renderInspectorSpec'),
+    renderInspectorSpec: runtimeHelperNotInstalled('renderInspectorSpec'),
     siteBase,
 
     // ---- Persist + undo/redo ------------------------------------------
@@ -385,9 +381,10 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     undoRedoing: false,
     undoPersistenceFailed: false,
     saveTimer: null,
+    saveQueue: Promise.resolve(true),
     coEditConnection: null,
     coEditSync: () => coEditSyncImpl(ctx),
-    saveStateNow: stub('saveStateNow'),
+    saveStateNow: runtimeHelperNotInstalled('saveStateNow'),
     disableUndoPersistence: (reason, error) => disableUndoPersistenceImpl(ctx, reason, error),
 
     // ---- Selection state-machine --------------------------------------
@@ -408,7 +405,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     camera: { x: 0, y: 0, zoom: 1 },
     pagePositions: [],
     pendingImport: null,
-    buildSectionNode: stub('buildSectionNode'),
+    buildSectionNode: runtimeHelperNotInstalled('buildSectionNode'),
     syncSidebarStyleKitButtons: (buttons) => syncSidebarStyleKitButtonsImpl(ctx, buttons),
     renderPlacementSlots: () => renderPlacementSlotsImpl(ctx),
     setBoxStyle: (wrapper, box) => setBoxStyleImpl(ctx, wrapper, box),
@@ -450,8 +447,8 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     },
     setAiBusy: (busy) => setAiBusyImpl(ctx, busy),
 
-    // ---- Phase 2m residual forward declaration ------------------------
-    flushPendingSave: stub('flushPendingSave'),
+    // ---- Persist + immediate-save bridge ------------------------------
+    flushPendingSave: runtimeHelperNotInstalled('flushPendingSave'),
 
     // ---- Keyboard handlers --------------------------------------------
     editingElementId: null,
@@ -465,8 +462,8 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     clearTemporaryPanState: () => clearTemporaryPanStateImpl(ctx),
     endTemporaryPan: () => endTemporaryPanImpl(ctx),
     exitPlacementMode: () => exitPlacementModeImpl(ctx),
-    pointerToCanvas: stub('pointerToCanvas'),
-    resolveElementWrapperAtPoint: stub('resolveElementWrapperAtPoint'),
+    pointerToCanvas: runtimeHelperNotInstalled('pointerToCanvas'),
+    resolveElementWrapperAtPoint: runtimeHelperNotInstalled('resolveElementWrapperAtPoint'),
     onCanvasLinkHover: (ev) => onCanvasLinkHoverImpl(ctx, ev),
     onCanvasLinkHoverLeave: (ev) => onCanvasLinkHoverLeaveImpl(ctx, ev),
     renderSectionsPanel: () => renderSectionsPanelImpl(ctx),
@@ -483,10 +480,10 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     saveToLibrary: (section) => saveToLibraryImpl(ctx, section),
     saveSiteAsTemplate: () => saveSiteAsTemplateImpl(ctx),
 
-    // ---- Phase 2j forward declarations (still inline) ----------------
+    // ---- Sidebar dispatch bridge -------------------------------------
     SIDEBAR_COMMANDS: {},
-    insertElementForSidebarCommand: stub('insertElementForSidebarCommand'),
-    getPagePosition: stub('getPagePosition'),
+    insertElementForSidebarCommand: runtimeHelperNotInstalled('insertElementForSidebarCommand'),
+    getPagePosition: runtimeHelperNotInstalled('getPagePosition'),
     sectionsCatalog: null,
 
     // ---- Session-expired / access-revoked lifecycle -------------------
@@ -550,7 +547,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     aiRewriteText: (elementId) => aiRewriteTextImpl(ctx, elementId),
     aiReplaceMedia: (elementId) => aiReplaceMediaImpl(ctx, elementId),
     migrateState: (s) => migrateState(s) as EditableSite,
-    uploadGeneratedBlobToElement: stub('uploadGeneratedBlobToElement'),
+    uploadGeneratedBlobToElement: runtimeHelperNotInstalled('uploadGeneratedBlobToElement'),
 
     // ---- Link popover + mark toolbar + text editing -------------------
     markToolbar: null,
@@ -564,16 +561,16 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     applyMark: (type: InlineMarkType) => applyMarkImpl(ctx, type),
     beginTextEdit: (elementId) => beginTextEditImpl(ctx, elementId),
 
-    // ---- Forward declarations consumed by Phase 2q.g (still inline) --
-    forceOpenInspector: stub('forceOpenInspector'),
+    // ---- Link popover + paste normalization bridge -------------------
+    forceOpenInspector: runtimeHelperNotInstalled('forceOpenInspector'),
     buildRunNode: (run) => buildRunNodeImpl(ctx, run),
     marksEqual: (a: InlineMark[], b: InlineMark[]) => marksEqual(a, b),
     plainTextOf: (content: InlineRun[]) => plainTextOf(content),
-    renderMathInScope: stub('renderMathInScope'),
-    normalizePastedHtml: stub('normalizePastedHtml'),
-    plainTextToFragmentHtml: stub('plainTextToFragmentHtml'),
-    beginDrag: stub('beginDrag'),
-    openLinkModal: stub('openLinkModal'),
+    renderMathInScope: runtimeHelperNotInstalled('renderMathInScope'),
+    normalizePastedHtml: runtimeHelperNotInstalled('normalizePastedHtml'),
+    plainTextToFragmentHtml: runtimeHelperNotInstalled('plainTextToFragmentHtml'),
+    beginDrag: runtimeHelperNotInstalled('beginDrag'),
+    openLinkModal: runtimeHelperNotInstalled('openLinkModal'),
 
     // ---- Phase 2q.d: run + body builders + element menu --------------
     // ICON_SVG_MAP is imported directly from the icon registry now that
@@ -591,8 +588,8 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
       buildElementMenuImpl(ctx, element, section, wrapper),
     toggleElementMenu: (elementId, wrapper) => toggleElementMenuImpl(ctx, elementId, wrapper),
 
-    // ---- Phase 2q.e: forward-declared image generator (still inline) -
-    generateImageForElement: stub('generateImageForElement'),
+    // ---- AI image generator ------------------------------------------
+    generateImageForElement: runtimeHelperNotInstalled('generateImageForElement'),
 
     // ---- Phase 2q.i: sections picker + sidebar wiring ----------------
     sidebar: null,
@@ -614,9 +611,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     saveTemplateButton: null,
     versionsLoaded: false,
     versionsList: [],
-    // isEditableShortcutTarget stays inline through Phase 2 — the
-    // helper is a free closure in canvas-client.ts.
-    isEditableShortcutTarget: stub('isEditableShortcutTarget'),
+    // isEditableShortcutTarget is installed by runtime-helpers before
+    // attachSaveButton wires global shortcuts.
+    isEditableShortcutTarget: runtimeHelperNotInstalled('isEditableShortcutTarget'),
     deleteElement: (section, element) => deleteElement(ctx, section, element),
     updateVersionBadge: (version) => updateVersionBadgeImpl(ctx, version),
     publishSite: () => publishSiteImpl(ctx),
@@ -667,10 +664,12 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
  */
 export function createEditor(boot: EditorBoot): void {
   const ctx = createEditorContextSkeleton(boot);
+  installRuntimeHelpers(ctx);
 
   // ---- DOM ref caching (mirror canvas-client.ts:605-660) -------------
   ctx.root = document.getElementById('canvas-root');
   ctx.inspector = document.getElementById('canvas-inspector');
+  ctx.statusEl = document.getElementById('canvas-status');
   ctx.mainEl = document.querySelector('main.opencanvas-editor');
   ctx.sidebar = document.getElementById('canvas-sidebar');
   ctx.saveButton = document.getElementById('canvas-save');
@@ -697,10 +696,6 @@ export function createEditor(boot: EditorBoot): void {
       ctx.updateChatSelectionChip();
     });
   }
-
-  // ---- Keyboard handlers (registered before the site load resolves so
-  //      Space-hold / V / Escape work during boot) ---------------------
-  registerKeyboardHandlers(ctx);
 
   // ---- Boot async block (mirror canvas-client.ts:13913-14405) -------
   void (async () => {
@@ -742,26 +737,25 @@ export function createEditor(boot: EditorBoot): void {
       if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
         ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
       }
+      ctx.onMarkToolbarReflow = () => onMarkToolbarReflowImpl(ctx);
+      wireMarkToolbarReflowListeners(ctx);
       // mountViewport MUST precede renderAll so #canvas-root is in its
-      // final DOM position when sections render in. mountViewport stays
-      // inline through Phase 2; see Phase 3 cutover for the swap.
-      // -- mountViewport(ctx); -- forward-decl: stays inline.
+      // final DOM position when sections render in.
+      mountViewportImpl(ctx);
       ctx.renderAll();
       // Math rendering: re-run once KaTeX resolves so deferred equations
-      // catch up. renderMathInScope stays inline at Phase 2.
+      // catch up.
       window.addEventListener('opencanvas-katex-ready', function () {
         if (ctx.root) ctx.renderMathInScope(ctx.root);
       });
+      if (window.katex && ctx.root) ctx.renderMathInScope(ctx.root);
       ctx.attachRootEvents();
       attachPointerHandlersImpl(ctx);
       mountReel(ctx);
       attachGripHandlersImpl(ctx);
       ctx.attachSidebarTabs();
       attachPageCrumbImpl(ctx);
-
-      // Sidebar-toggle / inspector-toggle wiring stay inline through
-      // Phase 2 — these are pure DOM listeners with no extracted module.
-      // Phase 3 cutover ports them onto createEditor's body.
+      attachChromeToggles(ctx);
 
       ctx.ensureVersionsTabMounted();
       ctx.attachSidebarActions();
@@ -806,7 +800,9 @@ export function createEditor(boot: EditorBoot): void {
       // can flip its disabled state).
       ctx.attachSaveButton();
       ctx.attachPublishButton();
+      ctx.localPresence = loadPresenceIdentity(ctx.presenceDisplayName);
       ctx.attachCoEdit();
+      wireCoEditPresenceListeners(ctx);
       ctx.setStatus('Ready', 'ok');
 
       // Session keepalive — Owner sessions get an hourly HEAD; published-

@@ -124,6 +124,8 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     postAssetUpload: () => {
       throw new Error('postAssetUpload stub: smoke does not exercise uploads');
     },
+    statusEl: null,
+    statusTimer: null,
     setStatus: () => {},
     authFetch: () => {
       throw new Error('authFetch stub: smoke does not exercise picker fetches');
@@ -192,6 +194,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     undoRedoing: false,
     undoPersistenceFailed: false,
     saveTimer: null,
+    saveQueue: Promise.resolve(true),
     coEditConnection: null,
     coEditSync: () => false,
     saveStateNow: () => {
