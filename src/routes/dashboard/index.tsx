@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { and, desc, eq, isNotNull, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
+import { PlanTiles, planTilesStyles } from '../../billing/plan-tiles';
 import { db } from '../../db/client';
 import { site, ownerAsset, siteCollaborator } from '../../db/schema';
 import { clerkAuth, getClerkUser, resolveClerkKeys } from '../../auth/middleware';
@@ -97,12 +98,9 @@ function buildThumbHtml(
     ...(state.footer ? { footer: state.footer } : {}),
     ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
   };
-  const canvasHtml = renderCanvasSnapshot(
-    snapshot,
-    `/api/canvas/sites/${siteId}/assets`,
-    siteId,
-    { turnstileSiteKey },
-  );
+  const canvasHtml = renderCanvasSnapshot(snapshot, `/api/canvas/sites/${siteId}/assets`, siteId, {
+    turnstileSiteKey,
+  });
   return [
     '<!DOCTYPE html><html><head>',
     `<base href="${origin}/">`,
@@ -727,7 +725,133 @@ const cardStyles = `
     .dash-stats { grid-template-columns: repeat(2, 1fr); }
     .dash-quick { grid-template-columns: 1fr; }
   }
+
+  /* ADR 0042 (2026-06-04 amendment). Plan-upgrade modal — reuses the
+     same overlay/card shape as the import modal so visitors see a
+     consistent dialog affordance. The plan tiles inside come from the
+     shared PlanTiles component (also rendered on /dashboard/settings
+     under the Plan tab), so the picker looks identical on both
+     surfaces. The trigger is the "Upgrade to add sites" button next to
+     New site, and the small "Upgrade" link in the Plan stat card. */
+  .plan-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(26, 25, 23, 0.55);
+    backdrop-filter: blur(4px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .plan-modal-overlay[data-open="true"] { display: flex; }
+  .plan-modal {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    width: min(720px, calc(100vw - 48px));
+    padding: 28px;
+    box-shadow: var(--shadow-lg);
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+  .plan-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .plan-modal h2 {
+    margin: 0 0 4px;
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .plan-modal-sub {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--ink-3);
+  }
+  .plan-modal-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    color: var(--ink-2);
+    border-radius: var(--r-xs);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+  .plan-modal-close:hover { background: var(--surface-3); color: var(--ink); }
+  ${planTilesStyles}
 `;
+
+// ADR 0042 (2026-06-04 amendment). Plan-upgrade modal wiring. Open
+// triggers: the "Upgrade to add sites" button (rendered when atSiteLimit)
+// and the small "Upgrade" link in the Plan stat card. Each Switch tile
+// PATCHes /api/profile with the chosen plan and reloads on success so
+// the dashboard re-paints with the new plan-aware site cap + storage
+// limit. Errors surface through the shared __opencanvasModal.alert.
+const planUpgradeScript = raw(`<script>
+(function() {
+  var overlay = document.getElementById('plan-modal-overlay');
+  if (!overlay) return;
+  var openers = [document.getElementById('plan-upgrade-btn'), document.getElementById('plan-upgrade-link')].filter(Boolean);
+  var closeBtn = document.getElementById('plan-modal-close');
+  var switchButtons = overlay.querySelectorAll('.plan-switch-btn[data-plan]');
+
+  function open() { overlay.setAttribute('data-open', 'true'); }
+  function close() { overlay.setAttribute('data-open', 'false'); }
+  function alertSwitchFailure(err) {
+    var message = err && err.message ? err.message : 'Could not switch plan.';
+    var modal = window.__opencanvasModal;
+    if (!modal || typeof modal.alert !== 'function') {
+      console.error('[plan-switch] modal helper unavailable', { message: message, error: err });
+      throw new Error('plan switch modal helper unavailable');
+    }
+    return modal.alert(message, 'Switch plan');
+  }
+
+  openers.forEach(function(btn) { btn.addEventListener('click', open); });
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && overlay.getAttribute('data-open') === 'true') close();
+  });
+
+  switchButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var plan = btn.getAttribute('data-plan');
+      if (!plan) return;
+      var label = btn.textContent;
+      switchButtons.forEach(function(b) { b.disabled = true; });
+      btn.textContent = 'Switching…';
+      fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan })
+      }).then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, data: d }; });
+      }).then(function(result) {
+        if (!result.ok) throw new Error(result.data.error || 'Switch failed');
+        window.location.reload();
+      }).catch(function(err) {
+        switchButtons.forEach(function(b) { b.disabled = false; });
+        btn.textContent = label;
+        alertSwitchFailure(err);
+      });
+    });
+  });
+})();
+</script>`);
 
 const importScript = raw(`<script>
 (function() {
@@ -1168,10 +1292,7 @@ dashboard.get('/', async (c) => {
       .from(site)
       .innerJoin(siteCollaborator, eq(siteCollaborator.siteId, site.id))
       .where(
-        and(
-          eq(siteCollaborator.customerId, customerId),
-          isNotNull(siteCollaborator.acceptedAt),
-        ),
+        and(eq(siteCollaborator.customerId, customerId), isNotNull(siteCollaborator.acceptedAt)),
       )
       .orderBy(desc(site.createdAt)),
     database
@@ -1241,7 +1362,7 @@ dashboard.get('/', async (c) => {
             Import
           </Button>
           {atSiteLimit ? (
-            <Button variant="primary" class="new-site" href="/dashboard/settings">
+            <Button variant="primary" class="new-site" id="plan-upgrade-btn">
               Upgrade to add sites
             </Button>
           ) : (
@@ -1256,7 +1377,9 @@ dashboard.get('/', async (c) => {
         <div class="dash-stat-card">
           <div class="stat-label">Owned sites</div>
           <div class="stat-value">{String(ownedSiteCount)}</div>
-          <div class="stat-sub">of {siteLimitLabel} on {planName}</div>
+          <div class="stat-sub">
+            of {siteLimitLabel} on {planName}
+          </div>
         </div>
         <div class="dash-stat-card">
           <div class="stat-label">Published</div>
@@ -1272,12 +1395,29 @@ dashboard.get('/', async (c) => {
         <div class="dash-stat-card">
           <div class="stat-label">Storage used</div>
           <div class="stat-value">{formatBytes(storageBytes)}</div>
-          <div class="stat-sub">of {storageLimitLabel} on {planName}</div>
+          <div class="stat-sub">
+            of {storageLimitLabel} on {planName}
+          </div>
         </div>
         <div class="dash-stat-card">
           <div class="stat-label">Plan</div>
           <div class="stat-value">{planName}</div>
-          <div class="stat-sub"><a href="/dashboard/settings" style="font-size:12px">{customerPlan === 'team' ? 'Manage' : 'Upgrade'}</a></div>
+          <div class="stat-sub">
+            {customerPlan === 'team' ? (
+              <a href="/dashboard/settings" style="font-size:12px">
+                Manage
+              </a>
+            ) : (
+              <button
+                type="button"
+                id="plan-upgrade-link"
+                class="stat-link-btn"
+                style="font-size:12px;background:none;border:none;color:var(--red-ink);cursor:pointer;padding:0;font-family:inherit;text-decoration:underline"
+              >
+                Upgrade
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1337,6 +1477,25 @@ dashboard.get('/', async (c) => {
           </div>
         </div>
       </div>
+
+      <div class="plan-modal-overlay" id="plan-modal-overlay" data-open="false">
+        <div class="plan-modal" role="dialog" aria-modal="true" aria-labelledby="plan-modal-title">
+          <div class="plan-modal-header">
+            <div>
+              <h2 id="plan-modal-title">Switch your plan</h2>
+              <p class="plan-modal-sub">
+                Plans are instant in this build — no card needed, no charges made. Your plan
+                controls how many sites you can create and how much storage you get.
+              </p>
+            </div>
+            <button type="button" class="plan-modal-close" id="plan-modal-close" aria-label="Close">
+              &times;
+            </button>
+          </div>
+          <PlanTiles currentPlan={customerPlan} />
+        </div>
+      </div>
+
       <p class="dash-sub">
         Signed in as {primaryEmail}.{' '}
         <a class="dash-sign-out" href="/sign-out">
@@ -1466,6 +1625,7 @@ dashboard.get('/', async (c) => {
       <div id="card-backdrop" class="card-backdrop" data-open="false" />
       {toggleScript}
       {importScript}
+      {planUpgradeScript}
     </DashboardShell>,
   );
 });

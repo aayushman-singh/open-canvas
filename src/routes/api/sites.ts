@@ -6,7 +6,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { SEED_ASSET_REGISTRY } from '../../canvas/seed-assets';
-import type { CanvasSection, EditableSite, MediaKind } from '../../canvas/schema';
+import type { CanvasElement, CanvasSection, EditableSite, MediaKind } from '../../canvas/schema';
 import { validateEditableSite } from '../../canvas/validate';
 import { db } from '../../db/client';
 import {
@@ -162,6 +162,180 @@ function customerSeedAssetId(customerId: string, seedAssetId: string): string {
   return `seed-${customerId}-${seedAssetId}`;
 }
 
+type AssetIdResolution = string | { missing: string };
+type AssetIdResolver = (assetId: string, path: string) => AssetIdResolution;
+
+function rewriteElementAssetIds(
+  element: CanvasElement,
+  elementPath: string,
+  resolveAssetId: AssetIdResolver,
+): string | null {
+  const esBgImage = element.elementStyle?.backgroundImageAssetId;
+  if (typeof esBgImage === 'string' && esBgImage.length > 0) {
+    const mapped = resolveAssetId(esBgImage, `${elementPath}.elementStyle.backgroundImageAssetId`);
+    if (typeof mapped !== 'string') return mapped.missing;
+    element.elementStyle = { ...element.elementStyle, backgroundImageAssetId: mapped };
+  }
+
+  if (element.type === 'media') {
+    const mapped = resolveAssetId(element.assetId, `${elementPath}.assetId`);
+    if (typeof mapped !== 'string') return mapped.missing;
+    element.assetId = mapped;
+    if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
+      const posterMapped = resolveAssetId(element.posterAssetId, `${elementPath}.posterAssetId`);
+      if (typeof posterMapped !== 'string') return posterMapped.missing;
+      element.posterAssetId = posterMapped;
+    }
+    return null;
+  }
+
+  if (
+    element.type === 'nav' &&
+    typeof element.logoAssetId === 'string' &&
+    element.logoAssetId.length > 0
+  ) {
+    const mapped = resolveAssetId(element.logoAssetId, `${elementPath}.logoAssetId`);
+    if (typeof mapped !== 'string') return mapped.missing;
+    element.logoAssetId = mapped;
+    return null;
+  }
+
+  if (element.type === 'carousel') {
+    for (let slideIdx = 0; slideIdx < element.slides.length; slideIdx++) {
+      const slide = element.slides[slideIdx];
+      if (!slide) continue;
+      const mapped = resolveAssetId(
+        slide.assetId,
+        `${elementPath}.slides[${String(slideIdx)}].assetId`,
+      );
+      if (typeof mapped !== 'string') return mapped.missing;
+      slide.assetId = mapped;
+    }
+    return null;
+  }
+
+  if (element.type === 'tabs') {
+    for (let tabIdx = 0; tabIdx < element.tabs.length; tabIdx++) {
+      const tab = element.tabs[tabIdx];
+      if (!tab) continue;
+      for (let childIdx = 0; childIdx < tab.elements.length; childIdx++) {
+        const child = tab.elements[childIdx];
+        if (!child) continue;
+        const missing = rewriteElementAssetIds(
+          child,
+          `${elementPath}.tabs[${String(tabIdx)}].elements[${String(childIdx)}]`,
+          resolveAssetId,
+        );
+        if (missing !== null) return missing;
+      }
+    }
+    return null;
+  }
+
+  if (element.type === 'collection') {
+    for (let childIdx = 0; childIdx < element.entryTemplate.length; childIdx++) {
+      const child = element.entryTemplate[childIdx];
+      if (!child) continue;
+      const missing = rewriteElementAssetIds(
+        child,
+        `${elementPath}.entryTemplate[${String(childIdx)}]`,
+        resolveAssetId,
+      );
+      if (missing !== null) return missing;
+    }
+    if (element.cardTemplate !== undefined) {
+      for (let childIdx = 0; childIdx < element.cardTemplate.length; childIdx++) {
+        const child = element.cardTemplate[childIdx];
+        if (!child) continue;
+        const missing = rewriteElementAssetIds(
+          child,
+          `${elementPath}.cardTemplate[${String(childIdx)}]`,
+          resolveAssetId,
+        );
+        if (missing !== null) return missing;
+      }
+    }
+    for (let entryIdx = 0; entryIdx < element.entries.length; entryIdx++) {
+      const entry = element.entries[entryIdx];
+      if (!entry) continue;
+      for (let childIdx = 0; childIdx < entry.length; childIdx++) {
+        const child = entry[childIdx];
+        if (!child) continue;
+        const missing = rewriteElementAssetIds(
+          child,
+          `${elementPath}.entries[${String(entryIdx)}][${String(childIdx)}]`,
+          resolveAssetId,
+        );
+        if (missing !== null) return missing;
+      }
+    }
+  }
+
+  return null;
+}
+
+function rewriteSectionAssetIds(
+  section: CanvasSection | undefined,
+  sectionPath: string,
+  resolveAssetId: AssetIdResolver,
+): string | null {
+  if (!section) return null;
+  if (
+    typeof section.backgroundVideoAssetId === 'string' &&
+    section.backgroundVideoAssetId.length > 0
+  ) {
+    const mapped = resolveAssetId(
+      section.backgroundVideoAssetId,
+      `${sectionPath}.backgroundVideoAssetId`,
+    );
+    if (typeof mapped !== 'string') return mapped.missing;
+    section.backgroundVideoAssetId = mapped;
+  }
+  for (let elementIdx = 0; elementIdx < section.elements.length; elementIdx++) {
+    const element = section.elements[elementIdx];
+    if (!element) continue;
+    const missing = rewriteElementAssetIds(
+      element,
+      `${sectionPath}.elements[${String(elementIdx)}]`,
+      resolveAssetId,
+    );
+    if (missing !== null) return missing;
+  }
+  return null;
+}
+
+function rewriteEditableSiteAssetIds(
+  editableState: EditableSite,
+  resolveAssetId: AssetIdResolver,
+): string | null {
+  for (const [pageIdx, page] of editableState.pages.entries()) {
+    const pagePath = `pages[${String(pageIdx)}]`;
+    if (typeof page.ogImageAssetId === 'string' && page.ogImageAssetId.length > 0) {
+      const mapped = resolveAssetId(page.ogImageAssetId, `${pagePath}.ogImageAssetId`);
+      if (typeof mapped !== 'string') return mapped.missing;
+      page.ogImageAssetId = mapped;
+    }
+    for (const [sectionIdx, section] of page.sections.entries()) {
+      const missing = rewriteSectionAssetIds(
+        section,
+        `${pagePath}.sections[${String(sectionIdx)}]`,
+        resolveAssetId,
+      );
+      if (missing !== null) return missing;
+    }
+  }
+  let missing = rewriteSectionAssetIds(editableState.header, 'header', resolveAssetId);
+  if (missing !== null) return missing;
+  missing = rewriteSectionAssetIds(editableState.footer, 'footer', resolveAssetId);
+  if (missing !== null) return missing;
+  if (typeof editableState.faviconAssetId === 'string' && editableState.faviconAssetId.length > 0) {
+    const mapped = resolveAssetId(editableState.faviconAssetId, 'faviconAssetId');
+    if (typeof mapped !== 'string') return mapped.missing;
+    editableState.faviconAssetId = mapped;
+  }
+  return null;
+}
+
 /**
  * Materialise the Owner Asset rows a new site needs from a Template Seed.
  *
@@ -248,96 +422,8 @@ export function prepareSeedAssetsForCustomer(
     return materializedAssetId;
   }
 
-  function materializeSectionAssets(
-    section: CanvasSection | undefined,
-    sectionPath: string,
-  ): string | null {
-    if (!section) return null;
-    if (typeof section.backgroundVideoAssetId === 'string' && section.backgroundVideoAssetId.length > 0) {
-      const mapped = materializeAssetId(section.backgroundVideoAssetId, `${sectionPath}.backgroundVideoAssetId`);
-      if (typeof mapped !== 'string') return mapped.missing;
-      section.backgroundVideoAssetId = mapped;
-    }
-    for (let elementIdx = 0; elementIdx < section.elements.length; elementIdx++) {
-      const element = section.elements[elementIdx];
-      if (!element) continue;
-      const elementPath = `${sectionPath}.elements[${String(elementIdx)}]`;
-      const esBgImage = element.elementStyle?.backgroundImageAssetId;
-      if (typeof esBgImage === 'string' && esBgImage.length > 0) {
-        const mapped = materializeAssetId(
-          esBgImage,
-          `${elementPath}.elementStyle.backgroundImageAssetId`,
-        );
-        if (typeof mapped !== 'string') return mapped.missing;
-        element.elementStyle = { ...element.elementStyle, backgroundImageAssetId: mapped };
-      }
-      if (element.type === 'media') {
-        const mapped = materializeAssetId(element.assetId, `${elementPath}.assetId`);
-        if (typeof mapped !== 'string') return mapped.missing;
-        element.assetId = mapped;
-        if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
-          const posterMapped = materializeAssetId(
-            element.posterAssetId,
-            `${elementPath}.posterAssetId`,
-          );
-          if (typeof posterMapped !== 'string') return posterMapped.missing;
-          element.posterAssetId = posterMapped;
-        }
-      } else if (
-        element.type === 'nav' &&
-        typeof element.logoAssetId === 'string' &&
-        element.logoAssetId.length > 0
-      ) {
-        const mapped = materializeAssetId(element.logoAssetId, `${elementPath}.logoAssetId`);
-        if (typeof mapped !== 'string') return mapped.missing;
-        element.logoAssetId = mapped;
-      } else if (element.type === 'carousel') {
-        for (let slideIdx = 0; slideIdx < element.slides.length; slideIdx++) {
-          const slide = element.slides[slideIdx];
-          if (!slide) continue;
-          const mapped = materializeAssetId(
-            slide.assetId,
-            `${elementPath}.slides[${String(slideIdx)}].assetId`,
-          );
-          if (typeof mapped !== 'string') return mapped.missing;
-          slide.assetId = mapped;
-        }
-      }
-    }
-    return null;
-  }
-
-  for (const [pageIdx, page] of editableState.pages.entries()) {
-    const pagePath = `pages[${String(pageIdx)}]`;
-    if (typeof page.ogImageAssetId === 'string' && page.ogImageAssetId.length > 0) {
-      const mapped = materializeAssetId(page.ogImageAssetId, `${pagePath}.ogImageAssetId`);
-      if (typeof mapped !== 'string') {
-        return { ok: false, unknownSeedIds: [mapped.missing], assetKindErrors: [] };
-      }
-      page.ogImageAssetId = mapped;
-    }
-    for (const [sectionIdx, section] of page.sections.entries()) {
-      const missing = materializeSectionAssets(
-        section,
-        `${pagePath}.sections[${String(sectionIdx)}]`,
-      );
-      if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
-    }
-  }
-  let missing = materializeSectionAssets(editableState.header, 'header');
+  const missing = rewriteEditableSiteAssetIds(editableState, materializeAssetId);
   if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
-  missing = materializeSectionAssets(editableState.footer, 'footer');
-  if (missing !== null) return { ok: false, unknownSeedIds: [missing], assetKindErrors: [] };
-  if (
-    typeof editableState.faviconAssetId === 'string' &&
-    editableState.faviconAssetId.length > 0
-  ) {
-    const mapped = materializeAssetId(editableState.faviconAssetId, 'faviconAssetId');
-    if (typeof mapped !== 'string') {
-      return { ok: false, unknownSeedIds: [mapped.missing], assetKindErrors: [] };
-    }
-    editableState.faviconAssetId = mapped;
-  }
 
   return { ok: true, editableState, seedRows };
 }
@@ -490,18 +576,23 @@ sites.post('/', async (c) => {
       }
     }
 
-    for (const page of editableState.pages) {
-      for (const section of page.sections) {
-        for (const element of section.elements) {
-          if (element.type !== 'media') continue;
-          const mapped = assetIdMap.get(element.assetId);
-          if (mapped) element.assetId = mapped;
-          if (element.mediaKind === 'video' && element.posterAssetId !== undefined) {
-            const posterMapped = assetIdMap.get(element.posterAssetId);
-            if (posterMapped) element.posterAssetId = posterMapped;
-          }
-        }
+    const missingTemplateAsset = rewriteEditableSiteAssetIds(editableState, (assetId, path) => {
+      if (assetId === '' || assetId === '__placeholder__') return assetId;
+      const mapped = assetIdMap.get(assetId);
+      if (mapped === undefined) {
+        console.error(`[custom-template] missing cloned asset for ${path}: ${assetId}`);
+        return { missing: assetId };
       }
+      return mapped;
+    });
+    if (missingTemplateAsset !== null) {
+      return c.json(
+        {
+          error: 'custom template references asset ids missing from its manifest',
+          unknownAssetIds: [missingTemplateAsset],
+        },
+        500,
+      );
     }
     assetRows = newRows;
   }

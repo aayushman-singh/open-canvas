@@ -46,7 +46,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0034 | `+ New Page` opens a modal that captures title, slug, and locale | Accepted | [`docs/adr/0034-new-page-modal-with-title-slug-locale.md`](0034-new-page-modal-with-title-slug-locale.md) |
 | 0035 | Visitor dark mode is a three-way enum (`light` / `dark` / `toggleable`) | Accepted | [`docs/adr/0035-visitor-dark-mode-three-way-enum.md`](0035-visitor-dark-mode-three-way-enum.md) |
 | 0037 | Account page ships the billing surface before the billing engine | Superseded by 0042 | [`docs/adr/0037-account-page-billing-surface-pre-billing.md`](0037-account-page-billing-surface-pre-billing.md) |
-| 0042 | Account page is usage metering only; no billing surface ships | Accepted (supersedes 0037) | [`docs/adr/0042-account-page-metering-only.md`](0042-account-page-metering-only.md) |
+| 0042 | Account page renders a mock-billing plan picker; no billing engine ships | Accepted (supersedes 0037, amended 2026-06-04) | [`docs/adr/0042-account-page-metering-only.md`](0042-account-page-metering-only.md) |
 | 0038 | Snapshot preview is a server-rendered sandboxed iframe via srcdoc | Accepted | [`docs/adr/0038-snapshot-preview-iframe.md`](0038-snapshot-preview-iframe.md) |
 | 0039 | A11y link in the canvas editor header | Accepted | [`docs/adr/0039-a11y-link-in-canvas-editor-header.md`](0039-a11y-link-in-canvas-editor-header.md) |
 | 0040 | Apogee Showcase fixture canonical URLs derive from request host at emit time | Accepted | [`docs/adr/0040-canonical-urls-from-host-config.md`](0040-canonical-urls-from-host-config.md) |

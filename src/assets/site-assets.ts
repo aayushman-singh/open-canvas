@@ -153,6 +153,36 @@ function collectElementReferences(
         element.id,
       );
     });
+    return;
+  }
+  if (element.type === 'tabs') {
+    element.tabs.forEach((tab, tabIdx) => {
+      tab.elements.forEach((child, childIdx) => {
+        collectElementReferences(
+          child,
+          `${elementPath}.tabs[${String(tabIdx)}].elements[${String(childIdx)}]`,
+          out,
+        );
+      });
+    });
+    return;
+  }
+  if (element.type === 'collection') {
+    element.entryTemplate.forEach((child, childIdx) => {
+      collectElementReferences(child, `${elementPath}.entryTemplate[${String(childIdx)}]`, out);
+    });
+    element.cardTemplate?.forEach((child, childIdx) => {
+      collectElementReferences(child, `${elementPath}.cardTemplate[${String(childIdx)}]`, out);
+    });
+    element.entries.forEach((entry, entryIdx) => {
+      entry.forEach((child, childIdx) => {
+        collectElementReferences(
+          child,
+          `${elementPath}.entries[${String(entryIdx)}][${String(childIdx)}]`,
+          out,
+        );
+      });
+    });
   }
 }
 
@@ -218,27 +248,78 @@ function isUnfilledAssetId(assetId: unknown): boolean {
   return assetId === '' || assetId === PLACEHOLDER_ASSET_ID;
 }
 
-function collectUnfilledSectionReferences(
-  section: CanvasSection,
-  sectionPath: string,
+function collectUnfilledElementReferences(
+  element: CanvasElement,
+  elementPath: string,
   out: UnfilledAssetReference[],
 ): void {
-  for (const [elementIdx, element] of section.elements.entries()) {
-    if (element.type !== 'media') continue;
+  if (element.type === 'media') {
     if (isUnfilledAssetId(element.assetId)) {
       out.push({
         role: 'asset',
-        path: `${sectionPath}.elements[${String(elementIdx)}].assetId`,
+        path: `${elementPath}.assetId`,
         mediaElementId: element.id,
       });
     }
     if (element.mediaKind === 'video' && isUnfilledAssetId(element.posterAssetId)) {
       out.push({
         role: 'poster',
-        path: `${sectionPath}.elements[${String(elementIdx)}].posterAssetId`,
+        path: `${elementPath}.posterAssetId`,
         mediaElementId: element.id,
       });
     }
+    return;
+  }
+  if (element.type === 'tabs') {
+    element.tabs.forEach((tab, tabIdx) => {
+      tab.elements.forEach((child, childIdx) => {
+        collectUnfilledElementReferences(
+          child,
+          `${elementPath}.tabs[${String(tabIdx)}].elements[${String(childIdx)}]`,
+          out,
+        );
+      });
+    });
+    return;
+  }
+  if (element.type === 'collection') {
+    element.entryTemplate.forEach((child, childIdx) => {
+      collectUnfilledElementReferences(
+        child,
+        `${elementPath}.entryTemplate[${String(childIdx)}]`,
+        out,
+      );
+    });
+    element.cardTemplate?.forEach((child, childIdx) => {
+      collectUnfilledElementReferences(
+        child,
+        `${elementPath}.cardTemplate[${String(childIdx)}]`,
+        out,
+      );
+    });
+    element.entries.forEach((entry, entryIdx) => {
+      entry.forEach((child, childIdx) => {
+        collectUnfilledElementReferences(
+          child,
+          `${elementPath}.entries[${String(entryIdx)}][${String(childIdx)}]`,
+          out,
+        );
+      });
+    });
+  }
+}
+
+function collectUnfilledSectionReferences(
+  section: CanvasSection,
+  sectionPath: string,
+  out: UnfilledAssetReference[],
+): void {
+  for (const [elementIdx, element] of section.elements.entries()) {
+    collectUnfilledElementReferences(
+      element,
+      `${sectionPath}.elements[${String(elementIdx)}]`,
+      out,
+    );
   }
 }
 

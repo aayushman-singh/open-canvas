@@ -35,7 +35,12 @@ import {
 } from './routes/api/sites';
 import { canReadScopedLibraryRow, escapeHtmlText } from './routes/api/library-access';
 import { getAddon } from './addons/registry';
-import { allTemplateSeeds, getTemplateSeed, instantiateTemplate, starterTemplate } from './templates/registry';
+import {
+  allTemplateSeeds,
+  getTemplateSeed,
+  instantiateTemplate,
+  starterTemplate,
+} from './templates/registry';
 
 // ADR 0061 Phase D — materialise once, reuse the EditableSite shape
 // throughout. Pre-Phase-D code that read `.state` on a TemplateSeed now
@@ -77,8 +82,23 @@ const smokeEnv: Record<string, string> = {
   TURNSTILE_SITE_KEY: 'turnstile-smoke-key',
 };
 
+const smokeExecutionCtx = {
+  waitUntil(promise: Promise<unknown>): void {
+    void promise.catch((err: unknown) => {
+      console.error('[review-smoke] waitUntil task failed', err);
+    });
+  },
+  passThroughOnException(): void {},
+  props: {},
+};
+
 async function responseText(path: string): Promise<{ status: number; body: string }> {
-  const response = await app.request(`http://opencanvas.test${path}`, undefined, smokeEnv);
+  const response = await app.request(
+    `http://opencanvas.test${path}`,
+    undefined,
+    smokeEnv,
+    smokeExecutionCtx,
+  );
   return { status: response.status, body: await response.text() };
 }
 
@@ -86,7 +106,12 @@ async function responseFromHost(
   host: string,
   path: string,
 ): Promise<{ status: number; body: string }> {
-  const response = await app.request(`http://${host}${path}`, undefined, smokeEnv);
+  const response = await app.request(
+    `http://${host}${path}`,
+    undefined,
+    smokeEnv,
+    smokeExecutionCtx,
+  );
   return { status: response.status, body: await response.text() };
 }
 
@@ -584,12 +609,19 @@ for (const [name, source] of [
 assert(
   dashboardSource.includes('const atSiteLimit = siteLimit !== null') &&
     !templatesPageSource.includes("You've reached your Free plan limit (3 sites)") &&
-    billingSettingsSource.includes('ADR 0042: usage meters only') &&
+    billingSettingsSource.includes('ADR 0042 (2026-06-04 amendment)') &&
+    billingSettingsSource.includes('data-tab="tab-plan"') &&
+    billingSettingsSource.includes('<PlanTiles currentPlan={customerPlan} />') &&
     billingSettingsSource.includes('const siteLimitLabel = siteLimit === null') &&
-    billingSettingsSource.includes('<span>{String(siteCount)} / {siteLimitLabel}</span>') &&
-    !billingSettingsSource.includes('plan.id === customerPlan') &&
-    !billingSettingsSource.includes('plan-now'),
-  'expected paid-plan dashboard UI to honor plan limits while Account stays metering-only',
+    billingSettingsSource.includes('String(siteCount)') &&
+    billingSettingsSource.includes('siteLimitLabel') &&
+    dashboardSource.includes('id="plan-upgrade-btn"') &&
+    dashboardSource.includes('plan-modal-overlay') &&
+    dashboardSource.includes('plan switch modal helper unavailable') &&
+    billingSettingsSource.includes('plan switch modal helper unavailable') &&
+    !dashboardSource.includes("alert(err.message || 'Could not switch plan.'") &&
+    !billingSettingsSource.includes("alert(err.message || 'Could not switch plan.'"),
+  'expected paid-plan dashboard UI to honor plan limits and to expose the ADR 0042 mock-billing plan picker on dashboard + settings',
 );
 
 const publicRouteSource = await readSource('./routes/public.ts');
@@ -1322,6 +1354,7 @@ try {
     `http://opencanvas.test/__live?siteId=fake-site-id`,
     { headers: new Headers({ upgrade: 'websocket' }) },
     smokeEnv,
+    smokeExecutionCtx,
   );
   assert(
     liveNoToken.status === 401,
@@ -1333,6 +1366,7 @@ try {
     `http://opencanvas.test/__live?siteId=fake-site-id&wsToken=not-a-real-token`,
     { headers: new Headers({ upgrade: 'websocket' }) },
     smokeEnv,
+    smokeExecutionCtx,
   );
   assert(
     liveInvalidToken.status === 401,
@@ -1348,6 +1382,7 @@ try {
     `http://opencanvas.test/__live?siteId=fake-site-id&wsToken=${encodeURIComponent(wrongSiteToken)}`,
     { headers: new Headers({ upgrade: 'websocket' }) },
     smokeEnv,
+    smokeExecutionCtx,
   );
   assert(
     liveWrongSite.status === 401,
@@ -1493,16 +1528,8 @@ assert(
   referencedSeedIds.length > 0,
   'expected starterTemplate to reference at least one seed asset id',
 );
-const preparedForCustomerA = prepareSeedAssetsForCustomer(
-  'customer-a',
-  starterState,
-  new Map(),
-);
-const preparedForCustomerB = prepareSeedAssetsForCustomer(
-  'customer-b',
-  starterState,
-  new Map(),
-);
+const preparedForCustomerA = prepareSeedAssetsForCustomer('customer-a', starterState, new Map());
+const preparedForCustomerB = prepareSeedAssetsForCustomer('customer-b', starterState, new Map());
 assert(preparedForCustomerA.ok, 'expected seed asset preparation for customer-a to succeed');
 assert(preparedForCustomerB.ok, 'expected seed asset preparation for customer-b to succeed');
 const preparedAIds = new Set(
@@ -1528,6 +1555,99 @@ for (const row of preparedForCustomerA.seedRows) {
   assert(
     preparedAStateIds.has(row.id),
     `expected editable state to reference materialised Owner Asset id "${row.id}"`,
+  );
+}
+const nestedSeedState: EditableSite = {
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'nested-seed-page',
+      slug: 'nested-seed',
+      title: 'Nested seed assets',
+      width: 1440,
+      sections: [
+        {
+          id: 'nested-seed-section',
+          recipeId: 'custom',
+          name: 'Nested seed',
+          height: 600,
+          elements: [
+            {
+              id: 'nested-seed-tabs',
+              type: 'tabs',
+              box: { x: 0, y: 0, w: 600, h: 360, z: 1 },
+              activeTabId: 'media',
+              tabs: [
+                {
+                  id: 'media',
+                  label: [{ text: 'Media' }],
+                  elements: [
+                    {
+                      id: 'nested-seed-tab-media',
+                      type: 'media',
+                      mediaKind: 'image',
+                      assetId: 'seed-hero-poster-1',
+                      alt: '',
+                      fit: 'cover',
+                      box: { x: 0, y: 0, w: 200, h: 120, z: 1 },
+                    },
+                  ],
+                },
+                { id: 'empty', label: [{ text: 'Empty' }], elements: [] },
+              ],
+            },
+            {
+              id: 'nested-seed-collection',
+              type: 'collection',
+              mode: 'manual',
+              box: { x: 0, y: 380, w: 600, h: 160, z: 2 },
+              layout: { columns: 1, gap: 12 },
+              entryTemplate: [
+                {
+                  id: 'nested-seed-template-logo',
+                  type: 'nav',
+                  box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+                  logoAssetId: 'seed-portrait-placeholder',
+                  links: [],
+                  layout: 'left-right',
+                  sticky: false,
+                },
+              ],
+              entries: [
+                [
+                  {
+                    id: 'nested-seed-entry-slide',
+                    type: 'carousel',
+                    box: { x: 0, y: 0, w: 320, h: 120, z: 1 },
+                    slides: [{ id: 'nested-seed-slide', assetId: 'seed-project-thumb-neutral' }],
+                    showArrows: true,
+                    showDots: true,
+                  },
+                ],
+              ],
+              cardTemplate: [],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const preparedNestedSeed = prepareSeedAssetsForCustomer(
+  'customer-nested-seed',
+  nestedSeedState,
+  new Map(),
+);
+assert(preparedNestedSeed.ok, 'expected nested seed asset preparation to succeed');
+const preparedNestedSeedIds = collectReferencedAssetIds(preparedNestedSeed.editableState);
+for (const originalId of [
+  'seed-hero-poster-1',
+  'seed-portrait-placeholder',
+  'seed-project-thumb-neutral',
+]) {
+  assert(
+    !preparedNestedSeedIds.has(originalId),
+    `expected nested prepared state not to retain global seed asset id "${originalId}"`,
   );
 }
 for (const id of preparedAIds) {
@@ -1686,6 +1806,7 @@ const t7PreviewProbe = await app.request(
   'http://opencanvas.test/api/canvas-agent/sites/probe/preview',
   { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"prompt":"x"}' },
   smokeEnv,
+  smokeExecutionCtx,
 );
 assert(
   t7PreviewProbe.status === 302 || t7PreviewProbe.status === 401,
@@ -1695,6 +1816,7 @@ const t7ApplyProbe = await app.request(
   'http://opencanvas.test/api/canvas-agent/sites/probe/apply',
   { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"ops":[]}' },
   smokeEnv,
+  smokeExecutionCtx,
 );
 assert(
   t7ApplyProbe.status === 302 || t7ApplyProbe.status === 401,

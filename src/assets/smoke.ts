@@ -31,6 +31,7 @@ import { uploadOwnerAsset, UploadAssetError } from './upload.js';
 import {
   collectReferencedAssets,
   collectReferencedAssetIds,
+  collectUnfilledAssetReferences,
   type AssetReferenceRoot,
 } from './site-assets.js';
 import type { CanvasPage } from '../canvas/schema.js';
@@ -235,6 +236,140 @@ function runReferenceWalkTests(): void {
     'expected footer background video asset to be reachable',
   );
   assert(siteIds.has('slide-image-id'), 'expected footer carousel slide asset to be reachable');
+
+  const nestedPages: CanvasPage[] = [
+    {
+      id: 'page-nested-assets',
+      slug: 'nested-assets',
+      title: 'Nested assets',
+      width: 1440,
+      sections: [
+        {
+          id: 'section-nested',
+          recipeId: 'custom',
+          name: 'Nested',
+          height: 600,
+          elements: [
+            {
+              id: 'tabs-with-media',
+              type: 'tabs',
+              box: { x: 0, y: 0, w: 600, h: 400, z: 1 },
+              activeTabId: 'media',
+              tabs: [
+                {
+                  id: 'media',
+                  label: [{ text: 'Media' }],
+                  elements: [
+                    {
+                      id: 'nested-tab-media',
+                      type: 'media',
+                      mediaKind: 'image',
+                      assetId: 'nested-tab-image-id',
+                      alt: '',
+                      fit: 'cover',
+                      box: { x: 0, y: 0, w: 200, h: 120, z: 1 },
+                    },
+                  ],
+                },
+                { id: 'empty', label: [{ text: 'Empty' }], elements: [] },
+              ],
+            },
+            {
+              id: 'collection-with-assets',
+              type: 'collection',
+              mode: 'manual',
+              box: { x: 0, y: 420, w: 600, h: 160, z: 2 },
+              layout: { columns: 1, gap: 12 },
+              entryTemplate: [
+                {
+                  id: 'collection-template-logo',
+                  type: 'nav',
+                  box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+                  logoAssetId: 'nested-template-logo-id',
+                  links: [],
+                  layout: 'left-right',
+                  sticky: false,
+                },
+              ],
+              entries: [
+                [
+                  {
+                    id: 'collection-entry-slide',
+                    type: 'carousel',
+                    box: { x: 0, y: 0, w: 320, h: 120, z: 1 },
+                    slides: [{ id: 'nested-slide', assetId: 'nested-entry-slide-id' }],
+                    showArrows: true,
+                    showDots: true,
+                  },
+                ],
+              ],
+              cardTemplate: [
+                {
+                  id: 'collection-card-media',
+                  type: 'media',
+                  mediaKind: 'image',
+                  assetId: 'nested-card-image-id',
+                  alt: '',
+                  fit: 'cover',
+                  box: { x: 0, y: 0, w: 200, h: 120, z: 1 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const nestedIds = collectReferencedAssetIds(nestedPages);
+  assert(nestedIds.has('nested-tab-image-id'), 'expected tab-panel image asset to be reachable');
+  assert(
+    nestedIds.has('nested-template-logo-id'),
+    'expected collection entryTemplate nav logo asset to be reachable',
+  );
+  assert(
+    nestedIds.has('nested-entry-slide-id'),
+    'expected collection entry carousel slide asset to be reachable',
+  );
+  assert(
+    nestedIds.has('nested-card-image-id'),
+    'expected collection cardTemplate image asset to be reachable',
+  );
+
+  const nestedUnfilledPages = structuredClone(nestedPages);
+  const unfilledElements = nestedUnfilledPages[0]!.sections[0]!.elements;
+  const unfilledTabs = unfilledElements[0]!;
+  if (unfilledTabs.type !== 'tabs') throw new Error('[assets:smoke] expected tabs first');
+  const unfilledTabMedia = unfilledTabs.tabs[0]!.elements[0]!;
+  if (unfilledTabMedia.type !== 'media') {
+    throw new Error('[assets:smoke] expected tab media');
+  }
+  unfilledTabMedia.assetId = '__placeholder__';
+  const unfilledCollection = unfilledElements[1]!;
+  if (unfilledCollection.type !== 'collection') {
+    throw new Error('[assets:smoke] expected collection second');
+  }
+  const unfilledCardMedia = unfilledCollection.cardTemplate?.[0];
+  if (unfilledCardMedia?.type !== 'media') {
+    throw new Error('[assets:smoke] expected collection card media');
+  }
+  unfilledCardMedia.assetId = '';
+  const nestedUnfilled = collectUnfilledAssetReferences(nestedUnfilledPages);
+  assert(
+    nestedUnfilled.some(
+      (ref) =>
+        ref.mediaElementId === 'nested-tab-media' &&
+        ref.path.includes('.tabs[0].elements[0].assetId'),
+    ),
+    'expected tab-panel unfilled media asset to be reported with nested path',
+  );
+  assert(
+    nestedUnfilled.some(
+      (ref) =>
+        ref.mediaElementId === 'collection-card-media' &&
+        ref.path.includes('.cardTemplate[0].assetId'),
+    ),
+    'expected collection cardTemplate unfilled media asset to be reported with nested path',
+  );
 }
 
 // ---------------------------------------------------------------------------

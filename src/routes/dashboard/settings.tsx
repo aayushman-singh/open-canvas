@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { eq, count, sum } from 'drizzle-orm';
 import { siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
+import { PlanTiles, planTilesStyles } from '../../billing/plan-tiles';
 import { db } from '../../db/client';
 import { site, ownerAsset } from '../../db/schema';
 import { clerkAuth, getClerkUser } from '../../auth/middleware';
@@ -31,17 +32,18 @@ function formatBytes(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
-// Per ADR 0042 (which supersedes ADR 0037), settings.tsx renders a
-// metering-only Account page — Sites + Storage usage meters, plus the
-// Notifications and Account profile tabs. The original layout (plan
-// tiles, fake invoices, "Coming soon" alerts) was removed because the
-// billing engine itself isn't being implemented; rendering an
-// engine-less billing surface would be a no-fallback violation.
+// Per ADR 0042 (2026-06-04 amendment), settings.tsx renders a four-tab
+// Account page: Plan (mock-billing plan picker), Usage (Sites + Storage
+// meters), Notifications, Account. The 2026-05-30 metering-only framing
+// dead-ended the dashboard's "Upgrade to add sites" CTA at a surface
+// with no upgrade affordance; the Plan tab re-introduces tiles + a
+// Switch button that flips customer.plan via PATCH /api/profile. The
+// mock is the cost (no payment is processed); the DB write is real.
 //
-// Naming kept stable for deep-link continuity: the first tab still
-// uses panel id 'tab-billing' (now visually labelled 'Usage'), and
-// the .settings-tab / .settings-panel / data-tab / data-active hooks
-// the inline tab-switch script reads are unchanged.
+// The Usage panel keeps its 'tab-billing' panel id for deep-link
+// continuity with prior smoke tests. The .settings-tab / .settings-panel
+// / data-tab / data-active hooks the inline tab-switch script reads are
+// unchanged.
 const settingsStyles = `
   .content { max-width: 820px; padding-bottom: 70px; }
   .content > h1 { font-size: 32px; letter-spacing: -.03em; margin-bottom: 4px; }
@@ -138,6 +140,95 @@ const settingsStyles = `
   .acc-card.danger { border-color: var(--red-line); }
   .acc-card.danger h2 { color: var(--red-ink); }
 
+  /* notification kinds list — per ADR 0043 + email-policy.ts.
+     Read-only: surfaces what's wired so users don't wonder if the bell
+     is fake; per-user channel preferences are not in scope yet. */
+  .notif-kinds {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    overflow: hidden;
+  }
+  .notif-kind {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--surface);
+  }
+  .notif-kind .nk-label { min-width: 0; }
+  .notif-kind .nk-label b {
+    display: block;
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 650;
+    margin-bottom: 2px;
+  }
+  .notif-kind .nk-label small {
+    display: block;
+    font-size: 12.5px;
+    color: var(--ink-3);
+    line-height: 1.45;
+  }
+  .nk-pill {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border-radius: var(--r-pill);
+    white-space: nowrap;
+  }
+  .nk-pill.on  { background: var(--ok-soft); color: var(--ok); }
+  .nk-pill.off { background: var(--surface-2); color: var(--ink-3); }
+  .nk-pill.cond { background: var(--warn-soft); color: var(--warn); }
+  .notif-channel-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    margin-bottom: 18px;
+  }
+  .notif-channel-row .ch-icon {
+    width: 32px; height: 32px;
+    border-radius: var(--r-xs);
+    background: var(--surface-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-2);
+    flex-shrink: 0;
+  }
+  .notif-channel-row .ch-body { flex: 1; min-width: 0; }
+  .notif-channel-row .ch-body b {
+    display: block;
+    font-size: 13.5px;
+    color: var(--ink);
+    font-weight: 650;
+  }
+  .notif-channel-row .ch-body small {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: 1px;
+  }
+  .notif-preferences-note {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    margin: 14px 0 0;
+    line-height: 1.5;
+  }
+
   .acc-user-row {
     display: flex;
     align-items: center;
@@ -192,6 +283,50 @@ const tabScript = raw(`<script>
 })();
 </script>`);
 
+// ADR 0042 (2026-06-04). The Plan tab's Switch buttons issue
+// PATCH /api/profile with the chosen plan and reload on success so the
+// tiles repaint with the new current-plan badge. Failures surface in
+// the shared modal alert (window.__opencanvasModal.alert) the dashboard
+// shell already mounts — keeps copy + styling consistent across the
+// dashboard.
+const planSwitchScript = raw(`<script>
+(function() {
+  var buttons = document.querySelectorAll('#tab-plan .plan-switch-btn[data-plan]');
+  function alertSwitchFailure(err) {
+    var message = err && err.message ? err.message : 'Could not switch plan.';
+    var modal = window.__opencanvasModal;
+    if (!modal || typeof modal.alert !== 'function') {
+      console.error('[plan-switch] modal helper unavailable', { message: message, error: err });
+      throw new Error('plan switch modal helper unavailable');
+    }
+    return modal.alert(message, 'Switch plan');
+  }
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var plan = btn.getAttribute('data-plan');
+      if (!plan) return;
+      var label = btn.textContent;
+      buttons.forEach(function(b) { b.disabled = true; });
+      btn.textContent = 'Switching…';
+      fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan })
+      }).then(function(r) {
+        return r.json().then(function(d) { return { ok: r.ok, data: d }; });
+      }).then(function(result) {
+        if (!result.ok) throw new Error(result.data.error || 'Switch failed');
+        window.location.reload();
+      }).catch(function(err) {
+        buttons.forEach(function(b) { b.disabled = false; });
+        btn.textContent = label;
+        alertSwitchFailure(err);
+      });
+    });
+  });
+})();
+</script>`);
+
 settingsRoute.get('/settings', async (c) => {
   const user = await getClerkUser(c);
   if (!user) {
@@ -208,22 +343,16 @@ settingsRoute.get('/settings', async (c) => {
   const database = db(c.env);
   const primaryEmail = customerRecord.email;
   const customerId = customerRecord.id;
-  // Per ADR 0042: the customer.plan column still exists (cohorts seeded
-  // by ADR 0009 / migration 0007), but the Account surface no longer
-  // exposes billing — no plan tiles, no invoices, no upgrade prompts.
-  // We still read the plan to drive the *limits* the meters render
-  // against (siteLimitForPlan / storageLimitForPlan), because the
-  // limit is a real product constraint enforced at write time.
+  // Per ADR 0042's 2026-06-04 amendment, customer.plan now drives both
+  // the Plan tab picker and the Usage meters. The picker writes the same
+  // column the site/storage limit checks read; no payment engine is implied.
   const customerPlan = customerRecord.plan;
 
   // Sites count + storage sum are independent; running them in parallel halves
   // the Neon round trips this page pays. Over the HTTP driver each query is a
   // fresh HTTPS request, so serial waits stack visibly in the page open time.
   const [sc, sb] = await Promise.all([
-    database
-      .select({ count: count() })
-      .from(site)
-      .where(eq(site.customerId, customerId)),
+    database.select({ count: count() }).from(site).where(eq(site.customerId, customerId)),
     database
       .select({ total: sum(ownerAsset.byteSize) })
       .from(ownerAsset)
@@ -257,7 +386,7 @@ settingsRoute.get('/settings', async (c) => {
       title="Open Canvas — settings"
       crumbs={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Settings' }]}
       activePath="/dashboard/settings"
-      pageStyles={settingsStyles}
+      pageStyles={settingsStyles + planTilesStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
       theme={readThemeCookie(c)}
     >
@@ -265,7 +394,10 @@ settingsRoute.get('/settings', async (c) => {
       <p class="sub">Track how much of your account you're using and manage your profile.</p>
 
       <div class="settings-tabs" role="tablist">
-        <button class="settings-tab" role="tab" aria-selected="true" data-tab="tab-billing">
+        <button class="settings-tab" role="tab" aria-selected="true" data-tab="tab-plan">
+          Plan
+        </button>
+        <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-billing">
           Usage
         </button>
         <button class="settings-tab" role="tab" aria-selected="false" data-tab="tab-notifications">
@@ -276,18 +408,34 @@ settingsRoute.get('/settings', async (c) => {
         </button>
       </div>
 
-      <div class="settings-panel" id="tab-billing" data-active="true">
-        {/* ADR 0042: usage meters only. The previous plan-tiles + invoices
-            block was removed alongside the billing-engine deferral. The
-            customer.plan column still drives the *limits* the meters
-            render against (the limit is a real product constraint
-            enforced at write time), but no plan-change UX or invoice
-            history is exposed. */}
+      <div class="settings-panel" id="tab-plan" data-active="true">
+        {/* ADR 0042 (2026-06-04 amendment). The plan picker is the
+            canonical upgrade affordance and the destination of the
+            dashboard's "Upgrade to add sites" CTA / Plan-stat-card
+            Upgrade link. The "Switch to X" button on each tile flips
+            customer.plan via PATCH /api/profile. The cost is mocked
+            (no payment is processed); the DB write and its consequence
+            (per-plan site/storage caps re-enforced on the next request)
+            are real. See planSwitchScript below. */}
+        <PlanTiles currentPlan={customerPlan} />
+        <p class="plan-mock-note">
+          Switching plans is instant and free in this build — no card needed, no charges made. Your
+          plan choice is what the per-plan site and storage caps are checked against.
+        </p>
+      </div>
+
+      <div class="settings-panel" id="tab-billing" data-active="false">
+        {/* ADR 0042 (2026-06-04 amendment). The Usage meters survived
+            the metering-only → plan-picker reframe; they're still the
+            canonical telemetry display for the per-plan caps. The Plan
+            tab above is the upgrade affordance. */}
         <div class="meters">
           <div class="mtr">
             <div class="k">
               <span>Sites</span>
-              <span>{String(siteCount)} / {siteLimitLabel}</span>
+              <span>
+                {String(siteCount)} / {siteLimitLabel}
+              </span>
             </div>
             <div class="bar">
               <i class={sitesTone} style={`width:${sitesFillPct}%`} />
@@ -296,7 +444,9 @@ settingsRoute.get('/settings', async (c) => {
           <div class="mtr">
             <div class="k">
               <span>Storage</span>
-              <span>{formatBytes(storageBytes)} / {storageLimitLabel}</span>
+              <span>
+                {formatBytes(storageBytes)} / {storageLimitLabel}
+              </span>
             </div>
             <div class="bar">
               <i class={storageTone} style={`width:${storageFillPct}%`} />
@@ -307,11 +457,98 @@ settingsRoute.get('/settings', async (c) => {
 
       <div class="settings-panel" id="tab-notifications" data-active="false">
         <div class="card acc-card">
-          <h2>Email notifications</h2>
+          <h2>Delivery channels</h2>
           <p class="ch-sub">
-            Per-event email preferences aren't wired up in this build. You'll receive
-            transactional account emails (sign-in, publish receipts) regardless; everything
-            else lands here once the notifications service ships.
+            Open Canvas delivers notifications two ways. The bell shows everything in real time;
+            email goes out for the events most likely to need attention away from the dashboard.
+          </p>
+          <div class="notif-channel-row">
+            <span class="ch-icon" aria-hidden="true">
+              {raw(
+                `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+              )}
+            </span>
+            <div class="ch-body">
+              <b>In-app bell</b>
+              <small>
+                Top-bar bell on the dashboard and in the editor. Live updates over WebSocket.
+              </small>
+            </div>
+            <span class="nk-pill on">On</span>
+          </div>
+          <div class="notif-channel-row">
+            <span class="ch-icon" aria-hidden="true">
+              {raw(
+                `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6" stroke-linecap="round"/></svg>`,
+              )}
+            </span>
+            <div class="ch-body">
+              <b>Email to {primaryEmail}</b>
+              <small>Sent for the events flagged below. Goes to your Clerk primary address.</small>
+            </div>
+            <span class="nk-pill on">On</span>
+          </div>
+        </div>
+
+        <div class="card acc-card">
+          <h2>What you get notified about</h2>
+          <p class="ch-sub">
+            Every event below lands in the bell. The right column shows whether it also generates an
+            email.
+          </p>
+          <ul class="notif-kinds">
+            <li class="notif-kind">
+              <div class="nk-label">
+                <b>Form submissions</b>
+                <small>A visitor submits a form on one of your sites.</small>
+              </div>
+              <span class="nk-pill on">Bell</span>
+              <span class="nk-pill on">Email</span>
+            </li>
+            <li class="notif-kind">
+              <div class="nk-label">
+                <b>Publish failures</b>
+                <small>A publish attempt couldn't finish — surfaces the failure reason.</small>
+              </div>
+              <span class="nk-pill on">Bell</span>
+              <span class="nk-pill on">Email</span>
+            </li>
+            <li class="notif-kind">
+              <div class="nk-label">
+                <b>Successful publishes</b>
+                <small>Confirmation that a publish landed cleanly with its new version.</small>
+              </div>
+              <span class="nk-pill on">Bell</span>
+              <span class="nk-pill off">No email</span>
+            </li>
+            <li class="notif-kind">
+              <div class="nk-label">
+                <b>Access changes to your account</b>
+                <small>Your role on a site changed or your access was revoked.</small>
+              </div>
+              <span class="nk-pill on">Bell</span>
+              <span class="nk-pill on">Email</span>
+            </li>
+            <li class="notif-kind">
+              <div class="nk-label">
+                <b>Invites and joins addressed to you</b>
+                <small>You were invited to a site, or your invitation was accepted.</small>
+              </div>
+              <span class="nk-pill on">Bell</span>
+              <span class="nk-pill on">Email</span>
+            </li>
+            <li class="notif-kind">
+              <div class="nk-label">
+                <b>Teammate activity on shared sites</b>
+                <small>Other collaborators joining, leaving, or having their role changed.</small>
+              </div>
+              <span class="nk-pill on">Bell</span>
+              <span class="nk-pill off">No email</span>
+            </li>
+          </ul>
+          <p class="notif-preferences-note">
+            Per-event opt-outs aren't customizable yet. The channels above match the policy enforced
+            server-side; if any address an issue, the bell will catch it.
           </p>
         </div>
       </div>
@@ -319,14 +556,12 @@ settingsRoute.get('/settings', async (c) => {
       <div class="settings-panel" id="tab-account" data-active="false">
         <div class="card acc-card">
           <h2>Account</h2>
-          <p class="ch-sub">Manage your Open Canvas identity. Profile details live on a dedicated page.</p>
+          <p class="ch-sub">
+            Manage your Open Canvas identity. Profile details live on a dedicated page.
+          </p>
           <div class="acc-user-row">
             <div class="ava-small">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" width="48" height="48" />
-              ) : (
-                initial
-              )}
+              {avatarUrl ? <img src={avatarUrl} alt="" width="48" height="48" /> : initial}
             </div>
             <div class="who">
               <b>{displayName ?? primaryEmail.split('@')[0]}</b>
@@ -354,6 +589,7 @@ settingsRoute.get('/settings', async (c) => {
       </div>
 
       {tabScript}
+      {planSwitchScript}
     </DashboardShell>,
   );
 });
