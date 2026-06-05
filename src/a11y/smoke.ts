@@ -26,6 +26,7 @@ import { resolveComputedBackground } from './checks/contrast.js';
 import { getStyleKitPreset } from '../canvas/style-kits.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import type {
+  BuiltInStyleKit,
   CanvasElement,
   EditableSite,
   ContainerElement,
@@ -102,7 +103,7 @@ function mkContainer(
 }
 
 function mkSiteState(
-  styleKit: StyleKit,
+  styleKit: BuiltInStyleKit,
   pages: EditableSite['pages'],
 ): EditableSite {
   return { styleKit, pages };

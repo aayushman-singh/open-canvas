@@ -9,6 +9,7 @@
 
 import fixture from '../fixtures/home.json' with { type: 'json' };
 import { renderCanvasSnapshot } from '../render.js';
+import { pickStyleKitField } from '../schema.js';
 import type { EditableSite, PublishedSnapshot } from '../schema.js';
 
 import { renderResponsiveCss } from './index.js';
@@ -40,7 +41,7 @@ heroAction.responsive = { phone: { w: HERO_ACTION_PHONE_W } };
 const snapshot: PublishedSnapshot = {
   version: 1,
   publishedAt: '2026-05-23T00:00:00.000Z',
-  styleKit: editable.styleKit,
+  ...pickStyleKitField(editable),
   pages: editable.pages,
 };
 

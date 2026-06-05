@@ -472,7 +472,7 @@ await (async () => {
   if (lastState === null) {
     throw new Error('autosave callback never received a projected state');
   }
-  const persisted: EditableSite = lastState;
+  const persisted = lastState as EditableSite;
   // The last mutation set visitorTheme to 'dark' (themeCycle[4]). The
   // projection should reflect that.
   assert(
