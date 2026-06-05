@@ -28,7 +28,10 @@
 
 import type { EditorContext } from './editor-context.js';
 import type { InspectorSpec } from '../canvas/elements/inspector-spec.js';
+import type { CanvasElement } from '../canvas/schema.js';
 import { MOTION_PRESETS, type MotionPreset } from '../canvas/schema.js';
+import type { CollectionElement, CollectionSort } from '../canvas/elements/collection.js';
+import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from '../canvas/elements/collection.js';
 import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
@@ -116,6 +119,20 @@ export function renderInspector(ctx: EditorContext): void {
   )[element.type];
   if (inspectorSpec) {
     ctx.renderInspectorSpec(inspectorSpec, element);
+  } else if (element.type === 'collection') {
+    // ADR 0063 dec 8 + dec 10 — Collection is the only element whose
+    // inspector lives outside the InspectorSpec dispatch (the dispatch
+    // type-excludes 'collection'). The reasons:
+    //  - the fields are dynamic (folder list depends on slug, manual reel
+    //    depends on sort) and the InspectorSpec walker assumes a static
+    //    field tree;
+    //  - the source-slug dropdown fires a network read (and surfaces
+    //    inline status), which the walker has no hook for;
+    //  - the manual-reel drag-and-drop primitive is element-local and
+    //    F4 explicitly defers extracting a shared sortable component
+    //    until a third caller exists.
+    // Hence the bespoke renderer below.
+    renderCollectionInspector(ctx, element);
   }
 
   // -- Element style controls -----------------------------------------------
@@ -550,4 +567,734 @@ export function renderInspector(ctx: EditorContext): void {
     replayAnimations(ctx, element.id);
   });
   ctx.inspector.appendChild(elPlayBtn);
+}
+
+// ---------------------------------------------------------------------------
+// ADR 0063 dec 8 + dec 10 — Collection element inspector.
+// ---------------------------------------------------------------------------
+//
+// Renders the seven fields listed in the ADR (source slug, folder, sort,
+// manual-order reel, display mode, manage-entries link, status line).
+//
+// Why this lives inline in element-inspector.ts rather than its own module:
+//  - all reads + writes go through the ctx/element pair the orchestrator
+//    already holds; no shared state crosses a module boundary;
+//  - the F4 extraction of the manual-reel drag primitive is explicitly
+//    deferred until a third caller exists — pulling out a helper module
+//    on N=1 would invent the wrong shape;
+//  - element-inspector.ts already owns the dispatch fork for collection
+//    (the InspectorSpec dispatch type-excludes it), so the function lives
+//    next to its caller for readability.
+//
+// Entries fetch: a single `GET ctx.apiBase + '/sites/<id>/entries'` per
+// inspector render. The endpoint does not yet expose `?slugs=true` or a
+// `?folder=` filter (Phase 2C left it as a flat list-by-site, with an
+// optional `?collection=` narrowing). We fetch the full site list once,
+// derive distinct slugs + folders client-side, and filter the manual reel
+// + status count by element.collectionSlug / element.folder in memory. A
+// per-site cache (`entriesBySite`) shared across inspector renders keeps
+// reopen-the-inspector cheap; the cache is keyed on siteId only so a slug
+// change on one Collection doesn't refetch for the next, but the cache is
+// invalidated explicitly after a publish or entries-tab navigation by the
+// dashboard route (not by the inspector — same scope rule as the page-
+// inspector preview cache).
+
+interface InspectorEntryRow {
+  id: string;
+  collectionSlug: string;
+  slug: string;
+  title: string;
+  folder: string | null;
+  ogImageAssetId: string | null;
+  publishedDate: string;
+  status: string;
+}
+
+interface EntriesCacheState {
+  status: 'loading' | 'ready' | 'error';
+  rows: InspectorEntryRow[];
+  error: string | null;
+}
+
+const entriesBySite = new Map<string, EntriesCacheState>();
+const pendingFetches = new Map<string, Promise<void>>();
+
+function ensureEntriesLoaded(ctx: EditorContext): EntriesCacheState {
+  const cached = entriesBySite.get(ctx.siteId);
+  if (cached !== undefined) return cached;
+  const initial: EntriesCacheState = { status: 'loading', rows: [], error: null };
+  entriesBySite.set(ctx.siteId, initial);
+  // Loud-failure rule (CLAUDE.md): a fetch error surfaces both in the
+  // inspector status line AND ctx.setStatus, never silently degrades to
+  // an empty list. The retry path is "re-open the inspector" — the cache
+  // remembers the failure until the user explicitly tries again.
+  const url = ctx.apiBase + '/sites/' + encodeURIComponent(ctx.siteId) + '/entries';
+  const p = fetch(url, { credentials: 'include' })
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error(
+          'GET ' + url + ' returned ' + String(res.status) + ' ' + res.statusText,
+        );
+      }
+      return res.json() as Promise<{ entries: InspectorEntryRow[] }>;
+    })
+    .then(function (body) {
+      const rows = Array.isArray(body.entries) ? body.entries : [];
+      entriesBySite.set(ctx.siteId, { status: 'ready', rows: rows, error: null });
+      pendingFetches.delete(ctx.siteId);
+      // Re-render only if the user is still inspecting a Collection. The
+      // renderInspector path is idempotent — calling it for a different
+      // element type just rebuilds that inspector with fresh entry data
+      // it didn't need, which is wasted work but not incorrect.
+      if (ctx.selectedElementId !== null) {
+        const found = ctx.findElement(ctx.selectedElementId);
+        if (found !== null && found.element.type === 'collection') {
+          renderInspector(ctx);
+        }
+      }
+    })
+    .catch(function (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[element-inspector] entries fetch failed for site', ctx.siteId, err);
+      entriesBySite.set(ctx.siteId, {
+        status: 'error',
+        rows: [],
+        error: message,
+      });
+      pendingFetches.delete(ctx.siteId);
+      ctx.setStatus('Could not load entries: ' + message, 'error');
+      if (ctx.selectedElementId !== null) {
+        const found = ctx.findElement(ctx.selectedElementId);
+        if (found !== null && found.element.type === 'collection') {
+          renderInspector(ctx);
+        }
+      }
+    });
+  pendingFetches.set(ctx.siteId, p);
+  return initial;
+}
+
+/** Distinct collection slugs present in the site's entries, sorted. */
+function distinctSlugs(rows: ReadonlyArray<InspectorEntryRow>): string[] {
+  const set = new Set<string>();
+  for (const row of rows) set.add(row.collectionSlug);
+  const out = Array.from(set);
+  out.sort();
+  return out;
+}
+
+/** Distinct folder values within a given slug. `null` represents
+ *  "ungrouped" and is preserved as a separate option. */
+function distinctFolders(
+  rows: ReadonlyArray<InspectorEntryRow>,
+  slug: string,
+): Array<string | null> {
+  const set = new Set<string | null>();
+  for (const row of rows) {
+    if (row.collectionSlug !== slug) continue;
+    set.add(row.folder);
+  }
+  // Order: real folders alphabetically, then null at the end.
+  const real: string[] = [];
+  let hasNull = false;
+  for (const v of set) {
+    if (v === null) hasNull = true;
+    else real.push(v);
+  }
+  real.sort();
+  const out: Array<string | null> = real;
+  if (hasNull) out.push(null);
+  return out;
+}
+
+/** The entries actually matched by the element's (slug, folder) pair. The
+ *  manual-reel uses this same filter so the reel and the materialized output
+ *  agree on which entries are "in" the Collection. */
+function matchedEntries(
+  rows: ReadonlyArray<InspectorEntryRow>,
+  el: CollectionElement,
+): InspectorEntryRow[] {
+  if (el.collectionSlug === undefined) return [];
+  const slug = el.collectionSlug;
+  const wantsFolder = el.folder !== undefined;
+  const out: InspectorEntryRow[] = [];
+  for (const row of rows) {
+    if (row.collectionSlug !== slug) continue;
+    if (wantsFolder && row.folder !== el.folder) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+/** Build the ordered manual-reel list, stripping stale IDs (entries no
+ *  longer in the source) and appending unordered entries (in the source
+ *  but missing from manualOrder) at the end. Pure — exported shape is
+ *  the array; the inspector renders it. */
+function buildManualReelOrder(
+  matched: ReadonlyArray<InspectorEntryRow>,
+  manualOrder: ReadonlyArray<string> | undefined,
+): { ordered: InspectorEntryRow[]; unordered: InspectorEntryRow[] } {
+  const byId = new Map<string, InspectorEntryRow>();
+  for (const row of matched) byId.set(row.id, row);
+  const ordered: InspectorEntryRow[] = [];
+  const seen = new Set<string>();
+  if (manualOrder !== undefined) {
+    for (const id of manualOrder) {
+      const row = byId.get(id);
+      if (row === undefined) continue;
+      if (seen.has(id)) continue;
+      ordered.push(row);
+      seen.add(id);
+    }
+  }
+  const unordered: InspectorEntryRow[] = [];
+  for (const row of matched) {
+    if (seen.has(row.id)) continue;
+    unordered.push(row);
+  }
+  return { ordered: ordered, unordered: unordered };
+}
+
+/** Persist the current manualOrder back to the element. Stale IDs are
+ *  stripped before write so a stale-id load that never sees a drag still
+ *  cleans up on the next inspector render. */
+function persistManualOrder(
+  ctx: EditorContext,
+  el: CollectionElement,
+  matched: ReadonlyArray<InspectorEntryRow>,
+  nextOrder: ReadonlyArray<string>,
+): void {
+  const validIds = new Set<string>();
+  for (const row of matched) validIds.add(row.id);
+  const cleaned: string[] = [];
+  for (const id of nextOrder) {
+    if (validIds.has(id) && cleaned.indexOf(id) === -1) cleaned.push(id);
+  }
+  el.manualOrder = cleaned;
+  ctx.captureForUndo();
+  ctx.rebuildElement(el.id);
+  ctx.scheduleSave();
+}
+
+function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void {
+  if (el.type !== 'collection') return;
+  if (!ctx.inspector) return;
+  const collection = el;
+  const inspector = ctx.inspector;
+
+  // Header — visual separation from the action groups above and the
+  // Style section that follows.
+  const heading = document.createElement('h3');
+  heading.textContent = 'Collection';
+  heading.className = 'inspector-section-heading';
+  inspector.appendChild(heading);
+
+  const cache = ensureEntriesLoaded(ctx);
+
+  // -- 1. Source slug dropdown ---------------------------------------------
+  // Free-text is deliberately not allowed: the slug must exist in the
+  // site's entries, and the Phase 1 validator catches it at save time.
+  // The inspector enforces it at edit time too.
+  const slugSelect = document.createElement('select');
+  const unsetOpt = document.createElement('option');
+  unsetOpt.value = '__unset__';
+  unsetOpt.textContent = '— Unset —';
+  slugSelect.appendChild(unsetOpt);
+  const slugs = distinctSlugs(cache.rows);
+  // If the element points at a slug that no longer exists in the cache
+  // (entry deleted, source renamed, fetch still loading), surface it as
+  // an option so the dropdown reflects current state truthfully.
+  const knownSlug = collection.collectionSlug;
+  const slugList: string[] = slugs.slice();
+  if (knownSlug !== undefined && slugList.indexOf(knownSlug) === -1) {
+    slugList.push(knownSlug);
+    slugList.sort();
+  }
+  for (const slug of slugList) {
+    const opt = document.createElement('option');
+    opt.value = slug;
+    opt.textContent = slug;
+    slugSelect.appendChild(opt);
+  }
+  if (collection.collectionSlug === undefined) {
+    slugSelect.value = '__unset__';
+  } else {
+    slugSelect.value = collection.collectionSlug;
+  }
+  slugSelect.addEventListener('change', function () {
+    ctx.captureForUndo();
+    if (slugSelect.value === '__unset__') {
+      delete collection.collectionSlug;
+      // Clearing the slug also clears any folder / manualOrder — both
+      // reference entries that have no meaning without a source.
+      delete collection.folder;
+      delete collection.manualOrder;
+    } else {
+      collection.collectionSlug = slugSelect.value;
+      // Changing the slug invalidates the folder (folders are scoped to
+      // a slug) and the manualOrder (IDs are slug-scoped). Drop both so
+      // the next render rebuilds from the new source.
+      delete collection.folder;
+      delete collection.manualOrder;
+    }
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    renderInspector(ctx);
+  });
+  inspector.appendChild(field('Source', slugSelect));
+
+  // -- 7. Status line (rendered immediately under the source picker so the
+  //   "0 entries" signal sits next to its cause). The ADR puts it as the
+  //   last field, but visually the message belongs adjacent to the picker
+  //   that produces the count. The fields are still semantically distinct.
+  const statusLine = document.createElement('div');
+  statusLine.style.cssText =
+    'font-size:12px; color:var(--opencanvas-fg-mute, #888); margin: -4px 0 8px 0;';
+  if (cache.status === 'loading') {
+    statusLine.textContent = 'Loading entries…';
+  } else if (cache.status === 'error') {
+    statusLine.textContent = 'Could not load entries: ' + (cache.error ?? 'unknown error');
+    statusLine.style.color = 'var(--opencanvas-error, #d33)';
+  } else if (collection.collectionSlug === undefined) {
+    statusLine.textContent = 'Pick a source to bind this collection.';
+  } else {
+    const matched = matchedEntries(cache.rows, collection);
+    statusLine.textContent =
+      String(matched.length) + ' entries match this source/folder.';
+    if (matched.length === 0) {
+      const addHint = document.createElement('div');
+      addHint.style.cssText = 'margin-top:2px;';
+      addHint.textContent = 'Add entries from the dashboard to see real content.';
+      statusLine.appendChild(addHint);
+    }
+  }
+  inspector.appendChild(statusLine);
+
+  // -- 2. Folder dropdown --------------------------------------------------
+  const folderSelect = document.createElement('select');
+  const folderAllOpt = document.createElement('option');
+  folderAllOpt.value = '__all__';
+  folderAllOpt.textContent = '(All folders)';
+  folderSelect.appendChild(folderAllOpt);
+
+  let staleFolderWarning: HTMLElement | null = null;
+
+  if (collection.collectionSlug === undefined || cache.status !== 'ready') {
+    folderSelect.disabled = true;
+    folderSelect.value = '__all__';
+  } else {
+    const folders = distinctFolders(cache.rows, collection.collectionSlug);
+    for (const f of folders) {
+      const opt = document.createElement('option');
+      if (f === null) {
+        opt.value = '__null__';
+        opt.textContent = 'Ungrouped';
+      } else {
+        opt.value = 'folder:' + f;
+        opt.textContent = f;
+      }
+      folderSelect.appendChild(opt);
+    }
+    if (collection.folder === undefined) {
+      folderSelect.value = '__all__';
+    } else {
+      // Map element.folder onto the dropdown values. Note: element.folder
+      // is `string | undefined`; the schema uses undefined for "all" and
+      // a string for a specific folder. The DB column also allows null
+      // ("ungrouped"); on the element we surface that via a tagged
+      // dropdown value (__null__) but we don't currently let the element
+      // bind to "ungrouped only" — the dropdown allows it, and a select
+      // of __null__ writes nothing distinguishable into the element
+      // schema unless we add another sentinel field. For now, picking
+      // "Ungrouped" filters to entries with `folder === null`; we store
+      // the literal empty string as the element's folder marker so the
+      // materializer (Phase 2B) can filter equivalently. Folder values
+      // are validated to be 1..64 chars on the API side, so '' is
+      // unambiguous as the "match-null" sentinel inside the element.
+      const desired = collection.folder === '' ? '__null__' : 'folder:' + collection.folder;
+      let found = false;
+      for (let i = 0; i < folderSelect.options.length; i++) {
+        if (folderSelect.options[i]!.value === desired) {
+          folderSelect.value = desired;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        // Stale: the element's folder no longer exists in the source.
+        // Surface a one-line warning + clear-it button (loud failure per
+        // the ADR's failure-mode section). The dropdown shows __all__
+        // because the stale value isn't a real option.
+        folderSelect.value = '__all__';
+        staleFolderWarning = document.createElement('div');
+        staleFolderWarning.style.cssText =
+          'font-size:12px; color:var(--opencanvas-error, #d33); margin: -4px 0 8px 0;';
+        const warnText = document.createElement('span');
+        warnText.textContent =
+          "Folder '" +
+          collection.folder +
+          "' is no longer present in this source. ";
+        staleFolderWarning.appendChild(warnText);
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.textContent = 'Clear';
+        clearBtn.className = 'style-btn-clear';
+        clearBtn.addEventListener('click', function () {
+          ctx.captureForUndo();
+          delete collection.folder;
+          ctx.rebuildElement(collection.id);
+          ctx.scheduleSave();
+          renderInspector(ctx);
+        });
+        staleFolderWarning.appendChild(clearBtn);
+      }
+    }
+  }
+  folderSelect.addEventListener('change', function () {
+    ctx.captureForUndo();
+    const v = folderSelect.value;
+    if (v === '__all__') {
+      delete collection.folder;
+    } else if (v === '__null__') {
+      collection.folder = '';
+    } else if (v.indexOf('folder:') === 0) {
+      collection.folder = v.slice('folder:'.length);
+    }
+    // Folder change invalidates manualOrder (it referenced entries the
+    // new filter may exclude). Strip on next render rather than wiping
+    // — strip-on-render lets a temporary folder swap keep the order.
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    renderInspector(ctx);
+  });
+  inspector.appendChild(field('Folder', folderSelect));
+  if (staleFolderWarning !== null) inspector.appendChild(staleFolderWarning);
+
+  // -- 3. Sort dropdown ----------------------------------------------------
+  // The schema-level sort can also be a legacy object shape during the
+  // multi-commit migration; normalize before display so the dropdown
+  // never reads an object.
+  let currentSort: CollectionSort = 'date-desc';
+  if (typeof collection.sort === 'string') {
+    if (COLLECTION_SORTS.indexOf(collection.sort) !== -1) currentSort = collection.sort;
+  }
+  const sortSelect = document.createElement('select');
+  const SORT_LABELS: Record<CollectionSort, string> = {
+    'date-desc': 'Newest first',
+    'date-asc': 'Oldest first',
+    manual: 'Manual order',
+  };
+  for (const s of COLLECTION_SORTS) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = SORT_LABELS[s];
+    sortSelect.appendChild(opt);
+  }
+  sortSelect.value = currentSort;
+  sortSelect.addEventListener('change', function () {
+    ctx.captureForUndo();
+    const next = sortSelect.value as CollectionSort;
+    collection.sort = next;
+    if (next !== 'manual') {
+      // Leaving manual drops manualOrder — the IDs have no meaning under
+      // a date sort and keeping them around would just confuse the next
+      // time the Owner toggles back.
+      delete collection.manualOrder;
+    } else if (collection.manualOrder === undefined) {
+      // Entering manual seeds an empty order so the reel renders an
+      // explicit "Unordered" group; the matched entries fall into it
+      // and the Owner reorders by dragging.
+      collection.manualOrder = [];
+    }
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+    renderInspector(ctx);
+  });
+  inspector.appendChild(field('Sort', sortSelect));
+
+  // -- 4. Manual order reel (only when sort === 'manual') ------------------
+  if (currentSort === 'manual' && collection.collectionSlug !== undefined && cache.status === 'ready') {
+    const matched = matchedEntries(cache.rows, collection);
+    const split = buildManualReelOrder(matched, collection.manualOrder);
+
+    // Strip stale IDs on render — per the ADR: "Removed entries are
+    // stripped from `manualOrder` lazily on the next inspector render."
+    // We only write back if the cleaned order differs to avoid a
+    // pointless save thrash.
+    if (collection.manualOrder !== undefined) {
+      const cleaned = split.ordered.map(function (r) { return r.id; });
+      const before = collection.manualOrder.join('|');
+      const after = cleaned.join('|');
+      if (before !== after) {
+        collection.manualOrder = cleaned;
+        ctx.scheduleSave();
+      }
+    }
+
+    const reelHost = document.createElement('div');
+    reelHost.className = 'opencanvas-collection-manual-reel';
+    reelHost.style.cssText =
+      'display:flex; flex-direction:column; gap:4px; ' +
+      'border:1px solid var(--opencanvas-hairline, var(--line, #2a2a2a)); ' +
+      'border-radius:4px; padding:6px; background:transparent;';
+
+    const orderedIds: string[] = split.ordered.map(function (r) { return r.id; });
+
+    function buildRow(row: InspectorEntryRow, isUnordered: boolean): HTMLElement {
+      const r = document.createElement('div');
+      r.className = 'opencanvas-collection-manual-row';
+      r.setAttribute('data-entry-id', row.id);
+      r.style.cssText =
+        'display:flex; align-items:center; gap:8px; padding:4px 6px; ' +
+        'background:var(--opencanvas-bg-card, rgba(255,255,255,0.03)); ' +
+        'border:1px solid var(--opencanvas-hairline, var(--line, #2a2a2a)); ' +
+        'border-radius:3px;' +
+        (isUnordered ? ' opacity:0.7;' : '');
+
+      const thumb = document.createElement('div');
+      thumb.style.cssText =
+        'width:32px; height:32px; flex:0 0 32px; border-radius:2px; ' +
+        'background:var(--opencanvas-bg-mute, #222); overflow:hidden; ' +
+        'display:flex; align-items:center; justify-content:center;';
+      if (row.ogImageAssetId !== null && row.ogImageAssetId.length > 0) {
+        const img = document.createElement('img');
+        img.src = ctx.siteBase + '/assets/' + encodeURIComponent(row.ogImageAssetId);
+        img.alt = '';
+        img.style.cssText = 'width:100%; height:100%; object-fit:cover;';
+        thumb.appendChild(img);
+      }
+      r.appendChild(thumb);
+
+      const titleEl = document.createElement('div');
+      titleEl.style.cssText =
+        'flex:1; font-size:12px; overflow:hidden; ' +
+        'text-overflow:ellipsis; white-space:nowrap;';
+      titleEl.textContent = row.title.length > 0 ? row.title : row.slug;
+      r.appendChild(titleEl);
+
+      const grip = document.createElement('span');
+      grip.setAttribute('data-collection-reel-grip', '');
+      grip.title = isUnordered ? 'Drag into the manual order' : 'Drag to reorder';
+      grip.style.cssText =
+        'flex:0 0 auto; font-family:var(--mono, monospace); ' +
+        'font-size:14px; cursor:grab; padding:0 6px; user-select:none;';
+      grip.textContent = '⋮⋮';
+      r.appendChild(grip);
+
+      // Drag handler — inline because F4 explicitly defers extracting a
+      // shared sortable component. Mirrors beginReelDragImpl's shape:
+      // 5px movement threshold, ghost follows pointer, drop-line painted
+      // at the would-be insertion slot, commit on mouseup.
+      grip.addEventListener('mousedown', function (startEv) {
+        if (startEv.button !== 0) return;
+        startEv.preventDefault();
+        const startX = startEv.clientX;
+        const startY = startEv.clientY;
+        let hasMoved = false;
+        let ghost: HTMLElement | null = null;
+        let dropLine: HTMLElement | null = null;
+        // Drop position is computed in the "merged" array (ordered +
+        // unordered), then snapped down to the orderedIds-only space
+        // when persisted. This lets the Owner pull an Unordered row
+        // into a specific slot.
+        let dropAt = -1;
+
+        function onMove(ev: MouseEvent): void {
+          const dx = ev.clientX - startX;
+          const dy = ev.clientY - startY;
+          if (!hasMoved && Math.sqrt(dx * dx + dy * dy) < 5) return;
+          if (!hasMoved) {
+            hasMoved = true;
+            ghost = document.createElement('div');
+            ghost.style.cssText =
+              'position:fixed; pointer-events:none; opacity:0.8; z-index:9000; ' +
+              'background:var(--opencanvas-bg-card, #222); padding:4px 8px; ' +
+              'border:1px solid var(--opencanvas-hairline, var(--line, #2a2a2a)); ' +
+              'border-radius:3px; font-size:12px; max-width:240px; ' +
+              'overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+            ghost.textContent = row.title.length > 0 ? row.title : row.slug;
+            document.body.appendChild(ghost);
+
+            dropLine = document.createElement('div');
+            dropLine.style.cssText =
+              'position:fixed; pointer-events:none; z-index:9000; ' +
+              'height:2px; background:var(--opencanvas-accent, #4af);';
+            dropLine.hidden = true;
+            document.body.appendChild(dropLine);
+            r.style.opacity = '0.4';
+          }
+          ghost!.style.left = ev.clientX - 100 + 'px';
+          ghost!.style.top = ev.clientY - 12 + 'px';
+
+          // Compute drop slot against the rows in reelHost — both
+          // ordered and unordered rows are valid targets so the Owner
+          // can pull an Unordered entry into any slot in one drag.
+          const rows = Array.from(
+            reelHost.querySelectorAll<HTMLElement>('.opencanvas-collection-manual-row'),
+          );
+          dropAt = rows.length;
+          for (let i = 0; i < rows.length; i++) {
+            const rect = rows[i]!.getBoundingClientRect();
+            if (ev.clientY < rect.top + rect.height / 2) {
+              dropAt = i;
+              break;
+            }
+          }
+          // Skip-self no-op — same as beginReelDragImpl's pattern.
+          const selfIdx = rows.indexOf(r);
+          if (dropAt === selfIdx || dropAt === selfIdx + 1) {
+            dropLine!.hidden = true;
+            dropAt = -1;
+            return;
+          }
+          // Paint the drop line at the slot boundary.
+          let refRect: DOMRect;
+          if (dropAt < rows.length) {
+            refRect = rows[dropAt]!.getBoundingClientRect();
+            dropLine!.style.top = refRect.top - 1 + 'px';
+          } else {
+            refRect = rows[rows.length - 1]!.getBoundingClientRect();
+            dropLine!.style.top = refRect.bottom - 1 + 'px';
+          }
+          dropLine!.style.left = refRect.left + 'px';
+          dropLine!.style.width = refRect.width + 'px';
+          dropLine!.hidden = false;
+        }
+
+        function onUp(): void {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          if (ghost !== null) ghost.remove();
+          if (dropLine !== null) dropLine.remove();
+          r.style.opacity = '';
+          if (!hasMoved) return;
+          if (dropAt < 0) return;
+          // Build the new merged ordering by removing `row.id` from its
+          // current spot and re-inserting at dropAt. Then snap to the
+          // orderedIds-only space for persistence (Unordered rows that
+          // were never reordered stay at the bottom; the dragged row
+          // becomes part of the ordered set wherever it landed).
+          try {
+            const mergedIds: string[] = [];
+            for (const o of split.ordered) mergedIds.push(o.id);
+            for (const u of split.unordered) mergedIds.push(u.id);
+            const fromIdx = mergedIds.indexOf(row.id);
+            if (fromIdx < 0) {
+              ctx.setStatus('Reorder failed, try again.', 'error');
+              renderInspector(ctx);
+              return;
+            }
+            mergedIds.splice(fromIdx, 1);
+            const adjusted = dropAt > fromIdx ? dropAt - 1 : dropAt;
+            const clampedAt = Math.max(0, Math.min(adjusted, mergedIds.length));
+            mergedIds.splice(clampedAt, 0, row.id);
+            // The new manualOrder includes every entry above and
+            // including the dragged row in the merged list — i.e.
+            // anything explicitly placed becomes part of the order;
+            // anything below the dragged row that was never ordered
+            // remains Unordered. This is the minimal write that
+            // matches user intent.
+            const newDraggedIdx = mergedIds.indexOf(row.id);
+            const explicitOrder = mergedIds.slice(0, newDraggedIdx + 1);
+            // Merge with any prior orderedIds that were above the
+            // dragged row and didn't move — they stay in their slot.
+            for (const id of orderedIds) {
+              if (explicitOrder.indexOf(id) === -1) {
+                // Pre-existing ordered ID that wasn't repositioned —
+                // keep its relative position by appending in order.
+                explicitOrder.push(id);
+              }
+            }
+            persistManualOrder(ctx, collection, matched, explicitOrder);
+            renderInspector(ctx);
+          } catch (err) {
+            console.error('[element-inspector] manual reel drop failed', err);
+            ctx.setStatus('Reorder failed, try again.', 'error');
+            renderInspector(ctx);
+          }
+        }
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+
+      return r;
+    }
+
+    for (const row of split.ordered) reelHost.appendChild(buildRow(row, false));
+
+    if (split.unordered.length > 0) {
+      const divider = document.createElement('div');
+      divider.style.cssText =
+        'font-size:11px; color:var(--opencanvas-fg-mute, #888); ' +
+        'margin: 4px 2px 2px; text-transform:uppercase; letter-spacing:0.04em;';
+      divider.textContent = 'Unordered (will append at the end)';
+      reelHost.appendChild(divider);
+      for (const row of split.unordered) reelHost.appendChild(buildRow(row, true));
+    }
+
+    if (split.ordered.length === 0 && split.unordered.length === 0) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.style.cssText = 'font-size:12px; color:var(--opencanvas-fg-mute, #888);';
+      emptyMsg.textContent = 'No entries to order — bind a source with entries first.';
+      reelHost.appendChild(emptyMsg);
+    }
+
+    inspector.appendChild(field('Manual order', reelHost));
+  }
+
+  // -- 5. Display mode -----------------------------------------------------
+  // 'custom' is deferred to F1 — deliberately not in the dropdown. The
+  // ADR's COLLECTION_DISPLAYS const reflects this (the union excludes
+  // 'custom' until F1), so iterating it is the single source of truth.
+  const DISPLAY_LABELS: Record<string, string> = {
+    card: 'Card grid',
+    'image-only': 'Image only',
+  };
+  const displaySelect = document.createElement('select');
+  for (const d of COLLECTION_DISPLAYS) {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = DISPLAY_LABELS[d] ?? d;
+    displaySelect.appendChild(opt);
+  }
+  displaySelect.value = collection.display ?? 'card';
+  displaySelect.addEventListener('change', function () {
+    ctx.captureForUndo();
+    collection.display = displaySelect.value as typeof COLLECTION_DISPLAYS[number];
+    ctx.rebuildElement(collection.id);
+    ctx.scheduleSave();
+  });
+  inspector.appendChild(field('Display', displaySelect));
+
+  // -- 6. Manage entries link (ADR 0063 dec 10) ----------------------------
+  // Only rendered when the slug is set — there's no entries view for an
+  // unbound Collection. The link opens the dashboard's entries tab,
+  // pre-filtered to the slug (and folder, when set).
+  if (collection.collectionSlug !== undefined) {
+    const manageLink = document.createElement('a');
+    let href =
+      '/dashboard/sites/' +
+      encodeURIComponent(ctx.siteId) +
+      '/entries?collection=' +
+      encodeURIComponent(collection.collectionSlug);
+    if (collection.folder !== undefined && collection.folder.length > 0) {
+      href += '&folder=' + encodeURIComponent(collection.folder);
+    }
+    manageLink.href = href;
+    manageLink.target = '_blank';
+    manageLink.rel = 'noopener';
+    manageLink.className = 'opencanvas-page-inspector-link';
+    let label = 'Manage entries in ' + collection.collectionSlug;
+    if (collection.folder !== undefined && collection.folder.length > 0) {
+      label += '/' + collection.folder;
+    }
+    label += ' →';
+    manageLink.textContent = label;
+    manageLink.title = 'Open the Entries dashboard tab for this collection';
+    const linkWrap = document.createElement('div');
+    linkWrap.style.cssText = 'margin: 8px 0;';
+    linkWrap.appendChild(manageLink);
+    inspector.appendChild(linkWrap);
+  }
 }
