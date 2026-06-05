@@ -172,9 +172,26 @@ export function initUndo(ctx: EditorContext): void {
         }
       }
     }
-  } catch (_) {
-    // Corrupted JSON or storage error — fall back to a fresh seed.
+  } catch (err) {
     restored = false;
+    let rawForLog: string | null = null;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        rawForLog = localStorage.getItem(undoStorageKey(ctx.siteId));
+      }
+    } catch {
+      rawForLog = null;
+    }
+    console.error(
+      '[opencanvas-undo] failed to restore undo history from localStorage — clearing and starting fresh',
+      {
+        siteId: ctx.siteId,
+        key: undoStorageKey(ctx.siteId),
+        payloadLength: rawForLog === null ? null : rawForLog.length,
+        payloadPreview: rawForLog === null ? null : rawForLog.slice(0, 200),
+        error: err,
+      },
+    );
   }
   if (!restored) {
     ctx.undoStack = [structuredClone(ctx.state)];

@@ -50,6 +50,47 @@ function setElementField(element: CanvasElement, key: string, value: unknown): v
   target[key] = value;
 }
 
+function describeMissingArrayItems(existing: unknown[], incoming: unknown[]): string {
+  const incomingByLabel = new Set<string>();
+  const incomingById = new Set<string>();
+  for (const item of incoming) {
+    if (item !== null && typeof item === 'object') {
+      const rec = item as Record<string, unknown>;
+      if (typeof rec.label === 'string') incomingByLabel.add(rec.label);
+      if (typeof rec.id === 'string') incomingById.add(rec.id);
+    }
+  }
+  const missing: string[] = [];
+  for (const item of existing) {
+    if (item !== null && typeof item === 'object') {
+      const rec = item as Record<string, unknown>;
+      if (typeof rec.label === 'string' && !incomingByLabel.has(rec.label)) {
+        missing.push(rec.label);
+        continue;
+      }
+      if (typeof rec.id === 'string' && !incomingById.has(rec.id)) {
+        missing.push(rec.id);
+        continue;
+      }
+    }
+  }
+  if (missing.length === 0) return 'incoming array is shorter';
+  return JSON.stringify(missing);
+}
+
+function guardArrayShrink(element: CanvasElement, key: string, incoming: unknown): void {
+  if (!Array.isArray(incoming)) return;
+  const target = element as CanvasElement & Record<string, unknown>;
+  const existing = target[key];
+  if (!Array.isArray(existing)) return;
+  if (existing.length === 0) return;
+  if (incoming.length === 0) return;
+  if (incoming.length >= existing.length) return;
+  throw new Error(
+    `applyCanvasAgentOp(updateElement): refused to replace array field '${key}' on element ${element.id}: existing array has ${String(existing.length)} items, incoming has ${String(incoming.length)} items, missing items: ${describeMissingArrayItems(existing as unknown[], incoming)}. To intentionally remove items, send the full list including the ones to keep.`,
+  );
+}
+
 function applyInternalDeleteFields(
   target: Record<string, unknown>,
   patch: Record<string, unknown>,
@@ -280,6 +321,39 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     if (typeof opPageId === 'string' && opPageId.length > 0) {
       const target = next.pages.find((p) => p.id === opPageId);
       if (!target) {
+        // Defensive resolver — Gemini intermittently invents synthetic ids like
+        // `page_2` despite the system prompt forbidding it. When that happens, fall
+        // back to interpreting the trailing integer as a 1-based index into
+        // next.pages. Log loudly so we see how often the model relapses. If the
+        // integer is out of range, fall through to the loud throw below.
+        const syntheticMatch = /^page[_-](\d+)$/i.exec(opPageId);
+        if (syntheticMatch !== undefined && syntheticMatch !== null) {
+          const ordinal = Number(syntheticMatch[1]);
+          if (Number.isInteger(ordinal) && ordinal >= 1 && ordinal <= next.pages.length) {
+            const resolved = next.pages[ordinal - 1];
+            if (resolved !== undefined) {
+              console.warn(
+                '[canvas-ops] agent generated synthetic pageId "' +
+                  opPageId +
+                  '" — resolved to ordinal #' +
+                  String(ordinal) +
+                  ' (real id: "' +
+                  resolved.id +
+                  '"). Tighten the agent prompt if this keeps firing.',
+              );
+              if (
+                typeof opAfterSectionId === 'string' &&
+                opAfterSectionId.length > 0 &&
+                !resolved.sections.some((s) => s.id === opAfterSectionId)
+              ) {
+                throw new Error(
+                  `applyCanvasAgentOp(${kindLabel}): afterSectionId ${opAfterSectionId} does not exist on page ${resolved.id}`,
+                );
+              }
+              return { page: resolved };
+            }
+          }
+        }
         throw new Error(
           `applyCanvasAgentOp(${kindLabel}): pageId not found: ${opPageId}. Known pages: ${next.pages
             .map((p) => p.id)
@@ -454,6 +528,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
     ]);
     for (const [key, value] of Object.entries(patch)) {
       if (!sharedKeys.has(key) && value !== undefined) {
+        guardArrayShrink(element, key, value);
         setElementField(element, key, value);
       }
     }

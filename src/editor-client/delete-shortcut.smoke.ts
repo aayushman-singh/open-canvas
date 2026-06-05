@@ -65,7 +65,7 @@ function makeSite(opts: {
   footer?: CanvasSection;
 }): EditableSite {
   const site: EditableSite = {
-    styleKit: 'custom',
+    styleKit: 'charcoal',
     pages: [opts.page],
   };
   if (opts.header) site.header = opts.header;

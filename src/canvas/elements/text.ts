@@ -433,8 +433,7 @@ const inlineMarkSchema: JsonSchema = {
     },
     color: {
       type: 'string',
-      description:
-        'Required ONLY when type=="color". Hex colour (#RGB, #RRGGBB, or #RRGGBBAA).',
+      description: 'Required ONLY when type=="color". Hex colour (#RGB, #RRGGBB, or #RRGGBBAA).',
     },
   },
   required: ['type'],
@@ -484,7 +483,7 @@ export const textAgentToolSpec: AgentToolSpec = {
       type: 'array',
       items: inlineRunSchema,
       description:
-        'Replacement inline content as InlineRun[]. Text elements only. Prefer the `rewriteText` standalone tool.',
+        'Replacement inline content as InlineRun[]. Text elements only. Prefer the `rewriteText` standalone tool. IMPORTANT: this is FULL-REPLACE — the new array OVERWRITES the existing one entirely. Sending a partial array WILL DELETE the omitted runs. Omitting all items via an empty [] clears the text entirely.',
     },
     letterSpacing: {
       type: 'string',

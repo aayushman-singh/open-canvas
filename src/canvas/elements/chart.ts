@@ -145,7 +145,8 @@ export const chartAgentToolSpec: AgentToolSpec = {
     },
     series: {
       type: 'array',
-      description: 'Chart data series. Chart elements only.',
+      description:
+        'Chart data series. Chart elements only. IMPORTANT: this is FULL-REPLACE — to add a single series you MUST send the complete list of existing series plus the new one. Sending a partial array WILL DELETE the omitted series. Omitting all items via an empty [] clears the chart series entirely.',
       items: {
         type: 'object',
         properties: {
@@ -157,7 +158,8 @@ export const chartAgentToolSpec: AgentToolSpec = {
     },
     categories: {
       type: 'array',
-      description: 'Chart category labels. Chart elements only.',
+      description:
+        'Chart category labels. Chart elements only. IMPORTANT: this is FULL-REPLACE — to add a single category you MUST send the complete list of existing categories plus the new one. Sending a partial array WILL DELETE the omitted categories. Omitting all items via an empty [] clears the categories entirely.',
       items: { type: 'string' },
     },
   },

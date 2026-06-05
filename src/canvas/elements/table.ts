@@ -264,7 +264,7 @@ export const tableAgentToolSpec: AgentToolSpec = {
     columns: {
       type: 'array',
       description:
-        'Table columns. Table elements only. Each column needs id and header; align can be left, center, or right.',
+        'Table columns. Table elements only. Each column needs id and header; align can be left, center, or right. IMPORTANT: this is FULL-REPLACE — to add a single column you MUST send the complete list of existing columns plus the new one. Sending a partial array WILL DELETE the omitted columns. Omitting all items via an empty [] clears the columns entirely.',
       items: {
         type: 'object',
         properties: {
@@ -278,7 +278,7 @@ export const tableAgentToolSpec: AgentToolSpec = {
     rows: {
       type: 'array',
       description:
-        'Table rows. Table elements only. Each row needs id and cells as a column-id to text map.',
+        'Table rows. Table elements only. Each row needs id and cells as a column-id to text map. IMPORTANT: this is FULL-REPLACE — to add a single row you MUST send the complete list of existing rows plus the new one. Sending a partial array WILL DELETE the omitted rows. Omitting all items via an empty [] clears the rows entirely.',
       items: {
         type: 'object',
         properties: {

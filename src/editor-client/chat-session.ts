@@ -460,6 +460,7 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           card.setAttribute('data-status', 'rejected');
                           acceptBtn.disabled = true;
                           rejectBtn.disabled = true;
+                          entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
                           if (entry.targetNode) {
                             entry.targetNode.removeAttribute('data-ai-overlay-status');
                           }
@@ -499,20 +500,51 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                         // Whole-card click pans the camera onto the
                         // target node and pulse-rings it. Action buttons
                         // stopPropagation so clicking Accept/Reject/Revert
-                        // never triggers an unwanted pan. Ops with no
-                        // resolvable target (e.g. addPage before the
-                        // page is created) just no-op.
+                        // never triggers an unwanted pan. Re-resolve every
+                        // click — entry.targetNode goes stale across any
+                        // ctx.renderAll() (co-edit, accept of a sibling
+                        // op) and a detached node silently no-ops.
                         card.style.cursor = 'pointer';
                         card.addEventListener('click', function () {
-                          if (!entry.targetNode) {
-                            entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
-                          }
+                          entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
                           if (entry.targetNode) {
                             entry.targetNode.setAttribute(
                               'data-ai-overlay-status',
                               entry.status === 'accepted' ? 'accepted' : 'proposed',
                             );
                             ctx.focusCanvasOnNode(entry.targetNode);
+                            return;
+                          }
+                          const opForLog = entry.op as { kind?: string; elementId?: string; sectionId?: string; afterSectionId?: string; pageId?: string };
+                          const opKind = (opForLog && opForLog.kind) || '(unknown)';
+                          const opElementId = opForLog && opForLog.elementId;
+                          const opSectionId = (opForLog && opForLog.sectionId) || (opForLog && opForLog.afterSectionId);
+                          const opCreatesTarget =
+                            opKind === 'addElement' ||
+                            opKind === 'addPage' ||
+                            opKind === 'insertSection' ||
+                            opKind === 'addSection';
+                          if (opCreatesTarget && entry.status !== 'accepted') {
+                            ctx.setStatus(
+                              'This suggestion adds new content — accept it to preview on canvas',
+                              'info',
+                            );
+                            return;
+                          }
+                          ctx.setStatus(
+                            'Cannot focus suggestion: target ' + opKind + ' not on canvas',
+                            'error',
+                          );
+                          if (window.console && console.error) {
+                            console.error('[chat suggestion click] no canvas node for op', {
+                              opKind: opKind,
+                              elementId: opElementId,
+                              sectionId: opSectionId,
+                              status: entry.status,
+                              hasRoot: !!ctx.root,
+                              hasViewport: !!ctx.viewport,
+                              op: entry.op,
+                            });
                           }
                         });
 
@@ -542,8 +574,31 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                       ctx.chatBusy = false;
                       if (submitBtn) submitBtn.disabled = false;
                     }
-                  } catch (_) {
-                    /* ignore malformed SSE lines */
+                  } catch (sseErr: unknown) {
+                    // Only swallow JSON.parse SyntaxError (the documented
+                    // partial-frame case). Every other failure inside the
+                    // event branches must surface loudly — the prior
+                    // catch-all is how the suggestion-click regression
+                    // hid. Surface but keep draining the stream so a
+                    // crashed op-preview does not strand the chat.
+                    if (sseErr instanceof SyntaxError) {
+                      if (window.console && console.warn) {
+                        console.warn(
+                          '[chat sse] dropped malformed line: ' + errorToString(sseErr),
+                        );
+                      }
+                    } else {
+                      removeThinking();
+                      if (window.console && console.error) {
+                        console.error('[chat sse] handler threw', sseErr, {
+                          line: line,
+                        });
+                      }
+                      ctx.appendChatMessage(
+                        'error',
+                        'Chat event handler crashed: ' + errorToString(sseErr),
+                      );
+                    }
                   }
                 }
               }

@@ -277,13 +277,17 @@ export async function runCollectionScaffoldFlowImpl(
   ctx.setStatus('Created collection "' + createdSlug + '"', 'ok');
 }
 
-/** Wire the #canvas-add-collection button. Mirrors the canvas-add-page
- *  wiring at src/editor-client/index.ts:754-759. No-op when the button
- *  is absent (smokes, edit-token surfaces without the sidebar, etc.). */
+/** Wire every element carrying `data-canvas-add-collection` to the
+ *  scaffold flow. Mirrors the canvas-add-page wiring at
+ *  src/editor-client/index.ts:754-759 but selects by data attribute so
+ *  multiple entry points (Pages tab, Add tab, future surfaces) share one
+ *  handler without duplicating the flow. No-op when no buttons are
+ *  present (smokes, edit-token surfaces without the sidebar, etc.). */
 export function attachCollectionScaffoldButtonImpl(ctx: EditorContext): void {
-  const btn = document.getElementById('canvas-add-collection');
-  if (!btn) return;
-  btn.addEventListener('click', () => {
-    void runCollectionScaffoldFlowImpl(ctx);
+  const buttons = document.querySelectorAll('[data-canvas-add-collection]');
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      void runCollectionScaffoldFlowImpl(ctx);
+    });
   });
 }

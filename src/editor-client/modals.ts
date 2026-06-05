@@ -1009,7 +1009,7 @@ export interface OpencanvasModalConfirmOpts {
 export interface OpencanvasModalGlobal {
   confirm(msg: string, opts?: OpencanvasModalConfirmOpts): Promise<boolean>;
   alert(msg: string, title?: string): Promise<void>;
-  prompt(title: string, label: string, def?: string): Promise<string | null>;
+  prompt(msg: string, def?: string, title?: string): Promise<string | null>;
 }
 
 /** Mirrors canvas-client.ts:1953-1957 in the pre-cutover IIFE. The
@@ -1032,10 +1032,10 @@ export function installOpencanvasModalGlobalImpl(ctx: EditorContext): void {
     alert(msg, title) {
       return ctx.openAlertModal({ title: title || '', message: msg });
     },
-    prompt(title, label, def) {
+    prompt(msg, def, title) {
       return ctx.openTextModal({
         title: title || '',
-        label: label || '',
+        label: msg || '',
         defaultValue: def || '',
       });
     },

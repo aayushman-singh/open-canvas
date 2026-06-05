@@ -131,7 +131,7 @@ export const accordionAgentToolSpec: AgentToolSpec = {
     items: {
       type: 'array',
       description:
-        'Accordion items. Accordion elements only. Each item needs id, title, and body as InlineRun objects.',
+        'Accordion items. Accordion elements only. Each item needs id, title, and body as InlineRun objects. IMPORTANT: this is FULL-REPLACE — to add a single item you MUST send the complete list of existing items plus the new one. Sending a partial array WILL DELETE the omitted items. Omitting all items via an empty [] clears the accordion entirely.',
       items: {
         type: 'object',
         properties: {

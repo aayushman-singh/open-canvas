@@ -175,6 +175,7 @@ import {
   refreshMarkToolbarFontSizeStateImpl,
 } from './mark-toolbar.js';
 import {
+  attachHomeCrumbImpl,
   attachPageCrumbImpl,
   createPageImpl,
   deletePageImpl,
@@ -523,6 +524,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     presenceDisplayName: boot.displayName,
     presenceUserId: boot.userId,
     editingSnapshot: null,
+    activeEditFinish: null,
 
     // ---- Modal cluster -------------------------------------------------
     modalOpen: false,
@@ -680,15 +682,17 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
  * ("Ready", "ok")` is the last call before the session-keepalive
  * interval + `setupChatSession`.
  *
- * Today this function is NEVER called — the editor route still serves
- * `canvasClientScript()` and the resulting IIFE owns the closure. Phase
- * 3 cutover (ADR 0015) is the commit-set that swaps the route over.
- * Until then this code typechecks and lints but is dead.
+ * ADR 0015 Phase 3 cutover shipped; the editor route at
+ * `src/editor/route.tsx` serves `EDITOR_CLIENT_MANIFEST.canvasClientUrl`
+ * and this function is the live entry point. `canvasClientScript()` and
+ * `src/editor/canvas-client.ts` are gone.
  */
 export function createEditor(boot: EditorBoot): void {
   const ctx = createEditorContextSkeleton(boot);
   installRuntimeHelpers(ctx);
-  installOpencanvasModalGlobalImpl(ctx);
+  if (!window.__opencanvasModal) {
+    installOpencanvasModalGlobalImpl(ctx);
+  }
 
   // ---- DOM ref caching (mirror canvas-client.ts:605-660) -------------
   ctx.root = document.getElementById('canvas-root');
@@ -792,6 +796,7 @@ export function createEditor(boot: EditorBoot): void {
       attachGripHandlersImpl(ctx);
       ctx.attachSidebarTabs();
       attachPageCrumbImpl(ctx);
+      attachHomeCrumbImpl(ctx);
       attachChromeToggles(ctx);
 
       ctx.ensureVersionsTabMounted();
@@ -871,7 +876,10 @@ export function createEditor(boot: EditorBoot): void {
       // canvas's @font-face <style> block renders them. Fires in the
       // background; the picker degrades to the preset list until the
       // catalog lands.
-      void ctx.refreshCustomFonts();
+      ctx.refreshCustomFonts().catch(function (err: unknown) {
+        console.error('[refreshCustomFonts] boot-time font catalog refresh failed', err);
+        ctx.setStatus('Could not load custom fonts — try reloading', 'error');
+      });
 
       ctx.setStatus('Ready', 'ok');
 
@@ -893,16 +901,39 @@ export function createEditor(boot: EditorBoot): void {
           setTimeout(function () {
             void fetch(ctx.apiBase + '/edit-token/refresh', { method: 'POST' })
               .then(function (r) {
+                if (!r.ok) {
+                  return r.text().then(function (text) {
+                    throw new Error(
+                      'refresh returned ' +
+                        String(r.status) +
+                        ' ' +
+                        r.statusText +
+                        ': ' +
+                        text,
+                    );
+                  });
+                }
                 return r.json();
               })
               .then(function (d) {
                 const data = d as { ok?: boolean; ttl?: number };
                 if (data && data.ok && typeof data.ttl === 'number') {
                   scheduleTokenRefresh(data.ttl);
+                  return;
                 }
+                throw new Error(
+                  'refresh succeeded but body had no ok/ttl: ' + JSON.stringify(data),
+                );
               })
-              .catch(function () {
-                // Refresh failed; the next authFetch will catch it.
+              .catch(function (err: unknown) {
+                console.error(
+                  '[edit-token-refresh] refresh failed; the next authFetch will surface the 401',
+                  err,
+                );
+                ctx.setStatus(
+                  'Edit-token refresh failed — your session may expire; save now and reload',
+                  'error',
+                );
               });
           }, delay);
         };
@@ -910,15 +941,40 @@ export function createEditor(boot: EditorBoot): void {
         // to learn the current TTL (and get a fresh token).
         void fetch(ctx.apiBase + '/edit-token/refresh', { method: 'POST' })
           .then(function (r) {
+            if (!r.ok) {
+              return r.text().then(function (text) {
+                throw new Error(
+                  'refresh returned ' +
+                    String(r.status) +
+                    ' ' +
+                    r.statusText +
+                    ': ' +
+                    text,
+                );
+              });
+            }
             return r.json();
           })
           .then(function (d) {
             const data = d as { ok?: boolean; ttl?: number };
             if (data && data.ok && typeof data.ttl === 'number') {
               scheduleTokenRefresh(data.ttl);
+              return;
             }
+            throw new Error(
+              'refresh succeeded but body had no ok/ttl: ' + JSON.stringify(data),
+            );
           })
-          .catch(function () {});
+          .catch(function (err: unknown) {
+            console.error(
+              '[edit-token-refresh] refresh failed; the next authFetch will surface the 401',
+              err,
+            );
+            ctx.setStatus(
+              'Edit-token refresh failed — your session may expire; save now and reload',
+              'error',
+            );
+          });
       }
 
       // ---- Chat panel SSE handler -------------------------------------

@@ -956,11 +956,12 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   const fetchPageId = page.id;
   const fetchCollectionSlug = collectionSlug;
   const url =
-    '/__api/sites/' +
+    ctx.apiBase +
+    '/sites/' +
     encodeURIComponent(ctx.siteId) +
     '/entries?collection=' +
     encodeURIComponent(collectionSlug);
-  void fetch(url, { credentials: 'include' })
+  void ctx.authFetch(url)
     .then(function (res) {
       if (!res.ok) {
         throw new Error('GET ' + url + ' returned ' + String(res.status) + ' ' + res.statusText);

@@ -525,15 +525,13 @@ export async function refreshCustomFontsImpl(ctx: EditorContext): Promise<void> 
   }
   const body = (await response.json()) as { fonts?: unknown };
   const rows: EditorCustomFont[] = [];
+  let malformedRowCount = 0;
   if (Array.isArray(body.fonts)) {
     for (let i = 0; i < body.fonts.length; i++) {
       const row = body.fonts[i] as Record<string, unknown> | null;
-      if (!row || typeof row !== 'object') continue;
-      // Shape-guard each field; a missing/wrong type skips the row
-      // rather than crashing the editor boot. The server schema
-      // guarantees these are present + typed on insert, but the editor
-      // refuses to trust that contract blindly.
       if (
+        !row ||
+        typeof row !== 'object' ||
         typeof row.id !== 'string' ||
         typeof row.name !== 'string' ||
         typeof row.family !== 'string' ||
@@ -542,6 +540,8 @@ export async function refreshCustomFontsImpl(ctx: EditorContext): Promise<void> 
         typeof row.contentHash !== 'string' ||
         typeof row.byteSize !== 'number'
       ) {
+        malformedRowCount++;
+        console.error('[refreshCustomFonts] malformed custom-font row', row);
         continue;
       }
       rows.push({
@@ -554,6 +554,13 @@ export async function refreshCustomFontsImpl(ctx: EditorContext): Promise<void> 
         byteSize: row.byteSize,
       });
     }
+  }
+  if (malformedRowCount > 0) {
+    ctx.setStatus(
+      'Custom font catalog has malformed entries; existing catalog preserved',
+      'error',
+    );
+    return;
   }
   ctx.customFonts = rows;
   refreshEditorFontFaceStyleTag(rows);

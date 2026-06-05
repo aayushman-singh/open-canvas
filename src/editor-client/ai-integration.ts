@@ -835,10 +835,10 @@ export function applyAgentOpsImpl(
               if (s.cardEl) s.cardEl.setAttribute('data-status', 'accepted');
               if (s.acceptBtn) s.acceptBtn.disabled = true;
               if (s.rejectBtn) s.rejectBtn.disabled = true;
-              // renderAll() blew away the old wrappers; the stale attr is
-              // gone with them. Clear the back-reference so a future
-              // Reject can't poke a detached node.
-              s.targetNode = null;
+              s.targetNode = findCanvasNodeForOpImpl(ctx, s.op as AgentOp);
+              if (s.targetNode) {
+                s.targetNode.setAttribute('data-ai-overlay-status', 'accepted');
+              }
               // Resolve the captured inverse. Deferred entries (new-id
               // ops) need the post-state to look up the new id; otherwise
               // we just lift the ready inverse onto the entry.
@@ -908,6 +908,7 @@ export function revertAgentEntryImpl(ctx: EditorContext, entry: SuggestionEntry 
               (res.body && ((res.body.errors && res.body.errors[0]) || res.body.error)) ||
               'revert failed';
             ctx.setStatus('Revert failed: ' + detail, 'error');
+            entry.targetNode = findCanvasNodeForOpImpl(ctx, entry.op as AgentOp);
             if (entry.revertBtn) entry.revertBtn.disabled = false;
             return false;
           }

@@ -197,9 +197,14 @@ export function editorPageJsx(opts: EditorPageOptions) {
   const breadcrumbs =
     context === 'public' ? (
       <span class="crumbs">
-        <a href={`/`} style="color: inherit; text-decoration: none;">
+        <button
+          type="button"
+          id="canvas-home-crumb"
+          style="color: inherit; text-decoration: none; background: none; border: none; padding: 0; font: inherit; cursor: pointer;"
+          aria-label="Go to home page"
+        >
           {publicAddress}
-        </a>
+        </button>
         <span class="sep">/</span>
         <span class="here">editing</span>
       </span>
@@ -431,6 +436,18 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 </button>
               </section>
               <section class="opencanvas-sidebar-group">
+                <h2>Collections</h2>
+                <button
+                  class="opencanvas-sidebar-action"
+                  type="button"
+                  data-canvas-add-collection
+                  aria-label="Create a new content collection (e.g. blog, case studies)"
+                  title="Create a new content collection (e.g. blog, case studies)"
+                >
+                  + New Collection
+                </button>
+              </section>
+              <section class="opencanvas-sidebar-group">
                 <h2>Components</h2>
                 <div class="opencanvas-sidebar-command-grid">
                   {/* Sidebar grid is built from SIDEBAR_DISPATCH per ADR 0011
@@ -530,6 +547,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 class="opencanvas-sidebar-action"
                 id="canvas-add-collection"
                 type="button"
+                data-canvas-add-collection
                 title="Create a new content collection (e.g. blog, case-studies)"
               >
                 + New Collection

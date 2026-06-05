@@ -212,6 +212,12 @@ export const collectionAgentToolSpec: AgentToolSpec = {
   parsePatch: () => ({}),
 };
 
+// Collection has no per-element sidebar command: bare CollectionElement
+// instances would orphan without an index page, template page, and at least
+// one entry. The Add panel surfaces a dedicated "+ New Collection" button
+// that calls the full scaffold flow (src/editor-client/collection-scaffold.ts
+// + POST /api/sites/:siteId/collections) instead. The empty commands array
+// satisfies the dispatch's mapped-type contract.
 // Sidebar entry for Collection is added by Phase 2D (ADR 0063 dec 9).
 // The empty commands array keeps the SidebarDispatch mapped-type contract
 // satisfied without surfacing a button this commit can't fully wire.

@@ -175,6 +175,7 @@ export function renderInspector(ctx: EditorContext): void {
       onChange: onStyleChange,
       enabledTitle: 'Enable background color',
       swatchDefault: '#000000',
+      resetLabel: 'Clear',
     });
     ctx.inspector.appendChild(field('Background', bgRow));
 

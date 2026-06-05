@@ -69,10 +69,7 @@ export function openVersionPillImpl(ctx: EditorContext): void {
     10,
   );
   const version = Number.isFinite(parsedVersion) ? parsedVersion : 0;
-  const page =
-    ctx.state && Array.isArray(ctx.state.pages) && ctx.state.pages.length > 0
-      ? ctx.state.pages[0]!
-      : null;
+  const page = ctx.currentPage();
   const addressEl = document.querySelector('.opencanvas-editor-header .address');
   const addressText =
     addressEl && addressEl.textContent ? addressEl.textContent.trim() : '';

@@ -13,6 +13,8 @@ import { Button, Badge, Pill, readThemeCookie } from '../../ui';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
+import { buildStyleKitCss } from '../../canvas/style-kits';
+import { resolveStyleKitWithCustom } from '../../themes/custom-resolve';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
 import { collectReferencedAssets } from '../../assets/site-assets';
@@ -99,6 +101,8 @@ function buildThumbHtml(
     ...(state.footer ? { footer: state.footer } : {}),
     ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
   };
+  const customKitCss =
+    state.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolveStyleKitWithCustom(state))}` : '';
   const canvasHtml = renderCanvasSnapshot(snapshot, `/api/canvas/sites/${siteId}/assets`, siteId, {
     turnstileSiteKey,
   });
@@ -107,6 +111,7 @@ function buildThumbHtml(
     `<base href="${origin}/">`,
     '<style>',
     canvasPublishedStyles,
+    customKitCss,
     '</style>',
     '</head><body style="margin:0;overflow:hidden;background:#0a0a0a">',
     canvasHtml,
