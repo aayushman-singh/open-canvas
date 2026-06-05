@@ -95,6 +95,20 @@ function buildAuthDetectScript(publishableKey: string, frontendApiHost: string):
     `window.Clerk.load().then(function(){` +
     `if(window.Clerk.user){` +
     `document.documentElement.setAttribute("data-signed-in","");` +
+    // Pre-warm /dashboard so click→paint feels instant. Same-origin
+    // prefetch sends the session cookie, so the response is reusable for
+    // the upcoming navigation.
+    `var pf=document.createElement("link");` +
+    `pf.rel="prefetch";pf.href="/dashboard";pf.as="document";` +
+    `document.head.appendChild(pf);` +
+    // Belt-and-braces: hover-fire a credentialed fetch so the Worker
+    // isolate + Neon connection stay hot through the click.
+    `var ctas=document.querySelectorAll('.auth-signed-in a[href="/dashboard"]');` +
+    `for(var i=0;i<ctas.length;i++){` +
+    `ctas[i].addEventListener("mouseenter",function(){` +
+    `fetch("/dashboard",{credentials:"same-origin"}).catch(function(){});` +
+    `},{once:true});` +
+    `}` +
     `}` +
     `}).catch(function(err){` +
     `console.error("[landing] Clerk.load failed",err);` +

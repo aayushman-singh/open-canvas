@@ -15,6 +15,7 @@ import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { buildStyleKitCss } from '../../canvas/style-kits';
 import { resolveStyleKitWithCustom } from '../../themes/custom-resolve';
+import { pickStyleKitField } from '../../canvas/schema';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
 import { collectReferencedAssets } from '../../assets/site-assets';
@@ -95,11 +96,10 @@ function buildThumbHtml(
   const snapshot: PublishedSnapshot = {
     version: 0,
     publishedAt: new Date().toISOString(),
-    styleKit: state.styleKit,
+    ...pickStyleKitField(state),
     pages: state.pages,
     ...(state.header ? { header: state.header } : {}),
     ...(state.footer ? { footer: state.footer } : {}),
-    ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
   };
   const customKitCss =
     state.styleKit === 'custom' ? `\n${buildStyleKitCss('custom', resolveStyleKitWithCustom(state))}` : '';
@@ -117,6 +117,31 @@ function buildThumbHtml(
     canvasHtml,
     '</body></html>',
   ].join('');
+}
+
+// Module-scope memo of rendered thumb HTML, keyed on `${siteId}:${updatedAtMs}`.
+// Survives across requests within a Worker isolate so the dashboard's hottest
+// cost — re-rendering every site's full snapshot on every page open — collapses
+// to a Map lookup after the first hit. The key includes updatedAt so any edit
+// (which bumps site.updatedAt) auto-invalidates without explicit busts.
+const thumbHtmlCache = new Map<string, string>();
+
+function thumbCacheKey(siteId: string, updatedAt: Date): string {
+  return `${siteId}:${updatedAt.getTime()}`;
+}
+
+function getCachedThumbHtml(siteId: string, updatedAt: Date): string | undefined {
+  return thumbHtmlCache.get(thumbCacheKey(siteId, updatedAt));
+}
+
+function setCachedThumbHtml(siteId: string, updatedAt: Date, html: string): void {
+  // Drop stale entries for this site so repeated edits don't grow the map
+  // unbounded over a long-lived isolate.
+  const prefix = `${siteId}:`;
+  for (const key of thumbHtmlCache.keys()) {
+    if (key.startsWith(prefix)) thumbHtmlCache.delete(key);
+  }
+  thumbHtmlCache.set(thumbCacheKey(siteId, updatedAt), html);
 }
 
 // Per-page styles for the dashboard root. Restyled to Open Canvas tokens
@@ -380,6 +405,20 @@ const cardStyles = `
     transform: scale(${String(THUMB_SCALE)});
     border: none;
     pointer-events: none;
+  }
+  /* Skeleton — shown while the deferred thumb hydrator is fetching. The
+     shimmer gives the dashboard a "loading content" feel instead of a flat
+     dead rectangle while /dashboard/thumbs/:siteId resolves. */
+  .site-card-thumb iframe[data-thumb-src] {
+    background:
+      linear-gradient(110deg, var(--surface-3) 30%, var(--surface-2) 50%, var(--surface-3) 70%)
+      var(--surface-3);
+    background-size: 200% 100%;
+    animation: oc-thumb-shimmer 1.2s linear infinite;
+  }
+  @keyframes oc-thumb-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
   }
 
   .site-card-body { padding: 16px 20px; }
@@ -1082,6 +1121,46 @@ document.addEventListener('click', function(e) {
 });
 </script>`);
 
+// Lazy-load skeleton iframes (those with data-thumb-src) by fetching the
+// per-site rendered HTML from /dashboard/thumbs/:siteId after first paint.
+// Concurrency is capped so a user with many sites doesn't fan out N Neon
+// reads at once. On success, the response body becomes the iframe's srcdoc,
+// which triggers an internal navigation inside the iframe — no reload.
+const thumbHydratorScript = raw(`<script>
+(function(){
+  function hydrate(){
+    var iframes = Array.prototype.slice.call(
+      document.querySelectorAll('iframe[data-thumb-src]')
+    );
+    if(iframes.length === 0) return;
+    var inflight = 0;
+    var max = 3;
+    function next(){
+      while(inflight < max && iframes.length){
+        var f = iframes.shift();
+        var src = f.getAttribute('data-thumb-src');
+        if(!src){ continue; }
+        f.removeAttribute('data-thumb-src');
+        inflight++;
+        fetch(src, { credentials: 'same-origin' })
+          .then(function(r){ return r.ok ? r.text() : null; })
+          .then(function(html){
+            if(html){ f.srcdoc = html; }
+          })
+          .catch(function(){})
+          .then(function(){ inflight--; next(); });
+      }
+    }
+    next();
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', hydrate);
+  } else {
+    hydrate();
+  }
+})();
+</script>`);
+
 interface SiteCard {
   siteId: string;
   ownedByCurrent: boolean;
@@ -1090,7 +1169,10 @@ interface SiteCard {
   styleKit: string;
   publishedVersion: number;
   updatedAt: Date;
-  thumbHtml: string;
+  // `null` means the thumb is not yet rendered for this isolate. The card
+  // emits a skeleton iframe with `data-thumb-src` and the inline hydrator
+  // fetches /dashboard/thumbs/:siteId after first paint.
+  thumbHtml: string | null;
   passwordEnabled: boolean;
   visitorTheme: 'light' | 'dark' | 'toggleable';
   searchIndexing: boolean;
@@ -1125,21 +1207,13 @@ function buildCards(
     editableState: EditableSite;
     passwordEnabled: boolean;
   }>,
-  origin: string,
-  turnstileSiteKey: string,
 ): SiteCard[] {
   return rows.map((row) => {
     const state = row.editableState;
-    let thumbHtml: string;
-    try {
-      thumbHtml = buildThumbHtml(state, row.id, origin, turnstileSiteKey);
-    } catch (error) {
-      console.error(
-        `dashboard: buildThumbHtml failed for siteId=${row.id} name=${JSON.stringify(row.name)} subdomain=${JSON.stringify(row.subdomain)}`,
-        error,
-      );
-      thumbHtml = THUMB_FAILED_HTML;
-    }
+    // Cache-only on the main list path. Cold cache → null → skeleton iframe
+    // hydrates via /dashboard/thumbs/:siteId after first paint. Skipping
+    // the synchronous renderCanvasSnapshot loop is the whole TTFB win.
+    const thumbHtml = getCachedThumbHtml(row.id, row.updatedAt) ?? null;
     return {
       siteId: row.id,
       ownedByCurrent: row.ownedByCurrent,
@@ -1256,7 +1330,6 @@ dashboard.get('/', async (c) => {
   const customerId = customerRecord.id;
   const customerPlan = customerRecord.plan;
 
-  const origin = new URL(c.req.url).origin;
   const apex = appDomain(c.env);
 
   // Site rows + collaborator sites + storage sum are independent — parallelize
@@ -1319,7 +1392,7 @@ dashboard.get('/', async (c) => {
       .filter((row) => !ownedIds.has(row.id))
       .map((row) => ({ ...row, ownedByCurrent: false })),
   ];
-  const cards = buildCards(rows, origin, requireTurnstileSiteKey(c.env));
+  const cards = buildCards(rows);
   const publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
   const storageBytes = Number(sb[0]?.total ?? 0);
 
@@ -1541,14 +1614,25 @@ dashboard.get('/', async (c) => {
           {cards.map((s) => (
             <div class="site-card">
               <div class="site-card-thumb">
-                <iframe
-                  srcdoc={s.thumbHtml}
-                  scrolling="no"
-                  tabindex={-1}
-                  loading="lazy"
-                  sandbox="allow-same-origin"
-                  title={`Preview of ${s.siteName}`}
-                />
+                {s.thumbHtml !== null ? (
+                  <iframe
+                    srcdoc={s.thumbHtml}
+                    scrolling="no"
+                    tabindex={-1}
+                    loading="lazy"
+                    sandbox="allow-same-origin"
+                    title={`Preview of ${s.siteName}`}
+                  />
+                ) : (
+                  <iframe
+                    data-thumb-src={`/dashboard/thumbs/${s.siteId}`}
+                    scrolling="no"
+                    tabindex={-1}
+                    loading="lazy"
+                    sandbox="allow-same-origin"
+                    title={`Preview of ${s.siteName}`}
+                  />
+                )}
               </div>
               <div class="site-card-body">
                 <h3>{s.siteName}</h3>
@@ -1659,6 +1743,81 @@ dashboard.get('/', async (c) => {
       {toggleScript}
       {importScript}
       {planUpgradeScript}
+      {thumbHydratorScript}
     </DashboardShell>,
   );
+});
+
+// Per-site thumb HTML — fed to the dashboard's skeleton iframes by the
+// thumbHydratorScript above. Splitting this out of the main listing handler
+// is the TTFB win: the page document no longer waits on `renderCanvasSnapshot`
+// to run for every site before first byte.
+//
+// Access: site owner OR accepted collaborator (mirrors the access rules of
+// the main listing's two queries). Any other caller gets 404 — we don't
+// distinguish "doesn't exist" from "not yours" because revealing the
+// difference would leak site IDs across customers.
+dashboard.get('/thumbs/:siteId', async (c) => {
+  const customerRecord = c.get('customer');
+  if (!customerRecord) {
+    throw new Error('thumbs route reached without a resolved customer');
+  }
+  const siteId = c.req.param('siteId');
+  const database = db(c.env);
+
+  const [row] = await database
+    .select({
+      id: site.id,
+      customerId: site.customerId,
+      name: site.name,
+      subdomain: site.subdomain,
+      updatedAt: site.updatedAt,
+      editableState: site.editableState,
+    })
+    .from(site)
+    .where(eq(site.id, siteId))
+    .limit(1);
+
+  if (!row) return c.notFound();
+
+  const isOwner = row.customerId === customerRecord.id;
+  let allowed = isOwner;
+  if (!allowed) {
+    const [collab] = await database
+      .select({ id: siteCollaborator.id })
+      .from(siteCollaborator)
+      .where(
+        and(
+          eq(siteCollaborator.siteId, siteId),
+          eq(siteCollaborator.customerId, customerRecord.id),
+          isNotNull(siteCollaborator.acceptedAt),
+        ),
+      )
+      .limit(1);
+    allowed = !!collab;
+  }
+  if (!allowed) return c.notFound();
+
+  let html = getCachedThumbHtml(siteId, row.updatedAt);
+  if (!html) {
+    const origin = new URL(c.req.url).origin;
+    try {
+      html = buildThumbHtml(
+        row.editableState,
+        siteId,
+        origin,
+        requireTurnstileSiteKey(c.env),
+      );
+      setCachedThumbHtml(siteId, row.updatedAt, html);
+    } catch (error) {
+      console.error(
+        `dashboard/thumbs: buildThumbHtml failed for siteId=${siteId} name=${JSON.stringify(row.name)} subdomain=${JSON.stringify(row.subdomain)}`,
+        error,
+      );
+      html = THUMB_FAILED_HTML;
+    }
+  }
+
+  c.header('Cache-Control', 'private, max-age=0, must-revalidate');
+  return c.html(html);
 });
