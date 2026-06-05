@@ -341,6 +341,8 @@ label.lbl {
 .theme-toggle .moon { display: none; }
 [data-theme="dark"] .theme-toggle .sun { display: none; }
 [data-theme="dark"] .theme-toggle .moon { display: block; }
+.nav .theme-toggle { width: 32px; height: 32px; }
+.nav .theme-toggle svg { width: 16px; height: 16px; }
 
 /* ---------- canvas-frame decoration (brand motif) ---------- */
 .canvas-frame { position: relative; }
