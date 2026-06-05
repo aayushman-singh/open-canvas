@@ -824,6 +824,12 @@ export function applyAgentOpsImpl(
             ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
           }
           applyCustomKitCss(ctx.state);
+          // AI-applied ops join the undo stack — without this, Ctrl+Z
+          // bypasses them entirely and the only revert path is the
+          // per-suggestion Revert button on the chat card (which
+          // disappears on hard refresh). The op already persisted via
+          // /apply so we only need the capture, not a save round-trip.
+          ctx.captureForUndo();
           // Ghost-preview cleanup BEFORE renderAll: each accepted suggestion
           // had a ghost slot in ctx.ghostSections matching s.suggestionId.
           // The apply replaced that slot with a real section so the ghost
@@ -933,6 +939,10 @@ export function revertAgentEntryImpl(ctx: EditorContext, entry: SuggestionEntry 
             ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
           }
           applyCustomKitCss(ctx.state);
+          // Revert is itself a mutation — capture for undo so Ctrl+Z can
+          // walk back over a Revert click the same way it can walk back
+          // over an Accept.
+          ctx.captureForUndo();
           // Ghost-preview re-materialise BEFORE renderAll: the proposal is
           // back to "pending" so the in-place ghost reappears. The blueprint
           // was captured on Accept and survives the revert round-trip.
