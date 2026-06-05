@@ -423,6 +423,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     chatAcceptAllBtn: null,
     showAcceptAllSummary: () => showAcceptAllSummaryImpl(ctx),
     pendingAiSuggestions: [],
+    ghostSections: [],
     applyAgentOps: (ops, suggestions) =>
       // The impl typing keeps the inverse-capture signature internal — the
       // ctx-level surface narrows back to `unknown[]` per the IIFE twin.

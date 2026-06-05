@@ -44,8 +44,11 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type { EditableSite } from '../../canvas/schema.js';
+import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
+import { createSectionFromRecipe } from '../../canvas/recipes.js';
+import { resolveDesignSection } from '../../canvas/layout/engine.js';
+import { resolveStyleKitWithCustom } from '../../canvas/style-kits.js';
 import { translateToolCall, isRecord } from '../tool-parsers.js';
 import {
   CHAT_AGENT_TOOLS,
@@ -346,12 +349,18 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         } else if (MUTATING_TOOL_NAMES.has(call.name)) {
           const dispatched = dispatchMutatingTool({ call, history });
           if (dispatched.preview) {
-            await writer.write({
+            const previewSection = resolvePreviewSection(dispatched.preview.op, ctx.state);
+            const event: Extract<
+              Parameters<ChatStreamWriter['write']>[0],
+              { kind: 'op-preview' }
+            > = {
               kind: 'op-preview',
               id: call.id,
               toolName: call.name,
               op: dispatched.preview.op,
-            });
+            };
+            if (previewSection) event.previewSection = previewSection;
+            await writer.write(event);
             previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
           }
         } else {
@@ -637,6 +646,84 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
   return { preview: { op: parsed.op } };
 }
 
+/**
+ * Resolve a server-side CanvasSection preview for additive section ops so
+ * the editor can ghost-render it in place between existing sections. Returns
+ * undefined for op kinds where in-place ghosting is not part of Phase A
+ * (delete*, update*, addElement, addPage, setStyleKit, setSiteConfig,
+ * moveSection, rewriteText, replaceMedia).
+ *
+ * Resolution rules:
+ *   - insertSection  → createSectionFromRecipe (pure factory)
+ *   - designSection  → resolveDesignSection against the target page's width
+ *                      and the resolved Style Kit (custom kit handled via
+ *                      resolveStyleKitWithCustom, mirroring applyCanvasAgentOp)
+ *   - duplicateSection → clone the targeted section from state with new ids
+ *
+ * Failures are SWALLOWED — the ghost preview is a UI affordance, not the
+ * source of truth. If resolution throws (e.g. unknown recipe id, missing
+ * customStyleKit), the SSE event still ships without `previewSection` and
+ * the existing suggestion card UI continues to work. The /apply path will
+ * surface the same error loudly when the Owner clicks Accept.
+ */
+function resolvePreviewSection(
+  op: CanvasAgentOp,
+  state: EditableSite,
+): CanvasSection | undefined {
+  try {
+    if (op.kind === 'insertSection') {
+      return createSectionFromRecipe(op.recipeId, op.input);
+    }
+    if (op.kind === 'designSection') {
+      const targetPage = resolveTargetPage(state, op.pageId ?? null);
+      if (!targetPage) return undefined;
+      const preset = resolveStyleKitWithCustom(state);
+      const result = resolveDesignSection(op.input, targetPage.width, preset);
+      return result.section;
+    }
+    if (op.kind === 'duplicateSection') {
+      return cloneSectionForPreview(state, op.sectionId);
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function resolveTargetPage(
+  state: EditableSite,
+  pageId: string | null,
+): { width: number } | undefined {
+  if (pageId === null) return state.pages[0];
+  const match = state.pages.find((p) => p.id === pageId);
+  return match ?? state.pages[0];
+}
+
+function cloneSectionForPreview(
+  state: EditableSite,
+  sectionId: string,
+): CanvasSection | undefined {
+  for (const page of state.pages) {
+    const found = page.sections.find((s) => s.id === sectionId);
+    if (found) {
+      const clone = structuredClone(found);
+      clone.id = `ghost-${sectionId}-${Math.random().toString(36).slice(2, 8)}`;
+      return clone;
+    }
+  }
+  if (state.header && state.header.id === sectionId) {
+    const clone = structuredClone(state.header);
+    clone.id = `ghost-${sectionId}-${Math.random().toString(36).slice(2, 8)}`;
+    return clone;
+  }
+  if (state.footer && state.footer.id === sectionId) {
+    const clone = structuredClone(state.footer);
+    clone.id = `ghost-${sectionId}-${Math.random().toString(36).slice(2, 8)}`;
+    return clone;
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // History → LlmMessage[] translation
 // ---------------------------------------------------------------------------
@@ -748,6 +835,15 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   );
   lines.push(
     '  3. Past tense becomes accurate only AFTER a tool call has been accepted. Until then, the Editable Site is unchanged.',
+  );
+  lines.push(
+    '  4. Make a confident default choice. Vague Owner requests are normal — Owners often do not know exactly what they want. Resolve ambiguity yourself: pick a sensible interpretation, propose the change, and let the Owner judge the result. The preview/Accept/Reject loop is cheap; iterating from a concrete proposal is faster than iterating from a clarifying question.',
+  );
+  lines.push(
+    '  5. Ask a clarifying question ONLY when two reasonable interpretations of the request would produce meaningfully different results AND you cannot tell which the Owner wants. Examples that justify asking: "delete the page" when there are multiple pages with similar names; "make it blue" when the Owner could mean text colour, background, or accent. Examples that do NOT justify asking: "add a hiring section" (pick a reasonable layout and propose it); "make the hero punchier" (rewrite with confident editorial judgement); "give it a darker feel" (propose a setStyleKit to a dark kit or a Pinned Style tweak). When in doubt, propose — never ask "what would you like the text to say?" or "how big should the heading be?" — make a choice.',
+  );
+  lines.push(
+    '  6. When you do need to ask, ask ONE focused question. Never lead with a wall of questions. Multiple back-and-forth turns are cheap; bombarding the Owner is not.',
   );
   lines.push('');
   lines.push('Reply structure — must follow exactly:');

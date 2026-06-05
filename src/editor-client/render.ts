@@ -325,8 +325,39 @@ export function renderAllImpl(ctx: EditorContext): void {
       article.appendChild(ctx.buildSectionNode(ctx.state.header, renderWidth));
     }
 
+    const pageGhosts = ctx.ghostSections.filter(
+      (g) => g.pageId === null || g.pageId === page.id,
+    );
+    // Ghosts at afterSectionId === null mount at the very top of the page
+    // body (above the first real section). This matches the orchestrator
+    // semantics where null means "insert at top".
+    for (let gi = 0; gi < pageGhosts.length; gi++) {
+      if (pageGhosts[gi]!.afterSectionId === null) {
+        article.appendChild(buildGhostSectionNode(ctx, pageGhosts[gi]!, renderWidth));
+      }
+    }
+
     for (let si = 0; si < page.sections.length; si++) {
-      article.appendChild(ctx.buildSectionNode(page.sections[si]!, renderWidth));
+      const section = page.sections[si]!;
+      article.appendChild(ctx.buildSectionNode(section, renderWidth));
+      for (let gi = 0; gi < pageGhosts.length; gi++) {
+        if (pageGhosts[gi]!.afterSectionId === section.id) {
+          article.appendChild(buildGhostSectionNode(ctx, pageGhosts[gi]!, renderWidth));
+        }
+      }
+    }
+
+    // Stale-ghost fallback: any ghost whose afterSectionId no longer points
+    // at a real section on this page (the section was renamed or deleted
+    // between op-preview and renderAll) gets appended at the end so the
+    // Owner still sees the proposal instead of it silently disappearing.
+    for (let gi = 0; gi < pageGhosts.length; gi++) {
+      const g = pageGhosts[gi]!;
+      if (g.afterSectionId === null) continue;
+      const stillExists = page.sections.some((s) => s.id === g.afterSectionId);
+      if (!stillExists) {
+        article.appendChild(buildGhostSectionNode(ctx, g, renderWidth));
+      }
     }
 
     if (ctx.state.footer) {
@@ -384,4 +415,37 @@ export function autoGrowTextElements(ctx: EditorContext): void {
       ctx.setBoxStyle(w, found.element.box);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ghost-section wrapper — wraps ctx.buildSectionNode output with a dimmed,
+// dashed-border, "AI proposal" pilled container so the Owner sees what the
+// agent is proposing in place. Pointer events are off on the inner content
+// so a stray drag doesn't try to edit the ghost; the wrapper itself can
+// still receive a click so a future affordance (e.g. inline accept/reject)
+// has somewhere to live. Today there are no inline ghost buttons — the
+// authoritative Accept/Reject live on the chat suggestion card.
+// ---------------------------------------------------------------------------
+
+function buildGhostSectionNode(
+  ctx: EditorContext,
+  ghost: EditorContext['ghostSections'][number],
+  renderWidth: number,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'opencanvas-ghost-section';
+  wrapper.setAttribute('data-opencanvas-ghost-section', ghost.id);
+  wrapper.style.position = 'relative';
+  wrapper.style.width = renderWidth + 'px';
+
+  const pill = document.createElement('div');
+  pill.className = 'opencanvas-ghost-pill';
+  pill.textContent = 'AI proposal';
+  wrapper.appendChild(pill);
+
+  const inner = ctx.buildSectionNode(ghost.section, renderWidth);
+  inner.setAttribute('data-ghost', 'true');
+  wrapper.appendChild(inner);
+
+  return wrapper;
 }

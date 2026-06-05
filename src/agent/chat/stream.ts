@@ -19,6 +19,7 @@
 // single contract.
 
 import type { CanvasAgentOp } from '../canvas-ops.js';
+import type { CanvasSection } from '../../canvas/schema.js';
 
 // ---------------------------------------------------------------------------
 // Event union
@@ -29,7 +30,27 @@ export type ChatStreamEvent =
   | { kind: 'token'; text: string }
   | { kind: 'tool-call'; id: string; name: string; args: unknown }
   | { kind: 'tool-result'; id: string; name: string; output: unknown }
-  | { kind: 'op-preview'; id: string; toolName: string; op: CanvasAgentOp }
+  | {
+      kind: 'op-preview';
+      id: string;
+      toolName: string;
+      op: CanvasAgentOp;
+      /**
+       * Optional, set ONLY for additive section ops (insertSection,
+       * designSection, duplicateSection). Carries the section the op would
+       * materialise so the editor can ghost-render it between existing
+       * sections at lower opacity while the Owner decides Accept / Reject.
+       *
+       * Resolved server-side because designSection needs the layout engine
+       * + style-kit lookup; shipping the resolved CanvasSection over the
+       * wire avoids pulling the engine into the editor bundle.
+       *
+       * The op itself is the source of truth for /apply — previewSection is
+       * a UI hint only. On Accept the apply route re-resolves the op against
+       * the freshly-saved editable state.
+       */
+      previewSection?: CanvasSection;
+    }
   | { kind: 'error'; error: string }
   | {
       kind: 'done';

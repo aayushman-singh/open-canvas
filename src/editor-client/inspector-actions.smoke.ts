@@ -82,6 +82,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     state: null,
     mainEl: null,
     selectedElementId: null,
+    ghostSections: [],
     findElement(elementId: string): FindElementResult | null {
       for (const el of section.elements) {
         if (el.id === elementId) {
