@@ -59,9 +59,14 @@ type Bindings = {
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-// See orchestrator.ts CHAT_DEFAULT_MODEL — 3.x requires thought_signature
-// round-trip on tool calls; reverted to 2.5-pro until the adapter handles it.
-const CANVAS_AGENT_MODEL = 'gemini-2.5-pro';
+// 2.5-flash drives every preview/apply flow that posts here — inspector
+// "AI rewrite", "AI create section", "AI replace media" prompt, between-
+// section AI insert. 2.5-pro was the prior pin but the rewrite path is by far
+// the dominant call shape and 2.5-flash is well within capability for it;
+// the latency + cost cut is felt on every Owner interaction. Stays on 2.5
+// (not 3.x) until the GeminiAdapter handles 3.x thought_signature round-trip
+// on tool calls — see orchestrator.ts CHAT_DEFAULT_MODEL.
+const CANVAS_AGENT_MODEL = 'gemini-2.5-flash';
 
 const canvasAgentApi = new Hono<Env>();
 
