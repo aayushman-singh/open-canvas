@@ -15,6 +15,7 @@
 //   6. Precise token count is authoritative at the cap boundary.
 //   7. Wall-clock aborts during countTokens end the turn loudly.
 //   8. Token trimming never orphans active tool responses.
+//   9. Ghost previews fail loudly when the preview target cannot resolve.
 //
 // All paths run without GEMINI_API_KEY / DATABASE_URL — the mock LlmAdapter
 // + InMemorySessionStore stand in.
@@ -719,6 +720,7 @@ const ghostCustomState = {
   styleKit: 'custom' as const,
   customStyleKit: STYLE_KIT_PRESETS.charcoal,
 };
+const ghostCustomHero = ghostCustomState.pages[0]!.sections[0]!;
 const designCallId = 'designSection-1-def';
 const ghostDesignAdapter = new MockLlmAdapter([
   () =>
@@ -732,7 +734,7 @@ const ghostDesignAdapter = new MockLlmAdapter([
         // top level, not nested under `input` (that's the OP shape, which
         // the parser builds from these args internally).
         arguments: {
-          afterSectionId: ghostHero.id,
+          afterSectionId: ghostCustomHero.id,
           sectionName: 'Careers',
           layout: {
             type: 'stack',
@@ -791,6 +793,79 @@ const rewriteEvt = events1.find(
 assert(
   rewriteEvt !== undefined && rewriteEvt.previewSection === undefined,
   'rewriteText op-preview must NOT carry previewSection — Phase A ghosts are section-shaped only',
+);
+
+// 10c — preview resolution failure must be loud. An explicit pageId that
+// does not exist is the same error applyCanvasAgentOp would throw; the chat
+// turn must stop with error+done instead of shipping an op-preview without a
+// ghost and deferring the failure until Accept.
+const invalidPageDesignAdapter = new MockLlmAdapter([
+  () =>
+    yieldChunks(
+      {
+        type: 'tool_call',
+        id: 'designSection-invalid-page',
+        name: 'designSection',
+        arguments: {
+          pageId: 'page-does-not-exist',
+          afterSectionId: ghostHero.id,
+          sectionName: 'Broken target',
+          layout: {
+            type: 'stack',
+            direction: 'column',
+            children: [
+              {
+                element: {
+                  type: 'text',
+                  text: {
+                    content: 'This should not preview',
+                    role: 'heading',
+                    color: 'text',
+                    font: 'display',
+                    size: 48,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { type: 'done', reason: 'tool_use' },
+    ),
+  () =>
+    yieldChunks(
+      { type: 'text', text: 'This pass should not run.' },
+      { type: 'done', reason: 'stop' },
+    ),
+]);
+const invalidPageWriter = new BufferedStreamWriter();
+const invalidPageSession = await new InMemorySessionStore().create(
+  'site-ghost-invalid',
+  'customer-smoke',
+);
+const invalidPageResult = await runChatTurn({
+  session: invalidPageSession,
+  userMessage: 'Add a section to a missing page.',
+  writer: invalidPageWriter,
+  ctx: { adapter: invalidPageDesignAdapter, state: ghostState, systemInstruction: '[smoke] sys' },
+});
+const invalidPageEvents = invalidPageWriter.events();
+const invalidPageError = invalidPageEvents.find(
+  (e): e is Extract<ChatStreamEvent, { kind: 'error' }> => e.kind === 'error',
+);
+assert(
+  invalidPageError !== undefined &&
+    invalidPageError.error.includes('pageId not found: page-does-not-exist'),
+  'invalid designSection preview pageId must emit a loud error with the missing page id',
+);
+assert(
+  !invalidPageEvents.some((e) => e.kind === 'op-preview'),
+  'invalid designSection preview target must stop before op-preview',
+);
+assert(
+  invalidPageResult.doneReason === 'other' &&
+    invalidPageEvents.some((e) => e.kind === 'done' && e.reason === 'other'),
+  'invalid designSection preview target must end the turn with done(other)',
 );
 
 console.log('[chat:smoke] 10/10 Ghost-preview — OK');

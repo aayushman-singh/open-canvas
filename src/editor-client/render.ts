@@ -326,18 +326,7 @@ export function renderAllImpl(ctx: EditorContext): void {
       article.appendChild(ctx.buildSectionNode(ctx.state.header, renderWidth));
     }
 
-    const pageGhosts = ctx.ghostSections.filter(
-      (g) => g.pageId === null || g.pageId === page.id,
-    );
-    // Ghosts at afterSectionId === null mount at the very top of the page
-    // body (above the first real section). This matches the orchestrator
-    // semantics where null means "insert at top".
-    for (let gi = 0; gi < pageGhosts.length; gi++) {
-      if (pageGhosts[gi]!.afterSectionId === null) {
-        article.appendChild(buildGhostSectionNode(ctx, pageGhosts[gi]!, renderWidth));
-      }
-    }
-
+    const pageGhosts = ctx.ghostSections.filter((g) => g.pageId === page.id);
     for (let si = 0; si < page.sections.length; si++) {
       const section = page.sections[si]!;
       article.appendChild(ctx.buildSectionNode(section, renderWidth));
@@ -348,16 +337,11 @@ export function renderAllImpl(ctx: EditorContext): void {
       }
     }
 
-    // Stale-ghost fallback: any ghost whose afterSectionId no longer points
-    // at a real section on this page (the section was renamed or deleted
-    // between op-preview and renderAll) gets appended at the end so the
-    // Owner still sees the proposal instead of it silently disappearing.
+    // applyCanvasAgentOp appends additive section ops when afterSectionId is
+    // null, so the ghost sits after the real page body and before the footer.
     for (let gi = 0; gi < pageGhosts.length; gi++) {
-      const g = pageGhosts[gi]!;
-      if (g.afterSectionId === null) continue;
-      const stillExists = page.sections.some((s) => s.id === g.afterSectionId);
-      if (!stillExists) {
-        article.appendChild(buildGhostSectionNode(ctx, g, renderWidth));
+      if (pageGhosts[gi]!.afterSectionId === null) {
+        article.appendChild(buildGhostSectionNode(ctx, pageGhosts[gi]!, renderWidth));
       }
     }
 

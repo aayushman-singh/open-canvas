@@ -711,7 +711,7 @@ export interface EditorContext {
      *  it. */
     ghostBlueprint?: {
       id: string;
-      pageId: string | null;
+      pageId: string;
       afterSectionId: string | null;
       section: CanvasSection;
     };
@@ -728,12 +728,12 @@ export interface EditorContext {
     /** Mirrors pendingAiSuggestions[i].suggestionId — the originating
      *  op-preview event id. Used to find-and-remove on accept/reject/revert. */
     id: string;
-    /** Target pageId from the op. null = first page (matches orchestrator
-     *  default). The ghost only renders when the active page matches. */
-    pageId: string | null;
-    /** afterSectionId from the op. null = insert at top of the page; a
-     *  non-existent id falls back to "appended to end of page" so a stale
-     *  ghost never disappears. */
+    /** Concrete target page id resolved from the op using applyCanvasAgentOp's
+     *  insertion precedence: explicit pageId, afterSectionId's page, then the
+     *  first page. The ghost renders only on this page. */
+    pageId: string;
+    /** afterSectionId from the op. null = append to the end of the page body; a
+     *  non-existent id is rejected before the ghost enters this store. */
     afterSectionId: string | null;
     /** Resolved section to render dimmed. Carries its own (synthetic) id;
      *  if the op is later accepted, the real apply mints a different id. */

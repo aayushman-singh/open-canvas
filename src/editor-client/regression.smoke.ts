@@ -3,6 +3,8 @@
 // Focused source guards for Phase 3 regressions that used to be covered by
 // the monolithic review smoke while the inline IIFE was production code.
 
+import { resolveGhostPageIdForPreview } from './chat-session.js';
+
 declare const Bun: {
   file(input: URL): {
     text(): Promise<string>;
@@ -111,6 +113,64 @@ assert(
 assert(
   !/ctx\.selectedElementId\s*=\s*null/.test(pageCrud),
   'page-crud must NOT null ctx.selectedElementId directly — routes around the DOM cleanup',
+);
+
+const ghostTargetPages = [
+  { id: 'page-a', sections: [{ id: 'sec-a' }] },
+  { id: 'page-b', sections: [{ id: 'sec-b' }] },
+];
+assert(
+  resolveGhostPageIdForPreview(ghostTargetPages, undefined, null) === 'page-a',
+  'ghost preview with no pageId/afterSectionId must resolve to the first page, not every page',
+);
+assert(
+  resolveGhostPageIdForPreview(ghostTargetPages, null, 'sec-b') === 'page-b',
+  'ghost preview with afterSectionId must resolve to the page containing that section',
+);
+assert(
+  resolveGhostPageIdForPreview(ghostTargetPages, 'page-b', 'sec-b') === 'page-b',
+  'ghost preview with an explicit pageId must render only on that page',
+);
+try {
+  resolveGhostPageIdForPreview(ghostTargetPages, 'page-missing', null);
+  throw new Error('expected missing explicit pageId to throw');
+} catch (err) {
+  assert(
+    err instanceof Error && err.message.includes('pageId not found: page-missing'),
+    'ghost preview must throw loudly when an explicit pageId does not exist',
+  );
+}
+try {
+  resolveGhostPageIdForPreview(ghostTargetPages, 'page-a', 'sec-b');
+  throw new Error('expected mismatched afterSectionId to throw');
+} catch (err) {
+  assert(
+    err instanceof Error &&
+      err.message.includes('afterSectionId sec-b does not exist on page page-a'),
+    'ghost preview must throw loudly when afterSectionId is outside the explicit page',
+  );
+}
+
+const renderSource = await source('./render.ts');
+const pageGhostFilter = renderSource.indexOf('const pageGhosts = ctx.ghostSections.filter');
+const realSectionsLoop = renderSource.indexOf(
+  'for (let si = 0; si < page.sections.length; si++)',
+);
+const nullGhostAppend = renderSource.indexOf(
+  "if (pageGhosts[gi]!.afterSectionId === null)",
+  realSectionsLoop,
+);
+const footerAppend = renderSource.indexOf('if (ctx.state.footer)', nullGhostAppend);
+assert(
+  pageGhostFilter >= 0 &&
+    realSectionsLoop > pageGhostFilter &&
+    nullGhostAppend > realSectionsLoop &&
+    footerAppend > nullGhostAppend,
+  'ghost preview afterSectionId:null must render after real page sections and before footer, matching applyCanvasAgentOp append semantics',
+);
+assert(
+  !renderSource.includes('above the first real section'),
+  'ghost preview render comments must not describe null afterSectionId as top-of-page insertion',
 );
 
 const linkPopover = await source('./link-popover.ts');

@@ -91,11 +91,51 @@ interface ChatSseEvent {
  * op shape is malformed. The caller filters non-null results into
  * ctx.ghostSections.
  */
+export function resolveGhostPageIdForPreview(
+  pages: readonly { id: string; sections: readonly { id: string }[] }[],
+  opPageId: string | null | undefined,
+  afterSectionId: string | null,
+): string {
+  const firstPage = pages[0];
+  if (!firstPage) {
+    throw new Error('ghost preview: state must have at least one page');
+  }
+  if (typeof opPageId === 'string' && opPageId.length > 0) {
+    const target = pages.find((p) => p.id === opPageId);
+    if (!target) {
+      throw new Error(
+        `ghost preview: pageId not found: ${opPageId}. Known pages: ${pages
+          .map((p) => p.id)
+          .join(', ')}`,
+      );
+    }
+    if (
+      typeof afterSectionId === 'string' &&
+      afterSectionId.length > 0 &&
+      !target.sections.some((s) => s.id === afterSectionId)
+    ) {
+      throw new Error(
+        `ghost preview: afterSectionId ${afterSectionId} does not exist on page ${opPageId}`,
+      );
+    }
+    return target.id;
+  }
+  if (typeof afterSectionId === 'string' && afterSectionId.length > 0) {
+    const target = pages.find((p) => p.sections.some((s) => s.id === afterSectionId));
+    if (!target) {
+      throw new Error(`ghost preview: afterSectionId not found on any page: ${afterSectionId}`);
+    }
+    return target.id;
+  }
+  return firstPage.id;
+}
+
 function extractGhostFromOpPreview(
   opSnapshot: unknown,
   previewSection: CanvasSection | undefined,
   suggestionId: string,
-): { id: string; pageId: string | null; afterSectionId: string | null; section: CanvasSection } | null {
+  pages: readonly { id: string; sections: readonly { id: string }[] }[],
+): { id: string; pageId: string; afterSectionId: string | null; section: CanvasSection } | null {
   if (!previewSection || !opSnapshot || typeof opSnapshot !== 'object') return null;
   const op = opSnapshot as {
     kind?: string;
@@ -120,7 +160,11 @@ function extractGhostFromOpPreview(
       : op.afterSectionId === undefined
         ? null
         : op.afterSectionId;
-  const pageId = op.pageId === undefined ? null : op.pageId;
+  const pageId = resolveGhostPageIdForPreview(
+    pages,
+    op.pageId === undefined ? null : op.pageId,
+    afterSectionId,
+  );
   return { id: suggestionId, pageId, afterSectionId, section: previewSection };
 }
 
@@ -376,6 +420,7 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           opSnapshot,
                           previewSectionSnapshot,
                           suggestionIdSnapshot,
+                          ctx.state!.pages,
                         );
                         if (ghost) {
                           ctx.ghostSections.push(ghost);

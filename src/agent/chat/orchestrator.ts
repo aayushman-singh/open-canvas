@@ -44,7 +44,7 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type { CanvasSection, EditableSite } from '../../canvas/schema.js';
+import type { CanvasPage, CanvasSection, EditableSite } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
 import { createSectionFromRecipe } from '../../canvas/recipes.js';
 import { resolveDesignSection } from '../../canvas/layout/engine.js';
@@ -349,7 +349,21 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         } else if (MUTATING_TOOL_NAMES.has(call.name)) {
           const dispatched = dispatchMutatingTool({ call, history });
           if (dispatched.preview) {
-            const previewSection = resolvePreviewSection(dispatched.preview.op, ctx.state);
+            let previewSection: CanvasSection | undefined;
+            try {
+              previewSection = resolvePreviewSection(dispatched.preview.op, ctx.state);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              await writer.write({ kind: 'error', error: message });
+              history.push({
+                role: 'tool',
+                toolCallId: call.id,
+                toolName: call.name,
+                content: JSON.stringify({ error: message }),
+              });
+              await writer.write({ kind: 'done', reason: 'other' });
+              return { messages: history, previewOps, doneReason: 'other' };
+            }
             const event: Extract<
               Parameters<ChatStreamWriter['write']>[0],
               { kind: 'op-preview' }
@@ -660,68 +674,102 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
  *                      resolveStyleKitWithCustom, mirroring applyCanvasAgentOp)
  *   - duplicateSection → clone the targeted section from state with new ids
  *
- * Failures are SWALLOWED — the ghost preview is a UI affordance, not the
- * source of truth. If resolution throws (e.g. unknown recipe id, missing
- * customStyleKit), the SSE event still ships without `previewSection` and
- * the existing suggestion card UI continues to work. The /apply path will
- * surface the same error loudly when the Owner clicks Accept.
+ * Failures are loud. The ghost is the Owner's preview of what Accept will do,
+ * so resolution must mirror applyCanvasAgentOp instead of silently omitting or
+ * retargeting the preview section.
  */
 function resolvePreviewSection(
   op: CanvasAgentOp,
   state: EditableSite,
 ): CanvasSection | undefined {
-  try {
-    if (op.kind === 'insertSection') {
-      return createSectionFromRecipe(op.recipeId, op.input);
-    }
-    if (op.kind === 'designSection') {
-      const targetPage = resolveTargetPage(state, op.pageId ?? null);
-      if (!targetPage) return undefined;
-      const preset = resolveStyleKitWithCustom(state);
-      const result = resolveDesignSection(op.input, targetPage.width, preset);
-      return result.section;
-    }
-    if (op.kind === 'duplicateSection') {
-      return cloneSectionForPreview(state, op.sectionId);
-    }
-  } catch {
-    return undefined;
+  if (op.kind === 'insertSection') {
+    resolvePreviewInsertionPage(state, op.pageId ?? null, op.afterSectionId, 'insertSection');
+    return createSectionFromRecipe(op.recipeId, op.input);
+  }
+  if (op.kind === 'designSection') {
+    const targetPage = resolvePreviewInsertionPage(
+      state,
+      op.pageId ?? null,
+      op.afterSectionId,
+      'designSection',
+    );
+    const preset = resolveStyleKitWithCustom(state);
+    const result = resolveDesignSection(op.input, targetPage.width, preset);
+    return result.section;
+  }
+  if (op.kind === 'duplicateSection') {
+    return cloneSectionForPreview(state, op.sectionId);
   }
   return undefined;
 }
 
-function resolveTargetPage(
+function resolvePreviewInsertionPage(
   state: EditableSite,
-  pageId: string | null,
-): { width: number } | undefined {
-  if (pageId === null) return state.pages[0];
-  const match = state.pages.find((p) => p.id === pageId);
-  return match ?? state.pages[0];
+  opPageId: string | null | undefined,
+  opAfterSectionId: string | null,
+  kindLabel: string,
+): CanvasPage {
+  const firstPage = state.pages[0];
+  if (!firstPage) {
+    throw new Error('resolvePreviewSection: state must have at least one page');
+  }
+  if (typeof opPageId === 'string' && opPageId.length > 0) {
+    const target = state.pages.find((p) => p.id === opPageId);
+    if (!target) {
+      throw new Error(
+        `resolvePreviewSection(${kindLabel}): pageId not found: ${opPageId}. Known pages: ${state.pages
+          .map((p) => p.id)
+          .join(', ')}`,
+      );
+    }
+    if (
+      typeof opAfterSectionId === 'string' &&
+      opAfterSectionId.length > 0 &&
+      !target.sections.some((s) => s.id === opAfterSectionId)
+    ) {
+      throw new Error(
+        `resolvePreviewSection(${kindLabel}): afterSectionId ${opAfterSectionId} does not exist on page ${opPageId}`,
+      );
+    }
+    return target;
+  }
+  if (typeof opAfterSectionId === 'string' && opAfterSectionId.length > 0) {
+    const target = state.pages.find((p) => p.sections.some((s) => s.id === opAfterSectionId));
+    if (!target) {
+      throw new Error(
+        `resolvePreviewSection(${kindLabel}): afterSectionId not found on any page: ${opAfterSectionId}`,
+      );
+    }
+    return target;
+  }
+  return firstPage;
 }
 
 function cloneSectionForPreview(
   state: EditableSite,
   sectionId: string,
-): CanvasSection | undefined {
+): CanvasSection {
   for (const page of state.pages) {
     const found = page.sections.find((s) => s.id === sectionId);
     if (found) {
       const clone = structuredClone(found);
-      clone.id = `ghost-${sectionId}-${Math.random().toString(36).slice(2, 8)}`;
+      clone.id = `sec-${clone.recipeId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      clone.name = `${found.name} copy`;
+      for (const el of clone.elements) {
+        const prefix = el.id.includes('-') ? el.id.split('-').slice(0, -1).join('-') : 'el';
+        el.id = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      }
+      if (clone.role) delete clone.role;
       return clone;
     }
   }
   if (state.header && state.header.id === sectionId) {
-    const clone = structuredClone(state.header);
-    clone.id = `ghost-${sectionId}-${Math.random().toString(36).slice(2, 8)}`;
-    return clone;
+    throw new Error('resolvePreviewSection(duplicateSection): cannot duplicate header or footer');
   }
   if (state.footer && state.footer.id === sectionId) {
-    const clone = structuredClone(state.footer);
-    clone.id = `ghost-${sectionId}-${Math.random().toString(36).slice(2, 8)}`;
-    return clone;
+    throw new Error('resolvePreviewSection(duplicateSection): cannot duplicate header or footer');
   }
-  return undefined;
+  throw new Error(`resolvePreviewSection(duplicateSection): section not found: ${sectionId}`);
 }
 
 // ---------------------------------------------------------------------------
