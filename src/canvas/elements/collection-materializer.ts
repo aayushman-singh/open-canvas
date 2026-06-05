@@ -1,56 +1,75 @@
 // src/canvas/elements/collection-materializer.ts
 //
-// ADR 0060 — pure materialization pass applied to an `EditableSite` before
-// publish. Hydrates collection surfaces from the entries table:
+// ADR 0060 + ADR 0063 — publish-time materialization pass applied to an
+// `EditableSite` before publish.
 //
-//   - Pages with `pageKind === 'collection-index'` get their page-bound
-//     `CollectionElement.entries[]` populated. For each matching entry, the
-//     element's `cardTemplate` is cloned and `{{field}}` placeholders inside
-//     string fields of any child element are substituted.
+// Two distinct expansion paths run here:
+//   1. Pages with `pageKind === 'collection-item-template'` are cloned once
+//      per matching published entry. Each clone inherits the entry's metadata
+//      (title, description, publishedDate, author, category, tags,
+//      ogImageAssetId) and has `{{field}}` placeholders substituted across
+//      every string field of every element. ADR 0060 path, unchanged.
+//   2. CollectionElements inside ordinary pages (and header/footer) are
+//      hydrated per ADR 0063 dec 4 + dec 7 + dec 8: filter by
+//      `el.collectionSlug` (+ optional `el.folder`), order by `el.sort`
+//      (with `el.manualOrder` overriding when `sort === 'manual'`), then
+//      either clone the built-in `DEFAULT_CARD_TEMPLATE` per entry
+//      (`display === 'card'`) or emit one Image-wrapped-in-a-linked-Container
+//      per entry (`display === 'image-only'`). Per-entry instances are
+//      written into the deprecated-but-load-bearing `el.entries` slot so
+//      downstream consumers (editor preview at `body-builders-data.ts`, and
+//      the renderer rewrite that lands alongside ADR 0063 dec 6's click-
+//      handling change) can traverse them with the existing matrix shape.
 //
-//   - Pages with `pageKind === 'collection-item-template'` are expanded: the
-//     single ghost template page is replaced by N concrete pages, one per
-//     matching entry. Each clone inherits the entry's metadata (title,
-//     description, publishedDate, author, category, tags, ogImageAssetId) and
-//     has `{{field}}` placeholders substituted across every string field of
-//     every element. The `pageKind`/`collectionSlug` template metadata is
-//     stripped from the clones — they ship as ordinary pages.
-//
-//   - Pages without `pageKind` pass through unchanged.
+// Failure modes (loud, per ADR 0063 + CLAUDE.md):
+//   * `collectionSlug === undefined` or zero matches → `el.entries = []` and
+//     a `warnings` string is appended: `"Collection element <id> on page
+//     <slug> matched 0 entries (source=<slug or 'unset'>, folder=<folder>)."`.
+//     The new `materializeCollectionsWithReport` export surfaces warnings to
+//     callers; the existing `materializeCollections` discards them so the
+//     publish.ts migration to consume warnings can land in a separate commit.
+//   * Stale ids in `manualOrder` (entry deleted from CMS) → silently skipped
+//     at materialization. Inspector lazy-strip lives in editor-client.
 //
 // Contract guarantees:
 //   * Pure: the input `site` is deep-cloned and never mutated.
 //   * Caller filters drafts. This module trusts the entry list it receives;
 //     only `status: 'published'` rows should be passed in by the caller
 //     (see ADR 0060 §3 — "Draft entries are excluded").
-//   * Entry → page binding rule: an entry matches a page when
-//       entry.collectionSlug === page.collectionSlug
-//     (`CollectionElement.filter.category` can further narrow index entries
-//     inside that collection).
-//   * Index-page entries are also filtered by `element.filter.tags` (entry
-//     must include every listed tag) and capped by `element.filter.limit`.
-//   * Default sort on index pages is `publishedDate desc` when no
-//     `element.sort` is configured. ADR 0060 §3 leaves this implicit; the
-//     materializer pins it so snapshot diffs stay deterministic.
 //   * Template-page clone ids are deterministic — `${page.id}--${entry.slug}`
-//     — so re-running materialization on the same input produces byte-equal
-//     pages (good for snapshot replay smokes).
+//     — and per-entry card ids follow the same rule
+//     (`${baseElement.id}--${entry.slug}`) so re-running materialization on
+//     the same input produces byte-equal pages (good for snapshot replay
+//     smokes).
+//   * Legacy CollectionElement fields (`mode`, `cardTemplate`, `fieldBindings`,
+//     `filter`, the object-shaped `sort`) are read-skipped per Phase 2B's
+//     migration discipline. Only the new fields (`collectionSlug`, `folder`,
+//     `sort` as string, `manualOrder`, `display`) are read.
 
 import type {
+  ActionElement,
   CanvasElement,
   CanvasPage,
   CanvasSection,
+  ContainerElement,
   EditableSite,
-  InlineRun,
-  MediaElement,
+  ImageMediaElement,
   TextElement,
 } from '../schema.js';
-import type { CollectionElement, PageMetadataField } from './collection.js';
+import type { CollectionElement, CollectionSort } from './collection.js';
+import {
+  DEFAULT_CARD_SIBLINGS,
+  DEFAULT_CARD_TEMPLATE,
+} from './collection-defaults.js';
 
 /** Row shape consumed by the materializer. Mirrors the published projection of
- *  the `collection_entry` table (ADR 0060 §1). The caller is responsible for
- *  excluding `status: 'draft'` rows before passing in this array. */
+ *  the `collection_entry` table (ADR 0060 §1 + ADR 0063 dec 7). The caller is
+ *  responsible for excluding `status: 'draft'` rows before passing in this
+ *  array. */
 export interface MaterializerEntry {
+  /** Stable entry id (matches `collection_entry.id`). Used by `manualOrder`
+   *  resolution; optional during the multi-commit publish-path migration. */
+  id?: string;
   collectionSlug: string;
   slug: string;
   title: string;
@@ -61,10 +80,18 @@ export interface MaterializerEntry {
   category: string;
   tags: string[];
   ogImageAssetId: string | null;
+  /** ADR 0063 dec 7 — optional sub-grouping value. `null` = ungrouped. */
+  folder?: string | null;
 }
 
-/** Placeholder fields the substitutor recognises. `{{tag}}` resolves to the
- *  entry's first tag (empty string when none). */
+/** Report shape exposed by `materializeCollectionsWithReport`. Warnings are
+ *  human-readable strings shaped per ADR 0063 dec 1 / dec 7 — callers (publish
+ *  report emitter, dashboard preflight) surface them verbatim. */
+export interface MaterializerReport {
+  site: EditableSite;
+  warnings: string[];
+}
+
 type PlaceholderField =
   | 'title'
   | 'excerpt'
@@ -73,7 +100,8 @@ type PlaceholderField =
   | 'author'
   | 'category'
   | 'tag'
-  | 'slug';
+  | 'slug'
+  | 'ogImageAssetId';
 
 const PLACEHOLDER_FIELDS: readonly PlaceholderField[] = [
   'title',
@@ -84,6 +112,7 @@ const PLACEHOLDER_FIELDS: readonly PlaceholderField[] = [
   'category',
   'tag',
   'slug',
+  'ogImageAssetId',
 ];
 
 function placeholderValue(entry: MaterializerEntry, field: PlaceholderField): string {
@@ -104,31 +133,11 @@ function placeholderValue(entry: MaterializerEntry, field: PlaceholderField): st
       return entry.tags[0] ?? '';
     case 'slug':
       return entry.slug;
-  }
-}
-
-function metadataFieldValue(entry: MaterializerEntry, field: PageMetadataField): string {
-  switch (field) {
-    case 'title':
-      return entry.title;
-    case 'description':
-      return entry.excerpt;
-    case 'ogImage':
+    case 'ogImageAssetId':
       return entry.ogImageAssetId ?? '';
-    case 'publishedDate':
-      return entry.publishedDate;
-    case 'author':
-      return entry.author;
-    case 'tags':
-      return entry.tags.join(', ');
-    case 'category':
-      return entry.category;
   }
 }
 
-/** Replace every `{{field}}` token in a single string with its entry value.
- *  Unknown tokens are left intact so unrelated mustache-shaped text (rare,
- *  but possible in user-authored copy) survives. */
 function substituteString(input: string, entry: MaterializerEntry): string {
   let out = input;
   for (const field of PLACEHOLDER_FIELDS) {
@@ -140,16 +149,6 @@ function substituteString(input: string, entry: MaterializerEntry): string {
   return out;
 }
 
-/** Recursively substitute placeholders in every string field of an arbitrary
- *  JSON-shaped value. The canvas document model is all-JSON (no functions, no
- *  class instances), so a structural walk is exhaustive across `BaseElement`,
- *  `InlineRun`, `ElementStyle`, `pinnedStyle`, etc. without per-element
- *  special-casing. Numbers/booleans/null/undefined pass through.
- *
- *  Arrays are walked element-by-element. Plain objects are walked key-by-key.
- *  This intentionally substitutes inside both `key` values (e.g. text content,
- *  hrefs, alt text) and inside nested containers like `tabs[].elements[]`,
- *  `entryTemplate[]`, `cardTemplate[]`, `entries[][]`. */
 function substituteInValue<T>(value: T, entry: MaterializerEntry): T {
   if (typeof value === 'string') {
     return substituteString(value, entry) as T;
@@ -168,223 +167,144 @@ function substituteInValue<T>(value: T, entry: MaterializerEntry): T {
   return value;
 }
 
-/** Deep-clone via structured JSON round-trip. The canvas model is JSON-only
- *  (validated upstream), so `JSON.parse(JSON.stringify(...))` is the
- *  canonical clone — no Dates, no Maps, no functions to lose. */
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-/** Apply an `element.sort` config to a list of entries. Default — used when
- *  `sort` is undefined — is `publishedDate desc`. Sort is stable: equal keys
- *  preserve incoming order, so deterministic upstream ordering (e.g. by id)
- *  flows through. */
-function sortEntries(
-  entries: MaterializerEntry[],
-  sort: CollectionElement['sort'],
-): MaterializerEntry[] {
-  const field = sort?.field ?? 'publishedDate';
-  const order = sort?.order ?? 'desc';
-  const sign = order === 'asc' ? 1 : -1;
-  // Decorate-sort-undecorate keeps the sort stable across Node engines.
+function sortEntriesByDateDesc(entries: MaterializerEntry[]): MaterializerEntry[] {
   return entries
     .map((entry, idx) => ({ entry, idx }))
     .sort((a, b) => {
-      const av = a.entry[field];
-      const bv = b.entry[field];
-      if (av < bv) return -1 * sign;
-      if (av > bv) return 1 * sign;
+      if (a.entry.publishedDate < b.entry.publishedDate) return 1;
+      if (a.entry.publishedDate > b.entry.publishedDate) return -1;
       return a.idx - b.idx;
     })
     .map(({ entry }) => entry);
 }
 
-/** Filter and limit the entry list for an index-page collection element. */
-function filterEntriesForElement(
-  element: CollectionElement,
-  pageCollectionSlug: string,
+function sortEntriesByDateAsc(entries: MaterializerEntry[]): MaterializerEntry[] {
+  return entries
+    .map((entry, idx) => ({ entry, idx }))
+    .sort((a, b) => {
+      if (a.entry.publishedDate < b.entry.publishedDate) return -1;
+      if (a.entry.publishedDate > b.entry.publishedDate) return 1;
+      return a.idx - b.idx;
+    })
+    .map(({ entry }) => entry);
+}
+
+/** Apply `manualOrder` to a candidate entry list. Stale ids (entry deleted
+ *  upstream) are dropped silently per ADR 0063 dec 8 failure path. Entries
+ *  not named in `manualOrder` are appended in date-desc order so newly added
+ *  posts surface predictably until the Owner re-curates. */
+function sortEntriesManual(
   entries: MaterializerEntry[],
+  manualOrder: readonly string[],
 ): MaterializerEntry[] {
-  const category = element.filter?.category;
-  const requiredTags = element.filter?.tags ?? [];
-  const limit = element.filter?.limit;
-
-  const matched = entries.filter((entry) => {
-    if (entry.collectionSlug !== pageCollectionSlug) return false;
-    if (category !== undefined && entry.category !== category) return false;
-    if (requiredTags.length > 0) {
-      for (const tag of requiredTags) {
-        if (!entry.tags.includes(tag)) return false;
-      }
-    }
-    return true;
-  });
-
-  const sorted = sortEntries(matched, element.sort);
-  return limit !== undefined ? sorted.slice(0, limit) : sorted;
-}
-
-/** Walk all `CanvasElement` nodes in a section (and their nested children).
- *  Returns each element in a flat order so the index-page pass can find every
- *  `CollectionElement` regardless of nesting depth (collections inside tabs,
- *  collections inside collections via `entryTemplate`, etc.). */
-function walkElements(elements: CanvasElement[], visit: (el: CanvasElement) => void): void {
-  for (const el of elements) {
-    visit(el);
-    if (el.type === 'tabs') {
-      const tabsEl = el;
-      for (const tab of tabsEl.tabs) {
-        walkElements(tab.elements, visit);
-      }
-      continue;
-    }
-    if (el.type === 'collection') {
-      const collEl = el;
-      walkElements(collEl.entryTemplate, visit);
-      if (collEl.cardTemplate !== undefined) walkElements(collEl.cardTemplate, visit);
-      for (const entry of collEl.entries) {
-        walkElements(entry, visit);
-      }
-      continue;
-    }
+  const byId = new Map<string, MaterializerEntry>();
+  for (const entry of entries) {
+    if (entry.id !== undefined) byId.set(entry.id, entry);
   }
-}
-
-function replaceTextElementContent(element: TextElement, value: string): void {
-  const first = element.content[0];
-  const next: InlineRun = { text: value };
-  if (first?.marks !== undefined) {
-    next.marks = deepClone(first.marks);
+  const ordered: MaterializerEntry[] = [];
+  const claimed = new Set<string>();
+  for (const id of manualOrder) {
+    const hit = byId.get(id);
+    if (hit === undefined) continue;
+    ordered.push(hit);
+    claimed.add(id);
   }
-  element.content = [next];
+  const tail = entries.filter((entry) => entry.id === undefined || !claimed.has(entry.id));
+  ordered.push(...sortEntriesByDateDesc(tail));
+  return ordered;
 }
 
-function replaceMediaElementAsset(element: MediaElement, entry: MaterializerEntry): void {
-  if (entry.ogImageAssetId === null || entry.ogImageAssetId.length === 0) {
-    throw new Error(
-      `collection materializer: media field binding for entry ${JSON.stringify(entry.slug)} requires ogImageAssetId`,
-    );
-  }
-  element.assetId = entry.ogImageAssetId;
-  element.alt = entry.title;
-}
-
-function applyFieldBindings(
-  elements: CanvasElement[],
-  fieldBindings: CollectionElement['fieldBindings'],
+/** ADR 0063 dec 4 + dec 6 — assemble one entry's worth of canvas elements.
+ *  Outer Container links the whole surface; siblings carry the visible chrome.
+ *  Ids are suffixed with the entry slug so replay produces byte-equal output. */
+function buildCardEntryInstance(
   entry: MaterializerEntry,
-): void {
-  if (fieldBindings === undefined) return;
-  walkElements(elements, (el) => {
-    const field = fieldBindings[el.id];
-    if (field === undefined) return;
-    if (el.type === 'text') {
-      replaceTextElementContent(el, metadataFieldValue(entry, field));
-      return;
-    }
-    if (el.type === 'media') {
-      if (field !== 'ogImage') {
-        throw new Error(
-          `collection materializer: media element ${JSON.stringify(el.id)} is bound to non-media field ${JSON.stringify(field)}`,
-        );
-      }
-      replaceMediaElementAsset(el, entry);
-    }
-  });
-}
-
-/** Substitute placeholders and field bindings for an entry across a list of
- *  cloned cardTemplate elements, then suffix every element id with the
- *  entry slug. The id-suffix step is required because the materializer
- *  produces N clones of the same cardTemplate within a single page, and the
- *  validator's element-id-unique-within-page rule (page-routing.ts) would
- *  otherwise fail on the first multi-entry index page. The suffix runs
- *  AFTER `applyFieldBindings` because the OUTER lookup is keyed by the
- *  original element id. The clone has already been deep-cloned by the
- *  caller, so binding can mutate in place.
- *
- *  Nested page-bound CollectionElements inside the cardTemplate carry their
- *  own `fieldBindings` map keyed by the inner-card element ids. The id
- *  suffix would invalidate those maps: when the next pass (`hydrateIndexSection`
- *  descending into our clone) hydrates the nested collection, its
- *  `applyFieldBindings` lookup would miss every key and silently drop the
- *  bindings. Remap each nested CollectionElement's `fieldBindings` keys
- *  to the suffixed ids in the same walk, preserving the invariant that
- *  `fieldBindings` keys match the ids of the cardTemplate elements they
- *  bind to. */
-function substituteCardTemplate(
-  cardTemplate: CanvasElement[],
-  fieldBindings: CollectionElement['fieldBindings'],
-  entry: MaterializerEntry,
+  collectionSlug: string,
 ): CanvasElement[] {
-  const substituted = substituteInValue(cardTemplate, entry);
-  applyFieldBindings(substituted, fieldBindings, entry);
-  walkElements(substituted, (el) => {
-    el.id = `${el.id}--${entry.slug}`;
-    if (el.type === 'collection' && el.fieldBindings !== undefined) {
-      const remapped: Record<string, PageMetadataField> = {};
-      for (const [k, v] of Object.entries(el.fieldBindings)) {
-        remapped[`${k}--${entry.slug}`] = v;
-      }
-      el.fieldBindings = remapped;
+  const detailUrl = `/${collectionSlug}/${entry.slug}`;
+  const containerSeed = deepClone(DEFAULT_CARD_TEMPLATE as ContainerElement);
+  const substitutedContainer = substituteInValue(containerSeed, entry);
+  const container: ContainerElement = {
+    ...substitutedContainer,
+    id: `${DEFAULT_CARD_TEMPLATE.id}--${entry.slug}`,
+    linkHref: { type: 'external', url: detailUrl },
+  };
+  const siblings: CanvasElement[] = DEFAULT_CARD_SIBLINGS.map((sib): CanvasElement => {
+    const seed = deepClone(sib);
+    const substituted = substituteInValue(seed, entry);
+    if (substituted.type === 'action') {
+      const action: ActionElement = {
+        id: `${sib.id}--${entry.slug}`,
+        type: 'action',
+        box: substituted.box,
+        label: substituted.label,
+        variant: substituted.variant,
+        href: { type: 'external', url: detailUrl },
+      };
+      return action;
     }
-  });
-  return substituted;
-}
-
-/** Hydrate every page-bound CollectionElement under an index page. Mutates
- *  the (already-cloned) page in place. */
-function hydrateIndexPage(page: CanvasPage, entries: MaterializerEntry[]): void {
-  const pageCollectionSlug = page.collectionSlug;
-  if (pageCollectionSlug === undefined) return;
-  for (const section of page.sections) {
-    hydrateIndexSection(section, pageCollectionSlug, entries);
-  }
-}
-
-function hydrateIndexSection(
-  section: CanvasSection,
-  pageCollectionSlug: string,
-  entries: MaterializerEntry[],
-): void {
-  walkElements(section.elements, (el) => {
-    if (el.type !== 'collection') return;
-    const collEl = el;
-    if (collEl.mode !== 'page-bound') return;
-    if (collEl.cardTemplate === undefined || collEl.cardTemplate.length === 0) {
-      // No card template means nothing to clone per entry; leave `entries`
-      // empty. Validation upstream allows this (cardTemplate is optional);
-      // the materializer is silent here because there is no failure mode —
-      // the publisher renders an empty grid, which is the correct outcome
-      // for an unconfigured page-bound collection.
-      collEl.entries = [];
-      return;
+    if (substituted.type === 'media' && substituted.mediaKind === 'image') {
+      const image: ImageMediaElement = {
+        ...substituted,
+        id: `${sib.id}--${entry.slug}`,
+      };
+      return image;
     }
-    const matched = filterEntriesForElement(collEl, pageCollectionSlug, entries);
-    collEl.entries = matched.map((entry) => {
-      const cloned = deepClone(collEl.cardTemplate ?? []);
-      return substituteCardTemplate(cloned, collEl.fieldBindings, entry);
-    });
+    const text: TextElement = {
+      ...(substituted as TextElement),
+      id: `${sib.id}--${entry.slug}`,
+    };
+    return text;
   });
+  return [container, ...siblings];
 }
 
-/** Build one concrete page from a template page + an entry. Strips
- *  `pageKind`/`collectionSlug` so the output is an ordinary canvas page. */
+/** ADR 0063 dec 4 — image-only mode. Per-entry instance is a single Container
+ *  with `linkHref` set to the detail URL plus a single ImageMediaElement
+ *  sibling carrying the entry's ogImageAssetId. The Container wraps the
+ *  surface as the link (matching the card-as-link pattern from dec 6); the
+ *  Image is positioned identically so it fills the linked area. */
+function buildImageOnlyEntryInstance(
+  entry: MaterializerEntry,
+  collectionSlug: string,
+): CanvasElement[] {
+  const detailUrl = `/${collectionSlug}/${entry.slug}`;
+  const assetId = entry.ogImageAssetId ?? '__placeholder__';
+  const container: ContainerElement = {
+    id: `collection-image-link--${entry.slug}`,
+    type: 'container',
+    box: { x: 0, y: 0, w: 320, h: 200, z: 1 },
+    variant: 'flat',
+    linkHref: { type: 'external', url: detailUrl },
+    linkLabel: entry.title,
+  };
+  const image: ImageMediaElement = {
+    id: `collection-image-asset--${entry.slug}`,
+    type: 'media',
+    mediaKind: 'image',
+    box: { x: 0, y: 0, w: 320, h: 200, z: 2 },
+    assetId,
+    alt: entry.title,
+    fit: 'cover',
+  };
+  return [container, image];
+}
+
+function readSortMode(el: CollectionElement): CollectionSort {
+  if (typeof el.sort === 'string') return el.sort;
+  return 'date-desc';
+}
+
 function clonePageForEntry(template: CanvasPage, entry: MaterializerEntry): CanvasPage {
-  // Deep-clone the template first so substituteInValue can walk every string.
   const cloned = deepClone(template);
-  // Substitute placeholders across the section/element subtree only — page
-  // metadata fields are set explicitly below from the entry row.
   cloned.sections = substituteInValue(cloned.sections, entry);
-  // Deterministic clone id keeps snapshot diffs stable across replays.
   cloned.id = `${template.id}--${entry.slug}`;
   cloned.slug = `${template.collectionSlug ?? ''}/${entry.slug}`;
   cloned.title = entry.title;
-  // CanvasPage's optional metadata fields (`description`, `author`,
-  // `category`) reject empty strings at validation time ("non-empty when
-  // present"). The entry row uses an empty string to mean "unset" because
-  // the DB column is NOT NULL with a `''` default. Translate that here: if
-  // the entry value is empty, drop the field rather than set ''.
   if (entry.excerpt.length > 0) cloned.description = entry.excerpt;
   else delete cloned.description;
   cloned.publishedDate = entry.publishedDate;
@@ -398,53 +318,159 @@ function clonePageForEntry(template: CanvasPage, entry: MaterializerEntry): Canv
   } else {
     delete cloned.ogImageAssetId;
   }
-  // Strip template metadata — the published clone is an ordinary page.
   delete cloned.pageKind;
   delete cloned.collectionSlug;
   return cloned;
 }
 
-/** ADR 0060 publish-time materialization pass.
- *  Pure: returns a new `EditableSite` with hydrated index-page collections
- *  and template pages expanded into one page per matching entry. The input
- *  `site` is never mutated.
+/** Resolve the entry list for one Collection element. Returns the ordered,
+ *  filtered list plus a warning string when the result is empty (ADR 0063
+ *  dec 1 / dec 7 failure path). The warning string includes the page slug
+ *  so the publish report can pinpoint the offending surface. */
+function resolveEntriesForCollection(
+  el: CollectionElement,
+  entries: readonly MaterializerEntry[],
+  pageSlug: string,
+): { ordered: MaterializerEntry[]; warning: string | null } {
+  const collectionSlug = el.collectionSlug;
+  if (collectionSlug === undefined) {
+    return {
+      ordered: [],
+      warning:
+        `Collection element ${el.id} on page ${pageSlug} matched 0 entries ` +
+        `(source=unset, folder=${el.folder ?? 'unset'}).`,
+    };
+  }
+  const matchesSlug = entries.filter((entry) => entry.collectionSlug === collectionSlug);
+  const matched =
+    el.folder === undefined
+      ? matchesSlug
+      : matchesSlug.filter((entry) => (entry.folder ?? null) === el.folder);
+  if (matched.length === 0) {
+    return {
+      ordered: [],
+      warning:
+        `Collection element ${el.id} on page ${pageSlug} matched 0 entries ` +
+        `(source=${collectionSlug}, folder=${el.folder ?? 'unset'}).`,
+    };
+  }
+  const sortMode = readSortMode(el);
+  let ordered: MaterializerEntry[];
+  if (sortMode === 'date-asc') {
+    ordered = sortEntriesByDateAsc(matched);
+  } else if (sortMode === 'manual') {
+    ordered = sortEntriesManual(matched, el.manualOrder ?? []);
+  } else {
+    ordered = sortEntriesByDateDesc(matched);
+  }
+  return { ordered, warning: null };
+}
+
+/** Hydrate one Collection element in place. Writes per-entry instances into
+ *  `el.entries` (the matrix shape downstream consumers already iterate); on
+ *  zero matches `el.entries` is set to `[]` (no placeholder content per
+ *  ADR 0063 dec 5 — publish renderer emits empty, editor preview owns the
+ *  placeholder UI separately). */
+function hydrateCollectionElement(
+  el: CollectionElement,
+  entries: readonly MaterializerEntry[],
+  pageSlug: string,
+  warnings: string[],
+): void {
+  const { ordered, warning } = resolveEntriesForCollection(el, entries, pageSlug);
+  if (warning !== null) warnings.push(warning);
+  const collectionSlug = el.collectionSlug ?? '';
+  const display = el.display ?? 'card';
+  const built: CanvasElement[][] = ordered.map((entry) =>
+    display === 'image-only'
+      ? buildImageOnlyEntryInstance(entry, collectionSlug)
+      : buildCardEntryInstance(entry, collectionSlug),
+  );
+  el.entries = built;
+}
+
+function hydrateCollectionsInSection(
+  section: CanvasSection,
+  entries: readonly MaterializerEntry[],
+  pageSlug: string,
+  warnings: string[],
+): void {
+  const visitElement = (el: CanvasElement): void => {
+    if (el.type === 'tabs') {
+      for (const tab of el.tabs) {
+        for (const child of tab.elements) visitElement(child);
+      }
+      return;
+    }
+    if (el.type === 'collection') {
+      hydrateCollectionElement(el, entries, pageSlug, warnings);
+    }
+  };
+  for (const el of section.elements) visitElement(el);
+}
+
+function hydrateCollectionsInPage(
+  page: CanvasPage,
+  entries: readonly MaterializerEntry[],
+  warnings: string[],
+): void {
+  for (const section of page.sections) {
+    hydrateCollectionsInSection(section, entries, page.slug, warnings);
+  }
+}
+
+/** ADR 0060 + ADR 0063 publish-time materialization pass.
+ *  Returns a new `EditableSite` with template pages expanded into one page
+ *  per matching entry, plus every CollectionElement on every ordinary page
+ *  (and site header/footer) hydrated with per-entry instances.
  *
- *  The caller must pre-filter `entries` to published rows. Draft entries
- *  passed in here will appear in the snapshot. */
+ *  Warnings raised during the pass are discarded by this entry point — call
+ *  `materializeCollectionsWithReport` instead to surface them. The shape is
+ *  split so the existing publish.ts call site stays source-compatible while
+ *  the new report-consuming wiring lands in a separate commit.
+ *
+ *  The caller must pre-filter `entries` to published rows. */
 export function materializeCollections(
   site: EditableSite,
   entries: MaterializerEntry[],
 ): EditableSite {
+  return materializeCollectionsWithReport(site, entries).site;
+}
+
+/** Materialization pass with the warning list exposed. New consumers (publish
+ *  report emitter, dashboard preflight) call this; legacy callers stay on
+ *  `materializeCollections`. */
+export function materializeCollectionsWithReport(
+  site: EditableSite,
+  entries: MaterializerEntry[],
+): MaterializerReport {
   const cloned = deepClone(site);
+  const warnings: string[] = [];
   const out: CanvasPage[] = [];
   for (const page of cloned.pages) {
-    if (page.pageKind === 'collection-index') {
-      hydrateIndexPage(page, entries);
-      out.push(page);
-      continue;
-    }
     if (page.pageKind === 'collection-item-template') {
       const collectionSlug = page.collectionSlug;
       if (collectionSlug === undefined) {
-        // The validator rejects this combination, so it should be unreachable
-        // at publish time. Keep the template page intact rather than dropping
-        // it silently — a fail-loud surface for the developer if validation
-        // is ever bypassed.
         out.push(page);
         continue;
       }
-      const matched = sortEntries(
+      const matched = sortEntriesByDateDesc(
         entries.filter((entry) => entry.collectionSlug === collectionSlug),
-        undefined,
       );
       for (const entry of matched) {
         out.push(clonePageForEntry(page, entry));
       }
       continue;
     }
-    // Ordinary page — pass through unchanged.
+    hydrateCollectionsInPage(page, entries, warnings);
     out.push(page);
   }
+  if (cloned.header !== undefined) {
+    hydrateCollectionsInSection(cloned.header, entries, '__header__', warnings);
+  }
+  if (cloned.footer !== undefined) {
+    hydrateCollectionsInSection(cloned.footer, entries, '__footer__', warnings);
+  }
   cloned.pages = out;
-  return cloned;
+  return { site: cloned, warnings };
 }

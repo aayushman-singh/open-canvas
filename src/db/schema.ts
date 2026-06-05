@@ -704,6 +704,16 @@ export const collectionEntry = pgTable(
     tags: jsonb('tags').notNull().$type<string[]>().default([]),
     ogImageAssetId: text('og_image_asset_id'),
     status: text('status').notNull().$type<CollectionEntryStatus>().default('draft'),
+    /**
+     * ADR 0063 dec 7 — optional sub-grouping within a `collectionSlug`. Owners
+     * partition entries inside one slug ("tech notes" vs "design notes" in
+     * `blog`) without forking taxonomy. `null` = ungrouped.
+     *
+     * Format constraint (`length <= 64`, no `/` or `\`) is enforced at the
+     * API write boundary by Phase 2C — DB-level CHECK lives in drizzle 0018
+     * so a direct SQL writer can't sneak in a malformed value either.
+     */
+    folder: text('folder'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -728,6 +738,14 @@ export const collectionEntry = pgTable(
       t.collectionSlug,
       t.slug,
     ),
+    // ADR 0063 dec 7 — folder-filtered listing index. The Collection
+    // materializer reads `(siteId, collectionSlug, folder)` for the per-
+    // element filter, ordered by `publishedDate DESC`. The trailing
+    // `published_date` column keeps the same descending-date order the
+    // un-foldered index above uses, so the two indexes have parallel shape.
+    siteCollectionFolderPublishedIdx: index(
+      'collection_entry_site_collection_folder_published_idx',
+    ).on(t.siteId, t.collectionSlug, t.folder, t.publishedDate.desc()),
   }),
 );
 

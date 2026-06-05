@@ -29,6 +29,7 @@ import { CANVAS_AGENT_TOOLS } from '../../agent/canvas-tools';
 import { applyCanvasAgentOp, type CanvasAgentOp } from '../../agent/canvas-ops';
 import { parseApplyOp, translateToolCall, isRecord } from '../../agent/tool-parsers';
 import {
+  CHAT_DEFAULT_MODEL,
   runChatTurn,
   type OrchestratorContext,
   type RunTurnResult,
@@ -58,10 +59,6 @@ type Bindings = {
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
-
-// See orchestrator.ts CHAT_DEFAULT_MODEL — 3.x requires thought_signature
-// round-trip on tool calls; reverted to 2.5-pro until the adapter handles it.
-const CANVAS_AGENT_MODEL = 'gemini-2.5-pro';
 
 const canvasAgentApi = new Hono<Env>();
 
@@ -325,7 +322,7 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
   const writer = new BufferedStreamWriter();
   const ctx: OrchestratorContext = {
     adapter,
-    model: CANVAS_AGENT_MODEL,
+    model: CHAT_DEFAULT_MODEL,
     state: row.editableState,
     systemInstruction: buildSystemPrompt(row.editableState),
     tools: CANVAS_AGENT_TOOLS,
@@ -338,6 +335,11 @@ canvasAgentApi.post('/sites/:siteId/preview', async (c) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return c.json({ error: `LLM call failed: ${message}` }, 500);
+  }
+
+  const turnError = collectFirstError(writer.events());
+  if (turnError) {
+    return c.json({ error: turnError }, 500);
   }
 
   const assistantText = collectAssistantText(writer.events());
@@ -380,6 +382,13 @@ function collectAssistantText(events: readonly ChatStreamEvent[]): string {
     if (ev.kind === 'token') text += ev.text;
   }
   return text;
+}
+
+function collectFirstError(events: readonly ChatStreamEvent[]): string | null {
+  const match = events.find(
+    (event): event is Extract<ChatStreamEvent, { kind: 'error' }> => event.kind === 'error',
+  );
+  return match?.error ?? null;
 }
 
 // Truncation is informational: the Owner still sees whatever ops the model

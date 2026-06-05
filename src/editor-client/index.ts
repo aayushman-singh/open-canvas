@@ -23,7 +23,16 @@
 
 import './styles.css';
 
-import type { CanvasElement, CanvasPage, CanvasSection, EditableSite, InlineMark, InlineRun, InlineMarkType, PositionedBox } from '../canvas/schema.js';
+import type {
+  CanvasElement,
+  CanvasPage,
+  CanvasSection,
+  EditableSite,
+  InlineMark,
+  InlineRun,
+  InlineMarkType,
+  PositionedBox,
+} from '../canvas/schema.js';
 import type { MediaElement } from '../canvas/elements/media.js';
 import { INSPECTOR_DISPATCH } from '../canvas/elements/index.js';
 import { ICON_NAMES, renderIconSvg } from '../canvas/icons.js';
@@ -60,11 +69,7 @@ import {
   openTextModalImpl,
   type OpencanvasModalGlobal,
 } from './modals.js';
-import {
-  applyElementStyleImpl,
-  applyPinnedStyleImpl,
-  setBoxStyleImpl,
-} from './style-apply.js';
+import { applyElementStyleImpl, applyPinnedStyleImpl, setBoxStyleImpl } from './style-apply.js';
 import { buildRunNodeImpl } from './run-builders.js';
 import {
   buildActionBodyImpl,
@@ -82,7 +87,10 @@ import {
   toggleElementMenuImpl,
 } from './element-menu.js';
 import { renderInspector as renderInspectorImpl } from './element-inspector.js';
-import { selectElement as selectElementImpl, selectSection as selectSectionImpl } from './selection.js';
+import {
+  selectElement as selectElementImpl,
+  selectSection as selectSectionImpl,
+} from './selection.js';
 import { serializeContentToRuns, marksEqual, plainTextOf } from './mark-serialize.js';
 import {
   captureForUndo as captureForUndoImpl,
@@ -91,7 +99,10 @@ import {
   initUndo,
 } from './persist.js';
 import { authFetchImpl } from './session-lifecycle.js';
-import { toggleChatPanel as toggleChatPanelImpl, updateChatSelectionChipImpl } from './chat-panel.js';
+import {
+  toggleChatPanel as toggleChatPanelImpl,
+  updateChatSelectionChipImpl,
+} from './chat-panel.js';
 import { appendChatMessageImpl, hideChatWelcomeImpl, setupChatSession } from './chat-session.js';
 import {
   applyAgentOpsImpl,
@@ -137,11 +148,7 @@ import {
   buildKitSummary,
   syncSidebarStyleKitButtonsImpl,
 } from './sidebar.js';
-import {
-  attachPublishButtonImpl,
-  publishSiteImpl,
-  updateVersionBadgeImpl,
-} from './publish.js';
+import { attachPublishButtonImpl, publishSiteImpl, updateVersionBadgeImpl } from './publish.js';
 import {
   attachVersionBadgeImpl,
   closeVersionPillImpl,
@@ -179,9 +186,23 @@ import {
   setActivePageImpl,
   updatePageSidebarImpl,
 } from './page-crud.js';
-import { attachCollectionScaffoldButtonImpl } from './collection-scaffold.js';
-import { mountReel, openReelImpl, closeReelImpl, renderReelImpl, moveSectionToIndex as moveSectionToIndexImpl } from './reel.js';
-import { renderAllImpl, fitToPage as fitToPageImpl, fitAllPages as fitAllPagesImpl } from './render.js';
+import {
+  attachCollectionScaffoldButtonImpl,
+  runCollectionScaffoldFlowImpl,
+} from './collection-scaffold.js';
+import { migrateLegacyCollectionIndexPagesImpl } from './site-load-migration.js';
+import {
+  mountReel,
+  openReelImpl,
+  closeReelImpl,
+  renderReelImpl,
+  moveSectionToIndex as moveSectionToIndexImpl,
+} from './reel.js';
+import {
+  renderAllImpl,
+  fitToPage as fitToPageImpl,
+  fitAllPages as fitAllPagesImpl,
+} from './render.js';
 import { attachGripHandlersImpl, beginSectionDragImpl } from './section-drag.js';
 import {
   addBlankSectionFromSidebarImpl,
@@ -291,11 +312,10 @@ function errorToString(err: unknown): string {
  * fallback for methods that still live inline in canvas-client.ts.
  */
 function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
-  const runtimeHelperNotInstalled = (label: string): (() => never) =>
+  const runtimeHelperNotInstalled =
+    (label: string): (() => never) =>
     () => {
-      throw new Error(
-        `${label}: runtime helper was not installed before createEditor boot`,
-      );
+      throw new Error(`${label}: runtime helper was not installed before createEditor boot`);
     };
   const siteBase = boot.apiBase + '/canvas/sites/' + boot.siteId;
   // The Partial cast remains because optional fields (repaintRemoteCursors
@@ -384,7 +404,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     removeLinkPopover: () => removeLinkPopoverImpl(ctx),
     closeReel: () => closeReelImpl(ctx),
     showLinkPopover: (anchorEl, opts) =>
-      opts === undefined ? showLinkPopoverImpl(ctx, anchorEl) : showLinkPopoverImpl(ctx, anchorEl, opts),
+      opts === undefined
+        ? showLinkPopoverImpl(ctx, anchorEl)
+        : showLinkPopoverImpl(ctx, anchorEl, opts),
     updateChatSelectionChip: () => updateChatSelectionChipImpl(ctx),
     renderReel: () => renderReelImpl(ctx),
     selectSection: (sectionId) => selectSectionImpl(ctx, sectionId),
@@ -424,6 +446,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     chatAcceptAllBtn: null,
     showAcceptAllSummary: () => showAcceptAllSummaryImpl(ctx),
     pendingAiSuggestions: [],
+    ghostSections: [],
     applyAgentOps: (ops, suggestions) =>
       // The impl typing keeps the inverse-capture signature internal — the
       // ctx-level surface narrows back to `unknown[]` per the IIFE twin.
@@ -551,8 +574,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     refreshMarkToolbarFontSizeState: () => refreshMarkToolbarFontSizeStateImpl(ctx),
     buildMarkToolbar: (anchor) => buildMarkToolbarImpl(ctx, anchor),
     applyMark: (type: InlineMarkType) => applyMarkImpl(ctx, type),
-    beginTextEdit: (elementId, clickedWrapper) =>
-      beginTextEditImpl(ctx, elementId, clickedWrapper),
+    beginTextEdit: (elementId, clickedWrapper) => beginTextEditImpl(ctx, elementId, clickedWrapper),
 
     // ---- Link popover + paste normalization bridge -------------------
     forceOpenInspector: runtimeHelperNotInstalled('forceOpenInspector'),
@@ -731,13 +753,25 @@ export function createEditor(boot: EditorBoot): void {
       }
       ctx.state = body.editableState;
       if (ctx.state) ctx.state = ctx.migrateState(ctx.state);
+      // ADR 0063 dec 2 — one-shot migration of legacy
+      // pageKind === 'collection-index' pages. ADR 0063 retires the
+      // index-page binding model in favour of element-level
+      // collectionSlug. Pages with exactly one Collection auto-migrate
+      // (copy slug onto element, clear pageKind + collectionSlug);
+      // pages with zero or multiple Collections retain the fields and
+      // surface a banner asking the Owner to set the slug on each
+      // Collection manually. Persistence rides the normal
+      // ctx.scheduleSave() autosave so the migration is durable. Runs
+      // before renderAll() so the post-migration shape drives the
+      // first render. Subsequent loads see no collection-index pages
+      // and become no-ops (the "have we migrated" signal is the
+      // absence of legacy pageKind, not a separate flag).
+      if (ctx.state) migrateLegacyCollectionIndexPagesImpl(ctx);
       if (ctx.state && ctx.state.pages && ctx.state.pages.length > 0) {
         ctx.activePageId = ctx.state.pages[0]!.id;
       }
       // Version badge + initUndo + style-kit attribute (mirror IIFE).
-      ctx.updateVersionBadge(
-        typeof body.publishedVersion === 'number' ? body.publishedVersion : 0,
-      );
+      ctx.updateVersionBadge(typeof body.publishedVersion === 'number' ? body.publishedVersion : 0);
       ctx.attachVersionBadge();
       initUndo(ctx);
       if (ctx.mainEl && ctx.state && ctx.state.styleKit) {
@@ -783,6 +817,23 @@ export function createEditor(boot: EditorBoot): void {
       // page switch live in collection-scaffold.ts; the wiring point is
       // here so it sits alongside the other Pages-tab affordances.
       attachCollectionScaffoldButtonImpl(ctx);
+      // ADR 0063 dec 9 — Collection sidebar button (Add panel Components
+      // grid). The existing collection-scaffold module attaches to the
+      // Pages-tab `#canvas-add-collection` button by id; the new
+      // Components-grid button uses the `data-canvas-add-collection`
+      // attribute so the two wirings don't collide. Both fire the same
+      // wizard — element-level insertion without the scaffold leaves a
+      // half-built collection (no index page, no entries) that just
+      // shows the placeholder banner with nowhere to escape to.
+      const addCollectionButtons = document.querySelectorAll('[data-canvas-add-collection]');
+      for (let i = 0; i < addCollectionButtons.length; i++) {
+        const btn = addCollectionButtons[i];
+        if (btn instanceof HTMLElement && btn.id !== 'canvas-add-collection') {
+          btn.addEventListener('click', () => {
+            void runCollectionScaffoldFlowImpl(ctx);
+          });
+        }
+      }
       const pageListEl = document.getElementById('canvas-page-list');
       if (pageListEl) {
         pageListEl.addEventListener('click', function (ev) {
@@ -835,11 +886,14 @@ export function createEditor(boot: EditorBoot): void {
       // Session keepalive — Owner sessions get an hourly HEAD; published-
       // site editors get a token refresh ~15 min before expiry.
       if (ctx.apiBase === '/api') {
-        setInterval(function () {
-          void fetch(ctx.siteBase, { method: 'HEAD' }).catch(function () {
-            // silent — failures surface on the next real API call
-          });
-        }, 60 * 60 * 1000);
+        setInterval(
+          function () {
+            void fetch(ctx.siteBase, { method: 'HEAD' }).catch(function () {
+              // silent — failures surface on the next real API call
+            });
+          },
+          60 * 60 * 1000,
+        );
       } else if (ctx.apiBase === '/__api') {
         const REFRESH_BUFFER = 900; // seconds before expiry to refresh
         const scheduleTokenRefresh = (ttl: number): void => {

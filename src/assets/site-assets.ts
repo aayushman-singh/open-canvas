@@ -168,13 +168,20 @@ function collectElementReferences(
     return;
   }
   if (element.type === 'collection') {
-    element.entryTemplate.forEach((child, childIdx) => {
+    // ADR 0063 — the new CollectionElement carries no authorable children;
+    // per-entry DOM is materializer output and pulls its asset references
+    // from the `collection_entry` row (`ogImageAssetId`), not from the
+    // canvas document. Legacy `entryTemplate` / `cardTemplate` / `entries`
+    // are optional during the migration; walk them when present so existing
+    // fixtures keep contributing references until the cleanup commit drops
+    // them.
+    (element.entryTemplate ?? []).forEach((child, childIdx) => {
       collectElementReferences(child, `${elementPath}.entryTemplate[${String(childIdx)}]`, out);
     });
     element.cardTemplate?.forEach((child, childIdx) => {
       collectElementReferences(child, `${elementPath}.cardTemplate[${String(childIdx)}]`, out);
     });
-    element.entries.forEach((entry, entryIdx) => {
+    (element.entries ?? []).forEach((entry, entryIdx) => {
       entry.forEach((child, childIdx) => {
         collectElementReferences(
           child,
@@ -283,7 +290,9 @@ function collectUnfilledElementReferences(
     return;
   }
   if (element.type === 'collection') {
-    element.entryTemplate.forEach((child, childIdx) => {
+    // ADR 0063 — legacy CollectionElement child arrays are optional during
+    // the transition; walk what's present, skip what's absent.
+    (element.entryTemplate ?? []).forEach((child, childIdx) => {
       collectUnfilledElementReferences(
         child,
         `${elementPath}.entryTemplate[${String(childIdx)}]`,
@@ -297,7 +306,7 @@ function collectUnfilledElementReferences(
         out,
       );
     });
-    element.entries.forEach((entry, entryIdx) => {
+    (element.entries ?? []).forEach((entry, entryIdx) => {
       entry.forEach((child, childIdx) => {
         collectUnfilledElementReferences(
           child,

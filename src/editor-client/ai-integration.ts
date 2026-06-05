@@ -125,6 +125,13 @@ interface SuggestionEntry {
   acceptBtn?: HTMLButtonElement;
   rejectBtn?: HTMLButtonElement;
   revertBtn?: HTMLButtonElement;
+  /** See EditorContext.pendingAiSuggestions[i].suggestionId — the op-preview
+   *  event id used to associate the entry with its ghost section in
+   *  ctx.ghostSections. */
+  suggestionId?: string;
+  /** See EditorContext.pendingAiSuggestions[i].ghostBlueprint — captured on
+   *  Accept so a later Revert can re-materialise the ghost. */
+  ghostBlueprint?: EditorContext['ghostSections'][number];
 }
 
 /**
@@ -804,6 +811,21 @@ export function applyAgentOpsImpl(
             ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
           }
           applyCustomKitCss(ctx.state);
+          // Ghost-preview cleanup BEFORE renderAll: each accepted suggestion
+          // had a ghost slot in ctx.ghostSections matching s.suggestionId.
+          // The apply replaced that slot with a real section so the ghost
+          // must come out, otherwise the next renderAll paints both. The
+          // blueprint stays on the suggestion entry — Revert needs it.
+          if (suggestions) {
+            const acceptedIds = new Set<string>();
+            for (let ai = 0; ai < suggestions.length; ai++) {
+              const sid = suggestions[ai]!.suggestionId;
+              if (typeof sid === 'string') acceptedIds.add(sid);
+            }
+            if (acceptedIds.size > 0) {
+              ctx.ghostSections = ctx.ghostSections.filter((g) => !acceptedIds.has(g.id));
+            }
+          }
           ctx.renderAll();
           if (suggestions) {
             const consumedDeferredIds = { elements: {}, sections: {}, pages: {} };
@@ -898,6 +920,15 @@ export function revertAgentEntryImpl(ctx: EditorContext, entry: SuggestionEntry 
             ctx.mainEl.setAttribute('data-style-kit', ctx.state.styleKit);
           }
           applyCustomKitCss(ctx.state);
+          // Ghost-preview re-materialise BEFORE renderAll: the proposal is
+          // back to "pending" so the in-place ghost reappears. The blueprint
+          // was captured on Accept and survives the revert round-trip.
+          const ghostBlueprint = (entry as { ghostBlueprint?: EditorContext['ghostSections'][number] })
+            .ghostBlueprint;
+          if (ghostBlueprint) {
+            const already = ctx.ghostSections.some((g) => g.id === ghostBlueprint.id);
+            if (!already) ctx.ghostSections.push(ghostBlueprint);
+          }
           ctx.renderAll();
           // Re-arm the card. Owner can Accept again; that path will
           // recompute a fresh inverse against the new pre-state.

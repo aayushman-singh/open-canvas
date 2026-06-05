@@ -1,56 +1,84 @@
 // src/canvas/collections-scaffold.ts
 //
-// ADR 0060 F3 — pure scaffold for the "+ New collection" wizard.
+// ADR 0063 Decision 11 — pure scaffold for the "+ New Collection" wizard.
 //
-// Given an `EditableSite` and a desired collection slug, this returns the
-// two new canvas pages and one sample entry needed to make the collection
-// "work" end-to-end: an index page (lists entries via a page-bound
-// CollectionElement), a template page (cloned per entry at publish), and a
-// sample entry so the Owner sees a non-empty preview the moment they click
-// publish.
+// Given an `EditableSite` plus a desired collection slug, this returns:
+//   * Two new canvas pages — [indexPage, templatePage] — to append to
+//     `EditableSite.pages`.
+//   * Two seed `collection_entry` rows so the index page renders a real
+//     two-card grid the moment the Owner lands on it (no placeholder
+//     banner).
 //
 // Pure: does not touch the database, the editor, or the network. The caller
-// (the `/api/sites/:siteId/collections` POST handler) is responsible for
-// persisting the new pages onto `site.editableState.pages[]` and the
-// sample entry into `collection_entry`.
+// (`POST /api/sites/:siteId/collections`) atomically persists the new pages
+// onto `site.editableState.pages[]` and inserts the seed rows into
+// `collection_entry` inside one DB transaction (drizzle `batch`). If any
+// sub-step fails the entire batch rolls back per ADR 0063 dec 11 §f.
 //
-// Slug rules mirror `ENTRY_SLUG_RE` in `routes/api/entries.ts` — lowercase
-// letters, digits, hyphens, 1..80 chars. The collection slug must not
-// collide with an existing page slug, an existing pageKind binding, or any
-// of the slugs the materializer would produce for the sample entry.
+// Slug rules mirror `ENTRY_SLUG_RE` in `routes/api/entries.ts` — 1..80
+// lowercase letters, digits, hyphens, no leading/trailing dash. The
+// collection slug must not collide with an existing page slug, an existing
+// page's `collectionSlug` binding, the materializer's per-entry slug shape
+// (`<collectionSlug>/<entrySlug>` for either seed entry), or the template
+// page slug (`<collectionSlug>/_template`).
+//
+// ADR 0063 dec 1 moved source binding from the page to the element, so the
+// index page's single Collection element carries `collectionSlug`,
+// `display: 'card'`, `sort: 'date-desc'`, no `folder`, no `manualOrder`.
+// The page itself still carries `pageKind: 'collection-index'` +
+// `collectionSlug` during the transition window (decision 2's migration is
+// E2's responsibility; F5 removes the field). The validator currently
+// requires `pageKind` and `collectionSlug` to be set together, so we set
+// both — the materializer reads the element's binding for card output
+// regardless.
 
-import type { CanvasPage, CanvasSection, EditableSite } from './schema.js';
-import type { CollectionElement, CollectionMode } from './elements/collection.js';
+import type {
+  CanvasPage,
+  CanvasSection,
+  EditableSite,
+  ImageMediaElement,
+  TextElement,
+} from './schema.js';
+import type { CollectionElement } from './elements/collection.js';
+import type { SeedEntryRow } from '../templates/portfolio-seed-entries.js';
+import { wizardSeedEntries } from '../templates/portfolio-seed-entries.js';
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
 
-export interface CollectionScaffoldSampleEntry {
-  collectionSlug: string;
-  slug: string;
-  title: string;
-  excerpt: string;
-  body: string;
-  publishedDate: string;
-  author: string;
-  category: string;
-  tags: string[];
-  ogImageAssetId: string | null;
-  status: 'published';
-}
+/** Maximum number of `collection-N` fallbacks attempted by
+ *  `resolveAvailableSlug`. Hitting this means the site already carries 99
+ *  collections named `collection-1`..`collection-99` plus a `blog` — the
+ *  wizard fails loudly rather than looping forever. */
+const SLUG_FALLBACK_MAX = 99;
+
+/** Default slug attempted before any fallback (ADR 0063 dec 11 §a). */
+export const WIZARD_DEFAULT_SLUG = 'blog';
+
+const WIZARD_SEED_ENTRY_SLUGS = ['welcome-to-your-blog', 'your-second-post'] as const;
 
 export interface CollectionScaffoldOk {
   ok: true;
   /** Two new pages to append to `EditableSite.pages`: [index, template]. */
   newPages: [CanvasPage, CanvasPage];
-  /** Sample entry to insert into `collection_entry` so the Owner sees
-   *  something the moment they hit publish. Caller fills siteId/createdAt. */
-  sampleEntry: CollectionScaffoldSampleEntry;
+  /** Two seed rows to insert into `collection_entry`. The caller annotates
+   *  each with `siteId` before passing to the DB driver. */
+  seedEntries: SeedEntryRow[];
+  /** Echo of the slug actually used — equals the input slug; included so
+   *  callers don't have to re-derive it from `newPages`. */
+  collectionSlug: string;
 }
 export interface CollectionScaffoldErr {
   ok: false;
+  /** Failure step name (`'slug-format'` | `'slug-conflict'` | `'id-conflict'`).
+   *  ADR 0063 dec 11 §f surfaces this in the dashboard toast. */
+  step: 'slug-format' | 'slug-conflict' | 'id-conflict';
   error: string;
 }
 export type CollectionScaffoldResult = CollectionScaffoldOk | CollectionScaffoldErr;
+
+/** Type alias for callers transitioning from the pre-ADR-0063 single-entry
+ *  shape. Same underlying row contract as the site-create-time seed. */
+export type CollectionScaffoldSeedEntry = SeedEntryRow;
 
 function titleCase(slug: string): string {
   // 'blog' → 'Blog'. 'case-studies' → 'Case Studies'.
@@ -61,34 +89,57 @@ function titleCase(slug: string): string {
     .join(' ');
 }
 
-function todayISO(): string {
-  // ISO date without time, matches the column shape.
-  return new Date().toISOString().slice(0, 10);
+/** True if `slug` collides with any existing page slug, page-bound
+ *  collection binding, or the slugs the materializer would produce for the
+ *  two seed entries / template page. The pure version used by both the
+ *  fallback resolver and the final shape check. */
+function slugIsTaken(pages: readonly CanvasPage[], slug: string): boolean {
+  const templatePageSlug = `${slug}/_template`;
+  const seedSlugs = WIZARD_SEED_ENTRY_SLUGS.map((s) => `${slug}/${s}`);
+  for (const page of pages) {
+    if (page.slug === slug) return true;
+    if (page.slug === templatePageSlug) return true;
+    if (seedSlugs.includes(page.slug)) return true;
+    if (page.collectionSlug === slug) return true;
+  }
+  return false;
 }
 
-const SAMPLE_ENTRY_SLUG = 'sample-post';
-
-function findSlugConflict(
+/** Pick the slug to scaffold against. If `requested === WIZARD_DEFAULT_SLUG`
+ *  ("blog") and it collides, walk `collection-1`..`collection-N` until one
+ *  is free. Custom slugs do NOT auto-fallback — the wizard returns the
+ *  collision verbatim so the Owner sees what they picked is taken.
+ *
+ *  Returns `{ok: true, slug}` on success or `{ok: false, error}` if the
+ *  fallback pool is exhausted (treated as a pool-exhaustion failure, never
+ *  silent). */
+export function resolveAvailableSlug(
   pages: readonly CanvasPage[],
-  collectionSlug: string,
-): string | null {
-  const templatePageSlug = `${collectionSlug}/template`;
-  const sampleExpandedSlug = `${collectionSlug}/${SAMPLE_ENTRY_SLUG}`;
-  for (const page of pages) {
-    if (page.slug === collectionSlug) {
-      return `a page with slug "${collectionSlug}" already exists`;
-    }
-    if (page.slug === templatePageSlug) {
-      return `a page with slug "${templatePageSlug}" already exists`;
-    }
-    if (page.slug === sampleExpandedSlug) {
-      return `a page with slug "${sampleExpandedSlug}" already exists`;
-    }
-    if (page.collectionSlug === collectionSlug) {
-      return `a collection "${collectionSlug}" is already set up on page "${page.id}"`;
+  requested: string,
+):
+  | { ok: true; slug: string }
+  | { ok: false; error: string } {
+  if (requested !== WIZARD_DEFAULT_SLUG) {
+    // Custom slug — no fallback; collisions surface as a hard error from
+    // the caller via slugIsTaken / scaffoldCollection's own collision check.
+    return { ok: true, slug: requested };
+  }
+  if (!slugIsTaken(pages, requested)) {
+    return { ok: true, slug: requested };
+  }
+  for (let i = 1; i <= SLUG_FALLBACK_MAX; i += 1) {
+    const candidate = `collection-${i}`;
+    if (!slugIsTaken(pages, candidate)) {
+      return { ok: true, slug: candidate };
     }
   }
-  return null;
+  return {
+    ok: false,
+    error:
+      'Collection slug pool exhausted (blog and collection-1..collection-' +
+      SLUG_FALLBACK_MAX +
+      ' are all taken)',
+  };
 }
 
 function findIdConflict(pages: readonly CanvasPage[], ids: readonly string[]): string | null {
@@ -99,70 +150,32 @@ function findIdConflict(pages: readonly CanvasPage[], ids: readonly string[]): s
   return null;
 }
 
+/** Build the index page — a normal page with one Collection element bound
+ *  to the collection at the element level (ADR 0063 dec 1). Layout: a 60px
+ *  heading at the top, then the Collection element filling the content
+ *  width with 600px height (ADR 0063 dec 11 §b). */
 function buildIndexPage(slug: string): CanvasPage {
-  const heading: CanvasSection['elements'][number] = {
+  const heading: TextElement = {
     id: `coll-${slug}-heading`,
     type: 'text',
-    box: { x: 80, y: 40, w: 1200, h: 60, z: 2 },
+    box: { x: 80, y: 40, w: 1280, h: 60, z: 2 },
     content: [{ text: titleCase(slug) }],
     role: 'heading',
     fontSize: 40,
     fontWeight: 600,
     align: 'left',
   };
+  // ADR 0063 dec 1 + dec 4 + dec 11 §b — element-level binding, default
+  // sort/display, no folder, no manualOrder. The materializer (Phase 2B)
+  // reads `display === 'card'` and clones its built-in default card
+  // template per entry; no per-element card template is embedded here.
   const collection: CollectionElement = {
     id: `coll-${slug}-grid`,
     type: 'collection',
     box: { x: 80, y: 140, w: 1280, h: 600, z: 1 },
-    mode: 'page-bound' satisfies CollectionMode,
-    entryTemplate: [],
-    entries: [],
-    sort: { field: 'publishedDate', order: 'desc' },
-    fieldBindings: {
-      [`coll-${slug}-card-title`]: 'title',
-      [`coll-${slug}-card-excerpt`]: 'description',
-      [`coll-${slug}-card-date`]: 'publishedDate',
-    },
-    cardTemplate: [
-      {
-        id: `coll-${slug}-card-bg`,
-        type: 'container',
-        box: { x: 0, y: 0, w: 400, h: 260, z: 1 },
-        variant: 'raised',
-        elementStyle: { borderRadius: 16 },
-      },
-      {
-        id: `coll-${slug}-card-title`,
-        type: 'text',
-        box: { x: 24, y: 32, w: 352, h: 60, z: 3 },
-        content: [{ text: '{{title}}' }],
-        role: 'heading',
-        fontSize: 22,
-        fontWeight: 600,
-        align: 'left',
-      },
-      {
-        id: `coll-${slug}-card-excerpt`,
-        type: 'text',
-        box: { x: 24, y: 104, w: 352, h: 80, z: 3 },
-        content: [{ text: '{{excerpt}}' }],
-        role: 'body',
-        fontSize: 14,
-        fontWeight: 400,
-        align: 'left',
-      },
-      {
-        id: `coll-${slug}-card-date`,
-        type: 'text',
-        box: { x: 24, y: 208, w: 352, h: 22, z: 3 },
-        content: [{ text: '{{publishedDate}}' }],
-        role: 'label',
-        fontSize: 12,
-        fontWeight: 400,
-        align: 'left',
-      },
-    ],
-    layout: { columns: 3, gap: 24 },
+    collectionSlug: slug,
+    sort: 'date-desc',
+    display: 'card',
   };
   const section: CanvasSection = {
     id: `coll-${slug}-index-section`,
@@ -171,6 +184,12 @@ function buildIndexPage(slug: string): CanvasPage {
     height: 800,
     elements: [heading, collection],
   };
+  // ADR 0063 dec 2 — `pageKind: 'collection-index'` is retired by the
+  // migration (E2's responsibility). During Phase 2D's transition window
+  // the validator still requires `pageKind` and `collectionSlug` to be set
+  // together (validate.ts:1522-1534), so we set both. The element-level
+  // binding above is what the materializer reads; the page-level fields
+  // are deadweight until E2's migration sweeps them.
   return {
     id: `page-collection-${slug}-index`,
     slug,
@@ -182,31 +201,59 @@ function buildIndexPage(slug: string): CanvasPage {
   };
 }
 
+/** Build the per-entry template page. Cloned once per published entry at
+ *  publish time by the materializer; the clones replace this page in the
+ *  snapshot (`collection-item-template` pages never ship as real pages —
+ *  the materializer drops them after expansion).
+ *
+ *  ADR 0063 dec 11 §c calls for hero image + h1 + byline + body. The hero
+ *  is declared as a media element with `assetId: ''` (an unfilled slot —
+ *  the validator allows empty assetId in editable state). Owners customise
+ *  it via the inspector. Phase 2B's materializer is the layer that will
+ *  eventually swap the empty slot for the entry's OG asset; today the
+ *  page-level `ogImageAssetId` copy in collection-materializer.ts:195
+ *  carries that signal to social cards. The hero element exists so the
+ *  Owner has a slot to fill rather than an empty canvas to design from
+ *  scratch. `noIndex: true` excludes the template from the sitemap
+ *  (decision 11 §c "never appears in the public sitemap"); the
+ *  materializer already drops template pages from publish output, so
+ *  `noIndex` is belt-and-braces for any editor-preview or
+ *  editableState-walking sitemap path. */
 function buildTemplatePage(slug: string): CanvasPage {
-  const titleEl: CanvasSection['elements'][number] = {
+  const hero: ImageMediaElement = {
+    id: `coll-${slug}-tmpl-hero`,
+    type: 'media',
+    mediaKind: 'image',
+    box: { x: 80, y: 64, w: 1280, h: 360, z: 2 },
+    assetId: '',
+    alt: '{{title}}',
+    fit: 'cover',
+    elementStyle: { borderRadius: 16, overflow: 'hidden' },
+  };
+  const titleEl: TextElement = {
     id: `coll-${slug}-tmpl-title`,
     type: 'text',
-    box: { x: 80, y: 80, w: 1280, h: 80, z: 3 },
+    box: { x: 80, y: 464, w: 1280, h: 80, z: 3 },
     content: [{ text: '{{title}}' }],
     role: 'heading',
     fontSize: 48,
     fontWeight: 600,
     align: 'left',
   };
-  const meta: CanvasSection['elements'][number] = {
+  const meta: TextElement = {
     id: `coll-${slug}-tmpl-meta`,
     type: 'text',
-    box: { x: 80, y: 176, w: 1280, h: 24, z: 3 },
+    box: { x: 80, y: 560, w: 1280, h: 24, z: 3 },
     content: [{ text: '{{author}} · {{publishedDate}}' }],
     role: 'label',
     fontSize: 13,
     fontWeight: 500,
     align: 'left',
   };
-  const body: CanvasSection['elements'][number] = {
+  const body: TextElement = {
     id: `coll-${slug}-tmpl-body`,
     type: 'text',
-    box: { x: 80, y: 240, w: 1000, h: 600, z: 3 },
+    box: { x: 80, y: 624, w: 1000, h: 600, z: 3 },
     content: [{ text: '{{body}}' }],
     role: 'body',
     fontSize: 17,
@@ -218,68 +265,57 @@ function buildTemplatePage(slug: string): CanvasPage {
     id: `coll-${slug}-template-section`,
     recipeId: 'custom',
     name: 'Entry body',
-    height: 900,
-    elements: [titleEl, meta, body],
+    height: 1280,
+    elements: [hero, titleEl, meta, body],
   };
   return {
     id: `page-collection-${slug}-template`,
-    slug: `${slug}/template`,
+    slug: `${slug}/_template`,
     title: '{{title}}',
     width: 1440,
     sections: [section],
     pageKind: 'collection-item-template',
     collectionSlug: slug,
+    noIndex: true,
   };
 }
 
-function buildSampleEntry(slug: string): CollectionScaffoldSampleEntry {
-  return {
-    collectionSlug: slug,
-    slug: SAMPLE_ENTRY_SLUG,
-    title: `Welcome to ${titleCase(slug)}`,
-    excerpt:
-      'This is a sample entry. Edit or delete it from the dashboard — it does not come back.',
-    body:
-      'This is a sample entry. Open the Entries tab in the dashboard to edit or delete it.\n\nWhen you publish, every entry in this collection appears at /' +
-      slug +
-      '/<entry-slug> on your live site, and the index page at /' +
-      slug +
-      ' lists them all.',
-    publishedDate: todayISO(),
-    author: '',
-    category: '',
-    tags: [],
-    ogImageAssetId: null,
-    status: 'published',
-  };
-}
-
-/** Build the two new canvas pages + sample entry for a new collection. Pure.
- *  Returns `{ok: false}` when the slug is malformed or would collide with an
- *  existing page slug / pageKind binding. */
+/** Build the two new canvas pages + two seed entries for a new collection.
+ *  Pure. Returns `{ok: false}` when the slug is malformed or would collide
+ *  with an existing page slug / pageKind binding.
+ *
+ *  `now` is the wall-clock used to date the seed entries (today + yesterday
+ *  per ADR 0063 dec 11 §d). Defaults to `new Date()`; the smoke passes a
+ *  fixed date to make assertions deterministic. */
 export function scaffoldCollection(
   state: EditableSite,
   slug: string,
+  now: Date = new Date(),
 ): CollectionScaffoldResult {
   if (typeof slug !== 'string' || !SLUG_RE.test(slug)) {
     return {
       ok: false,
+      step: 'slug-format',
       error: 'collection slug must be 1..80 lowercase letters, digits, or dashes',
     };
   }
-  const slugConflict = findSlugConflict(state.pages, slug);
-  if (slugConflict !== null) {
-    return { ok: false, error: slugConflict };
+  if (slugIsTaken(state.pages, slug)) {
+    return {
+      ok: false,
+      step: 'slug-conflict',
+      error: `a page with slug "${slug}" already exists (or the slug is bound to another page)`,
+    };
   }
   const indexPage = buildIndexPage(slug);
   const templatePage = buildTemplatePage(slug);
   const idConflict = findIdConflict(state.pages, [indexPage.id, templatePage.id]);
   if (idConflict !== null) {
-    return { ok: false, error: idConflict };
+    return { ok: false, step: 'id-conflict', error: idConflict };
   }
   return {
     ok: true,
     newPages: [indexPage, templatePage],
-    sampleEntry: buildSampleEntry(slug),
+    seedEntries: wizardSeedEntries(slug, now),
+    collectionSlug: slug,
   };
 }

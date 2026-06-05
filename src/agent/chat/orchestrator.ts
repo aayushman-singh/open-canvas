@@ -44,8 +44,11 @@ import type {
   LlmTool,
 } from '../llm.js';
 import type { CanvasAgentOp } from '../canvas-ops.js';
-import type { EditableSite } from '../../canvas/schema.js';
+import type { CanvasPage, CanvasSection, EditableSite } from '../../canvas/schema.js';
 import type { SiteFont } from '../../db/schema.js';
+import { createSectionFromRecipe } from '../../canvas/recipes.js';
+import { resolveDesignSection } from '../../canvas/layout/engine.js';
+import { resolveStyleKitWithCustom } from '../../canvas/style-kits.js';
 import { translateToolCall, isRecord } from '../tool-parsers.js';
 import {
   CHAT_AGENT_TOOLS,
@@ -346,12 +349,32 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         } else if (MUTATING_TOOL_NAMES.has(call.name)) {
           const dispatched = dispatchMutatingTool({ call, history });
           if (dispatched.preview) {
-            await writer.write({
+            let previewSection: CanvasSection | undefined;
+            try {
+              previewSection = resolvePreviewSection(dispatched.preview.op, ctx.state);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              await writer.write({ kind: 'error', error: message });
+              history.push({
+                role: 'tool',
+                toolCallId: call.id,
+                toolName: call.name,
+                content: JSON.stringify({ error: message }),
+              });
+              await writer.write({ kind: 'done', reason: 'other' });
+              return { messages: history, previewOps, doneReason: 'other' };
+            }
+            const event: Extract<
+              Parameters<ChatStreamWriter['write']>[0],
+              { kind: 'op-preview' }
+            > = {
               kind: 'op-preview',
               id: call.id,
               toolName: call.name,
               op: dispatched.preview.op,
-            });
+            };
+            if (previewSection) event.previewSection = previewSection;
+            await writer.write(event);
             previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
           }
         } else {
@@ -637,6 +660,118 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
   return { preview: { op: parsed.op } };
 }
 
+/**
+ * Resolve a server-side CanvasSection preview for additive section ops so
+ * the editor can ghost-render it in place between existing sections. Returns
+ * undefined for op kinds where in-place ghosting is not part of Phase A
+ * (delete*, update*, addElement, addPage, setStyleKit, setSiteConfig,
+ * moveSection, rewriteText, replaceMedia).
+ *
+ * Resolution rules:
+ *   - insertSection  → createSectionFromRecipe (pure factory)
+ *   - designSection  → resolveDesignSection against the target page's width
+ *                      and the resolved Style Kit (custom kit handled via
+ *                      resolveStyleKitWithCustom, mirroring applyCanvasAgentOp)
+ *   - duplicateSection → clone the targeted section from state with new ids
+ *
+ * Failures are loud. The ghost is the Owner's preview of what Accept will do,
+ * so resolution must mirror applyCanvasAgentOp instead of silently omitting or
+ * retargeting the preview section.
+ */
+function resolvePreviewSection(
+  op: CanvasAgentOp,
+  state: EditableSite,
+): CanvasSection | undefined {
+  if (op.kind === 'insertSection') {
+    resolvePreviewInsertionPage(state, op.pageId ?? null, op.afterSectionId, 'insertSection');
+    return createSectionFromRecipe(op.recipeId, op.input);
+  }
+  if (op.kind === 'designSection') {
+    const targetPage = resolvePreviewInsertionPage(
+      state,
+      op.pageId ?? null,
+      op.afterSectionId,
+      'designSection',
+    );
+    const preset = resolveStyleKitWithCustom(state);
+    const result = resolveDesignSection(op.input, targetPage.width, preset);
+    return result.section;
+  }
+  if (op.kind === 'duplicateSection') {
+    return cloneSectionForPreview(state, op.sectionId);
+  }
+  return undefined;
+}
+
+function resolvePreviewInsertionPage(
+  state: EditableSite,
+  opPageId: string | null | undefined,
+  opAfterSectionId: string | null,
+  kindLabel: string,
+): CanvasPage {
+  const firstPage = state.pages[0];
+  if (!firstPage) {
+    throw new Error('resolvePreviewSection: state must have at least one page');
+  }
+  if (typeof opPageId === 'string' && opPageId.length > 0) {
+    const target = state.pages.find((p) => p.id === opPageId);
+    if (!target) {
+      throw new Error(
+        `resolvePreviewSection(${kindLabel}): pageId not found: ${opPageId}. Known pages: ${state.pages
+          .map((p) => p.id)
+          .join(', ')}`,
+      );
+    }
+    if (
+      typeof opAfterSectionId === 'string' &&
+      opAfterSectionId.length > 0 &&
+      !target.sections.some((s) => s.id === opAfterSectionId)
+    ) {
+      throw new Error(
+        `resolvePreviewSection(${kindLabel}): afterSectionId ${opAfterSectionId} does not exist on page ${opPageId}`,
+      );
+    }
+    return target;
+  }
+  if (typeof opAfterSectionId === 'string' && opAfterSectionId.length > 0) {
+    const target = state.pages.find((p) => p.sections.some((s) => s.id === opAfterSectionId));
+    if (!target) {
+      throw new Error(
+        `resolvePreviewSection(${kindLabel}): afterSectionId not found on any page: ${opAfterSectionId}`,
+      );
+    }
+    return target;
+  }
+  return firstPage;
+}
+
+function cloneSectionForPreview(
+  state: EditableSite,
+  sectionId: string,
+): CanvasSection {
+  for (const page of state.pages) {
+    const found = page.sections.find((s) => s.id === sectionId);
+    if (found) {
+      const clone = structuredClone(found);
+      clone.id = `sec-${clone.recipeId}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      clone.name = `${found.name} copy`;
+      for (const el of clone.elements) {
+        const prefix = el.id.includes('-') ? el.id.split('-').slice(0, -1).join('-') : 'el';
+        el.id = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`;
+      }
+      if (clone.role) delete clone.role;
+      return clone;
+    }
+  }
+  if (state.header && state.header.id === sectionId) {
+    throw new Error('resolvePreviewSection(duplicateSection): cannot duplicate header or footer');
+  }
+  if (state.footer && state.footer.id === sectionId) {
+    throw new Error('resolvePreviewSection(duplicateSection): cannot duplicate header or footer');
+  }
+  throw new Error(`resolvePreviewSection(duplicateSection): section not found: ${sectionId}`);
+}
+
 // ---------------------------------------------------------------------------
 // History → LlmMessage[] translation
 // ---------------------------------------------------------------------------
@@ -748,6 +883,15 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   );
   lines.push(
     '  3. Past tense becomes accurate only AFTER a tool call has been accepted. Until then, the Editable Site is unchanged.',
+  );
+  lines.push(
+    '  4. Make a confident default choice. Vague Owner requests are normal — Owners often do not know exactly what they want. Resolve ambiguity yourself: pick a sensible interpretation, propose the change, and let the Owner judge the result. The preview/Accept/Reject loop is cheap; iterating from a concrete proposal is faster than iterating from a clarifying question.',
+  );
+  lines.push(
+    '  5. Ask a clarifying question ONLY when two reasonable interpretations of the request would produce meaningfully different results AND you cannot tell which the Owner wants. Examples that justify asking: "delete the page" when there are multiple pages with similar names; "make it blue" when the Owner could mean text colour, background, or accent. Examples that do NOT justify asking: "add a hiring section" (pick a reasonable layout and propose it); "make the hero punchier" (rewrite with confident editorial judgement); "give it a darker feel" (propose a setStyleKit to a dark kit or a Pinned Style tweak). When in doubt, propose — never ask "what would you like the text to say?" or "how big should the heading be?" — make a choice.',
+  );
+  lines.push(
+    '  6. When you do need to ask, ask ONE focused question. Never lead with a wall of questions. Multiple back-and-forth turns are cheap; bombarding the Owner is not.',
   );
   lines.push('');
   lines.push('Reply structure — must follow exactly:');

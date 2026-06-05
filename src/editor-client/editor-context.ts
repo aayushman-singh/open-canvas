@@ -695,6 +695,49 @@ export interface EditorContext {
     acceptBtn?: HTMLButtonElement;
     rejectBtn?: HTMLButtonElement;
     revertBtn?: HTMLButtonElement;
+    /** Unique id mirroring the op-preview SSE event's `id` field — the LLM
+     *  tool_call id the orchestrator minted for this proposal. Used by the
+     *  ghost-preview layer to associate a suggestion entry with its ghost
+     *  section in ctx.ghostSections so accept/reject/revert can find and
+     *  remove the right ghost. Optional because pre-ghost-preview code paths
+     *  may not have set it. */
+    suggestionId?: string;
+    /** Snapshot of the ghost-section blueprint for this entry (only set when
+     *  the op was insertSection / designSection / duplicateSection AND the
+     *  server shipped a previewSection). On Revert success the blueprint is
+     *  pushed back into ctx.ghostSections so the proposal preview reappears
+     *  while the entry returns to status="pending". On Accept / Reject the
+     *  ghost is removed but the blueprint stays on the entry — Revert needs
+     *  it. */
+    ghostBlueprint?: {
+      id: string;
+      pageId: string;
+      afterSectionId: string | null;
+      section: CanvasSection;
+    };
+  }>;
+  /** Transient ghost-preview store — one entry per pending additive section
+   *  op (insertSection, designSection, duplicateSection) the agent proposed.
+   *  Editor-only, NOT shared via Yjs — each Owner sees only their own ghosts
+   *  so co-editors are not distracted by half-baked proposals. renderAllImpl
+   *  weaves these into the canvas between real sections at lower opacity;
+   *  chat-session.ts owns push/remove on op-preview / Reject / Revert.
+   *  Accept clears via renderAll after the real apply replaces the ghost
+   *  slot with a real section. */
+  ghostSections: Array<{
+    /** Mirrors pendingAiSuggestions[i].suggestionId — the originating
+     *  op-preview event id. Used to find-and-remove on accept/reject/revert. */
+    id: string;
+    /** Concrete target page id resolved from the op using applyCanvasAgentOp's
+     *  insertion precedence: explicit pageId, afterSectionId's page, then the
+     *  first page. The ghost renders only on this page. */
+    pageId: string;
+    /** afterSectionId from the op. null = append to the end of the page body; a
+     *  non-existent id is rejected before the ghost enters this store. */
+    afterSectionId: string | null;
+    /** Resolved section to render dimmed. Carries its own (synthetic) id;
+     *  if the op is later accepted, the real apply mints a different id. */
+    section: CanvasSection;
   }>;
   /** POST the given ops through /canvas-agent/.../apply, snapshot pre-
    *  state to compute per-op inverses, flip matching suggestion entries

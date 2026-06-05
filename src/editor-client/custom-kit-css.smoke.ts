@@ -303,7 +303,21 @@ try {
     'applyCustomKitCss must REMOVE the injected <style> when state.styleKit !== "custom" — otherwise the prior custom kit block stays in the cascade after a built-in switch',
   );
 
-  // Case C: null state is a no-op (boot order — pre-state-load callers may
+  // Case C: custom selector without customStyleKit is invalid at the
+  // validator gate. The editor must fail loudly instead of silently
+  // removing the style tag and painting a degraded no-accent preview.
+  let missingCustomError = '';
+  try {
+    applyCustomKitCss({ styleKit: 'custom' as const, pages: [] });
+  } catch (err) {
+    missingCustomError = err instanceof Error ? err.message : String(err);
+  }
+  assert(
+    missingCustomError.includes('customStyleKit'),
+    'applyCustomKitCss must throw when styleKit === "custom" but customStyleKit is missing',
+  );
+
+  // Case D: null state is a no-op (boot order — pre-state-load callers may
   // hit this). Should still clear any stale tag.
   applyCustomKitCss(null);
   assert(
@@ -311,7 +325,7 @@ try {
     'applyCustomKitCss(null) must leave the head without the custom-kit <style>',
   );
 
-  // Case D: re-injecting same CSS is idempotent (no orphan duplicate tags).
+  // Case E: re-injecting same CSS is idempotent (no orphan duplicate tags).
   applyCustomKitCss(customState);
   applyCustomKitCss(customState);
   let injectedCount = 0;

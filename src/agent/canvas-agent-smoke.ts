@@ -53,8 +53,9 @@ assert(
   'preview/apply route prompt must not mention legacy darkModeEnabled',
 );
 assert(
-  canvasAgentRouteSource.includes("const CANVAS_AGENT_MODEL = 'gemini-2.5-pro'"),
-  'canvas-agent route must be on gemini-2.5-pro until GeminiAdapter handles 3.x thought_signature round-trip',
+  canvasAgentRouteSource.includes('CHAT_DEFAULT_MODEL') &&
+    !canvasAgentRouteSource.includes('gemini-2.5-flash'),
+  'canvas-agent route must use the chat orchestrator primary model constant instead of pinning a separate all-flows Flash override',
 );
 
 // ---------------------------------------------------------------------------

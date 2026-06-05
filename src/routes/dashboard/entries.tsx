@@ -109,7 +109,7 @@ const pageStyles = `
   }
   .entries-table .et-head {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 110px 130px 130px 40px;
+    grid-template-columns: 1.4fr 1fr 110px 110px 130px 130px 40px;
     gap: 16px;
     padding: 12px 20px;
     background: var(--surface-2);
@@ -121,7 +121,7 @@ const pageStyles = `
   }
   .entries-table .et-row {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 110px 130px 130px 40px;
+    grid-template-columns: 1.4fr 1fr 110px 110px 130px 130px 40px;
     gap: 16px;
     align-items: center;
     padding: 14px 20px;
@@ -154,6 +154,56 @@ const pageStyles = `
     font-size: 12.5px;
     color: var(--ink-3);
   }
+  .entries-table .et-row .et-folder {
+    font-size: 13px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .entries-table .et-row .et-folder.is-empty { color: var(--ink-3); }
+
+  /* ADR 0063 dec 7 — folder filter chip row above the list table. Sits
+     between the collection pill row and the table, mirroring the .formsel
+     pill chrome but in a less-emphatic shape so the two filter rows do not
+     visually compete. */
+  .folder-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 4px 0;
+    font-family: var(--sans);
+    font-size: 12.5px;
+  }
+  .folder-chips .lbl {
+    color: var(--ink-3);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+    margin-right: 4px;
+  }
+  .folder-chips a {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    text-decoration: none;
+    font-weight: 600;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .folder-chips a:hover { background: var(--surface-3); color: var(--ink); }
+  .folder-chips a.on {
+    background: var(--red-soft);
+    color: var(--red-ink);
+    border-color: var(--red-soft);
+  }
+  .folder-chips a.ungrouped { font-style: italic; }
 
   .status-pill {
     display: inline-flex;
@@ -381,11 +431,22 @@ function TrashIcon() {
 // without spinning up the full Hono request lifecycle.
 // --------------------------------------------------------------------------
 
+// ADR 0063 dec 7 — folder filter state on the list view.
+//   * `activeFolder = undefined` → "All" chip selected, show every entry.
+//   * `activeFolder = null`      → "Ungrouped" chip selected, show only
+//                                  rows whose `folder` column IS NULL.
+//   * `activeFolder = <string>`  → exact-match chip selected.
+// The view derives the chip list itself from `entries` (see comment in
+// the route handler — we already load every entry for the collection, so a
+// client-side `Set<>` is strictly cheaper than a second query).
+export type FolderFilter = string | null | undefined;
+
 export interface EntriesListViewProps {
   siteId: string;
   siteName: string;
   collections: string[];
   activeCollection: string | null;
+  activeFolder: FolderFilter;
   entries: CollectionEntry[];
 }
 
@@ -394,6 +455,7 @@ export function EntriesListView({
   siteName,
   collections,
   activeCollection,
+  activeFolder,
   entries,
 }: EntriesListViewProps) {
   if (collections.length === 0) {
@@ -424,6 +486,39 @@ export function EntriesListView({
   const current = activeCollection ?? collections[0]!;
   const newHref = `/dashboard/sites/${esc(siteId)}/entries/new?collection=${encodeURIComponent(current)}`;
 
+  // ADR 0063 dec 7 — distinct folder values for the chip row are derived
+  // client-side from the `entries` array we already loaded. The brief
+  // permits either an API aggregation (`?folders=true`) or this in-process
+  // derivation; we picked the latter because the dashboard route always
+  // hydrates the full collection's entries to render the table, so a second
+  // query would be pure overhead. Trade-off: a folder that has no entries
+  // never appears as a chip. That matches the Owner's mental model — if
+  // there are no entries in a folder, there is nothing to filter to.
+  const folderSet = new Set<string>();
+  let hasUngrouped = false;
+  for (const e of entries) {
+    if (e.folder === null) hasUngrouped = true;
+    else folderSet.add(e.folder);
+  }
+  const folderChips = Array.from(folderSet).sort((a, b) => a.localeCompare(b));
+
+  // Apply the folder filter to the visible rows. The route handler already
+  // loaded the full collection (so distinct-folder derivation is cheap);
+  // the narrowing here keeps the visible rows in sync with the chip
+  // selection without an extra query.
+  const visibleEntries = entries.filter((e) => {
+    if (activeFolder === undefined) return true;
+    if (activeFolder === null) return e.folder === null;
+    return e.folder === activeFolder;
+  });
+
+  // Chip hrefs share the active collection but vary the `folder` param:
+  //   * All       → ?collection=<slug>            (folder param absent)
+  //   * Ungrouped → ?collection=<slug>&folder=    (empty value = IS NULL)
+  //   * <name>    → ?collection=<slug>&folder=<name>
+  const collectionParam = `?collection=${encodeURIComponent(current)}`;
+  const listBase = `/dashboard/sites/${esc(siteId)}/entries`;
+
   return (
     <>
       <div class="entries-toolbar">
@@ -447,7 +542,7 @@ export function EntriesListView({
         <div class="formsel" role="tablist" aria-label="Collections">
           {collections.map((slug) => (
             <a
-              href={`/dashboard/sites/${esc(siteId)}/entries?collection=${encodeURIComponent(slug)}`}
+              href={`${listBase}?collection=${encodeURIComponent(slug)}`}
               class={slug === current ? 'on' : ''}
             >
               {slug}
@@ -456,23 +551,85 @@ export function EntriesListView({
         </div>
       </div>
 
-      <div class="entries-table" data-collection={current}>
+      {folderChips.length > 0 || hasUngrouped ? (
+        <div
+          class="folder-chips"
+          role="tablist"
+          aria-label="Filter by folder"
+          data-folder-chips
+        >
+          <span class="lbl">Folder</span>
+          <a
+            href={`${listBase}${collectionParam}`}
+            class={activeFolder === undefined ? 'on' : ''}
+            data-folder-chip="all"
+          >
+            All
+          </a>
+          {hasUngrouped ? (
+            <a
+              href={`${listBase}${collectionParam}&folder=`}
+              class={`ungrouped${activeFolder === null ? ' on' : ''}`}
+              data-folder-chip=""
+            >
+              Ungrouped
+            </a>
+          ) : null}
+          {folderChips.map((f) => (
+            <a
+              href={`${listBase}${collectionParam}&folder=${encodeURIComponent(f)}`}
+              class={activeFolder === f ? 'on' : ''}
+              data-folder-chip={f}
+            >
+              {f}
+            </a>
+          ))}
+        </div>
+      ) : null}
+
+      <div
+        class="entries-table"
+        data-collection={current}
+        data-active-folder={
+          activeFolder === undefined
+            ? ''
+            : activeFolder === null
+            ? '__ungrouped__'
+            : activeFolder
+        }
+      >
         <div class="et-head">
           <span>Title</span>
           <span>Slug</span>
           <span>Status</span>
+          <span>Folder</span>
           <span>Published</span>
           <span>Updated</span>
           <span></span>
         </div>
-        {entries.length === 0 ? (
+        {visibleEntries.length === 0 ? (
           <div class="empty">
-            No entries in <b>{current}</b> yet. Click <b>+ New entry</b> to
-            write the first one.
+            {activeFolder === undefined ? (
+              <>
+                No entries in <b>{current}</b> yet. Click <b>+ New entry</b>{' '}
+                to write the first one.
+              </>
+            ) : activeFolder === null ? (
+              <>
+                No ungrouped entries in <b>{current}</b>. Every entry is in a
+                folder — pick a folder chip above, or set one on the entry
+                form.
+              </>
+            ) : (
+              <>
+                No entries in folder <b>{activeFolder}</b>. Pick another
+                folder chip above, or clear the filter to see all entries.
+              </>
+            )}
           </div>
         ) : (
-          entries.map((entry) => (
-            <div class="et-row" data-entry-id={entry.id}>
+          visibleEntries.map((entry) => (
+            <div class="et-row" data-entry-id={entry.id} data-entry-folder={entry.folder ?? ''}>
               <a
                 class="row-main"
                 href={`/dashboard/sites/${esc(siteId)}/entries/${esc(entry.id)}`}
@@ -483,6 +640,9 @@ export function EntriesListView({
                 <div class="et-slug">{entry.collectionSlug}/{entry.slug}</div>
                 <div>
                   <span class={`status-pill ${entry.status}`}>{entry.status}</span>
+                </div>
+                <div class={`et-folder${entry.folder === null ? ' is-empty' : ''}`}>
+                  {entry.folder ?? '—'}
                 </div>
                 <div class="et-date">{entry.publishedDate}</div>
                 <div class="et-updated">{relativeWhen(entry.updatedAt)}</div>
@@ -521,6 +681,10 @@ export interface EntryFormViewProps {
     category: string;
     tags: string[];
     status: CollectionEntryStatus;
+    // ADR 0063 dec 7 — `null` = ungrouped (empty input). On submit the
+    // client serialises empty string → null so the API write boundary
+    // never sees a synonym for "no folder."
+    folder: string | null;
   };
 }
 
@@ -644,6 +808,22 @@ export function EntryFormView({ siteId, siteName, mode, entry }: EntryFormViewPr
           />
         </label>
 
+        {/* ADR 0063 dec 7 — folder input. Empty = ungrouped (null). The
+            client script serialises `''` → `null` before posting so the API
+            never sees the empty-string-as-synonym case. Validation feedback
+            renders in the shared `.msg` area below the action buttons. */}
+        <label>
+          <span>Folder (optional)</span>
+          <input
+            type="text"
+            name="folder"
+            value={entry.folder ?? ''}
+            maxlength={64}
+            placeholder="e.g. tech, design — leave empty for ungrouped"
+            data-folder-input
+          />
+        </label>
+
         <div class="actions">
           <button type="submit" class="btn btn-primary">
             {isEdit ? 'Save changes' : 'Create entry'}
@@ -696,12 +876,28 @@ export function formClientScript(siteId: string): string {
     msg.className = 'msg ' + (kind || '');
   }
 
+  // ADR 0063 dec 7 — same shape rule the server enforces, mirrored on the
+  // client so the Owner gets immediate feedback before the round trip.
+  // The server is still the source of truth (fails loud with 400 on
+  // identical inputs); this is just a UX nicety.
+  function validateFolder(value) {
+    if (value.length === 0) return null; // empty = ungrouped, valid
+    if (value.length > 64) return 'Folder must be 64 characters or fewer.';
+    if (value.indexOf('/') >= 0 || value.indexOf('\\') >= 0) {
+      return 'Folder must not contain "/" or "\\".';
+    }
+    return null;
+  }
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     showMsg('Saving…', 'ok');
     const mode = form.getAttribute('data-mode');
     const entryId = form.getAttribute('data-entry-id') || '';
     const tagsRaw = form.tags.value.trim();
+    const folderRaw = form.folder ? form.folder.value.trim() : '';
+    const folderError = validateFolder(folderRaw);
+    if (folderError) { showMsg(folderError, 'err'); return; }
     const payload = {
       collectionSlug: form.collectionSlug.value,
       title: form.title.value.trim(),
@@ -713,6 +909,10 @@ export function formClientScript(siteId: string): string {
       category: form.category.value.trim(),
       tags: tagsRaw.length > 0 ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : [],
       status: form.status.value,
+      // Empty input means "ungrouped" — serialise to null so the API never
+      // sees an empty-string folder. Server rejects '' loudly; we filter
+      // here so the round trip succeeds for the natural empty-input case.
+      folder: folderRaw.length > 0 ? folderRaw : null,
     };
     if (payload.title.length === 0) { showMsg('Title is required.', 'err'); return; }
     if (payload.slug.length === 0) { showMsg('Slug is required.', 'err'); return; }
@@ -880,6 +1080,18 @@ entriesDashboardRoute.get('/sites/:siteId/entries', async (c) => {
       ? requested
       : collections[0] ?? null;
 
+  // ADR 0063 dec 7 — folder filter. Query-string semantics mirror the API:
+  //   * `?folder` absent             → activeFolder = undefined ("All")
+  //   * `?folder=`     (empty value) → activeFolder = null      ("Ungrouped")
+  //   * `?folder=<v>`  (non-empty)   → activeFolder = '<v>'
+  // We accept the request shape liberally on the dashboard — the API write
+  // boundary still rejects malformed folders loudly. An invalid filter value
+  // here just renders an empty list; that's a "no entries match" UX, not
+  // an error worth surfacing in the page chrome.
+  const folderQuery = c.req.query('folder');
+  const activeFolder: FolderFilter =
+    folderQuery === undefined ? undefined : folderQuery.length === 0 ? null : folderQuery;
+
   const entries: CollectionEntry[] = active
     ? await database
         .select()
@@ -914,6 +1126,7 @@ entriesDashboardRoute.get('/sites/:siteId/entries', async (c) => {
         siteName={owned.name}
         collections={collections}
         activeCollection={active}
+        activeFolder={activeFolder}
         entries={entries}
       />
       <script>{raw(listClientScript(siteId))}</script>
@@ -987,6 +1200,7 @@ entriesDashboardRoute.get('/sites/:siteId/entries/new', async (c) => {
           category: '',
           tags: [],
           status: 'draft',
+          folder: null,
         }}
       />
       <script>{raw(formClientScript(siteId))}</script>
@@ -1050,6 +1264,7 @@ entriesDashboardRoute.get('/sites/:siteId/entries/:entryId', async (c) => {
           category: row.category,
           tags: row.tags,
           status: row.status,
+          folder: row.folder,
         }}
       />
       <script>{raw(formClientScript(siteId))}</script>

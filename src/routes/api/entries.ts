@@ -15,7 +15,7 @@
 // bodies become 400 with a JSON `error` message. Slug-collision conflicts
 // (the `(site_id, collection_slug, slug)` unique index) become 409.
 
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware.js';
 import { requireAuth } from '../../auth/require-auth.js';
@@ -67,6 +67,49 @@ type ParseOk<T> = { ok: true; value: T };
 type ParseErr = { ok: false; error: string };
 type ParseResult<T> = ParseOk<T> | ParseErr;
 
+// ADR 0063 dec 7 — `folder` rule. `null` = ungrouped (the default and
+// schema-supported nullability). When present it must be a 1..64 char string
+// containing no path separator (`/` or `\`). Empty string is rejected at the
+// write boundary so callers cannot use it as a synonym for `null` — that
+// would silently mask intent (did the Owner mean "no folder" or did the
+// form fail to populate?). We force the caller to pick: `null` to clear,
+// a non-empty string to set.
+//
+// Returned `value` is either `string` (validated) or `null` (clear). Never
+// truncates; an over-long value rejects loudly so the Owner sees the
+// exact constraint that failed.
+export const FOLDER_MAX_LENGTH = 64;
+
+export function parseFolder(value: unknown): ParseResult<string | null> {
+  if (value === null) return { ok: true, value: null };
+  if (typeof value !== 'string') {
+    return {
+      ok: false,
+      error:
+        'folder must be a string of 1..64 characters with no path separators (/ or \\), or null to clear.',
+    };
+  }
+  if (value.length === 0) {
+    return {
+      ok: false,
+      error: 'folder must not be empty — use null to clear the folder.',
+    };
+  }
+  if (value.length > FOLDER_MAX_LENGTH) {
+    return {
+      ok: false,
+      error: `folder must be ${FOLDER_MAX_LENGTH} characters or fewer (got ${value.length}).`,
+    };
+  }
+  if (value.includes('/') || value.includes('\\')) {
+    return {
+      ok: false,
+      error: 'folder must not contain path separators (/ or \\).',
+    };
+  }
+  return { ok: true, value };
+}
+
 export interface CreateEntryInput {
   collectionSlug: string;
   slug: string;
@@ -79,6 +122,9 @@ export interface CreateEntryInput {
   tags: string[];
   ogImageAssetId: string | null;
   status: CollectionEntryStatus;
+  // ADR 0063 dec 7 — optional sub-grouping inside one collectionSlug.
+  // `null` = ungrouped; absent in the request body defaults to `null`.
+  folder: string | null;
 }
 
 export function parseCreateEntryBody(raw: unknown): ParseResult<CreateEntryInput> {
@@ -143,6 +189,20 @@ export function parseCreateEntryBody(raw: unknown): ParseResult<CreateEntryInput
     status = r.status;
   }
 
+  // ADR 0063 dec 7 — `folder` is optional on create. Absent OR explicit
+  // `null` both resolve to "ungrouped." Any other value flows through the
+  // same shape rule the PATCH and the dashboard form use, so the
+  // 1..64-no-path-separators contract is identical at every write
+  // boundary.
+  let folder: string | null = null;
+  if (r.folder !== undefined) {
+    const parsedFolder = parseFolder(r.folder);
+    if (!parsedFolder.ok) {
+      return { ok: false, error: parsedFolder.error };
+    }
+    folder = parsedFolder.value;
+  }
+
   return {
     ok: true,
     value: {
@@ -157,6 +217,7 @@ export function parseCreateEntryBody(raw: unknown): ParseResult<CreateEntryInput
       tags,
       ogImageAssetId,
       status,
+      folder,
     },
   };
 }
@@ -251,6 +312,16 @@ export function parseUpdateEntryBody(raw: unknown): ParseResult<UpdateEntryPatch
     }
     patch.status = r.status;
   }
+  // ADR 0063 dec 7 — folder PATCH. Presence is meaningful: absent leaves
+  // the existing folder untouched, `null` clears it, a valid string
+  // replaces it.
+  if ('folder' in r) {
+    const parsedFolder = parseFolder(r.folder);
+    if (!parsedFolder.ok) {
+      return { ok: false, error: parsedFolder.error };
+    }
+    patch.folder = parsedFolder.value;
+  }
 
   if (Object.keys(patch).length === 0) {
     return { ok: false, error: 'at least one field must be provided' };
@@ -341,6 +412,17 @@ entriesRoute.use('*', clerkAuth());
 entriesRoute.use('*', requireAuth());
 
 // GET /  — list entries for the site, optionally filtered by ?collection=
+// and ?folder=.
+//
+// ADR 0063 dec 7 — `folder` filter semantics:
+//   * `?folder=<value>` (non-empty)  → exact match on the value. Subject to
+//     the same shape rule as writes; invalid values return 400.
+//   * `?folder=`        (empty)       → "ungrouped" — filter to rows with
+//     `folder IS NULL`. The empty string is the URL-natural way to express
+//     "I picked the Ungrouped chip in the dashboard" without burning a
+//     reserved keyword.
+//   * `?folder` absent                → no folder filter — return all
+//     entries in the collection regardless of folder.
 entriesRoute.get('/', async (c) => {
   const siteId = c.req.param('siteId');
   if (typeof siteId !== 'string' || siteId.length === 0) {
@@ -350,16 +432,39 @@ entriesRoute.get('/', async (c) => {
   if (!access.ok) return access.response;
 
   const collection = c.req.query('collection');
-  const database = db(c.env);
-  const where =
-    typeof collection === 'string' && collection.length > 0
-      ? and(eq(collectionEntry.siteId, siteId), eq(collectionEntry.collectionSlug, collection))
-      : eq(collectionEntry.siteId, siteId);
+  // `Hono.req.query('folder')` returns `undefined` when the param is absent,
+  // and the empty string when the param is present-but-empty (`?folder=`).
+  // We rely on that distinction below to pick the IS NULL filter — see
+  // the per-case branch.
+  const folderParam = c.req.query('folder');
 
+  const filters = [eq(collectionEntry.siteId, siteId)];
+  if (typeof collection === 'string' && collection.length > 0) {
+    filters.push(eq(collectionEntry.collectionSlug, collection));
+  }
+  if (folderParam !== undefined) {
+    if (folderParam.length === 0) {
+      // Ungrouped — match `folder IS NULL` rows.
+      filters.push(isNull(collectionEntry.folder));
+    } else {
+      // Non-empty: validate shape against the write-boundary rule so the
+      // caller cannot pass an invalid filter that the DB would reject
+      // anyway. Same error envelope as a bad POST/PATCH body.
+      const parsedFolder = parseFolder(folderParam);
+      if (!parsedFolder.ok) {
+        return c.json({ error: parsedFolder.error }, 400);
+      }
+      // `parsedFolder.value` is guaranteed non-null here because the
+      // empty-string branch is handled above.
+      filters.push(eq(collectionEntry.folder, parsedFolder.value as string));
+    }
+  }
+
+  const database = db(c.env);
   const rows: CollectionEntry[] = await database
     .select()
     .from(collectionEntry)
-    .where(where)
+    .where(and(...filters))
     .orderBy(desc(collectionEntry.publishedDate));
 
   return c.json({ entries: rows });
@@ -422,6 +527,7 @@ entriesRoute.post('/', async (c) => {
     tags: parsed.value.tags,
     ogImageAssetId: parsed.value.ogImageAssetId,
     status: parsed.value.status,
+    folder: parsed.value.folder,
   };
 
   try {

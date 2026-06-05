@@ -52,6 +52,7 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
+import type { CanvasSection } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
 
 /**
@@ -73,6 +74,98 @@ interface ChatSseEvent {
   toolName?: string;
   error?: string;
   message?: string;
+  /** Op-preview correlation id — the LLM tool_call id the orchestrator
+   *  minted for this proposal. Used by the ghost-preview layer to associate
+   *  a suggestion entry with its ghost in ctx.ghostSections. */
+  id?: string;
+  /** Server-resolved section for additive section ops so the editor can
+   *  ghost-render it in place between existing sections. Present only for
+   *  insertSection / designSection / duplicateSection; omitted otherwise. */
+  previewSection?: CanvasSection;
+}
+
+/**
+ * Read the additive-section ghost target from an op-preview event. Returns
+ * null when the op is not one of insertSection / designSection /
+ * duplicateSection, the server-resolved previewSection is missing, or the
+ * op shape is malformed. The caller filters non-null results into
+ * ctx.ghostSections.
+ */
+export function resolveGhostPageIdForPreview(
+  pages: readonly { id: string; sections: readonly { id: string }[] }[],
+  opPageId: string | null | undefined,
+  afterSectionId: string | null,
+): string {
+  const firstPage = pages[0];
+  if (!firstPage) {
+    throw new Error('ghost preview: state must have at least one page');
+  }
+  if (typeof opPageId === 'string' && opPageId.length > 0) {
+    const target = pages.find((p) => p.id === opPageId);
+    if (!target) {
+      throw new Error(
+        `ghost preview: pageId not found: ${opPageId}. Known pages: ${pages
+          .map((p) => p.id)
+          .join(', ')}`,
+      );
+    }
+    if (
+      typeof afterSectionId === 'string' &&
+      afterSectionId.length > 0 &&
+      !target.sections.some((s) => s.id === afterSectionId)
+    ) {
+      throw new Error(
+        `ghost preview: afterSectionId ${afterSectionId} does not exist on page ${opPageId}`,
+      );
+    }
+    return target.id;
+  }
+  if (typeof afterSectionId === 'string' && afterSectionId.length > 0) {
+    const target = pages.find((p) => p.sections.some((s) => s.id === afterSectionId));
+    if (!target) {
+      throw new Error(`ghost preview: afterSectionId not found on any page: ${afterSectionId}`);
+    }
+    return target.id;
+  }
+  return firstPage.id;
+}
+
+function extractGhostFromOpPreview(
+  opSnapshot: unknown,
+  previewSection: CanvasSection | undefined,
+  suggestionId: string,
+  pages: readonly { id: string; sections: readonly { id: string }[] }[],
+): { id: string; pageId: string; afterSectionId: string | null; section: CanvasSection } | null {
+  if (!previewSection || !opSnapshot || typeof opSnapshot !== 'object') return null;
+  const op = opSnapshot as {
+    kind?: string;
+    pageId?: string | null;
+    afterSectionId?: string | null;
+    sectionId?: string;
+  };
+  if (
+    op.kind !== 'insertSection' &&
+    op.kind !== 'designSection' &&
+    op.kind !== 'duplicateSection'
+  ) {
+    return null;
+  }
+  // duplicateSection inserts the clone after the original by default in
+  // applyCanvasAgentOp — mirror that so the ghost lands where the real op
+  // would land. For insertSection / designSection the op carries
+  // afterSectionId verbatim.
+  const afterSectionId =
+    op.kind === 'duplicateSection'
+      ? typeof op.sectionId === 'string' ? op.sectionId : null
+      : op.afterSectionId === undefined
+        ? null
+        : op.afterSectionId;
+  const pageId = resolveGhostPageIdForPreview(
+    pages,
+    op.pageId === undefined ? null : op.pageId,
+    afterSectionId,
+  );
+  return { id: suggestionId, pageId, afterSectionId, section: previewSection };
 }
 
 /**
@@ -275,7 +368,12 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                       // whatever the function-scoped data happens to
                       // hold at click time (the SSE callback re-fires
                       // and would otherwise alias the same reference).
-                      (function (opSnapshot: unknown, toolNameSnapshot: string) {
+                      (function (
+                        opSnapshot: unknown,
+                        toolNameSnapshot: string,
+                        previewSectionSnapshot: CanvasSection | undefined,
+                        suggestionIdSnapshot: string,
+                      ) {
                         const card = document.createElement('div');
                         card.className = 'opencanvas-chat-msg opencanvas-chat-suggestion';
                         card.setAttribute('data-status', 'pending');
@@ -307,8 +405,31 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           cardEl: card,
                           targetNode: targetNode,
                           inverseOp: null as unknown,
+                          suggestionId: suggestionIdSnapshot,
                         };
                         ctx.pendingAiSuggestions.push(entry);
+
+                        // Ghost preview: for additive section ops the server
+                        // shipped a resolved CanvasSection; materialise it in
+                        // ctx.ghostSections and re-render so the Owner sees
+                        // the proposal in place at lower opacity. Non-additive
+                        // op kinds (rewriteText, updateElement, deleteSection
+                        // etc.) fall through with no ghost — the existing
+                        // overlay-chip on the target node carries that signal.
+                        const ghost = extractGhostFromOpPreview(
+                          opSnapshot,
+                          previewSectionSnapshot,
+                          suggestionIdSnapshot,
+                          ctx.state!.pages,
+                        );
+                        if (ghost) {
+                          ctx.ghostSections.push(ghost);
+                          // Attach a blueprint for revert: when an accepted
+                          // op is rolled back the suggestion returns to
+                          // pending and the ghost should reappear.
+                          (entry as { ghostBlueprint?: typeof ghost }).ghostBlueprint = ghost;
+                          ctx.renderAll();
+                        }
 
                         const actions = document.createElement('div');
                         actions.className = 'opencanvas-chat-suggestion-actions';
@@ -321,6 +442,11 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           if (entry.status !== 'pending') return;
                           acceptBtn.disabled = true;
                           rejectBtn.disabled = true;
+                          // Ghost cleanup lives in applyAgentOpsImpl's
+                          // success branch (drop by suggestionId before its
+                          // own renderAll). That keeps Accept / Apply-all
+                          // paths converged on one removal site instead of
+                          // each entry button writing its own filter.
                           void ctx.applyAgentOps([entry.op], [entry]);
                         });
                         const rejectBtn = document.createElement('button');
@@ -337,6 +463,14 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
                           if (entry.targetNode) {
                             entry.targetNode.removeAttribute('data-ai-overlay-status');
+                          }
+                          // Remove the ghost from the canvas — the Owner
+                          // said no, so the proposal preview goes away.
+                          if (ghost) {
+                            ctx.ghostSections = ctx.ghostSections.filter(
+                              (g) => g.id !== ghost.id,
+                            );
+                            ctx.renderAll();
                           }
                           ctx.refreshAcceptAllButton();
                         });
@@ -417,7 +551,17 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                         ctx.chatMessages!.appendChild(card);
                         ctx.chatMessages!.scrollTop = ctx.chatMessages!.scrollHeight;
                         ctx.refreshAcceptAllButton();
-                      })(data.op, data.toolName || '');
+                      })(
+                        data.op,
+                        data.toolName || '',
+                        data.previewSection,
+                        // Fall back to a synthetic id when the server didn't
+                        // ship one (pre-ghost-preview servers, future event
+                        // shapes). Anchored to a counter + Date.now so two
+                        // events landing in the same ms still get unique ids.
+                        data.id ||
+                          'ghost-' + String(Date.now()) + '-' + String(Math.random()).slice(2, 8),
+                      );
                       removeThinking();
                     } else if (kind === 'error') {
                       removeThinking();

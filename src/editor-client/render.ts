@@ -78,6 +78,7 @@ import {
   ZOOM_MIN,
 } from './editor-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
+import { augmentCollectionPreviewsImpl } from './collection-preview.js';
 
 export function clampZoom(value: number, max?: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -325,8 +326,23 @@ export function renderAllImpl(ctx: EditorContext): void {
       article.appendChild(ctx.buildSectionNode(ctx.state.header, renderWidth));
     }
 
+    const pageGhosts = ctx.ghostSections.filter((g) => g.pageId === page.id);
     for (let si = 0; si < page.sections.length; si++) {
-      article.appendChild(ctx.buildSectionNode(page.sections[si]!, renderWidth));
+      const section = page.sections[si]!;
+      article.appendChild(ctx.buildSectionNode(section, renderWidth));
+      for (let gi = 0; gi < pageGhosts.length; gi++) {
+        if (pageGhosts[gi]!.afterSectionId === section.id) {
+          article.appendChild(buildGhostSectionNode(ctx, pageGhosts[gi]!, renderWidth));
+        }
+      }
+    }
+
+    // applyCanvasAgentOp appends additive section ops when afterSectionId is
+    // null, so the ghost sits after the real page body and before the footer.
+    for (let gi = 0; gi < pageGhosts.length; gi++) {
+      if (pageGhosts[gi]!.afterSectionId === null) {
+        article.appendChild(buildGhostSectionNode(ctx, pageGhosts[gi]!, renderWidth));
+      }
     }
 
     if (ctx.state.footer) {
@@ -358,6 +374,13 @@ export function renderAllImpl(ctx: EditorContext): void {
 
   ctx.renderReel();
   autoGrowTextElements(ctx);
+  // ADR 0063 dec 5 — augment Collection wrappers with editor-only
+  // placeholder card chrome (3 cards + a "Source: <slug or unset>"
+  // banner) when the binding is unset or matches zero entries. Runs
+  // strictly after autoGrowTextElements so the inner frame's final box
+  // dimensions are settled; the augmenter is idempotent so a redundant
+  // call on a no-Collection page is a cheap zero-iteration loop.
+  augmentCollectionPreviewsImpl(ctx);
 
   if (ctx.pendingImport) {
     ctx.renderPlacementSlots();
@@ -384,4 +407,37 @@ export function autoGrowTextElements(ctx: EditorContext): void {
       ctx.setBoxStyle(w, found.element.box);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ghost-section wrapper — wraps ctx.buildSectionNode output with a dimmed,
+// dashed-border, "AI proposal" pilled container so the Owner sees what the
+// agent is proposing in place. Pointer events are off on the inner content
+// so a stray drag doesn't try to edit the ghost; the wrapper itself can
+// still receive a click so a future affordance (e.g. inline accept/reject)
+// has somewhere to live. Today there are no inline ghost buttons — the
+// authoritative Accept/Reject live on the chat suggestion card.
+// ---------------------------------------------------------------------------
+
+function buildGhostSectionNode(
+  ctx: EditorContext,
+  ghost: EditorContext['ghostSections'][number],
+  renderWidth: number,
+): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'opencanvas-ghost-section';
+  wrapper.setAttribute('data-opencanvas-ghost-section', ghost.id);
+  wrapper.style.position = 'relative';
+  wrapper.style.width = renderWidth + 'px';
+
+  const pill = document.createElement('div');
+  pill.className = 'opencanvas-ghost-pill';
+  pill.textContent = 'AI proposal';
+  wrapper.appendChild(pill);
+
+  const inner = ctx.buildSectionNode(ghost.section, renderWidth);
+  inner.setAttribute('data-ghost', 'true');
+  wrapper.appendChild(inner);
+
+  return wrapper;
 }

@@ -145,10 +145,7 @@ async function lookupOwnedSite(
       ),
     )
     .where(
-      and(
-        eq(site.id, siteId),
-        or(eq(site.customerId, customerId), isNotNull(siteCollaborator.id)),
-      ),
+      and(eq(site.id, siteId), or(eq(site.customerId, customerId), isNotNull(siteCollaborator.id))),
     )
     .limit(1);
   const row = siteRow[0];
@@ -326,8 +323,19 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 aria-expanded="false"
                 aria-controls="notif-panel"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" stroke-linejoin="round" />
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
                 </svg>
                 <span class="notif-badge" id="notif-badge" hidden aria-hidden="true">
                   0
@@ -361,7 +369,12 @@ export function editorPageJsx(opts: EditorPageOptions) {
             {/* Presence pill — pre-seeded with solo (1 editing) so the
                 visible state is correct from first paint. The WS callback
                 overwrites this once it attaches with the real peer count. */}
-            <span data-opencanvas-presence role="status" aria-live="polite" aria-label="People editing">
+            <span
+              data-opencanvas-presence
+              role="status"
+              aria-live="polite"
+              aria-label="People editing"
+            >
               <span data-opencanvas-presence-count>1</span> editing
             </span>
           </header>
@@ -455,6 +468,28 @@ export function editorPageJsx(opts: EditorPageOptions) {
                         {cmd.sidebarLabel}
                       </button>
                     ))}
+                  {/* ADR 0063 dec 9 — Collection sidebar button. The
+                      collectionSidebarSpec entry intentionally has zero
+                      commands (Collection insertion goes through the
+                      full scaffolding wizard rather than a bare element
+                      insert, because a Collection without an index page
+                      + entries is half-built and shows the placeholder
+                      banner the Owner can't escape from). Surfacing the
+                      button here, outside the dispatch-driven loop, keeps
+                      the Components grid discoverable without forcing
+                      collectionSidebarSpec to declare a fake bare-insert
+                      command that doesn't match the wizard semantics.
+                      The data-canvas-add-collection attribute is the wiring
+                      hook collection-scaffold.ts (D) and index.ts both
+                      key on. */}
+                  <button
+                    type="button"
+                    class="opencanvas-sidebar-command"
+                    data-canvas-add-collection
+                    title="Add a content collection (e.g. blog, case-studies) with index page + entries"
+                  >
+                    Collection
+                  </button>
                 </div>
               </section>
               <section class="opencanvas-sidebar-group">
@@ -545,9 +580,7 @@ export function editorPageJsx(opts: EditorPageOptions) {
             </div>
             <div id="canvas-chat-messages" class="opencanvas-chat-messages">
               <div id="canvas-chat-welcome" class="opencanvas-chat-welcome">
-                <p class="opencanvas-chat-welcome-greeting">
-                  Hi! I'm the AI for your site. I can:
-                </p>
+                <p class="opencanvas-chat-welcome-greeting">Hi! I'm the AI for your site. I can:</p>
                 <ul class="opencanvas-chat-welcome-list">
                   <li>Rewrite text or restyle elements</li>
                   <li>Add, remove, or reorder sections and pages</li>
@@ -558,13 +591,25 @@ export function editorPageJsx(opts: EditorPageOptions) {
                   Select an element on the canvas, then ask me to change it — or try one of these:
                 </p>
                 <div class="opencanvas-chat-welcome-chips">
-                  <button type="button" class="opencanvas-chat-chip" data-chip-prompt="What can you change for me on this page?">
+                  <button
+                    type="button"
+                    class="opencanvas-chat-chip"
+                    data-chip-prompt="What can you change for me on this page?"
+                  >
                     What can you change?
                   </button>
-                  <button type="button" class="opencanvas-chat-chip" data-chip-prompt="Add a contact section to the bottom of this page.">
+                  <button
+                    type="button"
+                    class="opencanvas-chat-chip"
+                    data-chip-prompt="Add a contact section to the bottom of this page."
+                  >
                     Add a contact section
                   </button>
-                  <button type="button" class="opencanvas-chat-chip" data-chip-prompt="Switch this site to the blue-saas style kit.">
+                  <button
+                    type="button"
+                    class="opencanvas-chat-chip"
+                    data-chip-prompt="Switch this site to the blue-saas style kit."
+                  >
                     Try a different style kit
                   </button>
                 </div>
@@ -590,7 +635,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
               hidden
             >
               <span data-accept-all-label>Accept all changes</span>
-              <span data-accept-all-count class="opencanvas-chat-accept-all-count">0</span>
+              <span data-accept-all-count class="opencanvas-chat-accept-all-count">
+                0
+              </span>
             </button>
             <form id="canvas-chat-form" class="opencanvas-chat-input">
               <input

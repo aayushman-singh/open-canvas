@@ -1119,6 +1119,44 @@ body.opencanvas-modal-open {
   100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0); }
 }
 
+/* Ghost-section preview \u2014 wraps the resolved CanvasSection the agent
+   proposes (insertSection / designSection / duplicateSection) so the
+   owner sees the new content rendered in place between the existing
+   sections at lower opacity, with a dashed accent outline and a small
+   "AI proposal" pill. Pointer events are off on the inner content so a
+   stray drag can't try to edit a not-yet-committed section. */
+.opencanvas-ghost-section {
+  position: relative;
+  opacity: 0.42;
+  outline: 2px dashed var(--accent, var(--red));
+  outline-offset: -2px;
+  border-radius: 4px;
+  transition: opacity 120ms ease-out;
+  animation: opencanvas-ghost-fade-in 180ms ease-out;
+}
+.opencanvas-ghost-section:hover { opacity: 0.62; }
+.opencanvas-ghost-section [data-ghost="true"] { pointer-events: none; }
+.opencanvas-ghost-pill {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--accent, var(--red));
+  border-radius: 999px;
+  padding: 3px 10px;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+@keyframes opencanvas-ghost-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 0.42; transform: translateY(0); }
+}
+
 /* Accept-all confirmation overlay \u2014 modal dialog listing every pending
    op as a single bullet list so the owner can re-read what they're
    about to land before committing. Reuses the existing modal-backdrop

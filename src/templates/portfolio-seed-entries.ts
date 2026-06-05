@@ -129,3 +129,76 @@ export const PORTFOLIO_SHOWCASE_SEED_ENTRIES: readonly SeedEntryRow[] = [
 export const TEMPLATE_SEED_ENTRIES: Record<string, readonly SeedEntryRow[]> = {
   'portfolio-showcase': PORTFOLIO_SHOWCASE_SEED_ENTRIES,
 };
+
+// -----------------------------------------------------------------------------
+// "+ New Collection" wizard seeds (ADR 0063 dec 11)
+// -----------------------------------------------------------------------------
+//
+// When the Owner clicks "+ New Collection", the scaffold endpoint creates two
+// real `collection_entry` rows so the freshly-minted Collection element renders
+// as a multi-card grid the moment the Owner lands on the index page (no
+// placeholder banner). The rows are real DB rows — the Owner edits or deletes
+// them from the Entries dashboard like any other entry.
+//
+// Per ADR 0063 dec 11 constraint: "Sample content that pretends to be real but
+// isn't is forbidden." These rows live in `collection_entry` like any other
+// row; the materializer treats them no differently. The wizard's only role is
+// inserting them; once inserted they belong to the site, not the wizard.
+//
+// `publishedDate` for the two rows is "today" and "yesterday" relative to the
+// wizard call, so the date-desc default sort displays them in the obvious
+// order on the first render.
+
+/** Compute an ISO-date (YYYY-MM-DD) for `daysAgo` days before `now`.
+ *  Exposed (not just used inline) so the smoke can mint deterministic rows by
+ *  passing a fixed `now`. */
+export function isoDateDaysAgo(now: Date, daysAgo: number): string {
+  const d = new Date(now);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Two seed rows for the "+ New Collection" wizard, bound to `collectionSlug`.
+ *  Pure: caller (the POST endpoint) annotates each row with the new site's id
+ *  before inserting. The shapes match `NewCollectionEntry` minus `siteId` and
+ *  the DB-defaulted `id`/`createdAt`/`updatedAt` columns. */
+export function wizardSeedEntries(collectionSlug: string, now: Date): SeedEntryRow[] {
+  const today = isoDateDaysAgo(now, 0);
+  const yesterday = isoDateDaysAgo(now, 1);
+  return [
+    {
+      collectionSlug,
+      slug: 'welcome-to-your-blog',
+      title: 'Welcome to your blog',
+      excerpt: 'A short intro to your new blog.',
+      body:
+        '# Welcome\n\n' +
+        'This is a real entry — edit it from the Entries dashboard tab, or delete it. ' +
+        'Your second post shows what a multi-entry list looks like.\n\n' +
+        'Add more entries any time. The card layout you see here is auto-generated ' +
+        "from this entry's title, excerpt, and OG image.",
+      publishedDate: today,
+      author: 'You',
+      category: '',
+      tags: [],
+      ogImageAssetId: null,
+      status: 'published',
+    },
+    {
+      collectionSlug,
+      slug: 'your-second-post',
+      title: 'Your second post',
+      excerpt: 'Another post so the grid has more than one card.',
+      body:
+        '# Second post\n\n' +
+        'Delete me when you write your first real entry. I exist so your home page ' +
+        'shows what a multi-entry blog feels like.',
+      publishedDate: yesterday,
+      author: 'You',
+      category: '',
+      tags: [],
+      ogImageAssetId: null,
+      status: 'published',
+    },
+  ];
+}

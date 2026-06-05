@@ -1,31 +1,49 @@
 // src/canvas/elements/collection-materializer.smoke.ts
 //
-// `bun run src/canvas/elements/collection-materializer.smoke.ts` — exercises
-// the ADR 0060 publish-time materialization pass. Covers:
-//   1. Index page: page-bound CollectionElement.entries is populated by
-//      cloning cardTemplate per matching entry, with placeholders substituted.
-//   2. Template page: a single `collection-item-template` page expands into
+// ADR 0060 + ADR 0063 — publish-time materialization pass smoke.
+//
+// Survivors from Phase 1 (template-page expansion):
+//   1. Template page (`pageKind: 'collection-item-template'`) expands into
 //      one concrete page per matching entry, with metadata copied from the
-//      entry row and `pageKind`/`collectionSlug` stripped from the clone.
-//   3. Empty entries list → no-op shape (index entries stay empty, template
-//      pages drop out of the page list with no clones).
-//   4. Pages without `pageKind` pass through unchanged.
-//   5. `filter.tags` requires every listed tag to appear on the entry.
-//   6. Default sort is `publishedDate desc` when `element.sort` is unset.
-//   7. The input EditableSite is not mutated (purity contract).
-//   8. Template-page clone ids are deterministic across replays.
-//   9. Collection membership binds to collectionSlug, not category.
-//  10. fieldBindings can populate text cards even without literal placeholders.
+//      entry row and `pageKind` / `collectionSlug` stripped from the clone.
+//   2. Empty entries list → template drops out, ordinary pages pass through.
+//   3. Page without `pageKind` passes through unchanged.
+//   4. Purity: the input EditableSite is not mutated.
+//   5. Template-page clone ids are deterministic across replays.
+//   6. Collection membership binds to `collectionSlug`, not `category`.
+//
+// New in Phase 2B (ADR 0063 D4/D7/D8 materializer):
+//   7. `display: 'image-only'` emits one image-wrapped-in-a-linked-Container
+//      per entry, ordered per the active sort.
+//   8. `display: 'card'` clones DEFAULT_CARD_TEMPLATE per entry, substitutes
+//      `{{title}}` / `{{excerpt}}` / `{{ogImageAssetId}}` / `{{slug}}`, and
+//      sets the outer linkHref to `/<collectionSlug>/<entry.slug>`.
+//   9. `folder` excludes non-matching entries; absence means all entries in
+//      the slug pass through.
+//  10. `sort: 'manual'` orders by `manualOrder` (entry IDs); entries not in
+//      the list append at the end in date-desc order. Stale ids in
+//      `manualOrder` are skipped silently.
+//  11. Zero-entry case (no matches OR `collectionSlug === undefined`) yields
+//      `el.entries = []` and a warning string of the ADR-pinned shape.
+//  12. Legacy CollectionElement fields (`mode`, `cardTemplate`, object-shaped
+//      `sort`, etc.) are read-skipped — present-but-stale legacy values do
+//      not crash and do not influence behaviour.
 
 import type {
   CanvasElement,
   CanvasPage,
   CanvasSection,
+  ContainerElement,
   EditableSite,
+  ImageMediaElement,
   TextElement,
 } from '../schema.js';
 import type { CollectionElement } from './collection.js';
-import { materializeCollections, type MaterializerEntry } from './collection-materializer.js';
+import {
+  materializeCollections,
+  materializeCollectionsWithReport,
+  type MaterializerEntry,
+} from './collection-materializer.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[collection-materializer:smoke] ${message}`);
@@ -48,24 +66,6 @@ function makeText(id: string, text: string): TextElement {
   };
 }
 
-function makeIndexCollection(): CollectionElement {
-  return {
-    id: 'el-collection-blog',
-    type: 'collection',
-    mode: 'page-bound',
-    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
-    entryTemplate: [makeText('tmpl-title', 'Title')],
-    entries: [],
-    cardTemplate: [
-      makeText('card-title', '{{title}}'),
-      makeText('card-excerpt', '{{excerpt}}'),
-      makeText('card-meta', '{{author}} — {{publishedDate}}'),
-    ],
-    fieldBindings: { 'card-title': 'title' },
-    layout: { columns: 3, gap: 24 },
-  };
-}
-
 function makeSection(elements: CanvasElement[]): CanvasSection {
   return {
     id: 'sec-1',
@@ -73,18 +73,6 @@ function makeSection(elements: CanvasElement[]): CanvasSection {
     name: 'Section',
     height: 800,
     elements,
-  };
-}
-
-function makeIndexPage(): CanvasPage {
-  return {
-    id: 'page-blog',
-    slug: 'blog',
-    title: 'Blog',
-    width: 1200,
-    sections: [makeSection([makeIndexCollection()])],
-    pageKind: 'collection-index',
-    collectionSlug: 'blog',
   };
 }
 
@@ -123,6 +111,7 @@ function makeSite(pages: CanvasPage[]): EditableSite {
 
 function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): MaterializerEntry {
   return {
+    id: `entry-${overrides.slug}`,
     collectionSlug: 'blog',
     title: 'Post title',
     excerpt: 'Post excerpt',
@@ -132,62 +121,13 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
     category: 'blog',
     tags: ['launch'],
     ogImageAssetId: null,
+    folder: null,
     ...overrides,
   };
 }
 
 // ---------------------------------------------------------------------------
-// (1) Index page: cardTemplate gets cloned + substituted per entry
-// ---------------------------------------------------------------------------
-
-{
-  const entries: MaterializerEntry[] = [
-    makeEntry({
-      slug: 'first-post',
-      title: 'First post',
-      excerpt: 'First excerpt',
-      author: 'Alice',
-      publishedDate: '2026-05-01T00:00:00.000Z',
-    }),
-    makeEntry({
-      slug: 'second-post',
-      title: 'Second post',
-      excerpt: 'Second excerpt',
-      author: 'Bob',
-      publishedDate: '2026-05-15T00:00:00.000Z',
-    }),
-  ];
-  const site = makeSite([makeIndexPage()]);
-  const out = materializeCollections(site, entries);
-
-  const indexPage = out.pages[0]!;
-  assert(indexPage.id === 'page-blog', '(1) index page preserved at slot 0');
-  const collEl = indexPage.sections[0]!.elements[0]! as CollectionElement;
-  assert(
-    collEl.entries.length === 2,
-    `(1) expected 2 entries, got ${String(collEl.entries.length)}`,
-  );
-
-  // Default sort is publishedDate desc → Second post (May 15) before First (May 1).
-  const firstEntryTitleText = (collEl.entries[0]![0]! as TextElement).content[0]!.text;
-  assert(
-    firstEntryTitleText === 'Second post',
-    `(1) default sort desc places later date first (got ${firstEntryTitleText})`,
-  );
-  const secondEntryExcerpt = (collEl.entries[1]![1]! as TextElement).content[0]!.text;
-  assert(
-    secondEntryExcerpt === 'First excerpt',
-    `(1) {{excerpt}} substituted on second entry (got ${secondEntryExcerpt})`,
-  );
-  const firstEntryMeta = (collEl.entries[0]![2]! as TextElement).content[0]!.text;
-  assert(
-    firstEntryMeta === 'Bob — 2026-05-15T00:00:00.000Z',
-    `(1) multi-token meta substituted (got ${firstEntryMeta})`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// (2) Template page: one template → N pages
+// (1) Template page: one template → N pages with metadata + placeholders
 // ---------------------------------------------------------------------------
 
 {
@@ -201,59 +141,51 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
 
   assert(
     out.pages.length === 3,
-    `(2) template expands to 3 pages (got ${String(out.pages.length)})`,
+    `(1) template expands to 3 pages (got ${String(out.pages.length)})`,
   );
 
-  // Verify each clone strips template metadata.
   for (const page of out.pages) {
-    assert(page.pageKind === undefined, `(2) cloned page strips pageKind (page ${page.id})`);
+    assert(page.pageKind === undefined, `(1) cloned page strips pageKind (page ${page.id})`);
     assert(
       page.collectionSlug === undefined,
-      `(2) cloned page strips collectionSlug (page ${page.id})`,
+      `(1) cloned page strips collectionSlug (page ${page.id})`,
     );
   }
 
-  // Verify metadata copy + slug composition + deterministic id.
   const firstClone = out.pages[0]!;
-  assert(firstClone.id.startsWith('page-blog-template--'), '(2) clone id is deterministic');
+  assert(firstClone.id.startsWith('page-blog-template--'), '(1) clone id is deterministic');
   assert(
     firstClone.slug.startsWith('blog/'),
-    `(2) clone slug prefixed by collection (got ${firstClone.slug})`,
+    `(1) clone slug prefixed by collection (got ${firstClone.slug})`,
   );
-  assert(firstClone.title === 'First post', '(2) title pulled from entry');
-  assert(firstClone.description === entries[0]!.excerpt, '(2) description = entry.excerpt');
-  assert(firstClone.author === entries[0]!.author, '(2) author pulled from entry');
-  assert(firstClone.publishedDate === entries[0]!.publishedDate, '(2) publishedDate pulled');
-  assert(firstClone.category === 'blog', '(2) category pulled from entry');
+  assert(firstClone.title === 'First post', '(1) title pulled from entry');
+  assert(firstClone.description === entries[0]!.excerpt, '(1) description = entry.excerpt');
+  assert(firstClone.author === entries[0]!.author, '(1) author pulled from entry');
+  assert(firstClone.publishedDate === entries[0]!.publishedDate, '(1) publishedDate pulled');
+  assert(firstClone.category === 'blog', '(1) category pulled from entry');
 
-  // Verify body placeholder substituted across an element string field.
   const heroBody = (firstClone.sections[0]!.elements[2]! as TextElement).content[0]!.text;
-  assert(heroBody === 'Body of first', `(2) {{body}} substituted (got ${heroBody})`);
+  assert(heroBody === 'Body of first', `(1) {{body}} substituted (got ${heroBody})`);
   const heroSlug = (firstClone.sections[0]!.elements[3]! as TextElement).content[0]!.text;
-  assert(heroSlug === 'slug: first-post', `(2) {{slug}} substituted (got ${heroSlug})`);
+  assert(heroSlug === 'slug: first-post', `(1) {{slug}} substituted (got ${heroSlug})`);
 }
 
 // ---------------------------------------------------------------------------
-// (3) Empty entries list → no-op on index, template drops out
+// (2) Empty entries → template drops, ordinary stays
 // ---------------------------------------------------------------------------
 
 {
-  const site = makeSite([makeIndexPage(), makeTemplatePage(), makeOrdinaryPage()]);
+  const site = makeSite([makeTemplatePage(), makeOrdinaryPage()]);
   const out = materializeCollections(site, []);
-
-  // Index page survives with empty entries[]; template drops; ordinary stays.
   assert(
-    out.pages.length === 2,
-    `(3) template drops when no entries (got ${String(out.pages.length)})`,
+    out.pages.length === 1,
+    `(2) template drops when no entries (got ${String(out.pages.length)})`,
   );
-  assert(out.pages[0]!.id === 'page-blog', '(3) index page retained');
-  assert(out.pages[1]!.id === 'page-about', '(3) ordinary page retained');
-  const indexCollEl = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
-  assert(indexCollEl.entries.length === 0, '(3) index collection stays empty');
+  assert(out.pages[0]!.id === 'page-about', '(2) ordinary page retained');
 }
 
 // ---------------------------------------------------------------------------
-// (4) Page without pageKind: untouched
+// (3) Ordinary page passes through untouched
 // ---------------------------------------------------------------------------
 
 {
@@ -261,80 +193,27 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   const site = makeSite([ordinary]);
   const entries: MaterializerEntry[] = [makeEntry({ slug: 's', title: 'T', body: 'B' })];
   const out = materializeCollections(site, entries);
-  assert(out.pages.length === 1, '(4) ordinary page count unchanged');
+  assert(out.pages.length === 1, '(3) ordinary page count unchanged');
   const headline = (out.pages[0]!.sections[0]!.elements[0]! as TextElement).content[0]!.text;
-  assert(headline === 'About us', `(4) ordinary page text untouched (got ${headline})`);
+  assert(headline === 'About us', `(3) ordinary page text untouched (got ${headline})`);
 }
 
 // ---------------------------------------------------------------------------
-// (5) filter.tags requires every listed tag
+// (4) Purity: input site is not mutated
 // ---------------------------------------------------------------------------
 
 {
-  const index = makeIndexPage();
-  const collEl = index.sections[0]!.elements[0]! as CollectionElement;
-  collEl.filter = { tags: ['launch', 'design'] };
-  const entries: MaterializerEntry[] = [
-    makeEntry({ slug: 'a', title: 'A', tags: ['launch', 'design', 'extra'] }),
-    makeEntry({ slug: 'b', title: 'B', tags: ['launch'] }), // missing 'design'
-    makeEntry({ slug: 'c', title: 'C', tags: ['design'] }), // missing 'launch'
-    makeEntry({ slug: 'd', title: 'D', tags: ['launch', 'design'] }),
-  ];
-  const out = materializeCollections(makeSite([index]), entries);
-  const hydrated = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
-  assert(
-    hydrated.entries.length === 2,
-    `(5) only entries with all tags match (got ${String(hydrated.entries.length)})`,
-  );
-
-  const matchedTitles = hydrated.entries.map((e) => (e[0]! as TextElement).content[0]!.text).sort();
-  assert(
-    matchedTitles[0] === 'A' && matchedTitles[1] === 'D',
-    `(5) matched A and D, got ${JSON.stringify(matchedTitles)}`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// (6) Default sort is publishedDate desc; filter.limit applies
-// ---------------------------------------------------------------------------
-
-{
-  const index = makeIndexPage();
-  const collEl = index.sections[0]!.elements[0]! as CollectionElement;
-  collEl.filter = { limit: 2 };
-  const entries: MaterializerEntry[] = [
-    makeEntry({ slug: 'oldest', title: 'Oldest', publishedDate: '2026-01-01T00:00:00.000Z' }),
-    makeEntry({ slug: 'newest', title: 'Newest', publishedDate: '2026-06-01T00:00:00.000Z' }),
-    makeEntry({ slug: 'middle', title: 'Middle', publishedDate: '2026-03-01T00:00:00.000Z' }),
-  ];
-  const out = materializeCollections(makeSite([index]), entries);
-  const hydrated = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
-  assert(
-    hydrated.entries.length === 2,
-    `(6) limit caps to 2 (got ${String(hydrated.entries.length)})`,
-  );
-  const first = (hydrated.entries[0]![0]! as TextElement).content[0]!.text;
-  const second = (hydrated.entries[1]![0]! as TextElement).content[0]!.text;
-  assert(first === 'Newest', `(6) newest first (got ${first})`);
-  assert(second === 'Middle', `(6) middle second (got ${second})`);
-}
-
-// ---------------------------------------------------------------------------
-// (7) Purity: input site is not mutated
-// ---------------------------------------------------------------------------
-
-{
-  const index = makeIndexPage();
-  const site = makeSite([index]);
+  const template = makeTemplatePage();
+  const site = makeSite([template]);
   const before = JSON.stringify(site);
   const entries: MaterializerEntry[] = [makeEntry({ slug: 's1', title: 'T1' })];
   materializeCollections(site, entries);
   const after = JSON.stringify(site);
-  assert(before === after, '(7) input site is not mutated');
+  assert(before === after, '(4) input site is not mutated');
 }
 
 // ---------------------------------------------------------------------------
-// (8) Template-page clone ids are deterministic across replays
+// (5) Template-page clone ids are deterministic across replays
 // ---------------------------------------------------------------------------
 
 {
@@ -347,12 +226,12 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
   const b = materializeCollections(site, entries);
   assert(
     JSON.stringify(a) === JSON.stringify(b),
-    '(8) two runs on the same input produce byte-equal output',
+    '(5) two runs on the same input produce byte-equal output',
   );
 }
 
 // ---------------------------------------------------------------------------
-// (9) Collection membership binds to collectionSlug, not category
+// (6) Collection membership binds to collectionSlug, not category
 // ---------------------------------------------------------------------------
 
 {
@@ -370,147 +249,409 @@ function makeEntry(overrides: Partial<MaterializerEntry> & { slug: string }): Ma
       category: 'blog',
     }),
   ];
-  const out = materializeCollections(makeSite([makeIndexPage(), makeTemplatePage()]), entries);
-  const index = out.pages[0]!;
-  const hydrated = index.sections[0]!.elements[0]! as CollectionElement;
-  assert(
-    hydrated.entries.length === 1,
-    `(9) index page must include only blog collection entries, got ${String(hydrated.entries.length)}`,
-  );
-  assert(
-    (hydrated.entries[0]![0]! as TextElement).content[0]!.text === 'Engineering note',
-    '(9) index page must include blog entry even when category differs',
-  );
+  const out = materializeCollections(makeSite([makeTemplatePage()]), entries);
   assert(
     out.pages.some((page) => page.slug === 'blog/engineering-note'),
-    '(9) template page must clone blog collection entry even when category differs',
+    '(6) template clones blog entry even when category differs',
   );
   assert(
     !out.pages.some((page) => page.slug === 'blog/case-study'),
-    '(9) template page must not clone entries from another collection even when category matches',
+    '(6) template does not clone entries from another collection',
   );
 }
 
 // ---------------------------------------------------------------------------
-// (10) fieldBindings populate text cards without literal placeholders
+// Phase 2B fixture helpers — Collection-on-ordinary-page coverage
 // ---------------------------------------------------------------------------
 
-{
-  const index = makeIndexPage();
-  const collEl = index.sections[0]!.elements[0]! as CollectionElement;
-  collEl.cardTemplate = [
-    makeText('bound-title', 'Static title'),
-    makeText('bound-description', 'Static description'),
-  ];
-  collEl.fieldBindings = {
-    'bound-title': 'title',
-    'bound-description': 'description',
+function makeCollectionElement(overrides: Partial<CollectionElement> = {}): CollectionElement {
+  return {
+    id: 'col-1',
+    type: 'collection',
+    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+    collectionSlug: 'blog',
+    display: 'card',
+    sort: 'date-desc',
+    ...overrides,
   };
-  const out = materializeCollections(makeSite([index]), [
-    makeEntry({ slug: 'bound', title: 'Bound title', excerpt: 'Bound excerpt' }),
-  ]);
-  const hydrated = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
-  assert(
-    (hydrated.entries[0]![0]! as TextElement).content[0]!.text === 'Bound title',
-    '(10) fieldBindings title must replace text content',
-  );
-  assert(
-    (hydrated.entries[0]![1]! as TextElement).content[0]!.text === 'Bound excerpt',
-    '(10) fieldBindings description must map to entry excerpt',
-  );
+}
+
+function makeOrdinaryPageWithCollection(
+  collection: CollectionElement,
+  slug = 'home',
+): CanvasPage {
+  return {
+    id: `page-${slug}`,
+    slug,
+    title: slug,
+    width: 1200,
+    sections: [makeSection([collection])],
+  };
+}
+
+function getCollectionFrom(site: EditableSite, pageSlug = 'home'): CollectionElement {
+  const page = site.pages.find((p) => p.slug === pageSlug);
+  if (page === undefined) throw new Error(`page ${pageSlug} not found`);
+  const el = page.sections[0]!.elements[0];
+  if (!el || el.type !== 'collection') throw new Error('expected collection at [0][0]');
+  return el;
+}
+
+function externalUrlOf(container: ContainerElement): string {
+  const href = container.linkHref;
+  if (href === undefined) throw new Error('container.linkHref is undefined');
+  if (href.type !== 'external') throw new Error('container.linkHref is not external');
+  return href.url;
 }
 
 // ---------------------------------------------------------------------------
-// (11) Nested page-bound collection inside an outer cardTemplate: when the
-//      outer hydration suffixes element ids with the outer entry slug, the
-//      nested collection's `fieldBindings` map must be remapped to the new
-//      ids in lockstep — otherwise the next hydration pass's
-//      applyFieldBindings lookup misses every key and the nested cards
-//      render their static placeholder content. Regression pin for the
-//      codex P2 finding on the id-suffix change.
+// (7) `display: 'image-only'` emits one Image-wrapped-in-Container per entry
 // ---------------------------------------------------------------------------
 
 {
-  const innerText = makeText('nested-title', 'Static');
-  const nested: CollectionElement = {
-    id: 'nested-coll',
-    type: 'collection',
-    mode: 'page-bound',
-    box: { x: 0, y: 0, w: 300, h: 200, z: 1 },
-    entryTemplate: [],
-    entries: [],
-    filter: { category: 'child' },
-    cardTemplate: [innerText],
-    fieldBindings: { 'nested-title': 'title' },
-    layout: { columns: 1, gap: 1 },
-  };
-  const outer: CollectionElement = {
-    id: 'outer-coll',
-    type: 'collection',
-    mode: 'page-bound',
-    box: { x: 0, y: 0, w: 300, h: 200, z: 1 },
-    entryTemplate: [],
-    entries: [],
-    filter: { category: 'parent' },
-    cardTemplate: [nested],
-    layout: { columns: 1, gap: 1 },
-  };
-  const site: EditableSite = {
-    styleKit: 'charcoal',
-    pages: [
-      {
-        id: 'page-blog',
-        slug: 'blog',
-        title: 'Blog',
-        width: 1200,
-        pageKind: 'collection-index',
-        collectionSlug: 'blog',
-        sections: [
-          {
-            id: 'sec',
-            recipeId: 'custom',
-            name: 's',
-            height: 800,
-            elements: [outer],
-          },
-        ],
-      },
-    ],
-  };
+  const collection = makeCollectionElement({ display: 'image-only' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
   const entries: MaterializerEntry[] = [
     makeEntry({
-      slug: 'parent',
-      title: 'Parent title',
-      category: 'parent',
-      collectionSlug: 'blog',
+      slug: 'newer',
+      title: 'Newer post',
+      ogImageAssetId: 'asset-newer',
+      publishedDate: '2026-06-04T00:00:00.000Z',
     }),
     makeEntry({
-      slug: 'child',
-      title: 'Child title',
-      category: 'child',
-      collectionSlug: 'blog',
+      slug: 'older',
+      title: 'Older post',
+      ogImageAssetId: 'asset-older',
+      publishedDate: '2026-05-01T00:00:00.000Z',
     }),
   ];
   const out = materializeCollections(site, entries);
-  const hydratedOuter = out.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
+  const hydrated = getCollectionFrom(out);
+  const matrix = hydrated.entries;
+  assert(Array.isArray(matrix), '(7) image-only writes entries matrix');
+  assert(matrix.length === 2, `(7) one instance per entry (got ${String(matrix.length)})`);
+
+  const first = matrix[0]!;
+  const firstContainer = first[0]! as ContainerElement;
+  assert(firstContainer.type === 'container', '(7) instance[0] is the link container');
   assert(
-    hydratedOuter.entries.length === 1,
-    `(11) outer hydration must pick parent-categorised entry only (got ${String(hydratedOuter.entries.length)})`,
+    externalUrlOf(firstContainer) === '/blog/newer',
+    `(7) linkHref url = /blog/newer (got ${externalUrlOf(firstContainer)})`,
   );
-  const hydratedNested = hydratedOuter.entries[0]![0]! as CollectionElement;
+  const firstImage = first[1]! as ImageMediaElement;
+  assert(firstImage.type === 'media' && firstImage.mediaKind === 'image', '(7) image sibling');
+  assert(firstImage.assetId === 'asset-newer', '(7) image carries entry ogImageAssetId');
+  assert(firstImage.alt === 'Newer post', '(7) image alt = title');
+
+  const secondContainer = matrix[1]![0]! as ContainerElement;
   assert(
-    hydratedNested.type === 'collection',
-    '(11) nested element must remain a collection after id suffixing',
+    externalUrlOf(secondContainer) === '/blog/older',
+    '(7) second instance links to /blog/older',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (8) `display: 'card'` clones DEFAULT_CARD_TEMPLATE per entry with subs
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({ display: 'card' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entry = makeEntry({
+    slug: 'welcome',
+    title: 'Welcome to the blog',
+    excerpt: 'Three lines of teaser text.',
+    ogImageAssetId: 'asset-welcome',
+  });
+  const out = materializeCollections(site, [entry]);
+  const hydrated = getCollectionFrom(out);
+  const instance = hydrated.entries![0]!;
+
+  const container = instance[0]! as ContainerElement;
+  assert(container.type === 'container', '(8) instance[0] is Container');
+  assert(container.preset === 'card', '(8) outer Container carries preset: card');
+  assert(
+    externalUrlOf(container) === '/blog/welcome',
+    `(8) outer linkHref = /blog/welcome (got ${externalUrlOf(container)})`,
+  );
+  assert(container.linkLabel === 'Welcome to the blog', '(8) linkLabel = entry title');
+
+  const image = instance[1]! as ImageMediaElement;
+  assert(image.type === 'media' && image.mediaKind === 'image', '(8) sibling[0] = Image');
+  assert(image.assetId === 'asset-welcome', '(8) image bound to ogImageAssetId');
+  assert(image.alt === 'Welcome to the blog', '(8) image alt = title');
+
+  const title = instance[2]! as TextElement;
+  assert(title.type === 'text' && title.role === 'heading', '(8) sibling[1] = title TextElement');
+  assert(title.content[0]!.text === 'Welcome to the blog', '(8) title substituted');
+
+  const excerpt = instance[3]! as TextElement;
+  assert(excerpt.type === 'text' && excerpt.role === 'body', '(8) sibling[2] = excerpt');
+  assert(excerpt.content[0]!.text === 'Three lines of teaser text.', '(8) excerpt substituted');
+
+  const cta = instance[4]!;
+  assert(cta.type === 'action', '(8) sibling[3] = Action button');
+  if (cta.type === 'action') {
+    assert(
+      cta.label[0]!.text === 'Read more',
+      `(8) CTA label = "Read more" (got ${cta.label[0]?.text ?? ''})`,
+    );
+    assert(
+      cta.href !== undefined && cta.href.type === 'external' && cta.href.url === '/blog/welcome',
+      `(8) CTA href = /blog/welcome (got ${JSON.stringify(cta.href)})`,
+    );
+  }
+
+  assert(container.id === 'card-default-root--welcome', '(8) container id derived from slug');
+  assert(title.id === 'card-default-title--welcome', '(8) title id derived from slug');
+}
+
+// ---------------------------------------------------------------------------
+// (9) `folder` filter narrows the candidate pool
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({ folder: 'tech-notes' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'tech-1', folder: 'tech-notes' }),
+    makeEntry({ slug: 'tech-2', folder: 'tech-notes' }),
+    makeEntry({ slug: 'design-1', folder: 'design-notes' }),
+    makeEntry({ slug: 'no-folder' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const hydrated = getCollectionFrom(out);
+  const matrix = hydrated.entries!;
+  assert(matrix.length === 2, `(9) folder narrows to 2 entries (got ${String(matrix.length)})`);
+  const urls = matrix.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+  assert(urls.includes('/blog/tech-1'), '(9) tech-1 included');
+  assert(urls.includes('/blog/tech-2'), '(9) tech-2 included');
+  assert(!urls.includes('/blog/design-1'), '(9) design-1 excluded');
+  assert(!urls.includes('/blog/no-folder'), '(9) un-foldered entry excluded');
+}
+
+// ---------------------------------------------------------------------------
+// (9b) Absent `folder` includes every entry in the slug regardless of folder
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement();
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'tech-1', folder: 'tech-notes' }),
+    makeEntry({ slug: 'design-1', folder: 'design-notes' }),
+    makeEntry({ slug: 'no-folder' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 3, `(9b) absent folder = all 3 entries (got ${String(matrix.length)})`);
+}
+
+// ---------------------------------------------------------------------------
+// (10) `sort: 'manual'` honours manualOrder, appends missing in date-desc
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({
+    sort: 'manual',
+    manualOrder: ['entry-third', 'entry-first'],
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'first', publishedDate: '2026-01-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'second', publishedDate: '2026-02-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'third', publishedDate: '2026-03-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'fourth', publishedDate: '2026-04-01T00:00:00.000Z' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  const urls = matrix.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+  assert(
+    urls[0] === '/blog/third' && urls[1] === '/blog/first',
+    `(10) manualOrder respected (got ${urls.join(',')})`,
   );
   assert(
-    hydratedNested.entries.length === 1,
-    `(11) nested hydration must pick child-categorised entry only (got ${String(hydratedNested.entries.length)})`,
+    urls[2] === '/blog/fourth' && urls[3] === '/blog/second',
+    `(10) unclaimed entries appended date-desc (got ${urls.join(',')})`,
   );
-  const nestedCardText = (hydratedNested.entries[0]![0]! as TextElement).content[0]!.text;
+}
+
+// ---------------------------------------------------------------------------
+// (10b) Stale ids in `manualOrder` (entry deleted) are skipped silently
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({
+    sort: 'manual',
+    manualOrder: ['entry-vanished', 'entry-first', 'entry-also-gone'],
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'first', publishedDate: '2026-01-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'second', publishedDate: '2026-02-01T00:00:00.000Z' }),
+  ];
+  let threw = false;
+  try {
+    const out = materializeCollections(site, entries);
+    const matrix = getCollectionFrom(out).entries!;
+    const urls = matrix.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+    assert(urls.length === 2, `(10b) only surviving entries rendered (got ${urls.length})`);
+    assert(
+      urls[0] === '/blog/first' && urls[1] === '/blog/second',
+      `(10b) stale ids skipped, then date-desc append (got ${urls.join(',')})`,
+    );
+  } catch (_e) {
+    threw = true;
+  }
+  assert(!threw, '(10b) stale manualOrder ids do not crash the materializer');
+}
+
+// ---------------------------------------------------------------------------
+// (10c) `sort: 'date-asc'` orders oldest-first
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({ sort: 'date-asc' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'newer', publishedDate: '2026-06-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'older', publishedDate: '2026-01-01T00:00:00.000Z' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  const urls = matrix.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
   assert(
-    nestedCardText === 'Child title',
-    `(11) nested cardTemplate fieldBindings must resolve to entry title after outer id-suffix rename (got ${nestedCardText})`,
+    urls[0] === '/blog/older' && urls[1] === '/blog/newer',
+    `(10c) date-asc orders oldest-first (got ${urls.join(',')})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// (11) Zero-entry case returns empty + a warning of the ADR-pinned shape
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({ id: 'col-empty', collectionSlug: 'nonexistent' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const { site: out, warnings } = materializeCollectionsWithReport(site, []);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 0, `(11) zero matches → empty matrix (got ${String(matrix.length)})`);
+  assert(warnings.length === 1, `(11) one warning emitted (got ${String(warnings.length)})`);
+  assert(
+    warnings[0]!.includes('Collection element col-empty on page home matched 0 entries'),
+    `(11) warning names element + page (got: ${warnings[0]!})`,
+  );
+  assert(
+    warnings[0]!.includes('source=nonexistent') && warnings[0]!.includes('folder=unset'),
+    `(11) warning carries source + folder (got: ${warnings[0]!})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (11b) `collectionSlug === undefined` also yields empty + 'source=unset'
+// ---------------------------------------------------------------------------
+
+{
+  const collection: CollectionElement = {
+    id: 'col-unbound',
+    type: 'collection',
+    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+    display: 'card',
+    sort: 'date-desc',
+  };
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [makeEntry({ slug: 'anything' })];
+  const { site: out, warnings } = materializeCollectionsWithReport(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 0, '(11b) unbound collection produces no instances');
+  assert(
+    warnings[0]!.includes('source=unset'),
+    `(11b) unbound warning labels source=unset (got: ${warnings[0]!})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (11c) Folder filter referencing an empty folder → warning carries folder
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({ id: 'col-no-folder-hits', folder: 'ghost-folder' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [makeEntry({ slug: 'real', folder: 'tech-notes' })];
+  const { warnings } = materializeCollectionsWithReport(site, entries);
+  assert(warnings.length === 1, '(11c) one warning for empty folder');
+  assert(
+    warnings[0]!.includes('source=blog') && warnings[0]!.includes('folder=ghost-folder'),
+    `(11c) warning names source + folder (got: ${warnings[0]!})`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (12) Legacy CollectionElement fields are read-skipped (no crash, no effect)
+// ---------------------------------------------------------------------------
+
+{
+  const collection: CollectionElement = {
+    id: 'col-legacy',
+    type: 'collection',
+    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+    collectionSlug: 'blog',
+    display: 'card',
+    sort: 'date-desc',
+    // -- legacy fields the new materializer must ignore ----------------------
+    mode: 'page-bound',
+    cardTemplate: [
+      {
+        id: 'legacy-card-text',
+        type: 'text',
+        box: { x: 0, y: 0, w: 100, h: 20, z: 1 },
+        content: [{ text: 'legacy card should not render' }],
+        role: 'body',
+        fontSize: 12,
+        fontWeight: 400,
+        align: 'left',
+      },
+    ],
+    fieldBindings: { title: 'title' },
+    filter: { category: 'engineering' },
+    layout: { columns: 3, gap: 16 },
+  };
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'one', title: 'Real card', category: 'design' }),
+  ];
+  let threw = false;
+  try {
+    const out = materializeCollections(site, entries);
+    const matrix = getCollectionFrom(out).entries!;
+    assert(matrix.length === 1, '(12) legacy fields do not break materialization');
+    const title = matrix[0]![2]! as TextElement;
+    assert(
+      title.content[0]!.text === 'Real card',
+      `(12) new defaults win over legacy cardTemplate (got ${title.content[0]?.text ?? ''})`,
+    );
+    const containerOuter = matrix[0]![0]! as ContainerElement;
+    assert(
+      containerOuter.preset === 'card',
+      '(12) materializer uses DEFAULT_CARD_TEMPLATE, not legacy cardTemplate',
+    );
+  } catch (_e) {
+    threw = true;
+  }
+  assert(!threw, '(12) legacy fields present must not throw');
+}
+
+// ---------------------------------------------------------------------------
+// (13) Purity holds across the hydrate path too
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement();
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const before = JSON.stringify(site);
+  materializeCollections(site, [makeEntry({ slug: 'one' })]);
+  const after = JSON.stringify(site);
+  assert(before === after, '(13) hydrate path does not mutate input site');
 }
 
 console.log('[collection-materializer:smoke] OK');

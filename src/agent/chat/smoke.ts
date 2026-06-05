@@ -15,6 +15,7 @@
 //   6. Precise token count is authoritative at the cap boundary.
 //   7. Wall-clock aborts during countTokens end the turn loudly.
 //   8. Token trimming never orphans active tool responses.
+//   9. Ghost previews fail loudly when the preview target cannot resolve.
 //
 // All paths run without GEMINI_API_KEY / DATABASE_URL — the mock LlmAdapter
 // + InMemorySessionStore stand in.
@@ -30,6 +31,7 @@ import type {
 import type { EditableSite, SectionRecipeId } from '../../canvas/schema.js';
 import { SECTION_RECIPE_IDS } from '../../canvas/schema.js';
 import { createSectionFromRecipe, type RecipeFactoryInput } from '../../canvas/recipes.js';
+import { STYLE_KIT_PRESETS } from '../../canvas/style-kits.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 
 import { CHAT_DEFAULT_MODEL, runChatTurn, type OrchestratorContext } from './orchestrator.js';
@@ -685,6 +687,188 @@ assert(
 );
 
 console.log('[chat:smoke] 9/9 Historical tool-call trim — OK');
+
+// ---------------------------------------------------------------------------
+// Test 10 — Ghost-preview: op-preview events for additive section ops carry
+//   a server-resolved previewSection so the editor can render the proposal
+//   in place between existing sections.
+//
+//   Coverage:
+//     10a — designSection on a custom-styled site (exercises the
+//           resolveStyleKitWithCustom path; mirrors the fix in commit
+//           d496996 — without it, resolvePreviewSection would have thrown
+//           and the orchestrator would have shipped op-preview without
+//           previewSection, silently downgrading the UI).
+//     10b — Non-additive op (rewriteText from test 1) must NOT carry
+//           previewSection. Phase A ghosts are section-shaped only.
+//   Not covered (intentional):
+//     - insertSection: the chat agent does not expose insertSection as a
+//       tool; only designSection is in CANVAS_AGENT_TOOLS. The
+//       resolvePreviewSection insertSection branch exists for direct API
+//       callers (recipe pickers, programmatic apply) and is exercised via
+//       canvas-agent-smoke's createSectionFromRecipe coverage instead.
+//     - duplicateSection: same as insertSection — not an LLM tool name.
+// ---------------------------------------------------------------------------
+
+const ghostState = buildFixtureState();
+const ghostHero = ghostState.pages[0]!.sections[0]!;
+
+// 10a — designSection on a state with styleKit:'custom' resolves through
+// resolveStyleKitWithCustom (mirrors the canvas-ops fix from commit d496996).
+const ghostCustomState = {
+  ...buildFixtureState(),
+  styleKit: 'custom' as const,
+  customStyleKit: STYLE_KIT_PRESETS.charcoal,
+};
+const ghostCustomHero = ghostCustomState.pages[0]!.sections[0]!;
+const designCallId = 'designSection-1-def';
+const ghostDesignAdapter = new MockLlmAdapter([
+  () =>
+    yieldChunks(
+      { type: 'text', text: 'Designing a careers section. ' },
+      {
+        type: 'tool_call',
+        id: designCallId,
+        name: 'designSection',
+        // designSection tool args are FLAT — sectionName + layout at the
+        // top level, not nested under `input` (that's the OP shape, which
+        // the parser builds from these args internally).
+        arguments: {
+          afterSectionId: ghostCustomHero.id,
+          sectionName: 'Careers',
+          layout: {
+            type: 'stack',
+            direction: 'column',
+            align: 'center',
+            children: [
+              {
+                element: {
+                  type: 'text',
+                  text: {
+                    content: 'Now hiring',
+                    role: 'heading',
+                    color: 'text',
+                    font: 'display',
+                    size: 56,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { type: 'done', reason: 'tool_use' },
+    ),
+  () => yieldChunks({ type: 'text', text: 'Accept to apply.' }, { type: 'done', reason: 'stop' }),
+]);
+const ghostDesignWriter = new BufferedStreamWriter();
+const ghostDesignStore = new InMemorySessionStore();
+const ghostDesignSession = await ghostDesignStore.create('site-ghost-design', 'customer-smoke');
+await runChatTurn({
+  session: ghostDesignSession,
+  userMessage: 'Add a careers section.',
+  writer: ghostDesignWriter,
+  ctx: { adapter: ghostDesignAdapter, state: ghostCustomState, systemInstruction: '[smoke] sys' },
+});
+const designPreview = ghostDesignWriter
+  .events()
+  .find((e): e is Extract<ChatStreamEvent, { kind: 'op-preview' }> => e.kind === 'op-preview');
+assert(
+  designPreview !== undefined && designPreview.toolName === 'designSection',
+  'expected an op-preview for designSection',
+);
+assert(
+  designPreview!.previewSection !== undefined,
+  'designSection op-preview on a custom-styled site must carry a previewSection (resolveStyleKitWithCustom should not throw)',
+);
+assert(
+  designPreview!.previewSection!.elements.length > 0,
+  'designSection previewSection must contain the resolved layout-tree elements',
+);
+
+// 10b — rewriteText (non-additive op from test 1) must NOT carry previewSection.
+const rewriteEvt = events1.find(
+  (e): e is Extract<ChatStreamEvent, { kind: 'op-preview' }> => e.kind === 'op-preview',
+);
+assert(
+  rewriteEvt !== undefined && rewriteEvt.previewSection === undefined,
+  'rewriteText op-preview must NOT carry previewSection — Phase A ghosts are section-shaped only',
+);
+
+// 10c — preview resolution failure must be loud. An explicit pageId that
+// does not exist is the same error applyCanvasAgentOp would throw; the chat
+// turn must stop with error+done instead of shipping an op-preview without a
+// ghost and deferring the failure until Accept.
+const invalidPageDesignAdapter = new MockLlmAdapter([
+  () =>
+    yieldChunks(
+      {
+        type: 'tool_call',
+        id: 'designSection-invalid-page',
+        name: 'designSection',
+        arguments: {
+          pageId: 'page-does-not-exist',
+          afterSectionId: ghostHero.id,
+          sectionName: 'Broken target',
+          layout: {
+            type: 'stack',
+            direction: 'column',
+            children: [
+              {
+                element: {
+                  type: 'text',
+                  text: {
+                    content: 'This should not preview',
+                    role: 'heading',
+                    color: 'text',
+                    font: 'display',
+                    size: 48,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { type: 'done', reason: 'tool_use' },
+    ),
+  () =>
+    yieldChunks(
+      { type: 'text', text: 'This pass should not run.' },
+      { type: 'done', reason: 'stop' },
+    ),
+]);
+const invalidPageWriter = new BufferedStreamWriter();
+const invalidPageSession = await new InMemorySessionStore().create(
+  'site-ghost-invalid',
+  'customer-smoke',
+);
+const invalidPageResult = await runChatTurn({
+  session: invalidPageSession,
+  userMessage: 'Add a section to a missing page.',
+  writer: invalidPageWriter,
+  ctx: { adapter: invalidPageDesignAdapter, state: ghostState, systemInstruction: '[smoke] sys' },
+});
+const invalidPageEvents = invalidPageWriter.events();
+const invalidPageError = invalidPageEvents.find(
+  (e): e is Extract<ChatStreamEvent, { kind: 'error' }> => e.kind === 'error',
+);
+assert(
+  invalidPageError !== undefined &&
+    invalidPageError.error.includes('pageId not found: page-does-not-exist'),
+  'invalid designSection preview pageId must emit a loud error with the missing page id',
+);
+assert(
+  !invalidPageEvents.some((e) => e.kind === 'op-preview'),
+  'invalid designSection preview target must stop before op-preview',
+);
+assert(
+  invalidPageResult.doneReason === 'other' &&
+    invalidPageEvents.some((e) => e.kind === 'done' && e.reason === 'other'),
+  'invalid designSection preview target must end the turn with done(other)',
+);
+
+console.log('[chat:smoke] 10/10 Ghost-preview — OK');
 
 // ---------------------------------------------------------------------------
 // Done.

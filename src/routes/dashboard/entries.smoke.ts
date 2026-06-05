@@ -4,16 +4,19 @@
 // the ADR 0060 Stream C Entries dashboard route. Verifies that:
 //
 //   1. The list view renders the toolbar, the "+ New entry" button, the
-//      collection pill row, the table header, one row per entry, status
-//      pills, and the delete affordance.
-//   2. The list view collapses to an empty-state with the `pageKind` hint
-//      when the site has no collections.
+//      collection pill row, the table header (incl. ADR 0063 d7's Folder
+//      column), one row per entry, status pills, and the delete affordance.
+//   2. The list view collapses to an empty-state CTA when the site has no
+//      collections.
 //   3. The form view (mode='new') renders all required fields with their
 //      types and the create button.
 //   4. The form view (mode='edit') prefills inputs from the entry row and
 //      shows the "Save changes" button.
 //   5. The shell sidebar wiring exposes an 'Entries' nav entry between
 //      Forms and Versions.
+//   6. The form/list client scripts compile and embed the site id verbatim.
+//   7. ADR 0063 d7: the folder chip row renders when folders exist, and
+//      filtering by chip narrows the visible rows.
 //
 // The route is otherwise driven by Clerk-auth middleware + Postgres; this
 // smoke targets the pure render functions to keep the assertion surface
@@ -67,6 +70,8 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
     tags: ['launch', 'cms'],
     ogImageAssetId: null,
     status: 'published',
+    // ADR 0063 dec 7 — `folder` column added; defaults to NULL = ungrouped.
+    folder: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -84,6 +89,7 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
       siteName: SITE_NAME,
       collections: ['blog', 'notes'],
       activeCollection: 'blog',
+      activeFolder: undefined,
       entries: [
         makeEntry(),
         makeEntry({
@@ -111,6 +117,7 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   assert(html.includes('>Title<'), '(1) table head: Title column');
   assert(html.includes('>Slug<'), '(1) table head: Slug column');
   assert(html.includes('>Status<'), '(1) table head: Status column');
+  assert(html.includes('>Folder<'), '(1) table head: Folder column (ADR 0063 d7)');
   assert(html.includes('>Published<'), '(1) table head: Published column');
   assert(html.includes('>Updated<'), '(1) table head: Updated column');
   // Rows
@@ -129,6 +136,12 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   assert(
     html.includes(`href="/dashboard/sites/${SITE_ID}/entries/entry-1"`),
     '(1) row click navigates to /entries/:entryId',
+  );
+  // ADR 0063 d7 — folder cells render even when both entries are
+  // ungrouped: the em-dash placeholder must appear in the per-row cell.
+  assert(
+    html.includes('class="et-folder is-empty">—<'),
+    '(1) ungrouped entries render an em-dash in the Folder column',
   );
 
   // Print the first 30 lines of rendered HTML so the orchestrator's
@@ -150,15 +163,26 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
       siteName: SITE_NAME,
       collections: [],
       activeCollection: null,
+      activeFolder: undefined,
       entries: [],
     }),
   );
 
   assert(html.includes('No collections yet'), '(2) empty-state copy present');
-  assert(html.includes('pageKind'), '(2) empty-state hints at pageKind so the Owner knows what to do');
+  // Post-ADR 0060 F3 the zero-collection copy points at the in-route
+  // "+ New collection" wizard rather than the editor's pageKind path.
+  assert(
+    html.includes('New collection'),
+    '(2) empty-state surfaces the New collection wizard CTA',
+  );
   assert(
     !html.includes('+ New entry') && !html.includes('class="formsel"'),
-    '(2) no CTA / pill row when there are zero collections',
+    '(2) no New entry CTA / collection pill row when there are zero collections',
+  );
+  // ADR 0063 d7 — folder filter chips never render without entries.
+  assert(
+    !html.includes('class="folder-chips"'),
+    '(2) no folder chip row when there are zero entries',
   );
 }
 
@@ -184,6 +208,7 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
         category: '',
         tags: [],
         status: 'draft',
+        folder: null,
       },
     }),
   );
@@ -200,6 +225,12 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   assert(html.includes('name="author"'), '(3) author input present');
   assert(html.includes('name="category"'), '(3) category input present');
   assert(html.includes('name="tags"'), '(3) tags input present');
+  // ADR 0063 d7 — folder input present and capped at 64 chars to match the
+  // server-side rule. Hook attribute `data-folder-input` lets the client
+  // validator find the field without a brittle CSS selector chain.
+  assert(html.includes('name="folder"'), '(3) folder input present');
+  assert(html.includes('maxlength="64"'), '(3) folder input enforces 64-char cap');
+  assert(html.includes('data-folder-input'), '(3) folder input keyed for the client validator hook');
   assert(html.includes('name="status"') && html.includes('<select'), '(3) status select present');
   assert(html.includes('>Draft<') && html.includes('>Published<'), '(3) status options listed');
   // Collection is read-only on the form
@@ -231,6 +262,7 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
         category: 'engineering',
         tags: ['launch', 'cms'],
         status: 'published',
+        folder: 'tech',
       },
     }),
   );
@@ -244,6 +276,11 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   assert(html.includes('value="Alice"'), '(4) author prefilled');
   assert(html.includes('value="engineering"'), '(4) category prefilled');
   assert(html.includes('value="launch, cms"'), '(4) tags joined and prefilled');
+  // ADR 0063 d7 — folder string round-trips into the input value.
+  assert(
+    /name="folder"[^>]*value="tech"/.test(html) || html.includes('value="tech"'),
+    '(4) folder string prefilled in the form input',
+  );
   // The "published" option should be marked selected — hono renders boolean
   // attrs by emitting the bare attribute name when truthy.
   assert(
@@ -297,6 +334,129 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
   const ls = listClientScript(SITE_ID);
   assert(ls.includes('__opencanvasModal'), '(6) list client script uses the shared confirm modal');
   assert(ls.includes("method: 'DELETE'"), '(6) list client script issues DELETE on confirm');
+
+  // ADR 0063 d7 — form client script learns about the folder field. It
+  // validates the shape inline (UX) and serialises empty → null before
+  // sending so the server only ever sees null or a valid non-empty
+  // string.
+  assert(fs.includes('validateFolder'), '(6) form client script ships a validateFolder() helper');
+  assert(fs.includes('folder: folderRaw.length > 0 ? folderRaw : null'), '(6) form client script serialises empty input → null');
+}
+
+// ---------------------------------------------------------------------------
+// (7) ADR 0063 d7 — folder chip row + filter narrowing.
+//     With a mix of folder values present, the chip row renders [All,
+//     Ungrouped, <each distinct folder>]. Selecting a chip narrows the
+//     visible rows in the rendered HTML.
+// ---------------------------------------------------------------------------
+
+{
+  const fixtures = [
+    makeEntry({ id: 'e-tech-1', slug: 'tech-post-1', title: 'Tech post 1', folder: 'tech' }),
+    makeEntry({ id: 'e-tech-2', slug: 'tech-post-2', title: 'Tech post 2', folder: 'tech' }),
+    makeEntry({ id: 'e-design-1', slug: 'design-post-1', title: 'Design post', folder: 'design' }),
+    makeEntry({ id: 'e-bare', slug: 'plain', title: 'Plain entry', folder: null }),
+  ];
+
+  // "All" — every row visible, every chip rendered.
+  const allHtml = renderJsx(
+    EntriesListView({
+      siteId: SITE_ID,
+      siteName: SITE_NAME,
+      collections: ['blog'],
+      activeCollection: 'blog',
+      activeFolder: undefined,
+      entries: fixtures,
+    }),
+  );
+  assert(allHtml.includes('class="folder-chips"'), '(7-all) folder chip row renders when folders exist');
+  assert(allHtml.includes('data-folder-chip="all"'), '(7-all) All chip emitted with stable hook');
+  assert(allHtml.includes('data-folder-chip=""'), '(7-all) Ungrouped chip emitted (empty value)');
+  assert(allHtml.includes('data-folder-chip="tech"'), '(7-all) tech chip present');
+  assert(allHtml.includes('data-folder-chip="design"'), '(7-all) design chip present');
+  assert(
+    allHtml.includes('Tech post 1') &&
+      allHtml.includes('Tech post 2') &&
+      allHtml.includes('Design post') &&
+      allHtml.includes('Plain entry'),
+    '(7-all) all entries visible when activeFolder=undefined',
+  );
+  // Active chip carries the .on marker class.
+  assert(
+    /data-folder-chip="all"[^>]*class="on"|class="on"[^>]*data-folder-chip="all"/.test(allHtml),
+    '(7-all) All chip is the active one',
+  );
+
+  // "Ungrouped" — only the folder=null row remains.
+  const ungroupedHtml = renderJsx(
+    EntriesListView({
+      siteId: SITE_ID,
+      siteName: SITE_NAME,
+      collections: ['blog'],
+      activeCollection: 'blog',
+      activeFolder: null,
+      entries: fixtures,
+    }),
+  );
+  assert(ungroupedHtml.includes('Plain entry'), '(7-ungrouped) folder=null row is shown');
+  assert(
+    !ungroupedHtml.includes('Tech post 1') &&
+      !ungroupedHtml.includes('Tech post 2') &&
+      !ungroupedHtml.includes('Design post'),
+    '(7-ungrouped) foldered rows are filtered out',
+  );
+
+  // "tech" — only the two tech rows remain.
+  const techHtml = renderJsx(
+    EntriesListView({
+      siteId: SITE_ID,
+      siteName: SITE_NAME,
+      collections: ['blog'],
+      activeCollection: 'blog',
+      activeFolder: 'tech',
+      entries: fixtures,
+    }),
+  );
+  assert(
+    techHtml.includes('Tech post 1') && techHtml.includes('Tech post 2'),
+    '(7-tech) tech rows visible',
+  );
+  assert(
+    !techHtml.includes('Design post') && !techHtml.includes('Plain entry'),
+    '(7-tech) non-tech rows filtered out',
+  );
+  // Folder chip hrefs hit the same /entries route with the right query.
+  // Hono escapes `&` to `&amp;` inside HTML attributes — assert against the
+  // escaped form (the browser unescapes it on click).
+  assert(
+    techHtml.includes(`/dashboard/sites/${SITE_ID}/entries?collection=blog&amp;folder=tech`),
+    '(7-tech) tech chip href encodes the folder filter',
+  );
+  assert(
+    techHtml.includes(`/dashboard/sites/${SITE_ID}/entries?collection=blog&amp;folder=`),
+    '(7-tech) Ungrouped chip href uses empty folder value',
+  );
+  // The active folder is recorded on the table for client tooling.
+  assert(
+    techHtml.includes('data-active-folder="tech"'),
+    '(7-tech) table records the active folder for downstream tooling',
+  );
+
+  // No matches in the active folder → renders the per-folder empty state.
+  const noMatchHtml = renderJsx(
+    EntriesListView({
+      siteId: SITE_ID,
+      siteName: SITE_NAME,
+      collections: ['blog'],
+      activeCollection: 'blog',
+      activeFolder: 'ghost',
+      entries: fixtures,
+    }),
+  );
+  assert(
+    noMatchHtml.includes('No entries in folder'),
+    '(7-empty) per-folder empty-state copy when filter narrows to zero',
+  );
 }
 
 console.log('[entries:smoke] OK');

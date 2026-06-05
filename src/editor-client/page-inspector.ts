@@ -839,7 +839,24 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   const collectionSlug = page.collectionSlug ?? '';
   const cacheKey = templatePreviewCacheKey(page.id, collectionSlug);
 
-  // B1. Badge + entry counts + Manage entries link ------------------------
+  // B1. Badge + entry counts ----------------------------------------------
+  //
+  // ADR 0063 dec 10 — the "Manage entries →" affordance previously sat here
+  // as an anchor inside this group (alongside the badge + counts). The link
+  // followed the *binding*, and after ADR 0063 dec 1 the binding lives on
+  // the Collection element, not the page — so the affordance moved to the
+  // Collection element inspector (`renderCollectionInspector` in
+  // element-inspector.ts). The badge + entry-count line stay because they
+  // serve the `collection-item-template` page workflow (Owner needs to know
+  // the active source/counts while editing the per-entry template).
+  //
+  // syncTemplateBanner + templateBannerManageHref + templateBannerLabelText
+  // are deliberately untouched: the canvas-top banner still appears for
+  // `collection-item-template` pages and keeps its own "Manage entries →"
+  // link inside the banner DOM. The Owner has two surfaces for "manage":
+  // (1) the floating banner above the artboard while editing a template
+  // page, and (2) the element inspector when a Collection element is
+  // selected. Both end at the same dashboard URL.
   const groupBadge = document.createElement('div');
   groupBadge.className = 'opencanvas-page-inspector-group';
   const hBadge = document.createElement('h4');
@@ -850,19 +867,6 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
   countsLine.style.cssText = 'font-size:12px; color:var(--opencanvas-fg-mute, #888);';
   countsLine.textContent = '— published · — drafts';
   groupBadge.appendChild(countsLine);
-
-  const manageLink = document.createElement('a');
-  manageLink.href =
-    '/dashboard/sites/' +
-    encodeURIComponent(ctx.siteId) +
-    '/entries?collection=' +
-    encodeURIComponent(collectionSlug);
-  manageLink.target = '_blank';
-  manageLink.rel = 'noopener';
-  manageLink.className = 'opencanvas-page-inspector-link';
-  manageLink.textContent = 'Manage entries →';
-  manageLink.title = 'Open the Entries dashboard tab for this collection';
-  groupBadge.appendChild(manageLink);
   ctx.inspector.appendChild(groupBadge);
 
   // B2. Placeholder chips --------------------------------------------------

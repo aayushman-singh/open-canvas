@@ -297,11 +297,11 @@ function makeCtx(): { ctx: Parameters<typeof mountActionLabel>[0]; log: RebuildL
   assert(log.saveCalls >= 1, 'Clear must scheduleSave so the new shape persists');
 }
 
-// ---- Contract 5: defensive seed for empty-array input -----------------
+// ---- Contract 5: invalid label state fails loudly ---------------------
 //
-// The validator rejects an empty array at-rest, but mountActionLabel can
-// be invoked mid-migration. Seed [{text:''}] so the input has something
-// to bind to instead of throwing on label[0]!.text.
+// The validator rejects an empty array at-rest. If one reaches the custom
+// mount, the editor must surface that validation-gate breach instead of
+// silently repairing it into a valid-looking empty run.
 
 {
   const action = {
@@ -315,12 +315,20 @@ function makeCtx(): { ctx: Parameters<typeof mountActionLabel>[0]; log: RebuildL
   const host = makeStubNode('div');
   const { ctx } = makeCtx();
 
-  mountActionLabel(ctx, action, host as unknown as HTMLElement);
+  let message = '';
+  try {
+    mountActionLabel(ctx, action, host as unknown as HTMLElement);
+  } catch (err) {
+    message = err instanceof Error ? err.message : String(err);
+  }
 
   assert(
-    action.label.length === 1 && action.label[0]!.text === '',
-    'mount must seed an empty array to [{text:""}] so the input can bind',
+    message.includes('a-label-4') && message.includes('label'),
+    'mount must throw with element id + label context when label is invalid (got "' +
+      message +
+      '")',
   );
+  assert(action.label.length === 0, 'mount must not mutate invalid label arrays while throwing');
 }
 
 // ---- Teardown ---------------------------------------------------------
