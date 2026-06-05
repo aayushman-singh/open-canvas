@@ -165,6 +165,11 @@ export function showLinkPopoverImpl(
     if (matchedPage) {
       removeLinkPopoverImpl(ctx);
       ctx.setActivePage(matchedPage.id);
+      // Explicit "Go to page" navigation — pan the camera so the target
+      // lands in the viewport. setActivePage is camera-pure; explicit nav
+      // opts in. Without this the Owner clicks Go and stares at a blank
+      // canvas when the target sits hundreds of pixels off-screen.
+      ctx.panToPage(matchedPage.id);
       return;
     }
     if (!isAllowedHref(href)) {

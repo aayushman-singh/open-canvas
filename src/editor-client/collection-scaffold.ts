@@ -61,6 +61,7 @@ export interface CollectionScaffoldCtx {
   flushPendingSave(): Promise<boolean>;
   migrateState(state: EditableSite): EditableSite;
   setActivePage(pageId: string | null): void;
+  panToPage(pageId: string | null): void;
   renderAll(): void;
   updatePageSidebar(): void;
 }
@@ -273,6 +274,10 @@ export async function runCollectionScaffoldFlowImpl(
       : confirmIndexPageId(refreshed, 'page-collection-' + createdSlug + '-index');
   if (targetPageId !== null) {
     ctx.setActivePage(targetPageId);
+    // Newly-minted collection index page — pan so the freshly-created
+    // page lands in view. setActivePage is camera-pure; explicit nav
+    // opts in.
+    ctx.panToPage(targetPageId);
   }
   ctx.setStatus('Created collection "' + createdSlug + '"', 'ok');
 }

@@ -182,41 +182,31 @@ export function fitZoom(ctx: EditorContext): void {
   fitToPage(ctx, null);
 }
 
-// Pan-only camera move: bring the named page's top-left corner into the
-// viewport at a small inset (PAD), preserving the current zoom. Used by
-// setActivePageImpl so every page switch (link popover Go-to, page-list
-// sidebar click, artboard label click, inactive-artboard click) brings
-// the new artboard into view without re-zooming. Falls through to
-// fitToPage when the page is too large to fit at the current zoom — that
-// is the only branch that touches camera.zoom.
+// Pan-only camera move: center the named page in the viewport at the
+// CURRENT zoom. Never touches camera.zoom — if the page is larger than
+// the viewport at the current zoom the user sees a centered page that
+// extends past the edges, and can zoom out manually. The earlier
+// fitToPage fallback was removed because resetting zoom on what the
+// caller asked for as a "pan" surprised users (the camera would
+// silently shrink the whole canvas just because the target page didn't
+// happen to fit).
 //
-// Math:
-//   worldToScreen says screen.x = world.x * zoom + camera.x + rect.left.
-//   We want the page's left edge (world.x = pos.x) to land at viewport
-//   left + PAD, i.e. screen.x = rect.left + PAD. Solving for camera.x:
-//     camera.x = PAD - pos.x * zoom
-//   Symmetric for y, with PAD against the viewport top.
+// Math (mirrors fitToPage's centering, but using current zoom):
+//   To put the page's center at the viewport's center:
+//     camera.x = (rect.width - pos.width * zoom) / 2 - pos.x * zoom
+//     camera.y = (rect.height - pos.height * zoom) / 2 - pos.y * zoom
+//   Derivation: worldToScreen says screen.x = world.x * zoom + camera.x +
+//   rect.left. The page's center sits at world.x = pos.x + pos.width/2.
+//   Setting its screen.x to rect.left + rect.width/2 and solving for
+//   camera.x gives the formula above.
 export function panToPage(ctx: EditorContext, pageId: string | null): void {
   if (!ctx.viewport) return;
   const pos = getPagePosition(ctx, pageId);
   if (!pos) return;
   const rect = ctx.viewport.getBoundingClientRect();
-  const pad = 64;
   const zoom = ctx.camera.zoom;
-  // If the page is wider than the entire viewport at the current zoom,
-  // fall back to fit-to-page so the user can see the whole thing. The
-  // check intentionally ignores the inset — a page that's narrower than
-  // the viewport but wider than (viewport - 2*pad) still fits well
-  // enough at the requested inset and the right edge falls just past
-  // the viewport, which matches the editor's existing aesthetic (the
-  // initial-load home page sits with its right edge near the viewport
-  // edge too).
-  if (pos.width * zoom > rect.width) {
-    fitToPage(ctx, pageId);
-    return;
-  }
-  ctx.camera.x = pad - pos.x * zoom;
-  ctx.camera.y = pad - pos.y * zoom;
+  ctx.camera.x = (rect.width - pos.width * zoom) / 2 - pos.x * zoom;
+  ctx.camera.y = (rect.height - pos.height * zoom) / 2 - pos.y * zoom;
   applyCameraTransform(ctx);
 }
 

@@ -202,6 +202,7 @@ import {
   renderAllImpl,
   fitToPage as fitToPageImpl,
   fitAllPages as fitAllPagesImpl,
+  panToPage as panToPageImpl,
 } from './render.js';
 import { attachGripHandlersImpl, beginSectionDragImpl } from './section-drag.js';
 import {
@@ -554,6 +555,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     deletePage: (pageId) => deletePageImpl(ctx, pageId),
     fitToPage: (pageId) => fitToPageImpl(ctx, pageId),
     fitAllPages: () => fitAllPagesImpl(ctx),
+    panToPage: (pageId) => panToPageImpl(ctx, pageId),
 
     // ---- AI preview panel (single-shot) -------------------------------
     aiPanel: null,
@@ -851,11 +853,12 @@ export function createEditor(boot: EditorBoot): void {
           if (pageItem) {
             const pid2 = pageItem.getAttribute('data-page-id');
             if (pid2 && pid2 !== ctx.activePageId) {
-              // setActivePage now pans the camera (preserves zoom). The
-              // earlier behaviour also called fitToPage to re-zoom; per
-              // spec the desired UX is pan-on-activate everywhere, so
-              // the explicit fitToPage was retired.
+              // Explicit user navigation from the page sidebar — pan the
+              // camera so the target lands in the viewport. setActivePage
+              // is camera-pure now (element clicks on inactive artboards
+              // shouldn't move the camera); explicit nav opts in.
               ctx.setActivePage(pid2);
+              ctx.panToPage(pid2);
             }
           }
         });
