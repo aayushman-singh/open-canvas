@@ -664,10 +664,12 @@ export type NewNotificationRead = typeof notificationRead.$inferInsert;
 // -- collectionEntry (ADR 0060 — CMS-style entries) --------------------------
 //
 // One row per content entry (blog post, case study, etc.) for a given
-// collection on a given site. The canvas only ships `collection-index` and
-// `collection-item-template` pages; this table holds the actual content. A
-// publish-time `materializeCollections` pass clones the template per
-// published row in the matching collection.
+// collection on a given site. After ADR 0063 F5 the canvas only ships
+// `collection-item-template` pages (the retired `collection-index`
+// value was replaced by element-level `CollectionElement.collectionSlug`);
+// this table holds the actual content. A publish-time
+// `materializeCollections` pass clones the template per published row in
+// the matching collection and hydrates element-level Collection bindings.
 //
 // `collectionSlug` is the user-facing name ("blog", "notes") and groups
 // entries within a site. Per-entry `slug` is unique within (site,

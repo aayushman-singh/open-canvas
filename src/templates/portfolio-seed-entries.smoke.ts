@@ -1,11 +1,14 @@
 // src/templates/portfolio-seed-entries.smoke.ts
 //
-// ADR 0060 F2 — pins the portfolio-showcase template's CMS shape:
+// ADR 0060 F2 + ADR 0063 F5 — pins the portfolio-showcase template's
+// CMS shape:
 //
 //   1. The fixture no longer ships individual `page-pf-post-*` pages —
 //      those are replaced by a single `collection-item-template` page.
-//   2. The blog index page (`page-pf-blog`) is marked
-//      `pageKind: 'collection-index'`, `collectionSlug: 'blog'`.
+//   2. The blog index page (`page-pf-blog`) is an ordinary CanvasPage
+//      (no `pageKind`, no page-level `collectionSlug`). Its body
+//      contains one Collection element pre-bound to `'blog'` via
+//      element-level `collectionSlug` per ADR 0063 dec 1 + F5.
 //   3. The collection-item-template page exists with the matching slug.
 //   4. The seed entry list has four rows, each with the fields the
 //      materializer + db insert path require.
@@ -56,15 +59,31 @@ function assert(condition: boolean, message: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// (2) Blog index page is collection-index, collectionSlug='blog'
+// (2) Blog index page carries no page-level pageKind/collectionSlug after
+//     ADR 0063 F5 — the binding lives on the Collection element instead.
 // ---------------------------------------------------------------------------
 
 {
   const state = instantiateTemplate(portfolioShowcaseTemplate.id);
   const indexPage = state.pages.find((p) => p.id === 'page-pf-blog');
   assert(indexPage !== undefined, '(2) page-pf-blog must be present');
-  assert(indexPage!.pageKind === 'collection-index', '(2) blog page must be collection-index');
-  assert(indexPage!.collectionSlug === 'blog', '(2) blog page must bind to "blog"');
+  assert(
+    indexPage!.pageKind === undefined,
+    '(2) page-pf-blog must not carry pageKind after F5 (collection-index is retired)',
+  );
+  assert(
+    indexPage!.collectionSlug === undefined,
+    '(2) page-pf-blog must not carry page-level collectionSlug after F5',
+  );
+  // Find the Collection element inside the blog-list section and confirm
+  // its element-level binding survived the JSON edit.
+  const allElements = indexPage!.sections.flatMap((s) => s.elements);
+  const collection = allElements.find((e) => e.type === 'collection');
+  assert(collection !== undefined, '(2) page-pf-blog must contain a Collection element');
+  assert(
+    (collection as { collectionSlug?: string }).collectionSlug === 'blog',
+    '(2) Collection element must bind to "blog" via element-level collectionSlug',
+  );
 }
 
 // ---------------------------------------------------------------------------

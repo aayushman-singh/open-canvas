@@ -148,6 +148,11 @@ function makeCtx(): MockHandles {
       }
       // GET refresh of /canvas/sites/:siteId — return a state with the
       // new pages appended so the wizard can confirm the index page id.
+      // ADR 0063 F5 — the wizard's refresh shape no longer carries a
+      // page-level `pageKind: 'collection-index'` on the index page.
+      // The element-level binding on the Collection element is the
+      // single source of truth; the template page keeps its kind
+      // because the publish-time clone-per-entry pass keys on it.
       const defaultRefresh: EditableSite = refreshState ?? {
         styleKit: 'charcoal',
         pages: [
@@ -158,8 +163,6 @@ function makeCtx(): MockHandles {
             title: 'Blog',
             width: 1440,
             sections: [],
-            pageKind: 'collection-index',
-            collectionSlug: 'blog',
           },
           {
             id: 'page-collection-blog-template',
@@ -465,6 +468,7 @@ function makeCtx(): MockHandles {
       { status: 201, headers: { 'content-type': 'application/json' } },
     ),
   );
+  // ADR 0063 F5 — index page no longer carries pageKind/collectionSlug.
   handles.setRefreshState({
     styleKit: 'charcoal',
     pages: [
@@ -475,8 +479,6 @@ function makeCtx(): MockHandles {
         title: 'Collection 1',
         width: 1440,
         sections: [],
-        pageKind: 'collection-index',
-        collectionSlug: 'collection-1',
       },
     ],
   });

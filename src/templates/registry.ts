@@ -391,6 +391,13 @@ export const portfolioShowcaseTemplate: TemplateSeed = {
       ],
     },
     {
+      // ADR 0063 dec 2 + F5 — `pageKind: 'collection-index'` is retired.
+      // The Collection element inside the resolved
+      // portfolio-template-blog-list section carries `collectionSlug:
+      // 'blog'` directly (see the JSON), so this page no longer needs
+      // page-level binding metadata. It is now an ordinary CanvasPage
+      // whose body happens to include one Collection element bound to
+      // the blog source.
       id: 'page-pf-blog',
       slug: 'blog',
       title: 'Notes — Aayushman Singh',
@@ -398,8 +405,6 @@ export const portfolioShowcaseTemplate: TemplateSeed = {
       description:
         'Long-form writing on autonomous agents, self-healing CI, local-first software, and building tools for the State.',
       entranceAnimation: 'fade-up',
-      pageKind: 'collection-index',
-      collectionSlug: 'blog',
       bodyRefs: [
         { sectionId: 'portfolio-template-blog-hero-v1', instanceId: 'pfbloghero' },
         { sectionId: 'portfolio-template-blog-list-v1', instanceId: 'pfbloglist' },

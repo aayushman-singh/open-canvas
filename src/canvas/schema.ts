@@ -104,23 +104,23 @@ export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 
 // ADR 0060 / ADR 0063 — CMS collection page kinds.
 //
-// ADR 0063 dec 2 — `'collection-index'` is retired by the validator (new
-// pages cannot set it; existing in-DB pages are migrated on first load by
-// the editor-client startup hook, see E2). The constant still includes the
-// dead value so the on-load migration code path can recognise rows that
-// need rewriting; the page-validator rejects it explicitly so a freshly
-// authored page can never carry it. `'collection-item-template'` stays
-// because the publish-time clone-per-entry pass keys on the page's slug.
-export const COLLECTION_PAGE_KINDS = ['collection-index', 'collection-item-template'] as const;
+// ADR 0063 dec 2 + F5 — `'collection-index'` is retired. The element-
+// level binding (CollectionElement.collectionSlug) is now the only
+// source of truth for "what does this Collection list." The on-load
+// migration (E2 / site-load-migration.ts) sweeps any legacy in-DB
+// pages on first editor load; F3's audit (2026-06-05, Neon) confirmed
+// exactly one prod page (pwtest-engineer's collection-blog-index)
+// carries the legacy shape and is handled by that migration.
+// `validatePage` from this commit onward REJECTS
+// `pageKind === 'collection-index'` outright — the migrator's
+// legacy-string awareness still lives in
+// `editor-client/site-load-migration.ts` (which keys off the literal
+// `'collection-index'` against the raw JSONB shape, not this union),
+// so removing the value here cannot blind the migration loop.
+// `'collection-item-template'` stays because the publish-time clone-
+// per-entry pass keys on the page's slug.
+export const COLLECTION_PAGE_KINDS = ['collection-item-template'] as const;
 export type CollectionPageKind = (typeof COLLECTION_PAGE_KINDS)[number];
-
-/** The post-migration CMS collection page kinds the validator will accept
- *  once ADR 0063 F5 runs. The retired `'collection-index'` value lives in
- *  `COLLECTION_PAGE_KINDS` so the on-load migration (E2) can identify it
- *  and the union still typechecks pre-migration; F5 narrows `validatePage`
- *  to read from this constant instead once F3's prod-data audit confirms
- *  the migration ran cleanly. */
-export const COLLECTION_PAGE_KINDS_ACTIVE = ['collection-item-template'] as const;
 
 export const AGENT_RECIPE_IDS = [
   'hero-split',
@@ -552,14 +552,20 @@ export interface CanvasPage {
   author?: string;
   tags?: string[];
   category?: string;
-  /** ADR 0060 — marks a page as a CMS collection surface.
-   *  'collection-index' = a list page whose page-bound CollectionElements
-   *  get hydrated from the entries table at publish.
+  /** ADR 0060 + ADR 0063 F5 — marks a page as a CMS collection surface.
    *  'collection-item-template' = the ghost detail page; the publisher
    *  clones it once per entry, substituting {{field}} placeholders.
-   *  Both kinds require `collectionSlug`. */
+   *  Requires `collectionSlug`.
+   *
+   *  The retired `'collection-index'` value (ADR 0063 dec 2) is no
+   *  longer in the union. Legacy in-DB rows are swept on first editor
+   *  load by `migrateLegacyCollectionIndexPagesImpl`; the validator
+   *  rejects any fresh occurrence with an explicit error. The page-
+   *  level binding model is fully replaced by element-level
+   *  `CollectionElement.collectionSlug`. */
   pageKind?: CollectionPageKind;
-  /** Which collection (e.g. 'blog') this template/index binds to. Required iff pageKind is set. */
+  /** Which collection (e.g. 'blog') this template page binds to. Required
+   *  when `pageKind === 'collection-item-template'` per validate.ts. */
   collectionSlug?: string;
   // -- Site-pin opt-out (ADR 0059) --------------------------------------------
   /** When true, the site-level `EditableSite.header` is not rendered on this page. Absent = show. */

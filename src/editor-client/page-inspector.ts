@@ -725,13 +725,11 @@ const PAGE_KIND_UI_VALUES = ['standard', ...COLLECTION_PAGE_KINDS] as const;
 
 function pageKindLabel(value: string): string {
   if (value === 'standard') return 'Standard';
-  if (value === 'collection-index') return 'Collection index';
   if (value === 'collection-item-template') return 'Collection item template';
   return value;
 }
 
 function templateBadgeText(page: CanvasPage): string {
-  if (page.pageKind === 'collection-index') return 'Index for: ' + (page.collectionSlug ?? '');
   if (page.pageKind === 'collection-item-template')
     return 'Template for: ' + (page.collectionSlug ?? '');
   return '';
@@ -1104,10 +1102,12 @@ function markTemplateBannerDismissed(pageId: string): void {
 }
 
 /** Pure: the banner label for a template page. Exported so the smoke can
- *  pin both index and item-template phrasings without spinning up a DOM. */
+ *  pin the item-template phrasing without spinning up a DOM. After ADR
+ *  0063 F5 the only template-banner-worthy page kind is
+ *  `'collection-item-template'`; `'collection-index'` is retired and
+ *  handled by `migrateLegacyCollectionIndexPagesImpl` on first load. */
 export function templateBannerLabelText(page: Pick<CanvasPage, 'pageKind' | 'collectionSlug'>): string {
   const slug = page.collectionSlug ?? '';
-  if (page.pageKind === 'collection-index') return 'Index for ' + slug;
   if (page.pageKind === 'collection-item-template') return 'Template for ' + slug;
   return '';
 }

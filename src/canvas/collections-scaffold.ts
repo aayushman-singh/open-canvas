@@ -25,12 +25,10 @@
 // ADR 0063 dec 1 moved source binding from the page to the element, so the
 // index page's single Collection element carries `collectionSlug`,
 // `display: 'card'`, `sort: 'date-desc'`, no `folder`, no `manualOrder`.
-// The page itself still carries `pageKind: 'collection-index'` +
-// `collectionSlug` during the transition window (decision 2's migration is
-// E2's responsibility; F5 removes the field). The validator currently
-// requires `pageKind` and `collectionSlug` to be set together, so we set
-// both — the materializer reads the element's binding for card output
-// regardless.
+// After F5 the page itself no longer carries `pageKind` or
+// `collectionSlug` — those page-level fields are retired and the
+// element-level binding is the single source of truth. The wizard
+// emits a plain CanvasPage with one pre-bound Collection element.
 
 import type {
   CanvasPage,
@@ -184,20 +182,18 @@ function buildIndexPage(slug: string): CanvasPage {
     height: 800,
     elements: [heading, collection],
   };
-  // ADR 0063 dec 2 — `pageKind: 'collection-index'` is retired by the
-  // migration (E2's responsibility). During Phase 2D's transition window
-  // the validator still requires `pageKind` and `collectionSlug` to be set
-  // together (validate.ts:1522-1534), so we set both. The element-level
-  // binding above is what the materializer reads; the page-level fields
-  // are deadweight until E2's migration sweeps them.
+  // ADR 0063 dec 2 + F5 — `pageKind: 'collection-index'` is retired.
+  // The element-level binding above is the single source of truth for
+  // what this Collection lists. F5 narrowed the validator to reject
+  // the dead pageKind value, so the wizard no longer stamps it onto
+  // the page. The index page is now an ordinary CanvasPage that
+  // happens to carry one pre-bound Collection element.
   return {
     id: `page-collection-${slug}-index`,
     slug,
     title: titleCase(slug),
     width: 1440,
     sections: [section],
-    pageKind: 'collection-index',
-    collectionSlug: slug,
   };
 }
 

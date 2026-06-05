@@ -291,12 +291,15 @@ function makeEntry(overrides: Partial<TemplatePreviewEntry> = {}): TemplatePrevi
     }) === 'Template for blog',
     'item-template banner label must read "Template for <slug>"',
   );
+  // ADR 0063 F5 — `'collection-index'` is retired; the banner returns
+  // empty string for any non-item-template kind so the legacy value
+  // (still surfaced by editor-client/site-load-migration before it
+  // sweeps the page) does not render a stale banner.
   assert(
     templateBannerLabelText({
-      pageKind: 'collection-index',
       collectionSlug: 'notes',
-    }) === 'Index for notes',
-    'index banner label must read "Index for <slug>"',
+    }) === '',
+    'non-template pages produce no banner label',
   );
   assert(
     templateBannerLabelText({}) === '',

@@ -39,7 +39,7 @@
 //   'canonical'?      -> string
 //   'noIndex'?        -> boolean
 //   'locale'?         -> string
-//   'pageKind'?       -> 'collection-index' | 'collection-item-template' (ADR 0060)
+//   'pageKind'?       -> 'collection-item-template' (ADR 0060; ADR 0063 F5 retired 'collection-index')
 //   'collectionSlug'? -> string                       (ADR 0060)
 //   'sections'        -> Y.Array<Y.Map<unknown>>     (CanvasSection[])
 //

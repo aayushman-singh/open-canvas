@@ -1503,26 +1503,36 @@ function validatePage(
   }
   assertOptionalNonEmptyString(page.category, `${basePath}.category`, errors);
   assertOptionalNonEmptyString(page.description, `${basePath}.description`, errors);
-  // ADR 0060 + ADR 0063 dec 2 — pageKind + collectionSlug.
+  // ADR 0060 + ADR 0063 dec 2 + F5 — pageKind + collectionSlug.
   //
-  // ADR 0063 dec 2 retires `'collection-index'`. The ADR's follow-up F5
-  // tracks the validator-tightening step: the value starts as "warn" while
-  // the on-load migration (E2) sweeps prod data, and is promoted from
-  // "warn" to "throw" after F3's audit. This commit lands the union with
-  // both values so the migration target ('collection-index' on legacy
-  // rows) and the surviving target ('collection-item-template') both
-  // typecheck; F5 narrows the validator once the migration runs cleanly.
+  // F5 hard-rejects `pageKind === 'collection-index'`: the page-level
+  // binding model is retired per ADR 0063 dec 2 and the source of
+  // truth lives on the CollectionElement itself. The on-load
+  // migration (site-load-migration.ts) sweeps legacy in-DB rows
+  // before the validator runs against them; F3's audit (2026-06-05)
+  // confirmed only one prod page carried the dead shape and is
+  // handled by that sweep. Anyone trying to author a fresh page with
+  // `'collection-index'` (via JSONB hand-edit, an out-of-band writer,
+  // or a stale client) hits this error explicitly — no silent
+  // re-coercion.
   if (page.pageKind !== undefined) {
-    assertOneOf(
-      page.pageKind,
-      COLLECTION_PAGE_KINDS,
-      `${basePath}.pageKind`,
-      errors,
-    );
-    if (page.collectionSlug === undefined) {
+    const rawKind = (page as { pageKind?: string }).pageKind;
+    if (rawKind === 'collection-index') {
       errors.push(
-        `${basePath}.collectionSlug is required when pageKind is set (ADR 0060: a CMS-marked page must name its collection)`,
+        `${basePath}.pageKind 'collection-index' is retired; this Collection's binding lives on the CollectionElement itself per ADR 0063.`,
       );
+    } else {
+      assertOneOf(
+        page.pageKind,
+        COLLECTION_PAGE_KINDS,
+        `${basePath}.pageKind`,
+        errors,
+      );
+      if (page.collectionSlug === undefined) {
+        errors.push(
+          `${basePath}.collectionSlug is required when pageKind is set (ADR 0060: a CMS-marked page must name its collection)`,
+        );
+      }
     }
   }
   if (page.collectionSlug !== undefined) {

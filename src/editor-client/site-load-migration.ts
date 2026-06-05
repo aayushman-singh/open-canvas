@@ -122,7 +122,17 @@ export function migrateLegacyCollectionIndexPagesImpl(ctx: SiteLoadMigrationCtx)
   let missingSlugPages = 0;
 
   for (const page of ctx.state.pages) {
-    if (!page || page.pageKind !== 'collection-index') continue;
+    // ADR 0063 F5 narrowed COLLECTION_PAGE_KINDS to drop
+    // `'collection-index'`, so `page.pageKind` typechecks as
+    // `'collection-item-template' | undefined`. Legacy in-DB rows still
+    // carry the dead string value at runtime — JSONB is byte-for-byte
+    // what the editor saved before the union narrowed — so the
+    // migration must read it through `string | undefined` to recognise
+    // the legacy shape and sweep it. This is the one place the literal
+    // is read after F5 (the migration code itself is the legacy-
+    // awareness boundary).
+    const rawPageKind = (page as { pageKind?: string }).pageKind;
+    if (!page || rawPageKind !== 'collection-index') continue;
 
     const pageSlug = page.collectionSlug;
     if (pageSlug === undefined || pageSlug.length === 0) {

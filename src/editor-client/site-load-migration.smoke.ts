@@ -56,9 +56,14 @@ interface RecordedStatus {
   tone: 'ok' | 'error' | 'info' | undefined;
 }
 
+// ADR 0063 F5 narrowed `CollectionPageKind` so the type union no longer
+// includes the retired `'collection-index'` value, but this smoke needs
+// to construct fixtures carrying the dead value to verify the migration
+// recognises them. The helper takes the kind as `string` and stamps it
+// through an unknown-cast so legacy literals stay constructible.
 function makePage(opts: {
   id: string;
-  pageKind?: 'collection-index' | 'collection-item-template';
+  pageKind?: string;
   collectionSlug?: string;
   collectionElementCount: number;
   collectionElementSlugs?: (string | undefined)[];
@@ -89,9 +94,17 @@ function makePage(opts: {
       },
     ],
   };
-  if (opts.pageKind !== undefined) page.pageKind = opts.pageKind;
+  if (opts.pageKind !== undefined) {
+    (page as { pageKind?: string }).pageKind = opts.pageKind;
+  }
   if (opts.collectionSlug !== undefined) page.collectionSlug = opts.collectionSlug;
   return page;
+}
+
+/** Read `page.pageKind` as `string | undefined` so smoke assertions can
+ *  still compare against the F5-retired `'collection-index'` literal. */
+function rawPageKind(page: CanvasPage): string | undefined {
+  return (page as { pageKind?: string }).pageKind;
 }
 
 function makeCtx(state: EditableSite | null): {
@@ -155,7 +168,7 @@ function makeSite(pages: CanvasPage[]): EditableSite {
   const site = makeSite([page]);
   const { ctx, statuses, saveCalls } = makeCtx(site);
   migrateLegacyCollectionIndexPagesImpl(ctx);
-  assert(page.pageKind === 'collection-index', '(2) multi-Collection: pageKind must persist');
+  assert(rawPageKind(page) === 'collection-index', '(2) multi-Collection: pageKind must persist');
   assert(page.collectionSlug === 'blog', '(2) multi-Collection: collectionSlug must persist');
   const coll0 = page.sections[0]!.elements[0]! as unknown as Record<string, unknown>;
   const coll1 = page.sections[0]!.elements[1]! as unknown as Record<string, unknown>;
@@ -191,7 +204,7 @@ function makeSite(pages: CanvasPage[]): EditableSite {
   const site = makeSite([page]);
   const { ctx, statuses, saveCalls } = makeCtx(site);
   migrateLegacyCollectionIndexPagesImpl(ctx);
-  assert(page.pageKind === 'collection-index', '(3) zero-Collection: pageKind must persist');
+  assert(rawPageKind(page) === 'collection-index', '(3) zero-Collection: pageKind must persist');
   assert(saveCalls.count === 0, '(3) no save fires for zero-Collection page');
   assert(statuses.length === 1, '(3) banner enqueued');
   assert(
@@ -219,7 +232,7 @@ function makeSite(pages: CanvasPage[]): EditableSite {
     const { ctx, statuses } = makeCtx(site);
     migrateLegacyCollectionIndexPagesImpl(ctx);
     assert(
-      page.pageKind === 'collection-index',
+      rawPageKind(page) === 'collection-index',
       '(4) missing-slug: pageKind must persist (cannot migrate)',
     );
     assert(warns.length >= 1, '(4) console.warn must fire for missing slug');
@@ -298,9 +311,13 @@ function makeSite(pages: CanvasPage[]): EditableSite {
         elements: [sibling, collection] as never,
       },
     ],
-    pageKind: 'collection-index',
     collectionSlug: 'blog',
   };
+  // F5 narrowed the union so `'collection-index'` is no longer
+  // assignable to `page.pageKind`; the smoke stamps the legacy literal
+  // through an unknown-cast so the migration can recognise it on the
+  // raw JSONB shape.
+  (page as { pageKind?: string }).pageKind = 'collection-index';
   const site = makeSite([page]);
   const { ctx, statuses, saveCalls } = makeCtx(site);
   migrateLegacyCollectionIndexPagesImpl(ctx);
@@ -356,14 +373,15 @@ function makeSite(pages: CanvasPage[]): EditableSite {
         elements: [collB] as never,
       },
     ],
-    pageKind: 'collection-index',
     collectionSlug: 'blog',
   };
+  // F5 narrowed the union; stamp the legacy literal via cast.
+  (page as { pageKind?: string }).pageKind = 'collection-index';
   const site = makeSite([page]);
   const { ctx, statuses, saveCalls } = makeCtx(site);
   migrateLegacyCollectionIndexPagesImpl(ctx);
   assert(
-    page.pageKind === 'collection-index',
+    rawPageKind(page) === 'collection-index',
     '(8) cross-section multi-Collection: pageKind must persist',
   );
   assert(saveCalls.count === 0, '(8) cross-section multi-Collection: no save fires');
@@ -415,9 +433,10 @@ function makeSite(pages: CanvasPage[]): EditableSite {
         elements: [tabsEl] as never,
       },
     ],
-    pageKind: 'collection-index',
     collectionSlug: 'notes',
   };
+  // F5 narrowed the union; stamp the legacy literal via cast.
+  (page as { pageKind?: string }).pageKind = 'collection-index';
   const site = makeSite([page]);
   const { ctx, statuses, saveCalls } = makeCtx(site);
   migrateLegacyCollectionIndexPagesImpl(ctx);

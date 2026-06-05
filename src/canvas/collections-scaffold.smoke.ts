@@ -3,9 +3,12 @@
 // ADR 0063 Decision 11 — pins the "+ New Collection" wizard's pure scaffold:
 //
 //   1. Valid slug produces an index page + template page + two seed entries.
-//   2. The two new pages carry the correct pageKind/collectionSlug, slugs,
-//      element ids, and the Collection element ships ADR-0063 element-level
-//      binding (collectionSlug, sort='date-desc', display='card').
+//   2. The index page is an ordinary CanvasPage (no pageKind, no page-level
+//      collectionSlug — ADR 0063 F5 retired that binding model). The
+//      template page still carries pageKind='collection-item-template' +
+//      matching collectionSlug. The Collection element on the index page
+//      ships ADR-0063 element-level binding (collectionSlug,
+//      sort='date-desc', display='card').
 //   3. The materializer expands the template + each seed entry into one
 //      concrete page per entry.
 //   4. The resulting site validates end-to-end.
@@ -84,8 +87,15 @@ const FIXED_NOW = new Date('2026-06-05T12:00:00Z');
   if (!result.ok) throw new Error('unreachable');
 
   const [indexPage, templatePage] = result.newPages;
-  assert(indexPage.pageKind === 'collection-index', '(1) index page pageKind');
-  assert(indexPage.collectionSlug === 'blog', '(1) index page collectionSlug');
+  // ADR 0063 F5 — the wizard no longer stamps `pageKind: 'collection-
+  // index'` or page-level `collectionSlug` on the index page. The
+  // element-level binding on the Collection element (asserted below
+  // via the materializer round-trip) is the single source of truth.
+  assert(indexPage.pageKind === undefined, '(1) index page pageKind retired after F5');
+  assert(
+    indexPage.collectionSlug === undefined,
+    '(1) index page must not carry page-level collectionSlug after F5',
+  );
   assert(indexPage.slug === 'blog', '(1) index page slug = "blog"');
   assert(templatePage.pageKind === 'collection-item-template', '(1) template pageKind');
   assert(templatePage.collectionSlug === 'blog', '(1) template collectionSlug');

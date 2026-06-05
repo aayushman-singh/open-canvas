@@ -60,16 +60,15 @@
           "h": 600,
           "z": 1
         },
+        "collectionSlug": "blog",
+        "display": "card",
+        "sort": "date-desc",
         "mode": "page-bound",
         "entryTemplate": [],
         "entries": [],
         "filter": {
           "category": "notes",
           "limit": 12
-        },
-        "sort": {
-          "field": "publishedDate",
-          "order": "desc"
         },
         "fieldBindings": {
           "title": "title",

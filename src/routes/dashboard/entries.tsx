@@ -19,11 +19,14 @@
 //   1. Distinct `collection_slug` values already present in this site's
 //      `collection_entry` rows.
 //   2. Any `pageKind`-marked pages in the site's `editableState.pages[]`
-//      (a collection-index or collection-item-template) that carry a
-//      `collectionSlug`.
+//      (after ADR 0063 F5 this is only `collection-item-template`; the
+//      `collection-index` value was retired in favour of element-level
+//      `CollectionElement.collectionSlug`). The page's `collectionSlug`
+//      still names the bound collection for the template page.
 //
 // When neither source produces a collection, we render an empty state telling
-// the Owner to add a `pageKind: 'collection-index'` page in the editor first.
+// the Owner to add a Collection element (via the editor's Add sidebar) and
+// bind it to a slug in the inspector.
 //
 // Open Canvas chrome — `.entries-toolbar`, `.entries-table`, `.entry-form`
 // live in `pageStyles` and reuse the existing CSS tokens (`var(--ink)`,
