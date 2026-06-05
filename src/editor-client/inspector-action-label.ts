@@ -32,12 +32,13 @@ export function mountActionLabel(
   element: ActionElement,
   host: HTMLElement,
 ): void {
-  if (!Array.isArray(element.label) || element.label.length === 0) {
-    // Defensive: at-rest the validator rejects an empty array, so this
-    // branch only fires if a custom-mount handler is invoked on a record
-    // that bypassed validation (e.g. an in-flight migration). Seed with
-    // one empty run so the input has something to bind to.
-    element.label = [{ text: '' }];
+  const firstRun = Array.isArray(element.label) ? element.label[0] : undefined;
+  if (!firstRun || typeof firstRun.text !== 'string') {
+    throw new Error(
+      'mountActionLabel: action element ' +
+        element.id +
+        ' label must be a non-empty InlineRun[]; validateEditableSite should reject invalid action labels before inspector mount',
+    );
   }
 
   const wrap = document.createElement('div');
@@ -45,7 +46,7 @@ export function mountActionLabel(
   const input = document.createElement('input');
   input.type = 'text';
   input.placeholder = 'Button label (leave empty for icon-only)';
-  input.value = element.label[0]!.text;
+  input.value = firstRun.text;
   input.addEventListener('input', () => {
     // Live update on every keystroke so the canvas preview matches what
     // the user is typing. Only the first run's .text changes; marks on

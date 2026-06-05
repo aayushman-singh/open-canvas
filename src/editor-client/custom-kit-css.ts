@@ -41,7 +41,11 @@ export const CUSTOM_KIT_STYLE_ID = 'opencanvas-editor-custom-kit-css';
  *      and writes it into a `<style id="opencanvas-editor-custom-kit-css">`
  *      tag, creating the tag if absent or updating its `textContent` if it
  *      already exists.
- *  - any other case (built-in kit, or custom selector without a preset)
+ *  - `state.styleKit === 'custom'` without `state.customStyleKit`
+ *    → throws. The validator rejects that state; reaching this helper means
+ *      the editor is holding invalid site data and must not paint a degraded
+ *      preview.
+ *  - built-in kit or null state
  *    → removes the tag if present. The built-in kit blocks already live in
  *      the prebuilt stylesheet so nothing else is required.
  *
@@ -53,9 +57,14 @@ export function applyCustomKitCss(state: EditableSite | null): void {
   const head = document.head;
   if (!head) return;
   const existing = document.getElementById(CUSTOM_KIT_STYLE_ID);
-  if (state === null || state.styleKit !== 'custom' || state.customStyleKit === undefined) {
+  if (state === null || state.styleKit !== 'custom') {
     if (existing) existing.remove();
     return;
+  }
+  if (state.customStyleKit === undefined) {
+    throw new Error(
+      'applyCustomKitCss: customStyleKit is required when styleKit === "custom"',
+    );
   }
   const css = buildStyleKitCss('custom', state.customStyleKit);
   if (existing instanceof HTMLStyleElement) {

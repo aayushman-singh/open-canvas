@@ -6,10 +6,11 @@
 // Coverage:
 //   (1) Happy path: prompted slug "blog" → POST hits the right URL with
 //       the right body shape → site state refresh → setActivePage runs
-//       with the freshly-scaffolded index page id → success status.
+//       with the index page id returned by the server → success status.
 //   (2) Cancelled prompt: openTextModal returning null skips the POST
 //       entirely.
-//   (3) Slug shape failure surfaces an error toast and skips the POST.
+//   (3) Slug shape failure is surfaced from the server response, not a
+//       client-side duplicate regex.
 //   (4) Server error response surfaces the server's `error` string in
 //       the status toast.
 //   (5) flushPendingSave returning false short-circuits before the POST.
@@ -20,6 +21,12 @@
 // carries all the prompt/POST/refresh/activate logic.
 //
 // Run with `bun run collection-scaffold:smoke`.
+
+declare const Bun: {
+  file(input: URL): {
+    text(): Promise<string>;
+  };
+};
 
 import type { EditableSite } from '../canvas/schema.js';
 import type { CollectionScaffoldCtx } from './collection-scaffold.js';
@@ -79,6 +86,9 @@ interface MockHandles {
   updatePageSidebarCalls: { count: number };
 }
 
+const SERVER_INDEX_PAGE_ID = 'page-from-server-blog-index';
+const SERVER_TEMPLATE_PAGE_ID = 'page-from-server-blog-template';
+
 function makeCtx(): MockHandles {
   let promptReply: string | null = null;
   let postResponse: Response | null = null;
@@ -106,6 +116,8 @@ function makeCtx(): MockHandles {
             new Response(
               JSON.stringify({
                 collectionSlug: 'blog',
+                indexPageId: SERVER_INDEX_PAGE_ID,
+                templatePageId: SERVER_TEMPLATE_PAGE_ID,
                 redirectTo: '/dashboard/sites/site-smoke/entries?collection=blog',
               }),
               { status: 201, headers: { 'content-type': 'application/json' } },
@@ -120,7 +132,7 @@ function makeCtx(): MockHandles {
         pages: [
           ...emptyState().pages,
           {
-            id: 'page-collection-blog-index',
+            id: SERVER_INDEX_PAGE_ID,
             slug: 'blog',
             title: 'Blog',
             width: 1440,
@@ -129,7 +141,7 @@ function makeCtx(): MockHandles {
             collectionSlug: 'blog',
           },
           {
-            id: 'page-collection-blog-template',
+            id: SERVER_TEMPLATE_PAGE_ID,
             slug: 'blog/template',
             title: '{{title}}',
             width: 1440,
@@ -232,11 +244,13 @@ function makeCtx(): MockHandles {
     '(1) refresh url must hit siteBase (got ' + refreshCall.url + ')',
   );
 
-  // setActivePage called once with the index page id from the refreshed state.
+  // setActivePage called once with the canonical index page id returned by
+  // the POST response. This deliberately does not match the scaffold's old
+  // private id format, so the client cannot pass by re-deriving the id.
   assert(
     handles.activePageIds.length === 1 &&
-      handles.activePageIds[0] === 'page-collection-blog-index',
-    '(1) setActivePage must switch to the new index page (got ' +
+      handles.activePageIds[0] === SERVER_INDEX_PAGE_ID,
+    '(1) setActivePage must switch to the server-returned index page id (got ' +
       JSON.stringify(handles.activePageIds) +
       ')',
   );
@@ -277,23 +291,33 @@ function makeCtx(): MockHandles {
 }
 
 // ---------------------------------------------------------------------------
-// (3) Bad slug shape → error toast, no POST
+// (3) Bad slug shape → server error toast, no refresh
 // ---------------------------------------------------------------------------
 
 {
   const handles = makeCtx();
   handles.setPromptReply('Has Caps');
+  handles.setPostResponse(
+    new Response(
+      JSON.stringify({ error: 'collection slug must be 1..80 lowercase letters, digits, or dashes' }),
+      { status: 409, headers: { 'content-type': 'application/json' } },
+    ),
+  );
 
   await runCollectionScaffoldFlowImpl(handles.ctx);
 
   assert(
-    handles.fetches.length === 0,
-    '(3) malformed slug must skip POST (got ' + handles.fetches.length + ' fetches)',
+    handles.fetches.length === 1,
+    '(3) malformed slug must POST and let the server-owned slug validator answer (got ' +
+      handles.fetches.length +
+      ' fetches)',
   );
   const last = handles.statuses[handles.statuses.length - 1];
   assert(
-    last !== undefined && last.tone === 'error',
-    '(3) malformed slug must surface an error status (got ' + JSON.stringify(last) + ')',
+    last !== undefined && last.tone === 'error' && last.text.includes('collection slug'),
+    '(3) malformed slug must surface the server validation error (got ' +
+      JSON.stringify(last) +
+      ')',
   );
 }
 
@@ -350,6 +374,22 @@ function makeCtx(): MockHandles {
   assert(
     last !== undefined && last.tone === 'error' && last.text.toLowerCase().includes('save'),
     '(5) failed flush must surface a save-prompt error status (got ' + JSON.stringify(last) + ')',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (6) Server response contract names the canonical page ids
+// ---------------------------------------------------------------------------
+
+{
+  const routeSource = await Bun.file(new URL('../routes/api/collections.ts', import.meta.url)).text();
+  assert(
+    routeSource.includes('indexPageId') && routeSource.includes('scaffold.newPages[0].id'),
+    '(6) collections API response must include indexPageId from scaffold.newPages[0].id',
+  );
+  assert(
+    routeSource.includes('templatePageId') && routeSource.includes('scaffold.newPages[1].id'),
+    '(6) collections API response must include templatePageId from scaffold.newPages[1].id',
   );
 }
 
