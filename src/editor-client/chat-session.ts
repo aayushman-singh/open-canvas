@@ -260,17 +260,20 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
       | null;
     if (submitBtn) submitBtn.disabled = true;
 
-    // Thinking bubble: bouncing-dots placeholder shown immediately so
-    // the panel does not sit dead while the model warms up. Removed
-    // as soon as the first SSE event lands (any kind) so the real
-    // streaming bubble can take its place.
+    // Thinking bubble: lightbulb + "Thinking…" placeholder shown
+    // immediately so the panel does not sit dead while the model warms
+    // up. Removed as soon as the first SSE event lands (any kind) so
+    // the real streaming bubble can take its place.
     let thinkingEl: HTMLDivElement | null = document.createElement('div');
     thinkingEl.className = 'opencanvas-chat-thinking';
-    for (let ti = 0; ti < 3; ti++) {
-      const dot = document.createElement('span');
-      dot.className = 'opencanvas-chat-thinking-dot';
-      thinkingEl.appendChild(dot);
-    }
+    const bulb = document.createElement('span');
+    bulb.className = 'opencanvas-chat-thinking-bulb';
+    bulb.textContent = '💡';
+    const label = document.createElement('span');
+    label.className = 'opencanvas-chat-thinking-label';
+    label.textContent = 'Thinking…';
+    thinkingEl.appendChild(bulb);
+    thinkingEl.appendChild(label);
     ctx.chatMessages!.appendChild(thinkingEl);
     ctx.chatMessages!.scrollTop = ctx.chatMessages!.scrollHeight;
     function removeThinking(): void {
@@ -396,6 +399,42 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                         const targetNode = ctx.findCanvasNodeForOp(opSnapshot);
                         if (targetNode) {
                           targetNode.setAttribute('data-ai-overlay-status', 'proposed');
+                          // Media-replacement ghost: when the AI proposes a
+                          // new image on an existing media element, overlay
+                          // the proposed asset on top of the live one so the
+                          // owner can actually see what they'd be applying
+                          // before clicking Accept. The dashed outline alone
+                          // tells them *which* element is targeted but not
+                          // *what* changes. Image-only for now; videos would
+                          // need a separate <video> overlay path.
+                          const proposalSnapshot = opSnapshot as {
+                            kind?: string;
+                            mediaKind?: string;
+                            assetId?: string;
+                          };
+                          if (
+                            proposalSnapshot.kind === 'replaceMedia' &&
+                            proposalSnapshot.mediaKind === 'image' &&
+                            typeof proposalSnapshot.assetId === 'string' &&
+                            proposalSnapshot.assetId.length > 0
+                          ) {
+                            const mediaGhost = document.createElement('div');
+                            mediaGhost.className = 'opencanvas-ai-media-ghost';
+                            mediaGhost.setAttribute(
+                              'data-ai-media-ghost-for',
+                              suggestionIdSnapshot,
+                            );
+                            const ghostImg = document.createElement('img');
+                            ghostImg.src =
+                              ctx.siteBase + '/assets/' + encodeURIComponent(proposalSnapshot.assetId);
+                            ghostImg.alt = '';
+                            mediaGhost.appendChild(ghostImg);
+                            const ghostBadge = document.createElement('span');
+                            ghostBadge.className = 'opencanvas-ai-media-ghost-badge';
+                            ghostBadge.textContent = '💡 Proposed';
+                            mediaGhost.appendChild(ghostBadge);
+                            targetNode.appendChild(mediaGhost);
+                          }
                         }
 
                         const entry = {
@@ -463,6 +502,12 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
                           if (entry.targetNode) {
                             entry.targetNode.removeAttribute('data-ai-overlay-status');
+                            // Strip any replaceMedia ghost overlay we
+                            // attached above when the proposal landed.
+                            const mediaGhost = entry.targetNode.querySelector(
+                              '[data-ai-media-ghost-for="' + suggestionIdSnapshot + '"]',
+                            );
+                            if (mediaGhost) mediaGhost.remove();
                           }
                           // Remove the ghost from the canvas — the Owner
                           // said no, so the proposal preview goes away.

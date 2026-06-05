@@ -967,29 +967,30 @@ export function showAcceptAllSummaryImpl(ctx: EditorContext): void {
   const h = document.createElement('h3');
   h.textContent = 'Apply ' + live.length + ' change' + (live.length === 1 ? '' : 's') + '?';
   card.appendChild(h);
-  const ol = document.createElement('ol');
-  for (let i = 0; i < live.length; i++) {
-    const li = document.createElement('li');
-    li.textContent = describeOp(live[i]!.op as AgentOp);
-    ol.appendChild(li);
-  }
-  card.appendChild(ol);
+  // Short hint instead of enumerating every op — the chat history
+  // already lists each suggestion with its own card, so re-rendering
+  // the same list in a modal made the dialog grow vertically without
+  // adding any new information.
+  const hint = document.createElement('p');
+  hint.className = 'opencanvas-ai-summary-modal-hint';
+  hint.textContent = 'See the chat above for details on each change.';
+  card.appendChild(hint);
   const actions = document.createElement('div');
   actions.className = 'opencanvas-ai-summary-modal-actions';
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.textContent = 'Cancel';
-  cancel.addEventListener('click', function () {
+  const deny = document.createElement('button');
+  deny.type = 'button';
+  deny.textContent = 'Deny';
+  deny.addEventListener('click', function () {
     modal.remove();
   });
-  const go = document.createElement('button');
-  go.type = 'button';
-  go.className = 'primary';
-  go.textContent = 'Apply all';
-  go.addEventListener('click', function () {
-    go.disabled = true;
-    cancel.disabled = true;
-    go.textContent = 'Applying…';
+  const confirm = document.createElement('button');
+  confirm.type = 'button';
+  confirm.className = 'primary';
+  confirm.textContent = 'Confirm';
+  confirm.addEventListener('click', function () {
+    confirm.disabled = true;
+    deny.disabled = true;
+    confirm.textContent = 'Applying…';
     void ctx
       .applyAgentOps(
         live.map(function (s) {
@@ -1001,8 +1002,8 @@ export function showAcceptAllSummaryImpl(ctx: EditorContext): void {
         modal.remove();
       });
   });
-  actions.appendChild(cancel);
-  actions.appendChild(go);
+  actions.appendChild(deny);
+  actions.appendChild(confirm);
   card.appendChild(actions);
   modal.appendChild(card);
   document.body.appendChild(modal);
