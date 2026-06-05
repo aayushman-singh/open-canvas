@@ -34,7 +34,7 @@ import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { validateEditableSite, validatePublishedSnapshot } from '../../canvas/validate';
 import {
-  materializeCollections,
+  materializeCollectionsWithReport,
   type MaterializerEntry,
 } from '../../canvas/elements/collection-materializer';
 import { db, type Db } from '../../db/client';
@@ -571,7 +571,23 @@ publishApi.post('/sites/:siteId', async (c) => {
     tags: entry.tags,
     ogImageAssetId: entry.ogImageAssetId,
   }));
-  const materializedEditableState = materializeCollections(row.editableState, materializerEntries);
+  // ADR 0063 F-publish-warnings — surface every zero-entry / unbound /
+  // empty-folder warning the materializer raised into the publish
+  // response. CLAUDE.md fail-loud rule: a Collection that publishes with
+  // zero cards is a configuration error the Owner needs to know about,
+  // not a silent skip. The legacy `materializeCollections` alias
+  // discards the warning list and survives for non-publish callers (the
+  // collection-materializer smokes, portfolio-seed-entries smoke,
+  // collection-per-entry-og smoke, collections-scaffold smoke,
+  // text-richtext smoke) that intentionally do not consume warnings.
+  const { site: materializedEditableState, warnings: materializerWarnings } =
+    materializeCollectionsWithReport(row.editableState, materializerEntries);
+  if (materializerWarnings.length > 0) {
+    console.warn(
+      '[publish] collection materializer warnings',
+      JSON.stringify({ siteId: row.id, count: materializerWarnings.length, warnings: materializerWarnings }),
+    );
+  }
   timeline.end('materializeCollections');
 
   // PublishedSnapshot = EditableSite & { version, publishedAt }. Every
@@ -698,6 +714,12 @@ publishApi.post('/sites/:siteId', async (c) => {
       ok: true,
       version: snapshot.version,
       publicUrl: `https://${row.subdomain}.${appDomain(c.env)}/`,
+      // ADR 0063 F-publish-warnings — zero-entry / unbound / empty-folder
+      // warnings from the materializer surface here so the editor's
+      // publish-result toast can tell the Owner which Collections came
+      // out empty. Always present (empty array on a clean publish) so
+      // clients can render unconditionally.
+      warnings: materializerWarnings,
     }),
   );
 });

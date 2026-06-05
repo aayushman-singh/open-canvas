@@ -69,6 +69,11 @@ export async function publishSiteImpl(ctx: EditorContext): Promise<void> {
           errors?: string[];
           missingAssetIds?: string[];
           error?: string;
+          // ADR 0063 F-publish-warnings — non-fatal warnings emitted by
+          // the collection materializer (zero-entry / unbound / empty-
+          // folder Collections). Always present on success; empty array
+          // on a clean publish.
+          warnings?: string[];
         }
       | null;
     if (!response.ok) {
@@ -99,7 +104,24 @@ export async function publishSiteImpl(ctx: EditorContext): Promise<void> {
       body && typeof body.version === 'number' && Number.isFinite(body.version)
         ? ' v' + body.version
         : '';
-    ctx.setStatus('Published' + versionSuffix, 'ok');
+    // ADR 0063 F-publish-warnings — surface materializer warnings on
+    // success. CLAUDE.md fail-loud: a Collection that publishes with
+    // zero cards is a configuration error the Owner must see, not a
+    // silent skip. Status line carries the count; each warning is
+    // console.warn'd verbatim so the Owner can copy them from devtools
+    // into a bug report. The structured array remains in the JSON
+    // response body for future inspector-side surfacing (post-F5 work).
+    const publishWarnings = body && Array.isArray(body.warnings) ? body.warnings : [];
+    const warningSuffix =
+      publishWarnings.length > 0
+        ? ' (' + String(publishWarnings.length) + ' warning' + (publishWarnings.length === 1 ? '' : 's') + ')'
+        : '';
+    ctx.setStatus('Published' + versionSuffix + warningSuffix, 'ok');
+    if (publishWarnings.length > 0) {
+      for (const line of publishWarnings) {
+        console.warn('[publish:warning]', line);
+      }
+    }
     if (body && typeof body.version === 'number') {
       ctx.updateVersionBadge(body.version);
     }
