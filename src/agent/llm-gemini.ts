@@ -10,6 +10,14 @@
 // without a stable per-call id when called via the developer API. We
 // synthesise one from the call name + a monotonic counter so the orchestrator
 // can pair the matching functionResponse on the next turn.
+//
+// thoughtSignature round-trip (Gemini 3.x+): every Part the model returns may
+// carry an opaque base64 `thoughtSignature`. Per
+// https://ai.google.dev/gemini-api/docs/thought-signatures we MUST echo every
+// signature back verbatim in the next request's contents array, attached to
+// the same Part it arrived on, or the API returns HTTP 400. We surface them
+// on LlmChunk so the orchestrator can persist them on ChatMessage, then
+// re-attach them in translateMessagesToContents on the way back in.
 
 import {
   GoogleGenAI,
@@ -75,14 +83,24 @@ export class GeminiAdapter implements LlmAdapter {
       if (!candidate) continue;
       const parts = candidate.content?.parts ?? [];
       for (const part of parts) {
+        const signature = readThoughtSignature(part);
         if (typeof part.text === 'string' && part.text.length > 0) {
-          yield { type: 'text', text: part.text };
+          const out: Extract<LlmChunk, { type: 'text' }> = { type: 'text', text: part.text };
+          if (signature) out.thoughtSignature = signature;
+          yield out;
         }
         if (part.functionCall) {
           const name = part.functionCall.name ?? 'unknown';
           const id = part.functionCall.id ?? synthCallId(name, toolCallCounter++);
           const args = (part.functionCall.args ?? {}) as unknown;
-          yield { type: 'tool_call', id, name, arguments: args };
+          const out: Extract<LlmChunk, { type: 'tool_call' }> = {
+            type: 'tool_call',
+            id,
+            name,
+            arguments: args,
+          };
+          if (signature) out.thoughtSignature = signature;
+          yield out;
         }
       }
       if (candidate.finishReason) {
@@ -161,19 +179,24 @@ function translateMessagesToContents(messages: LlmMessage[]): Content[] {
         out.push({ role: 'user', parts: [{ text: msg.content }] });
         break;
       case 'assistant': {
-        const parts: NonNullable<Content['parts']> = [];
+        type Part = NonNullable<Content['parts']>[number];
+        const parts: Part[] = [];
         if (msg.content.length > 0) {
-          parts.push({ text: msg.content });
+          const textPart: Part = { text: msg.content };
+          if (msg.thoughtSignature) writeThoughtSignature(textPart, msg.thoughtSignature);
+          parts.push(textPart);
         }
         if (msg.toolCalls) {
           for (const call of msg.toolCalls) {
-            parts.push({
+            const callPart: Part = {
               functionCall: {
                 id: call.id,
                 name: call.name,
                 args: (call.arguments ?? {}) as Record<string, unknown>,
               },
-            });
+            };
+            if (call.thoughtSignature) writeThoughtSignature(callPart, call.thoughtSignature);
+            parts.push(callPart);
           }
         }
         // Gemini requires at least one part per Content entry.
@@ -198,6 +221,22 @@ function translateMessagesToContents(messages: LlmMessage[]): Content[] {
     }
   }
   return out;
+}
+
+// thoughtSignature lives on Part as a base64 string. The SDK's typings expose
+// it on Part, but version skew between the runtime field name (camelCase in
+// JS, snake_case on the wire) and older type defs makes a typed accessor
+// fragile. Read defensively via unknown-cast.
+function readThoughtSignature(part: unknown): string | undefined {
+  if (typeof part !== 'object' || part === null) return undefined;
+  const rec = part as Record<string, unknown>;
+  const v = rec['thoughtSignature'] ?? rec['thought_signature'];
+  if (typeof v === 'string' && v.length > 0) return v;
+  return undefined;
+}
+
+function writeThoughtSignature(part: object, signature: string): void {
+  (part as Record<string, unknown>)['thoughtSignature'] = signature;
 }
 
 function safeJsonParse(s: string): Record<string, unknown> {

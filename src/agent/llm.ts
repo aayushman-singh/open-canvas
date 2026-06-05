@@ -9,13 +9,26 @@
 export type LlmMessage =
   | { role: 'system'; content: string }
   | { role: 'user'; content: string }
-  | { role: 'assistant'; content: string; toolCalls?: LlmAssistantToolCall[] }
+  | {
+      role: 'assistant';
+      content: string;
+      toolCalls?: LlmAssistantToolCall[];
+      // Gemini 3.x signs each model turn with an opaque base64 thoughtSignature
+      // on every Part. Missing them on the next request returns HTTP 400. This
+      // field carries the text-part signature; per-tool-call signatures live on
+      // LlmAssistantToolCall.thoughtSignature.
+      thoughtSignature?: string;
+    }
   | { role: 'tool'; toolCallId: string; toolName: string; content: string };
 
 export interface LlmAssistantToolCall {
   id: string;
   name: string;
   arguments: unknown;
+  // See LlmMessage.assistant.thoughtSignature. With parallel tool calls Gemini
+  // only emits a signature on the first call; downstream calls have it
+  // omitted.
+  thoughtSignature?: string;
 }
 
 // JSON-Schema subset that every supported model accepts. Use plain strings for
@@ -43,8 +56,8 @@ export interface LlmTool {
 }
 
 export type LlmChunk =
-  | { type: 'text'; text: string }
-  | { type: 'tool_call'; id: string; name: string; arguments: unknown }
+  | { type: 'text'; text: string; thoughtSignature?: string }
+  | { type: 'tool_call'; id: string; name: string; arguments: unknown; thoughtSignature?: string }
   | { type: 'done'; reason: 'stop' | 'length' | 'tool_use' | 'safety' | 'other' };
 
 export interface ChatWithToolsOptions {

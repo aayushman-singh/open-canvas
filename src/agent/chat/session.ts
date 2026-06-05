@@ -54,6 +54,11 @@ export interface ChatToolCall {
   id: string;
   name: string;
   arguments: unknown;
+  // Opaque base64 signature Gemini 3.x attaches to each functionCall Part. We
+  // persist it on the assistant turn so the next request's Content[] can echo
+  // it back verbatim — missing signatures return HTTP 400 from the API. See
+  // src/agent/llm-gemini.ts for the round-trip mechanics.
+  thoughtSignature?: string;
 }
 
 export interface ChatMessage {
@@ -62,6 +67,9 @@ export interface ChatMessage {
   toolCalls?: ChatToolCall[];
   toolCallId?: string;
   toolName?: string;
+  // Text-part signature for assistant turns that produced text. See
+  // ChatToolCall.thoughtSignature for the function-call counterpart.
+  thoughtSignature?: string;
 }
 
 export interface ChatSessionState {
@@ -393,5 +401,6 @@ function normalizeMessage(m: ChatMessage): ChatMessage {
   if (m.toolCalls) out.toolCalls = m.toolCalls;
   if (m.toolCallId !== undefined) out.toolCallId = m.toolCallId;
   if (m.toolName !== undefined) out.toolName = m.toolName;
+  if (m.thoughtSignature !== undefined) out.thoughtSignature = m.thoughtSignature;
   return out;
 }

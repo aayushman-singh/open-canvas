@@ -49,8 +49,8 @@ function assert(condition: boolean, message: string): void {
 }
 
 assert(
-  CHAT_DEFAULT_MODEL === 'gemini-2.5-pro',
-  `CHAT_DEFAULT_MODEL must be gemini-2.5-pro until the GeminiAdapter handles 3.x thought_signature round-trip, got ${CHAT_DEFAULT_MODEL}`,
+  CHAT_DEFAULT_MODEL === 'gemini-3.5-flash',
+  `CHAT_DEFAULT_MODEL must be gemini-3.5-flash (released 2026-05-19, the current frontier-class SKU), got ${CHAT_DEFAULT_MODEL}`,
 );
 
 // ---------------------------------------------------------------------------

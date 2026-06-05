@@ -70,17 +70,18 @@ import type { ChatStreamWriter } from './stream.js';
 // Tunables
 // ---------------------------------------------------------------------------
 
-// Gemini 3.x added a thought_signature round-trip requirement on tool
-// calls that our GeminiAdapter does not yet capture or replay, so 3.1
-// returns HTTP 400 on every multi-turn tool flow. Reverted to 2.5-pro
-// until the adapter is upgraded; do not bump without that work first.
-export const CHAT_DEFAULT_MODEL = 'gemini-2.5-pro';
+// gemini-3.5-flash (released 2026-05-19) outperforms gemini-3.1-pro on every
+// published benchmark — coding, agentic, multimodal — at a fraction of the
+// price. With the GeminiAdapter now round-tripping thoughtSignature on every
+// Part, both the "primary planning" tier and the "flash inspection" tier per
+// ADR 0056 point at the same model. The two-tier code structure stays so a
+// future split (e.g. routing inspection to 3.x-flash-lite for cost) is a
+// constant change, not a refactor.
+export const CHAT_DEFAULT_MODEL = 'gemini-3.5-flash';
 
 // Flash tier for summarisation + read-only inspection sub-loops per ADR 0056.
-// Pinned to 2.5-flash (same family as 2.5-pro) so the wire-shape from
-// @google/genai matches. Bumping past 2.5 needs the same thought_signature
-// adapter work the primary model is waiting on.
-export const CHAT_FLASH_MODEL = 'gemini-2.5-flash';
+// Currently the same model as CHAT_DEFAULT_MODEL — see comment above.
+export const CHAT_FLASH_MODEL = 'gemini-3.5-flash';
 
 // Tool-call safety net per ADR 0055 decision 2. The cap is intentionally
 // high — it is NOT the primary stop condition (wall-clock and token budgets
@@ -317,17 +318,18 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
         }
         throw err;
       }
-      const { text, toolCalls, finishReason } = pass;
+      const { text, toolCalls, textSignature, finishReason } = pass;
 
       // Append the assistant turn even when it produced no tool calls — the
       // user's history needs to mirror what the model said.
       const assistantMessage: ChatMessage = { role: 'assistant', content: text };
+      if (textSignature) assistantMessage.thoughtSignature = textSignature;
       if (toolCalls.length > 0) {
-        assistantMessage.toolCalls = toolCalls.map<ChatToolCall>((c) => ({
-          id: c.id,
-          name: c.name,
-          arguments: c.arguments,
-        }));
+        assistantMessage.toolCalls = toolCalls.map<ChatToolCall>((c) => {
+          const out: ChatToolCall = { id: c.id, name: c.name, arguments: c.arguments };
+          if (c.thoughtSignature) out.thoughtSignature = c.thoughtSignature;
+          return out;
+        });
       }
       history.push(assistantMessage);
 
@@ -367,9 +369,7 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       // ADR 0056 decision 2: classify this iteration for next-iteration
       // routing. Read-only-only → next iteration runs on Flash; anything
       // else (mutating, mixed, unknown) → next iteration stays on Pro.
-      lastIterationWasReadOnlyOnly = toolCalls.every((call) =>
-        READ_ONLY_TOOL_NAMES.has(call.name),
-      );
+      lastIterationWasReadOnlyOnly = toolCalls.every((call) => READ_ONLY_TOOL_NAMES.has(call.name));
 
       // Per ADR 0055 decision 4, re-trim after every tool dispatch — a large
       // query_site / query_assets result can land mid-iteration and blow the
@@ -467,6 +467,8 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
 interface PassResult {
   text: string;
   toolCalls: LlmAssistantToolCall[];
+  /** Text-part thoughtSignature from Gemini 3.x; persisted on the assistant message for next-turn replay. */
+  textSignature?: string;
   finishReason?: RunTurnResult['doneReason'];
 }
 
@@ -478,11 +480,15 @@ async function streamOnePass(
 ): Promise<PassResult> {
   const toolCalls: LlmAssistantToolCall[] = [];
   let text = '';
+  // Gemini emits the text-part thoughtSignature on the final text chunk only,
+  // so a "last non-empty wins" capture matches the spec.
+  let textSignature: string | undefined;
   let finishReason: RunTurnResult['doneReason'] | undefined;
 
   for await (const chunk of adapter.chatWithTools(messages, opts)) {
     if (chunk.type === 'text') {
       text += chunk.text;
+      if (chunk.thoughtSignature) textSignature = chunk.thoughtSignature;
       await writer.write({ kind: 'token', text: chunk.text });
     } else if (chunk.type === 'tool_call') {
       const call: LlmAssistantToolCall = {
@@ -490,6 +496,7 @@ async function streamOnePass(
         name: chunk.name,
         arguments: chunk.arguments,
       };
+      if (chunk.thoughtSignature) call.thoughtSignature = chunk.thoughtSignature;
       toolCalls.push(call);
       await writer.write({
         kind: 'tool-call',
@@ -503,6 +510,7 @@ async function streamOnePass(
   }
 
   const out: PassResult = { text, toolCalls };
+  if (textSignature !== undefined) out.textSignature = textSignature;
   if (finishReason !== undefined) out.finishReason = finishReason;
   return out;
 }
@@ -649,12 +657,13 @@ export function toLlmMessages(history: readonly ChatMessage[]): LlmMessage[] {
         role: 'assistant',
         content: msg.content,
       };
+      if (msg.thoughtSignature) assistant.thoughtSignature = msg.thoughtSignature;
       if (msg.toolCalls && msg.toolCalls.length > 0) {
-        assistant.toolCalls = msg.toolCalls.map((c) => ({
-          id: c.id,
-          name: c.name,
-          arguments: c.arguments,
-        }));
+        assistant.toolCalls = msg.toolCalls.map((c) => {
+          const llmCall: LlmAssistantToolCall = { id: c.id, name: c.name, arguments: c.arguments };
+          if (c.thoughtSignature) llmCall.thoughtSignature = c.thoughtSignature;
+          return llmCall;
+        });
       }
       out.push(assistant);
       continue;
@@ -743,13 +752,13 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   lines.push('');
   lines.push('Reply structure — must follow exactly:');
   lines.push(
-    "  A. Open with a SHORT acknowledgement of the request before emitting any mutating tool call. One short phrase only, e.g. \"Got it.\", \"On it.\", \"Sure — proposing this now.\". Do NOT enumerate or describe the proposals you are about to make. The Owner sees each proposal rendered as its own card; pre-announcing them duplicates the UI.",
+    '  A. Open with a SHORT acknowledgement of the request before emitting any mutating tool call. One short phrase only, e.g. "Got it.", "On it.", "Sure — proposing this now.". Do NOT enumerate or describe the proposals you are about to make. The Owner sees each proposal rendered as its own card; pre-announcing them duplicates the UI.',
   );
   lines.push(
     '  B. Emit your tool calls. Do not narrate between them. Do not write sentences like "First, I\'ll propose...", "After that, I\'ll propose...", "Now I\'ll add..." — the cards speak for themselves.',
   );
   lines.push(
-    "  C. After the last tool call for the turn, close with ONE short sentence summarising what was proposed and inviting feedback, e.g. \"I've proposed a new Manifesto page and a hero section — let me know if you'd like changes.\" Keep proposal-tense (\"proposed\", \"suggested\"), never accepted-tense.",
+    '  C. After the last tool call for the turn, close with ONE short sentence summarising what was proposed and inviting feedback, e.g. "I\'ve proposed a new Manifesto page and a hero section — let me know if you\'d like changes." Keep proposal-tense ("proposed", "suggested"), never accepted-tense.',
   );
   lines.push(
     '  D. For read-only or question-answering turns (no mutating tool calls), reply in normal prose. The acknowledgement-then-summary rule only applies when at least one mutating tool call is emitted.',
@@ -800,6 +809,41 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent IDs — call query_site or query_assets first when unsure.');
+  lines.push('');
+  lines.push('Architecture primer — how Open Canvas is shaped:');
+  lines.push(
+    '  - An Owner edits one Editable Site; a Visitor sees the Published Site at a public address. Publishing promotes the whole Editable Site to a Published Snapshot. Agent Edits change ONLY the Editable Site, never the Published Site.',
+  );
+  lines.push(
+    '  - An Editable Site has zero-or-one Header Section, zero-or-one Footer Section, and one-or-more Canvas Pages. Header and Footer are site-pinned and shared by every page; they are NOT page sections. Body sections belong to a page.',
+  );
+  lines.push(
+    '  - Every Section lives in the Section Library (the canonical pool). An Editable Site or Template Seed REFERENCES sections by id; it does not embed section data. The same Section can appear on multiple pages as separate Section Instances; an instance may carry a sparse Section Override that only changes the fields it touches.',
+  );
+  lines.push(
+    '  - A Canvas Section is a bounded 2D space holding Positioned Elements (Content Elements with x/y/width/height). Element types include text, media, action, shape, container, accordion, carousel, chart, collection, form, nav, tabs, table.',
+  );
+  lines.push(
+    '  - Style is layered: a site-wide Theme Choice picks one Style Kit (charcoal / orange-editorial / blue-saas / green-organic) which restyles every Design Primitive. A Pinned Style on a single element overrides the Style Kit for that element only and survives kit switches. Use setStyleKit to change the whole site; use updateElement for element-level Pinned Style.',
+  );
+  lines.push(
+    "  - Media Elements reference an Owner Asset by id. Owner Assets belong to the Owner (not the site) — the same asset can appear on many sites. NEVER fabricate asset ids; always call query_assets first.",
+  );
+  lines.push(
+    '  - The Agent Edit preview/accept loop is structural, not cosmetic: every mutating tool call you emit is a PROPOSAL. The Owner sees a preview card and either accepts (which applies the op via the apply route) or rejects (which discards it). Until accept, the Editable Site is unchanged — that is why your past-tense rule above is absolute.',
+  );
+  lines.push(
+    '  - Collection elements (CMS) are special: their content is materialised at render time from CMS entries the Owner manages in the dashboard, NOT from inline element data. To change what a collection displays, the Owner edits CMS entries — proposing a rewriteText on a collection child element will fail.',
+  );
+  lines.push(
+    '  - Each chat turn is one Agent Turn bounded by wall-clock, token, and tool-call budgets. When a budget exhausts the turn ends with a named done reason; the Owner sees that reason and can resume with a new ask.',
+  );
+  lines.push(
+    'PAGE IDS: NEVER write synthetic page ids like "page_1", "page_2", "page-1". The only valid pageIds are the exact strings enumerated in the "Pages:" section above (e.g. "page-pf-home", "page-2aea8178"). If you need to refer to "the second page", look up its real id from that list. If you cannot identify the target page by id, OMIT the pageId field — most ops default to the currently-focused page.',
+  );
+  lines.push(
+    'ARRAY FIELDS: When updating any array field on an element (e.g. nav links, carousel slides, gallery images, accordion items, tabs), the patch is FULL-REPLACE — the new array OVERWRITES the existing one entirely. To add or modify a single item, you MUST first call query_site to read the current array, then send back the complete list including the unchanged items plus your additions/changes. Sending a partial array will delete every omitted item. The apply path now rejects partial-shrink operations with an error — read it as a signal that you forgot to include existing items.',
+  );
 
   if (selectedElementId) {
     const summary = findElementSummary(state, selectedElementId);
