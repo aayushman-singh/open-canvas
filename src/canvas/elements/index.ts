@@ -74,11 +74,13 @@ export { FORM_FONT_FAMILIES, FORM_FONT_WEIGHTS } from './form.js';
 export type { NavElement, NavLayout, NavLink, NavLinkKind } from './nav.js';
 export type { TableColumn, TableElement, TableRow } from './table.js';
 export type {
+  CollectionDisplay,
   CollectionElement,
   CollectionFilter,
   CollectionLayout,
   CollectionMode,
   CollectionSort,
+  LegacyCollectionSortObject,
   PageMetadataField,
 } from './collection.js';
 export type { Tab, TabsElement } from './tabs.js';

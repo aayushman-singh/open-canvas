@@ -1,235 +1,151 @@
 // src/canvas/elements/collection-smoke.ts
 //
-// `bun run collection:smoke` — Collection element smoke test. Verifies:
-//   1. Manual-mode collection renders all entries with grid layout
-//   2. Page-bound mode emits the correct mode attribute
-//   3. Validation accepts well-formed collections and rejects bad ones
-//   4. Page metadata fields survive schema validation
-//   5. Yjs round-trip preserves collection + page metadata
+// ADR 0063 cutover — the Collection element no longer carries authorable
+// children. Source binding, folder filter, sort, and display now live as
+// scalar fields on the element; per-entry DOM is materializer output
+// (Phase 2B). This smoke covers the type/validator shape Phase 1 lands:
+//   1. Validation accepts a well-formed Collection (collectionSlug, sort,
+//      display) and rejects malformed folder values per dec 7.
+//   2. Page metadata fields survive schema validation.
+//   3. Yjs round-trip preserves the new ADR-0063 fields plus page metadata.
+//
+// The render + materialization behaviour smokes belong to Phase 2B once the
+// per-element materialization is implemented; the dead manual/page-bound
+// rendering assertions retired with the page-bound model.
 
 import type {
-  CanvasElement,
   CanvasPage,
   CanvasSection,
   EditableSite,
-  TextElement,
 } from '../schema.js';
 import { validateEditableSite } from '../validate.js';
-import { renderCollection, type CollectionElement } from './collection.js';
+import type { CollectionElement } from './collection.js';
 import { encodeYDoc, decodeYDoc } from '../yjs-projection.js';
-import { renderText } from './text.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[collection:smoke] ${message}`);
 }
 
-// `renderChild` mirrors production: each cell is a fully-wrapped `opencanvas-element`
-// div around the body. Production threads the canonical renderElement through
-// ctx; the smoke fixtures only contain text children, so a minimal wrapper
-// that carries the same data-opencanvas-element attribute is enough to assert on.
-const RENDER_CTX = {
-  styleKit: 'charcoal',
-  assetBasePath: '/assets',
-  renderChild: (element: CanvasElement): string => {
-    if (element.type === 'text') {
-      return `<div class="opencanvas-element" data-opencanvas-element="${element.id}" data-element-type="text">${renderText(element)}</div>`;
-    }
-    throw new Error(`[collection:smoke] unsupported fixture child type ${element.type}`);
-  },
-};
-
 // ---------------------------------------------------------------------------
 // Fixture builders
 // ---------------------------------------------------------------------------
 
-function makeText(id: string, text: string): TextElement {
+function makeCollection(overrides: Partial<CollectionElement> = {}): CollectionElement {
   return {
-    id,
-    type: 'text',
-    box: { x: 0, y: 0, w: 300, h: 40, z: 1 },
-    content: [{ text }],
-    role: 'body',
-    fontSize: 16,
-    fontWeight: 400,
-    align: 'left',
-  };
-}
-
-function makeManualCollection(): CollectionElement {
-  return {
-    id: 'el-collection-manual',
+    id: 'el-collection',
     type: 'collection',
-    mode: 'manual',
     box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
-    entryTemplate: [makeText('tmpl-name', 'Name'), makeText('tmpl-role', 'Role')],
-    entries: [
-      [makeText('entry-0-name', 'Alice'), makeText('entry-0-role', 'CEO')],
-      [makeText('entry-1-name', 'Bob'), makeText('entry-1-role', 'CTO')],
-      [makeText('entry-2-name', 'Carol'), makeText('entry-2-role', 'Design')],
-    ],
-    layout: { columns: 3, gap: 24 },
+    collectionSlug: 'blog',
+    sort: 'date-desc',
+    display: 'card',
+    ...overrides,
   };
 }
 
-function makePageBoundCollection(): CollectionElement {
-  return {
-    id: 'el-collection-pagebound',
-    type: 'collection',
-    mode: 'page-bound',
-    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
-    entryTemplate: [makeText('tmpl-title', 'Title')],
-    entries: [],
-    filter: { category: 'blog', tags: ['launch', 'design'], limit: 10 },
-    sort: { field: 'publishedDate', order: 'desc' },
-    cardTemplate: [makeText('card-title', 'Card title')],
-    fieldBindings: { 'card-title': 'title' },
-    layout: { columns: 2, gap: 32 },
-  };
-}
-
-function makeSection(elements: CollectionElement[]): CanvasSection {
+function makeSection(element: CollectionElement): CanvasSection {
   return {
     id: 'sec-collection',
     recipeId: 'custom',
     name: 'Collection section',
     height: 800,
-    elements,
+    elements: [element],
   };
 }
 
 function makeSiteState(
   collection: CollectionElement,
-  pageMetadata?: Partial<CanvasPage>,
+  pageMetadata: Partial<CanvasPage> = {},
 ): EditableSite {
   const page: CanvasPage = {
     id: 'page-home',
     slug: 'home',
     title: 'Home',
     width: 1200,
-    sections: [makeSection([collection])],
+    sections: [makeSection(collection)],
     ...pageMetadata,
   };
   return { styleKit: 'charcoal', pages: [page] };
 }
 
 // ---------------------------------------------------------------------------
-// (1) Manual-mode collection renders all entries with grid layout
+// (1) Validation: accepts well-formed ADR-0063 Collection, rejects malformed
 // ---------------------------------------------------------------------------
 
 {
-  const el = makeManualCollection();
-  const html = renderCollection(el, RENDER_CTX);
-
-  assert(html.includes('data-collection-mode="manual"'), '(1) manual mode attr present');
+  const good = validateEditableSite(makeSiteState(makeCollection()));
   assert(
-    html.includes('grid-template-columns:repeat(3,1fr)'),
-    '(1) grid-template-columns matches layout.columns=3',
-  );
-  assert(html.includes('gap:24px'), '(1) gap matches layout.gap=24');
-
-  const entryMatches = html.match(/data-opencanvas-entry="/g) ?? [];
-  assert(entryMatches.length === 3, `(1) renders 3 entries (got ${String(entryMatches.length)})`);
-
-  // 2 cells per entry × 3 entries = 6 `opencanvas-element` wrappers emitted by
-  // renderChild. The collection no longer wraps cells in a per-child layer;
-  // each cell IS a full element wrapper.
-  const childMatches = html.match(/class="opencanvas-element"/g) ?? [];
-  assert(
-    childMatches.length === 6,
-    `(1) renders 6 children total (2 per entry × 3 entries, got ${String(childMatches.length)})`,
-  );
-  assert(html.includes('Alice'), '(1) renders entry text content, not placeholder divs only');
-  assert(html.includes('CEO'), '(1) renders all text children for an entry');
-}
-
-// ---------------------------------------------------------------------------
-// (2) Page-bound mode emits correct attributes
-// ---------------------------------------------------------------------------
-
-{
-  const el = makePageBoundCollection();
-  const html = renderCollection(el, RENDER_CTX);
-
-  assert(html.includes('data-collection-mode="page-bound"'), '(2) page-bound mode attr present');
-  assert(
-    html.includes('grid-template-columns:repeat(2,1fr)'),
-    '(2) grid-template-columns matches layout.columns=2',
+    good.valid,
+    `(1) valid ADR-0063 collection passes validation: ${good.valid ? '' : good.errors.join('; ')}`,
   );
 
-  const entryMatches = html.match(/data-opencanvas-entry="/g) ?? [];
-  assert(
-    entryMatches.length === 0,
-    `(2) page-bound with no entries renders 0 entries (got ${String(entryMatches.length)})`,
-  );
-}
-
-// ---------------------------------------------------------------------------
-// (3) Validation: accepts good, rejects bad
-// ---------------------------------------------------------------------------
-
-{
-  const goodState = makeSiteState(makeManualCollection());
-  const goodResult = validateEditableSite(goodState);
-  assert(
-    goodResult.valid,
-    `(3) valid manual collection passes validation: ${goodResult.valid ? '' : goodResult.errors.join('; ')}`,
-  );
-
-  const pageBoundState = makeSiteState(makePageBoundCollection());
-  const pbResult = validateEditableSite(pageBoundState);
-  assert(
-    pbResult.valid,
-    `(3) valid page-bound collection passes validation: ${pbResult.valid ? '' : pbResult.errors.join('; ')}`,
-  );
-
-  // Bad: missing mode
-  const badMode = makeSiteState({
-    ...makeManualCollection(),
-    mode: 'invalid' as CollectionElement['mode'],
-  });
-  const badModeResult = validateEditableSite(badMode);
-  assert(!badModeResult.valid, '(3) invalid mode rejected');
-
-  // Bad: layout.columns < 1
-  const badCols = makeSiteState({
-    ...makeManualCollection(),
-    layout: { columns: 0, gap: 10 },
-  });
-  const badColsResult = validateEditableSite(badCols);
-  assert(!badColsResult.valid, '(3) layout.columns=0 rejected');
-
-  // Bad: layout.gap < 0
-  const badGap = makeSiteState({
-    ...makeManualCollection(),
-    layout: { columns: 2, gap: -1 },
-  });
-  const badGapResult = validateEditableSite(badGap);
-  assert(!badGapResult.valid, '(3) layout.gap=-1 rejected');
-
-  const badNestedText = makeManualCollection();
-  badNestedText.entries = [[{ ...makeText('entry-bad-title', ''), content: [] }]];
-  const badNestedResult = validateEditableSite(makeSiteState(badNestedText));
-  assert(!badNestedResult.valid, '(3) invalid nested entry element rejected');
-
-  const badBinding = makePageBoundCollection();
-  badBinding.fieldBindings = {
-    'card-title': 'slug' as NonNullable<CollectionElement['fieldBindings']>[string],
+  // Unbound source is allowed (the inspector renders a "Pick a source" prompt).
+  // exactOptionalPropertyTypes forbids passing `undefined` through Partial, so
+  // construct the element directly with the key omitted to express absence.
+  const unboundEl: CollectionElement = {
+    id: 'el-collection',
+    type: 'collection',
+    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+    sort: 'date-desc',
+    display: 'card',
   };
-  const badBindingResult = validateEditableSite(makeSiteState(badBinding));
-  assert(!badBindingResult.valid, '(3) invalid field binding rejected');
+  const unbound = validateEditableSite(makeSiteState(unboundEl));
+  assert(unbound.valid, '(1) unbound collection (collectionSlug undefined) is allowed');
 
-  const badMetadataResult = validateEditableSite(
-    makeSiteState(makeManualCollection(), { publishedDate: 'not-a-date' }),
+  // Folder shape constraints (ADR 0063 dec 7).
+  const badSlash = validateEditableSite(makeSiteState(makeCollection({ folder: 'a/b' })));
+  assert(!badSlash.valid, '(1) folder with "/" is rejected');
+
+  const badBackslash = validateEditableSite(
+    makeSiteState(makeCollection({ folder: 'a\\b' })),
   );
-  assert(!badMetadataResult.valid, '(3) invalid page metadata date rejected');
+  assert(!badBackslash.valid, '(1) folder with "\\" is rejected');
+
+  const tooLong = 'a'.repeat(65);
+  const badLength = validateEditableSite(makeSiteState(makeCollection({ folder: tooLong })));
+  assert(!badLength.valid, '(1) folder over 64 chars is rejected');
+
+  // Unknown sort + display values are rejected. Build the elements directly
+  // — exactOptionalPropertyTypes won't let an `undefined`-permitting cast
+  // flow through Partial<CollectionElement>.
+  const badSort = validateEditableSite(
+    makeSiteState({
+      ...makeCollection(),
+      sort: 'random' as unknown as NonNullable<CollectionElement['sort']>,
+    }),
+  );
+  assert(!badSort.valid, '(1) unknown sort value is rejected');
+
+  const badDisplay = validateEditableSite(
+    makeSiteState({
+      ...makeCollection(),
+      display: 'custom' as unknown as NonNullable<CollectionElement['display']>,
+    }),
+  );
+  assert(!badDisplay.valid, "(1) display 'custom' (deferred to F1) is rejected this commit");
+
+  // manualOrder shape: must be string[] when present.
+  const manualOk = validateEditableSite(
+    makeSiteState(makeCollection({ sort: 'manual', manualOrder: ['e1', 'e2'] })),
+  );
+  assert(manualOk.valid, "(1) sort='manual' with manualOrder string[] is allowed");
+
+  const badManual = validateEditableSite(
+    makeSiteState(
+      makeCollection({
+        sort: 'manual',
+        manualOrder: [42 as unknown as string],
+      }),
+    ),
+  );
+  assert(!badManual.valid, '(1) manualOrder with a non-string id is rejected');
 }
 
 // ---------------------------------------------------------------------------
-// (4) Page metadata fields survive schema validation
+// (2) Page metadata still validates around the new Collection shape
 // ---------------------------------------------------------------------------
 
 {
-  const state = makeSiteState(makeManualCollection(), {
+  const state = makeSiteState(makeCollection(), {
     publishedDate: '2026-05-25T00:00:00.000Z',
     author: 'Alice',
     tags: ['launch', 'design'],
@@ -238,53 +154,61 @@ function makeSiteState(
   const result = validateEditableSite(state);
   assert(
     result.valid,
-    `(4) page metadata passes validation: ${result.valid ? '' : result.errors.join('; ')}`,
+    `(2) page metadata passes validation: ${result.valid ? '' : result.errors.join('; ')}`,
   );
   assert(
     state.pages[0]!.publishedDate === '2026-05-25T00:00:00.000Z',
-    '(4) publishedDate preserved',
+    '(2) publishedDate preserved',
   );
-  assert(state.pages[0]!.author === 'Alice', '(4) author preserved');
-  assert(state.pages[0]!.tags!.length === 2, '(4) tags preserved');
-  assert(state.pages[0]!.category === 'blog', '(4) category preserved');
+  assert(state.pages[0]!.author === 'Alice', '(2) author preserved');
+  assert(state.pages[0]!.tags!.length === 2, '(2) tags preserved');
+  assert(state.pages[0]!.category === 'blog', '(2) category preserved');
+
+  const badMetadata = validateEditableSite(
+    makeSiteState(makeCollection(), { publishedDate: 'not-a-date' }),
+  );
+  assert(!badMetadata.valid, '(2) invalid page metadata date rejected');
 }
 
 // ---------------------------------------------------------------------------
-// (5) Yjs round-trip: collection + page metadata survive encode → decode
+// (3) Yjs round-trip: ADR-0063 fields + page metadata survive encode -> decode
 // ---------------------------------------------------------------------------
 
 {
-  const state = makeSiteState(makePageBoundCollection(), {
-    publishedDate: '2026-05-25T00:00:00.000Z',
-    author: 'Alice',
-    tags: ['launch', 'design'],
-    category: 'blog',
-  });
+  const state = makeSiteState(
+    makeCollection({
+      collectionSlug: 'blog',
+      folder: 'tech',
+      sort: 'manual',
+      manualOrder: ['e1', 'e2', 'e3'],
+      display: 'image-only',
+    }),
+    {
+      publishedDate: '2026-05-25T00:00:00.000Z',
+      author: 'Alice',
+      tags: ['launch', 'design'],
+      category: 'blog',
+    },
+  );
 
   const doc = encodeYDoc(state);
   const decoded = decodeYDoc(doc);
 
   // Page metadata round-trip
   const page = decoded.pages[0]!;
-  assert(page.publishedDate === '2026-05-25T00:00:00.000Z', '(5) publishedDate round-trips');
-  assert(page.author === 'Alice', '(5) author round-trips');
-  assert(JSON.stringify(page.tags) === '["launch","design"]', '(5) tags round-trip');
-  assert(page.category === 'blog', '(5) category round-trips');
+  assert(page.publishedDate === '2026-05-25T00:00:00.000Z', '(3) publishedDate round-trips');
+  assert(page.author === 'Alice', '(3) author round-trips');
+  assert(JSON.stringify(page.tags) === '["launch","design"]', '(3) tags round-trip');
+  assert(page.category === 'blog', '(3) category round-trips');
 
   // Collection element round-trip
   const el = page.sections[0]!.elements[0]! as CollectionElement;
-  assert(el.type === 'collection', '(5) element type round-trips');
-  assert(el.mode === 'page-bound', '(5) mode round-trips');
-  assert(el.layout.columns === 2, '(5) layout.columns round-trips');
-  assert(el.layout.gap === 32, '(5) layout.gap round-trips');
-  assert(el.filter!.category === 'blog', '(5) filter.category round-trips');
-  assert(JSON.stringify(el.filter!.tags) === '["launch","design"]', '(5) filter.tags round-trip');
-  assert(el.filter!.limit === 10, '(5) filter.limit round-trips');
-  assert(el.sort!.field === 'publishedDate', '(5) sort.field round-trips');
-  assert(el.sort!.order === 'desc', '(5) sort.order round-trips');
-  assert(el.cardTemplate!.length === 1, '(5) cardTemplate round-trips');
-  assert(el.fieldBindings!['card-title'] === 'title', '(5) fieldBindings round-trip');
-  assert(el.entryTemplate.length === 1, '(5) entryTemplate round-trips');
+  assert(el.type === 'collection', '(3) element type round-trips');
+  assert(el.collectionSlug === 'blog', '(3) collectionSlug round-trips');
+  assert(el.folder === 'tech', '(3) folder round-trips');
+  assert(el.sort === 'manual', '(3) sort round-trips');
+  assert(el.display === 'image-only', '(3) display round-trips');
+  assert(JSON.stringify(el.manualOrder) === '["e1","e2","e3"]', '(3) manualOrder round-trips');
 }
 
 console.log('[collection:smoke] OK');

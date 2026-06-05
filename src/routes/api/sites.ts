@@ -233,8 +233,12 @@ function rewriteElementAssetIds(
   }
 
   if (element.type === 'collection') {
-    for (let childIdx = 0; childIdx < element.entryTemplate.length; childIdx++) {
-      const child = element.entryTemplate[childIdx];
+    // ADR 0063 — legacy entryTemplate / cardTemplate / entries are optional
+    // during the transition; walk what's present so existing fixtures import
+    // cleanly until the cleanup commit drops these fields.
+    const entryTemplate = element.entryTemplate ?? [];
+    for (let childIdx = 0; childIdx < entryTemplate.length; childIdx++) {
+      const child = entryTemplate[childIdx];
       if (!child) continue;
       const missing = rewriteElementAssetIds(
         child,
@@ -255,8 +259,9 @@ function rewriteElementAssetIds(
         if (missing !== null) return missing;
       }
     }
-    for (let entryIdx = 0; entryIdx < element.entries.length; entryIdx++) {
-      const entry = element.entries[entryIdx];
+    const legacyEntries = element.entries ?? [];
+    for (let entryIdx = 0; entryIdx < legacyEntries.length; entryIdx++) {
+      const entry = legacyEntries[entryIdx];
       if (!entry) continue;
       for (let childIdx = 0; childIdx < entry.length; childIdx++) {
         const child = entry[childIdx];

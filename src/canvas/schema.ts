@@ -102,13 +102,25 @@ export type MotionPreset = (typeof MOTION_PRESETS)[number];
 export const SCROLL_TRIGGER_MODES = ['on-load', 'on-scroll'] as const;
 export type ScrollTriggerMode = (typeof SCROLL_TRIGGER_MODES)[number];
 
-// ADR 0060 — CMS collection page kinds. Marks a `CanvasPage` as either the
-// index list page (whose page-bound CollectionElements get hydrated from the
-// `collection_entry` table at publish) or the ghost detail template page
-// (cloned once per entry, with `{{field}}` placeholders substituted). Pages
-// without `pageKind` are ordinary canvas pages.
+// ADR 0060 / ADR 0063 — CMS collection page kinds.
+//
+// ADR 0063 dec 2 — `'collection-index'` is retired by the validator (new
+// pages cannot set it; existing in-DB pages are migrated on first load by
+// the editor-client startup hook, see E2). The constant still includes the
+// dead value so the on-load migration code path can recognise rows that
+// need rewriting; the page-validator rejects it explicitly so a freshly
+// authored page can never carry it. `'collection-item-template'` stays
+// because the publish-time clone-per-entry pass keys on the page's slug.
 export const COLLECTION_PAGE_KINDS = ['collection-index', 'collection-item-template'] as const;
 export type CollectionPageKind = (typeof COLLECTION_PAGE_KINDS)[number];
+
+/** The post-migration CMS collection page kinds the validator will accept
+ *  once ADR 0063 F5 runs. The retired `'collection-index'` value lives in
+ *  `COLLECTION_PAGE_KINDS` so the on-load migration (E2) can identify it
+ *  and the union still typechecks pre-migration; F5 narrows `validatePage`
+ *  to read from this constant instead once F3's prod-data audit confirms
+ *  the migration ran cleanly. */
+export const COLLECTION_PAGE_KINDS_ACTIVE = ['collection-item-template'] as const;
 
 export const AGENT_RECIPE_IDS = [
   'hero-split',

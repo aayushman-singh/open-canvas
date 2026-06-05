@@ -123,6 +123,7 @@ import type {
   ChartSeries,
   CodeElement,
   CollectionElement,
+  CollectionSort,
   EmbedElement,
   FormElement,
   FormFieldDef,
@@ -696,17 +697,49 @@ function encodeTabsElement(el: TabsElement): Y.Map<unknown> {
 function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
   const out = new Y.Map<unknown>();
   encodeBaseElementFields(out, el);
-  out.set('mode', el.mode);
-  const entryTemplate = new Y.Array<Y.Map<unknown>>();
-  for (const child of el.entryTemplate) entryTemplate.push([encodeElement(child)]);
-  out.set('entryTemplate', entryTemplate);
-  const entries = new Y.Array<Y.Array<Y.Map<unknown>>>();
-  for (const entry of el.entries) {
-    const row = new Y.Array<Y.Map<unknown>>();
-    for (const child of entry) row.push([encodeElement(child)]);
-    entries.push([row]);
+  // ADR 0063 canonical fields. `collectionSlug` is the only required-ish
+  // axis at the type level (absence = unbound); `sort` / `display` /
+  // `manualOrder` / `folder` ride through as plain values.
+  if (el.collectionSlug !== undefined) out.set('collectionSlug', el.collectionSlug);
+  if (el.folder !== undefined) out.set('folder', el.folder);
+  if (el.display !== undefined) out.set('display', el.display);
+  if (el.sort !== undefined) {
+    if (typeof el.sort === 'string') {
+      out.set('sort', el.sort);
+    } else {
+      // Legacy `{ field, order }` form — round-trip as a Y.Map so future
+      // migrations can pick it up. Phase 2B will rewrite the materializer
+      // around the string form only.
+      const sortMap = new Y.Map<unknown>();
+      sortMap.set('field', el.sort.field);
+      sortMap.set('order', el.sort.order);
+      out.set('sort', sortMap);
+    }
   }
-  out.set('entries', entries);
+  if (el.manualOrder !== undefined) {
+    const arr = new Y.Array<string>();
+    for (const id of el.manualOrder) arr.push([id]);
+    out.set('manualOrder', arr);
+  }
+  // -- Legacy fields (retired by ADR 0063) ----------------------------------
+  // Round-trip what's present so existing fixtures + the queued Phase 2D
+  // rewrite of collections-scaffold survive the yjs encode/decode pair
+  // until the cleanup commit drops them.
+  if (el.mode !== undefined) out.set('mode', el.mode);
+  if (el.entryTemplate !== undefined) {
+    const entryTemplate = new Y.Array<Y.Map<unknown>>();
+    for (const child of el.entryTemplate) entryTemplate.push([encodeElement(child)]);
+    out.set('entryTemplate', entryTemplate);
+  }
+  if (el.entries !== undefined) {
+    const entries = new Y.Array<Y.Array<Y.Map<unknown>>>();
+    for (const entry of el.entries) {
+      const row = new Y.Array<Y.Map<unknown>>();
+      for (const child of entry) row.push([encodeElement(child)]);
+      entries.push([row]);
+    }
+    out.set('entries', entries);
+  }
   if (el.filter !== undefined) {
     const filterMap = new Y.Map<unknown>();
     if (el.filter.category !== undefined) filterMap.set('category', el.filter.category);
@@ -717,12 +750,6 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     }
     if (el.filter.limit !== undefined) filterMap.set('limit', el.filter.limit);
     out.set('filter', filterMap);
-  }
-  if (el.sort !== undefined) {
-    const sortMap = new Y.Map<unknown>();
-    sortMap.set('field', el.sort.field);
-    sortMap.set('order', el.sort.order);
-    out.set('sort', sortMap);
   }
   if (el.cardTemplate !== undefined) {
     const cardTemplate = new Y.Array<Y.Map<unknown>>();
@@ -736,10 +763,12 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
     }
     out.set('fieldBindings', bindingsMap);
   }
-  const layoutMap = new Y.Map<unknown>();
-  layoutMap.set('columns', el.layout.columns);
-  layoutMap.set('gap', el.layout.gap);
-  out.set('layout', layoutMap);
+  if (el.layout !== undefined) {
+    const layoutMap = new Y.Map<unknown>();
+    layoutMap.set('columns', el.layout.columns);
+    layoutMap.set('gap', el.layout.gap);
+    out.set('layout', layoutMap);
+  }
   return out;
 }
 
@@ -1315,37 +1344,59 @@ function decodeTabsElement(map: Y.Map<unknown>, base: BaseElement): TabsElement 
 }
 
 function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): CollectionElement {
-  const entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
-  const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
-  const entries = rawEntries.map((row) => row.map(decodeElement));
-  const layoutMap = map.get('layout') as Y.Map<unknown>;
   const el: CollectionElement = {
     ...base,
     type: 'collection',
-    mode: map.get('mode') as CollectionElement['mode'],
-    entryTemplate,
-    entries,
-    layout: {
+  };
+  // ADR 0063 canonical fields.
+  if (map.has('collectionSlug')) el.collectionSlug = map.get('collectionSlug') as string;
+  if (map.has('folder')) el.folder = map.get('folder') as string;
+  if (map.has('display')) {
+    el.display = map.get('display') as NonNullable<CollectionElement['display']>;
+  }
+  if (map.has('sort')) {
+    const raw = map.get('sort');
+    if (typeof raw === 'string') {
+      el.sort = raw as CollectionSort;
+    } else {
+      // Legacy `{ field, order }` form survives encode/decode unchanged.
+      const sortMap = raw as Y.Map<unknown>;
+      el.sort = {
+        field: sortMap.get('field') as 'publishedDate' | 'title',
+        order: sortMap.get('order') as 'asc' | 'desc',
+      };
+    }
+  }
+  if (map.has('manualOrder')) {
+    el.manualOrder = (map.get('manualOrder') as Y.Array<string>).toArray();
+  }
+  // -- Legacy fields (round-tripped during transition) ----------------------
+  if (map.has('mode')) {
+    el.mode = map.get('mode') as NonNullable<CollectionElement['mode']>;
+  }
+  if (map.has('entryTemplate')) {
+    el.entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
+  }
+  if (map.has('entries')) {
+    const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
+    el.entries = rawEntries.map((row) => row.map(decodeElement));
+  }
+  if (map.has('layout')) {
+    const layoutMap = map.get('layout') as Y.Map<unknown>;
+    el.layout = {
       columns: layoutMap.get('columns') as number,
       gap: layoutMap.get('gap') as number,
-    },
-  };
+    };
+  }
   if (map.has('filter')) {
     const filterMap = map.get('filter') as Y.Map<unknown>;
-    const filter: CollectionElement['filter'] = {};
+    const filter: NonNullable<CollectionElement['filter']> = {};
     if (filterMap.has('category')) filter.category = filterMap.get('category') as string;
     if (filterMap.has('tags')) {
       filter.tags = (filterMap.get('tags') as Y.Array<string>).toArray();
     }
     if (filterMap.has('limit')) filter.limit = filterMap.get('limit') as number;
     el.filter = filter;
-  }
-  if (map.has('sort')) {
-    const sortMap = map.get('sort') as Y.Map<unknown>;
-    el.sort = {
-      field: sortMap.get('field') as NonNullable<CollectionElement['sort']>['field'],
-      order: sortMap.get('order') as 'asc' | 'desc',
-    };
   }
   if (map.has('cardTemplate')) {
     el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
@@ -1356,10 +1407,7 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
     for (const [elementId, field] of bindingsMap.entries()) {
       bindings[elementId] = field;
     }
-    el.fieldBindings = bindings as Record<
-      string,
-      NonNullable<CollectionElement['fieldBindings']>[string]
-    >;
+    el.fieldBindings = bindings as NonNullable<CollectionElement['fieldBindings']>;
   }
   return el;
 }

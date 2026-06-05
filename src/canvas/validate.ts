@@ -6,7 +6,8 @@
 
 import { SEED_ASSET_REGISTRY } from './seed-assets.js';
 import { CUSTOM_404_PAGE_SLUG } from './page-routing.js';
-import { PAGE_METADATA_FIELDS } from './elements/collection.js';
+import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from './elements/collection.js';
+import type { CollectionDisplay, CollectionSort } from './elements/collection.js';
 import { escapeCssValue } from './elements/render-utils.js';
 import { isAllowedHref } from './action-href.js';
 import {
@@ -799,52 +800,13 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
   }
 }
 
-function validateCollectionChildren(
-  children: unknown,
-  childWidth: number,
-  childHeight: number,
-  basePath: string,
-  errors: string[],
-  pageIds: Set<string>,
-  validPageIds: Set<string> | null,
-): void {
-  if (!Array.isArray(children)) {
-    errors.push(`${basePath} must be an array`);
-    return;
-  }
-  children.forEach((child, idx) => {
-    const childPath = pathJoin(basePath, idx);
-    assertUniqueElementId(child, childPath, pageIds, errors);
-    validateElement(child, childWidth, childHeight, childPath, errors, validPageIds, pageIds);
-  });
-}
-
-function validateCollectionEntries(
-  entries: unknown,
-  childWidth: number,
-  childHeight: number,
-  basePath: string,
-  errors: string[],
-  pageIds: Set<string>,
-  validPageIds: Set<string> | null,
-): void {
-  if (!Array.isArray(entries)) {
-    errors.push(`${basePath} must be an array`);
-    return;
-  }
-  entries.forEach((entry, entryIdx) => {
-    const entryPath = pathJoin(basePath, entryIdx);
-    validateCollectionChildren(
-      entry,
-      childWidth,
-      childHeight,
-      entryPath,
-      errors,
-      pageIds,
-      validPageIds,
-    );
-  });
-}
+// ADR 0063 dec 1 + dec 6 — the new CollectionElement has no authorable
+// children. Per-entry instances are materializer output, not part of the
+// canvas document, so the validator has nothing to recurse into. The old
+// `validateCollectionChildren` / `validateCollectionEntries` helpers (which
+// walked `entryTemplate` / `cardTemplate` / `entries`) were removed alongside
+// those fields; the anchor-uniqueness walker in `validatePageAnchorIdUniqueness`
+// now stops at the Collection wrapper.
 
 /**
  * Strict format for `anchorId` per ADR 0050 dec 2: ASCII lowercase, digits,
@@ -1135,128 +1097,90 @@ function validateElement(
       break;
     }
     case 'collection': {
-      assertOneOf(element.mode, ['manual', 'page-bound'] as const, `${basePath}.mode`, errors);
-      const childWidth =
-        isRecord(element.box) && isFiniteNumber(element.box.w) && element.box.w > 0
-          ? element.box.w
-          : pageWidth;
-      const childHeight =
-        isRecord(element.box) && isFiniteNumber(element.box.h) && element.box.h > 0
-          ? element.box.h
-          : sectionHeight;
-      validateCollectionChildren(
-        element.entryTemplate,
-        childWidth,
-        childHeight,
-        `${basePath}.entryTemplate`,
-        errors,
-        pageIds,
-        validPageIds,
-      );
-      validateCollectionEntries(
-        element.entries,
-        childWidth,
-        childHeight,
-        `${basePath}.entries`,
-        errors,
-        pageIds,
-        validPageIds,
-      );
-      if (!isRecord(element.layout)) {
-        errors.push(`${basePath}.layout must be an object`);
-      } else {
-        if (
-          !isFiniteNumber(element.layout.columns) ||
-          !Number.isInteger(element.layout.columns) ||
-          element.layout.columns < 1
-        ) {
-          errors.push(`${basePath}.layout.columns must be a positive integer`);
-        }
-        if (!isFiniteNumber(element.layout.gap) || element.layout.gap < 0) {
-          errors.push(`${basePath}.layout.gap must be >= 0`);
-        }
-      }
-      if (element.mode === 'page-bound') {
-        if (element.filter !== undefined) {
-          if (!isRecord(element.filter)) {
-            errors.push(`${basePath}.filter must be an object when present`);
-          } else {
-            if (
-              element.filter.category !== undefined &&
-              !isNonEmptyString(element.filter.category)
-            ) {
-              errors.push(`${basePath}.filter.category must be a non-empty string when present`);
-            }
-            if (element.filter.tags !== undefined) {
-              if (!Array.isArray(element.filter.tags)) {
-                errors.push(`${basePath}.filter.tags must be an array when present`);
-              } else {
-                element.filter.tags.forEach((tag, tagIdx) => {
-                  if (!isNonEmptyString(tag)) {
-                    errors.push(
-                      `${basePath}.filter.tags[${String(tagIdx)}] must be a non-empty string`,
-                    );
-                  }
-                });
-              }
-            }
-            if (
-              element.filter.limit !== undefined &&
-              (!isFiniteNumber(element.filter.limit) ||
-                !Number.isInteger(element.filter.limit) ||
-                element.filter.limit < 1)
-            ) {
-              errors.push(`${basePath}.filter.limit must be a positive integer when present`);
-            }
-          }
-        }
-        if (element.sort !== undefined) {
-          if (!isRecord(element.sort)) {
-            errors.push(`${basePath}.sort must be an object when present`);
-          } else {
-            assertOneOf(
-              element.sort.field,
-              ['publishedDate', 'title'] as const,
-              `${basePath}.sort.field`,
-              errors,
-            );
-            assertOneOf(
-              element.sort.order,
-              ['asc', 'desc'] as const,
-              `${basePath}.sort.order`,
-              errors,
-            );
-          }
-        }
-        if (element.cardTemplate !== undefined) {
-          validateCollectionChildren(
-            element.cardTemplate,
-            childWidth,
-            childHeight,
-            `${basePath}.cardTemplate`,
-            errors,
-            pageIds,
-            validPageIds,
+      // ADR 0063 dec 1 — element-level binding. `collectionSlug` may be
+      // undefined (the inspector shows a "Pick a source" prompt) but when
+      // present it must be a non-empty string.
+      if (element.collectionSlug !== undefined) {
+        if (!isNonEmptyString(element.collectionSlug)) {
+          errors.push(
+            `${basePath}.collectionSlug must be a non-empty string when present (got ${describe(element.collectionSlug)})`,
           );
         }
-        if (element.fieldBindings !== undefined) {
-          if (!isRecord(element.fieldBindings)) {
-            errors.push(`${basePath}.fieldBindings must be an object when present`);
-          } else {
-            for (const [elementId, field] of Object.entries(element.fieldBindings)) {
-              if (!isNonEmptyString(elementId)) {
-                errors.push(`${basePath}.fieldBindings keys must be non-empty element ids`);
-              }
-              assertOneOf(
-                field,
-                PAGE_METADATA_FIELDS,
-                `${basePath}.fieldBindings["${elementId}"]`,
-                errors,
-              );
-            }
-          }
+      }
+      // ADR 0063 dec 7 — folder filter. Optional; same shape constraints
+      // as the API write boundary so a malformed value cannot ride into
+      // the canvas state from an out-of-band writer either.
+      if (element.folder !== undefined) {
+        if (typeof element.folder !== 'string' || element.folder.length === 0) {
+          errors.push(
+            `${basePath}.folder must be a non-empty string when present (got ${describe(element.folder)})`,
+          );
+        } else if (element.folder.length > 64) {
+          errors.push(
+            `${basePath}.folder exceeds the 64-char cap (got ${String(element.folder.length)})`,
+          );
+        } else if (element.folder.includes('/') || element.folder.includes('\\')) {
+          errors.push(
+            `${basePath}.folder must not contain "/" or "\\" (got ${describe(element.folder)})`,
+          );
         }
       }
+      // `sort` and `display` are optional during the multi-commit migration
+      // (Phase 1 lands the shape; Phase 2B tightens to required-on-insert).
+      // The validator accepts either the new string-union form or the legacy
+      // object form `{ field, order }` so pre-ADR-0063 fixtures and the
+      // queued Phase 2D collections-scaffold rewrite stay valid until the
+      // cleanup commit. The new materializer (Phase 2B) only reads the
+      // string form; legacy values flow through as inert.
+      if (element.sort !== undefined) {
+        if (typeof element.sort === 'string') {
+          assertOneOf<CollectionSort>(
+            element.sort,
+            COLLECTION_SORTS,
+            `${basePath}.sort`,
+            errors,
+          );
+        } else if (!isRecord(element.sort)) {
+          errors.push(
+            `${basePath}.sort must be one of [${COLLECTION_SORTS.join(', ')}] or a legacy { field, order } object (got ${describe(element.sort)})`,
+          );
+        }
+      }
+      if (element.display !== undefined) {
+        assertOneOf<CollectionDisplay>(
+          element.display,
+          COLLECTION_DISPLAYS,
+          `${basePath}.display`,
+          errors,
+        );
+      }
+      // `manualOrder` is required-shape iff `sort === 'manual'`, optional
+      // (but if present must be string[]) otherwise. Stale ids are stripped
+      // by the inspector on next render (ADR 0063 dec 8) — the validator
+      // only enforces shape, not entry-existence.
+      if (element.manualOrder !== undefined) {
+        if (!Array.isArray(element.manualOrder)) {
+          errors.push(
+            `${basePath}.manualOrder must be an array when present (got ${describe(element.manualOrder)})`,
+          );
+        } else {
+          element.manualOrder.forEach((entryId, idx) => {
+            if (!isNonEmptyString(entryId)) {
+              errors.push(
+                `${basePath}.manualOrder[${String(idx)}] must be a non-empty string (got ${describe(entryId)})`,
+              );
+            }
+          });
+        }
+      }
+      // Reference `pageWidth` / `sectionHeight` so the unused-parameter
+      // surface stays symmetric with the other element branches; the new
+      // CollectionElement carries no nested elements, so there is no
+      // child-recursion here.
+      void pageWidth;
+      void sectionHeight;
+      void pageIds;
+      void validPageIds;
       break;
     }
     case 'nav': {
@@ -1579,12 +1503,22 @@ function validatePage(
   }
   assertOptionalNonEmptyString(page.category, `${basePath}.category`, errors);
   assertOptionalNonEmptyString(page.description, `${basePath}.description`, errors);
-  // ADR 0060 — pageKind + collectionSlug must be both-set-or-both-absent. When
-  // present, pageKind must be one of the canonical kinds and collectionSlug
-  // must be a non-empty string. The publish-time materializer relies on this
-  // invariant to map index/template pages to their entries.
+  // ADR 0060 + ADR 0063 dec 2 — pageKind + collectionSlug.
+  //
+  // ADR 0063 dec 2 retires `'collection-index'`. The ADR's follow-up F5
+  // tracks the validator-tightening step: the value starts as "warn" while
+  // the on-load migration (E2) sweeps prod data, and is promoted from
+  // "warn" to "throw" after F3's audit. This commit lands the union with
+  // both values so the migration target ('collection-index' on legacy
+  // rows) and the surviving target ('collection-item-template') both
+  // typecheck; F5 narrows the validator once the migration runs cleanly.
   if (page.pageKind !== undefined) {
-    assertOneOf(page.pageKind, COLLECTION_PAGE_KINDS, `${basePath}.pageKind`, errors);
+    assertOneOf(
+      page.pageKind,
+      COLLECTION_PAGE_KINDS,
+      `${basePath}.pageKind`,
+      errors,
+    );
     if (page.collectionSlug === undefined) {
       errors.push(
         `${basePath}.collectionSlug is required when pageKind is set (ADR 0060: a CMS-marked page must name its collection)`,
@@ -1688,32 +1622,11 @@ function validatePageAnchorIdUniqueness(
       });
       return;
     }
-    if (el.type === 'collection') {
-      if (Array.isArray(el.entryTemplate)) {
-        el.entryTemplate.forEach((child, childIdx) => {
-          visitElementTree(child, pathJoin(pathJoin(elementPath, 'entryTemplate'), childIdx));
-        });
-      }
-      if (Array.isArray(el.cardTemplate)) {
-        el.cardTemplate.forEach((child, childIdx) => {
-          visitElementTree(child, pathJoin(pathJoin(elementPath, 'cardTemplate'), childIdx));
-        });
-      }
-      if (Array.isArray(el.entries)) {
-        el.entries.forEach((entry, entryIdx) => {
-          if (!Array.isArray(entry)) return;
-          entry.forEach((child, childIdx) => {
-            visitElementTree(
-              child,
-              pathJoin(
-                pathJoin(pathJoin(pathJoin(elementPath, 'entries'), entryIdx), 'children'),
-                childIdx,
-              ),
-            );
-          });
-        });
-      }
-    }
+    // ADR 0063 — CollectionElement no longer carries authorable children
+    // (entryTemplate / cardTemplate / entries were retired with the page-
+    // bound model). The materializer emits per-entry DOM at publish time
+    // outside the canvas document, so anchor-uniqueness has nothing to
+    // recurse into here; visiting `el.anchorId` above is the full surface.
   };
   const visitSection = (section: unknown, sectionPath: string): void => {
     if (!isRecord(section)) return;

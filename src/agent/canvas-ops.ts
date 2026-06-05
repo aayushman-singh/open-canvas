@@ -745,7 +745,12 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       if (!collectionElement || collectionElement.type !== 'collection') {
         throw new Error(`restoreElement: collection element not found: ${op.collectionElementId}`);
       }
-      const entry = collectionElement.entries[op.entryIndex];
+      // ADR 0063 — legacy CollectionElement.entries is optional during the
+      // transition; fall through to the loud "missing entry" path when the
+      // field is absent rather than silently materialising an empty parent.
+      const legacyEntries = collectionElement.entries;
+      const entry =
+        legacyEntries === undefined ? undefined : legacyEntries[op.entryIndex];
       if (!Array.isArray(entry)) {
         throw new Error(
           `restoreElement: collection entry ${String(op.entryIndex)} missing on ${op.collectionElementId}`,

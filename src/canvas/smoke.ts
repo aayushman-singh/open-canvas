@@ -1095,46 +1095,11 @@ assertRenderDispatchFailure(
   'expected renderer to reject inherited Object.prototype dispatch keys at top level',
 );
 
-const prototypeCollectionChild = {
-  id: 'el-prototype-constructor',
-  type: 'constructor',
-  box: { x: 0, y: 0, w: 100, h: 40, z: 1 },
-} as unknown as CanvasElement;
-assertRenderDispatchFailure(
-  {
-    version: 1,
-    publishedAt: '2026-05-28T00:00:00.000Z',
-    styleKit: 'charcoal',
-    pages: [
-      {
-        id: 'page-prototype-collection',
-        slug: 'prototype-collection',
-        title: 'Prototype Collection',
-        width: 960,
-        sections: [
-          {
-            id: 'section-prototype-collection',
-            recipeId: 'custom',
-            name: 'Prototype Collection',
-            height: 240,
-            elements: [
-              {
-                id: 'el-collection-prototype-child',
-                type: 'collection',
-                box: { x: 0, y: 0, w: 400, h: 160, z: 1 },
-                mode: 'manual',
-                entryTemplate: [],
-                entries: [[prototypeCollectionChild]],
-                layout: { columns: 1, gap: 0 },
-              } as unknown as CanvasElement,
-            ],
-          },
-        ],
-      },
-    ],
-  },
-  'renderElementBody: no RENDER_DISPATCH entry for element type="constructor" id="el-prototype-constructor"',
-  'expected renderer to reject inherited Object.prototype dispatch keys in collection children',
-);
+// ADR 0063 dec 6 — Collection elements no longer carry authorable children;
+// per-entry DOM is materializer output (Phase 2B) outside the renderer's
+// dispatch recursion. The prototype-key-in-collection-child regression test
+// retired with the page-bound model and is replaced by the top-level
+// dispatch check above plus the prototype-key-in-tabs-panel test (which
+// covers the remaining nested-render path).
 
 console.log('[canvas:smoke] OK');

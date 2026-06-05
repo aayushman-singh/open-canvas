@@ -541,10 +541,12 @@ function walkElements(
         }
       }
     } else if (el.type === 'collection') {
-      for (const child of el.entryTemplate) {
+      // ADR 0063 — legacy entryTemplate / cardTemplate / entries are
+      // optional during the transition; walk only what's present.
+      for (const child of el.entryTemplate ?? []) {
         if (visit(child)) return true;
       }
-      for (const entry of el.entries) {
+      for (const entry of el.entries ?? []) {
         for (const child of entry) {
           if (visit(child)) return true;
         }

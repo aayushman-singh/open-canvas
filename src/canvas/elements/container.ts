@@ -40,6 +40,15 @@ export interface ContainerElement extends BaseElement {
    * style-kit CSS can scope rules to tinted containers. Closes gap #17.
    */
   tint?: string;
+  /**
+   * ADR 0063 dec 3 — optional layout marker the materializer keys on when
+   * defaulting a Collection's per-entry template. `'card'` containers inside
+   * a `display === 'card'` Collection are treated as the per-entry card
+   * shape. Absence = ordinary container; no behaviour change for existing
+   * Containers (purely additive). Only one valid value today; widened only
+   * when a second marker earns its place.
+   */
+  preset?: 'card';
 }
 
 export function renderContainer(element: ContainerElement): string {

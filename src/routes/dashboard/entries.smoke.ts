@@ -67,6 +67,8 @@ function makeEntry(overrides: Partial<CollectionEntry> = {}): CollectionEntry {
     tags: ['launch', 'cms'],
     ogImageAssetId: null,
     status: 'published',
+    // ADR 0063 dec 7 — `folder` column added; defaults to NULL = ungrouped.
+    folder: null,
     createdAt: now,
     updatedAt: now,
     ...overrides,

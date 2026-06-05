@@ -120,6 +120,13 @@
       "when": 1780602110701,
       "tag": "0017_collection_entry_slug_lookup_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1780963200000,
+      "tag": "0018_collection_entry_folder",
+      "breakpoints": true
     }
   ]
 }
