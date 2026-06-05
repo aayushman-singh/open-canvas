@@ -199,6 +199,12 @@ function makeCtx(): MockHandles {
     setActivePage(pageId) {
       activePageIds.push(pageId);
     },
+    panToPage() {
+      // No-op in the smoke — the scaffold flow calls panToPage after
+      // setActivePage to bring the newly-created index page into view.
+      // The activePageIds recording is enough to pin the scaffold's
+      // navigation contract.
+    },
     renderAll() {
       renderAllCalls.count += 1;
     },

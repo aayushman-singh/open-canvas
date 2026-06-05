@@ -1300,6 +1300,15 @@ export interface EditorContext {
    *  link guard is hard NO-DELETE — there is no rewrite-references
    *  fallback; the Owner must repoint the action(s) first. */
   deletePage(pageId: string): Promise<void>;
+  /** Bring the named page into the viewport at the current zoom with a
+   *  64px inset against viewport-left. Falls through to fitToPage when
+   *  the page is wider than the viewport at the current zoom. Bound impl
+   *  lives in render.ts. Wired here so explicit-navigation call sites
+   *  (link-popover "Go to page", alt+click action with page-href, page
+   *  sidebar / breadcrumb, collection scaffold) can opt into pan without
+   *  re-importing render. setActivePage no longer pans on its own —
+   *  element clicks that activate a page should NOT move the camera. */
+  panToPage(pageId: string | null): void;
   /** Center the named page in the viewport and auto-zoom up to
    *  ZOOM_MAX_FIT (100%). Defaults pageId to the active page. Bound impl
    *  lives in render.ts (Phase 2l). Forward-declared here so the page

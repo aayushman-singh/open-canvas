@@ -156,6 +156,7 @@ function renderRichText(element: TextElement): string {
   if (element.textTransform !== undefined) {
     entries.push(['text-transform', element.textTransform]);
   }
+  pushPinnedFontFamily(entries, element);
   const innerStyle = styleFromEntries(entries);
   const html = RICH_TEXT_MD.render(source);
   return `<div class="opencanvas-text opencanvas-richtext" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${html}</div>`;
@@ -191,9 +192,28 @@ export function renderText(element: TextElement): string {
   if (element.textTransform !== undefined) {
     entries.push(['text-transform', element.textTransform]);
   }
+  pushPinnedFontFamily(entries, element);
   const innerStyle = styleFromEntries(entries);
   const runsHtml = element.content.map(renderInlineRun).join('');
   return `<${tag} class="opencanvas-text" data-role="${escapeAttr(element.role)}" style="${innerStyle}">${runsHtml}</${tag}>`;
+}
+
+// pinnedStyle["font-family"] must land on the inner text node, not just
+// the wrapper. Every style kit emits a rule like
+// `[data-style-kit="X"] [data-element-type="text"][data-role="Y"] .opencanvas-text
+//   { font-family: var(--opencanvas-kit-font-...) }`
+// which gives .opencanvas-text its own font-family declaration. That
+// breaks inheritance from the wrapper's inline font-family, so the
+// inspector picker would write the value but the visible text would
+// still use the kit default. An inline style here outranks the kit
+// selector. The wrapper still receives the family too via
+// buildElementWrapperStyle's pinnedStyle pass; the duplicate is harmless.
+function pushPinnedFontFamily(entries: [string, string][], element: TextElement): void {
+  const value = element.pinnedStyle?.['font-family'];
+  if (typeof value !== 'string' || value.length === 0) return;
+  const safe = escapeCssValue(value);
+  if (safe === '') return;
+  entries.push(['font-family', safe]);
 }
 
 export const textInspectorSpec: InspectorSpec = {

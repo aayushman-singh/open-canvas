@@ -346,6 +346,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     },
     fitToPage: () => {},
     fitAllPages: () => {},
+    panToPage: () => {},
     aiPanel: null,
     closeAiPanel: () => {},
     runAiPreview: () => {

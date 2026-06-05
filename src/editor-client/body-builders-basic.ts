@@ -66,6 +66,18 @@ export function buildTextBodyImpl(ctx: EditorContext, element: TextElement): HTM
   node.style.fontWeight = String(element.fontWeight);
   node.style.textAlign = element.align;
   node.style.margin = '0';
+  // pinnedStyle["font-family"] must land on the inner text node, not just
+  // the wrapper. Every style kit emits a rule like
+  // `[data-style-kit="X"] [data-element-type="text"][data-role="Y"] .opencanvas-text
+  //   { font-family: var(--opencanvas-kit-font-...) }`
+  // which gives .opencanvas-text its own font-family declaration. That
+  // breaks inheritance from the wrapper's inline font-family, so the
+  // picker would write the value but the visible text would still use the
+  // kit default. An inline style here outranks the kit selector.
+  const pinnedFontFamily = element.pinnedStyle?.['font-family'];
+  if (typeof pinnedFontFamily === 'string' && pinnedFontFamily.length > 0) {
+    node.style.fontFamily = pinnedFontFamily;
+  }
   const content = Array.isArray(element.content) ? element.content : [];
   for (let i = 0; i < content.length; i++) {
     const run = content[i];
@@ -165,6 +177,10 @@ export function buildActionBodyImpl(ctx: EditorContext, element: ActionElement):
       ev.stopPropagation();
       if (element.href && element.href.type === 'page') {
         ctx.setActivePage(element.href.pageId);
+        // Alt+click on a page-href action is explicit navigation —
+        // pan the camera so the target page lands in view.
+        // setActivePage is camera-pure; explicit nav opts in.
+        ctx.panToPage(element.href.pageId);
         return;
       }
       if (element.href && element.href.type === 'external') {

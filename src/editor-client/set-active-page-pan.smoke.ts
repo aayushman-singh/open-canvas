@@ -1,22 +1,15 @@
 // src/editor-client/set-active-page-pan.smoke.ts
 //
 // Pins the user-visible contract for setActivePage: flipping the active
-// page must bring the new page into the viewport. Pre-fix, link-popover's
-// "Go to {pageName}" button only flipped data-active on the new artboard
-// without panning the camera, so the user saw "nothing happened" until
-// they manually zoomed out and discovered the active page sitting hundreds
-// of pixels off-screen.
+// page must NOT move the camera. The earlier contract panned the camera
+// to inset the new page at viewport-left+64px, which was jarring on every
+// element click that crossed an inactive artboard (the click handler
+// activates the page as a side effect of selecting the element). The
+// pan is now opt-in via direct panToPage() calls — setActivePage stays
+// camera-pure.
 //
-// Repro shape (from the original bug report):
-//   - 6 pages laid out as a horizontal strip (page.width=1440 + gap=120 →
-//     each artboard 1560px apart in world-space).
-//   - Camera at { x: 0, y: 0, zoom: 1 }, showing page 0 at viewport-left.
-//   - User clicks an action with href {type: 'page', pageId: page-1}.
-//   - link-popover.ts calls ctx.setActivePage(page-1).
-//   - Expected: camera.x moves so page-1's left edge lands in the
-//     viewport (with a 64px breathing-room inset).
-//   - Pre-fix actual: camera unchanged, page-1 sits ~1500px off the right
-//     edge of the viewport.
+// panToPage itself still exists as a primitive and its fit-to-page
+// fallback contract (case 2 below) is still pinned for explicit callers.
 //
 // Run with `bun.cmd run src/editor-client/set-active-page-pan.smoke.ts`.
 
@@ -188,7 +181,7 @@ try {
   };
   const ctx = ctxConcrete as unknown as EditorContext;
 
-  // ---- Case 1: pan-only (page fits at current zoom) ------------------
+  // ---- Case 1: setActivePage is camera-pure --------------------------
 
   setActivePageImpl(ctx, 'page-1');
 
@@ -212,49 +205,28 @@ try {
     'newly active page must gain data-active="true"',
   );
 
-  // Camera panned. Page-1 world.x=1560, zoom=1, PAD=64 →
-  // camera.x = 64 - 1560 = -1496. This places page-1's left edge at
-  // screen.x = 1560 * 1 + (-1496) + 340 (rect.left) = 404, which is
-  // 64px inside the viewport's left edge (340) — the breathing-room
-  // inset we promised.
-  assert(
-    ctx.camera.x === 64 - 1560,
-    `camera.x must pan to 64 - 1560 = -1496 (got ${ctx.camera.x})`,
-  );
-  assert(
-    ctx.camera.y === 64 - 40,
-    `camera.y must pan to 64 - 40 = 24 (got ${ctx.camera.y})`,
-  );
-  assert(ctx.camera.zoom === 1, `zoom must be preserved (got ${ctx.camera.zoom})`);
+  // Camera untouched — setActivePage no longer pans.
+  assert(ctx.camera.x === 0, `camera.x must stay at 0 (got ${ctx.camera.x})`);
+  assert(ctx.camera.y === 0, `camera.y must stay at 0 (got ${ctx.camera.y})`);
+  assert(ctx.camera.zoom === 1, `zoom must stay at 1 (got ${ctx.camera.zoom})`);
 
-  // Page-1's left edge after panning, in screen coords:
-  //   screen.x = world.x * zoom + camera.x + viewport.left
-  //   = 1560 + (-1496) + 340 = 404
-  // viewport.left = 340, viewport.right = 1875. 404 is inside.
-  const page1ScreenLeft = 1560 * ctx.camera.zoom + ctx.camera.x + VIEWPORT_LEFT;
+  // applyCameraTransform was never called → root.style.transform is unset.
   assert(
-    page1ScreenLeft >= VIEWPORT_LEFT && page1ScreenLeft < VIEWPORT_LEFT + VIEWPORT_WIDTH,
-    `page-1 left edge (${page1ScreenLeft}) must land inside viewport ` +
-      `[${VIEWPORT_LEFT}, ${VIEWPORT_LEFT + VIEWPORT_WIDTH})`,
-  );
-
-  // applyCameraTransform was called → root.style.transform reflects the
-  // camera.
-  const transform = rootStub.style.transform;
-  assert(
-    typeof transform === 'string' && transform.includes('translate(-1496px, 24px)'),
-    `root.style.transform must reflect the new camera (got ${transform})`,
+    rootStub.style.transform === undefined,
+    `root.style.transform must remain unset (got ${rootStub.style.transform})`,
   );
 
   assert(renderInspectorCalls === 1, 'inspector must re-render once per page switch');
   assert(renderReelCalls === 1, 'reel must re-render once per page switch');
   assert(updatePageSidebarCalls === 1, 'page sidebar must re-render once per page switch');
 
-  // ---- Case 2: page-width > viewport-width at current zoom -----------
+  // ---- Case 2: panToPage centers + preserves zoom (even when oversized)
   //
-  // panToPage must fall through to fitToPage when the page can't fit at
-  // the current zoom. Set a viewport narrower than the page and call
-  // panToPage directly to exercise the branch.
+  // panToPage must center the target page in the viewport at the current
+  // zoom and never touch camera.zoom — even when the page is wider than
+  // the viewport at that zoom (the user can manually zoom out). Pre-fix,
+  // panToPage fell through to fitToPage in that case and silently
+  // shrank the whole canvas, which surprised callers expecting a pan.
 
   const narrowViewport: { getBoundingClientRect(): DOMRect } = {
     getBoundingClientRect(): DOMRect {
@@ -290,14 +262,38 @@ try {
 
   panToPage(narrowCtx, 'page-0');
 
-  // fitToPage clamps zoom to ZOOM_MAX_FIT (1.0) and Math.min(scaleX, scaleY).
-  // availW = 800 - 128 = 672; scaleX = 672/1440 ≈ 0.47; availH = 600-128 = 472;
-  // scaleY = 472/800 = 0.59. min = 0.47, clampZoom snaps to one-decimal = 0.5.
-  // So zoom should drop from 1 to ~0.5 — definitely less than 1.
   assert(
-    narrowCtx.camera.zoom < 1,
-    `narrow viewport must trigger zoom-out (got zoom=${narrowCtx.camera.zoom})`,
+    narrowCtx.camera.zoom === 1,
+    `panToPage must preserve zoom even when page is wider than viewport (got zoom=${narrowCtx.camera.zoom})`,
   );
+  // Centering: camera.x = (800 - 1440*1)/2 - 0*1 = -320
+  //            camera.y = (600 - 800*1)/2  - 40*1 = -140
+  assert(
+    narrowCtx.camera.x === (800 - 1440) / 2,
+    `camera.x must center the page (got ${narrowCtx.camera.x}, want ${(800 - 1440) / 2})`,
+  );
+  assert(
+    narrowCtx.camera.y === (600 - 800) / 2 - 40,
+    `camera.y must center the page (got ${narrowCtx.camera.y}, want ${(600 - 800) / 2 - 40})`,
+  );
+
+  // ---- Case 3: panToPage centers a page that DOES fit ----------------
+  //
+  // The common case: page narrower than the viewport at the current zoom.
+  // Re-use the original viewportStub (1535 wide) and panToPage page-1.
+  // Page-1 is at world.x = 1560, width = 1440. At zoom 1:
+  //   camera.x = (1535 - 1440)/2 - 1560*1 = 47.5 - 1560 = -1512.5
+  //   camera.y = (900 - 800)/2 - 40 = 50 - 40 = 10
+  panToPage(ctx, 'page-1');
+  assert(
+    ctx.camera.x === (VIEWPORT_WIDTH - 1440) / 2 - 1560,
+    `camera.x must center page-1 (got ${ctx.camera.x})`,
+  );
+  assert(
+    ctx.camera.y === (VIEWPORT_HEIGHT - 800) / 2 - 40,
+    `camera.y must center page-1 vertically (got ${ctx.camera.y})`,
+  );
+  assert(ctx.camera.zoom === 1, `zoom preserved on centering pan (got ${ctx.camera.zoom})`);
 
   console.log('[set-active-page-pan:smoke] OK');
 } finally {
