@@ -10,9 +10,11 @@
 import type { CanvasPage } from '../../canvas/schema.js';
 import {
   ENTRY_SLUG_RE,
+  FOLDER_MAX_LENGTH,
   findConflictingSitePage,
   isValidSlug,
   parseCreateEntryBody,
+  parseFolder,
   parseUpdateEntryBody,
 } from './entries.js';
 
@@ -130,6 +132,119 @@ assert(!createBadStatus.ok, 'unknown status must reject');
 const createNonObject = parseCreateEntryBody('not a body');
 assert(!createNonObject.ok, 'non-object body must reject');
 
+// -- Folder validation (ADR 0063 dec 7) --------------------------------------
+//
+// `parseFolder` is the shared rule the create body, the update body, and
+// the GET filter all funnel through. Cover the shape rule end to end here
+// so the API and dashboard both inherit the same contract.
+
+assert(FOLDER_MAX_LENGTH === 64, 'folder cap is the 64-char limit ADR 0063 d7 names');
+
+const folderNull = parseFolder(null);
+assert(folderNull.ok && folderNull.value === null, 'null folder = ungrouped, must parse');
+
+const folderSimple = parseFolder('tech');
+assert(folderSimple.ok && folderSimple.value === 'tech', 'simple folder value must parse');
+
+const folderUtf8 = parseFolder('Notes Été');
+assert(folderUtf8.ok, 'non-ASCII folder names must be allowed (case-sensitive, free text)');
+
+const folderMaxLen = parseFolder('a'.repeat(64));
+assert(folderMaxLen.ok, '64-char folder is the upper boundary and must parse');
+
+const folderEmpty = parseFolder('');
+assert(!folderEmpty.ok, 'empty-string folder must reject (null clears, empty is not a synonym)');
+
+const folderTooLong = parseFolder('a'.repeat(65));
+assert(!folderTooLong.ok, '65-char folder must reject loudly — no silent truncation');
+
+const folderSlash = parseFolder('a/b');
+assert(!folderSlash.ok, 'forward-slash folder must reject (path separator)');
+
+const folderBackslash = parseFolder('a\\b');
+assert(!folderBackslash.ok, 'backslash folder must reject (path separator)');
+
+const folderNonString = parseFolder(42);
+assert(!folderNonString.ok, 'non-string non-null folder must reject');
+
+const folderUndefined = parseFolder(undefined);
+assert(!folderUndefined.ok, 'undefined folder must reject (caller picks null or a string)');
+
+// Create body — folder absent defaults to null (ungrouped).
+const createNoFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+});
+assert(createNoFolder.ok, 'create without folder must parse');
+if (createNoFolder.ok) {
+  assert(createNoFolder.value.folder === null, 'absent folder defaults to null on create');
+}
+
+// Create body — explicit null folder.
+const createNullFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+  folder: null,
+});
+assert(createNullFolder.ok, 'create with explicit null folder must parse');
+if (createNullFolder.ok) {
+  assert(createNullFolder.value.folder === null, 'explicit null folder preserved on create');
+}
+
+// Create body — valid folder string.
+const createWithFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+  folder: 'tech',
+});
+assert(createWithFolder.ok, 'create with valid folder string must parse');
+if (createWithFolder.ok) {
+  assert(createWithFolder.value.folder === 'tech', 'folder string echoed back on create');
+}
+
+// Create body — invalid folder rejects the whole body (no partial success).
+const createEmptyFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+  folder: '',
+});
+assert(!createEmptyFolder.ok, 'create with empty folder string must reject');
+
+const createSlashFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+  folder: 'a/b',
+});
+assert(!createSlashFolder.ok, 'create with slash in folder must reject');
+
+const createBackslashFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+  folder: 'a\\b',
+});
+assert(!createBackslashFolder.ok, 'create with backslash in folder must reject');
+
+const createLongFolder = parseCreateEntryBody({
+  collectionSlug: 'blog',
+  slug: 'ok',
+  title: 'T',
+  publishedDate: '2026-06-04',
+  folder: 'a'.repeat(65),
+});
+assert(!createLongFolder.ok, 'create with overlong folder must reject (no truncation)');
+
 // -- Update body validation --------------------------------------------------
 
 const updateOk = parseUpdateEntryBody({ title: 'Updated' });
@@ -177,6 +292,41 @@ assert(!updateBadOg.ok, 'empty-string ogImageAssetId must reject');
 
 const updateNonObject = parseUpdateEntryBody(42);
 assert(!updateNonObject.ok, 'non-object patch body must reject');
+
+// Folder PATCH — presence is meaningful (absent = leave alone, null =
+// clear, string = set). ADR 0063 dec 7.
+const patchSetFolder = parseUpdateEntryBody({ folder: 'design' });
+assert(patchSetFolder.ok, 'patch with folder string must parse');
+if (patchSetFolder.ok) {
+  assert(patchSetFolder.value.folder === 'design', 'patch echoes the folder string');
+}
+
+const patchClearFolder = parseUpdateEntryBody({ folder: null });
+assert(patchClearFolder.ok, 'patch with folder=null must parse (clears the folder)');
+if (patchClearFolder.ok) {
+  assert(patchClearFolder.value.folder === null, 'patch preserves folder=null');
+}
+
+const patchEmptyFolder = parseUpdateEntryBody({ folder: '' });
+assert(!patchEmptyFolder.ok, 'patch with empty folder string must reject — use null to clear');
+
+const patchSlashFolder = parseUpdateEntryBody({ folder: 'a/b' });
+assert(!patchSlashFolder.ok, 'patch with slash folder must reject');
+
+const patchBackslashFolder = parseUpdateEntryBody({ folder: 'a\\b' });
+assert(!patchBackslashFolder.ok, 'patch with backslash folder must reject');
+
+const patchLongFolder = parseUpdateEntryBody({ folder: 'a'.repeat(65) });
+assert(!patchLongFolder.ok, 'patch with overlong folder must reject');
+
+const patchFolderAbsent = parseUpdateEntryBody({ title: 'just-title' });
+assert(patchFolderAbsent.ok, 'patch without folder field must still parse');
+if (patchFolderAbsent.ok) {
+  assert(
+    !('folder' in patchFolderAbsent.value),
+    'absent folder must not appear on the patch (preserves DB value)',
+  );
+}
 
 // -- Slug-collision pre-check (ADR 0060 Pass 3) ------------------------------
 //
