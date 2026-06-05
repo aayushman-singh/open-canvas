@@ -169,6 +169,20 @@ export type CanvasAgentOp =
   | { kind: 'setStyleKit'; styleKit: BuiltInStyleKit }
   | { kind: 'setSiteConfig'; patch: Record<string, unknown> }
   /**
+   * Deterministic site-wide find-and-replace on string fields the user can
+   * see: text element content (including rich-text markdown blobs), action
+   * element labels, media element alt text, and page titles. Walks every
+   * page + the site-pinned header/footer, recurses into tabs / collection
+   * entries. Pure literal substring replace; no word-boundary, no regex.
+   *
+   * The LLM emits ONE renameToken op for a bulk "rename X to Y everywhere"
+   * intent instead of N rewriteText / updateElement ops the model has to
+   * enumerate and can truncate. The walk is deterministic so coverage is
+   * 100% — what the user reads is "rename Apogee to Briar", what executes
+   * is exactly that, with no per-element re-enumeration through the model.
+   */
+  | { kind: 'renameToken'; from: string; to: string; caseSensitive?: boolean }
+  /**
    * Internal revert ops — emitted ONLY by the editor's chat-revert flow,
    * never offered to the LLM (intentionally absent from translateToolCall
    * and the agent tool list). Each restore op carries the FULL captured
@@ -896,6 +910,85 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
         ) {
           element.href = { type: 'page', pageId: restoredPageId };
         }
+      }
+    }
+    return next;
+  }
+
+  if (op.kind === 'renameToken') {
+    if (typeof op.from !== 'string' || op.from.length === 0) {
+      throw new Error('applyCanvasAgentOp(renameToken): from must be a non-empty string');
+    }
+    if (typeof op.to !== 'string') {
+      throw new Error('applyCanvasAgentOp(renameToken): to must be a string');
+    }
+    // Bind locals so the inner walker closes over narrowed-string fields
+    // instead of re-reading them off `op` (which keeps its DU shape).
+    const fromLiteral: string = op.from;
+    const toLiteral: string = op.to;
+    const caseSensitive = op.caseSensitive !== false;
+    const fromKey = caseSensitive ? fromLiteral : fromLiteral.toLowerCase();
+    function replaceIn(text: string): string {
+      if (typeof text !== 'string' || text.length === 0) return text;
+      if (caseSensitive) return text.split(fromLiteral).join(toLiteral);
+      // Case-insensitive: walk indices manually so we preserve the
+      // original casing of any chars we leave alone but always substitute
+      // with `to` verbatim (matches user expectation of "rename to this
+      // exact spelling").
+      let out = '';
+      let cursor = 0;
+      const lower = text.toLowerCase();
+      while (cursor < text.length) {
+        const idx = lower.indexOf(fromKey, cursor);
+        if (idx < 0) {
+          out += text.slice(cursor);
+          break;
+        }
+        out += text.slice(cursor, idx) + toLiteral;
+        cursor = idx + fromKey.length;
+      }
+      return out;
+    }
+    function walkInlineRuns(runs: unknown): void {
+      if (!Array.isArray(runs)) return;
+      for (let i = 0; i < runs.length; i++) {
+        const run = runs[i] as { text?: unknown } | null;
+        if (run && typeof run.text === 'string') {
+          run.text = replaceIn(run.text);
+        }
+      }
+    }
+    function walkElements(arr: CanvasElement[] | undefined): void {
+      if (!Array.isArray(arr)) return;
+      for (let i = 0; i < arr.length; i++) {
+        const el = arr[i] as unknown as Record<string, unknown>;
+        if (!el) continue;
+        if (el.type === 'text') {
+          walkInlineRuns(el.content);
+        } else if (el.type === 'action') {
+          walkInlineRuns(el.label);
+        } else if (el.type === 'media') {
+          if (typeof el.alt === 'string') el.alt = replaceIn(el.alt);
+        }
+        // Recurse into tabs / collection entries so nested text gets
+        // covered too — the editor renders both flat from the outside.
+        if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+          for (const tab of el.tabs as Array<{ elements?: CanvasElement[] }>) {
+            if (tab) walkElements(tab.elements);
+          }
+        } else if (el.type === 'collection' && Array.isArray(el.entries)) {
+          for (const entry of el.entries as CanvasElement[][]) {
+            walkElements(entry);
+          }
+        }
+      }
+    }
+    if (next.header) walkElements(next.header.elements);
+    if (next.footer) walkElements(next.footer.elements);
+    for (const page of next.pages) {
+      if (typeof page.title === 'string') page.title = replaceIn(page.title);
+      for (const section of page.sections) {
+        walkElements(section.elements);
       }
     }
     return next;

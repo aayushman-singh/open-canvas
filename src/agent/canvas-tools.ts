@@ -394,6 +394,33 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
   },
 
   // -------------------------------------------------------------------------
+  // renameToken — deterministic site-wide find-and-replace
+  // -------------------------------------------------------------------------
+  {
+    name: 'renameToken',
+    description:
+      'Site-wide find-and-replace on visible string fields (text content including rich-text markdown, action labels, media alt, page titles). USE THIS for any "rename X to Y everywhere" / "replace all instances of …" / "swap brand name" intent — NEVER enumerate per-element rewriteText calls for that case. The walk is deterministic so coverage is 100% across pages, header, footer, tabs, and collection entries. Pure literal substring replace; no regex. caseSensitive defaults to true; pass false for case-insensitive matching with the replacement value substituted verbatim.',
+    parameters: {
+      type: 'object',
+      properties: {
+        from: {
+          type: 'string',
+          description: 'The literal string to find. Must be non-empty.',
+        },
+        to: {
+          type: 'string',
+          description: 'The literal string to substitute. May be empty (deletion).',
+        },
+        caseSensitive: {
+          type: 'boolean',
+          description: 'Match case when finding occurrences. Default true.',
+        },
+      },
+      required: ['from', 'to'],
+    },
+  },
+
+  // -------------------------------------------------------------------------
   // addElement
   // -------------------------------------------------------------------------
   {

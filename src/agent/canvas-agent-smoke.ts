@@ -346,6 +346,7 @@ const expectedCanvasToolNames = [
   'designSection',
   'duplicateSection',
   'moveSection',
+  'renameToken',
   'replaceMedia',
   'rewriteText',
   'setSiteConfig',
@@ -521,6 +522,10 @@ const toolArgsByName: Record<string, Record<string, unknown>> = {
     defaultLocale: 'en',
     siteNoIndex: true,
   },
+  renameToken: {
+    from: 'Apogee',
+    to: 'Briar',
+  },
 };
 
 for (const name of expectedCanvasToolNames) {
@@ -545,6 +550,160 @@ for (const name of expectedCanvasToolNames) {
     `expected parseApplyOp(${name}) to preserve the normalized preview op`,
   );
 }
+
+// ---------------------------------------------------------------------------
+// renameToken applier — site-wide find-and-replace coverage.
+//
+// Pins that the walker reaches every visible surface: text content (flat
+// + rich-text), action labels, media alt, page titles, header/footer
+// elements, AND nested tab-panel / collection-entry elements.
+// ---------------------------------------------------------------------------
+
+const renameFixture: EditableSite = {
+  styleKit: 'charcoal',
+  header: {
+    id: 'sec-hdr',
+    name: 'Header',
+    height: 80,
+    recipeId: 'custom',
+    elements: [
+      {
+        id: 'el-hdr-logo',
+        type: 'text',
+        box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+        role: 'heading',
+        align: 'left',
+        fontSize: 24,
+        fontWeight: 700,
+        content: [{ text: 'Apogee' }],
+      },
+    ],
+  },
+  pages: [
+    {
+      id: 'page-home',
+      slug: 'index',
+      title: 'Apogee — the modern web platform',
+      width: 1440,
+      sections: [
+        {
+          id: 'sec-hero',
+          name: 'Hero',
+          height: 600,
+          recipeId: 'custom',
+          elements: [
+            {
+              id: 'el-headline',
+              type: 'text',
+              box: { x: 0, y: 0, w: 600, h: 60, z: 1 },
+              role: 'heading',
+              align: 'left',
+              fontSize: 40,
+              fontWeight: 700,
+              content: [
+                { text: 'Build with Apogee, ship faster' },
+                { text: 'Apogee', marks: [{ type: 'bold' }] },
+              ],
+            },
+            {
+              id: 'el-action',
+              type: 'action',
+              box: { x: 0, y: 80, w: 200, h: 48, z: 2 },
+              variant: 'solid',
+              label: [{ text: 'Start with Apogee' }],
+              href: { type: 'external', url: 'https://example.com' },
+            },
+            {
+              id: 'el-media',
+              type: 'media',
+              box: { x: 700, y: 0, w: 480, h: 320, z: 1 },
+              mediaKind: 'image',
+              assetId: 'asset-1',
+              alt: 'Apogee dashboard screenshot',
+              fit: 'cover',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const renamed = applyCanvasAgentOp(renameFixture, {
+  kind: 'renameToken',
+  from: 'Apogee',
+  to: 'Briar',
+});
+
+assert(
+  renamed.header?.elements[0]?.type === 'text' &&
+    (renamed.header.elements[0].content as Array<{ text: string }>)[0]?.text === 'Briar',
+  'renameToken must rewrite header text element content',
+);
+assert(
+  renamed.pages[0]?.title === 'Briar — the modern web platform',
+  'renameToken must rewrite page title',
+);
+const renamedHero = renamed.pages[0]?.sections[0]?.elements;
+const renamedHeadlineRuns = (renamedHero?.[0] as { content: Array<{ text: string }> }).content;
+assert(
+  renamedHeadlineRuns[0]?.text === 'Build with Briar, ship faster' &&
+    renamedHeadlineRuns[1]?.text === 'Briar',
+  'renameToken must rewrite every inline run in a multi-run text element',
+);
+const renamedAction = renamedHero?.[1] as { label: Array<{ text: string }> };
+assert(
+  renamedAction.label[0]?.text === 'Start with Briar',
+  'renameToken must rewrite action label inline runs',
+);
+const renamedMedia = renamedHero?.[2] as { alt: string };
+assert(
+  renamedMedia.alt === 'Briar dashboard screenshot',
+  'renameToken must rewrite media alt text',
+);
+
+const ciFixture: EditableSite = {
+  styleKit: 'charcoal',
+  pages: [
+    {
+      id: 'page-1',
+      slug: 'index',
+      title: 'Page',
+      width: 1440,
+      sections: [
+        {
+          id: 's',
+          name: 'S',
+          height: 100,
+          recipeId: 'custom',
+          elements: [
+            {
+              id: 't',
+              type: 'text',
+              box: { x: 0, y: 0, w: 600, h: 60, z: 1 },
+              role: 'heading',
+              align: 'left',
+              fontSize: 24,
+              fontWeight: 600,
+              content: [{ text: 'apogee APOGEE Apogee aPogeE' }],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+const ciRenamed = applyCanvasAgentOp(ciFixture, {
+  kind: 'renameToken',
+  from: 'Apogee',
+  to: 'Briar',
+  caseSensitive: false,
+});
+const ciContent = (ciRenamed.pages[0]?.sections[0]?.elements[0] as { content: Array<{ text: string }> }).content;
+assert(
+  ciContent[0]?.text === 'Briar Briar Briar Briar',
+  'renameToken caseSensitive:false must replace all casings with the literal `to`',
+);
 
 const malformedInsertPageId = parseApplyOp(
   {

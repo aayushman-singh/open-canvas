@@ -115,6 +115,7 @@ export const MUTATING_TOOL_NAMES = new Set<string>([
   'deletePage',
   'setStyleKit',
   'setSiteConfig',
+  'renameToken',
 ]);
 
 /** Tool names that are read-only; the orchestrator dispatches and feeds the result back into the model. */

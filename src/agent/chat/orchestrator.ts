@@ -950,6 +950,9 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
   lines.push(
     "  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.",
   );
+  lines.push(
+    "  renameToken — site-wide literal find-and-replace on visible string fields (text content, action labels, media alt, page titles). USE THIS for any \"rename X to Y everywhere\", \"swap brand name\", or \"replace all instances of …\" intent. Emit ONE renameToken op, never enumerate per-element rewriteText calls for a bulk rename — the deterministic walk is exhaustive across pages, header, footer, tabs, and collection entries. Pure substring replace; pass caseSensitive:false to match regardless of casing.",
+  );
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
   lines.push('Do not invent IDs — call query_site or query_assets first when unsure.');

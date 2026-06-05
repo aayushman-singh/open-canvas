@@ -97,6 +97,26 @@ export function parseRewriteText(args: unknown): ParseResult {
   return standaloneTextTool.parse(args);
 }
 
+export function parseRenameToken(args: unknown): ParseResult {
+  if (!isRecord(args)) return { ok: false, error: 'renameToken arguments must be an object' };
+  if (!isNonEmptyString(args.from)) {
+    return { ok: false, error: 'renameToken.from must be a non-empty string' };
+  }
+  if (typeof args.to !== 'string') {
+    return { ok: false, error: 'renameToken.to must be a string' };
+  }
+  if (args.caseSensitive !== undefined && typeof args.caseSensitive !== 'boolean') {
+    return { ok: false, error: 'renameToken.caseSensitive must be a boolean when present' };
+  }
+  const op: CanvasAgentOp = {
+    kind: 'renameToken',
+    from: args.from,
+    to: args.to,
+  };
+  if (args.caseSensitive !== undefined) op.caseSensitive = args.caseSensitive;
+  return { ok: true, op };
+}
+
 export function parseReplaceMedia(args: unknown): ParseResult {
   return standaloneMediaTool.parse(args);
 }
@@ -859,6 +879,8 @@ export function translateToolCall(call: LlmAssistantToolCall): ParseResult {
       return parseSetStyleKit(call.arguments);
     case 'setSiteConfig':
       return parseSetSiteConfig(call.arguments);
+    case 'renameToken':
+      return parseRenameToken(call.arguments);
     default:
       return { ok: false, error: `unknown tool name: ${call.name}` };
   }
@@ -1043,6 +1065,7 @@ export function parseApplyOp(value: unknown, styleKit: StyleKit): ParseResult {
   if (value.kind === 'setSiteConfig') {
     return isRecord(value.patch) ? parseCanonicalSetSiteConfigOp(value) : parseSetSiteConfig(value);
   }
+  if (value.kind === 'renameToken') return parseRenameToken(value);
 
   // Internal revert ops — emitted only by the editor's chat-revert flow.
   // Intentionally absent from translateToolCall: the LLM never sees them

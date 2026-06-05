@@ -108,6 +108,10 @@ interface AgentOp {
   content?: Array<{ text?: string }> | undefined;
   element?: { id?: string; type?: string } | undefined;
   input?: { brief?: string; sectionName?: string } | undefined;
+  /** renameToken op — site-wide find-and-replace. */
+  from?: string | undefined;
+  to?: string | undefined;
+  caseSensitive?: boolean | undefined;
 }
 
 /**
@@ -701,6 +705,15 @@ export function describeOp(op: AgentOp): string {
   if (op.kind === 'updatePage') return 'Update page ' + op.pageId;
   if (op.kind === 'deletePage') return 'Delete page ' + op.pageId;
   if (op.kind === 'setStyleKit') return 'Switch style kit to ' + JSON.stringify(op.styleKit);
+  if (op.kind === 'renameToken') {
+    return (
+      'Rename ' +
+      JSON.stringify(op.from ?? '') +
+      ' → ' +
+      JSON.stringify(op.to ?? '') +
+      ' across the whole site'
+    );
+  }
   return 'Unknown op';
 }
 
