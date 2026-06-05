@@ -5,6 +5,12 @@
 **Author:** Aayushman Singh
 **Drives:** the canonical-URL leak surfaced in Pass 3 + Pass 4 of the demo drive and re-confirmed in [docs/demo/drive-2026-05-29-pass-5-findings.md](../demo/drive-2026-05-29-pass-5-findings.md). Five `apogee.rev01.aayushman.dev` literals lived in [src/canvas/fixtures/apogee-showcase.json](../../src/canvas/fixtures/apogee-showcase.json) at lines 615, 2357, 3453, 4950, 6367. Every site created from Apogee Showcase published those URLs into its meta tags until the Owner manually overrode them.
 
+**As-built (2026-06-05):**
+- Decision 1 — every built-in TemplateSeed page is free of `canonical` and `ogImageAssetId`; the runtime path in [`src/seo/meta-emit.ts`](../../src/seo/meta-emit.ts) composes canonicals from the request host. Verified across all nine templates.
+- Decision 2 — landed as a CI-time check in [`src/seo/smoke.ts`](../../src/seo/smoke.ts) that iterates every `allTemplateSeeds` entry, materialises it via `instantiateTemplate`, and asserts no page carries a pre-baked canonical or `ogImageAssetId`. A runtime boot-time check was considered and rejected as duplicative coverage — CI already gates merges. The smoke catches the same regression class at the smallest reviewable moment.
+- Decision 3 — SEO panel SERP preview reads `canonicalRaw.length > 0 ? canonicalRaw : publishedUrl` at [`src/routes/dashboard/page-settings.tsx:1113`](../../src/routes/dashboard/page-settings.tsx#L1113), surfacing the leaked value instead of the auto-derived URL.
+- Decision 4 — host-mismatch warning lands as a `.canonical-warning` block at [`src/routes/dashboard/page-settings.tsx:1244`](../../src/routes/dashboard/page-settings.tsx#L1244) with CSS at [line 133](../../src/routes/dashboard/page-settings.tsx#L133) and the toggle behaviour at [line 762](../../src/routes/dashboard/page-settings.tsx#L762). Field is not auto-cleared.
+
 ## Context
 
 The Apogee Showcase template fixture is the seed for every Owner who picks "Apogee Showcase" in the template gallery (S1.6 in [docs/demo/act-1-script.md](../demo/act-1-script.md)). It includes per-page SEO blocks with a `canonical` field. The fixture was authored when rev01 ran at `rev01.aayushman.dev` with per-site subdomain `apogee.rev01.aayushman.dev`. The apex migration to `opencanvas.aayushman.dev` (per [ADR 0013](0013-host-config-from-environment.md), the `project_opencanvas_apex_migration` memory, and the rebrand commits on `origin/main`) moved every site under the new apex, but the fixture's hard-coded canonicals stayed pointed at the dead host.
