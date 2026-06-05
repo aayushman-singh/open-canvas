@@ -36,7 +36,7 @@ import type {
   MediaKind,
   SectionRecipeId,
 } from '../canvas/schema.js';
-import { getStyleKitPreset } from '../canvas/style-kits.js';
+import { resolveStyleKitWithCustom } from '../canvas/style-kits.js';
 
 const SECTION_HEIGHT_MAX = 1400;
 const INTERNAL_DELETE_FIELDS_KEY = '__deleteFields';
@@ -369,7 +369,7 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       op.afterSectionId,
       'designSection',
     );
-    const preset = getStyleKitPreset(next.styleKit);
+    const preset = resolveStyleKitWithCustom(next);
     const result = resolveDesignSection(op.input, targetPage.width, preset);
     if (result.imagePrompts.size > 0) {
       throw new Error(
@@ -837,6 +837,6 @@ export function resolveDesignOp(
 ): DesignSectionResult {
   const page = state.pages[0];
   if (!page) throw new Error('resolveDesignOp: state must have at least one page');
-  const preset = getStyleKitPreset(state.styleKit);
+  const preset = resolveStyleKitWithCustom(state);
   return resolveDesignSection(input, page.width, preset);
 }

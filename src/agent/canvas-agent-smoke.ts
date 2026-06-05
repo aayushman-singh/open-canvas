@@ -28,6 +28,7 @@ import {
   type EditableSite,
   type SectionRecipeId,
 } from '../canvas/schema.js';
+import { STYLE_KIT_PRESETS } from '../canvas/style-kits.js';
 import { validateEditableSite } from '../canvas/validate.js';
 import type { DesignSectionInput } from '../canvas/layout/tree.js';
 import { parseDesignSectionToolArgs } from './design-section-parser.js';
@@ -1047,5 +1048,32 @@ assert(
   resolveResult.section.elements.length === 2,
   `expected 2 elements in resolved section, got ${String(resolveResult.section.elements.length)}`,
 );
+
+// Regression: site with styleKit:'custom' resolves through
+// resolveStyleKitWithCustom(state) — not getStyleKitPreset(state.styleKit),
+// which throws on 'custom' by design. Before this guard, applyCanvasAgentOp
+// and resolveDesignOp 500'd every chat /apply on a custom-themed site with
+// "getStyleKitPreset: unknown style kit \"custom\"".
+{
+  const customState: EditableSite = {
+    ...baseState,
+    styleKit: 'custom',
+    customStyleKit: STYLE_KIT_PRESETS.charcoal,
+  };
+  const designOnCustom = applyCanvasAgentOp(customState, {
+    kind: 'designSection',
+    afterSectionId: baseSection.id,
+    input: designInput,
+  });
+  assert(
+    designOnCustom.pages[0]?.sections.length === 2,
+    'designSection on styleKit:custom must apply without throwing',
+  );
+  const resolveOnCustom = resolveDesignOp(customState, designInput);
+  assert(
+    resolveOnCustom.section.elements.length > 0,
+    'resolveDesignOp on styleKit:custom must resolve without throwing',
+  );
+}
 
 console.log('[canvas-agent:smoke] OK');
