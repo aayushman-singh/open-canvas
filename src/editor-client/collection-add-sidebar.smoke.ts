@@ -46,14 +46,17 @@ assert(
   '(3) button label must be exactly "Collection" (got: ' + JSON.stringify(label) + ')',
 );
 
-// (2) The button lives inside the Components section.
+// (2) The button lives inside the Components section. Other panels (the
+// Pages tab "+ New Collection" and the Add-panel "Collections" group) also
+// carry data-canvas-add-collection — we want the position of the
+// Components-grid button specifically, which the regex already pinpoints.
 const componentsHeader = routeSrc.indexOf('<h2>Components</h2>');
 const colorsHeader = routeSrc.indexOf('<h2>Colors</h2>');
-const buttonStart = routeSrc.indexOf('data-canvas-add-collection');
+const buttonStart = match.index;
 assert(componentsHeader > 0, '(2) <h2>Components</h2> marker must exist');
 assert(colorsHeader > componentsHeader, '(2) <h2>Colors</h2> must follow Components');
 assert(
-  buttonStart > componentsHeader && buttonStart < colorsHeader,
+  buttonStart !== undefined && buttonStart > componentsHeader && buttonStart < colorsHeader,
   '(2) Collection button must live inside the Components grid section (between Components and Colors headers)',
 );
 
