@@ -1,22 +1,23 @@
 // src/editor-client/collection-scaffold.ts
 //
-// ADR 0060 F3 — surfaces the "+ New collection" wizard from the editor's
-// Pages sidebar.
+// ADR 0063 Decision 11 — surfaces the "+ New Collection" wizard from the
+// editor's Pages sidebar.
 //
 // The backend endpoint POST /api/sites/:siteId/collections (see
-// src/routes/api/collections.ts) creates an index page + template page +
-// sample entry triple in one round-trip. The editor button mounted at
-// #canvas-add-collection collects the slug, calls the endpoint, and on
-// success refreshes the editor's local state from the server (so the
-// new pages appear in the sidebar list and the active page can switch to
-// the freshly-minted index page).
+// src/routes/api/collections.ts) atomically creates an index page +
+// template page + two seed entries in one round-trip. The editor button
+// mounted at #canvas-add-collection collects the slug, calls the endpoint,
+// and on success refreshes the editor's local state from the server (so
+// the new pages appear in the sidebar list and the active page switches
+// to the freshly-minted index page).
 //
 // Design notes:
-//   - The wizard is intentionally minimal — just a slug prompt. The
-//     scaffold endpoint derives the human title from the slug
-//     (`titleCase('blog')` → 'Blog'), so a separate name field would
-//     double-bookkeep the same string. If we later want a richer wizard
-//     we extend collections-scaffold.ts to take a name override.
+//   - The wizard pre-computes the default slug client-side so the prompt's
+//     default value (`'blog'`, falling back to `collection-1`/`-2`/... if
+//     blog is taken locally) is one keystroke away from acceptance. The
+//     Owner can edit it before confirming. The server re-resolves the
+//     slug against its own snapshot — local pre-computation is a UX
+//     affordance, not a validation gate.
 //   - On success we flushPendingSave first so any in-flight local edits
 //     land on the server BEFORE we overwrite ctx.state with the server's
 //     snapshot. Skipping the flush would clobber unsaved work — fail-loud
@@ -25,6 +26,8 @@
 //   - Errors are surfaced through ctx.setStatus(... 'error') so the
 //     existing toast-style status line carries the message. The editor
 //     does not have a separate "toast" surface; setStatus IS the toast.
+//   - The server response includes `indexPageId` directly so we no longer
+//     have to re-derive page identity from id-format conventions.
 //   - Two seams are extracted for testability:
 //       1. `runCollectionScaffoldFlowImpl(ctx)` — the full wizard logic
 //          (prompt → POST → refresh → activate). Exercised by the smoke
@@ -35,7 +38,8 @@
 //          canvas-add-page wiring.
 
 import type { EditorContext } from './editor-context.js';
-import type { EditableSite } from '../canvas/schema.js';
+import type { CanvasPage, EditableSite } from '../canvas/schema.js';
+import { WIZARD_DEFAULT_SLUG } from '../canvas/collections-scaffold.js';
 
 /** Subset of EditorContext the wizard actually depends on. Carrying the
  *  narrow shape — instead of leaning on the full EditorContext — keeps
@@ -59,6 +63,52 @@ export interface CollectionScaffoldCtx {
   setActivePage(pageId: string | null): void;
   renderAll(): void;
   updatePageSidebar(): void;
+}
+
+/** Slug rule mirrors `SLUG_RE` in src/canvas/collections-scaffold.ts so the
+ *  client surfaces the same rejection the server would emit, without a round
+ *  trip. The server is still the source of truth — server-side validation
+ *  remains the gate. */
+const CLIENT_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
+
+/** Mirror of `slugIsTaken` from src/canvas/collections-scaffold.ts. Used
+ *  only to pick a sensible default for the prompt's pre-filled value; the
+ *  server re-resolves authoritatively. Conservative — checks page slugs,
+ *  page-level collectionSlug bindings, and the template/seed-entry slug
+ *  shapes the scaffold will produce. */
+function clientSlugIsTaken(pages: readonly CanvasPage[], slug: string): boolean {
+  const templatePageSlug = `${slug}/_template`;
+  const seedSlugs = [
+    `${slug}/welcome-to-your-blog`,
+    `${slug}/your-second-post`,
+  ];
+  for (const page of pages) {
+    if (!page) continue;
+    if (page.slug === slug) return true;
+    if (page.slug === templatePageSlug) return true;
+    if (seedSlugs.includes(page.slug)) return true;
+    if (page.collectionSlug === slug) return true;
+  }
+  return false;
+}
+
+/** Compute the default slug to pre-fill the prompt with. Mirrors the
+ *  server's `resolveAvailableSlug`: tries `'blog'`, then `collection-1`,
+ *  `collection-2`, ... up to N. Returns the empty string if state is
+ *  unavailable; the caller surfaces an error in that case. */
+function pickDefaultSlugClientSide(state: EditableSite | null): string {
+  if (state === null) return WIZARD_DEFAULT_SLUG;
+  if (!clientSlugIsTaken(state.pages, WIZARD_DEFAULT_SLUG)) {
+    return WIZARD_DEFAULT_SLUG;
+  }
+  for (let i = 1; i <= 99; i += 1) {
+    const candidate = `collection-${i}`;
+    if (!clientSlugIsTaken(state.pages, candidate)) return candidate;
+  }
+  // Exhausted: the server will fail with the pool-exhausted 409. Returning
+  // WIZARD_DEFAULT_SLUG here is fine — the server's failure surfaces
+  // through the existing error toast path; we don't silently substitute.
+  return WIZARD_DEFAULT_SLUG;
 }
 
 function errorToString(err: unknown): string {
@@ -98,6 +148,18 @@ async function refreshSiteState(ctx: CollectionScaffoldCtx): Promise<EditableSit
   return ctx.migrateState(body.editableState);
 }
 
+/** Confirm that the page id the server returned in the POST response is
+ *  actually present in the freshly refreshed editor state. The server is
+ *  the source of truth for the id; this guards against the (unlikely) race
+ *  where the refresh GET returned a stale snapshot that pre-dates the POST.
+ *  Returns the id when present, null otherwise. */
+function confirmIndexPageId(state: EditableSite, indexPageId: string): string | null {
+  for (const page of state.pages) {
+    if (page && page.id === indexPageId) return page.id;
+  }
+  return null;
+}
+
 /** Full wizard logic — prompt the Owner for a slug, POST to the scaffold
  *  endpoint, refresh local state, and switch the active page to the new
  *  index. Exposed (not just attached) so the smoke can exercise it
@@ -105,16 +167,29 @@ async function refreshSiteState(ctx: CollectionScaffoldCtx): Promise<EditableSit
 export async function runCollectionScaffoldFlowImpl(
   ctx: CollectionScaffoldCtx,
 ): Promise<void> {
+  // ADR 0063 dec 11 §a — surface the available slug as the prompt's
+  // pre-filled default so the Owner can hit Enter to accept, or rename
+  // before confirming. Computed client-side from ctx.state; the server
+  // re-resolves authoritatively (no fallback inside the wizard).
+  const defaultSlug = pickDefaultSlugClientSide(ctx.state);
   const promptedSlug = await ctx.openTextModal({
     title: 'New collection',
     label:
-      'Slug (e.g. "blog", "case-studies"). Pages, the URL path, and the entries tab all use this.',
+      'Slug (e.g. "blog", "case-studies"). Pages, the URL path, and the entries tab all use this. Rename if you prefer something else.',
+    defaultValue: defaultSlug,
     placeholder: 'blog',
   });
   if (promptedSlug === null) return;
   const slug = promptedSlug.trim().toLowerCase();
   if (slug.length === 0) {
     ctx.setStatus('Collection slug is required', 'error');
+    return;
+  }
+  if (!CLIENT_SLUG_RE.test(slug)) {
+    ctx.setStatus(
+      'Slug must be 1..80 lowercase letters, digits, or dashes (no leading/trailing dash)',
+      'error',
+    );
     return;
   }
 
@@ -159,29 +234,27 @@ export async function runCollectionScaffoldFlowImpl(
     return;
   }
 
-  let created: { indexPageId?: unknown; templatePageId?: unknown };
+  // Read the 201 body — the server returns the resolved slug (which may
+  // differ from `slug` if the server walked the fallback pool) and the
+  // index page id directly, so we don't have to re-derive page identity
+  // from the id format convention.
+  let createdSlug = slug;
+  let createdIndexPageId: string | null = null;
   try {
-    created = (await response.json()) as { indexPageId?: unknown; templatePageId?: unknown };
-  } catch (err: unknown) {
-    ctx.setStatus(
-      'Collection created but server response was malformed: ' + errorToString(err),
-      'error',
-    );
-    return;
-  }
-  if (typeof created.indexPageId !== 'string' || created.indexPageId.length === 0) {
-    ctx.setStatus(
-      'Collection created but server response was missing indexPageId',
-      'error',
-    );
-    return;
-  }
-  if (typeof created.templatePageId !== 'string' || created.templatePageId.length === 0) {
-    ctx.setStatus(
-      'Collection created but server response was missing templatePageId',
-      'error',
-    );
-    return;
+    const body = (await response.json()) as {
+      collectionSlug?: unknown;
+      indexPageId?: unknown;
+    };
+    if (typeof body.collectionSlug === 'string' && body.collectionSlug.length > 0) {
+      createdSlug = body.collectionSlug;
+    }
+    if (typeof body.indexPageId === 'string' && body.indexPageId.length > 0) {
+      createdIndexPageId = body.indexPageId;
+    }
+  } catch {
+    // 201 with non-JSON body would be a server bug; carry on with the
+    // slug the client supplied. The refresh step below still re-seats
+    // ctx.state correctly regardless.
   }
 
   // POST succeeded. Refresh the editor's local state so the new pages
@@ -192,17 +265,16 @@ export async function runCollectionScaffoldFlowImpl(
   ctx.state = refreshed;
   ctx.renderAll();
   ctx.updatePageSidebar();
-  if (!refreshed.pages.some((page) => page && page.id === created.indexPageId)) {
-    ctx.setStatus(
-      'Collection created but refreshed state did not include index page "' +
-        created.indexPageId +
-        '"',
-      'error',
-    );
-    return;
+  // Switch active page to the freshly-minted index. Prefer the id the
+  // server returned; fall back to the id-format convention if absent.
+  const targetPageId =
+    createdIndexPageId !== null
+      ? confirmIndexPageId(refreshed, createdIndexPageId)
+      : confirmIndexPageId(refreshed, 'page-collection-' + createdSlug + '-index');
+  if (targetPageId !== null) {
+    ctx.setActivePage(targetPageId);
   }
-  ctx.setActivePage(created.indexPageId);
-  ctx.setStatus('Created collection "' + slug + '"', 'ok');
+  ctx.setStatus('Created collection "' + createdSlug + '"', 'ok');
 }
 
 /** Wire the #canvas-add-collection button. Mirrors the canvas-add-page

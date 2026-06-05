@@ -1,19 +1,24 @@
 // src/editor-client/collection-scaffold.smoke.ts
 //
-// ADR 0060 F3 — pins the "+ New collection" wizard surfaced from the
-// editor's Pages sidebar.
+// ADR 0063 Decision 11 — pins the "+ New Collection" wizard surfaced from
+// the editor's Pages sidebar.
 //
 // Coverage:
-//   (1) Happy path: prompted slug "blog" → POST hits the right URL with
-//       the right body shape → site state refresh → setActivePage runs
-//       with the index page id returned by the server → success status.
-//   (2) Cancelled prompt: openTextModal returning null skips the POST
-//       entirely.
-//   (3) Slug shape failure is surfaced from the server response, not a
-//       client-side duplicate regex.
-//   (4) Server error response surfaces the server's `error` string in
-//       the status toast.
-//   (5) flushPendingSave returning false short-circuits before the POST.
+//   (1) Happy path with the default slug pre-filled: openTextModal receives
+//       `defaultValue: 'blog'` (computed client-side from ctx.state) →
+//       POST hits the right URL with the right body shape → site state
+//       refresh → setActivePage runs with the index page id returned by
+//       the server → success status echoes the resolved slug.
+//   (2) Cancelled prompt: openTextModal returning null skips the POST.
+//   (3) Bad slug shape surfaces an error toast and skips the POST.
+//   (4) Server 409 surfaces the server's `error` string in the status.
+//   (5) flushPendingSave returning false short-circuits before POST.
+//   (6) When the local state already has 'blog' bound, the prompt's
+//       default value falls back to 'collection-1'.
+//   (7) Server returns 500 with `step: 'db-transaction'` — wizard surfaces
+//       the failure message; refresh does NOT run; active page unchanged.
+//   (8) Server returns a different resolved slug than what the client
+//       sent — the success toast and setActivePage use the SERVER's slug.
 //
 // Bare Bun has no `document`; exercising the runtime button wiring
 // (attachCollectionScaffoldButtonImpl) needs a DOM, so the smoke
@@ -21,12 +26,6 @@
 // carries all the prompt/POST/refresh/activate logic.
 //
 // Run with `bun run collection-scaffold:smoke`.
-
-declare const Bun: {
-  file(input: URL): {
-    text(): Promise<string>;
-  };
-};
 
 import type { EditableSite } from '../canvas/schema.js';
 import type { CollectionScaffoldCtx } from './collection-scaffold.js';
@@ -44,6 +43,10 @@ interface RecordedFetch {
 interface RecordedStatus {
   text: string;
   tone: 'ok' | 'error' | 'info' | undefined;
+}
+
+interface RecordedModalOpen {
+  defaultValue: string | undefined;
 }
 
 function emptyState(): EditableSite {
@@ -69,34 +72,47 @@ function emptyState(): EditableSite {
   };
 }
 
+function stateWithBlogTaken(): EditableSite {
+  return {
+    styleKit: 'charcoal',
+    pages: [
+      ...emptyState().pages,
+      {
+        id: 'page-existing-blog',
+        slug: 'blog',
+        title: 'Existing Blog',
+        width: 1440,
+        sections: [{ id: 'sec', recipeId: 'custom', name: '', height: 100, elements: [] }],
+      },
+    ],
+  };
+}
+
 interface MockHandles {
   ctx: CollectionScaffoldCtx;
   fetches: RecordedFetch[];
   statuses: RecordedStatus[];
   activePageIds: (string | null)[];
-  /** Set the slug the openTextModal resolves with. null simulates cancel. */
+  modalOpens: RecordedModalOpen[];
   setPromptReply: (value: string | null) => void;
-  /** Override the POST response. Default: 201 + `{collectionSlug, redirectTo}`. */
   setPostResponse: (response: Response) => void;
-  /** Override the refresh GET response. Default: empty site + new pages. */
   setRefreshState: (state: EditableSite) => void;
-  /** Override the flushPendingSave outcome. Default: true. */
   setFlushOutcome: (ok: boolean) => void;
+  setInitialState: (state: EditableSite | null) => void;
   renderAllCalls: { count: number };
   updatePageSidebarCalls: { count: number };
 }
-
-const SERVER_INDEX_PAGE_ID = 'page-from-server-blog-index';
-const SERVER_TEMPLATE_PAGE_ID = 'page-from-server-blog-template';
 
 function makeCtx(): MockHandles {
   let promptReply: string | null = null;
   let postResponse: Response | null = null;
   let refreshState: EditableSite | null = null;
   let flushOutcome = true;
+  let initialState: EditableSite | null = emptyState();
   const fetches: RecordedFetch[] = [];
   const statuses: RecordedStatus[] = [];
   const activePageIds: (string | null)[] = [];
+  const modalOpens: RecordedModalOpen[] = [];
   const renderAllCalls = { count: 0 };
   const updatePageSidebarCalls = { count: 0 };
 
@@ -104,7 +120,12 @@ function makeCtx(): MockHandles {
     apiBase: '/api',
     siteId: 'site-smoke',
     siteBase: '/api/canvas/sites/site-smoke',
-    state: emptyState(),
+    get state() {
+      return initialState;
+    },
+    set state(value: EditableSite | null) {
+      initialState = value;
+    },
     authFetch(input, init) {
       const url = typeof input === 'string' ? input : input.url;
       fetches.push({ url, init });
@@ -116,8 +137,9 @@ function makeCtx(): MockHandles {
             new Response(
               JSON.stringify({
                 collectionSlug: 'blog',
-                indexPageId: SERVER_INDEX_PAGE_ID,
-                templatePageId: SERVER_TEMPLATE_PAGE_ID,
+                indexPageId: 'page-collection-blog-index',
+                templatePageId: 'page-collection-blog-template',
+                seededEntrySlugs: ['welcome-to-your-blog', 'your-second-post'],
                 redirectTo: '/dashboard/sites/site-smoke/entries?collection=blog',
               }),
               { status: 201, headers: { 'content-type': 'application/json' } },
@@ -125,14 +147,13 @@ function makeCtx(): MockHandles {
         );
       }
       // GET refresh of /canvas/sites/:siteId — return a state with the
-      // new pages already appended so the wizard can pick up the index
-      // page id (the scaffold endpoint already wrote them to the DB).
+      // new pages appended so the wizard can confirm the index page id.
       const defaultRefresh: EditableSite = refreshState ?? {
         styleKit: 'charcoal',
         pages: [
           ...emptyState().pages,
           {
-            id: SERVER_INDEX_PAGE_ID,
+            id: 'page-collection-blog-index',
             slug: 'blog',
             title: 'Blog',
             width: 1440,
@@ -141,13 +162,14 @@ function makeCtx(): MockHandles {
             collectionSlug: 'blog',
           },
           {
-            id: SERVER_TEMPLATE_PAGE_ID,
-            slug: 'blog/template',
+            id: 'page-collection-blog-template',
+            slug: 'blog/_template',
             title: '{{title}}',
             width: 1440,
             sections: [],
             pageKind: 'collection-item-template',
             collectionSlug: 'blog',
+            noIndex: true,
           },
         ],
       };
@@ -158,7 +180,8 @@ function makeCtx(): MockHandles {
         ),
       );
     },
-    openTextModal(_opts) {
+    openTextModal(opts) {
+      modalOpens.push({ defaultValue: opts.defaultValue });
       return Promise.resolve(promptReply);
     },
     setStatus(text, tone) {
@@ -186,6 +209,7 @@ function makeCtx(): MockHandles {
     fetches,
     statuses,
     activePageIds,
+    modalOpens,
     setPromptReply: (value) => {
       promptReply = value;
     },
@@ -198,13 +222,16 @@ function makeCtx(): MockHandles {
     setFlushOutcome: (ok) => {
       flushOutcome = ok;
     },
+    setInitialState: (state) => {
+      initialState = state;
+    },
     renderAllCalls,
     updatePageSidebarCalls,
   };
 }
 
 // ---------------------------------------------------------------------------
-// (1) Happy path
+// (1) Happy path — default 'blog' pre-filled, server returns it, success
 // ---------------------------------------------------------------------------
 
 {
@@ -213,7 +240,12 @@ function makeCtx(): MockHandles {
 
   await runCollectionScaffoldFlowImpl(handles.ctx);
 
-  // Two requests fired: POST collection, then GET site state refresh.
+  assert(handles.modalOpens.length === 1, '(1) modal opened exactly once');
+  assert(
+    handles.modalOpens[0]!.defaultValue === 'blog',
+    `(1) modal pre-filled with default slug 'blog' (got ${String(handles.modalOpens[0]!.defaultValue)})`,
+  );
+
   assert(handles.fetches.length === 2, '(1) expected 2 fetches, got ' + handles.fetches.length);
 
   const postCall = handles.fetches[0]!;
@@ -244,13 +276,10 @@ function makeCtx(): MockHandles {
     '(1) refresh url must hit siteBase (got ' + refreshCall.url + ')',
   );
 
-  // setActivePage called once with the canonical index page id returned by
-  // the POST response. This deliberately does not match the scaffold's old
-  // private id format, so the client cannot pass by re-deriving the id.
   assert(
     handles.activePageIds.length === 1 &&
-      handles.activePageIds[0] === SERVER_INDEX_PAGE_ID,
-    '(1) setActivePage must switch to the server-returned index page id (got ' +
+      handles.activePageIds[0] === 'page-collection-blog-index',
+    '(1) setActivePage must switch to the new index page (got ' +
       JSON.stringify(handles.activePageIds) +
       ')',
   );
@@ -291,38 +320,28 @@ function makeCtx(): MockHandles {
 }
 
 // ---------------------------------------------------------------------------
-// (3) Bad slug shape → server error toast, no refresh
+// (3) Bad slug shape → error toast, no POST
 // ---------------------------------------------------------------------------
 
 {
   const handles = makeCtx();
   handles.setPromptReply('Has Caps');
-  handles.setPostResponse(
-    new Response(
-      JSON.stringify({ error: 'collection slug must be 1..80 lowercase letters, digits, or dashes' }),
-      { status: 409, headers: { 'content-type': 'application/json' } },
-    ),
-  );
 
   await runCollectionScaffoldFlowImpl(handles.ctx);
 
   assert(
-    handles.fetches.length === 1,
-    '(3) malformed slug must POST and let the server-owned slug validator answer (got ' +
-      handles.fetches.length +
-      ' fetches)',
+    handles.fetches.length === 0,
+    '(3) malformed slug must skip POST (got ' + handles.fetches.length + ' fetches)',
   );
   const last = handles.statuses[handles.statuses.length - 1];
   assert(
-    last !== undefined && last.tone === 'error' && last.text.includes('collection slug'),
-    '(3) malformed slug must surface the server validation error (got ' +
-      JSON.stringify(last) +
-      ')',
+    last !== undefined && last.tone === 'error',
+    '(3) malformed slug must surface an error status (got ' + JSON.stringify(last) + ')',
   );
 }
 
 // ---------------------------------------------------------------------------
-// (4) Server returns 409 with conflict error
+// (4) Server 409 with conflict error
 // ---------------------------------------------------------------------------
 
 {
@@ -330,14 +349,13 @@ function makeCtx(): MockHandles {
   handles.setPromptReply('blog');
   handles.setPostResponse(
     new Response(
-      JSON.stringify({ error: 'a page with slug "blog" already exists' }),
+      JSON.stringify({ error: 'a page with slug "blog" already exists', step: 'slug-conflict' }),
       { status: 409, headers: { 'content-type': 'application/json' } },
     ),
   );
 
   await runCollectionScaffoldFlowImpl(handles.ctx);
 
-  // POST happened, refresh did not.
   assert(
     handles.fetches.length === 1,
     '(4) server error must skip refresh (got ' + handles.fetches.length + ' fetches)',
@@ -378,18 +396,104 @@ function makeCtx(): MockHandles {
 }
 
 // ---------------------------------------------------------------------------
-// (6) Server response contract names the canonical page ids
+// (6) Local 'blog' taken → prompt pre-fills with 'collection-1'
 // ---------------------------------------------------------------------------
 
 {
-  const routeSource = await Bun.file(new URL('../routes/api/collections.ts', import.meta.url)).text();
+  const handles = makeCtx();
+  handles.setInitialState(stateWithBlogTaken());
+  handles.setPromptReply(null);
+
+  await runCollectionScaffoldFlowImpl(handles.ctx);
+
+  assert(handles.modalOpens.length === 1, '(6) modal opened once');
   assert(
-    routeSource.includes('indexPageId') && routeSource.includes('scaffold.newPages[0].id'),
-    '(6) collections API response must include indexPageId from scaffold.newPages[0].id',
+    handles.modalOpens[0]!.defaultValue === 'collection-1',
+    `(6) modal default must fall back to 'collection-1' when 'blog' is taken (got ${String(handles.modalOpens[0]!.defaultValue)})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// (7) Server 500 / db-transaction failure → error toast, no refresh
+// ---------------------------------------------------------------------------
+
+{
+  const handles = makeCtx();
+  handles.setPromptReply('blog');
+  handles.setPostResponse(
+    new Response(
+      JSON.stringify({
+        error: 'failed to provision collection: connection reset',
+        step: 'db-transaction',
+      }),
+      { status: 500, headers: { 'content-type': 'application/json' } },
+    ),
+  );
+
+  await runCollectionScaffoldFlowImpl(handles.ctx);
+
   assert(
-    routeSource.includes('templatePageId') && routeSource.includes('scaffold.newPages[1].id'),
-    '(6) collections API response must include templatePageId from scaffold.newPages[1].id',
+    handles.fetches.length === 1,
+    '(7) 500 response must skip refresh (got ' + handles.fetches.length + ' fetches)',
+  );
+  assert(handles.activePageIds.length === 0, '(7) 500 response must skip setActivePage');
+  const last = handles.statuses[handles.statuses.length - 1];
+  assert(
+    last !== undefined &&
+      last.tone === 'error' &&
+      last.text.includes('failed to provision collection: connection reset'),
+    '(7) 500 error message must surface in the status (got ' + JSON.stringify(last) + ')',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (8) Server resolved slug differs from client-sent slug
+// ---------------------------------------------------------------------------
+
+{
+  const handles = makeCtx();
+  handles.setPromptReply('blog');
+  handles.setPostResponse(
+    new Response(
+      JSON.stringify({
+        collectionSlug: 'collection-1',
+        indexPageId: 'page-collection-collection-1-index',
+        templatePageId: 'page-collection-collection-1-template',
+        seededEntrySlugs: ['welcome-to-your-blog', 'your-second-post'],
+        redirectTo: '/dashboard/sites/site-smoke/entries?collection=collection-1',
+      }),
+      { status: 201, headers: { 'content-type': 'application/json' } },
+    ),
+  );
+  handles.setRefreshState({
+    styleKit: 'charcoal',
+    pages: [
+      ...emptyState().pages,
+      {
+        id: 'page-collection-collection-1-index',
+        slug: 'collection-1',
+        title: 'Collection 1',
+        width: 1440,
+        sections: [],
+        pageKind: 'collection-index',
+        collectionSlug: 'collection-1',
+      },
+    ],
+  });
+
+  await runCollectionScaffoldFlowImpl(handles.ctx);
+
+  assert(
+    handles.activePageIds.length === 1 &&
+      handles.activePageIds[0] === 'page-collection-collection-1-index',
+    '(8) setActivePage must use the server-returned index page id (got ' +
+      JSON.stringify(handles.activePageIds) +
+      ')',
+  );
+  const final = handles.statuses[handles.statuses.length - 1];
+  assert(
+    final !== undefined && final.tone === 'ok' && final.text.includes('collection-1'),
+    '(8) success status must echo the server-resolved slug (got ' + JSON.stringify(final) + ')',
   );
 }
 
