@@ -973,7 +973,7 @@ export function showAcceptAllSummaryImpl(ctx: EditorContext): void {
   // adding any new information.
   const hint = document.createElement('p');
   hint.className = 'opencanvas-ai-summary-modal-hint';
-  hint.textContent = 'See the chat above for details on each change.';
+  hint.textContent = 'See the chat for details on each change.';
   card.appendChild(hint);
   const actions = document.createElement('div');
   actions.className = 'opencanvas-ai-summary-modal-actions';

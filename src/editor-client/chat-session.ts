@@ -360,8 +360,15 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                       // Tool calls are internal plumbing — the user only
                       // cares about the resulting suggestion card. Keep
                       // them in the devtools log for debugging but don't
-                      // pollute the chat transcript.
-                      removeThinking();
+                      // pollute the chat transcript. DO NOT remove the
+                      // thinking bubble here — a tool-call fires the
+                      // moment the model decides to invoke a tool, often
+                      // seconds before the op-preview card lands. Dropping
+                      // the indicator at that point leaves the user
+                      // staring at an empty chat panel while the tool
+                      // actually runs. The bubble is removed when
+                      // user-visible content arrives (text token, op-
+                      // preview, error, or stream done).
                       if (window.console && console.debug) {
                         console.debug('[chat tool-call]', data.name, data.args || data.arguments);
                       }
