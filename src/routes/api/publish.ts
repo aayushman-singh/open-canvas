@@ -18,13 +18,14 @@
 //      success while open visitor tabs missed the update; post-update failures
 //      restore the prior published state before surfacing.
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import {
   collectReferencedAssetIds,
   collectUnfilledAssetReferences,
   findAssetReferenceErrors,
 } from '../../assets/site-assets';
+import { loadAssetKindsWithSeedFallback } from '../../assets/seed-id-fallback';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import { resolvePrimaryPage, snapshotForPageSlug } from '../../canvas/page-routing';
@@ -40,7 +41,6 @@ import { db, type Db } from '../../db/client';
 import {
   collectionEntry,
   customer,
-  ownerAsset,
   site,
   siteSearchEntry,
   siteSnapshot,
@@ -503,10 +503,17 @@ publishApi.post('/sites/:siteId', async (c) => {
   const referenced = collectReferencedAssetIds(row.editableState);
   if (referenced.size > 0) {
     const referencedList = [...referenced];
-    const presentRows = await database
-      .select({ id: ownerAsset.id, kind: ownerAsset.kind })
-      .from(ownerAsset)
-      .where(and(eq(ownerAsset.customerId, customerId), inArray(ownerAsset.id, referencedList)));
+    // Apply the same seed-id content-hash fallback the save and read paths
+    // use. Pre-2026-06 editable states reference bare seed ids
+    // (`seed-project-thumb-neutral`); the materialised row lives at
+    // `seed-{customerId}-{seedId}` keyed by content hash. Without this
+    // fallback, every publish against such a state 400s as "missing
+    // assets" even though the seed thumbs are valid and reachable.
+    const presentRows = await loadAssetKindsWithSeedFallback(
+      database,
+      customerId,
+      referencedList,
+    );
     const referenceErrors = findAssetReferenceErrors(row.editableState, presentRows);
     const missing = referenceErrors.filter((error) => error.reason === 'missing');
     if (missing.length > 0) {
