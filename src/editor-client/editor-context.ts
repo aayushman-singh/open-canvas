@@ -1118,6 +1118,13 @@ export interface EditorContext {
    *  as `unknown` because co-edit only nulls the field and the actual
    *  InlineRun[] type ships with the editing cluster. */
   editingSnapshot: InlineRun[] | null;
+  /** Commit-and-cleanup callback for the active inline text edit. Set by
+   *  beginTextEditImpl to `() => finish(true)`; cleared by finish itself.
+   *  rebuildElementImpl invokes this when a rebuild fires for the
+   *  currently-editing element id, so the Owner's typing is serialised
+   *  before the wrapper is replaced (the old inner's listeners would
+   *  otherwise vanish with the GC'd node). */
+  activeEditFinish: (() => void) | null;
 
   // -- Phase 2q.a: modal cluster -----------------------------------------
   /** Hard sync gate: every opener throws synchronously if this is true,
@@ -1646,3 +1653,70 @@ export interface RemoteCursorEntry {
     offset?: number;
   } | null;
 }
+
+// ---------------------------------------------------------------------------
+// ADR 0064 — narrow named-Pick contexts. Each alias names a cohesive
+// cluster from the editor's runtime; modules sign their parameter as the
+// intersection of the named views they touch instead of the wide
+// `EditorContext`. `EditorContext` itself stays as the live shape that
+// `createEditor` constructs — every named context is a view, not a
+// separate runtime object. Renaming a field on `EditorContext` surfaces
+// here as a compile error in the matching `Pick<…>` literal.
+// ---------------------------------------------------------------------------
+
+/** Read access to the loaded site + navigation helpers that walk it. */
+export type StateContext = Pick<
+  EditorContext,
+  'state' | 'findElement' | 'findSection' | 'currentPage'
+>;
+
+/** Cached DOM refs the editor boot path captures and that downstream
+ *  modules read for mount + measurement. Status DOM lives here too;
+ *  `setStatus` is the verb in [[StatusEmitterContext]]. */
+export type DomContext = Pick<
+  EditorContext,
+  | 'root'
+  | 'inspector'
+  | 'sidebar'
+  | 'mainEl'
+  | 'statusEl'
+  | 'viewport'
+  | 'saveButton'
+  | 'publishButton'
+  | 'versionBadge'
+  | 'saveTemplateButton'
+  | 'chatToggleBtn'
+  | 'chatPanelEl'
+  | 'chatCloseBtn'
+  | 'chatSelectionEl'
+  | 'chatSelectionTextEl'
+  | 'chatSelectionClearBtn'
+>;
+
+/** Element / section selection state machine. */
+export type SelectionContext = Pick<
+  EditorContext,
+  | 'selectedElementId'
+  | 'selectedSectionId'
+  | 'editingElementId'
+  | 'selectElement'
+  | 'selectSection'
+>;
+
+/** Re-render orchestrators. */
+export type RenderContext = Pick<
+  EditorContext,
+  'renderAll' | 'renderInspector' | 'rebuildElement' | 'preserveInspectorScrollFor'
+>;
+
+/** Persistence — debounced save scheduler, undo capture, auth-wrapped
+ *  fetch, and the boot-time identity fields the network calls reference. */
+export type PersistContext = Pick<
+  EditorContext,
+  'scheduleSave' | 'captureForUndo' | 'authFetch' | 'apiBase' | 'siteId'
+>;
+
+/** Single-verb context for the status line. Touched by nearly every
+ *  cluster, so it earns its own one-field alias rather than living
+ *  inline at every call site. */
+export type StatusEmitterContext = Pick<EditorContext, 'setStatus'>;

@@ -79,6 +79,7 @@
 
 import type { EditorContext } from './editor-context.js';
 import type { CanvasPage } from '../canvas/schema.js';
+import { isCustom404Page } from '../canvas/page-routing.js';
 import { DEFAULT_PAGE_WIDTH_PX } from './editor-constants.js';
 import { isAllowedHref } from './href-utils.js';
 import { newPageId, newSectionId } from './ids.js';
@@ -229,6 +230,24 @@ export function attachPageCrumbImpl(ctx: EditorContext): void {
     openPageCrumbMenu(ctx);
   });
   refreshPageCrumbImpl(ctx);
+}
+
+export function attachHomeCrumbImpl(ctx: EditorContext): void {
+  const btn = document.getElementById('canvas-home-crumb');
+  if (!btn) return;
+  btn.addEventListener('click', (ev: Event) => {
+    ev.preventDefault();
+    if (!ctx.state || !Array.isArray(ctx.state.pages) || ctx.state.pages.length === 0) {
+      ctx.setStatus('No pages in this site — cannot go to home page', 'error');
+      return;
+    }
+    const home = ctx.state.pages.find((p) => p && !isCustom404Page(p));
+    if (!home) {
+      ctx.setStatus('No primary page found (every page is _404)', 'error');
+      return;
+    }
+    setActivePageImpl(ctx, home.id);
+  });
 }
 
 // Resolve a string href (e.g. "/about", "/about#hero", "about") to a Canvas

@@ -303,6 +303,12 @@ export function buildElementNodeImpl(ctx: EditorContext, element: CanvasElement)
 }
 
 export function rebuildElementImpl(ctx: EditorContext, elementId: string): void {
+  if (ctx.editingElementId === elementId && ctx.activeEditFinish) {
+    const commit = ctx.activeEditFinish;
+    ctx.setStatus('Text edits committed — click the element to keep editing', 'info');
+    commit();
+    return;
+  }
   const found = ctx.findElement(elementId);
   if (!found) return;
   if (!ctx.root) {

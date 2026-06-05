@@ -24,6 +24,9 @@ import notificationsApi from './notifications';
 import chatApi from '../../agent/chat/route';
 import { entriesRoute } from './entries';
 import { collectionsRoute } from './collections';
+import versionRoute from '../../version/route';
+import { fontsOwnerRouter } from '../../fonts/route';
+import embedExpandRoute from './embed-expand';
 import type { PublicEnv } from '../public';
 
 const ownerApi = new Hono<PublicEnv>();
@@ -48,5 +51,8 @@ ownerApi.route('/sites/:siteId/entries', entriesRoute);
 // pages and a sample entry in one shot. Mounts alongside entries so the
 // dashboard's Entries tab can call it without an extra API base.
 ownerApi.route('/sites/:siteId/collections', collectionsRoute);
+ownerApi.route('/sites/:siteId/snapshots', versionRoute);
+ownerApi.route('/sites/:siteId/fonts', fontsOwnerRouter);
+ownerApi.route('/embed', embedExpandRoute);
 
 export default ownerApi;

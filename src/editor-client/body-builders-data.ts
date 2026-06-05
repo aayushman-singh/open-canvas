@@ -580,12 +580,39 @@ export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLE
 }
 
 export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionElement): HTMLElement {
+  const entries = Array.isArray(element.entries) ? element.entries : [];
+  if (entries.length === 0) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'opencanvas-collection-preview opencanvas-collection-empty';
+    placeholder.style.width = '100%';
+    placeholder.style.height = '100%';
+    placeholder.style.boxSizing = 'border-box';
+    placeholder.style.border = '1px dashed var(--line-2, #d4d4d4)';
+    placeholder.style.background = 'var(--surface-2, #f5f5f5)';
+    placeholder.style.display = 'flex';
+    placeholder.style.flexDirection = 'column';
+    placeholder.style.alignItems = 'center';
+    placeholder.style.justifyContent = 'center';
+    placeholder.style.gap = '6px';
+    placeholder.style.padding = '16px';
+    placeholder.style.textAlign = 'center';
+    placeholder.style.color = 'var(--ink-3, #888)';
+    placeholder.style.fontSize = '13px';
+    const headline = document.createElement('div');
+    headline.style.fontWeight = '600';
+    headline.style.color = 'var(--ink-2, #555)';
+    headline.textContent = 'Collection grid — 0 entries';
+    placeholder.appendChild(headline);
+    const hint = document.createElement('div');
+    hint.textContent = 'Add entries in the Entries tab on the dashboard, then publish to populate this grid.';
+    placeholder.appendChild(hint);
+    return placeholder;
+  }
   const node = document.createElement('div');
   node.className = 'opencanvas-collection-preview';
   node.style.display = 'grid';
   node.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
   node.style.gap = '8px';
-  const entries = Array.isArray(element.entries) ? element.entries : [];
   for (let i = 0; i < entries.length; i++) {
     const raw = entries[i];
     const entry: CanvasElement[] = Array.isArray(raw) ? raw : [];
@@ -598,7 +625,6 @@ export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionE
     }
     node.appendChild(card);
   }
-  if (entries.length === 0) node.textContent = 'Collection';
   return node;
 }
 

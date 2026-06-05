@@ -525,6 +525,13 @@ export function attachCoEditImpl(ctx: EditorContext): void {
     !window.__opencanvasCoEdit ||
     typeof window.__opencanvasCoEdit.connectCoEdit !== 'function'
   ) {
+    // Cannot throw here or the rest of editor boot dies; surface loudly
+    // via persistent error toast + console so the Owner sees that saves
+    // are local-only and concurrent editing is silently disabled.
+    ctx.setStatus('Co-edit unavailable — please reload the page', 'error');
+    console.error(
+      '[co-edit] window.__opencanvasCoEdit not registered — CO_EDIT_BUNDLE failed to load or was blocked. Concurrent editing is disabled until reload.',
+    );
     return;
   }
 

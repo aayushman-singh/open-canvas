@@ -210,10 +210,14 @@ function formStyleAttrs(fs: FormStyle | undefined): { styleAttr: string; flagAtt
   };
 
   if (fs.fontFamily !== undefined && fs.fontFamily !== 'inherit') {
-    if (fs.fontFamily === 'kit-display') pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-display, inherit)');
-    else if (fs.fontFamily === 'kit-body') pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-body, inherit)');
-    else if (fs.fontFamily === 'kit-mono') pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-mono, inherit)');
-    else if (fs.fontFamily === 'custom') pushString('--opencanvas-form-font-family', fs.fontFamilyCustom);
+    if (fs.fontFamily === 'kit-display')
+      pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-display, inherit)');
+    else if (fs.fontFamily === 'kit-body')
+      pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-body, inherit)');
+    else if (fs.fontFamily === 'kit-mono')
+      pushRaw('--opencanvas-form-font-family', 'var(--opencanvas-kit-font-mono, inherit)');
+    else if (fs.fontFamily === 'custom')
+      pushString('--opencanvas-form-font-family', fs.fontFamilyCustom);
   }
   pushPx('--opencanvas-form-font-size', fs.fontSize);
   pushPx('--opencanvas-form-gap', fs.fieldGap);
@@ -221,7 +225,8 @@ function formStyleAttrs(fs: FormStyle | undefined): { styleAttr: string; flagAtt
   pushString('--opencanvas-form-label-color', fs.labelColor);
   pushPx('--opencanvas-form-label-size', fs.labelFontSize);
   if (fs.labelFontWeight !== undefined) {
-    const w = fs.labelFontWeight === 'normal' ? '400' : fs.labelFontWeight === 'medium' ? '500' : '700';
+    const w =
+      fs.labelFontWeight === 'normal' ? '400' : fs.labelFontWeight === 'medium' ? '500' : '700';
     pushRaw('--opencanvas-form-label-weight', w);
   }
 
@@ -245,7 +250,8 @@ function formStyleAttrs(fs: FormStyle | undefined): { styleAttr: string; flagAtt
   pushPx('--opencanvas-form-submit-pad-y', fs.submitPaddingY);
   pushPx('--opencanvas-form-submit-size', fs.submitFontSize);
   if (fs.submitFontWeight !== undefined) {
-    const w = fs.submitFontWeight === 'normal' ? '400' : fs.submitFontWeight === 'medium' ? '500' : '700';
+    const w =
+      fs.submitFontWeight === 'normal' ? '400' : fs.submitFontWeight === 'medium' ? '500' : '700';
     pushRaw('--opencanvas-form-submit-weight', w);
   }
 
@@ -401,7 +407,7 @@ export const formAgentToolSpec: AgentToolSpec = {
     fields: {
       type: 'array',
       description:
-        'Form field definitions. Form elements only. Each field needs id, label, kind, and required; kind is text, email, textarea, checkbox, or select.',
+        'Form field definitions. Form elements only. Each field needs id, label, kind, and required; kind is text, email, textarea, checkbox, or select. IMPORTANT: this is FULL-REPLACE — to add a single field you MUST send the complete list of existing fields plus the new one. Sending a partial array WILL DELETE the omitted fields. Omitting all items via an empty [] clears the form entirely.',
       items: {
         type: 'object',
         properties: {

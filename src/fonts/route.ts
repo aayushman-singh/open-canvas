@@ -1,27 +1,23 @@
 // src/fonts/route.ts
 //
-// Hono router that owns the custom-font surface.
+// Hono routers that own the custom-font surface, split by auth surface:
 //
-// Mount shape (main thread wires this up in src/index.ts):
+//   `fontsPublicRouter` (default export) — root-mounted, unauth visitor read:
+//     GET /fonts/:contentHash
 //
-//   POST   /api/sites/:siteId/fonts            — multipart upload
-//   GET    /api/sites/:siteId/fonts            — list site fonts
-//   DELETE /api/sites/:siteId/fonts/:id        — drop a row + R2 object
-//   GET    /fonts/:contentHash                 — public read (unauth) for
-//                                                visitors. Lives at the
-//                                                Worker root, parallel to
-//                                                /assets/:contentHash.
+//   `fontsOwnerRouter` (named export) — owner-scoped CRUD, mounted inside
+//   `ownerApi` so both /api/sites/:siteId/fonts (Clerk) and
+//   /__api/sites/:siteId/fonts (edit-token) reach the same handlers:
+//     POST   /                  — multipart upload
+//     GET    /                  — list site fonts
+//     DELETE /:id               — drop a row + R2 object
 //
-// Both `:siteId`-scoped verbs are Owner-gated (Clerk auth + customer-
-// ownership check). The public read endpoint is intentionally unauth —
-// visitors must be able to fetch font bytes without an account. The
-// content-hash URL is unguessable enough (256-bit SHA) to be its own
-// capability token; a brute-force read of the bucket is implausible.
-//
-// We export this router as the DEFAULT so the main thread mounts it with
-// `app.route('/', fontsRouter)` once. The verbs that nest under
-// `/api/sites/:siteId/fonts` and the verb that lives at `/fonts/:hash`
-// share the same Hono instance so the route table stays in one place.
+// The owner verbs are Clerk + customer-ownership gated; `clerkAuth()` is a
+// no-op when editTokenAuth has already populated the auth context. The
+// public read endpoint is intentionally unauth — visitors must be able to
+// fetch font bytes without an account. The content-hash URL is unguessable
+// enough (256-bit SHA) to be its own capability token; a brute-force read
+// of the bucket is implausible.
 
 import { and, eq } from 'drizzle-orm';
 import { Hono, type Context } from 'hono';
@@ -44,17 +40,16 @@ interface Bindings {
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
 
-const fontsRouter = new Hono<Env>();
+const fontsPublicRouter = new Hono<Env>();
 
 // --------------------------------------------------------------------------
 // Public read — must NOT be behind auth. Visitors of the published site hit
-// this URL via the @font-face `src: url('/fonts/<hash>')` declaration. We
-// register it BEFORE the auth middleware so the request never enters Clerk.
+// this URL via the @font-face `src: url('/fonts/<hash>')` declaration.
 // --------------------------------------------------------------------------
 
 const FONT_CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
-fontsRouter.get('/fonts/:contentHash', async (c) => {
+fontsPublicRouter.get('/fonts/:contentHash', async (c) => {
   const contentHash = c.req.param('contentHash');
   // Strict shape check — only 64-hex addresses can resolve. Anything else
   // returns 404 without ever reaching R2, so a probe like
@@ -77,13 +72,14 @@ fontsRouter.get('/fonts/:contentHash', async (c) => {
 });
 
 // --------------------------------------------------------------------------
-// Owner-scoped verbs. Auth middleware applies ONLY under /api/* via the
-// nested router below.
+// Owner-scoped verbs. Mounted inside ownerApi at `/sites/:siteId/fonts` so
+// both /api/* and /__api/* surfaces reach the same handlers. Paths below
+// are relative to that mount.
 // --------------------------------------------------------------------------
 
-const ownerApi = new Hono<Env>();
-ownerApi.use('*', clerkAuth());
-ownerApi.use('*', requireAuth());
+export const fontsOwnerRouter = new Hono<Env>();
+fontsOwnerRouter.use('*', clerkAuth());
+fontsOwnerRouter.use('*', requireAuth());
 
 async function resolveCustomerId(c: Context<Env>): Promise<string | null> {
   const auth = c.get('auth');
@@ -111,8 +107,11 @@ async function ownsSite(c: Context<Env>, siteId: string, customerId: string): Pr
 
 // ---- LIST ----------------------------------------------------------------
 
-ownerApi.get('/sites/:siteId/fonts', async (c) => {
+fontsOwnerRouter.get('/', async (c) => {
   const siteId = c.req.param('siteId');
+  if (typeof siteId !== 'string' || siteId.length === 0) {
+    return c.json({ error: 'siteId is required' }, 400);
+  }
   const customerId = await resolveCustomerId(c);
   if (!customerId) return c.json({ error: 'site not found' }, 404);
   if (!(await ownsSite(c, siteId, customerId))) {
@@ -138,8 +137,11 @@ ownerApi.get('/sites/:siteId/fonts', async (c) => {
 
 // ---- UPLOAD --------------------------------------------------------------
 
-ownerApi.post('/sites/:siteId/fonts', async (c) => {
+fontsOwnerRouter.post('/', async (c) => {
   const siteId = c.req.param('siteId');
+  if (typeof siteId !== 'string' || siteId.length === 0) {
+    return c.json({ error: 'siteId is required' }, 400);
+  }
   const customerId = await resolveCustomerId(c);
   if (!customerId) return c.json({ error: 'site not found' }, 404);
   if (!(await ownsSite(c, siteId, customerId))) {
@@ -209,9 +211,15 @@ ownerApi.post('/sites/:siteId/fonts', async (c) => {
 
 // ---- DELETE --------------------------------------------------------------
 
-ownerApi.delete('/sites/:siteId/fonts/:id', async (c) => {
+fontsOwnerRouter.delete('/:id', async (c) => {
   const siteId = c.req.param('siteId');
   const fontId = c.req.param('id');
+  if (typeof siteId !== 'string' || siteId.length === 0) {
+    return c.json({ error: 'siteId is required' }, 400);
+  }
+  if (typeof fontId !== 'string' || fontId.length === 0) {
+    return c.json({ error: 'font not found' }, 404);
+  }
   const customerId = await resolveCustomerId(c);
   if (!customerId) return c.json({ error: 'site not found' }, 404);
   if (!(await ownsSite(c, siteId, customerId))) {
@@ -252,6 +260,4 @@ ownerApi.delete('/sites/:siteId/fonts/:id', async (c) => {
   return c.json({ ok: true, r2ObjectDeleted });
 });
 
-fontsRouter.route('/api', ownerApi);
-
-export default fontsRouter;
+export default fontsPublicRouter;

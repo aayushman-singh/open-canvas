@@ -119,11 +119,12 @@ export const collectionAgentToolSpec: AgentToolSpec = {
   parsePatch: () => ({}),
 };
 
-// Collection has no sidebar drop-in: the Owner adds collections by inserting
-// a collection-grid recipe section, not by clicking a sidebar component
-// button. The empty commands array satisfies the dispatch's mapped-type
-// contract without surfacing a button that would create an empty collection
-// outside its recipe context.
+// Collection has no per-element sidebar command: bare CollectionElement
+// instances would orphan without an index page, template page, and at least
+// one entry. The Add panel surfaces a dedicated "+ New Collection" button
+// that calls the full scaffold flow (src/editor-client/collection-scaffold.ts
+// + POST /api/sites/:siteId/collections) instead. The empty commands array
+// satisfies the dispatch's mapped-type contract.
 export const collectionSidebarSpec: SidebarSpec = {
   commands: [],
 };

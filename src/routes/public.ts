@@ -1045,6 +1045,13 @@ export async function handlePublicRequest<P extends string, I extends Input>(
     return null;
   }
 
+  // Custom @font-face URLs emitted by the published renderer point at
+  // `/fonts/<contentHash>`; fontsRouter is root-mounted (src/index.ts), so
+  // we must fall through here or visitor font requests render as page paths.
+  if (path.startsWith('/fonts/')) {
+    return null;
+  }
+
   if (path.startsWith('/assets/')) {
     // Visitor-facing asset surface. We serve ONLY assets that the current
     // publishedSnapshot.pages reference (per the snapshot-bound visibility

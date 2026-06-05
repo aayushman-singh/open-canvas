@@ -222,6 +222,7 @@ export function beginTextEditImpl(
     const snapshot = ctx.editingSnapshot;
     ctx.editingElementId = null;
     ctx.editingSnapshot = null;
+    ctx.activeEditFinish = null;
     if (!commit) {
       // Restore the visible DOM too — the user may have pressed marks.
       textElement.content = JSON.parse(JSON.stringify(snapshot)) as InlineRun[];
@@ -296,6 +297,10 @@ export function beginTextEditImpl(
   }
   inner.addEventListener('blur', onBlur);
   inner.addEventListener('keydown', onKey);
+
+  ctx.activeEditFinish = function () {
+    finish(true);
+  };
 
   // restoreFromSnapshot is only used by the IIFE twin's external callers
   // (none in scope today); expose-via-closure here so the unused-symbol

@@ -385,7 +385,7 @@ export function renderPlacementSlotsImpl(ctx: EditorContext): void {
   }
   document.body.setAttribute('data-placement-active', 'true');
 
-  const page = ctx.state && ctx.state.pages ? ctx.state.pages[0] : null;
+  const page = ctx.currentPage();
   if (!page) return;
   const sections = Array.isArray(page.sections) ? page.sections : [];
 

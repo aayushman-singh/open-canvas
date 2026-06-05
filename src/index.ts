@@ -7,7 +7,6 @@ import { importRouter } from './routes/api/import';
 import ownerApi from './routes/api/owner-app';
 import canvasEditor from './editor/route';
 import { handlePublicRequest, type PublicEnv } from './routes/public';
-import versionRoute from './version/route';
 import customDomainRouter from './custom-domain/route';
 import ogRoute from './og-image/route';
 import { scheduled } from './scheduled';
@@ -24,12 +23,11 @@ import a11yReportRoute from './routes/dashboard/a11y-report';
 import pageSettingsRoute from './routes/dashboard/page-settings';
 import sitemapRouter from './seo/sitemap/route';
 import apexSeoRouter from './seo/apex';
-import fontsRouter from './fonts/route';
+import fontsPublicRouter from './fonts/route';
 import chatPanelRoute from './routes/dashboard/chat-panel';
 import addonShopRoute from './routes/dashboard/addon-shop';
 import siteAddonsRoute from './routes/dashboard/site-addons';
 import addonsApi from './routes/api/addons';
-import embedExpandRoute from './routes/api/embed-expand';
 import profileRoute from './routes/dashboard/profile';
 import accountSettingsRoute from './routes/dashboard/settings';
 import { domainsRoute } from './routes/dashboard/domains';
@@ -122,7 +120,6 @@ app.route('/api/import', importRouter);
 app.route('/api/admin/library', librarySectionsAdmin);
 app.route('/api/admin/custom-templates', customTemplatesAdmin);
 app.route('/api', collaboratorsApi);
-app.route('/api/sites/:siteId/snapshots', versionRoute);
 app.route('/api/sites/:siteId/domains', customDomainRouter);
 app.route('/og', ogRoute);
 app.route('/api/forms', formsRouter);
@@ -153,16 +150,14 @@ app.route('/__opencanvas/search', searchRouter);
 // through (return null) for `/sitemap.xml` and `/robots.txt` — see the
 // fallthrough block in handlePublicRequest.
 app.route('/', sitemapRouter);
-// Custom fonts: public `GET /fonts/:contentHash` + Owner-scoped
-// `/api/sites/:siteId/fonts` verbs. Router is root-mounted so both paths
-// reach their handlers.
-app.route('/', fontsRouter);
+// Custom fonts visitor read: public `GET /fonts/:contentHash`. Owner verbs
+// live inside ownerApi so both /api/* and /__api/* reach them.
+app.route('/', fontsPublicRouter);
 app.route('/dashboard', chatPanelRoute);
 // Addon system — see docs/adr/0009-addon-entitlement-model.md.
 app.route('/dashboard', addonShopRoute);
 app.route('/dashboard', siteAddonsRoute);
 app.route('/api/addons', addonsApi);
-app.route('/api/embed', embedExpandRoute);
 app.route('/dashboard', profileRoute);
 app.route('/dashboard', accountSettingsRoute);
 app.route('/dashboard', domainsRoute);

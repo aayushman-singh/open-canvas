@@ -242,7 +242,7 @@ export const navAgentToolSpec: AgentToolSpec = {
     links: {
       type: 'array',
       description:
-        'Navigation links. Nav elements only. Each link needs label, href, and kind (internal, external, or anchor).',
+        'Navigation links. Nav elements only. Each link needs label, href, and kind (internal, external, or anchor). IMPORTANT: this is FULL-REPLACE — to add a single link you MUST send the complete list of existing links plus the new one. Sending a partial array WILL DELETE the omitted links. Omitting all items via an empty [] clears the nav entirely.',
       items: {
         type: 'object',
         properties: {

@@ -303,7 +303,7 @@ export const carouselAgentToolSpec: AgentToolSpec = {
     slides: {
       type: 'array',
       description:
-        'Carousel slides. Carousel elements only. Each slide needs id and assetId; caption and href are optional.',
+        'Carousel slides. Carousel elements only. Each slide needs id and assetId; caption and href are optional. IMPORTANT: this is FULL-REPLACE — to add a single slide you MUST send the complete list of existing slides plus the new one. Sending a partial array WILL DELETE the omitted slides. Omitting all items via an empty [] clears the carousel entirely.',
       items: {
         type: 'object',
         properties: {
