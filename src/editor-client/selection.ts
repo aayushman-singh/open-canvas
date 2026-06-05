@@ -145,6 +145,36 @@ export function findElementWrapperInArtboardOf(
   return fallback instanceof HTMLElement ? fallback : null;
 }
 
+// ADR 0063 dec 6 — clicks inside a Collection's rendered DOM (per-entry
+// cards from the Phase 2B materializer, or editor-only placeholder cards
+// from collection-preview.ts) select the parent Collection, not the inner
+// node. Mirrors Carousel slide behaviour: per-entry instances are
+// materializer output, not authorable elements, so every click bubbles
+// to the Collection element itself.
+//
+// The walk: starting at the clicked DOM node, walk parents until we hit
+// the first ancestor with `data-element-type`. If that ancestor's value
+// is "collection", return its element-id (its `data-opencanvas-element`
+// attribute). Otherwise return null and let the default
+// resolveElementWrapperAtPoint result stand — the click was on something
+// outside any Collection.
+export function resolveCollectionAncestorForClick(clickTarget: Element | null): string | null {
+  let node: Element | null = clickTarget;
+  while (node) {
+    if (node instanceof HTMLElement) {
+      const elType = node.getAttribute('data-element-type');
+      if (elType !== null) {
+        if (elType === 'collection') {
+          return node.getAttribute('data-opencanvas-element');
+        }
+        return null;
+      }
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
 export function selectSection(ctx: EditorContext, sectionId: string | null): void {
   if (ctx.selectedSectionId === sectionId) return;
   if (ctx.selectedSectionId) {

@@ -28,6 +28,7 @@
 // Phase 3 cutover destination, not a live call site yet.
 
 import type { EditorContext } from './editor-context.js';
+import { resolveCollectionAncestorForClick } from './selection.js';
 
 export function attachRootEventsImpl(ctx: EditorContext): void {
   const root = ctx.root;
@@ -88,6 +89,20 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
     }
     const elementNode = ctx.resolveElementWrapperAtPoint(target, ev.clientX, ev.clientY);
     if (elementNode) {
+      // ADR 0063 dec 6 — when the click landed inside a Collection's
+      // rendered DOM (per-entry materializer cards in Phase 2B, or
+      // editor-only placeholder cards from collection-preview.ts), the
+      // hit-test above picks the innermost wrapper. We override that
+      // result and select the enclosing Collection instead, mirroring
+      // Carousel slide behaviour — the inner nodes are materializer
+      // output, not authorable elements.
+      const collectionAncestorId = resolveCollectionAncestorForClick(target);
+      if (collectionAncestorId !== null) {
+        if (collectionAncestorId !== ctx.selectedElementId) {
+          ctx.selectElement(collectionAncestorId);
+        }
+        return;
+      }
       const id = elementNode.getAttribute('data-opencanvas-element');
       if (!id) return;
       const elType = elementNode.getAttribute('data-element-type');

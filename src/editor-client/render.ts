@@ -78,6 +78,7 @@ import {
   ZOOM_MIN,
 } from './editor-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
+import { augmentCollectionPreviewsImpl } from './collection-preview.js';
 
 export function clampZoom(value: number, max?: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -389,6 +390,13 @@ export function renderAllImpl(ctx: EditorContext): void {
 
   ctx.renderReel();
   autoGrowTextElements(ctx);
+  // ADR 0063 dec 5 — augment Collection wrappers with editor-only
+  // placeholder card chrome (3 cards + a "Source: <slug or unset>"
+  // banner) when the binding is unset or matches zero entries. Runs
+  // strictly after autoGrowTextElements so the inner frame's final box
+  // dimensions are settled; the augmenter is idempotent so a redundant
+  // call on a no-Collection page is a cheap zero-iteration loop.
+  augmentCollectionPreviewsImpl(ctx);
 
   if (ctx.pendingImport) {
     ctx.renderPlacementSlots();

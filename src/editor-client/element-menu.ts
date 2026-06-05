@@ -41,6 +41,7 @@
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 
+import { augmentCollectionPreviewForElementImpl } from './collection-preview.js';
 import { cssEscape } from './css-escape.js';
 import type { EditorContext } from './editor-context.js';
 import { newElementId } from './ids.js';
@@ -105,10 +106,7 @@ export function unmountResizeHandles(wrapper: HTMLElement): void {
 // opened it). Returns null when no wrapper holds the menu, which is a
 // legitimate state (e.g. the menu's owner wrapper was rebuilt before
 // close ran).
-function findMenuOwnerWrapper(
-  ctx: EditorContext,
-  elementId: string,
-): HTMLElement | null {
+function findMenuOwnerWrapper(ctx: EditorContext, elementId: string): HTMLElement | null {
   if (!ctx.root) return null;
   const wrappers = ctx.root.querySelectorAll(
     '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
@@ -191,7 +189,9 @@ export function buildElementMenuImpl(
         // section-sized bound to apply here.
         const page = ctx.currentPage();
         if (!page) {
-          throw new Error('duplicate element: no current page; cannot clamp duplicate within artboard');
+          throw new Error(
+            'duplicate element: no current page; cannot clamp duplicate within artboard',
+          );
         }
         copy.box.x = Math.min(copy.box.x, page.width - copy.box.w);
         copy.box.y = Math.min(copy.box.y, section.height - copy.box.h);
@@ -270,10 +270,7 @@ export function buildElementNodeImpl(ctx: EditorContext, element: CanvasElement)
     // the published page; without this the data-motion-delay-ms attr was a
     // dead label and every element on the page animated at t=0.
     if (element.motion.delayMs && element.motion.delayMs > 0) {
-      wrapper.style.setProperty(
-        '--opencanvas-motion-delay',
-        String(element.motion.delayMs) + 'ms',
-      );
+      wrapper.style.setProperty('--opencanvas-motion-delay', String(element.motion.delayMs) + 'ms');
     }
   }
   ctx.setBoxStyle(wrapper, element.box);
@@ -340,5 +337,13 @@ export function rebuildElementImpl(ctx: EditorContext, elementId: string): void 
         }
       }
     }
+  }
+  // ADR 0063 dec 5 — re-augment placeholder chrome after a Collection
+  // wrapper is replaced (e.g. inspector binding change). The new wrapper
+  // contains only the canonical .opencanvas-collection frame; without
+  // this call the editor-only placeholder cards would disappear until
+  // the next full renderAll().
+  if (found.element.type === 'collection') {
+    augmentCollectionPreviewForElementImpl(ctx, elementId);
   }
 }
