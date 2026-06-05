@@ -61,12 +61,6 @@ export interface CollectionScaffoldCtx {
   updatePageSidebar(): void;
 }
 
-/** Slug rule mirrors `SLUG_RE` in src/canvas/collections-scaffold.ts so the
- *  client surfaces the same rejection the server would emit, without a round
- *  trip. The server is still the source of truth — server-side validation
- *  remains the gate. */
-const CLIENT_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
-
 function errorToString(err: unknown): string {
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
@@ -104,21 +98,6 @@ async function refreshSiteState(ctx: CollectionScaffoldCtx): Promise<EditableSit
   return ctx.migrateState(body.editableState);
 }
 
-/** Resolve the index page id for the freshly-scaffolded collection inside a
- *  refreshed EditableSite. The scaffold pins its id format to
- *  `page-collection-${slug}-index` (see src/canvas/collections-scaffold.ts
- *  buildIndexPage), and we lean on that id format here so we don't have to
- *  re-derive page identity from pageKind+collectionSlug+slug tuples. If the
- *  format ever drifts, this helper returns null and the wizard falls back
- *  to leaving the active page unchanged. */
-function findScaffoldedIndexPageId(state: EditableSite, slug: string): string | null {
-  const expectedId = 'page-collection-' + slug + '-index';
-  for (const page of state.pages) {
-    if (page && page.id === expectedId) return page.id;
-  }
-  return null;
-}
-
 /** Full wizard logic — prompt the Owner for a slug, POST to the scaffold
  *  endpoint, refresh local state, and switch the active page to the new
  *  index. Exposed (not just attached) so the smoke can exercise it
@@ -136,13 +115,6 @@ export async function runCollectionScaffoldFlowImpl(
   const slug = promptedSlug.trim().toLowerCase();
   if (slug.length === 0) {
     ctx.setStatus('Collection slug is required', 'error');
-    return;
-  }
-  if (!CLIENT_SLUG_RE.test(slug)) {
-    ctx.setStatus(
-      'Slug must be 1..80 lowercase letters, digits, or dashes (no leading/trailing dash)',
-      'error',
-    );
     return;
   }
 
@@ -187,6 +159,31 @@ export async function runCollectionScaffoldFlowImpl(
     return;
   }
 
+  let created: { indexPageId?: unknown; templatePageId?: unknown };
+  try {
+    created = (await response.json()) as { indexPageId?: unknown; templatePageId?: unknown };
+  } catch (err: unknown) {
+    ctx.setStatus(
+      'Collection created but server response was malformed: ' + errorToString(err),
+      'error',
+    );
+    return;
+  }
+  if (typeof created.indexPageId !== 'string' || created.indexPageId.length === 0) {
+    ctx.setStatus(
+      'Collection created but server response was missing indexPageId',
+      'error',
+    );
+    return;
+  }
+  if (typeof created.templatePageId !== 'string' || created.templatePageId.length === 0) {
+    ctx.setStatus(
+      'Collection created but server response was missing templatePageId',
+      'error',
+    );
+    return;
+  }
+
   // POST succeeded. Refresh the editor's local state so the new pages
   // appear in the sidebar list and the active page can switch to the
   // freshly-minted index page.
@@ -195,10 +192,16 @@ export async function runCollectionScaffoldFlowImpl(
   ctx.state = refreshed;
   ctx.renderAll();
   ctx.updatePageSidebar();
-  const newIndexPageId = findScaffoldedIndexPageId(refreshed, slug);
-  if (newIndexPageId !== null) {
-    ctx.setActivePage(newIndexPageId);
+  if (!refreshed.pages.some((page) => page && page.id === created.indexPageId)) {
+    ctx.setStatus(
+      'Collection created but refreshed state did not include index page "' +
+        created.indexPageId +
+        '"',
+      'error',
+    );
+    return;
   }
+  ctx.setActivePage(created.indexPageId);
   ctx.setStatus('Created collection "' + slug + '"', 'ok');
 }
 

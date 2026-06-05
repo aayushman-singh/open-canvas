@@ -123,6 +123,8 @@ collectionsRoute.post('/', async (c) => {
   return c.json(
     {
       collectionSlug: slug,
+      indexPageId: scaffold.newPages[0].id,
+      templatePageId: scaffold.newPages[1].id,
       redirectTo: `/dashboard/sites/${siteId}/entries?collection=${encodeURIComponent(slug)}`,
     },
     201,
