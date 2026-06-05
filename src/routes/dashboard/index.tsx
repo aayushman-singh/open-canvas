@@ -1135,6 +1135,20 @@ const thumbHydratorScript = raw(`<script>
     if(iframes.length === 0) return;
     var inflight = 0;
     var max = 3;
+    function start(f, src){
+      // IIFE-scope `f` so each in-flight promise chain closes over its own
+      // iframe. A naive `while` loop with `var f = iframes.shift()` is the
+      // classic closure-in-loop trap: every .then(html => f.srcdoc = html)
+      // captures the SAME `f`, so all responses race to write into whichever
+      // iframe was popped last and every earlier iframe stays blank.
+      fetch(src, { credentials: 'same-origin' })
+        .then(function(r){ return r.ok ? r.text() : null; })
+        .then(function(html){
+          if(html){ f.srcdoc = html; }
+        })
+        .catch(function(){})
+        .then(function(){ inflight--; next(); });
+    }
     function next(){
       while(inflight < max && iframes.length){
         var f = iframes.shift();
@@ -1142,13 +1156,7 @@ const thumbHydratorScript = raw(`<script>
         if(!src){ continue; }
         f.removeAttribute('data-thumb-src');
         inflight++;
-        fetch(src, { credentials: 'same-origin' })
-          .then(function(r){ return r.ok ? r.text() : null; })
-          .then(function(html){
-            if(html){ f.srcdoc = html; }
-          })
-          .catch(function(){})
-          .then(function(){ inflight--; next(); });
+        start(f, src);
       }
     }
     next();
