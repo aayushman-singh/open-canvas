@@ -54,6 +54,20 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
       return;
     }
     // -- Inactive artboard click: activate it ---------------------------
+    // When the click also lands on an element or section, fall through
+    // so the cascade below can re-select it. Otherwise the user's first
+    // click on an element on an inactive page would
+    // (1) be selected by drag-resize's mousedown handler,
+    // (2) then immediately cleared by setActivePage's selectElement(null),
+    // (3) and the click would return before the element-select branch
+    //     could re-select it. End state: deselected on first click,
+    //     selects only on the second click. This was the user-visible
+    //     "click deselects, click again sticks" bug.
+    //
+    // When the click is on the artboard padding (no element/section),
+    // keep the original return-early so the background-deselect branch
+    // below doesn't add `canvas-pages-deselected` back right after we
+    // just removed it.
     const clickedArtboard = target.closest('.opencanvas-artboard');
     if (clickedArtboard && clickedArtboard.getAttribute('data-active') === 'false') {
       const abPageId = clickedArtboard.getAttribute('data-page-id');
@@ -61,7 +75,9 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
         ctx.setActivePage(abPageId);
       }
       root.classList.remove('canvas-pages-deselected');
-      return;
+      const clickedElementWrapper = target.closest('.opencanvas-element');
+      const clickedSectionWrapper = target.closest('.opencanvas-section');
+      if (!clickedElementWrapper && !clickedSectionWrapper) return;
     }
     const menuTrigger = target.closest('[data-element-menu-trigger]');
     if (menuTrigger) {
