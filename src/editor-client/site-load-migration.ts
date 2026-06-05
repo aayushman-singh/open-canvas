@@ -54,9 +54,17 @@ export interface SiteLoadMigrationCtx {
 }
 
 /** Walk every Collection element on a page (including nested via Tabs).
+ *  Post-ADR-0059 the body's elements live exclusively in
+ *  `page.sections[].elements` — `CanvasPage` has no top-level `elements`
+ *  field. The F3 audit (2026-06-05, Neon) confirmed every prod page
+ *  carrying `pageKind === 'collection-index'` has its Collection nested
+ *  inside a section, so the section walk is the load-bearing path.
  *  Collections cannot be nested inside Carousel / Container per the
  *  Phase 1 validator, so the only nesting surface to recurse into is
- *  Tabs (the standard container exception). */
+ *  Tabs (the standard container exception). The "single Collection"
+ *  rule applies across the union of every section.elements list, so a
+ *  page with one Collection in section A and one in section B totals
+ *  two and falls through to the multi-Collection banner path. */
 function findCollectionsInPage(page: CanvasPage): CollectionElement[] {
   const out: CollectionElement[] = [];
   const visitElement = (el: CanvasElement): void => {

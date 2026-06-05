@@ -27,6 +27,15 @@
 //       pageKind anymore).
 //   (6) Wiring: createEditor calls migrateLegacyCollectionIndexPagesImpl
 //       AFTER ctx.migrateState and BEFORE ctx.renderAll.
+//   (7) ADR 0063 F3 audit shape — pwtest-engineer's affected page has
+//       the Collection nested inside a section with sibling non-
+//       Collection elements (NOT at page top-level). The migration must
+//       find it inside section[].elements and migrate cleanly.
+//   (8) Cross-section count — two sections, one Collection each, single
+//       page → total count is 2 → multi-Collection branch fires.
+//   (9) Tabs-nested Collection — Collection lives inside a Tabs
+//       element's panel. Migration recurses into Tabs and counts the
+//       inner Collection toward the total.
 //
 // Run with `bun run site-load-migration:smoke`.
 
@@ -246,6 +255,183 @@ function makeSite(pages: CanvasPage[]): EditableSite {
   assert(saveCalls.count === 1, '(5) second run: scheduleSave does NOT fire again (no-op)');
   migrateLegacyCollectionIndexPagesImpl(ctx);
   assert(saveCalls.count === 1, '(5) third run: still a no-op');
+}
+
+// (7) ADR 0063 F3 audit shape — pwtest-engineer's affected page.
+//
+// The prod audit (F3, 2026-06-05) found exactly one site
+// (pwtest-engineer, site_id a525e78b-4f21-4618-ba2c-3a1dbff5fbdf) with
+// a `pageKind === 'collection-index'` page. Its single Collection
+// element is NESTED IN A SECTION alongside non-Collection siblings —
+// not at page top-level. This fixture pins that the migration walks
+// section.elements (not just top-level page-element surfaces) and
+// successfully migrates the realistic prod shape. F5's hard-reject
+// validator depends on this migration sweeping the affected page
+// cleanly.
+{
+  const sibling: Record<string, unknown> = {
+    type: 'text',
+    id: 'pwtest-text-hero',
+    box: { x: 0, y: 0, w: 800, h: 80 },
+    content: [{ text: 'Blog' }],
+    role: 'heading',
+    fontSize: 32,
+    fontWeight: 600,
+    align: 'left',
+  };
+  const collection: Record<string, unknown> = {
+    type: 'collection',
+    id: 'pwtest-blog-collection',
+    box: { x: 0, y: 100, w: 800, h: 600 },
+  };
+  const page: CanvasPage = {
+    id: 'page-collection-blog-index',
+    slug: 'blog',
+    title: 'Blog',
+    width: 1440,
+    sections: [
+      {
+        id: 'pwtest-section',
+        recipeId: 'custom',
+        name: 'sec',
+        height: 800,
+        elements: [sibling, collection] as never,
+      },
+    ],
+    pageKind: 'collection-index',
+    collectionSlug: 'blog',
+  };
+  const site = makeSite([page]);
+  const { ctx, statuses, saveCalls } = makeCtx(site);
+  migrateLegacyCollectionIndexPagesImpl(ctx);
+  assert(page.pageKind === undefined, '(7) pwtest-engineer page.pageKind must be cleared');
+  assert(
+    page.collectionSlug === undefined,
+    '(7) pwtest-engineer page.collectionSlug must be cleared',
+  );
+  const sib = page.sections[0]!.elements[0]! as unknown as Record<string, unknown>;
+  const col = page.sections[0]!.elements[1]! as unknown as Record<string, unknown>;
+  assert(sib.type === 'text', '(7) non-Collection sibling is untouched');
+  assert(col.collectionSlug === 'blog', '(7) section-nested Collection gains slug "blog"');
+  assert(col.display === 'card', '(7) section-nested Collection default display');
+  assert(col.sort === 'date-desc', '(7) section-nested Collection default sort');
+  assert(saveCalls.count === 1, '(7) scheduleSave fires exactly once for the prod-shape page');
+  assert(statuses.length === 0, '(7) no banner for the clean prod-shape migration');
+}
+
+// (8) Cross-section count — a single Collection in section A plus a
+// single Collection in section B totals two Collections on the page.
+// The "single Collection" migration rule applies across the union of
+// every section.elements list, so this page must hit the multi-
+// Collection branch (no auto-migration, banner enqueued).
+{
+  const collA: Record<string, unknown> = {
+    type: 'collection',
+    id: 'cross-coll-a',
+    box: { x: 0, y: 0, w: 800, h: 600 },
+  };
+  const collB: Record<string, unknown> = {
+    type: 'collection',
+    id: 'cross-coll-b',
+    box: { x: 0, y: 0, w: 800, h: 600 },
+  };
+  const page: CanvasPage = {
+    id: 'page-cross-section',
+    slug: 'cross',
+    title: 'Cross',
+    width: 1440,
+    sections: [
+      {
+        id: 'sec-a',
+        recipeId: 'custom',
+        name: 'A',
+        height: 600,
+        elements: [collA] as never,
+      },
+      {
+        id: 'sec-b',
+        recipeId: 'custom',
+        name: 'B',
+        height: 600,
+        elements: [collB] as never,
+      },
+    ],
+    pageKind: 'collection-index',
+    collectionSlug: 'blog',
+  };
+  const site = makeSite([page]);
+  const { ctx, statuses, saveCalls } = makeCtx(site);
+  migrateLegacyCollectionIndexPagesImpl(ctx);
+  assert(
+    page.pageKind === 'collection-index',
+    '(8) cross-section multi-Collection: pageKind must persist',
+  );
+  assert(saveCalls.count === 0, '(8) cross-section multi-Collection: no save fires');
+  assert(statuses.length === 1, '(8) cross-section multi-Collection: banner enqueued');
+  assert(
+    statuses[0]!.text.includes('multiple Collections'),
+    '(8) cross-section banner mentions multiple Collections',
+  );
+  const a = page.sections[0]!.elements[0]! as unknown as Record<string, unknown>;
+  const b = page.sections[1]!.elements[0]! as unknown as Record<string, unknown>;
+  assert(a.collectionSlug === undefined, '(8) section A Collection slug not auto-set');
+  assert(b.collectionSlug === undefined, '(8) section B Collection slug not auto-set');
+}
+
+// (9) Tabs-nested Collection — Collection lives inside a tab panel.
+// The walker recurses into Tabs (the only standard container that
+// hosts Collections — Containers and Carousels do not per the Phase 1
+// validator). One Collection total → migrates cleanly.
+{
+  const innerCollection: Record<string, unknown> = {
+    type: 'collection',
+    id: 'tabs-inner-coll',
+    box: { x: 0, y: 0, w: 800, h: 600 },
+  };
+  const tabsEl: Record<string, unknown> = {
+    type: 'tabs',
+    id: 'tabs-host',
+    box: { x: 0, y: 0, w: 1280, h: 800 },
+    tabs: [
+      {
+        id: 'tab-1',
+        label: 'Posts',
+        elements: [innerCollection],
+      },
+    ],
+    activeTabId: 'tab-1',
+  };
+  const page: CanvasPage = {
+    id: 'page-tabs-collection',
+    slug: 'tabs-coll',
+    title: 'Tabs Collection',
+    width: 1440,
+    sections: [
+      {
+        id: 'tabs-section',
+        recipeId: 'custom',
+        name: 'sec',
+        height: 800,
+        elements: [tabsEl] as never,
+      },
+    ],
+    pageKind: 'collection-index',
+    collectionSlug: 'notes',
+  };
+  const site = makeSite([page]);
+  const { ctx, statuses, saveCalls } = makeCtx(site);
+  migrateLegacyCollectionIndexPagesImpl(ctx);
+  assert(page.pageKind === undefined, '(9) tabs-nested: pageKind must be cleared');
+  assert(page.collectionSlug === undefined, '(9) tabs-nested: collectionSlug must be cleared');
+  // Drill into the tabs panel to inspect the migrated Collection.
+  const tabs = page.sections[0]!.elements[0]! as unknown as Record<string, unknown>;
+  const tabsArr = tabs.tabs as { elements: unknown[] }[];
+  const inner = tabsArr[0]!.elements[0]! as Record<string, unknown>;
+  assert(inner.collectionSlug === 'notes', '(9) tabs-nested Collection gains slug "notes"');
+  assert(inner.display === 'card', '(9) tabs-nested Collection default display');
+  assert(inner.sort === 'date-desc', '(9) tabs-nested Collection default sort');
+  assert(saveCalls.count === 1, '(9) tabs-nested: scheduleSave fires exactly once');
+  assert(statuses.length === 0, '(9) tabs-nested: no banner');
 }
 
 // (6) Wiring source guard — createEditor calls the migrator in the right
