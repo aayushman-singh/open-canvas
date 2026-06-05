@@ -1719,8 +1719,22 @@ interface SiteFieldValidatorCtx {
 type SiteFieldValidator = (ctx: SiteFieldValidatorCtx) => void;
 
 const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } = {
+  // ADR 0016 — `styleKit` and `customStyleKit` are a discriminated union at
+  // the type layer. The validator owns the cross-field contract: when the
+  // discriminator is `'custom'`, the sibling must be present; in either
+  // case, a present sibling is shape-validated so a malformed object can't
+  // ride through the publish spread.
   styleKit: ({ state, errors }) => {
     assertOneOf<StyleKit>(state.styleKit, STYLE_KITS, 'styleKit', errors);
+    if (state.styleKit === 'custom') {
+      if (state.customStyleKit === undefined) {
+        errors.push('customStyleKit is required when styleKit === "custom"');
+        return;
+      }
+    } else if (state.customStyleKit === undefined) {
+      return;
+    }
+    validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
   },
   pages: ({ state, errors }) => {
     if (!Array.isArray(state.pages) || state.pages.length === 0) {
@@ -1745,20 +1759,6 @@ const SITE_FIELD_VALIDATORS: { [K in keyof EditableSite]: SiteFieldValidator } =
         `state.footer must be a section object when present (got ${describe(state.footer)})`,
       );
     }
-  },
-  // `customStyleKit` is required iff styleKit === 'custom'; validated for
-  // shape in either case so a malformed object can't ride through the
-  // publish spread.
-  customStyleKit: ({ state, errors }) => {
-    if (state.styleKit === 'custom') {
-      if (state.customStyleKit === undefined) {
-        errors.push('customStyleKit is required when styleKit === "custom"');
-        return;
-      }
-    } else if (state.customStyleKit === undefined) {
-      return;
-    }
-    validateCustomStyleKit(state.customStyleKit, 'customStyleKit', errors);
   },
   defaultLocale: ({ state, errors }) => {
     // Locale uses the same "non-empty string when present" shape as the

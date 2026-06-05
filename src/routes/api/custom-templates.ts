@@ -24,6 +24,7 @@ import { requireAdmin, isAdmin } from '../../auth/require-admin.js';
 import { canvasPublishedStyles } from '../../canvas/public-styles.js';
 import { renderCanvasSnapshot } from '../../canvas/render.js';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form.js';
+import { pickStyleKitField } from '../../canvas/schema.js';
 import type { EditableSite, PublishedSnapshot } from '../../canvas/schema.js';
 import { validateEditableSite } from '../../canvas/validate.js';
 import { db } from '../../db/client.js';
@@ -310,11 +311,10 @@ customTemplatesOwner.get('/:id/preview', async (c) => {
   const snapshot: PublishedSnapshot = {
     version: 1,
     publishedAt: new Date().toISOString(),
-    styleKit: tmpl.siteState.styleKit,
+    ...pickStyleKitField(tmpl.siteState),
     pages: tmpl.siteState.pages,
     ...(tmpl.siteState.header ? { header: tmpl.siteState.header } : {}),
     ...(tmpl.siteState.footer ? { footer: tmpl.siteState.footer } : {}),
-    ...(tmpl.siteState.customStyleKit ? { customStyleKit: tmpl.siteState.customStyleKit } : {}),
   };
   // Template previews have no backing site yet — forms inside a preview
   // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass

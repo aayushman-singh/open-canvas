@@ -13,6 +13,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
 import { requireAuth } from '../../auth/require-auth';
 import {
   STYLE_KITS,
+  pickEditableSiteBase,
   type CanvasPage,
   type EditableSite,
   type StyleKit,
@@ -832,8 +833,19 @@ canvasApi.post('/sites/:siteId/style-kit', async (c) => {
     return c.json({ error: 'unknown style kit' }, 400);
   }
 
+  // ADR 0016 — styleKit + customStyleKit is a real discriminated union now.
+  // Switching to 'custom' requires a customStyleKit payload that this endpoint
+  // does not accept; the dedicated `PUT /api/sites/:id/custom-theme` route
+  // owns that transition. Reject the cross-branch switch loudly.
+  if (incoming === 'custom') {
+    return c.json(
+      { error: 'use PUT /api/sites/:id/custom-theme to switch to a custom kit' },
+      400,
+    );
+  }
+
   const nextState: EditableSite = {
-    ...result.site.editableState,
+    ...pickEditableSiteBase(result.site.editableState),
     styleKit: incoming,
   };
 

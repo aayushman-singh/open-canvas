@@ -71,15 +71,21 @@ export interface ContainerProps {
   padding: number;
 }
 
+/**
+ * ADR 0016 — `ElementNode.element` is a real discriminated union: the
+ * required prop branch is determined by `type`. The on-disk shape is
+ * unchanged; the guards in `engine.ts` that compensated for the old
+ * optional-sibling pattern are deleted.
+ */
+export type ElementNodeBody =
+  | { type: 'text'; text: TextProps }
+  | { type: 'media'; media: MediaProps }
+  | { type: 'action'; action: ActionProps }
+  | { type: 'shape'; shape: ShapeProps }
+  | { type: 'container'; container: ContainerProps };
+
 export interface ElementNode {
-  element: {
-    type: DesignElementType;
-    text?: TextProps;
-    media?: MediaProps;
-    action?: ActionProps;
-    shape?: ShapeProps;
-    container?: ContainerProps;
-  };
+  element: ElementNodeBody;
   size?: ElementSize;
 }
 

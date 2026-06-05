@@ -23,6 +23,7 @@ import { clerkAuth, type ClerkAuthVariables } from '../auth/middleware.js';
 import { requireAuth } from '../auth/require-auth.js';
 import {
   BUILT_IN_STYLE_KITS,
+  pickEditableSiteBase,
   type BuiltInStyleKit,
   type EditableSite,
   type StyleKitPreset,
@@ -180,10 +181,11 @@ themeRoute.delete('/:siteId/custom-theme', async (c) => {
     );
   }
   // Strip customStyleKit on reset — keeping it would mislead the OG card and
-  // the publish path into thinking a custom kit is still in play.
-  const { customStyleKit: _drop, ...rest } = owned.editableState;
-  void _drop;
-  const nextState: EditableSite = { ...rest, styleKit: styleKitRaw };
+  // the publish path into thinking a custom kit is still in play. Per ADR
+  // 0016 the styleKit DU is collapsed via the helper so the new branch
+  // discriminator and the absence of `customStyleKit` are set together.
+  const base = pickEditableSiteBase(owned.editableState);
+  const nextState: EditableSite = { ...base, styleKit: styleKitRaw };
   const validation = validateEditableSite(nextState);
   if (!validation.valid) {
     return c.json(

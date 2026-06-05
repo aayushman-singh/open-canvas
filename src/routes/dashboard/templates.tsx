@@ -8,6 +8,7 @@ import { canvasPublishedStyles } from '../../canvas/public-styles';
 import { renderCanvasSnapshot } from '../../canvas/render';
 import { requireTurnstileSiteKey } from '../../canvas/elements/form';
 import { getSeedAsset } from '../../canvas/seed-assets';
+import { pickStyleKitField } from '../../canvas/schema';
 import type { PublishedSnapshot } from '../../canvas/schema';
 import { siteLimitError, siteLimitForPlan } from '../../billing/plan-limits';
 import { db } from '../../db/client';
@@ -343,11 +344,10 @@ function PreviewPage({
   const snapshot: PublishedSnapshot = {
     version: 1,
     publishedAt: '2026-05-22T00:00:00.000Z',
-    styleKit: state.styleKit,
+    ...pickStyleKitField(state),
     pages: state.pages,
     ...(state.header ? { header: state.header } : {}),
     ...(state.footer ? { footer: state.footer } : {}),
-    ...(state.customStyleKit ? { customStyleKit: state.customStyleKit } : {}),
   };
   // Template previews have no backing site yet — forms inside a preview
   // cannot submit to a real /__opencanvas/forms/<siteId>/<formId> endpoint. Pass

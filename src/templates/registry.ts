@@ -21,6 +21,7 @@ import type {
   CanvasPage,
   CanvasSection,
   EditableSite,
+  EditableSiteStyleKit,
   StyleKit,
   StyleKitPreset,
 } from '../canvas/schema';
@@ -473,8 +474,19 @@ export function instantiateTemplate(templateId: string): EditableSite {
   if (!seed) {
     throw new Error(`instantiateTemplate: unknown template id '${templateId}'`);
   }
+  let styleKitField: EditableSiteStyleKit;
+  if (seed.styleKit === 'custom') {
+    if (seed.customStyleKit === undefined) {
+      throw new Error(
+        `instantiateTemplate: template '${templateId}' has styleKit='custom' but no customStyleKit`,
+      );
+    }
+    styleKitField = { styleKit: 'custom', customStyleKit: seed.customStyleKit };
+  } else {
+    styleKitField = { styleKit: seed.styleKit };
+  }
   const state: EditableSite = {
-    styleKit: seed.styleKit,
+    ...styleKitField,
     pages: seed.pages.map((p) => {
       const page: CanvasPage = {
         id: p.id,
@@ -505,7 +517,6 @@ export function instantiateTemplate(templateId: string): EditableSite {
       return page;
     }),
   };
-  if (seed.customStyleKit) state.customStyleKit = seed.customStyleKit;
   if (seed.headerRef) state.header = resolveRef(seed.headerRef);
   if (seed.footerRef) state.footer = resolveRef(seed.footerRef);
   return state;

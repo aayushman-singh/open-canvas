@@ -1,16 +1,18 @@
 # ADR 0016 — Fake discriminated-union patterns become real TS discriminated unions
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-29
+**Accepted:** 2026-06-05
 **Author:** Aayushman Singh
 **Drives:** Theme C of the rev01 OSS code review (handoff-rev01-batch-27 §"Theme C — Fake discriminated unions everywhere"), narrowed to the two patterns that actually fit the fake-DU shape.
-**Verified-state:** verified 2026-06-03 — **none of the five decisions are as-built; the type-level refactor has not begun.**
-- Decision 1 (EditableSiteStyleKit DU): not landed. [`src/canvas/schema.ts:480`](../../src/canvas/schema.ts) still carries `customStyleKit?: StyleKitPreset` as an optional sibling on `EditableSite`; no `EditableSiteStyleKit` discriminated-union type exists in `schema.ts`.
-- Decision 2 (ElementNodeBody DU) + Decision 4 (delete `requireXProps`): not landed. All five guards remain at [`src/canvas/layout/engine.ts:177–219`](../../src/canvas/layout/engine.ts) — `requireTextProps`, `requireMediaProps`, `requireActionProps`, `requireShapeProps`, `requireContainerProps` — and their callers at lines 246, 274, 290, 301, 310 still go through them.
-- Decision 3 (wire-format unchanged): definitional — not actionable until 1 or 2 is.
-- Follow-up audit query against production rows (whether any pre-validator data violates the contract) has not been run.
+**As-built (2026-06-05):**
+- Decision 1 — `EditableSiteStyleKit` DU lives in [`src/canvas/schema.ts`](../../src/canvas/schema.ts) alongside `EditableSiteBase`; `EditableSite = EditableSiteBase & EditableSiteStyleKit`. Two helpers (`pickStyleKitField`, `pickEditableSiteBase`) collapse the construction patterns at builder sites.
+- Decision 2 + Decision 4 — `ElementNodeBody` DU lives in [`src/canvas/layout/tree.ts`](../../src/canvas/layout/tree.ts); the five `requireXProps` guards in `engine.ts` are deleted. The switch in `createCanvasElement` narrows on `el.type` directly; content-level non-empty checks (text content, media imagePrompt, action label) remain inline.
+- Decision 3 — wire format unchanged; no DB migration ran.
+- Audit query — ran 2026-06-05 against Neon prod (`mute-haze-45580836`). Zero rows in `site.editable_state`, `site.published_snapshot`, `custom_template.site_state` have `styleKit='custom'` with missing `customStyleKit`. Four rows carry a stray `customStyleKit` on a non-`custom` discriminator; per Decision 3 the validator behaviour does not change, and the existing validator already tolerates the stray field — no data correction required.
+- Round-trip smoke at [`src/canvas/adr-0016-du-narrowing.smoke.ts`](../../src/canvas/adr-0016-du-narrowing.smoke.ts), wired into `ci:smoke`.
 
-Status stays **Proposed**. The pre-merge audit query is a prerequisite to landing Decisions 1 and 2 — running it is the first executable step. This ADR is tactically smaller than [ADR 0015](0015-editor-client-asset-pipeline.md) and has no infrastructure dependency, so it could ship in any order relative to 0015; the blockers are scheduling, not dependencies. The reinforcement with [ADR 0012](0012-validation-write-gate.md) (Accepted 2026-06-03) is unchanged — the gate enforces at the JSONB boundary, this ADR would make the same contract type-level.
+The custom-theme PUT/DELETE route (`src/themes/route.ts`) and the style-kit POST endpoint (`src/routes/api/canvas.ts`) now reject cross-branch transitions that the dedicated custom-theme endpoint should own — the latter is a small behavioural tightening that surfaced naturally from the DU.
 
 ## Context
 

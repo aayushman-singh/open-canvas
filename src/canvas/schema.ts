@@ -574,18 +574,22 @@ export interface CanvasPage {
   suppressFooter?: boolean;
 }
 
-export interface EditableSite {
-  styleKit: StyleKit;
+/**
+ * ADR 0016 — `styleKit` and `customStyleKit` form a real discriminated union:
+ * `customStyleKit` is required exactly when `styleKit === 'custom'` and absent
+ * otherwise. The on-disk JSONB shape is unchanged; the type now enforces the
+ * relationship the validator already gates.
+ */
+export type EditableSiteStyleKit =
+  | { styleKit: BuiltInStyleKit }
+  | { styleKit: 'custom'; customStyleKit: StyleKitPreset };
+
+export interface EditableSiteBase {
   pages: CanvasPage[];
   /** Site-wide header section shared across all pages. */
   header?: CanvasSection;
   /** Site-wide footer section shared across all pages. */
   footer?: CanvasSection;
-  /**
-   * Selected when `styleKit === 'custom'`. Required to be present in that
-   * case; ignored otherwise.
-   */
-  customStyleKit?: StyleKitPreset;
   /**
    * Default locale for pages with no explicit `locale`. Optional everywhere;
    * `'en'` when absent.
@@ -632,6 +636,38 @@ export interface EditableSite {
     smooth?: boolean;
     paddingTop?: number;
   };
+}
+
+export type EditableSite = EditableSiteBase & EditableSiteStyleKit;
+
+/**
+ * Extract the styleKit DU branch from an EditableSite (or any value that
+ * conforms to `EditableSiteStyleKit`). Useful at builder sites that reshape
+ * an EditableSite into a snapshot or rebuild it from parts — TS narrows the
+ * branch here, so callers spread the result without re-discriminating.
+ */
+export function pickStyleKitField(state: EditableSiteStyleKit): EditableSiteStyleKit {
+  if (state.styleKit === 'custom') {
+    return { styleKit: 'custom', customStyleKit: state.customStyleKit };
+  }
+  return { styleKit: state.styleKit };
+}
+
+/**
+ * Drop the styleKit DU off an EditableSite and return the base shape only.
+ * Builders that want to swap one styleKit branch for another use this to
+ * strip both `styleKit` and `customStyleKit` in one narrowing-safe move.
+ */
+export function pickEditableSiteBase(state: EditableSite): EditableSiteBase {
+  if (state.styleKit === 'custom') {
+    const { customStyleKit: _customStyleKit, styleKit: _styleKit, ...rest } = state;
+    void _customStyleKit;
+    void _styleKit;
+    return rest;
+  }
+  const { styleKit: _styleKit, ...rest } = state;
+  void _styleKit;
+  return rest;
 }
 
 /**

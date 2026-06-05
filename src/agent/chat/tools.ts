@@ -265,7 +265,7 @@ export function buildQuerySiteSummary(input: QuerySiteInput): QuerySiteSummary {
   const summary: QuerySiteSummary = {
     styleKit: state.styleKit,
     defaultLocale: state.defaultLocale ?? 'en',
-    customStyleKitPresent: state.customStyleKit !== undefined,
+    customStyleKitPresent: state.styleKit === 'custom',
     pageCount: state.pages.length,
     header,
     footer,
