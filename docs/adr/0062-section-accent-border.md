@@ -1,8 +1,10 @@
 # ADR 0062 — Section accent border is a single discriminated-union field with four mutually exclusive variants
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-04
+**Accepted:** 2026-06-05
 **Author:** Aayushman Singh
+**Implementation:** not yet shipped. Decision pinned 2026-06-05; field, validator arm, Yjs codec, renderer CSS, inspector group, and smokes land in a future commit-set under this ADR.
 
 ## Context
 

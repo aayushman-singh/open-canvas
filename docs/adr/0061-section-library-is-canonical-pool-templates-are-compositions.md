@@ -1,8 +1,10 @@
 # ADR 0061 — Section Library is the canonical pool; Template Seeds are compositions of Section Instances
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-04
+**Accepted:** 2026-06-05
 **Author:** Aayushman Singh
+**As-built:** landed on `origin/main` at `98f72ad` on 2026-06-04. `instantiateTemplate` materializes compositions from `librarySection` rows; `SECTION_CATALOG` deleted; drizzle 0016 added `base_slug`, `version`, `parent_id`, `category` columns and applied to Neon. Picker reads from DB only with category filter + expanded search haystack. Nine TemplateSeed fixtures decomposed into composition refs.
 
 ## Context
 

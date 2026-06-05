@@ -1,9 +1,14 @@
 # ADR 0058 — EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-03
+**Accepted:** 2026-06-05
 **Author:** Aayushman Singh
 **Drives:** [ADR 0015](0015-editor-client-asset-pipeline.md) Phase 2 source migration. Phase 2a–2g extracted 18 pure-leaf modules (~5% of the IIFE). Every remaining chunk reads or mutates IIFE-local state — `state`, `selectedSectionId`/`selectedElementId`/`editingElementId`, cached DOM refs, render and persist orchestrators, undo stack, AI busy flags. Pure-leaf extraction is exhausted; continuing requires a context object the extracted modules accept as a parameter. This ADR pins the shape of that object.
+
+**As-built (2026-06-05):** the IIFE migration is complete. `src/editor/canvas-client.ts` no longer exists; the editor route at [`src/editor/route.tsx`](../../src/editor/route.tsx#L611) serves the bundled entry from `EDITOR_CLIENT_MANIFEST.canvasClientUrl`. [`src/editor-client/index.ts`](../../src/editor-client/index.ts) exports a real `createEditor(boot)` that mirrors the original IIFE boot: DOM ref caching → async initial-state fetch → renderAll → event-listener wiring → setStatus('Ready') → session keepalive → chat session setup. [`src/editor-client/editor-context.ts`](../../src/editor-client/editor-context.ts) carries the `EditorContext` interface, ~150 members spread across phase markers 2h.1.a through 2q.k. ADR 0015 Phase 3 cutover shipped alongside the final 2q extractions.
+
+**The wide migration-aid shape is now the live shape.** Per Decision 5 and the named follow-up, decomposition into smaller named contexts (`StateContext` / `DomContext` / `RenderContext` / `PersistContext` / `SelectionContext`) is captured in [ADR 0064](0064-editor-context-decomposition.md).
 
 ## Context
 
