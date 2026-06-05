@@ -34,7 +34,7 @@ declare const Bun: {
   };
 };
 
-import type { StyleKitPreset } from '../canvas/schema.js';
+import type { EditableSite, StyleKitPreset } from '../canvas/schema.js';
 import { buildStyleKitCss } from '../canvas/style-kits.js';
 import { CUSTOM_KIT_STYLE_ID } from './custom-kit-css.js';
 
@@ -308,7 +308,11 @@ try {
   // removing the style tag and painting a degraded no-accent preview.
   let missingCustomError = '';
   try {
-    applyCustomKitCss({ styleKit: 'custom' as const, pages: [] });
+    // Deliberately malformed input to exercise the runtime guard — the
+    // EditableSite DU requires customStyleKit when styleKit === 'custom',
+    // so we cast through unknown to defeat the compile-time check that
+    // would otherwise block this runtime-throw test.
+    applyCustomKitCss({ styleKit: 'custom', pages: [] } as unknown as EditableSite);
   } catch (err) {
     missingCustomError = err instanceof Error ? err.message : String(err);
   }
