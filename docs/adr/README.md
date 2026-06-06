@@ -30,7 +30,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0018 | Email sender address is environment-driven | Accepted | [`docs/adr/0018-email-sender-from-env.md`](0018-email-sender-from-env.md) |
 | 0019 | `SectionRecipeId 'custom'` is the sentinel for manually-designed sections | Accepted | [`docs/adr/0019-section-recipe-custom-sentinel.md`](0019-section-recipe-custom-sentinel.md) |
 | 0020 | Per-request CSP nonce gates the editor's inline boot blob | Accepted | [`docs/adr/0020-csp-nonce-for-editor-boot-blob.md`](0020-csp-nonce-for-editor-boot-blob.md) |
-| 0021 | Dashboard ships as one shared, browser-cached asset bundle | Proposed | [`docs/adr/0021-dashboard-shared-asset-bundle.md`](0021-dashboard-shared-asset-bundle.md) |
+| 0021 | Dashboard ships as one shared, browser-cached asset bundle | Accepted | [`docs/adr/0021-dashboard-shared-asset-bundle.md`](0021-dashboard-shared-asset-bundle.md) |
 | 0022 | Twelve-token OKLCH theme grammar derived from a single seed | Accepted | [`docs/adr/0022-twelve-token-oklch-theme-grammar.md`](0022-twelve-token-oklch-theme-grammar.md) |
 | 0023 | Seed asset bytes are stored as base64 text files in-repo | Accepted | [`docs/adr/0023-seed-asset-bytes-as-base64-text.md`](0023-seed-asset-bytes-as-base64-text.md) |
 | 0024 | Landing page is one locked Post-Aero surface with a checked-in preview artifact | Accepted | [`docs/adr/0024-landing-locked-post-aero-with-preview.md`](0024-landing-locked-post-aero-with-preview.md) |

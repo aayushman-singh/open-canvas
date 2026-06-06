@@ -1,17 +1,19 @@
 # ADR 0021 — Dashboard ships as one shared, browser-cached asset bundle
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-29
+**Accepted:** 2026-06-05
 **Author:** Aayushman Singh
 **Drives:** the dashboard side of the inline-template-literal problem ([handoff-rev01-batch-27](../../) §"Theme E"). Follows the same delivery model as [ADR 0015](0015-editor-client-asset-pipeline.md). Flagged as a follow-up in 0015's out-of-scope.
-**Verified-state:** verified 2026-06-03 — **none of the four decisions are as-built, and none can be while [ADR 0015](0015-editor-client-asset-pipeline.md) remains unimplemented.**
-- `src/dashboard-client/` directory does not exist; the shared TS module tree has no files.
-- `scripts/build-dashboard-client.ts` does not exist; the build script is unwritten.
-- No `[assets]` binding is configured in `wrangler.toml` (this ADR shares the binding with ADR 0015).
-- Dashboard TSX surfaces ([`src/routes/dashboard/`](../../src/routes/dashboard/)) still embed per-page inline scripts; no `window.__rev01DashboardBoot` named-globals pattern exists.
-- This ADR's Follow-ups already name the dependency explicitly: *"Land after [ADR 0015] ships; the build infrastructure ... is the foundation this ADR builds on."*
 
-Status stays **Proposed, blocked on [ADR 0015](0015-editor-client-asset-pipeline.md)**. The build-infrastructure dependency is shared, not duplicated — once 0015's `scripts/build-editor-client.ts` and `[assets]` binding land, this ADR's analogue (`scripts/build-dashboard-client.ts`) becomes mechanical to add. The hard work is 0015's; this ADR is the second consumer of the same mechanism.
+**As-built (2026-06-05):**
+- ADR 0015 Phase 3 + ADR 0020 (CSP nonce helper) shipped, unblocking this ADR.
+- Decision 1 + 2 — build infrastructure landed. [`src/dashboard-client/index.ts`](../../src/dashboard-client/index.ts) is the bundle entrypoint with a switch-on-`route` dispatcher; [`scripts/build-dashboard-client.ts`](../../scripts/build-dashboard-client.ts) is the Bun.build sibling of `build-editor-client.ts`. Both write into the same `EDITOR_CLIENT_MANIFEST` via the shared [`scripts/manifest-helpers.ts`](../../scripts/manifest-helpers.ts) `writeManifest()` so either build can run alone without clobbering the other's slots. `dashboardClientUrl` joins `canvasClientUrl` / `canvasStylesUrl` / `coEditUrl` in the manifest.
+- Decision 3 — the boot-globals pattern landed as `window.__opencanvasDashboardBoot = { route: 'profile' }` (renamed from the ADR's `__rev01DashboardBoot` to match the post-rebrand naming on the editor side). The bundle reads the blob on DOM-ready and dispatches via the `route` discriminator. The CSP nonce gating from [ADR 0020](0020-csp-nonce-for-editor-boot-blob.md) extends here unchanged — same `generateNonce()` / `buildEditorCSP(nonce)` helper, ready to land on dashboard routes when their CSP follow-up is opened.
+- Decision 4 — source-map policy inherited from [`build-editor-client.ts`](../../scripts/build-editor-client.ts): inline in `--dev`, none in prod.
+- First migration: [`src/routes/dashboard/profile.tsx`](../../src/routes/dashboard/profile.tsx) replaces its inline form-submit script with the `__opencanvasDashboardBoot` + `<script src={dashboardClientUrl} defer>` pattern. Profile-page DOM contract (`#profile-form` / `#save-feedback` / `#save-btn`) and API contract (`PATCH /api/profile`) preserved verbatim. The form-submit logic moves to [`src/dashboard-client/profile.ts`](../../src/dashboard-client/profile.ts) as `mountProfile()` exported into the bundle.
+
+**Remaining dashboard routes** (~11 files, ~19 inline scripts) stay on their per-page inline scripts and migrate opportunistically — when a route is touched for any reason, its inline script moves into `src/dashboard-client/<page>.ts` and the route emits the boot blob instead. Per-touched-module migration mirrors [ADR 0064](0064-editor-context-decomposition.md)'s narrow-context migration pattern: no big-bang sweep.
 
 ## Context
 
