@@ -313,11 +313,17 @@ function severityChipLabel(severity: Severity): string {
 
 function IssueCard({ issue, editorHref }: { issue: AuditIssue; editorHref: string }) {
   const where =
-    issue.elementId !== undefined && issue.pageSlug !== undefined
-      ? `Page /${issue.pageSlug} — element ${issue.elementId}`
-      : issue.pageSlug !== undefined
-        ? `Page /${issue.pageSlug}`
-        : 'Site';
+    issue.pageSlug !== undefined ? `Page /${issue.pageSlug}` : 'Site';
+  // Append the targeting query params so the editor's boot path can pan to
+  // the right page and select the offending element. The editor reads these
+  // synchronously after state hydration — see editor-client/index.ts boot
+  // block. elementId stays user-invisible in the message (we use friendlier
+  // labels in the audit checks now), but it's the load-bearing identifier
+  // for the selection round-trip.
+  const params = new URLSearchParams();
+  if (issue.pageSlug !== undefined) params.set('focusPage', issue.pageSlug);
+  if (issue.elementId !== undefined) params.set('focusElement', issue.elementId);
+  const fixHref = params.toString().length > 0 ? `${editorHref}?${params.toString()}` : editorHref;
   return (
     <div class="issue">
       <span class={`sev ${severityChipClass(issue.severity)}`}>
@@ -327,7 +333,7 @@ function IssueCard({ issue, editorHref }: { issue: AuditIssue; editorHref: strin
         <b>{issue.message}</b>
         {issue.fixHint && <p>{issue.fixHint}</p>}
         <span class="where">{where}</span>
-        <a href={editorHref} class="fix">
+        <a href={fixHref} class="fix">
           Fix in editor <ArrowIcon />
         </a>
       </div>

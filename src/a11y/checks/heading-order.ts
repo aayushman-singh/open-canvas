@@ -104,12 +104,21 @@ export function checkHeadingOrder(
   for (const hit of headings) {
     if (hit.level > current + 1) {
       const from = current === 0 ? 'page start' : `H${String(current)}`;
+      // Snippet of the heading's actual text so the Owner can spot it
+      // without having to know the element's internal id.
+      const snippet = hit.element.content
+        .map((r) => r.text)
+        .join('')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 40);
+      const subject = snippet.length > 0 ? `Heading "${snippet}"` : 'Heading';
       issues.push({
         kind: 'heading-skip',
         severity: DEFAULT_SEVERITY_BY_KIND['heading-skip'],
         elementId: hit.element.id,
         pageSlug: page.slug,
-        message: `Heading on page "${page.slug}" jumps from ${from} to H${String(hit.level)} (text "${hit.element.id}").`,
+        message: `${subject} on page "${page.slug}" jumps from ${from} to H${String(hit.level)}.`,
         fixHint:
           'Add the missing intermediate heading level, or reduce the font size of the larger heading so the visual + semantic order line up.',
       });

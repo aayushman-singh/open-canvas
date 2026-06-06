@@ -186,14 +186,25 @@ export function checkContrastOnPage(
 
     const source =
       bg.source === 'container'
-        ? `wrapping container "${bg.containerId ?? ''}"`
-        : 'page Style Kit background';
+        ? 'its container background'
+        : 'the page background';
+    // Surface a short text snippet so the Owner can recognise the element
+    // by what it says, not by its internal id. Falls back to the role name
+    // when the text is empty (whitespace-only / icon-only runs).
+    const snippet = element.content
+      .map((r) => r.text)
+      .join('')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 40);
+    const roleLabel = element.role === 'heading' ? 'Heading' : 'Text';
+    const subject = snippet.length > 0 ? `${roleLabel} "${snippet}"` : roleLabel;
     issues.push({
       kind: 'contrast',
       severity,
       elementId: element.id,
       pageSlug: page.slug,
-      message: `Text "${element.id}" on page "${page.slug}" has contrast ratio ${ratio.toFixed(2)}:1 against ${source}.`,
+      message: `${subject} on page "${page.slug}" has contrast ratio ${ratio.toFixed(2)}:1 against ${source}.`,
       fixHint:
         severity === 'blocking'
           ? 'Raise the text/background contrast above 3:1 — pick a darker or lighter text colour, or move the text off a low-contrast surface.'

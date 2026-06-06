@@ -24,7 +24,7 @@ export function checkActionLabels(page: CanvasPage): AuditIssue[] {
           severity: DEFAULT_SEVERITY_BY_KIND['missing-action-label'],
           elementId: element.id,
           pageSlug: page.slug,
-          message: `Action "${element.id}" on page "${page.slug}" has no label — it would render as an empty link.`,
+          message: `Button on page "${page.slug}" has no label — it would render as an empty link.`,
           fixHint:
             'Open the action in the editor and add a visible label (e.g. "Get started", "Read more").',
         });

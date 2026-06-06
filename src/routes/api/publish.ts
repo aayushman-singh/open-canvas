@@ -455,24 +455,14 @@ publishApi.post('/sites/:siteId', async (c) => {
     );
   }
 
-  // Accessibility audit gate. Blocking issues (for example missing alt text,
-  // contrast < 3.0, or empty page title) stop publish with a structured 422.
-  // Warnings and info-level findings do not block.
+  // Accessibility audit runs on every publish so the dashboard a11y report
+  // stays current — Owner can drill in from /a11y-report and fix findings
+  // at their own pace. Blockers no longer abort publish: shipping fast beats
+  // a gate the Owner has to fight through, and the report surface (with the
+  // "go to element" links) makes the findings easy to triage post-ship.
   timeline.begin('runAudit');
-  const auditReport = runAudit(row.editableState);
+  runAudit(row.editableState);
   timeline.end('runAudit');
-  if (auditReport.blockerCount > 0) {
-    return attachTimings(
-      c.json(
-        {
-          error: 'cannot publish: accessibility blockers',
-          blockers: auditReport.issues.filter((i) => i.severity === 'blocking'),
-          report: auditReport,
-        },
-        422,
-      ),
-    );
-  }
 
   timeline.begin('collectUnfilledAssetReferences');
   const unfilledMediaSlots = collectUnfilledAssetReferences(row.editableState);

@@ -771,8 +771,24 @@ export function createEditor(boot: EditorBoot): void {
       // and become no-ops (the "have we migrated" signal is the
       // absence of legacy pageKind, not a separate flag).
       if (ctx.state) migrateLegacyCollectionIndexPagesImpl(ctx);
+      // Deep-link focus from the dashboard a11y report: `?focusPage=<slug>&
+      // focusElement=<id>` opens the editor on the page that hosts the
+      // offending element. Stash the element id for the post-render
+      // selection call below.
+      const focusParams = new URLSearchParams(window.location.search);
+      const focusPageSlug = focusParams.get('focusPage');
+      const focusElementId = focusParams.get('focusElement');
       if (ctx.state && ctx.state.pages && ctx.state.pages.length > 0) {
-        ctx.activePageId = ctx.state.pages[0]!.id;
+        let initialActiveId = ctx.state.pages[0]!.id;
+        if (focusPageSlug !== null) {
+          for (const page of ctx.state.pages) {
+            if (page.slug === focusPageSlug) {
+              initialActiveId = page.id;
+              break;
+            }
+          }
+        }
+        ctx.activePageId = initialActiveId;
       }
       // Version badge + initUndo + style-kit attribute (mirror IIFE).
       ctx.updateVersionBadge(typeof body.publishedVersion === 'number' ? body.publishedVersion : 0);
@@ -972,6 +988,17 @@ export function createEditor(boot: EditorBoot): void {
 
       // ---- Chat panel SSE handler -------------------------------------
       setupChatSession(ctx);
+
+      // ---- Deep-link focus: pan + select the dashboard-report target --
+      // Runs after every mount/attach finishes so the section DOM the
+      // selection walker reads is in its final position. Element id may
+      // point at something that no longer exists (Owner edited / deleted
+      // it between the audit run and the click) — both calls are no-ops
+      // when the element is missing, so the editor still boots normally.
+      if (focusElementId !== null && focusElementId.length > 0) {
+        ctx.panToElement(focusElementId);
+        ctx.selectElement(focusElementId);
+      }
     } catch (err: unknown) {
       ctx.setStatus('Failed to load site: ' + errorToString(err), 'error');
     }

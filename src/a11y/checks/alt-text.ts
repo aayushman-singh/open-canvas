@@ -32,7 +32,7 @@ export function checkAltText(page: CanvasPage): AuditIssue[] {
           severity: DEFAULT_SEVERITY_BY_KIND['missing-alt'],
           elementId: element.id,
           pageSlug: page.slug,
-          message: `Media element "${element.id}" on page "${page.slug}" is missing alt text.`,
+          message: `Image on page "${page.slug}" is missing alt text.`,
           fixHint:
             'Open the element in the editor and write a short alt description (one sentence is plenty).',
         });

@@ -6,8 +6,9 @@
 //
 // Returns the full `AuditReport` for the Owner's current editableState,
 // independent of publishing. The publish endpoint (`src/routes/api/publish.ts`)
-// performs its OWN audit call and refuses on `blockerCount > 0`; this route
-// is the read-only counterpart so the dashboard UI can render the report
+// runs the audit too but ships through regardless — Owner can drill in from
+// the dashboard report and fix findings on their own pace. This route is
+// the read-only counterpart so the dashboard UI can render the report
 // without forcing a publish attempt.
 //
 // Auth: Clerk-gated like every other Owner endpoint. The customer→site join

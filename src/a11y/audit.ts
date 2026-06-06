@@ -5,10 +5,11 @@
 // Contract:
 //   - Pure function: `runAudit(state: EditableSite): AuditReport`.
 //   - Walks every page; runs each registered check; aggregates the issue list.
-//   - NO publishing side-effect — that's the caller's job. The pre-publish
-//     gate lives in `src/routes/api/publish.ts` and refuses publish when
-//     `blockerCount > 0`. The "audit only" route in `src/a11y/route.ts`
-//     simply returns the report.
+//   - NO publishing side-effect — that's the caller's job. The publish path
+//     in `src/routes/api/publish.ts` runs the audit but no longer aborts on
+//     `blockerCount > 0`; the dashboard report (`/dashboard/sites/:id/a11y`)
+//     is where Owners triage findings post-ship. The "audit only" route in
+//     `src/a11y/route.ts` simply returns the report.
 //
 // All-or-nothing posture (per global CLAUDE.md):
 //   - A check that throws (e.g. an element type the audit didn't anticipate,
