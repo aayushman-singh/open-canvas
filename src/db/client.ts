@@ -46,7 +46,13 @@ export function db(env: DbEnv) {
   const sql = postgres(resolveConnectionString(env), {
     max: 5,
     fetch_types: false,
-    prepare: true,
+    // Tried prepare:true with Hyperdrive — every per-request postgres()
+    // client still paid the PREPARE+EXECUTE 2-RTT cycle because Hyperdrive's
+    // statement cache isn't surfacing across short-lived TCP connections in
+    // our config. Disabling prepare drops it to a single round-trip per
+    // query. Per Cloudflare docs this means Hyperdrive can't cache anything,
+    // but caching wasn't happening anyway in our measurements.
+    prepare: false,
   });
   return drizzle(sql, { schema });
 }
