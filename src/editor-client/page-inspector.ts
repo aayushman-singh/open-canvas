@@ -688,17 +688,32 @@ export function renderPageInspector(ctx: EditorContext): void {
   seoLabel.textContent = 'SEO & metadata';
   seoGroup.appendChild(seoLabel);
   const seoLink = document.createElement('a');
-  seoLink.href =
+  const seoHref =
     '/dashboard/sites/' +
     encodeURIComponent(ctx.siteId) +
     '/pages/' +
     encodeURIComponent(page.id) +
     '/seo';
+  seoLink.href = seoHref;
   seoLink.target = '_blank';
   seoLink.rel = 'noopener';
   seoLink.className = 'opencanvas-page-inspector-link';
   seoLink.textContent = 'Open SEO panel →';
   seoLink.title = 'Edit title, description, share-card image and search settings';
+  // Newly-created pages live only in `ctx.state` until the debounced save
+  // commits. The dashboard panel reads from Neon in a fresh tab, so an
+  // unflushed local page would 404. Flush first; flushPendingSave surfaces
+  // the failure on the status line, and we skip the open instead of landing
+  // on a guaranteed-broken tab.
+  seoLink.addEventListener('click', (ev) => {
+    if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+    ev.preventDefault();
+    void (async () => {
+      const saved = await ctx.flushPendingSave();
+      if (!saved) return;
+      window.open(seoHref, '_blank', 'noopener,noreferrer');
+    })();
+  });
   seoGroup.appendChild(seoLink);
   ctx.inspector.appendChild(seoGroup);
 

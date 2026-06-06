@@ -333,9 +333,25 @@ export function updatePageSidebarImpl(ctx: EditorContext): void {
 
     const seoLink = document.createElement('a');
     seoLink.textContent = 'SEO';
-    seoLink.href = '/dashboard/sites/' + ctx.siteId + '/pages/' + page.id + '/seo';
+    const seoHref = '/dashboard/sites/' + ctx.siteId + '/pages/' + page.id + '/seo';
+    seoLink.href = seoHref;
     seoLink.target = '_blank';
+    seoLink.rel = 'noopener noreferrer';
     seoLink.className = 'opencanvas-page-seo-link';
+    // Newly-created pages live only in `ctx.state` until the debounced save
+    // commits. Opening the dashboard panel in a fresh tab reads from Neon, so
+    // an unflushed local page lookup returns null and the route 404s. Flush
+    // first; on failure flushPendingSave already surfaces the status and we
+    // skip the navigation instead of opening a guaranteed-broken tab.
+    seoLink.addEventListener('click', (ev) => {
+      if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+      ev.preventDefault();
+      void (async () => {
+        const saved = await ctx.flushPendingSave();
+        if (!saved) return;
+        window.open(seoHref, '_blank', 'noopener,noreferrer');
+      })();
+    });
     actions.appendChild(seoLink);
 
     if (ctx.state.pages.length > 1) {
