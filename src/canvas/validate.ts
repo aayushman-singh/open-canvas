@@ -704,7 +704,12 @@ function assertUniqueElementId(
  * `${basePath}.content[…]` so the Owner gets a uniform path-shape error and
  * the previous "text element <id>." prose prefix goes away (ADR 0012 dec 4).
  */
-function validateTextContent(content: unknown, basePath: string, errors: string[]): void {
+function validateTextContent(
+  content: unknown,
+  basePath: string,
+  errors: string[],
+  options: { allowEmptyConcat?: boolean } = {},
+): void {
   const contentPath = `${basePath}.content`;
   if (!Array.isArray(content) || content.length === 0) {
     errors.push(`${contentPath} must be a non-empty array`);
@@ -797,7 +802,7 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
       }
     });
   });
-  if (concatenated.length === 0) {
+  if (concatenated.length === 0 && options.allowEmptyConcat !== true) {
     errors.push(`${basePath} has empty concatenated plain text`);
   }
 }
@@ -1021,7 +1026,28 @@ function validateElement(
     }
     case 'action': {
       // ADR 0051 dec 1 — label is InlineRun[], same shape as TextElement.content.
-      validateTextContent(element.label, basePath + '.label', errors);
+      // Editor can produce empty labels (Owner deletes every char in the
+      // toolbar). Two posture branches:
+      //   - icon-only is legitimate (renderer skips the <span> when concat
+      //     text is empty AND iconKind is set — see action-icon-shrink.smoke)
+      //     so we pass allowEmptyConcat:true and let the empty runs through.
+      //   - no icon either: coerce to a default label rather than reject the
+      //     whole document. Owners get a visible "Button" they can re-edit
+      //     instead of an opaque "save failed" toast.
+      const iconOnlyOk = isIconName(element.iconKind);
+      if (Array.isArray(element.label)) {
+        const concat = element.label
+          .map((run) =>
+            isRecord(run) && typeof run.text === 'string' ? run.text : '',
+          )
+          .join('');
+        if (concat.length === 0 && !iconOnlyOk) {
+          element.label = [{ text: 'Button' }];
+        }
+      }
+      validateTextContent(element.label, basePath + '.label', errors, {
+        allowEmptyConcat: iconOnlyOk,
+      });
       // ADR 0051 dec 2 — optional icon glyph.
       if (element.iconKind !== undefined) {
         if (!isIconName(element.iconKind)) {
@@ -1063,10 +1089,12 @@ function validateElement(
       // variants ignore iconKind; the renderer never reads it for non-icon
       // shapes, so absence is fine.
       if (element.variant === 'icon') {
+        // Editor lets Owners pick variant='icon' without choosing an iconKind
+        // (or before they pick one). Coerce to a sane default so the save
+        // lands; the Owner sees a placeholder glyph they can swap rather
+        // than an opaque "save failed" toast.
         if (!isIconName(element.iconKind)) {
-          errors.push(
-            `${basePath}.iconKind is required when variant === 'icon' and must be one of [${ICON_NAMES.join(', ')}] (got ${describe(element.iconKind)})`,
-          );
+          element.iconKind = 'arrow-up-right';
         }
       } else if (element.iconKind !== undefined && !isIconName(element.iconKind)) {
         errors.push(

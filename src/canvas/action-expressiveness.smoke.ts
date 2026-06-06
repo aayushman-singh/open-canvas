@@ -90,20 +90,51 @@ function renderHtml(state: EditableSite): string {
   );
 }
 
-// Negative — empty label.
+// Empty label + no iconKind: validator coerces to a default ("Button") so
+// the save lands. Owners get a visible label they can re-edit rather than
+// an opaque "save failed" toast when the editor produces this state.
 {
-  const action = {
+  const action: {
+    id: string;
+    type: 'action';
+    box: { x: number; y: number; w: number; h: number; z: number };
+    label: { text: string }[];
+    href: { type: 'external'; url: string };
+    variant: 'solid';
+  } = {
     id: 'a-empty',
-    type: 'action' as const,
+    type: 'action',
     box: { x: 0, y: 0, w: 200, h: 48, z: 1 },
     label: [],
-    href: { type: 'external' as const, url: '/x' },
-    variant: 'solid' as const,
+    href: { type: 'external', url: '/x' },
+    variant: 'solid',
   };
   const r = validateEditableSite(siteWith([action]));
+  assert(r.valid, `expected empty-label to coerce + validate; got ${JSON.stringify(r)}`);
   assert(
-    !r.valid && r.errors.some((e) => e.includes('label') && e.includes('non-empty array')),
-    `expected empty-label rejection; got ${JSON.stringify(r)}`,
+    action.label.length === 1 && action.label[0]?.text === 'Button',
+    `expected empty label to default to [{text:'Button'}] in place; got ${JSON.stringify(action.label)}`,
+  );
+}
+
+// Empty label + iconKind set (icon-only action): validator allows the empty
+// concat-text. Renderer already skips the <span> in that case
+// (action-icon-shrink.smoke) so this is a legitimate authoring state.
+{
+  const action: ActionElement = {
+    id: 'a-icon-only',
+    type: 'action',
+    box: { x: 0, y: 0, w: 48, h: 48, z: 1 },
+    label: [{ text: '' }],
+    iconKind: 'copy',
+    href: { type: 'external', url: '/x' },
+    variant: 'solid',
+  };
+  const r = validateEditableSite(siteWith([action]));
+  assert(r.valid, `expected icon-only action with empty label to validate; got ${JSON.stringify(r)}`);
+  assert(
+    action.label.length === 1 && action.label[0]?.text === '',
+    'expected icon-only action label to be left untouched (no default injected)',
   );
 }
 
@@ -144,18 +175,29 @@ function renderHtml(state: EditableSite): string {
   );
 }
 
-// Negative — shape variant 'icon' without iconKind.
+// Shape variant 'icon' without iconKind: validator coerces to a default
+// (arrow-up-right) in place so the save lands. The Owner sees a placeholder
+// glyph they can swap in the inspector. Hard-rejection here was blocking
+// "save as template" the moment a freshly-dropped icon shape hadn't been
+// configured yet.
 {
-  const shape = {
+  const shape: {
+    id: string;
+    type: 'shape';
+    box: { x: number; y: number; w: number; h: number; z: number };
+    variant: 'icon';
+    iconKind?: string;
+  } = {
     id: 'sh-bad-icon',
-    type: 'shape' as const,
+    type: 'shape',
     box: { x: 0, y: 0, w: 32, h: 32, z: 1 },
-    variant: 'icon' as const,
+    variant: 'icon',
   };
-  const r = validateEditableSite(siteWith([shape]));
+  const r = validateEditableSite(siteWith([shape as unknown as ShapeElement]));
+  assert(r.valid, `expected missing-iconKind to coerce + validate; got ${JSON.stringify(r)}`);
   assert(
-    !r.valid && r.errors.some((e) => e.includes('iconKind is required when variant')),
-    `expected missing-iconKind rejection; got ${JSON.stringify(r)}`,
+    shape.iconKind === 'arrow-up-right',
+    `expected missing iconKind to default to arrow-up-right in place; got ${String(shape.iconKind)}`,
   );
 }
 
