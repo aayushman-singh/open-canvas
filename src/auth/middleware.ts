@@ -1,4 +1,32 @@
 import { createClerkClient, type User } from '@clerk/backend';
+
+// Module-scope cache for the Clerk SDK client. The SDK keeps an in-memory
+// JWKS cache and warm fetch state on the instance — and createClerkClient()
+// builds a fresh one with an empty cache. With one client constructed per
+// request, every authenticateRequest() then re-fetched JWKS from Clerk
+// (~280 ms over the wire) instead of hitting the local cache. Sharing one
+// client per (publishableKey, secretKey) pair across requests in the same
+// Worker isolate lets the JWKS cache survive and drops the warm-isolate
+// clerk;dur from ~280 ms to single-digit ms once the cache is hot.
+//
+// The Clerk client is stateless w.r.t. concurrent request handling (the
+// only mutable state is the JWKS cache, which is read-mostly and self-
+// refreshing), so sharing it across concurrent isolate-resident requests
+// is safe — unlike postgres.js's stateful connection pool.
+const clerkClientCache = new Map<string, ReturnType<typeof createClerkClient>>();
+function getOrCreateClerkClient(
+  publishableKey: string,
+  secretKey: string,
+): ReturnType<typeof createClerkClient> {
+  // Key on the secret only — the secret rotates iff the key pair rotates,
+  // so it's a sufficient cache discriminator without storing the secret
+  // anywhere external (we already hold it in env).
+  const cached = clerkClientCache.get(secretKey);
+  if (cached) return cached;
+  const client = createClerkClient({ publishableKey, secretKey });
+  clerkClientCache.set(secretKey, client);
+  return client;
+}
 import { eq } from 'drizzle-orm';
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
@@ -280,10 +308,7 @@ export function clerkAuth() {
     }
 
     const keys = resolveClerkKeys(c.env);
-    const clerk = createClerkClient({
-      publishableKey: keys.publishableKey,
-      secretKey: keys.secretKey,
-    });
+    const clerk = getOrCreateClerkClient(keys.publishableKey, keys.secretKey);
     c.set('clerk', clerk);
 
     const usingTestKeys = usesTestClerkKeys(c.env, keys);
@@ -485,10 +510,7 @@ export function editTokenAuth() {
     }
 
     const keys = resolveClerkKeys(c.env);
-    const clerk = createClerkClient({
-      publishableKey: keys.publishableKey,
-      secretKey: keys.secretKey,
-    });
+    const clerk = getOrCreateClerkClient(keys.publishableKey, keys.secretKey);
 
     c.set('clerk', clerk);
     c.set('auth', {
