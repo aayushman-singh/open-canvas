@@ -33,12 +33,19 @@ export type DbEnv = {
 };
 
 function resolveConnectionString(env: DbEnv): string {
-  if (env.HYPERDRIVE) return env.HYPERDRIVE.connectionString;
+  // Prefer DATABASE_URL over HYPERDRIVE. EXPLAIN ANALYZE at Neon clocks the
+  // dashboard listing query at 0.18 ms, but the Worker measures ~485 ms per
+  // query through the Hyperdrive binding — i.e. Hyperdrive is adding ~485 ms
+  // of overhead per call in our config, swamping every other win. Until we
+  // figure out why, route around it: if DATABASE_URL is set as a Worker
+  // secret, postgres.js connects directly to Neon's pooled endpoint. Falls
+  // back to HYPERDRIVE if the secret isn't present.
   if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (env.HYPERDRIVE) return env.HYPERDRIVE.connectionString;
   throw new Error(
-    'db(): neither HYPERDRIVE binding nor DATABASE_URL is set. ' +
-      'Wire HYPERDRIVE in wrangler.toml for the Worker, or pass DATABASE_URL ' +
-      'for smokes / migrations.',
+    'db(): neither DATABASE_URL secret nor HYPERDRIVE binding is set. ' +
+      'Run `wrangler secret put DATABASE_URL` with the Neon connection ' +
+      'string, or wire HYPERDRIVE in wrangler.toml.',
   );
 }
 
