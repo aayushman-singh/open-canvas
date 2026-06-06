@@ -71,6 +71,14 @@ export function mountActionLabel(
   clearBtn.textContent = 'Clear label (icon-only)';
   clearBtn.setAttribute('data-action-label-clear', element.id);
   clearBtn.addEventListener('click', () => {
+    // Icon-only is only legitimate when there IS an icon. Refuse the clear
+    // when iconKind is unset so the editor never produces an action with no
+    // visible content (the validator coerces that state to a "Button" label,
+    // which is correct as a safety net but ugly to discover by surprise).
+    if (typeof element.iconKind !== 'string' || element.iconKind.length === 0) {
+      ctx.setStatus('Pick an icon first — an icon-less button needs visible text.', 'error');
+      return;
+    }
     // Collapse to single empty run — the at-rest icon-only contract. The
     // renderer skips the `<span>` when every run has empty text. Marks
     // are dropped because an icon-only button should not carry a stale

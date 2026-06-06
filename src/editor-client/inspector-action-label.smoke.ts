@@ -130,16 +130,20 @@ const { mountActionLabel } = await import('./inspector-action-label.js');
 interface RebuildLog {
   rebuildCalls: string[];
   saveCalls: number;
+  statusCalls: { message: string; tone: string | undefined }[];
 }
 
 function makeCtx(): { ctx: Parameters<typeof mountActionLabel>[0]; log: RebuildLog } {
-  const log: RebuildLog = { rebuildCalls: [], saveCalls: 0 };
+  const log: RebuildLog = { rebuildCalls: [], saveCalls: 0, statusCalls: [] };
   const ctx = {
     rebuildElement: (id: string) => {
       log.rebuildCalls.push(id);
     },
     scheduleSave: () => {
       log.saveCalls += 1;
+    },
+    setStatus: (message: string, tone?: string) => {
+      log.statusCalls.push({ message, tone });
     },
   } as unknown as Parameters<typeof mountActionLabel>[0];
   return { ctx, log };
@@ -295,6 +299,56 @@ function makeCtx(): { ctx: Parameters<typeof mountActionLabel>[0]; log: RebuildL
     'Clear must rebuildElement to refresh the canvas preview',
   );
   assert(log.saveCalls >= 1, 'Clear must scheduleSave so the new shape persists');
+}
+
+// ---- Contract 4b: Clear refuses when no iconKind is set ---------------
+//
+// Icon-only is a legitimate authoring state ONLY when there IS an icon to
+// carry the visible content. Clear without an iconKind would leave the
+// action with nothing visible — the validator coerces that back to a
+// "Button" label, but the editor should not produce the state to begin
+// with. Pin the refusal so a future refactor can't quietly drop it.
+
+{
+  const action: ActionElement = {
+    id: 'a-label-no-icon',
+    type: 'action',
+    box: { x: 0, y: 0, w: 200, h: 48, z: 1 },
+    label: [{ text: 'Sign up' }],
+    href: { type: 'external', url: 'https://example.com' },
+    variant: 'solid',
+  };
+  const host = makeStubNode('div');
+  const { ctx, log } = makeCtx();
+
+  mountActionLabel(ctx, action, host as unknown as HTMLElement);
+
+  const clearBtn = host.findByTag('button')!;
+  clearBtn.dispatchEvent('click');
+
+  // Label must NOT have been collapsed — the original text stays put.
+  assert(
+    action.label.length === 1 && action.label[0]!.text === 'Sign up',
+    `Clear without iconKind must leave the label intact (got ${JSON.stringify(action.label)})`,
+  );
+  // No persistence side-effects fired.
+  assert(
+    log.rebuildCalls.length === 0,
+    `Refused Clear must NOT rebuildElement (got ${JSON.stringify(log.rebuildCalls)})`,
+  );
+  assert(
+    log.saveCalls === 0,
+    `Refused Clear must NOT scheduleSave (got ${String(log.saveCalls)})`,
+  );
+  // A status was surfaced naming the missing icon as the reason.
+  assert(
+    log.statusCalls.length === 1 && log.statusCalls[0]!.tone === 'error',
+    `Refused Clear must surface an error status (got ${JSON.stringify(log.statusCalls)})`,
+  );
+  assert(
+    log.statusCalls[0]!.message.toLowerCase().includes('icon'),
+    `Refused Clear status must name the icon as the reason (got "${log.statusCalls[0]!.message}")`,
+  );
 }
 
 // ---- Contract 5: invalid label state fails loudly ---------------------

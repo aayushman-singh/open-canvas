@@ -391,7 +391,23 @@ export function renderInspectorSpecImpl(
       const sel = selectInput(f.options, String(cur));
       sel.addEventListener('change', () => {
         elementByPath[f.path] = sel.value;
+        // Shape variant flips that require a dependent field. When variant
+        // becomes 'icon' on a shape without an iconKind, the validator-side
+        // contract demands one — assign a sane default in the same change so
+        // the editor never saves a half-configured icon shape. Re-render the
+        // inspector so the (showWhen-gated) icon picker mounts immediately.
+        let needsInspectorRerender = false;
+        if (
+          f.path === 'variant' &&
+          element.type === 'shape' &&
+          sel.value === 'icon' &&
+          typeof elementByPath.iconKind !== 'string'
+        ) {
+          elementByPath.iconKind = 'arrow-up-right';
+          needsInspectorRerender = true;
+        }
         ctx.rebuildElement(element.id);
+        if (needsInspectorRerender) ctx.renderInspector();
         ctx.scheduleSave();
       });
       ctx.inspector!.appendChild(field(f.label, sel));

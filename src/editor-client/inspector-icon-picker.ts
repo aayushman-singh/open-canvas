@@ -76,6 +76,36 @@ export function renderIconField(ctx: EditorContext, f: IconField, element: Canva
     tile.innerHTML = innerSvg;
     tile.addEventListener('click', () => {
       if (slug === null) {
+        // "None" click. Both consumers need state-consistent removal:
+        //   - Shape with variant='icon': iconKind is required while variant
+        //     stays 'icon'. Flip variant to 'rect' and drop iconKind together
+        //     so the saved state doesn't violate the icon-requires-iconKind
+        //     contract. The showWhen guard will hide the picker after the
+        //     next inspector render.
+        //   - Action with empty label: removing the icon would leave the
+        //     button with nothing visible. Refuse and surface a status so the
+        //     Owner adds a label before going icon-less.
+        if (element.type === 'shape') {
+          elementByPath.variant = 'rect';
+          delete elementByPath.iconKind;
+          paint();
+          ctx.rebuildElement(element.id);
+          ctx.renderInspector();
+          ctx.scheduleSave();
+          return;
+        }
+        if (element.type === 'action') {
+          const label = (element as { label?: { text?: unknown }[] }).label;
+          const concat = Array.isArray(label)
+            ? label
+                .map((r) => (r && typeof r.text === 'string' ? r.text : ''))
+                .join('')
+            : '';
+          if (concat.length === 0) {
+            ctx.setStatus('Add a label first — an icon-less action needs visible text.', 'error');
+            return;
+          }
+        }
         delete elementByPath[f.path];
       } else {
         elementByPath[f.path] = slug;
