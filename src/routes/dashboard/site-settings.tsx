@@ -1334,7 +1334,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
       collaboratorHitForSite(c.env, customerId, siteId),
     );
     if (collabHit) {
-      c.header('Server-Timing', t.header());
+      c.header('Server-Timing', t.header(), { append: true });
       return c.html(
         <NotSiteOwnerPage
           siteId={siteId}
@@ -1345,7 +1345,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         403,
       );
     }
-    c.header('Server-Timing', t.header());
+    c.header('Server-Timing', t.header(), { append: true });
     return c.text('site not found', 404);
   }
 
@@ -1356,7 +1356,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
     : 'Never set';
 
   t.mark('collabs', collaborators.length);
-  c.header('Server-Timing', t.header());
+  c.header('Server-Timing', t.header(), { append: true });
   return c.html(
     <DashboardShell
       title={`${owned.name} — settings`}

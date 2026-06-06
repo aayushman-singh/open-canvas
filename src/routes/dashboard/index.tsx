@@ -1453,7 +1453,7 @@ dashboard.get('/', async (c) => {
   // forces the browser to recheck freshness before showing stale content.
   c.header('Cache-Control', 'private, max-age=0, must-revalidate');
   t.mark('rows', rows.length, `owned=${ownedRows.length},collab=${collabRows.length}`);
-  c.header('Server-Timing', t.header());
+  c.header('Server-Timing', t.header(), { append: true });
   return c.html(
     <DashboardShell
       title="Open Canvas — Your sites"
@@ -1849,6 +1849,6 @@ dashboard.get('/thumbs/:siteId', async (c) => {
 
   c.header('Cache-Control', 'private, max-age=0, must-revalidate');
   t.mark('size', html.length, cacheHit ? 'cache-hit' : 'cache-miss');
-  c.header('Server-Timing', t.header());
+  c.header('Server-Timing', t.header(), { append: true });
   return c.html(html);
 });

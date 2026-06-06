@@ -97,7 +97,7 @@ notificationsApi.get('/notifications', async (c) => {
   // because the body is scoped to one Owner.
   c.header('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
   t.mark('rows', notifications.length, `unread=${unread},sites=${siteIds.length}`);
-  c.header('Server-Timing', t.header());
+  c.header('Server-Timing', t.header(), { append: true });
   return c.json({ notifications, unreadCount: unread });
 });
 

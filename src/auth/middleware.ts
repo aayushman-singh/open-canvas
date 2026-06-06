@@ -308,17 +308,26 @@ export function clerkAuth() {
     }
 
     const keys = resolveClerkKeys(c.env);
+    const tClient = performance.now();
     const clerk = getOrCreateClerkClient(keys.publishableKey, keys.secretKey);
     c.set('clerk', clerk);
+    const clientMs = performance.now() - tClient;
 
     const usingTestKeys = usesTestClerkKeys(c.env, keys);
     const requestForClerk: Request = usingTestKeys
       ? rebuildRequestForLocalDevClerk(c.req.raw, resolveDevPublicOrigin(c.env))
       : c.req.raw;
 
+    const tAuthReq = performance.now();
     const requestState = await clerk.authenticateRequest(requestForClerk, {
       authorizedParties: authorizedParties(c.env),
     });
+    const authReqMs = performance.now() - tAuthReq;
+    c.header(
+      'Server-Timing',
+      `clerk-client;dur=${clientMs.toFixed(1)}, clerk-authreq;dur=${authReqMs.toFixed(1)}`,
+      { append: true },
+    );
 
     // Clerk's hosted account portal hands off the session via a handshake
     // round-trip. When status === 'handshake', Clerk wants the user redirected
