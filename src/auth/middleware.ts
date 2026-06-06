@@ -422,7 +422,44 @@ export function clerkAuth() {
  * share one network round trip. Returns `null` only when the request was
  * authenticated through a non-Clerk middleware (e.g. the on-site edit-token
  * popup) and we never had a Clerk session to begin with.
+ *
+ * Module-scope memo on top: every dashboard render needed user.imageUrl and
+ * user.firstName for the avatar + greeting, and getClerkUser was hitting
+ * Clerk's REST API over the network on every request (~260-470 ms even with
+ * the SDK client itself cached). Cache the User by clerkUserId with the
+ * same 60 s TTL the customer row uses — stale avatar/displayName for at
+ * most a minute is the acceptable trade for sub-ms warm reads.
  */
+type CachedClerkUser = { user: User; expiresAt: number };
+const clerkUserCacheTtlMs = 60_000;
+const clerkUserCache = new Map<string, CachedClerkUser>();
+
+function readCachedClerkUser(clerkUserId: string): User | null {
+  const entry = clerkUserCache.get(clerkUserId);
+  if (entry === undefined) return null;
+  if (entry.expiresAt < Date.now()) {
+    clerkUserCache.delete(clerkUserId);
+    return null;
+  }
+  return entry.user;
+}
+
+function writeCachedClerkUser(clerkUserId: string, user: User): void {
+  clerkUserCache.set(clerkUserId, {
+    user,
+    expiresAt: Date.now() + clerkUserCacheTtlMs,
+  });
+}
+
+/**
+ * Drop the cached Clerk User for a given user id. Callers that mutate the
+ * user (display-name / avatar refresh on /profile) call this so the next
+ * read bypasses the stale cache.
+ */
+export function invalidateClerkUserCache(clerkUserId: string): void {
+  clerkUserCache.delete(clerkUserId);
+}
+
 const CLERK_USER_PROMISE = Symbol('clerk-user-promise');
 type ClerkUserAware = {
   get(key: typeof CLERK_USER_PROMISE): Promise<User | null> | undefined;
@@ -445,8 +482,16 @@ export async function getClerkUser(
   const auth = c.get('auth') as AuthState;
   const clerk = c.get('clerk') as ReturnType<typeof createClerkClient>;
   if (!auth.userId || !clerk) return null;
+  const memo = readCachedClerkUser(auth.userId);
+  if (memo !== null) {
+    const resolved = Promise.resolve(memo);
+    c.set('user', memo);
+    c.set(CLERK_USER_PROMISE, resolved);
+    return resolved;
+  }
   const promise = clerk.users.getUser(auth.userId).then((user) => {
     c.set('user', user);
+    writeCachedClerkUser(auth.userId, user);
     return user;
   });
   c.set(CLERK_USER_PROMISE, promise);
