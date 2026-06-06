@@ -24,8 +24,21 @@
 // for the FIRST entry (which captures whatever happens before the first
 // measurement begins) but interpret the rest as relative slices.
 
+interface TimingEntry {
+  name: string;
+  dur: number;
+  desc?: string;
+}
+
+function makeEntry(name: string, dur: number, desc: string | undefined): TimingEntry {
+  // exactOptionalPropertyTypes treats `{ desc: undefined }` as a presence
+  // of an undefined-typed property, which `desc?: string` rejects. Build
+  // the entry without the key when no description was supplied.
+  return desc === undefined ? { name, dur } : { name, dur, desc };
+}
+
 export class Timings {
-  private entries: Array<{ name: string; dur: number; desc?: string }> = [];
+  private entries: TimingEntry[] = [];
 
   /** Time an async operation and record the duration in ms. */
   async measure<T>(
@@ -37,7 +50,7 @@ export class Timings {
     try {
       return await fn();
     } finally {
-      this.entries.push({ name, dur: performance.now() - t0, desc });
+      this.entries.push(makeEntry(name, performance.now() - t0, desc));
     }
   }
 
@@ -49,13 +62,13 @@ export class Timings {
   start(name: string, desc?: string): () => void {
     const t0 = performance.now();
     return () => {
-      this.entries.push({ name, dur: performance.now() - t0, desc });
+      this.entries.push(makeEntry(name, performance.now() - t0, desc));
     };
   }
 
   /** Record a pre-measured duration. Use when something else timed the work. */
   mark(name: string, dur: number, desc?: string): void {
-    this.entries.push({ name, dur, desc });
+    this.entries.push(makeEntry(name, dur, desc));
   }
 
   /** Format as a `Server-Timing` header value. */
