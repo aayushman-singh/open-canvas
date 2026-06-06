@@ -138,7 +138,17 @@ versionRoute.post('/', async (c) => {
     return c.json({ error: 'label must be 200 characters or fewer' }, 400);
   }
 
-  await captureManual(ownedSiteId, label, database, c.env);
+  try {
+    await captureManual(ownedSiteId, label, database, c.env);
+  } catch (err) {
+    // Surface the real cause as JSON. The client (versions-panel.ts) parses
+    // the error body via r.json() and would otherwise choke on hono's
+    // default plain-text 500 "Internal Server Error" page with an opaque
+    // "Unexpected token 'I'" SyntaxError.
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[version/capture] manual snapshot failed', { siteId, label, err });
+    return c.json({ error: `snapshot failed: ${message}` }, 500);
+  }
   return c.json({ ok: true });
 });
 
