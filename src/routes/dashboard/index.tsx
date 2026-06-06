@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { and, desc, eq, isNotNull, sql, sum } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { PlanTiles, planTilesStyles } from '../../billing/plan-tiles';
 import { db } from '../../db/client';
