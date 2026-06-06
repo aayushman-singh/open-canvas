@@ -11,6 +11,7 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import type { CanvasSection, EditableSite, PublishedSnapshot, StyleKit } from '../canvas/schema';
 
 // -- Postgres `bytea` custom column -------------------------------------------
@@ -93,6 +94,25 @@ export const site = pgTable(
     subdomain: text('subdomain').notNull().unique(),
     styleKit: text('style_kit').notNull().$type<StyleKit>(),
     editableState: jsonb('editable_state').notNull().$type<EditableSite>(),
+    // Generated columns projected from editableState — they were paying
+    // ~500ms per dashboard listing query via JSONB partial extraction
+    // because Postgres had to read the entire ~300kB editableState blob
+    // per row to compute `(editable_state->>'visitorTheme')` on demand.
+    // STORED generated columns evaluate the expression at write time and
+    // persist the scalar value, so reads touch a narrow column. Every
+    // editableState update auto-recomputes them; no manual sync.
+    visitorTheme: text('visitor_theme').generatedAlwaysAs(
+      sql`(editable_state->>'visitorTheme')`,
+      { mode: 'stored' },
+    ),
+    siteNoIndex: boolean('site_no_index').generatedAlwaysAs(
+      sql`((editable_state->>'siteNoIndex')::boolean)`,
+      { mode: 'stored' },
+    ),
+    faviconAssetId: text('favicon_asset_id').generatedAlwaysAs(
+      sql`(editable_state->>'faviconAssetId')`,
+      { mode: 'stored' },
+    ),
     publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
     publishedVersion: integer('published_version').notNull().default(0),
     // Password-protected publish. `passwordEnabled` is the visitor-gate switch;

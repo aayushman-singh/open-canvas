@@ -127,6 +127,13 @@
       "when": 1780963200000,
       "tag": "0018_collection_entry_folder",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781020800000,
+      "tag": "0019_site_jsonb_generated_columns",
+      "breakpoints": true
     }
   ]
 }

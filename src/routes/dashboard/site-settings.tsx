@@ -17,7 +17,7 @@
 // the rendered surface in sync with the DB — no client-side state
 // machine.
 
-import { and, eq, isNotNull, sql } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
@@ -484,9 +484,10 @@ async function lookupOwnedSite(
 ): Promise<OwnedSite | null> {
   const database = db(env);
   // Settings only needs three scalars off editableState (siteNoIndex,
-  // visitorTheme, faviconAssetId). Pulling the whole JSONB column cost
-  // ~700ms TTFB per render; projecting the fields at the database keeps
-  // the row small. The full state still loads in the editor route where
+  // visitorTheme, faviconAssetId). Migration 0019 added STORED generated
+  // columns for all three so the SELECT no longer triggers a full ~300kB
+  // editable_state read just to extract scalars; reading is now a narrow
+  // column lookup. The full state still loads in the editor route where
   // it's actually rendered.
   const rows = await database
     .select({
@@ -497,9 +498,9 @@ async function lookupOwnedSite(
       passwordSetAt: site.passwordSetAt,
       styleKit: site.styleKit,
       publishedVersion: site.publishedVersion,
-      siteNoIndex: sql<boolean | null>`(${site.editableState}->>'siteNoIndex')::boolean`,
-      visitorTheme: sql<string | null>`(${site.editableState}->>'visitorTheme')`,
-      faviconAssetId: sql<string | null>`(${site.editableState}->>'faviconAssetId')`,
+      siteNoIndex: site.siteNoIndex,
+      visitorTheme: site.visitorTheme,
+      faviconAssetId: site.faviconAssetId,
     })
     .from(site)
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))

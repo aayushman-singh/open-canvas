@@ -1351,27 +1351,6 @@ dashboard.get('/', async (c) => {
 
   const apex = appDomain(c.env);
 
-  // ── DIAGNOSTIC (revertable) ─────────────────────────────────────────────
-  // We're spending ~485 ms per Neon query through Hyperdrive vs ~244 ms with
-  // the previous HTTP driver. Three independent SELECT 1 timings let us tell
-  // which factor is responsible:
-  //   ping1  — first SELECT 1 on a fresh per-request postgres() client.
-  //            If this is ~240 ms the connection setup is cheap; if it's
-  //            ~485 ms we're paying TWO RTTs (PREPARE + EXECUTE) per query.
-  //   ping1b — second SELECT 1 on the same client. If Hyperdrive's prepared
-  //            statement cache is doing its job, this should drop sharply.
-  //   ping3x — three parallel SELECT 1s. If they share the connection pool
-  //            this should equal max(individual), not 3 × individual.
-  await t.measure('ping1', () => database.execute(sql`SELECT 1`));
-  await t.measure('ping1b', () => database.execute(sql`SELECT 1`));
-  await t.measure('ping3x', () =>
-    Promise.all([
-      database.execute(sql`SELECT 1`),
-      database.execute(sql`SELECT 1`),
-      database.execute(sql`SELECT 1`),
-    ]),
-  );
-
   // Site rows + collaborator sites + storage sum are independent — parallelize
   // so the page open pays one Neon round trip's worth of latency.
   //
@@ -1384,11 +1363,12 @@ dashboard.get('/', async (c) => {
   // off collaborator cards.
   // editableState is a fat JSONB column (often 100-400kB per site) and the
   // listing only reads two scalar fields off it (visitorTheme, siteNoIndex).
-  // Pulling the whole blob over the Neon wire was costing 900ms+ of TTFB
-  // for very little payoff. Project the two needed fields at the database
-  // with JSONB partial extraction so each row stays tiny — the editor and
-  // /dashboard/thumbs/:siteId routes still load the full state when they
-  // actually need it.
+  // The previous pass projected them with `(editableState->>'X')` at query
+  // time — that still forced Postgres to read the entire blob off disk per
+  // row, so db.list sat at ~500ms even with a warm Hyperdrive connection
+  // (ping1 = 5ms). Migration 0019 added STORED generated columns that
+  // pre-compute the scalars at write time; the SELECT now touches a narrow
+  // text + boolean instead of the fat JSONB column.
   const [ownedRows, collabRows, sb] = await t.measure('db.list', () =>
     Promise.all([
       database
@@ -1399,8 +1379,8 @@ dashboard.get('/', async (c) => {
           styleKit: site.styleKit,
           publishedVersion: site.publishedVersion,
           updatedAt: site.updatedAt,
-          visitorTheme: sql<string | null>`(${site.editableState}->>'visitorTheme')`,
-          siteNoIndex: sql<boolean | null>`(${site.editableState}->>'siteNoIndex')::boolean`,
+          visitorTheme: site.visitorTheme,
+          siteNoIndex: site.siteNoIndex,
           passwordEnabled: site.passwordEnabled,
         })
         .from(site)
@@ -1414,8 +1394,8 @@ dashboard.get('/', async (c) => {
           styleKit: site.styleKit,
           publishedVersion: site.publishedVersion,
           updatedAt: site.updatedAt,
-          visitorTheme: sql<string | null>`(${site.editableState}->>'visitorTheme')`,
-          siteNoIndex: sql<boolean | null>`(${site.editableState}->>'siteNoIndex')::boolean`,
+          visitorTheme: site.visitorTheme,
+          siteNoIndex: site.siteNoIndex,
           passwordEnabled: site.passwordEnabled,
         })
         .from(site)
