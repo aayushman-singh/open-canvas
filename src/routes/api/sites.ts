@@ -630,7 +630,7 @@ sites.post('/', async (c) => {
     status: entry.status,
   }));
   try {
-    const siteInsert = database.insert(site).values({
+    const siteRow = {
       id: newSiteId,
       customerId,
       name: trimmedName,
@@ -639,19 +639,21 @@ sites.post('/', async (c) => {
       editableState,
       publishedSnapshot: null,
       publishedVersion: 0,
-    });
+    };
     if (assetRows.length === 0 && seedEntryRows.length === 0) {
-      await siteInsert;
-    } else if (assetRows.length > 0 && seedEntryRows.length > 0) {
-      const assetInsert = database.insert(ownerAsset).values(assetRows).onConflictDoNothing();
-      const entryInsert = database.insert(collectionEntry).values(seedEntryRows);
-      await database.batch([siteInsert, assetInsert, entryInsert]);
-    } else if (assetRows.length > 0) {
-      const assetInsert = database.insert(ownerAsset).values(assetRows).onConflictDoNothing();
-      await database.batch([siteInsert, assetInsert]);
+      await database.insert(site).values(siteRow);
     } else {
-      const entryInsert = database.insert(collectionEntry).values(seedEntryRows);
-      await database.batch([siteInsert, entryInsert]);
+      // postgres-js drizzle has no `.batch()`; use a real transaction so the
+      // site + its assets / seed entries land atomically.
+      await database.transaction(async (tx) => {
+        await tx.insert(site).values(siteRow);
+        if (assetRows.length > 0) {
+          await tx.insert(ownerAsset).values(assetRows).onConflictDoNothing();
+        }
+        if (seedEntryRows.length > 0) {
+          await tx.insert(collectionEntry).values(seedEntryRows);
+        }
+      });
     }
   } catch (err) {
     if (isSiteLimitViolation(err)) {

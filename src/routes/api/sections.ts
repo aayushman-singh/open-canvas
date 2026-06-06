@@ -211,15 +211,21 @@ sections.post('/sites/:siteId/sections/import', async (c) => {
     );
   }
 
-  const siteUpdate = database
-    .update(site)
-    .set({ editableState: state, updatedAt: sql`now()` })
-    .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
   if (newAssetRows.length === 0) {
-    await siteUpdate;
+    await database
+      .update(site)
+      .set({ editableState: state, updatedAt: sql`now()` })
+      .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
   } else {
-    const assetInsert = database.insert(ownerAsset).values(newAssetRows).onConflictDoNothing();
-    await database.batch([siteUpdate, assetInsert]);
+    // postgres-js drizzle has no `.batch()`; transaction keeps the state
+    // update and the asset insert atomic together.
+    await database.transaction(async (tx) => {
+      await tx
+        .update(site)
+        .set({ editableState: state, updatedAt: sql`now()` })
+        .where(and(eq(site.id, siteId), eq(site.customerId, customerId)));
+      await tx.insert(ownerAsset).values(newAssetRows).onConflictDoNothing();
+    });
   }
 
   return c.json({ editableState: state });

@@ -7,13 +7,12 @@
 // existing row for the site, INSERT the freshly-extracted rows.
 //
 // Atomicity model:
-//   The neon-http driver does not support stateful `db.transaction(...)` —
-//   the HTTP wire protocol is single-shot. Drizzle's `db.batch([...])`
-//   compiles the entire payload into one batched neon-http call, which the
-//   Neon edge runs atomically. We emit two batched operations per rebuild:
-//   one DELETE and one bulk INSERT. An empty snapshot (no text-bearing
-//   elements) still issues the DELETE so the previous version's index is
-//   pruned.
+//   Hyperdrive-backed postgres.js (per the recent DB migration) supports
+//   stateful transactions. We wrap the DELETE + INSERT pair in a single
+//   `db.transaction(async (tx) => ...)` so a concurrent reader either sees
+//   the previous publish's rows OR the new publish's rows, never an empty
+//   intermediate. An empty snapshot (no text-bearing elements) still issues
+//   the DELETE so the previous version's index is pruned.
 //
 // Idempotency:
 //   Re-running rebuildSearchIndex with the same snapshot produces the same
@@ -40,7 +39,7 @@ import { extractSearchEntries, type SearchEntryDraft } from './extract.js';
 export interface IndexerDb {
   delete: Db['delete'];
   insert: Db['insert'];
-  batch: Db['batch'];
+  transaction: Db['transaction'];
 }
 
 /**
@@ -80,17 +79,13 @@ export async function rebuildSearchIndex(
     throw new Error('[search] rebuildSearchIndex: siteId is required');
   }
   const rows = buildSearchRows(siteId, snapshot);
-  const deleteOp = database.delete(siteSearchEntry).where(eq(siteSearchEntry.siteId, siteId));
   if (rows.length === 0) {
-    // Nothing to insert — just prune. The batch API requires at least one
-    // entry; we issue the delete on its own.
-    await deleteOp;
+    // Nothing to insert — just prune the previous rows.
+    await database.delete(siteSearchEntry).where(eq(siteSearchEntry.siteId, siteId));
     return;
   }
-  // The neon-http batch tuple type wants at least one element; the cast
-  // through `Parameters<...>[0]` is the cleanest way to widen our pair into
-  // the variadic-with-min-one shape the batch signature expects.
-  type BatchArg = Parameters<IndexerDb['batch']>[0];
-  const insertOp = database.insert(siteSearchEntry).values(rows);
-  await database.batch([deleteOp, insertOp] as unknown as BatchArg);
+  await database.transaction(async (tx) => {
+    await tx.delete(siteSearchEntry).where(eq(siteSearchEntry.siteId, siteId));
+    await tx.insert(siteSearchEntry).values(rows);
+  });
 }

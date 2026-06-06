@@ -163,9 +163,10 @@ function makeFixtureSiteState(page: CanvasPage): EditableSite {
 
 // ---------------------------------------------------------------------------
 // In-memory IndexerDb shim. Mimics the slice of drizzle the indexer uses:
-//   - db.delete(table).where(eq(...))     → drops matching rows
-//   - db.insert(table).values(rows)       → appends rows
-//   - db.batch([deleteOp, insertOp])      → runs both atomically
+//   - db.delete(table).where(eq(...))         → drops matching rows
+//   - db.insert(table).values(rows)           → appends rows
+//   - db.transaction(async (tx) => {...})     → runs the callback once;
+//                                                tx is the shim itself
 //
 // Predicates from `eq(siteSearchEntry.siteId, X)` are inspected by walking
 // the drizzle SQL chunks; we recognise the exact shape the indexer emits
@@ -218,14 +219,14 @@ class ShimDb {
   nextId: number = 1;
   deleteCalls: number = 0;
   insertCalls: number = 0;
-  batchCalls: number = 0;
+  transactionCalls: number = 0;
 
   reset(): void {
     this.rows = [];
     this.nextId = 1;
     this.deleteCalls = 0;
     this.insertCalls = 0;
-    this.batchCalls = 0;
+    this.transactionCalls = 0;
   }
 
   private compileSiteIdPredicate(expr: unknown): (row: SimRow) => boolean {
@@ -300,18 +301,15 @@ class ShimDb {
     };
   }
 
-  async batch(ops: ReadonlyArray<DeferredOp>): Promise<void> {
-    this.batchCalls += 1;
-    for (const op of ops) {
-      await op.__exec();
-    }
+  async transaction(callback: (tx: ShimDb) => Promise<void>): Promise<void> {
+    this.transactionCalls += 1;
+    await callback(this);
   }
 }
 
 // DeferredOp is a thenable representing a queued drizzle op. The indexer
-// either awaits it directly (one-shot delete on empty rebuild) or hands it
-// into `db.batch([...])`. We expose `__exec()` so the batch path runs each
-// pending op once, in order.
+// awaits these directly (whether inside a transaction callback or for the
+// one-shot delete on an empty rebuild).
 interface DeferredOp extends PromiseLike<void> {
   __exec: () => Promise<void>;
 }
@@ -414,16 +412,16 @@ assert(
 );
 {
   // Snapshot the counters into locals so the narrowing the `assert(...)`
-  // helper does on its boolean expression doesn't pin shim.batchCalls /
-  // shim.deleteCalls / shim.insertCalls to the literal value at this
+  // helper does on its boolean expression doesn't pin shim.transactionCalls
+  // / shim.deleteCalls / shim.insertCalls to the literal value at this
   // point — the assertions further down expect them to keep climbing.
-  const b: number = shim.batchCalls;
+  const t: number = shim.transactionCalls;
   const d: number = shim.deleteCalls;
   const i: number = shim.insertCalls;
   assert(
-    b === 1 && d === 1 && i === 1,
-    'rebuildSearchIndex issues exactly one delete + one insert inside one batch',
-    `batches=${String(b)} deletes=${String(d)} inserts=${String(i)}`,
+    t === 1 && d === 1 && i === 1,
+    'rebuildSearchIndex issues exactly one delete + one insert inside one transaction',
+    `transactions=${String(t)} deletes=${String(d)} inserts=${String(i)}`,
   );
 }
 
@@ -491,8 +489,8 @@ assert(
   `versions=${String([...new Set(shim.rows.map((r) => r.publishedVersion))].join(','))}`,
 );
 {
-  const b: number = shim.batchCalls;
-  assert(b === 2, 'second rebuild issues a second batch', `batchCalls=${String(b)}`);
+  const t: number = shim.transactionCalls;
+  assert(t === 2, 'second rebuild issues a second transaction', `transactionCalls=${String(t)}`);
 }
 
 // Idempotency: running rebuild a third time with the same snapshot leaves

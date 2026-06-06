@@ -139,15 +139,12 @@ collectionsRoute.post('/', async (c) => {
   };
 
   const database = db(c.env);
-  const siteUpdate = database
-    .update(site)
-    .set({ editableState: nextState })
-    .where(eq(site.id, siteId));
 
   // Both seed rows ship in a single INSERT statement (one VALUES list).
-  // Combined with the batch wrapper around siteUpdate + entryInsert, the
-  // whole flow runs in one Postgres transaction: page persistence and both
-  // entry inserts succeed or roll back together (ADR 0063 dec 11 §f).
+  // Combined with the transaction wrapper around the page persistence and
+  // entry inserts, the whole flow runs as one Postgres txn: site state
+  // update and both entry inserts succeed or roll back together
+  // (ADR 0063 dec 11 §f).
   const seedRows = scaffold.seedEntries.map((entry) => ({
     siteId,
     collectionSlug: entry.collectionSlug,
@@ -162,10 +159,11 @@ collectionsRoute.post('/', async (c) => {
     ogImageAssetId: entry.ogImageAssetId,
     status: entry.status,
   }));
-  const entryInsert = database.insert(collectionEntry).values(seedRows);
-
   try {
-    await database.batch([siteUpdate, entryInsert]);
+    await database.transaction(async (tx) => {
+      await tx.update(site).set({ editableState: nextState }).where(eq(site.id, siteId));
+      await tx.insert(collectionEntry).values(seedRows);
+    });
   } catch (err) {
     // Loud failure per CLAUDE.md no-fallbacks rule. We do NOT retry, do
     // NOT partial-commit, do NOT swap in defaults — the batch rolled back

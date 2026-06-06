@@ -244,7 +244,7 @@ importRouter.post('/', async (c) => {
   );
 
   try {
-    const siteInsert = database.insert(site).values({
+    const siteRow = {
       id: newSiteId,
       customerId,
       name: siteName,
@@ -253,22 +253,23 @@ importRouter.post('/', async (c) => {
       editableState,
       publishedSnapshot: null,
       publishedVersion: 0,
-    });
-
+    };
     const mediaAssetRows = preparedAssets.mediaAssetRows;
     const fontRows = preparedAssets.fontRows;
     if (mediaAssetRows.length === 0 && fontRows.length === 0) {
-      await siteInsert;
-    } else if (mediaAssetRows.length > 0 && fontRows.length > 0) {
-      const assetInsert = database.insert(ownerAsset).values(mediaAssetRows).onConflictDoNothing();
-      const fontInsert = database.insert(siteFont).values(fontRows).onConflictDoNothing();
-      await database.batch([siteInsert, assetInsert, fontInsert]);
-    } else if (mediaAssetRows.length > 0) {
-      const assetInsert = database.insert(ownerAsset).values(mediaAssetRows).onConflictDoNothing();
-      await database.batch([siteInsert, assetInsert]);
+      await database.insert(site).values(siteRow);
     } else {
-      const fontInsert = database.insert(siteFont).values(fontRows).onConflictDoNothing();
-      await database.batch([siteInsert, fontInsert]);
+      // postgres-js drizzle has no `.batch()`; use a real transaction so the
+      // site + its assets / fonts land atomically.
+      await database.transaction(async (tx) => {
+        await tx.insert(site).values(siteRow);
+        if (mediaAssetRows.length > 0) {
+          await tx.insert(ownerAsset).values(mediaAssetRows).onConflictDoNothing();
+        }
+        if (fontRows.length > 0) {
+          await tx.insert(siteFont).values(fontRows).onConflictDoNothing();
+        }
+      });
     }
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
