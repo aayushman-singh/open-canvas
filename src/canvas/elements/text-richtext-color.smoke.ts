@@ -111,33 +111,32 @@ function siteWith(text: TextElement): EditableSite {
   );
   assert(!badNamed.valid, '(1) named colour "red" must FAIL validation (hex-only payload)');
 
-  const badEmpty = validateEditableSite(
-    siteWith(
-      baseText({
-        content: [{ text: 'x', marks: [{ type: 'color', color: '' }] }],
-      }),
-    ),
+  // Missing-value cases are coerced to #000000 in place so the save lands —
+  // orphaned color marks are common from paste / inbound ops, and blocking
+  // the whole document on them is not worth it. Actual hex-malformed values
+  // (named colours, rgb(), etc.) still hard-fail above.
+  const emptyMark = { type: 'color' as const, color: '' };
+  const okEmpty = validateEditableSite(
+    siteWith(baseText({ content: [{ text: 'x', marks: [emptyMark] }] })),
   );
-  assert(!badEmpty.valid, '(1) empty color string must FAIL validation');
+  assert(okEmpty.valid, '(1) empty color string must coerce + validate');
+  assert(
+    emptyMark.color === '#000000',
+    '(1) empty color string must be defaulted to #000000 in place',
+  );
 
-  const badType = validateEditableSite(
-    siteWith(
-      baseText({
-        content: [
-          {
-            text: 'x',
-            marks: [
-              {
-                type: 'color',
-                color: 123 as unknown as string,
-              },
-            ],
-          },
-        ],
-      }),
-    ),
+  const numberMark = {
+    type: 'color' as const,
+    color: 123 as unknown as string,
+  };
+  const okNumber = validateEditableSite(
+    siteWith(baseText({ content: [{ text: 'x', marks: [numberMark] }] })),
   );
-  assert(!badType.valid, '(1) non-string color payload must FAIL validation');
+  assert(okNumber.valid, '(1) non-string color payload must coerce + validate');
+  assert(
+    numberMark.color === '#000000',
+    '(1) non-string color payload must be defaulted to #000000 in place',
+  );
 }
 
 // ---------------------------------------------------------------------------

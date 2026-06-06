@@ -781,13 +781,15 @@ function validateTextContent(content: unknown, basePath: string, errors: string[
         }
       }
       if (mark.type === 'color') {
+        // Missing / empty / non-string colour: orphaned color mark — common
+        // when an inbound op or paste hands us a {type:'color'} with no value.
+        // Coerce in place to a sane default so the save lands instead of
+        // failing the whole document. Actual hex-malformed values (named
+        // colours, rgb(), etc.) still hard-fail — the hex-only contract is
+        // a render-safety boundary we don't silently rewrite around.
         if (typeof mark.color !== 'string' || mark.color.length === 0) {
-          errors.push(
-            `${markPath}.color must be a non-empty string for color marks (got ${describe(mark.color)})`,
-          );
-          return;
-        }
-        if (!INLINE_COLOR_HEX_RE.test(mark.color)) {
+          mark.color = '#000000';
+        } else if (!INLINE_COLOR_HEX_RE.test(mark.color)) {
           errors.push(
             `${markPath}.color ${describe(mark.color)} must be a hex colour (#RGB, #RRGGBB, or #RRGGBBAA)`,
           );
