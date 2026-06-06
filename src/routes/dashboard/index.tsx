@@ -1351,6 +1351,27 @@ dashboard.get('/', async (c) => {
 
   const apex = appDomain(c.env);
 
+  // ── DIAGNOSTIC (revertable) ─────────────────────────────────────────────
+  // We're spending ~485 ms per Neon query through Hyperdrive vs ~244 ms with
+  // the previous HTTP driver. Three independent SELECT 1 timings let us tell
+  // which factor is responsible:
+  //   ping1  — first SELECT 1 on a fresh per-request postgres() client.
+  //            If this is ~240 ms the connection setup is cheap; if it's
+  //            ~485 ms we're paying TWO RTTs (PREPARE + EXECUTE) per query.
+  //   ping1b — second SELECT 1 on the same client. If Hyperdrive's prepared
+  //            statement cache is doing its job, this should drop sharply.
+  //   ping3x — three parallel SELECT 1s. If they share the connection pool
+  //            this should equal max(individual), not 3 × individual.
+  await t.measure('ping1', () => database.execute(sql`SELECT 1`));
+  await t.measure('ping1b', () => database.execute(sql`SELECT 1`));
+  await t.measure('ping3x', () =>
+    Promise.all([
+      database.execute(sql`SELECT 1`),
+      database.execute(sql`SELECT 1`),
+      database.execute(sql`SELECT 1`),
+    ]),
+  );
+
   // Site rows + collaborator sites + storage sum are independent — parallelize
   // so the page open pays one Neon round trip's worth of latency.
   //
