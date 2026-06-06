@@ -277,20 +277,13 @@ function runReferenceWalkTests(): void {
             {
               id: 'collection-with-assets',
               type: 'collection',
-              mode: 'manual',
               box: { x: 0, y: 420, w: 600, h: 160, z: 2 },
-              layout: { columns: 1, gap: 12 },
-              entryTemplate: [
-                {
-                  id: 'collection-template-logo',
-                  type: 'nav',
-                  box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
-                  logoAssetId: 'nested-template-logo-id',
-                  links: [],
-                  layout: 'left-right',
-                  sticky: false,
-                },
-              ],
+              collectionSlug: 'blog',
+              display: 'card',
+              sort: 'date-desc',
+              // ADR 0063 dec 6 — the materializer writes per-entry instances
+              // into `entries`; this fixture pre-baked them so the walker has
+              // something to traverse without invoking the materializer.
               entries: [
                 [
                   {
@@ -301,18 +294,16 @@ function runReferenceWalkTests(): void {
                     showArrows: true,
                     showDots: true,
                   },
+                  {
+                    id: 'collection-entry-card-media',
+                    type: 'media',
+                    mediaKind: 'image',
+                    assetId: 'nested-card-image-id',
+                    alt: '',
+                    fit: 'cover',
+                    box: { x: 0, y: 0, w: 200, h: 120, z: 1 },
+                  },
                 ],
-              ],
-              cardTemplate: [
-                {
-                  id: 'collection-card-media',
-                  type: 'media',
-                  mediaKind: 'image',
-                  assetId: 'nested-card-image-id',
-                  alt: '',
-                  fit: 'cover',
-                  box: { x: 0, y: 0, w: 200, h: 120, z: 1 },
-                },
               ],
             },
           ],
@@ -323,16 +314,12 @@ function runReferenceWalkTests(): void {
   const nestedIds = collectReferencedAssetIds(nestedPages);
   assert(nestedIds.has('nested-tab-image-id'), 'expected tab-panel image asset to be reachable');
   assert(
-    nestedIds.has('nested-template-logo-id'),
-    'expected collection entryTemplate nav logo asset to be reachable',
-  );
-  assert(
     nestedIds.has('nested-entry-slide-id'),
     'expected collection entry carousel slide asset to be reachable',
   );
   assert(
     nestedIds.has('nested-card-image-id'),
-    'expected collection cardTemplate image asset to be reachable',
+    'expected collection entry image asset to be reachable',
   );
 
   const nestedUnfilledPages = structuredClone(nestedPages);
@@ -348,11 +335,11 @@ function runReferenceWalkTests(): void {
   if (unfilledCollection.type !== 'collection') {
     throw new Error('[assets:smoke] expected collection second');
   }
-  const unfilledCardMedia = unfilledCollection.cardTemplate?.[0];
-  if (unfilledCardMedia?.type !== 'media') {
-    throw new Error('[assets:smoke] expected collection card media');
+  const unfilledEntry = unfilledCollection.entries?.[0]?.[1];
+  if (unfilledEntry?.type !== 'media') {
+    throw new Error('[assets:smoke] expected collection entry media');
   }
-  unfilledCardMedia.assetId = '';
+  unfilledEntry.assetId = '';
   const nestedUnfilled = collectUnfilledAssetReferences(nestedUnfilledPages);
   assert(
     nestedUnfilled.some(
@@ -365,10 +352,10 @@ function runReferenceWalkTests(): void {
   assert(
     nestedUnfilled.some(
       (ref) =>
-        ref.mediaElementId === 'collection-card-media' &&
-        ref.path.includes('.cardTemplate[0].assetId'),
+        ref.mediaElementId === 'collection-entry-card-media' &&
+        ref.path.includes('.entries[0][1].assetId'),
     ),
-    'expected collection cardTemplate unfilled media asset to be reported with nested path',
+    'expected collection entry unfilled media asset to be reported with nested path',
   );
 }
 

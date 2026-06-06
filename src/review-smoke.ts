@@ -1599,22 +1599,22 @@ const nestedSeedState: EditableSite = {
             {
               id: 'nested-seed-collection',
               type: 'collection',
-              mode: 'manual',
               box: { x: 0, y: 380, w: 600, h: 160, z: 2 },
-              layout: { columns: 1, gap: 12 },
-              entryTemplate: [
-                {
-                  id: 'nested-seed-template-logo',
-                  type: 'nav',
-                  box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
-                  logoAssetId: 'seed-portrait-placeholder',
-                  links: [],
-                  layout: 'left-right',
-                  sticky: false,
-                },
-              ],
+              collectionSlug: 'blog',
+              display: 'card',
+              sort: 'date-desc',
+              // ADR 0063 dec 6 — per-entry instances live in `entries`.
               entries: [
                 [
+                  {
+                    id: 'nested-seed-entry-logo',
+                    type: 'nav',
+                    box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
+                    logoAssetId: 'seed-portrait-placeholder',
+                    links: [],
+                    layout: 'left-right',
+                    sticky: false,
+                  },
                   {
                     id: 'nested-seed-entry-slide',
                     type: 'carousel',
@@ -1625,7 +1625,6 @@ const nestedSeedState: EditableSite = {
                   },
                 ],
               ],
-              cardTemplate: [],
             },
           ],
         },

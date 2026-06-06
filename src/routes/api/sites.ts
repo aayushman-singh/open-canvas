@@ -233,35 +233,12 @@ function rewriteElementAssetIds(
   }
 
   if (element.type === 'collection') {
-    // ADR 0063 — legacy entryTemplate / cardTemplate / entries are optional
-    // during the transition; walk what's present so existing fixtures import
-    // cleanly until the cleanup commit drops these fields.
-    const entryTemplate = element.entryTemplate ?? [];
-    for (let childIdx = 0; childIdx < entryTemplate.length; childIdx++) {
-      const child = entryTemplate[childIdx];
-      if (!child) continue;
-      const missing = rewriteElementAssetIds(
-        child,
-        `${elementPath}.entryTemplate[${String(childIdx)}]`,
-        resolveAssetId,
-      );
-      if (missing !== null) return missing;
-    }
-    if (element.cardTemplate !== undefined) {
-      for (let childIdx = 0; childIdx < element.cardTemplate.length; childIdx++) {
-        const child = element.cardTemplate[childIdx];
-        if (!child) continue;
-        const missing = rewriteElementAssetIds(
-          child,
-          `${elementPath}.cardTemplate[${String(childIdx)}]`,
-          resolveAssetId,
-        );
-        if (missing !== null) return missing;
-      }
-    }
-    const legacyEntries = element.entries ?? [];
-    for (let entryIdx = 0; entryIdx < legacyEntries.length; entryIdx++) {
-      const entry = legacyEntries[entryIdx];
+    // ADR 0063 dec 6 — per-entry instances live in `entries` (materializer
+    // output). Walk them so asset-id rewrites on import touch every nested
+    // media reference.
+    const collectionEntries = element.entries ?? [];
+    for (let entryIdx = 0; entryIdx < collectionEntries.length; entryIdx++) {
+      const entry = collectionEntries[entryIdx];
       if (!entry) continue;
       for (let childIdx = 0; childIdx < entry.length; childIdx++) {
         const child = entry[childIdx];

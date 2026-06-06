@@ -703,33 +703,11 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
   if (el.collectionSlug !== undefined) out.set('collectionSlug', el.collectionSlug);
   if (el.folder !== undefined) out.set('folder', el.folder);
   if (el.display !== undefined) out.set('display', el.display);
-  if (el.sort !== undefined) {
-    if (typeof el.sort === 'string') {
-      out.set('sort', el.sort);
-    } else {
-      // Legacy `{ field, order }` form — round-trip as a Y.Map so future
-      // migrations can pick it up. Phase 2B will rewrite the materializer
-      // around the string form only.
-      const sortMap = new Y.Map<unknown>();
-      sortMap.set('field', el.sort.field);
-      sortMap.set('order', el.sort.order);
-      out.set('sort', sortMap);
-    }
-  }
+  if (el.sort !== undefined) out.set('sort', el.sort);
   if (el.manualOrder !== undefined) {
     const arr = new Y.Array<string>();
     for (const id of el.manualOrder) arr.push([id]);
     out.set('manualOrder', arr);
-  }
-  // -- Legacy fields (retired by ADR 0063) ----------------------------------
-  // Round-trip what's present so existing fixtures + the queued Phase 2D
-  // rewrite of collections-scaffold survive the yjs encode/decode pair
-  // until the cleanup commit drops them.
-  if (el.mode !== undefined) out.set('mode', el.mode);
-  if (el.entryTemplate !== undefined) {
-    const entryTemplate = new Y.Array<Y.Map<unknown>>();
-    for (const child of el.entryTemplate) entryTemplate.push([encodeElement(child)]);
-    out.set('entryTemplate', entryTemplate);
   }
   if (el.entries !== undefined) {
     const entries = new Y.Array<Y.Array<Y.Map<unknown>>>();
@@ -739,35 +717,6 @@ function encodeCollectionElement(el: CollectionElement): Y.Map<unknown> {
       entries.push([row]);
     }
     out.set('entries', entries);
-  }
-  if (el.filter !== undefined) {
-    const filterMap = new Y.Map<unknown>();
-    if (el.filter.category !== undefined) filterMap.set('category', el.filter.category);
-    if (el.filter.tags !== undefined) {
-      const tagsArr = new Y.Array<string>();
-      for (const tag of el.filter.tags) tagsArr.push([tag]);
-      filterMap.set('tags', tagsArr);
-    }
-    if (el.filter.limit !== undefined) filterMap.set('limit', el.filter.limit);
-    out.set('filter', filterMap);
-  }
-  if (el.cardTemplate !== undefined) {
-    const cardTemplate = new Y.Array<Y.Map<unknown>>();
-    for (const child of el.cardTemplate) cardTemplate.push([encodeElement(child)]);
-    out.set('cardTemplate', cardTemplate);
-  }
-  if (el.fieldBindings !== undefined) {
-    const bindingsMap = new Y.Map<string>();
-    for (const [elementId, field] of Object.entries(el.fieldBindings)) {
-      bindingsMap.set(elementId, field);
-    }
-    out.set('fieldBindings', bindingsMap);
-  }
-  if (el.layout !== undefined) {
-    const layoutMap = new Y.Map<unknown>();
-    layoutMap.set('columns', el.layout.columns);
-    layoutMap.set('gap', el.layout.gap);
-    out.set('layout', layoutMap);
   }
   return out;
 }
@@ -1348,7 +1297,11 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
     ...base,
     type: 'collection',
   };
-  // ADR 0063 canonical fields.
+  // ADR 0063 canonical fields. Yjs storage is schema-tolerant; any historical
+  // keys for retired CollectionElement fields (`mode`, `cardTemplate`,
+  // `fieldBindings`, `entryTemplate`, `filter`, `layout`, legacy
+  // `{ field, order }` sort) sit unread on the Y.Doc — they cannot resurface
+  // because there is no type slot to land in.
   if (map.has('collectionSlug')) el.collectionSlug = map.get('collectionSlug') as string;
   if (map.has('folder')) el.folder = map.get('folder') as string;
   if (map.has('display')) {
@@ -1356,58 +1309,19 @@ function decodeCollectionElement(map: Y.Map<unknown>, base: BaseElement): Collec
   }
   if (map.has('sort')) {
     const raw = map.get('sort');
+    // Only the string-union form survives F5b; legacy `{ field, order }`
+    // objects (stored as Y.Map) are dropped silently — the materializer
+    // already treats `sort === undefined` as `'date-desc'`.
     if (typeof raw === 'string') {
       el.sort = raw as CollectionSort;
-    } else {
-      // Legacy `{ field, order }` form survives encode/decode unchanged.
-      const sortMap = raw as Y.Map<unknown>;
-      el.sort = {
-        field: sortMap.get('field') as 'publishedDate' | 'title',
-        order: sortMap.get('order') as 'asc' | 'desc',
-      };
     }
   }
   if (map.has('manualOrder')) {
     el.manualOrder = (map.get('manualOrder') as Y.Array<string>).toArray();
   }
-  // -- Legacy fields (round-tripped during transition) ----------------------
-  if (map.has('mode')) {
-    el.mode = map.get('mode') as NonNullable<CollectionElement['mode']>;
-  }
-  if (map.has('entryTemplate')) {
-    el.entryTemplate = (map.get('entryTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
-  }
   if (map.has('entries')) {
     const rawEntries = map.get('entries') as Y.Array<Y.Array<Y.Map<unknown>>>;
     el.entries = rawEntries.map((row) => row.map(decodeElement));
-  }
-  if (map.has('layout')) {
-    const layoutMap = map.get('layout') as Y.Map<unknown>;
-    el.layout = {
-      columns: layoutMap.get('columns') as number,
-      gap: layoutMap.get('gap') as number,
-    };
-  }
-  if (map.has('filter')) {
-    const filterMap = map.get('filter') as Y.Map<unknown>;
-    const filter: NonNullable<CollectionElement['filter']> = {};
-    if (filterMap.has('category')) filter.category = filterMap.get('category') as string;
-    if (filterMap.has('tags')) {
-      filter.tags = (filterMap.get('tags') as Y.Array<string>).toArray();
-    }
-    if (filterMap.has('limit')) filter.limit = filterMap.get('limit') as number;
-    el.filter = filter;
-  }
-  if (map.has('cardTemplate')) {
-    el.cardTemplate = (map.get('cardTemplate') as Y.Array<Y.Map<unknown>>).map(decodeElement);
-  }
-  if (map.has('fieldBindings')) {
-    const bindingsMap = map.get('fieldBindings') as Y.Map<string>;
-    const bindings: Record<string, string> = {};
-    for (const [elementId, field] of bindingsMap.entries()) {
-      bindings[elementId] = field;
-    }
-    el.fieldBindings = bindings as NonNullable<CollectionElement['fieldBindings']>;
   }
   return el;
 }

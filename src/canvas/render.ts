@@ -541,18 +541,11 @@ function walkElements(
         }
       }
     } else if (el.type === 'collection') {
-      // ADR 0063 — legacy entryTemplate / cardTemplate / entries are
-      // optional during the transition; walk only what's present.
-      for (const child of el.entryTemplate ?? []) {
-        if (visit(child)) return true;
-      }
+      // ADR 0063 dec 6 — `entries` is the materializer's per-entry output;
+      // walked so nested interactive elements (e.g. tabs inside a card)
+      // still trigger runtime injection.
       for (const entry of el.entries ?? []) {
         for (const child of entry) {
-          if (visit(child)) return true;
-        }
-      }
-      if (el.cardTemplate !== undefined) {
-        for (const child of el.cardTemplate) {
           if (visit(child)) return true;
         }
       }

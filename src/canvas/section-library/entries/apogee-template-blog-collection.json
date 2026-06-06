@@ -42,130 +42,6 @@
           "h": 460,
           "z": 1
         },
-        "mode": "manual",
-        "entryTemplate": [
-          {
-            "id": "tmpl-card-bg",
-            "type": "container",
-            "box": {
-              "x": 0,
-              "y": 0,
-              "w": 400,
-              "h": 440,
-              "z": 1
-            },
-            "variant": "raised"
-          },
-          {
-            "id": "tmpl-card-image",
-            "type": "media",
-            "box": {
-              "x": 0,
-              "y": 0,
-              "w": 400,
-              "h": 220,
-              "z": 2
-            },
-            "mediaKind": "image",
-            "assetId": "seed-hero-poster-1",
-            "alt": "Blog post cover",
-            "fit": "cover"
-          },
-          {
-            "id": "tmpl-card-tag",
-            "type": "text",
-            "box": {
-              "x": 24,
-              "y": 236,
-              "w": 120,
-              "h": 22,
-              "z": 3
-            },
-            "content": [
-              {
-                "text": "DESIGN"
-              }
-            ],
-            "role": "label",
-            "fontSize": 11,
-            "fontWeight": 700,
-            "align": "left",
-            "pinnedStyle": {
-              "color": "#B5462F"
-            }
-          },
-          {
-            "id": "tmpl-card-title",
-            "type": "text",
-            "box": {
-              "x": 24,
-              "y": 264,
-              "w": 352,
-              "h": 72,
-              "z": 3
-            },
-            "content": [
-              {
-                "text": "Article title",
-                "marks": [
-                  {
-                    "type": "bold"
-                  }
-                ]
-              }
-            ],
-            "role": "heading",
-            "fontSize": 20,
-            "fontWeight": 700,
-            "align": "left"
-          },
-          {
-            "id": "tmpl-card-excerpt",
-            "type": "text",
-            "box": {
-              "x": 24,
-              "y": 344,
-              "w": 352,
-              "h": 52,
-              "z": 3
-            },
-            "content": [
-              {
-                "text": "Article excerpt goes here."
-              }
-            ],
-            "role": "body",
-            "fontSize": 14,
-            "fontWeight": 400,
-            "align": "left",
-            "pinnedStyle": {
-              "color": "#6B6359"
-            }
-          },
-          {
-            "id": "tmpl-card-meta",
-            "type": "text",
-            "box": {
-              "x": 24,
-              "y": 404,
-              "w": 240,
-              "h": 22,
-              "z": 3
-            },
-            "content": [
-              {
-                "text": "Date  ·  X min read"
-              }
-            ],
-            "role": "label",
-            "fontSize": 12,
-            "fontWeight": 400,
-            "align": "left",
-            "pinnedStyle": {
-              "color": "#9E9587"
-            }
-          }
-        ],
         "entries": [
           [
             {
@@ -536,11 +412,7 @@
               }
             }
           ]
-        ],
-        "layout": {
-          "columns": 3,
-          "gap": 32
-        }
+        ]
       }
     ]
   },

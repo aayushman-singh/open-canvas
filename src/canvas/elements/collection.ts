@@ -12,16 +12,11 @@
 // can compose "Latest blog" + "Recent case studies" + "Featured projects"
 // as three Collection elements on one page (ADR 0063 dec 1).
 //
-// ----------------------------------------------------------------------------
-// Retired fields kept as optional during the Phase 1 transition
-// ----------------------------------------------------------------------------
-// `mode`, `entryTemplate`, `entries`, `cardTemplate`, `fieldBindings`,
-// `filter`, and `layout` belonged to the page-bound model ADR 0063 retires.
-// They are still declared (optional, `_legacy*` typed) so the Phase 2D
-// `collections-scaffold.ts` and other queued rewrites still compile against
-// the new schema during the multi-commit migration. The validator does not
-// require them; the new materializer (Phase 2B) does not read them. They
-// will be removed in a follow-up cleanup commit on this branch.
+// `entries: CanvasElement[][]` is load-bearing: the materializer WRITES
+// per-entry cloned templates into this slot at publish time, and downstream
+// renderers (`canvas/render.ts`, `interactive/inject.ts`) iterate the matrix.
+// Per-entry instances are materializer output, not authorable elements
+// (ADR 0063 dec 6).
 
 import type { BaseElement, CanvasElement } from '../schema.js';
 import type { AgentToolSpec } from './agent-tool-spec.js';
@@ -54,46 +49,6 @@ export type CollectionDisplay = (typeof COLLECTION_DISPLAYS)[number];
 export const COLLECTION_SORTS = ['date-desc', 'date-asc', 'manual'] as const;
 export type CollectionSort = (typeof COLLECTION_SORTS)[number];
 
-// ----------------------------------------------------------------------------
-// Legacy fields — retired by ADR 0063, kept structurally during transition
-// ----------------------------------------------------------------------------
-
-/** @deprecated ADR 0063 retired the page-bound mode. Carry-over only so the
- *  Phase 2D collections-scaffold rewrite can still reference the name. */
-export const PAGE_METADATA_FIELDS = [
-  'title',
-  'description',
-  'ogImage',
-  'publishedDate',
-  'author',
-  'tags',
-  'category',
-] as const;
-/** @deprecated ADR 0063 — see PAGE_METADATA_FIELDS. */
-export type PageMetadataField = (typeof PAGE_METADATA_FIELDS)[number];
-
-/** @deprecated ADR 0063 dec 1 — the page-bound binding model is retired. */
-export type CollectionMode = 'manual' | 'page-bound';
-
-/** @deprecated ADR 0063 dec 1 — superseded by element-level `collectionSlug` + `folder`. */
-export interface CollectionFilter {
-  category?: string;
-  tags?: string[];
-  limit?: number;
-}
-
-/** @deprecated ADR 0063 dec 4 — superseded by built-in card defaults. */
-export interface CollectionLayout {
-  columns: number;
-  gap: number;
-}
-
-/** @deprecated ADR 0063 dec 1 — superseded by the string-union `sort` field. */
-export interface LegacyCollectionSortObject {
-  field: 'publishedDate' | 'title';
-  order: 'asc' | 'desc';
-}
-
 export interface CollectionElement extends BaseElement {
   type: 'collection';
 
@@ -105,8 +60,7 @@ export interface CollectionElement extends BaseElement {
    * (ADR 0063 dec 5); the publish-time materializer emits zero cards plus
    * a warning line. The ADR contract reads `string | undefined`; the
    * `?: string` form is the same shape under TypeScript's
-   * `exactOptionalPropertyTypes` and lets the Phase 2D scaffolding
-   * compile without re-declaring the field on every constructor.
+   * `exactOptionalPropertyTypes`.
    */
   collectionSlug?: string;
   /**
@@ -116,15 +70,11 @@ export interface CollectionElement extends BaseElement {
    */
   folder?: string;
   /**
-   * Entry ordering. The new shape defaults to `'date-desc'` on insert via
-   * `collection-defaults.ts`; the legacy object form `{ field, order }` is
-   * accepted at the type level during the multi-commit migration so
-   * Phase 2D's collections-scaffold and pre-ADR-0063 fixtures still compile.
-   * Optional during the transition so legacy fixtures without `sort` keep
-   * type-checking; the new validator only accepts the string-union form
-   * when present.
+   * Entry ordering (ADR 0063 dec 1 + dec 8). Optional during the multi-commit
+   * Phase 1 transition so legacy fixtures without `sort` keep type-checking;
+   * the materializer treats absence as `'date-desc'`.
    */
-  sort?: CollectionSort | LegacyCollectionSortObject;
+  sort?: CollectionSort;
   /**
    * Ordered list of `collection_entry.id` values. Present iff
    * `sort === 'manual'`. Entries added to the source after `manualOrder` was
@@ -140,21 +90,14 @@ export interface CollectionElement extends BaseElement {
    */
   display?: CollectionDisplay;
 
-  // -- Legacy fields (retired by ADR 0063, structurally kept) ----------------
-  /** @deprecated ADR 0063 dec 1. */
-  mode?: CollectionMode;
-  /** @deprecated ADR 0063 dec 1. */
-  entryTemplate?: CanvasElement[];
-  /** @deprecated ADR 0063 dec 6 — materializer output, not authorable. */
+  /**
+   * Per-entry instances written by the materializer (ADR 0063 dec 6).
+   * The materializer is the only writer; downstream renderers
+   * (`canvas/render.ts`, `interactive/inject.ts`) iterate the matrix to
+   * emit per-entry DOM. NOT authorable — clicks on per-entry DOM bubble to
+   * the parent Collection (ADR 0063 dec 6).
+   */
   entries?: CanvasElement[][];
-  /** @deprecated ADR 0063 dec 1 — superseded by `folder`. */
-  filter?: CollectionFilter;
-  /** @deprecated ADR 0063 dec 4 — superseded by built-in card defaults. */
-  cardTemplate?: CanvasElement[];
-  /** @deprecated ADR 0063 dec 4 — bindings are built into the default card. */
-  fieldBindings?: Record<string, PageMetadataField>;
-  /** @deprecated ADR 0063 — layout is now derived from the display mode. */
-  layout?: CollectionLayout;
 }
 
 export interface CollectionRenderCtx {
@@ -183,12 +126,7 @@ export function renderCollection(el: CollectionElement, _ctx: CollectionRenderCt
   ]);
   const slugAttr = el.collectionSlug !== undefined ? escapeAttr(el.collectionSlug) : '';
   const folderAttr = el.folder !== undefined ? escapeAttr(el.folder) : '';
-  const sortAttr =
-    el.sort === undefined
-      ? 'date-desc'
-      : typeof el.sort === 'string'
-        ? el.sort
-        : `${el.sort.field}-${el.sort.order}`;
+  const sortAttr = el.sort ?? 'date-desc';
   const displayAttr = el.display ?? 'card';
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +

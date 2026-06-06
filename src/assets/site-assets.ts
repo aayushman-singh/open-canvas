@@ -168,19 +168,10 @@ function collectElementReferences(
     return;
   }
   if (element.type === 'collection') {
-    // ADR 0063 — the new CollectionElement carries no authorable children;
-    // per-entry DOM is materializer output and pulls its asset references
-    // from the `collection_entry` row (`ogImageAssetId`), not from the
-    // canvas document. Legacy `entryTemplate` / `cardTemplate` / `entries`
-    // are optional during the migration; walk them when present so existing
-    // fixtures keep contributing references until the cleanup commit drops
-    // them.
-    (element.entryTemplate ?? []).forEach((child, childIdx) => {
-      collectElementReferences(child, `${elementPath}.entryTemplate[${String(childIdx)}]`, out);
-    });
-    element.cardTemplate?.forEach((child, childIdx) => {
-      collectElementReferences(child, `${elementPath}.cardTemplate[${String(childIdx)}]`, out);
-    });
+    // ADR 0063 dec 6 — `entries` is the materializer's per-entry output;
+    // its child assets (e.g. media element assetId from a per-entry
+    // `ogImageAssetId`) must remain reachable so the publish guard does not
+    // 404 a referenced asset.
     (element.entries ?? []).forEach((entry, entryIdx) => {
       entry.forEach((child, childIdx) => {
         collectElementReferences(
@@ -290,22 +281,8 @@ function collectUnfilledElementReferences(
     return;
   }
   if (element.type === 'collection') {
-    // ADR 0063 — legacy CollectionElement child arrays are optional during
-    // the transition; walk what's present, skip what's absent.
-    (element.entryTemplate ?? []).forEach((child, childIdx) => {
-      collectUnfilledElementReferences(
-        child,
-        `${elementPath}.entryTemplate[${String(childIdx)}]`,
-        out,
-      );
-    });
-    element.cardTemplate?.forEach((child, childIdx) => {
-      collectUnfilledElementReferences(
-        child,
-        `${elementPath}.cardTemplate[${String(childIdx)}]`,
-        out,
-      );
-    });
+    // ADR 0063 dec 6 — per-entry instances live in `entries`; walk them so
+    // unfilled media assetIds surface in the editor publish-guard hints.
     (element.entries ?? []).forEach((entry, entryIdx) => {
       entry.forEach((child, childIdx) => {
         collectUnfilledElementReferences(

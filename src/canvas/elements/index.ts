@@ -76,12 +76,7 @@ export type { TableColumn, TableElement, TableRow } from './table.js';
 export type {
   CollectionDisplay,
   CollectionElement,
-  CollectionFilter,
-  CollectionLayout,
-  CollectionMode,
   CollectionSort,
-  LegacyCollectionSortObject,
-  PageMetadataField,
 } from './collection.js';
 export type { Tab, TabsElement } from './tabs.js';
 export { TABS_DEFAULT_BAR_HEIGHT } from './tabs.js';

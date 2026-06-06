@@ -41,10 +41,9 @@
 //     (`${baseElement.id}--${entry.slug}`) so re-running materialization on
 //     the same input produces byte-equal pages (good for snapshot replay
 //     smokes).
-//   * Legacy CollectionElement fields (`mode`, `cardTemplate`, `fieldBindings`,
-//     `filter`, the object-shaped `sort`) are read-skipped per Phase 2B's
-//     migration discipline. Only the new fields (`collectionSlug`, `folder`,
-//     `sort` as string, `manualOrder`, `display`) are read.
+//   * Reads only the ADR 0063 canonical fields (`collectionSlug`, `folder`,
+//     `sort`, `manualOrder`, `display`); legacy CollectionElement fields were
+//     removed in F5b.
 
 import type {
   ActionElement,
@@ -295,8 +294,7 @@ function buildImageOnlyEntryInstance(
 }
 
 function readSortMode(el: CollectionElement): CollectionSort {
-  if (typeof el.sort === 'string') return el.sort;
-  return 'date-desc';
+  return el.sort ?? 'date-desc';
 }
 
 function clonePageForEntry(template: CanvasPage, entry: MaterializerEntry): CanvasPage {

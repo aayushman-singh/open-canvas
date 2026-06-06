@@ -25,9 +25,6 @@
 //      `manualOrder` are skipped silently.
 //  11. Zero-entry case (no matches OR `collectionSlug === undefined`) yields
 //      `el.entries = []` and a warning string of the ADR-pinned shape.
-//  12. Legacy CollectionElement fields (`mode`, `cardTemplate`, object-shaped
-//      `sort`, etc.) are read-skipped — present-but-stale legacy values do
-//      not crash and do not influence behaviour.
 
 import type {
   CanvasElement,
@@ -584,61 +581,6 @@ function externalUrlOf(container: ContainerElement): string {
     warnings[0]!.includes('source=blog') && warnings[0]!.includes('folder=ghost-folder'),
     `(11c) warning names source + folder (got: ${warnings[0]!})`,
   );
-}
-
-// ---------------------------------------------------------------------------
-// (12) Legacy CollectionElement fields are read-skipped (no crash, no effect)
-// ---------------------------------------------------------------------------
-
-{
-  const collection: CollectionElement = {
-    id: 'col-legacy',
-    type: 'collection',
-    box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
-    collectionSlug: 'blog',
-    display: 'card',
-    sort: 'date-desc',
-    // -- legacy fields the new materializer must ignore ----------------------
-    mode: 'page-bound',
-    cardTemplate: [
-      {
-        id: 'legacy-card-text',
-        type: 'text',
-        box: { x: 0, y: 0, w: 100, h: 20, z: 1 },
-        content: [{ text: 'legacy card should not render' }],
-        role: 'body',
-        fontSize: 12,
-        fontWeight: 400,
-        align: 'left',
-      },
-    ],
-    fieldBindings: { title: 'title' },
-    filter: { category: 'engineering' },
-    layout: { columns: 3, gap: 16 },
-  };
-  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
-  const entries: MaterializerEntry[] = [
-    makeEntry({ slug: 'one', title: 'Real card', category: 'design' }),
-  ];
-  let threw = false;
-  try {
-    const out = materializeCollections(site, entries);
-    const matrix = getCollectionFrom(out).entries!;
-    assert(matrix.length === 1, '(12) legacy fields do not break materialization');
-    const title = matrix[0]![2]! as TextElement;
-    assert(
-      title.content[0]!.text === 'Real card',
-      `(12) new defaults win over legacy cardTemplate (got ${title.content[0]?.text ?? ''})`,
-    );
-    const containerOuter = matrix[0]![0]! as ContainerElement;
-    assert(
-      containerOuter.preset === 'card',
-      '(12) materializer uses DEFAULT_CARD_TEMPLATE, not legacy cardTemplate',
-    );
-  } catch (_e) {
-    threw = true;
-  }
-  assert(!threw, '(12) legacy fields present must not throw');
 }
 
 // ---------------------------------------------------------------------------

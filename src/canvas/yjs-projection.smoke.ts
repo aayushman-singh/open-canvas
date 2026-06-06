@@ -255,19 +255,11 @@ const syntheticElements: CanvasElement[] = [
     id: 'el-collection',
     type: 'collection',
     box: { x: 0, y: 3040, w: 1440, h: 320, z: 6 },
-    mode: 'manual',
-    entryTemplate: [
-      {
-        id: 'el-collection-template-text',
-        type: 'text',
-        box: { x: 0, y: 0, w: 320, h: 80, z: 1 },
-        content: [{ text: 'Entry title' }],
-        role: 'body',
-        fontSize: 18,
-        fontWeight: 500,
-        align: 'left',
-      },
-    ],
+    collectionSlug: 'blog',
+    display: 'card',
+    sort: 'date-desc',
+    folder: 'tech-notes',
+    manualOrder: [],
     entries: [
       [
         {
@@ -282,7 +274,6 @@ const syntheticElements: CanvasElement[] = [
         },
       ],
     ],
-    layout: { columns: 3, gap: 24 },
   },
   {
     id: 'el-tabs',

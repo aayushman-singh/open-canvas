@@ -1129,24 +1129,13 @@ function validateElement(
       }
       // `sort` and `display` are optional during the multi-commit migration
       // (Phase 1 lands the shape; Phase 2B tightens to required-on-insert).
-      // The validator accepts either the new string-union form or the legacy
-      // object form `{ field, order }` so pre-ADR-0063 fixtures and the
-      // queued Phase 2D collections-scaffold rewrite stay valid until the
-      // cleanup commit. The new materializer (Phase 2B) only reads the
-      // string form; legacy values flow through as inert.
       if (element.sort !== undefined) {
-        if (typeof element.sort === 'string') {
-          assertOneOf<CollectionSort>(
-            element.sort,
-            COLLECTION_SORTS,
-            `${basePath}.sort`,
-            errors,
-          );
-        } else if (!isRecord(element.sort)) {
-          errors.push(
-            `${basePath}.sort must be one of [${COLLECTION_SORTS.join(', ')}] or a legacy { field, order } object (got ${describe(element.sort)})`,
-          );
-        }
+        assertOneOf<CollectionSort>(
+          element.sort,
+          COLLECTION_SORTS,
+          `${basePath}.sort`,
+          errors,
+        );
       }
       if (element.display !== undefined) {
         assertOneOf<CollectionDisplay>(

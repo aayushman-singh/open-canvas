@@ -52,11 +52,10 @@ export function snapshotNeedsInteractiveRuntime(snapshot: PublishedSnapshot): bo
       return element.tabs.some((tab) => tab.elements.some(elementNeedsRuntime));
     }
     if (element.type === 'collection') {
-      // ADR 0063 — legacy CollectionElement child arrays are optional during
-      // the transition; check what's present, skip what's absent.
-      if ((element.entryTemplate ?? []).some(elementNeedsRuntime)) return true;
-      if ((element.entries ?? []).some((entry) => entry.some(elementNeedsRuntime))) return true;
-      return element.cardTemplate?.some(elementNeedsRuntime) === true;
+      // ADR 0063 dec 6 — `entries` is the materializer's per-entry output;
+      // walked so nested interactive elements (e.g. tabs inside a card)
+      // still trigger runtime injection.
+      return (element.entries ?? []).some((entry) => entry.some(elementNeedsRuntime));
     }
     return false;
   };
