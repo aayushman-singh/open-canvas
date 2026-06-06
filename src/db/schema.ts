@@ -103,15 +103,12 @@ export const site = pgTable(
     // editableState update auto-recomputes them; no manual sync.
     visitorTheme: text('visitor_theme').generatedAlwaysAs(
       sql`(editable_state->>'visitorTheme')`,
-      { mode: 'stored' },
     ),
     siteNoIndex: boolean('site_no_index').generatedAlwaysAs(
       sql`((editable_state->>'siteNoIndex')::boolean)`,
-      { mode: 'stored' },
     ),
     faviconAssetId: text('favicon_asset_id').generatedAlwaysAs(
       sql`(editable_state->>'faviconAssetId')`,
-      { mode: 'stored' },
     ),
     publishedSnapshot: jsonb('published_snapshot').$type<PublishedSnapshot | null>(),
     publishedVersion: integer('published_version').notNull().default(0),

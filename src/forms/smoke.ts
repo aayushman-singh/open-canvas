@@ -309,6 +309,11 @@ class InMemoryDb {
       subdomain: 'test',
       styleKit: 'charcoal',
       editableState,
+      // Generated columns at the DB; the in-memory shim mirrors the type
+      // by pre-deriving from editableState.
+      visitorTheme: editableState.visitorTheme ?? null,
+      siteNoIndex: editableState.siteNoIndex ?? null,
+      faviconAssetId: editableState.faviconAssetId ?? null,
       publishedSnapshot: row.publishedSnapshot,
       publishedVersion: row.publishedSnapshot ? row.publishedSnapshot.version : 0,
       passwordEnabled: false,
