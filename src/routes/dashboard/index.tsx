@@ -1137,11 +1137,15 @@ const thumbHydratorScript = raw(`<script>
     var inflight = 0;
     var max = 3;
     function start(f, src){
-      // IIFE-scope `f` so each in-flight promise chain closes over its own
-      // iframe. A naive `while` loop with `var f = iframes.shift()` is the
-      // classic closure-in-loop trap: every .then(html => f.srcdoc = html)
-      // captures the SAME `f`, so all responses race to write into whichever
-      // iframe was popped last and every earlier iframe stays blank.
+      // IIFE-scope the iframe ref so each in-flight promise chain closes
+      // over its own f. A naive while-loop with var f = iframes.shift() is
+      // the classic closure-in-loop trap: every .then handler captures the
+      // SAME f, so all responses race to write into whichever iframe was
+      // popped last and every earlier iframe stays blank.
+      //
+      // NB: no backticks in this comment, even in identifiers — the whole
+      // function body lives inside a raw() template literal and a stray
+      // backtick closes the outer literal early, breaking tsc parsing.
       fetch(src, { credentials: 'same-origin' })
         .then(function(r){ return r.ok ? r.text() : null; })
         .then(function(html){
