@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
-import { and, desc, eq, isNotNull, sum } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, sql, sum } from 'drizzle-orm';
 import { billingPlanLabel, siteLimitForPlan, storageLimitForPlan } from '../../billing/plan-limits';
 import { PlanTiles, planTilesStyles } from '../../billing/plan-tiles';
 import { db } from '../../db/client';
@@ -17,7 +17,6 @@ import { buildStyleKitCss } from '../../canvas/style-kits';
 import { resolveStyleKitWithCustom } from '../../themes/custom-resolve';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
-import { collectReferencedAssets } from '../../assets/site-assets';
 import { Timings } from '../../server-timing';
 
 type Bindings = HostConfigEnv & {
@@ -1213,19 +1212,27 @@ function buildCards(
     styleKit: string;
     publishedVersion: number;
     updatedAt: Date;
-    editableState: EditableSite;
+    visitorTheme: string | null;
+    siteNoIndex: boolean | null;
     passwordEnabled: boolean;
   }>,
 ): SiteCard[] {
   return rows.map((row) => {
-    const state = row.editableState;
     // The cache is consumed by /dashboard/thumbs/:siteId, not here. Inlining
     // a cached srcdoc into the dashboard body bloated the wire payload to
     // ~900kB (3 sites x ~300kB each), pushing domInteractive past 5s. The
     // cheap path is always the same: emit a placeholder iframe with a
-    // `data-thumb-src` attribute, let the inline hydrator pull each thumb
-    // off /dashboard/thumbs/:siteId after first paint, and let the cache do
-    // its job on THAT route's render cost — not on the listing's wire size.
+    // data-thumb-src attribute, let the inline hydrator pull each thumb off
+    // /dashboard/thumbs/:siteId after first paint, and let the cache do its
+    // job on THAT route's render cost — not on the listing's wire size.
+    //
+    // visitorTheme/siteNoIndex come from JSONB partial extraction at the
+    // listing query, so we narrow them to the SiteCard shape with the same
+    // defaults the renderer applied when we used to load the whole state.
+    const theme: SiteCard['visitorTheme'] =
+      row.visitorTheme === 'dark' || row.visitorTheme === 'toggleable'
+        ? row.visitorTheme
+        : 'light';
     return {
       siteId: row.id,
       ownedByCurrent: row.ownedByCurrent,
@@ -1235,8 +1242,8 @@ function buildCards(
       publishedVersion: row.publishedVersion,
       updatedAt: row.updatedAt,
       passwordEnabled: row.passwordEnabled,
-      visitorTheme: state.visitorTheme ?? 'light',
-      searchIndexing: !(state.siteNoIndex ?? false),
+      visitorTheme: theme,
+      searchIndexing: !(row.siteNoIndex ?? false),
     };
   });
 }
@@ -1354,6 +1361,13 @@ dashboard.get('/', async (c) => {
   // gate (that's a plan quota on creation, not on access), and each row is
   // tagged with ownership before rendering so owner-only card actions stay
   // off collaborator cards.
+  // editableState is a fat JSONB column (often 100-400kB per site) and the
+  // listing only reads two scalar fields off it (visitorTheme, siteNoIndex).
+  // Pulling the whole blob over the Neon wire was costing 900ms+ of TTFB
+  // for very little payoff. Project the two needed fields at the database
+  // with JSONB partial extraction so each row stays tiny — the editor and
+  // /dashboard/thumbs/:siteId routes still load the full state when they
+  // actually need it.
   const [ownedRows, collabRows, sb] = await t.measure('db.list', () =>
     Promise.all([
       database
@@ -1364,7 +1378,8 @@ dashboard.get('/', async (c) => {
           styleKit: site.styleKit,
           publishedVersion: site.publishedVersion,
           updatedAt: site.updatedAt,
-          editableState: site.editableState,
+          visitorTheme: sql<string | null>`(${site.editableState}->>'visitorTheme')`,
+          siteNoIndex: sql<boolean | null>`(${site.editableState}->>'siteNoIndex')::boolean`,
           passwordEnabled: site.passwordEnabled,
         })
         .from(site)
@@ -1378,7 +1393,8 @@ dashboard.get('/', async (c) => {
           styleKit: site.styleKit,
           publishedVersion: site.publishedVersion,
           updatedAt: site.updatedAt,
-          editableState: site.editableState,
+          visitorTheme: sql<string | null>`(${site.editableState}->>'visitorTheme')`,
+          siteNoIndex: sql<boolean | null>`(${site.editableState}->>'siteNoIndex')::boolean`,
           passwordEnabled: site.passwordEnabled,
         })
         .from(site)
@@ -1410,27 +1426,12 @@ dashboard.get('/', async (c) => {
   const publishedCount = rows.filter((r) => r.publishedVersion > 0).length;
   const storageBytes = Number(sb[0]?.total ?? 0);
 
-  // Preload the FIRST image asset each site's iframe will fetch. Same-origin
-  // iframes (the card thumbnails live on this Worker's origin) share the
-  // browser's HTTP cache with their parent document for matching cache keys
-  // (Chrome's partitioned cache uses top-frame-origin + iframe-origin; both
-  // are this Worker), so the preload populates the cache that the iframe's
-  // <img> requests then read from. One link per site — the document-order
-  // first reference is what visitors see above the card title, and chasing
-  // every referenced asset would just trade one slow waterfall for a slower
-  // parallel storm.
-  const preloadLinks = rows.flatMap((row) => {
-    const referenced = collectReferencedAssets(row.editableState);
-    const firstImage = referenced.find((ref) => ref.expectedKind === 'image');
-    if (!firstImage) return [];
-    return [
-      <link
-        rel="preload"
-        as="image"
-        href={`/api/canvas/sites/${row.id}/assets/${firstImage.assetId}`}
-      />,
-    ];
-  });
+  // Asset preloads used to walk editableState here and emit a <link
+  // rel=preload> per site for the first image. With the JSONB projection
+  // above we no longer load editableState on the listing path, and the
+  // /dashboard/thumbs/:siteId iframes pull their own asset URLs once they
+  // hydrate — the preload was a marginal head-start at most, not worth a
+  // separate per-site walk over the full state to recover.
 
   const siteLimit = siteLimitForPlan(customerPlan);
   const ownedSiteCount = ownedRows.length;
@@ -1460,7 +1461,6 @@ dashboard.get('/', async (c) => {
       pageStyles={cardStyles}
       userMeta={{ avatarUrl, displayName, email: primaryEmail }}
       theme={readThemeCookie(c)}
-      headLinks={preloadLinks}
     >
       <div class="page-head">
         <div>
@@ -1771,24 +1771,26 @@ dashboard.get('/thumbs/:siteId', async (c) => {
   const siteId = c.req.param('siteId');
   const database = db(c.env);
 
-  const [row] = await t.measure('db.site', () =>
+  // Two-phase fetch. Phase one pulls only the cheap metadata + updatedAt
+  // we need to authorize and key the cache; pulling editableState here
+  // would burn ~700ms even on cache HITS (which is the whole point of
+  // having the cache). Phase two only fires when we actually need to
+  // render — full editableState then, paid once per (siteId, updatedAt).
+  const [meta] = await t.measure('db.meta', () =>
     database
       .select({
         id: site.id,
         customerId: site.customerId,
-        name: site.name,
-        subdomain: site.subdomain,
         updatedAt: site.updatedAt,
-        editableState: site.editableState,
       })
       .from(site)
       .where(eq(site.id, siteId))
       .limit(1),
   );
 
-  if (!row) return c.notFound();
+  if (!meta) return c.notFound();
 
-  const isOwner = row.customerId === customerRecord.id;
+  const isOwner = meta.customerId === customerRecord.id;
   let allowed = isOwner;
   if (!allowed) {
     const [collab] = await t.measure('db.collab', () =>
@@ -1808,22 +1810,34 @@ dashboard.get('/thumbs/:siteId', async (c) => {
   }
   if (!allowed) return c.notFound();
 
-  let html = getCachedThumbHtml(siteId, row.updatedAt);
+  let html = getCachedThumbHtml(siteId, meta.updatedAt);
   const cacheHit = html !== undefined;
   if (!html) {
+    const [fullRow] = await t.measure('db.state', () =>
+      database
+        .select({
+          name: site.name,
+          subdomain: site.subdomain,
+          editableState: site.editableState,
+        })
+        .from(site)
+        .where(eq(site.id, siteId))
+        .limit(1),
+    );
+    if (!fullRow) return c.notFound();
     const origin = new URL(c.req.url).origin;
     const stopRender = t.start('render');
     try {
       html = buildThumbHtml(
-        row.editableState,
+        fullRow.editableState,
         siteId,
         origin,
         requireTurnstileSiteKey(c.env),
       );
-      setCachedThumbHtml(siteId, row.updatedAt, html);
+      setCachedThumbHtml(siteId, meta.updatedAt, html);
     } catch (error) {
       console.error(
-        `dashboard/thumbs: buildThumbHtml failed for siteId=${siteId} name=${JSON.stringify(row.name)} subdomain=${JSON.stringify(row.subdomain)}`,
+        `dashboard/thumbs: buildThumbHtml failed for siteId=${siteId} name=${JSON.stringify(fullRow.name)} subdomain=${JSON.stringify(fullRow.subdomain)}`,
         error,
       );
       html = THUMB_FAILED_HTML;

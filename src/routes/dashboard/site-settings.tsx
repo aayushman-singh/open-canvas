@@ -17,7 +17,7 @@
 // the rendered surface in sync with the DB — no client-side state
 // machine.
 
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { raw } from 'hono/html';
 import { clerkAuth, type ClerkAuthVariables } from '../../auth/middleware';
@@ -483,6 +483,11 @@ async function lookupOwnedSite(
   siteId: string,
 ): Promise<OwnedSite | null> {
   const database = db(env);
+  // Settings only needs three scalars off editableState (siteNoIndex,
+  // visitorTheme, faviconAssetId). Pulling the whole JSONB column cost
+  // ~700ms TTFB per render; projecting the fields at the database keeps
+  // the row small. The full state still loads in the editor route where
+  // it's actually rendered.
   const rows = await database
     .select({
       id: site.id,
@@ -492,13 +497,19 @@ async function lookupOwnedSite(
       passwordSetAt: site.passwordSetAt,
       styleKit: site.styleKit,
       publishedVersion: site.publishedVersion,
-      editableState: site.editableState,
+      siteNoIndex: sql<boolean | null>`(${site.editableState}->>'siteNoIndex')::boolean`,
+      visitorTheme: sql<string | null>`(${site.editableState}->>'visitorTheme')`,
+      faviconAssetId: sql<string | null>`(${site.editableState}->>'faviconAssetId')`,
     })
     .from(site)
     .where(and(eq(site.id, siteId), eq(site.customerId, customerId)))
     .limit(1);
   const row = rows[0];
   if (!row) return null;
+  const visitorTheme: OwnedSite['visitorTheme'] =
+    row.visitorTheme === 'dark' || row.visitorTheme === 'toggleable'
+      ? row.visitorTheme
+      : 'light';
   return {
     id: row.id,
     name: row.name,
@@ -507,9 +518,9 @@ async function lookupOwnedSite(
     passwordSetAt: row.passwordSetAt,
     styleKit: row.styleKit,
     publishedVersion: row.publishedVersion,
-    siteNoIndex: row.editableState.siteNoIndex ?? false,
-    visitorTheme: row.editableState.visitorTheme ?? 'light',
-    faviconAssetId: row.editableState.faviconAssetId ?? null,
+    siteNoIndex: row.siteNoIndex ?? false,
+    visitorTheme,
+    faviconAssetId: row.faviconAssetId,
   };
 }
 
