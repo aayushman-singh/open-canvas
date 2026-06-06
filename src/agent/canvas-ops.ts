@@ -990,6 +990,20 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       }
       return out;
     }
+    function replaceStringField(
+      target: Record<string, unknown>,
+      key: string,
+    ): void {
+      const v = target[key];
+      if (typeof v === 'string') target[key] = replaceIn(v);
+    }
+    function replaceStringArray(target: Record<string, unknown>, key: string): void {
+      const arr = target[key];
+      if (!Array.isArray(arr)) return;
+      for (let i = 0; i < arr.length; i++) {
+        if (typeof arr[i] === 'string') arr[i] = replaceIn(arr[i] as string);
+      }
+    }
     function walkInlineRuns(runs: unknown): void {
       if (!Array.isArray(runs)) return;
       for (let i = 0; i < runs.length; i++) {
@@ -1004,32 +1018,151 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       for (let i = 0; i < arr.length; i++) {
         const el = arr[i] as unknown as Record<string, unknown>;
         if (!el) continue;
-        if (el.type === 'text') {
-          walkInlineRuns(el.content);
-        } else if (el.type === 'action') {
-          walkInlineRuns(el.label);
-        } else if (el.type === 'media') {
-          if (typeof el.alt === 'string') el.alt = replaceIn(el.alt);
-        }
-        // Recurse into tabs / collection entries so nested text gets
-        // covered too — the editor renders both flat from the outside.
-        if (el.type === 'tabs' && Array.isArray(el.tabs)) {
-          for (const tab of el.tabs as Array<{ elements?: CanvasElement[] }>) {
-            if (tab) walkElements(tab.elements);
-          }
-        } else if (el.type === 'collection' && Array.isArray(el.entries)) {
-          for (const entry of el.entries as CanvasElement[][]) {
-            walkElements(entry);
-          }
+        switch (el.type) {
+          case 'text':
+            walkInlineRuns(el.content);
+            break;
+          case 'action':
+            walkInlineRuns(el.label);
+            break;
+          case 'media':
+            replaceStringField(el, 'alt');
+            break;
+          case 'embed':
+            // Embed: visitor-visible iframe title (aria-label on player).
+            replaceStringField(el, 'title');
+            break;
+          case 'accordion':
+            // accordion.items: { title: string, body: InlineRun[] }
+            if (Array.isArray(el.items)) {
+              for (const item of el.items as Array<Record<string, unknown>>) {
+                if (!item) continue;
+                replaceStringField(item, 'title');
+                walkInlineRuns(item.body);
+              }
+            }
+            break;
+          case 'carousel':
+            // carousel.slides: { caption?: string, ... }
+            if (Array.isArray(el.slides)) {
+              for (const slide of el.slides as Array<Record<string, unknown>>) {
+                if (!slide) continue;
+                replaceStringField(slide, 'caption');
+              }
+            }
+            break;
+          case 'nav':
+            // nav: siteTitle, links[].label, primaryAction.label
+            replaceStringField(el, 'siteTitle');
+            if (Array.isArray(el.links)) {
+              for (const link of el.links as Array<Record<string, unknown>>) {
+                if (link) replaceStringField(link, 'label');
+              }
+            }
+            {
+              const primary = el.primaryAction as Record<string, unknown> | undefined;
+              if (primary) replaceStringField(primary, 'label');
+            }
+            break;
+          case 'form':
+            // form: title (owner-facing), submitLabel, successMessage,
+            // fields[].label / .placeholder / .options[].label
+            replaceStringField(el, 'title');
+            replaceStringField(el, 'submitLabel');
+            replaceStringField(el, 'successMessage');
+            if (Array.isArray(el.fields)) {
+              for (const field of el.fields as Array<Record<string, unknown>>) {
+                if (!field) continue;
+                replaceStringField(field, 'label');
+                replaceStringField(field, 'placeholder');
+                if (Array.isArray(field.options)) {
+                  for (const opt of field.options as Array<Record<string, unknown>>) {
+                    if (opt) replaceStringField(opt, 'label');
+                  }
+                }
+              }
+            }
+            break;
+          case 'table':
+            // table: columns[].header, rows[].cells[colId] string values.
+            if (Array.isArray(el.columns)) {
+              for (const col of el.columns as Array<Record<string, unknown>>) {
+                if (col) replaceStringField(col, 'header');
+              }
+            }
+            if (Array.isArray(el.rows)) {
+              for (const row of el.rows as Array<Record<string, unknown>>) {
+                if (!row) continue;
+                const cells = row.cells as Record<string, unknown> | undefined;
+                if (cells && typeof cells === 'object') {
+                  for (const cellKey of Object.keys(cells)) {
+                    if (typeof cells[cellKey] === 'string') {
+                      cells[cellKey] = replaceIn(cells[cellKey]);
+                    }
+                  }
+                }
+              }
+            }
+            break;
+          case 'chart':
+            // chart: series[].label, categories[] string entries.
+            if (Array.isArray(el.series)) {
+              for (const s of el.series as Array<Record<string, unknown>>) {
+                if (s) replaceStringField(s, 'label');
+              }
+            }
+            replaceStringArray(el, 'categories');
+            break;
+          case 'tabs':
+            // tabs.tab[].label is an InlineRun[]; the per-tab element
+            // arrays are recursed below alongside the label sweep.
+            if (Array.isArray(el.tabs)) {
+              for (const tab of el.tabs as Array<{
+                label?: unknown;
+                elements?: CanvasElement[];
+              }>) {
+                if (!tab) continue;
+                walkInlineRuns(tab.label);
+                walkElements(tab.elements);
+              }
+            }
+            break;
+          case 'collection':
+            // Inline collection entries (legacy) — CMS-materialised entries
+            // live in DB and are walked by the publish-time materialiser, not
+            // here. The walker covers the editable-state inline shape so
+            // pre-CMS sites still rename cleanly.
+            if (Array.isArray(el.entries)) {
+              for (const entry of el.entries as CanvasElement[][]) {
+                walkElements(entry);
+              }
+            }
+            break;
+          // shape / container / (other variant-only or layout-only) have
+          // no string-bearing fields — intentional no-op so the switch
+          // stays exhaustive at the structural level.
         }
       }
     }
-    if (next.header) walkElements(next.header.elements);
-    if (next.footer) walkElements(next.footer.elements);
+    function walkSection(section: CanvasSection | undefined): void {
+      if (!section) return;
+      const sectionRec = section as unknown as Record<string, unknown>;
+      replaceStringField(sectionRec, 'name');
+      walkElements(section.elements);
+    }
+    walkSection(next.header);
+    walkSection(next.footer);
     for (const page of next.pages) {
-      if (typeof page.title === 'string') page.title = replaceIn(page.title);
+      const pageRec = page as unknown as Record<string, unknown>;
+      // Visitor- and SEO-facing strings on the page itself.
+      replaceStringField(pageRec, 'title');
+      replaceStringField(pageRec, 'slug');
+      replaceStringField(pageRec, 'description');
+      replaceStringField(pageRec, 'author');
+      replaceStringField(pageRec, 'category');
+      replaceStringArray(pageRec, 'tags');
       for (const section of page.sections) {
-        walkElements(section.elements);
+        walkSection(section);
       }
     }
     return next;

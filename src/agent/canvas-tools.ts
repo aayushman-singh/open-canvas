@@ -399,7 +399,7 @@ export const CANVAS_AGENT_TOOLS: LlmTool[] = [
   {
     name: 'renameToken',
     description:
-      'Site-wide find-and-replace on visible string fields (text content including rich-text markdown, action labels, media alt, page titles). USE THIS for any "rename X to Y everywhere" / "replace all instances of …" / "swap brand name" intent — NEVER enumerate per-element rewriteText calls for that case. The walk is deterministic so coverage is 100% across pages, header, footer, tabs, and collection entries. Pure literal substring replace; no regex. caseSensitive defaults to true; pass false for case-insensitive matching with the replacement value substituted verbatim.',
+      'Site-wide find-and-replace on every owner- or visitor-visible string field. Covers: text element runs, action labels, media alt, embed titles, accordion item titles and bodies, carousel slide captions, nav siteTitle / link labels / primary action label, form titles / submit labels / success messages / field labels / placeholders / option labels, table column headers and cell values, chart series labels and category labels, tab labels (and recurses into tab panel elements), inline collection entries, section names, page titles / slugs / descriptions / authors / categories / tags. Walks header, footer, and every page section. USE THIS for any "rename X to Y everywhere" / "replace all instances of …" / "swap brand name" intent — NEVER enumerate per-element rewriteText calls for that case. The walk is deterministic so coverage is 100%. Pure literal substring replace; no regex. caseSensitive defaults to true; pass false for case-insensitive matching with the replacement value substituted verbatim.',
     parameters: {
       type: 'object',
       properties: {

@@ -705,6 +705,287 @@ assert(
   'renameToken caseSensitive:false must replace all casings with the literal `to`',
 );
 
+// ---------------------------------------------------------------------------
+// renameToken exhaustive coverage — every element type with a string-bearing
+// field is exercised; the post-rename JSON must contain zero "Apogee"
+// residues. The fixture deliberately avoids the token in any id / recipeId /
+// asset id (only visitor- or owner-visible fields carry the brand), so a
+// plain JSON.stringify check is a tight regression guard against silent
+// walker drift when new element types ship.
+// ---------------------------------------------------------------------------
+
+const exhaustiveFixture = {
+  styleKit: 'charcoal',
+  header: {
+    id: 'sec-hdr-x',
+    name: 'Apogee header',
+    height: 80,
+    recipeId: 'custom',
+    elements: [
+      {
+        id: 'el-nav',
+        type: 'nav',
+        box: { x: 0, y: 0, w: 1440, h: 80, z: 1 },
+        layout: 'logo-left-links-right',
+        siteTitle: 'Apogee',
+        links: [
+          { label: 'Apogee solutions', href: '#sol', kind: 'external' },
+          { label: 'Pricing', href: '#price', kind: 'external' },
+        ],
+        primaryAction: { label: 'Try Apogee', href: '#cta', kind: 'external' },
+      },
+    ],
+  },
+  footer: {
+    id: 'sec-ftr-x',
+    name: 'Apogee footer',
+    height: 200,
+    recipeId: 'custom',
+    elements: [
+      {
+        id: 'el-foot-text',
+        type: 'text',
+        box: { x: 0, y: 0, w: 600, h: 40, z: 1 },
+        role: 'body',
+        align: 'left',
+        fontSize: 14,
+        fontWeight: 400,
+        content: [{ text: 'Apogee Inc.' }],
+      },
+    ],
+  },
+  pages: [
+    {
+      id: 'page-coverage',
+      slug: 'apogee-coverage',
+      title: 'Apogee — exhaustive walker fixture',
+      description: 'Marketing site for Apogee, the modern platform.',
+      author: 'Apogee Editorial',
+      category: 'Apogee Marketing',
+      tags: ['Apogee', 'launch'],
+      width: 1440,
+      sections: [
+        {
+          id: 'sec-x',
+          name: 'Apogee hero',
+          height: 800,
+          recipeId: 'custom',
+          elements: [
+            {
+              id: 'el-text',
+              type: 'text',
+              box: { x: 0, y: 0, w: 600, h: 60, z: 1 },
+              role: 'heading',
+              align: 'left',
+              fontSize: 40,
+              fontWeight: 700,
+              content: [{ text: 'Apogee headline' }],
+            },
+            {
+              id: 'el-action',
+              type: 'action',
+              box: { x: 0, y: 80, w: 200, h: 48, z: 2 },
+              variant: 'solid',
+              label: [{ text: 'Buy Apogee' }],
+              href: { type: 'external', url: 'https://example.com' },
+            },
+            {
+              id: 'el-media',
+              type: 'media',
+              box: { x: 0, y: 140, w: 480, h: 320, z: 1 },
+              mediaKind: 'image',
+              assetId: 'asset-1',
+              alt: 'Apogee dashboard',
+              fit: 'cover',
+            },
+            {
+              id: 'el-embed',
+              type: 'embed',
+              box: { x: 0, y: 470, w: 480, h: 270, z: 1 },
+              url: 'https://www.youtube.com/embed/abc',
+              title: 'Apogee walkthrough',
+            },
+            {
+              id: 'el-accordion',
+              type: 'accordion',
+              box: { x: 0, y: 750, w: 600, h: 200, z: 1 },
+              allowMultipleOpen: false,
+              items: [
+                { id: 'i1', title: 'What is Apogee?', body: [{ text: 'Apogee answer.' }] },
+              ],
+            },
+            {
+              id: 'el-carousel',
+              type: 'carousel',
+              box: { x: 600, y: 0, w: 800, h: 400, z: 1 },
+              mode: 'paginate',
+              direction: 'horizontal',
+              activeSlide: 0,
+              slides: [
+                { id: 's1', assetId: 'asset-2', caption: 'Apogee feature one' },
+                { id: 's2', assetId: 'asset-3', caption: 'Apogee feature two' },
+              ],
+            },
+            {
+              id: 'el-form',
+              type: 'form',
+              box: { x: 0, y: 950, w: 600, h: 400, z: 1 },
+              title: 'Apogee contact',
+              submitLabel: 'Send to Apogee',
+              successMessage: 'Thanks — Apogee team will reply.',
+              fields: [
+                {
+                  id: 'f1',
+                  kind: 'text',
+                  name: 'name',
+                  label: 'Apogee account name',
+                  placeholder: 'Your Apogee handle',
+                  required: true,
+                },
+                {
+                  id: 'f2',
+                  kind: 'select',
+                  name: 'plan',
+                  label: 'Plan',
+                  required: false,
+                  options: [
+                    { value: 'free', label: 'Apogee Free' },
+                    { value: 'pro', label: 'Apogee Pro' },
+                  ],
+                },
+              ],
+            },
+            {
+              id: 'el-table',
+              type: 'table',
+              box: { x: 600, y: 400, w: 800, h: 300, z: 1 },
+              columns: [
+                { id: 'c1', header: 'Apogee feature' },
+                { id: 'c2', header: 'Available' },
+              ],
+              rows: [
+                { id: 'r1', cells: { c1: 'Apogee AI', c2: 'Yes' } },
+                { id: 'r2', cells: { c1: 'CMS', c2: 'Apogee-managed' } },
+              ],
+            },
+            {
+              id: 'el-chart',
+              type: 'chart',
+              box: { x: 600, y: 700, w: 800, h: 300, z: 1 },
+              kind: 'bar',
+              showLegend: true,
+              series: [{ label: 'Apogee revenue', values: [1, 2, 3] }],
+              categories: ['Apogee Q1', 'Apogee Q2', 'Apogee Q3'],
+            },
+            {
+              id: 'el-tabs',
+              type: 'tabs',
+              box: { x: 0, y: 1350, w: 1440, h: 400, z: 1 },
+              activeTabId: 't1',
+              tabs: [
+                {
+                  id: 't1',
+                  label: [{ text: 'About Apogee' }],
+                  elements: [
+                    {
+                      id: 'el-tab-text',
+                      type: 'text',
+                      box: { x: 0, y: 0, w: 600, h: 60, z: 1 },
+                      role: 'body',
+                      align: 'left',
+                      fontSize: 16,
+                      fontWeight: 400,
+                      content: [{ text: 'Apogee inside a tab.' }],
+                    },
+                  ],
+                },
+                {
+                  id: 't2',
+                  label: [{ text: 'Apogee FAQ' }],
+                  elements: [],
+                },
+              ],
+            },
+            {
+              id: 'el-collection-inline',
+              type: 'collection',
+              box: { x: 0, y: 1750, w: 1440, h: 400, z: 1 },
+              templateBlueprint: 'card-3up',
+              entries: [
+                [
+                  {
+                    id: 'el-coll-text',
+                    type: 'text',
+                    box: { x: 0, y: 0, w: 400, h: 40, z: 1 },
+                    role: 'body',
+                    align: 'left',
+                    fontSize: 14,
+                    fontWeight: 400,
+                    content: [{ text: 'Apogee inline collection text.' }],
+                  },
+                ],
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+} as unknown as EditableSite;
+
+const exhaustiveRenamed = applyCanvasAgentOp(exhaustiveFixture, {
+  kind: 'renameToken',
+  from: 'Apogee',
+  to: 'Briar',
+});
+
+const exhaustiveJson = JSON.stringify(exhaustiveRenamed);
+if (exhaustiveJson.includes('Apogee')) {
+  // Surface every residue's path so a new element type with an uncovered
+  // string field names the field rather than failing with a single "still
+  // present" message. Walk the residues with a JSON path tracker.
+  const residues: string[] = [];
+  function track(value: unknown, path: string): void {
+    if (typeof value === 'string') {
+      if (value.includes('Apogee')) residues.push(`${path} = ${JSON.stringify(value)}`);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) track(value[i], `${path}[${String(i)}]`);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      for (const k of Object.keys(value)) track((value as Record<string, unknown>)[k], `${path}.${k}`);
+    }
+  }
+  track(exhaustiveRenamed, '$');
+  throw new Error(
+    `renameToken exhaustive coverage failed — residues:\n  ${residues.join('\n  ')}`,
+  );
+}
+
+// Spot-check a handful of fields the JSON-stringify guard already covered;
+// these stay as named asserts so a future regression points at the exact
+// field that broke, not just the JSON sweep.
+assert(
+  ((exhaustiveRenamed.header as { elements: Array<{ siteTitle?: string }> }).elements[0])
+    ?.siteTitle === 'Briar',
+  'renameToken must rewrite nav.siteTitle',
+);
+assert(
+  exhaustiveRenamed.pages[0]?.description === 'Marketing site for Briar, the modern platform.',
+  'renameToken must rewrite page.description',
+);
+const exhaustivePage = exhaustiveRenamed.pages[0] as unknown as { tags?: string[] };
+assert(
+  Array.isArray(exhaustivePage.tags) && exhaustivePage.tags[0] === 'Briar',
+  'renameToken must rewrite page.tags entries',
+);
+assert(
+  exhaustiveRenamed.pages[0]?.sections[0]?.name === 'Briar hero',
+  'renameToken must rewrite section.name',
+);
+
 const malformedInsertPageId = parseApplyOp(
   {
     kind: 'insertSection',

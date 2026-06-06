@@ -1318,7 +1318,7 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
     "  setSiteConfig — set visitorTheme ('light' | 'dark' | 'toggleable'), defaultLocale, or siteNoIndex.",
   );
   lines.push(
-    "  renameToken — site-wide literal find-and-replace on visible string fields (text content, action labels, media alt, page titles). USE THIS for any \"rename X to Y everywhere\", \"swap brand name\", or \"replace all instances of …\" intent. Emit ONE renameToken op, never enumerate per-element rewriteText calls for a bulk rename — the deterministic walk is exhaustive across pages, header, footer, tabs, and collection entries. Pure substring replace; pass caseSensitive:false to match regardless of casing.",
+    "  renameToken — site-wide literal find-and-replace on every owner- or visitor-visible string field: text element runs, action labels, media alt, embed titles, accordion item titles + bodies, carousel captions, nav siteTitle + link labels + primary action, form titles + submit + success + field labels + placeholders + option labels, table column headers + cell values, chart series + categories, tab labels (and recurses into tab panel elements), inline collection entries, section names, page titles + slugs + descriptions + authors + categories + tags. Walks header, footer, and every page section. USE THIS for any \"rename X to Y everywhere\", \"swap brand name\", or \"replace all instances of …\" intent. Emit ONE renameToken op — never enumerate per-element rewriteText calls for a bulk rename. Pure substring replace; pass caseSensitive:false to match regardless of casing.",
   );
   lines.push('');
   lines.push(`Current Style Kit: ${state.styleKit}.`);
