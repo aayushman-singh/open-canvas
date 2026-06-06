@@ -172,6 +172,7 @@
     "hono": "^4.12.21",
     "katex": "^0.17.0",
     "markdown-it": "^14.2.0",
+    "postgres": "^3.4.9",
     "satori": "0.26.0",
     "shiki": "^4.1.0",
     "y-protocols": "^1.0.7",
