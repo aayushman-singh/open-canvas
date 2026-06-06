@@ -12,20 +12,17 @@
 //      collisions surface as 409 so the Owner sees they picked a taken slug.
 //   2. Builds the index page + template page + two seed entries via
 //      `scaffoldCollection` (pure). Returns 409 on slug/id collisions.
-//   3. Persists everything in one atomic batch (drizzle `db.batch([...])`,
-//      neon-http transaction primitive). The batch contains:
+//   3. Persists everything in one atomic Postgres transaction. The transaction contains:
 //        - UPDATE site SET editableState  (append the two new pages)
 //        - INSERT INTO collection_entry   (both seed rows in one VALUES)
 //      If any statement fails (DB constraint, network drop, etc.) the whole
-//      batch rolls back per the neon-http transaction contract — no
-//      half-built blog.
+//      transaction rolls back — no half-built blog.
 //   4. Returns 201 with the resolved slug and the index page id so the
 //      editor can switch its active page to the freshly-minted index.
 //
 // Mirrors the transaction pattern in `routes/api/sites.ts` POST /api/sites
-// (site row + seed entries in one batch — see sites.ts:643-654). The
-// neon-http drizzle driver wraps `.batch([...])` in a single Postgres
-// transaction; failure of any statement aborts the whole batch.
+// (site row + seed entries in one transaction). Failure of any statement
+// aborts the whole transaction.
 //
 // Auth: Clerk + `editor` role on the site. Mounted via ownerApi so the
 // edit-token surface (on-site editor) reuses the same handler. The Hono
@@ -118,9 +115,7 @@ collectionsRoute.post('/', async (c) => {
   // WIZARD_DEFAULT_SLUG with fallback walk. Custom slug = verbatim, no
   // fallback (collisions caught by scaffoldCollection below).
   const slugForResolution =
-    requestedSlug === undefined || requestedSlug.length === 0
-      ? WIZARD_DEFAULT_SLUG
-      : requestedSlug;
+    requestedSlug === undefined || requestedSlug.length === 0 ? WIZARD_DEFAULT_SLUG : requestedSlug;
   const resolved = resolveAvailableSlug(access.site.editableState.pages, slugForResolution);
   if (!resolved.ok) {
     // Pool-exhausted: blog + collection-1..99 are all taken on this site.
@@ -166,8 +161,8 @@ collectionsRoute.post('/', async (c) => {
     });
   } catch (err) {
     // Loud failure per CLAUDE.md no-fallbacks rule. We do NOT retry, do
-    // NOT partial-commit, do NOT swap in defaults — the batch rolled back
-    // by neon-http's transaction contract, so DB state is unchanged from
+    // NOT partial-commit, do NOT swap in defaults — the transaction rolled
+    // back, so DB state is unchanged from
     // before this call. Surface the failing layer so the editor's toast
     // names what broke.
     console.error('collections_scaffold_batch_failed', {
@@ -179,8 +174,7 @@ collectionsRoute.post('/', async (c) => {
     return c.json(
       {
         error:
-          'failed to provision collection: ' +
-          (err instanceof Error ? err.message : 'unknown'),
+          'failed to provision collection: ' + (err instanceof Error ? err.message : 'unknown'),
         step: 'db-transaction',
       },
       500,

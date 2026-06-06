@@ -384,6 +384,18 @@ process.stdout.write('[notifications:smoke] writer failure contracts OK\n');
       notificationsInboxScript.includes('window.location.assign(pendingNavigationHref);'),
     'notification click must wait for mark-read before navigating',
   );
+  assert(
+    notificationsInboxScript.includes("cache: opts && opts.fresh ? 'no-store' : 'default'"),
+    'fetchInbox must be able to bypass browser cache for authoritative post-mutation/live refetches',
+  );
+  assert(
+    (notificationsInboxScript.match(/fetchInbox\(\{ fresh: true \}\)/g) || []).length >= 5,
+    'read/delete/mark-all/live notification refetches must bypass the cached GET /api/notifications response',
+  );
+  assert(
+    notificationsInboxScript.includes('fetchInbox({ since: lastSeenCreatedAt, fresh: true })'),
+    'WebSocket reconnect backfill must bypass browser cache while preserving since=lastSeenCreatedAt',
+  );
 
   // Cold-load perf — the initial /api/notifications fetch is NOT eager; it
   // schedules via requestIdleCallback (with a setTimeout fallback) so the
@@ -393,7 +405,7 @@ process.stdout.write('[notifications:smoke] writer failure contracts OK\n');
   // putting fetchInbox().catch back at module-top.
   assert(
     notificationsInboxScript.includes('kickInitialFetch') &&
-      notificationsInboxScript.includes("requestIdleCallback") &&
+      notificationsInboxScript.includes('requestIdleCallback') &&
       notificationsInboxScript.includes("kickInitialFetch('idle')") &&
       notificationsInboxScript.includes("kickInitialFetch('bell-open')"),
     'initial inbox fetch must be deferred to requestIdleCallback / first bell-open (not eager at module top)',
@@ -403,9 +415,11 @@ process.stdout.write('[notifications:smoke] writer failure contracts OK\n');
   // not the top-level invocation. Any literal `fetchInbox().catch` at the
   // module top (not inside a function) means the deferral got dropped.
   {
-    const idleInvocations = (notificationsInboxScript.match(
-      /idleScheduler\(function\(\)\s*\{\s*kickInitialFetch\('idle'\)/g,
-    ) || []).length;
+    const idleInvocations = (
+      notificationsInboxScript.match(
+        /idleScheduler\(function\(\)\s*\{\s*kickInitialFetch\('idle'\)/g,
+      ) || []
+    ).length;
     assert(
       idleInvocations === 1,
       'expected exactly one idleScheduler invocation that kicks the initial inbox fetch',

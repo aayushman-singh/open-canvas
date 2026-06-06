@@ -83,6 +83,8 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     mainEl: null,
     selectedElementId: null,
     ghostSections: [],
+    undoAiSidecarStack: [],
+    redoAiSidecarStack: [],
     findElement(elementId: string): FindElementResult | null {
       for (const el of section.elements) {
         if (el.id === elementId) {
@@ -298,7 +300,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     },
     SIDEBAR_COMMANDS: {},
     insertElementForSidebarCommand: () => {
-      throw new Error('insertElementForSidebarCommand stub: smoke does not exercise sidebar dispatch');
+      throw new Error(
+        'insertElementForSidebarCommand stub: smoke does not exercise sidebar dispatch',
+      );
     },
     getPagePosition: () => null,
     sectionsCatalog: null,
@@ -480,7 +484,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
   assert(log.renderAll === 1, 'duplicate must call renderAll exactly once');
   assert(log.renderInspector === 1, 'duplicate must call renderInspector exactly once');
   assert(log.scheduleSave === 1, 'duplicate must call scheduleSave exactly once');
-  assert(log.selectElement.length === 0, 'duplicate must NOT call selectElement (writes id directly)');
+  assert(
+    log.selectElement.length === 0,
+    'duplicate must NOT call selectElement (writes id directly)',
+  );
 })();
 
 // ----- deleteElement ----------------------------------------------------
@@ -496,7 +503,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
 
   assert(section.elements.length === 1, 'delete must shrink the parent array by 1');
   assert(section.elements[0] === other, 'survivor must be the un-deleted element');
-  assert(ctx.selectedElementId === null, 'delete must clear selection when it matched the deleted id');
+  assert(
+    ctx.selectedElementId === null,
+    'delete must clear selection when it matched the deleted id',
+  );
   assert(log.closeElementMenu === 1, 'delete must close the context menu');
   assert(log.captureForUndo === 1, 'delete must call captureForUndo exactly once');
   assert(log.renderAll === 1, 'delete must call renderAll exactly once');
@@ -536,7 +546,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
   assert(section.elements[2] === c, 'c stays at index 2');
   assert(log.renderAll === 1, 'move must renderAll');
   assert(log.scheduleSave === 1, 'move must scheduleSave');
-  assert(log.selectElement.length === 1 && log.selectElement[0] === 'el-b', 'move must reselect the moved element');
+  assert(
+    log.selectElement.length === 1 && log.selectElement[0] === 'el-b',
+    'move must reselect the moved element',
+  );
 })();
 
 (function moveInReadingOrderBoundarySpec() {

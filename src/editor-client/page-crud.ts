@@ -298,6 +298,23 @@ export function goToHrefOnCanvasImpl(ctx: EditorContext, href: unknown): boolean
   return false;
 }
 
+export function openPageSeoAfterSave(ctx: EditorContext, seoHref: string): void {
+  const opened = window.open('about:blank', '_blank');
+  if (!opened) {
+    ctx.setStatus('Could not open SEO panel: popup blocked', 'error');
+    return;
+  }
+  opened.opener = null;
+  void (async () => {
+    const saved = await ctx.flushPendingSave();
+    if (!saved) {
+      opened.close();
+      return;
+    }
+    opened.location.href = seoHref;
+  })();
+}
+
 export function updatePageSidebarImpl(ctx: EditorContext): void {
   const listEl = document.getElementById('canvas-page-list');
   if (!listEl || !ctx.state) return;
@@ -343,15 +360,14 @@ export function updatePageSidebarImpl(ctx: EditorContext): void {
     // an unflushed local page lookup returns null and the route 404s. Flush
     // first; on failure flushPendingSave already surfaces the status and we
     // skip the navigation instead of opening a guaranteed-broken tab.
-    seoLink.addEventListener('click', (ev) => {
-      if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+    const handleSeoLinkActivation = (ev: MouseEvent) => {
+      if (ev.type === 'click' && ev.button !== 0) return;
+      if (ev.type === 'auxclick' && ev.button !== 1) return;
       ev.preventDefault();
-      void (async () => {
-        const saved = await ctx.flushPendingSave();
-        if (!saved) return;
-        window.open(seoHref, '_blank', 'noopener,noreferrer');
-      })();
-    });
+      openPageSeoAfterSave(ctx, seoHref);
+    };
+    seoLink.addEventListener('click', handleSeoLinkActivation);
+    seoLink.addEventListener('auxclick', handleSeoLinkActivation);
     actions.appendChild(seoLink);
 
     if (ctx.state.pages.length > 1) {
@@ -461,12 +477,7 @@ export function findActionPageLinkReferences(ctx: EditorContext, pageId: string)
         tabs?: Array<{ elements?: unknown[] }>;
         entries?: unknown[][];
       };
-      if (
-        el.type === 'action' &&
-        el.href &&
-        el.href.type === 'page' &&
-        el.href.pageId === pageId
-      ) {
+      if (el.type === 'action' && el.href && el.href.type === 'page' && el.href.pageId === pageId) {
         let actionLabelText = '';
         const runs = Array.isArray(el.label) ? el.label : [];
         for (let ri = 0; ri < runs.length; ri++) {
@@ -486,10 +497,7 @@ export function findActionPageLinkReferences(ctx: EditorContext, pageId: string)
       }
     }
   }
-  function scanSection(
-    section: { elements?: unknown[] } | null | undefined,
-    label: string,
-  ): void {
+  function scanSection(section: { elements?: unknown[] } | null | undefined, label: string): void {
     scanElements(section?.elements, label);
   }
   if (!ctx.state) return refs;

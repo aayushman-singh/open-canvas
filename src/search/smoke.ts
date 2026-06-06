@@ -31,11 +31,7 @@ import type { EmbedElement } from '../canvas/elements/embed.js';
 import { siteSearchEntry } from '../db/schema.js';
 import { extractSearchEntries, PAGE_METADATA_ELEMENT_ID } from './extract.js';
 import { buildSearchRows, rebuildSearchIndex, type IndexerDb } from './indexer.js';
-import {
-  DEFAULT_QUERY_LIMIT,
-  MAX_QUERY_LENGTH,
-  validateQuery,
-} from './query.js';
+import { DEFAULT_QUERY_LIMIT, MAX_QUERY_LENGTH, validateQuery } from './query.js';
 import {
   buildInMemoryResults,
   buildInMemorySnippet,
@@ -351,11 +347,11 @@ const draftIds = new Set(drafts1.map((d) => d.elementId));
 assert(draftIds.has('hero-heading'), 'fixture produces hero-heading entry');
 assert(draftIds.has('hero-cta'), 'fixture produces hero-cta (action) entry');
 assert(draftIds.has('demo-video'), 'fixture produces demo-video (embed title) entry');
-assert(draftIds.has('snippet-bootstrap'), 'fixture produces snippet-bootstrap (code first line) entry');
 assert(
-  draftIds.has(PAGE_METADATA_ELEMENT_ID),
-  'fixture produces synthetic __page metadata entry',
+  draftIds.has('snippet-bootstrap'),
+  'fixture produces snippet-bootstrap (code first line) entry',
 );
+assert(draftIds.has(PAGE_METADATA_ELEMENT_ID), 'fixture produces synthetic __page metadata entry');
 
 // Code first-line rule: leading blank line is skipped, the first non-blank
 // line is what lands in the index.
@@ -401,7 +397,7 @@ assert(
 );
 
 // ---------------------------------------------------------------------------
-// (3) rebuildSearchIndex round-trip: writes the rows via batch DELETE+INSERT.
+// (3) rebuildSearchIndex round-trip: writes rows in one transaction.
 // ---------------------------------------------------------------------------
 
 await rebuildSearchIndex(SITE_ID, snapshot1, indexerDb);
@@ -447,10 +443,7 @@ assert(
   'snippet wraps the matching token in <mark>',
   headingHit?.snippet,
 );
-assert(
-  headingHit !== undefined && headingHit.pageSlug === 'home',
-  'hit row carries the page slug',
-);
+assert(headingHit !== undefined && headingHit.pageSlug === 'home', 'hit row carries the page slug');
 
 // Page-level metadata hit: the word "search" is in page.description.
 const metaResults = buildInMemoryResults(shim.rows, 'search', DEFAULT_QUERY_LIMIT);
@@ -604,7 +597,10 @@ assert(
 
 // HTML escaping inside snippet bodies: a `<script>` substring in the indexed
 // text is escaped so the visitor-facing UI can drop the snippet straight in.
-const escaped = buildInMemorySnippet('beware <script> injection</script> here lived-in', 'lived-in');
+const escaped = buildInMemorySnippet(
+  'beware <script> injection</script> here lived-in',
+  'lived-in',
+);
 assert(
   !escaped.includes('<script>') && escaped.includes('&lt;script&gt;'),
   'buildInMemorySnippet HTML-escapes raw < and >',
@@ -643,9 +639,8 @@ const customised = buildSearchBoxSection({
 });
 assert(
   customised.height === 120 &&
-    (customised.elements[0] as ActionElement).label
-      .map((r) => r.text)
-      .join('') === 'Find on site' &&
+    (customised.elements[0] as ActionElement).label.map((r) => r.text).join('') ===
+      'Find on site' &&
     (customised.elements[0] as ActionElement).variant === 'pill' &&
     (customised.elements[0] as ActionElement).box.w === 240,
   'recipe respects override options',
@@ -657,7 +652,10 @@ const recipeState: EditableSite = makeFixtureSiteState({
   ...page1,
   sections: [recipeSection, ...page1.sections],
 });
-assert(recipeState.pages[0]!.sections[0]!.id === recipeSection.id, 'recipe section composes into a site');
+assert(
+  recipeState.pages[0]!.sections[0]!.id === recipeSection.id,
+  'recipe section composes into a site',
+);
 
 process.stdout.write('[search:smoke] OK\n');
 process.exit(0);

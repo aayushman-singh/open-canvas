@@ -507,9 +507,7 @@ async function lookupOwnedSite(
   const row = rows[0];
   if (!row) return null;
   const visitorTheme: OwnedSite['visitorTheme'] =
-    row.visitorTheme === 'dark' || row.visitorTheme === 'toggleable'
-      ? row.visitorTheme
-      : 'light';
+    row.visitorTheme === 'dark' || row.visitorTheme === 'toggleable' ? row.visitorTheme : 'light';
   return {
     id: row.id,
     name: row.name,
@@ -1095,7 +1093,14 @@ const rev01SiteSettingsConfig = (() => {
 // rides the theme tokens for hue (.set-h .ic colour pair).
 function HostingIcon() {
   return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z" />
     </svg>
@@ -1104,7 +1109,14 @@ function HostingIcon() {
 
 function LockIcon() {
   return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
       <rect x="4" y="10" width="16" height="11" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </svg>
@@ -1113,7 +1125,14 @@ function LockIcon() {
 
 function SearchIcon() {
   return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
       <circle cx="11" cy="11" r="7" />
       <path d="M21 21l-4-4" stroke-linecap="round" />
     </svg>
@@ -1122,7 +1141,14 @@ function SearchIcon() {
 
 function FaviconIcon() {
   return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
       <rect x="3" y="3" width="18" height="18" rx="3" />
       <circle cx="12" cy="12" r="4" />
     </svg>
@@ -1139,7 +1165,14 @@ function MoonIcon() {
 
 function PeopleIcon() {
   return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
       <circle cx="9" cy="8" r="3.5" />
       <path d="M3 20a6 6 0 0 1 12 0M16 5a3.5 3.5 0 0 1 0 6M21 20a6 6 0 0 0-3-5" />
     </svg>
@@ -1238,16 +1271,18 @@ function NotSiteOwnerPage(props: {
       <section style="max-width: 560px; margin: 60px auto; padding: 0 24px;">
         <h1 style="font-size: 22px; margin: 0 0 12px;">Settings are owner-only</h1>
         <p style="color: var(--ink-2); margin: 0 0 12px; line-height: 1.5;">
-          You're a collaborator on <strong>{props.siteName}</strong>, not the
-          owner. Site settings — password protection, custom domain, favicon,
-          collaborators, and deletion — can only be changed by the owner.
+          You're a collaborator on <strong>{props.siteName}</strong>, not the owner. Site settings —
+          password protection, custom domain, favicon, collaborators, and deletion — can only be
+          changed by the owner.
         </p>
-        <p style="color: var(--ink-2); margin: 0 0 24px; line-height: 1.5;">
-          {ownerLine}
-        </p>
+        <p style="color: var(--ink-2); margin: 0 0 24px; line-height: 1.5;">{ownerLine}</p>
         <div style="display: flex; gap: 12px;">
-          <Button href={editorHref} variant="primary">Back to editor</Button>
-          <Button href="/dashboard" variant="ghost">All sites</Button>
+          <Button href={editorHref} variant="primary">
+            Back to editor
+          </Button>
+          <Button href="/dashboard" variant="ghost">
+            All sites
+          </Button>
         </div>
       </section>
     </DashboardShell>
@@ -1285,7 +1320,8 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           acceptedAt: siteCollaborator.acceptedAt,
         })
         .from(siteCollaborator)
-        .where(eq(siteCollaborator.siteId, siteId)),
+        .innerJoin(site, eq(site.id, siteCollaborator.siteId))
+        .where(and(eq(siteCollaborator.siteId, siteId), eq(site.customerId, customerId))),
     ]),
   );
   if (!owned) {
@@ -1357,9 +1393,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           </span>
           <div class="tt">
             <h2>Hosting</h2>
-            <p>
-              Your site is live. Share the address or connect your own domain.
-            </p>
+            <p>Your site is live. Share the address or connect your own domain.</p>
           </div>
           {owned.publishedVersion > 0 ? (
             <span class="chip chip-ok">
@@ -1388,11 +1422,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               <b>Custom domain</b>
               <small>Use a domain you already own</small>
             </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              href={`/dashboard/sites/${esc(siteId)}/domains`}
-            >
+            <Button variant="secondary" size="sm" href={`/dashboard/sites/${esc(siteId)}/domains`}>
               Connect domain
             </Button>
           </div>
@@ -1434,10 +1464,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             <h2>Password protection</h2>
             <p>Ask visitors for a password before they can see the site.</p>
           </div>
-          <span
-            class={`chip ${enabled ? 'chip-ok' : ''}`}
-            title={setAtLine}
-          >
+          <span class={`chip ${enabled ? 'chip-ok' : ''}`} title={setAtLine}>
             {enabled ? 'Enabled' : 'Disabled'}
           </span>
         </div>
@@ -1538,7 +1565,11 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               class="fv-thumb"
               data-picker-thumb
               data-has-image={owned.faviconAssetId ? 'true' : 'false'}
-              style={owned.faviconAssetId ? `background-image:url(/api/canvas/sites/${encodeURIComponent(owned.id)}/assets/${encodeURIComponent(owned.faviconAssetId)})` : ''}
+              style={
+                owned.faviconAssetId
+                  ? `background-image:url(/api/canvas/sites/${encodeURIComponent(owned.id)}/assets/${encodeURIComponent(owned.faviconAssetId)})`
+                  : ''
+              }
             >
               {owned.faviconAssetId ? '' : 'none'}
             </div>
@@ -1554,12 +1585,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
               <button type="button" data-picker-choose>
                 {owned.faviconAssetId ? 'Change' : 'Choose image'}
               </button>
-              <button
-                type="button"
-                class="clear"
-                data-picker-clear
-                hidden={!owned.faviconAssetId}
-              >
+              <button type="button" class="clear" data-picker-clear hidden={!owned.faviconAssetId}>
                 Remove
               </button>
             </div>
@@ -1722,9 +1748,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           </span>
           <div class="tt">
             <h2>Delete this site</h2>
-            <p>
-              Permanently remove {owned.name} and everything in it. This can&apos;t be undone.
-            </p>
+            <p>Permanently remove {owned.name} and everything in it. This can&apos;t be undone.</p>
           </div>
           <Button
             variant="secondary"
@@ -1753,9 +1777,8 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
           </div>
           <div class="picker-body" style="padding:20px 24px;">
             <p style="margin:0 0 14px;">
-              This permanently removes <strong>{owned.name}</strong> and everything in
-              it &mdash; pages, snapshots, forms, collaborators, addons. It can&apos;t
-              be undone.
+              This permanently removes <strong>{owned.name}</strong> and everything in it &mdash;
+              pages, snapshots, forms, collaborators, addons. It can&apos;t be undone.
             </p>
             <p style="margin:0 0 6px;font-size:13px;color:var(--ink-2);">
               Type <code>{owned.name}</code> to confirm.
@@ -1804,14 +1827,11 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
             <div class="picker-actions">
               <label>
                 Upload new
-                <input
-                  type="file"
-                  data-picker-upload
-                  accept="image/*"
-                  style="display:none"
-                />
+                <input type="file" data-picker-upload accept="image/*" style="display:none" />
               </label>
-              <button type="button" class="close" data-picker-close>Close</button>
+              <button type="button" class="close" data-picker-close>
+                Close
+              </button>
             </div>
           </div>
           <div class="picker-body">

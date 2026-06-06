@@ -48,6 +48,21 @@ export interface EditorBoot {
   userId: string;
 }
 
+export interface AiUndoSidecarSnapshot {
+  ghostSections: Array<{
+    id: string;
+    pageId: string;
+    afterSectionId: string | null;
+    section: CanvasSection;
+  }>;
+  suggestions: Array<{
+    index: number;
+    suggestionId: string | null;
+    status: string;
+    inverseOp: unknown;
+  }>;
+}
+
 /**
  * Single mutable object mirroring the IIFE closure surface. Extracted
  * modules accept this as their first parameter and read/mutate fields
@@ -325,9 +340,16 @@ export interface EditorContext {
    *  storage quota. Mutated by captureForUndo / flushPendingUndoCapture /
    *  undo / redo / initUndo; read by persistUndo. */
   undoStack: SiteSnapshot[];
+  /** Transient AI suggestion/ghost snapshots aligned with undoStack. These
+   *  are intentionally not persisted to localStorage: after hard refresh the
+   *  chat-card DOM is gone, so there is no sidecar UI to restore, while the
+   *  canvas state snapshots remain reload-safe. */
+  undoAiSidecarStack: Array<AiUndoSidecarSnapshot | null>;
   /** Symmetric redo history. Cleared on every fresh capture (mutating
    *  forward invalidates the redo timeline) and grown by undo. */
   redoStack: SiteSnapshot[];
+  /** Transient AI suggestion/ghost snapshots aligned with redoStack. */
+  redoAiSidecarStack: Array<AiUndoSidecarSnapshot | null>;
   /** 0ms debounce handle for captureForUndo. A burst of mutations
    *  collapses into one snapshot rather than one snapshot per setter.
    *  Null when no capture is pending. undo/redo flush this synchronously
@@ -549,7 +571,11 @@ export interface EditorContext {
    *  clamps section-level clones to the artboard — a behaviour
    *  duplicateElement (the inspector-actions verb) does NOT encode, so
    *  the menu must inline the duplicate path rather than reuse the verb. */
-  buildElementMenu(element: CanvasElement, section: CanvasSection, wrapper: HTMLElement): HTMLElement;
+  buildElementMenu(
+    element: CanvasElement,
+    section: CanvasSection,
+    wrapper: HTMLElement,
+  ): HTMLElement;
   /** Toggle the per-element 3-dot menu open or closed. Idempotent: a
    *  second call with the same elementId closes the menu. Pulls the
    *  element through ctx.findElement so the menu's verbs use the same
@@ -1748,11 +1774,7 @@ export type DomContext = Pick<
 /** Element / section selection state machine. */
 export type SelectionContext = Pick<
   EditorContext,
-  | 'selectedElementId'
-  | 'selectedSectionId'
-  | 'editingElementId'
-  | 'selectElement'
-  | 'selectSection'
+  'selectedElementId' | 'selectedSectionId' | 'editingElementId' | 'selectElement' | 'selectSection'
 >;
 
 /** Re-render orchestrators. */

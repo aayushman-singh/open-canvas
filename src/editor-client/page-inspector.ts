@@ -42,6 +42,7 @@ import { COLLECTION_PAGE_KINDS, MOTION_PRESETS, SCROLL_TRIGGER_MODES } from '../
 import { selectInput } from './dom-builders.js';
 import { buildColorRow } from './inspector-leaf-builders.js';
 import { cssEscape } from './css-escape.js';
+import { openPageSeoAfterSave } from './page-crud.js';
 
 // ADR 0060 Pass 2 — placeholder fields the entry-preview substitutor knows
 // about. Same set as the publish-time materializer (collection-materializer.ts)
@@ -705,15 +706,14 @@ export function renderPageInspector(ctx: EditorContext): void {
   // unflushed local page would 404. Flush first; flushPendingSave surfaces
   // the failure on the status line, and we skip the open instead of landing
   // on a guaranteed-broken tab.
-  seoLink.addEventListener('click', (ev) => {
-    if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  const handleSeoLinkActivation = (ev: MouseEvent) => {
+    if (ev.type === 'click' && ev.button !== 0) return;
+    if (ev.type === 'auxclick' && ev.button !== 1) return;
     ev.preventDefault();
-    void (async () => {
-      const saved = await ctx.flushPendingSave();
-      if (!saved) return;
-      window.open(seoHref, '_blank', 'noopener,noreferrer');
-    })();
-  });
+    openPageSeoAfterSave(ctx, seoHref);
+  };
+  seoLink.addEventListener('click', handleSeoLinkActivation);
+  seoLink.addEventListener('auxclick', handleSeoLinkActivation);
   seoGroup.appendChild(seoLink);
   ctx.inspector.appendChild(seoGroup);
 
@@ -974,7 +974,8 @@ function renderTemplateControls(ctx: EditorContext, page: CanvasPage): void {
     encodeURIComponent(ctx.siteId) +
     '/entries?collection=' +
     encodeURIComponent(collectionSlug);
-  void ctx.authFetch(url)
+  void ctx
+    .authFetch(url)
     .then(function (res) {
       if (!res.ok) {
         throw new Error('GET ' + url + ' returned ' + String(res.status) + ' ' + res.statusText);
@@ -1121,7 +1122,9 @@ function markTemplateBannerDismissed(pageId: string): void {
  *  0063 F5 the only template-banner-worthy page kind is
  *  `'collection-item-template'`; `'collection-index'` is retired and
  *  handled by `migrateLegacyCollectionIndexPagesImpl` on first load. */
-export function templateBannerLabelText(page: Pick<CanvasPage, 'pageKind' | 'collectionSlug'>): string {
+export function templateBannerLabelText(
+  page: Pick<CanvasPage, 'pageKind' | 'collectionSlug'>,
+): string {
   const slug = page.collectionSlug ?? '';
   if (page.pageKind === 'collection-item-template') return 'Template for ' + slug;
   return '';

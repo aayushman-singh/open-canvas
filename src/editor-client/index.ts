@@ -388,7 +388,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
 
     // ---- Persist + undo/redo ------------------------------------------
     undoStack: [],
+    undoAiSidecarStack: [],
     redoStack: [],
+    redoAiSidecarStack: [],
     undoTimer: null,
     undoRedoing: false,
     undoPersistenceFailed: false,
@@ -907,12 +909,7 @@ export function createEditor(boot: EditorBoot): void {
                 if (!r.ok) {
                   return r.text().then(function (text) {
                     throw new Error(
-                      'refresh returned ' +
-                        String(r.status) +
-                        ' ' +
-                        r.statusText +
-                        ': ' +
-                        text,
+                      'refresh returned ' + String(r.status) + ' ' + r.statusText + ': ' + text,
                     );
                   });
                 }
@@ -947,12 +944,7 @@ export function createEditor(boot: EditorBoot): void {
             if (!r.ok) {
               return r.text().then(function (text) {
                 throw new Error(
-                  'refresh returned ' +
-                    String(r.status) +
-                    ' ' +
-                    r.statusText +
-                    ': ' +
-                    text,
+                  'refresh returned ' + String(r.status) + ' ' + r.statusText + ': ' + text,
                 );
               });
             }
@@ -964,9 +956,7 @@ export function createEditor(boot: EditorBoot): void {
               scheduleTokenRefresh(data.ttl);
               return;
             }
-            throw new Error(
-              'refresh succeeded but body had no ok/ttl: ' + JSON.stringify(data),
-            );
+            throw new Error('refresh succeeded but body had no ok/ttl: ' + JSON.stringify(data));
           })
           .catch(function (err: unknown) {
             console.error(

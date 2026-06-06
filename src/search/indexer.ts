@@ -47,10 +47,7 @@ export interface IndexerDb {
  * assert the exact rows being staged before they are sent to the (shimmed)
  * DB.
  */
-export function buildSearchRows(
-  siteId: string,
-  snapshot: PublishedSnapshot,
-): NewSiteSearchEntry[] {
+export function buildSearchRows(siteId: string, snapshot: PublishedSnapshot): NewSiteSearchEntry[] {
   const drafts = extractSearchEntries(snapshot);
   return drafts.map((draft: SearchEntryDraft) => ({
     siteId,
@@ -63,8 +60,8 @@ export function buildSearchRows(
 
 /**
  * Replace the search-entry rows for `siteId` with the entries extracted from
- * `snapshot`. The DELETE + INSERT pair is sent as a single neon-http batch so
- * a concurrent reader either sees the previous publish's rows OR the new
+ * `snapshot`. The DELETE + INSERT pair runs inside one transaction so a
+ * concurrent reader either sees the previous publish's rows OR the new
  * publish's rows, never an empty intermediate.
  *
  * Exported as the integration contract for `src/routes/api/publish.ts`:

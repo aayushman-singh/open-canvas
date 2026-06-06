@@ -114,6 +114,34 @@ assert(
   !/ctx\.selectedElementId\s*=\s*null/.test(pageCrud),
   'page-crud must NOT null ctx.selectedElementId directly — routes around the DOM cleanup',
 );
+assert(
+  pageCrud.includes('export function openPageSeoAfterSave') &&
+    pageCrud.includes("window.open('about:blank', '_blank')") &&
+    pageCrud.includes('opened.opener = null'),
+  'page SEO links must reserve a new tab synchronously and sever opener before awaiting flushPendingSave',
+);
+assert(
+  pageCrud.includes("seoLink.addEventListener('click', handleSeoLinkActivation)") &&
+    pageCrud.includes("seoLink.addEventListener('auxclick', handleSeoLinkActivation)") &&
+    pageCrud.includes('openPageSeoAfterSave(ctx, seoHref)'),
+  'page sidebar SEO links must flush before opening for left-click and middle-click activations',
+);
+assert(
+  !pageCrud.includes('ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey'),
+  'page sidebar SEO links must not let modifier-clicks bypass flushPendingSave',
+);
+
+const pageInspector = await source('./page-inspector.ts');
+assert(
+  pageInspector.includes("seoLink.addEventListener('click', handleSeoLinkActivation)") &&
+    pageInspector.includes("seoLink.addEventListener('auxclick', handleSeoLinkActivation)") &&
+    pageInspector.includes('openPageSeoAfterSave(ctx, seoHref)'),
+  'page inspector SEO link must flush before opening for left-click and middle-click activations',
+);
+assert(
+  !pageInspector.includes('ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey'),
+  'page inspector SEO link must not let modifier-clicks bypass flushPendingSave',
+);
 
 const ghostTargetPages = [
   { id: 'page-a', sections: [{ id: 'sec-a' }] },
@@ -153,11 +181,9 @@ try {
 
 const renderSource = await source('./render.ts');
 const pageGhostFilter = renderSource.indexOf('const pageGhosts = ctx.ghostSections.filter');
-const realSectionsLoop = renderSource.indexOf(
-  'for (let si = 0; si < page.sections.length; si++)',
-);
+const realSectionsLoop = renderSource.indexOf('for (let si = 0; si < page.sections.length; si++)');
 const nullGhostAppend = renderSource.indexOf(
-  "if (pageGhosts[gi]!.afterSectionId === null)",
+  'if (pageGhosts[gi]!.afterSectionId === null)',
   realSectionsLoop,
 );
 const footerAppend = renderSource.indexOf('if (ctx.state.footer)', nullGhostAppend);
@@ -263,9 +289,7 @@ assert(
   "src/index.ts must mount ownerApi at '/__api' — drop this and the on-site editor 404s on every ctx.apiBase URL",
 );
 
-const ownerAppSrc = await Bun.file(
-  new URL('../routes/api/owner-app.ts', import.meta.url),
-).text();
+const ownerAppSrc = await Bun.file(new URL('../routes/api/owner-app.ts', import.meta.url)).text();
 
 // Each entry: { family, editorFile, editorNeedle, ownerMountRe, ownerMountLabel }.
 // `editorNeedle` is a substring grep against the editor source — it confirms
@@ -319,7 +343,8 @@ const apiBaseRouteContracts: ReadonlyArray<{
   {
     family: 'GET /sites/:siteId/elements/:elementId/history (slot history)',
     editorFile: './runtime-helpers.ts',
-    editorNeedle: "ctx.apiBase +\n          '/sites/' +\n          encodeURIComponent(ctx.siteId) +\n          '/elements/'",
+    editorNeedle:
+      "ctx.apiBase +\n          '/sites/' +\n          encodeURIComponent(ctx.siteId) +\n          '/elements/'",
     ownerMountRe: /ownerApi\.route\(\s*['"]\/['"]\s*,\s*slotHistoryApi\s*\)/,
     ownerMountLabel: "ownerApi.route('/', slotHistoryApi)",
   },
@@ -365,7 +390,8 @@ const apiBaseRouteContracts: ReadonlyArray<{
   {
     family: 'GET /sites/:siteId/entries (page-inspector collection preview, C5)',
     editorFile: './page-inspector.ts',
-    editorNeedle: "ctx.apiBase +\n    '/sites/' +\n    encodeURIComponent(ctx.siteId) +\n    '/entries?collection='",
+    editorNeedle:
+      "ctx.apiBase +\n    '/sites/' +\n    encodeURIComponent(ctx.siteId) +\n    '/entries?collection='",
     ownerMountRe: /ownerApi\.route\(\s*['"]\/sites\/:siteId\/entries['"]\s*,\s*entriesRoute\s*\)/,
     ownerMountLabel: "ownerApi.route('/sites/:siteId/entries', entriesRoute)",
   },
@@ -381,16 +407,14 @@ const apiBaseRouteContracts: ReadonlyArray<{
     family: 'GET/POST/DELETE /sites/:siteId/snapshots (version history, C2)',
     editorFile: './versions-panel.ts',
     editorNeedle: "ctx.apiBase + '/sites/' + ctx.siteId + '/snapshots'",
-    ownerMountRe:
-      /ownerApi\.route\(\s*['"]\/sites\/:siteId\/snapshots['"]\s*,\s*versionRoute\s*\)/,
+    ownerMountRe: /ownerApi\.route\(\s*['"]\/sites\/:siteId\/snapshots['"]\s*,\s*versionRoute\s*\)/,
     ownerMountLabel: "ownerApi.route('/sites/:siteId/snapshots', versionRoute)",
   },
   {
     family: 'GET/POST/DELETE /sites/:siteId/fonts (owner custom fonts, C3)',
     editorFile: './inspector-text-font-family.ts',
     editorNeedle: '${ctx.apiBase}/sites/${encodeURIComponent(ctx.siteId)}/fonts',
-    ownerMountRe:
-      /ownerApi\.route\(\s*['"]\/sites\/:siteId\/fonts['"]\s*,\s*fontsOwnerRouter\s*\)/,
+    ownerMountRe: /ownerApi\.route\(\s*['"]\/sites\/:siteId\/fonts['"]\s*,\s*fontsOwnerRouter\s*\)/,
     ownerMountLabel: "ownerApi.route('/sites/:siteId/fonts', fontsOwnerRouter)",
   },
   {

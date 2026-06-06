@@ -37,6 +37,16 @@ assert(
   !source.includes("querySelector('[data-collab-list]')"),
   'collaborator removal must not depend on boolean data-* list selector wiring',
 );
+{
+  const collabListStart = source.indexOf('id: siteCollaborator.id');
+  const collabListQuery = source.slice(collabListStart, source.indexOf(']),', collabListStart));
+  assert(
+    collabListStart >= 0 &&
+      collabListQuery.includes('.innerJoin(site, eq(site.id, siteCollaborator.siteId))') &&
+      collabListQuery.includes('eq(site.customerId, customerId)'),
+    'settings collaborator list query must prove owner access before reading collaborator emails',
+  );
+}
 
 type ChangeHandler = () => void;
 type QueuedResponse = {

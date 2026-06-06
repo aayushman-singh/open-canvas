@@ -48,7 +48,7 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type { AiUndoSidecarSnapshot, EditorContext } from './editor-context.js';
 import type { EditableSite } from '../canvas/schema.js';
 
 // Snapshot shape mirrors the inline IIFE: undoStack entries are deep
@@ -65,8 +65,111 @@ export type SiteSnapshot = EditableSite;
 const UNDO_MAX = 60;
 const UNDO_PERSIST_MAX = 20;
 
+type AiSuggestionEntry = EditorContext['pendingAiSuggestions'][number];
+
 function undoStorageKey(siteId: string): string {
   return 'oc:undo:' + siteId;
+}
+
+function emptyAiSidecarStack(length: number): Array<AiUndoSidecarSnapshot | null> {
+  return Array.from(
+    { length },
+    (): AiUndoSidecarSnapshot => ({ ghostSections: [], suggestions: [] }),
+  );
+}
+
+function aiSidecarSnapshot(ctx: EditorContext): AiUndoSidecarSnapshot {
+  return {
+    ghostSections: structuredClone(ctx.ghostSections),
+    suggestions: ctx.pendingAiSuggestions.map((entry, index) => ({
+      index,
+      suggestionId: entry.suggestionId ?? null,
+      status: typeof entry.status === 'string' ? entry.status : 'pending',
+      inverseOp: entry.inverseOp === undefined ? null : structuredClone(entry.inverseOp),
+    })),
+  };
+}
+
+function ensureAiSidecarStacks(ctx: EditorContext): void {
+  if (!Array.isArray(ctx.undoAiSidecarStack)) {
+    ctx.undoAiSidecarStack = emptyAiSidecarStack(ctx.undoStack.length);
+  }
+  while (ctx.undoAiSidecarStack.length < ctx.undoStack.length) {
+    ctx.undoAiSidecarStack.push(null);
+  }
+  while (ctx.undoAiSidecarStack.length > ctx.undoStack.length) {
+    ctx.undoAiSidecarStack.shift();
+  }
+  if (!Array.isArray(ctx.redoAiSidecarStack)) {
+    ctx.redoAiSidecarStack = emptyAiSidecarStack(ctx.redoStack.length);
+  }
+  while (ctx.redoAiSidecarStack.length < ctx.redoStack.length) {
+    ctx.redoAiSidecarStack.push(null);
+  }
+  while (ctx.redoAiSidecarStack.length > ctx.redoStack.length) {
+    ctx.redoAiSidecarStack.shift();
+  }
+}
+
+function updateCurrentUndoAiSidecar(ctx: EditorContext): void {
+  ensureAiSidecarStacks(ctx);
+  if (ctx.undoAiSidecarStack.length === 0) return;
+  ctx.undoAiSidecarStack[ctx.undoAiSidecarStack.length - 1] = aiSidecarSnapshot(ctx);
+}
+
+function applySuggestionUi(entry: AiSuggestionEntry): void {
+  const status = typeof entry.status === 'string' ? entry.status : 'pending';
+  if (entry.cardEl) entry.cardEl.setAttribute('data-status', status);
+  if (status === 'pending') {
+    if (entry.acceptBtn) entry.acceptBtn.disabled = false;
+    if (entry.rejectBtn) entry.rejectBtn.disabled = false;
+    if (entry.revertBtn) {
+      entry.revertBtn.hidden = true;
+      entry.revertBtn.disabled = false;
+    }
+    return;
+  }
+  if (entry.acceptBtn) entry.acceptBtn.disabled = true;
+  if (entry.rejectBtn) entry.rejectBtn.disabled = true;
+  if (entry.revertBtn) {
+    entry.revertBtn.disabled = false;
+    entry.revertBtn.hidden = !(status === 'accepted' && entry.inverseOp);
+  }
+}
+
+function restoreAiSidecar(ctx: EditorContext, snapshot: AiUndoSidecarSnapshot | null): void {
+  const restored = snapshot ?? { ghostSections: [], suggestions: [] };
+  ctx.ghostSections = structuredClone(restored.ghostSections);
+  const byId = new Map<string, AiUndoSidecarSnapshot['suggestions'][number]>();
+  const byIndex = new Map<number, AiUndoSidecarSnapshot['suggestions'][number]>();
+  for (const item of restored.suggestions) {
+    byIndex.set(item.index, item);
+    if (item.suggestionId) byId.set(item.suggestionId, item);
+  }
+  for (let i = 0; i < ctx.pendingAiSuggestions.length; i++) {
+    const entry = ctx.pendingAiSuggestions[i]!;
+    const item = (entry.suggestionId ? byId.get(entry.suggestionId) : undefined) ?? byIndex.get(i);
+    if (!item) continue;
+    entry.status = item.status;
+    entry.inverseOp = item.inverseOp === null ? null : structuredClone(item.inverseOp);
+    applySuggestionUi(entry);
+  }
+}
+
+function repaintAiSuggestionTargets(ctx: EditorContext): void {
+  for (const entry of ctx.pendingAiSuggestions) {
+    entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
+    if (!entry.targetNode) continue;
+    if (entry.status === 'rejected') {
+      entry.targetNode.removeAttribute('data-ai-overlay-status');
+    } else {
+      entry.targetNode.setAttribute(
+        'data-ai-overlay-status',
+        entry.status === 'accepted' ? 'accepted' : 'proposed',
+      );
+    }
+  }
+  ctx.refreshAcceptAllButton();
 }
 
 export function scheduleSave(ctx: EditorContext): void {
@@ -93,11 +196,7 @@ export function scheduleSave(ctx: EditorContext): void {
   }, 500);
 }
 
-export function disableUndoPersistence(
-  ctx: EditorContext,
-  reason: string,
-  error: unknown,
-): void {
+export function disableUndoPersistence(ctx: EditorContext, reason: string, error: unknown): void {
   if (ctx.undoPersistenceFailed) return;
   ctx.undoPersistenceFailed = true;
   console.error('[opencanvas-undo] persist failed', {
@@ -167,6 +266,8 @@ export function initUndo(ctx: EditorContext): void {
           if (top && JSON.stringify(top) === JSON.stringify(ctx.state)) {
             ctx.undoStack = stack;
             ctx.redoStack = redo;
+            ctx.undoAiSidecarStack = emptyAiSidecarStack(stack.length);
+            ctx.redoAiSidecarStack = emptyAiSidecarStack(redo.length);
             restored = true;
           }
         }
@@ -195,13 +296,18 @@ export function initUndo(ctx: EditorContext): void {
   }
   if (!restored) {
     ctx.undoStack = [structuredClone(ctx.state)];
+    ctx.undoAiSidecarStack = [aiSidecarSnapshot(ctx)];
     ctx.redoStack = [];
+    ctx.redoAiSidecarStack = [];
     persistUndo(ctx);
+  } else {
+    ensureAiSidecarStacks(ctx);
   }
 }
 
 export function captureForUndo(ctx: EditorContext): void {
   if (ctx.undoRedoing || !ctx.state) return;
+  updateCurrentUndoAiSidecar(ctx);
   if (ctx.undoTimer) clearTimeout(ctx.undoTimer);
   ctx.undoTimer = setTimeout(function () {
     ctx.undoTimer = null;
@@ -216,9 +322,15 @@ export function flushPendingUndoCapture(ctx: EditorContext): void {
   }
   if (!ctx.state) return;
   const snap = structuredClone(ctx.state);
+  ensureAiSidecarStacks(ctx);
   ctx.undoStack.push(snap);
-  if (ctx.undoStack.length > UNDO_MAX) ctx.undoStack.shift();
+  ctx.undoAiSidecarStack.push(aiSidecarSnapshot(ctx));
+  if (ctx.undoStack.length > UNDO_MAX) {
+    ctx.undoStack.shift();
+    ctx.undoAiSidecarStack.shift();
+  }
   ctx.redoStack = [];
+  ctx.redoAiSidecarStack = [];
   persistUndo(ctx);
 }
 
@@ -240,10 +352,15 @@ export function undo(ctx: EditorContext): void {
     return;
   }
   ctx.undoRedoing = true;
+  ensureAiSidecarStacks(ctx);
   ctx.redoStack.push(structuredClone(ctx.state));
+  ctx.redoAiSidecarStack.push(aiSidecarSnapshot(ctx));
   ctx.undoStack.pop();
+  ctx.undoAiSidecarStack.pop();
   ctx.state = structuredClone(ctx.undoStack[ctx.undoStack.length - 1]!);
+  restoreAiSidecar(ctx, ctx.undoAiSidecarStack[ctx.undoAiSidecarStack.length - 1] ?? null);
   ctx.renderAll();
+  repaintAiSuggestionTargets(ctx);
   ctx.scheduleSave();
   persistUndo(ctx);
   ctx.undoRedoing = false;
@@ -261,9 +378,13 @@ export function redo(ctx: EditorContext): void {
     return;
   }
   ctx.undoRedoing = true;
+  ensureAiSidecarStacks(ctx);
   ctx.undoStack.push(structuredClone(ctx.state));
+  ctx.undoAiSidecarStack.push(aiSidecarSnapshot(ctx));
   ctx.state = structuredClone(ctx.redoStack.pop()!);
+  restoreAiSidecar(ctx, ctx.redoAiSidecarStack.pop() ?? null);
   ctx.renderAll();
+  repaintAiSuggestionTargets(ctx);
   ctx.scheduleSave();
   persistUndo(ctx);
   ctx.undoRedoing = false;

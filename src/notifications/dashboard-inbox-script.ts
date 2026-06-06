@@ -269,7 +269,10 @@ export const notificationsInboxScript = `(function(){
     var since = opts && opts.since ? String(opts.since) : '';
     var url = apiBase + '/notifications?limit=20';
     if (since) url += '&since=' + encodeURIComponent(since);
-    return fetch(url, { credentials: 'include' })
+    return fetch(url, {
+      credentials: 'include',
+      cache: opts && opts.fresh ? 'no-store' : 'default',
+    })
       .then(function(r) {
         if (r.ok) return r.json();
         return r.text().then(function(body) {
@@ -358,7 +361,7 @@ export const notificationsInboxScript = `(function(){
               if (link) link.classList.remove('unread');
             }
             actionBtn.hidden = true;
-            return fetchInbox();
+            return fetchInbox({ fresh: true });
           })
           .catch(function(err) {
             toast('Could not mark notification as read.', 'error');
@@ -390,7 +393,7 @@ export const notificationsInboxScript = `(function(){
               delete inboxById[actionId];
               inboxItems = inboxItems.filter(function(item) { return item.id !== actionId; });
             }
-            return fetchInbox();
+            return fetchInbox({ fresh: true });
           })
           .catch(function(err) {
             toast('Could not delete notification.', 'error');
@@ -421,7 +424,7 @@ export const notificationsInboxScript = `(function(){
       })
       .then(function() {
         a.classList.remove('unread');
-        return fetchInbox();
+        return fetchInbox({ fresh: true });
       })
       .then(function() {
         window.location.assign(pendingNavigationHref);
@@ -453,7 +456,7 @@ export const notificationsInboxScript = `(function(){
           .then(function(data) {
             var n = (data && typeof data.markedRead === 'number') ? data.markedRead : 0;
             toast(n === 0 ? 'No unread notifications.' : (n === 1 ? '1 notification marked read.' : n + ' notifications marked read.'));
-            return fetchInbox();
+            return fetchInbox({ fresh: true });
           })
           .catch(function(err) {
             toast('Could not mark notifications as read.', 'error');
@@ -530,7 +533,7 @@ export const notificationsInboxScript = `(function(){
       ws.addEventListener('open', function() {
         streamRetry = 0;
         if (streamOpened && lastSeenCreatedAt) {
-          fetchInbox({ since: lastSeenCreatedAt }).catch(function(err) {
+          fetchInbox({ since: lastSeenCreatedAt, fresh: true }).catch(function(err) {
             reportFailure('stream reconnect backfill', err);
           });
         }
@@ -542,9 +545,9 @@ export const notificationsInboxScript = `(function(){
         catch (err) { reportFailure('stream parse', err); return; }
         if (!msg || typeof msg.kind !== 'string') return;
         if (msg.kind === 'notification') {
-          fetchInbox().catch(function(err) { reportFailure('notification event fetch', err); });
+          fetchInbox({ fresh: true }).catch(function(err) { reportFailure('notification event fetch', err); });
         } else if (msg.kind === 'read-state-changed') {
-          fetchInbox().catch(function(err) { reportFailure('read-state event fetch', err); });
+          fetchInbox({ fresh: true }).catch(function(err) { reportFailure('read-state event fetch', err); });
         }
       });
       ws.addEventListener('close', function() {
