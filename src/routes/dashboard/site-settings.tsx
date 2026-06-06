@@ -27,6 +27,7 @@ import { customer, site, siteCollaborator } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
+import { Timings } from '../../server-timing';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -1243,6 +1244,7 @@ function NotSiteOwnerPage(props: {
 }
 
 siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
+  const t = new Timings();
   const auth = c.get('auth');
   if (!auth.userId) {
     throw new Error('site-settings route reached without an authenticated user');
@@ -1255,14 +1257,17 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   if (!customerId) {
     return c.text('site not found', 404);
   }
-  const owned = await lookupOwnedSite(c.env, customerId, siteId);
+  const owned = await t.measure('db.owned', () => lookupOwnedSite(c.env, customerId, siteId));
   if (!owned) {
     // Distinguish "you're a collaborator on this site, not the owner" from
     // "this site doesn't exist for you at all" so the dashboard can show a
     // friendly explanation instead of a bare 404 — collaborators following
     // the Settings link in the editor chrome hit this path otherwise.
-    const collabHit = await collaboratorHitForSite(c.env, customerId, siteId);
+    const collabHit = await t.measure('db.collabHit', () =>
+      collaboratorHitForSite(c.env, customerId, siteId),
+    );
     if (collabHit) {
+      c.header('Server-Timing', t.header());
       return c.html(
         <NotSiteOwnerPage
           siteId={siteId}
@@ -1273,6 +1278,7 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
         403,
       );
     }
+    c.header('Server-Timing', t.header());
     return c.text('site not found', 404);
   }
 
@@ -1283,16 +1289,20 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
     : 'Never set';
 
   const database = db(c.env);
-  const collaborators = await database
-    .select({
-      id: siteCollaborator.id,
-      email: siteCollaborator.invitedEmail,
-      role: siteCollaborator.role,
-      acceptedAt: siteCollaborator.acceptedAt,
-    })
-    .from(siteCollaborator)
-    .where(eq(siteCollaborator.siteId, siteId));
+  const collaborators = await t.measure('db.collabs', () =>
+    database
+      .select({
+        id: siteCollaborator.id,
+        email: siteCollaborator.invitedEmail,
+        role: siteCollaborator.role,
+        acceptedAt: siteCollaborator.acceptedAt,
+      })
+      .from(siteCollaborator)
+      .where(eq(siteCollaborator.siteId, siteId)),
+  );
 
+  t.mark('collabs', collaborators.length);
+  c.header('Server-Timing', t.header());
   return c.html(
     <DashboardShell
       title={`${owned.name} — settings`}

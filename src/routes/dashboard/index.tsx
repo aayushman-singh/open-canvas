@@ -18,6 +18,7 @@ import { resolveStyleKitWithCustom } from '../../themes/custom-resolve';
 import type { PublishedSnapshot, EditableSite } from '../../canvas/schema';
 import { appDomain, type HostConfigEnv } from '../../host-config';
 import { collectReferencedAssets } from '../../assets/site-assets';
+import { Timings } from '../../server-timing';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -1321,7 +1322,8 @@ function DetailsPanel({ s }: { s: SiteCard }) {
 }
 
 dashboard.get('/', async (c) => {
-  const user = await getClerkUser(c);
+  const t = new Timings();
+  const user = await t.measure('clerk', () => getClerkUser(c));
   if (!user) {
     throw new Error('dashboard reached without a resolved user');
   }
@@ -1348,43 +1350,45 @@ dashboard.get('/', async (c) => {
   // gate (that's a plan quota on creation, not on access), and each row is
   // tagged with ownership before rendering so owner-only card actions stay
   // off collaborator cards.
-  const [ownedRows, collabRows, sb] = await Promise.all([
-    database
-      .select({
-        id: site.id,
-        name: site.name,
-        subdomain: site.subdomain,
-        styleKit: site.styleKit,
-        publishedVersion: site.publishedVersion,
-        updatedAt: site.updatedAt,
-        editableState: site.editableState,
-        passwordEnabled: site.passwordEnabled,
-      })
-      .from(site)
-      .where(eq(site.customerId, customerId))
-      .orderBy(desc(site.createdAt)),
-    database
-      .select({
-        id: site.id,
-        name: site.name,
-        subdomain: site.subdomain,
-        styleKit: site.styleKit,
-        publishedVersion: site.publishedVersion,
-        updatedAt: site.updatedAt,
-        editableState: site.editableState,
-        passwordEnabled: site.passwordEnabled,
-      })
-      .from(site)
-      .innerJoin(siteCollaborator, eq(siteCollaborator.siteId, site.id))
-      .where(
-        and(eq(siteCollaborator.customerId, customerId), isNotNull(siteCollaborator.acceptedAt)),
-      )
-      .orderBy(desc(site.createdAt)),
-    database
-      .select({ total: sum(ownerAsset.byteSize) })
-      .from(ownerAsset)
-      .where(eq(ownerAsset.customerId, customerId)),
-  ]);
+  const [ownedRows, collabRows, sb] = await t.measure('db.list', () =>
+    Promise.all([
+      database
+        .select({
+          id: site.id,
+          name: site.name,
+          subdomain: site.subdomain,
+          styleKit: site.styleKit,
+          publishedVersion: site.publishedVersion,
+          updatedAt: site.updatedAt,
+          editableState: site.editableState,
+          passwordEnabled: site.passwordEnabled,
+        })
+        .from(site)
+        .where(eq(site.customerId, customerId))
+        .orderBy(desc(site.createdAt)),
+      database
+        .select({
+          id: site.id,
+          name: site.name,
+          subdomain: site.subdomain,
+          styleKit: site.styleKit,
+          publishedVersion: site.publishedVersion,
+          updatedAt: site.updatedAt,
+          editableState: site.editableState,
+          passwordEnabled: site.passwordEnabled,
+        })
+        .from(site)
+        .innerJoin(siteCollaborator, eq(siteCollaborator.siteId, site.id))
+        .where(
+          and(eq(siteCollaborator.customerId, customerId), isNotNull(siteCollaborator.acceptedAt)),
+        )
+        .orderBy(desc(site.createdAt)),
+      database
+        .select({ total: sum(ownerAsset.byteSize) })
+        .from(ownerAsset)
+        .where(eq(ownerAsset.customerId, customerId)),
+    ]),
+  );
 
   // Belt-and-suspenders dedupe: in theory the WHERE on ownedRows excludes
   // collab rows because a site is owned by exactly one customer, but a
@@ -1442,6 +1446,8 @@ dashboard.get('/', async (c) => {
   // disk-cache hits cheap on back-button + reload but the must-revalidate
   // forces the browser to recheck freshness before showing stale content.
   c.header('Cache-Control', 'private, max-age=0, must-revalidate');
+  t.mark('rows', rows.length, `owned=${ownedRows.length},collab=${collabRows.length}`);
+  c.header('Server-Timing', t.header());
   return c.html(
     <DashboardShell
       title="Open Canvas — Your sites"
@@ -1753,6 +1759,7 @@ dashboard.get('/', async (c) => {
 // distinguish "doesn't exist" from "not yours" because revealing the
 // difference would leak site IDs across customers.
 dashboard.get('/thumbs/:siteId', async (c) => {
+  const t = new Timings();
   const customerRecord = c.get('customer');
   if (!customerRecord) {
     throw new Error('thumbs route reached without a resolved customer');
@@ -1760,42 +1767,48 @@ dashboard.get('/thumbs/:siteId', async (c) => {
   const siteId = c.req.param('siteId');
   const database = db(c.env);
 
-  const [row] = await database
-    .select({
-      id: site.id,
-      customerId: site.customerId,
-      name: site.name,
-      subdomain: site.subdomain,
-      updatedAt: site.updatedAt,
-      editableState: site.editableState,
-    })
-    .from(site)
-    .where(eq(site.id, siteId))
-    .limit(1);
+  const [row] = await t.measure('db.site', () =>
+    database
+      .select({
+        id: site.id,
+        customerId: site.customerId,
+        name: site.name,
+        subdomain: site.subdomain,
+        updatedAt: site.updatedAt,
+        editableState: site.editableState,
+      })
+      .from(site)
+      .where(eq(site.id, siteId))
+      .limit(1),
+  );
 
   if (!row) return c.notFound();
 
   const isOwner = row.customerId === customerRecord.id;
   let allowed = isOwner;
   if (!allowed) {
-    const [collab] = await database
-      .select({ id: siteCollaborator.id })
-      .from(siteCollaborator)
-      .where(
-        and(
-          eq(siteCollaborator.siteId, siteId),
-          eq(siteCollaborator.customerId, customerRecord.id),
-          isNotNull(siteCollaborator.acceptedAt),
-        ),
-      )
-      .limit(1);
+    const [collab] = await t.measure('db.collab', () =>
+      database
+        .select({ id: siteCollaborator.id })
+        .from(siteCollaborator)
+        .where(
+          and(
+            eq(siteCollaborator.siteId, siteId),
+            eq(siteCollaborator.customerId, customerRecord.id),
+            isNotNull(siteCollaborator.acceptedAt),
+          ),
+        )
+        .limit(1),
+    );
     allowed = !!collab;
   }
   if (!allowed) return c.notFound();
 
   let html = getCachedThumbHtml(siteId, row.updatedAt);
+  const cacheHit = html !== undefined;
   if (!html) {
     const origin = new URL(c.req.url).origin;
+    const stopRender = t.start('render');
     try {
       html = buildThumbHtml(
         row.editableState,
@@ -1810,9 +1823,13 @@ dashboard.get('/thumbs/:siteId', async (c) => {
         error,
       );
       html = THUMB_FAILED_HTML;
+    } finally {
+      stopRender();
     }
   }
 
   c.header('Cache-Control', 'private, max-age=0, must-revalidate');
+  t.mark('size', html.length, cacheHit ? 'cache-hit' : 'cache-miss');
+  c.header('Server-Timing', t.header());
   return c.html(html);
 });
