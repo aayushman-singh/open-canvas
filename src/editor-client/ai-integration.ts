@@ -112,6 +112,18 @@ interface AgentOp {
   from?: string | undefined;
   to?: string | undefined;
   caseSensitive?: boolean | undefined;
+  /** placeGeneratedImage op — chat-only intermediate from generateImage tool. */
+  target?:
+    | {
+        mode?: string;
+        elementId?: string;
+        sectionId?: string;
+        box?: { x: number; y: number; w: number; h: number };
+      }
+    | undefined;
+  prompt?: string | undefined;
+  dataUrl?: string | undefined;
+  mediaType?: string | undefined;
 }
 
 /**
@@ -714,19 +726,44 @@ export function describeOp(op: AgentOp): string {
       ' across the whole site'
     );
   }
+  if (op.kind === 'placeGeneratedImage') {
+    const promptStr = typeof op.prompt === 'string' ? op.prompt : '';
+    const shortened =
+      promptStr.length > 80 ? promptStr.slice(0, 77) + '…' : promptStr;
+    const target = op.target;
+    if (target && target.mode === 'replace' && target.elementId) {
+      return (
+        'Generate image for ' + target.elementId + ': ' + JSON.stringify(shortened)
+      );
+    }
+    if (target && target.mode === 'add' && target.sectionId) {
+      return (
+        'Generate + add image to section ' +
+        target.sectionId +
+        ': ' +
+        JSON.stringify(shortened)
+      );
+    }
+    return 'Generate image: ' + JSON.stringify(shortened);
+  }
   return 'Unknown op';
 }
 
 export function findCanvasNodeForOpImpl(ctx: EditorContext, op: AgentOp | null): HTMLElement | null {
   if (!ctx.root || !op) return null;
-  const elementId = op.elementId || (op.element && op.element.id) || null;
+  // placeGeneratedImage stashes the target under op.target; unpack it
+  // before falling through to the regular elementId / sectionId lookup so
+  // the same DOM-resolution path handles both replace and add modes.
+  const targetElementId = op.target && op.target.elementId;
+  const targetSectionId = op.target && op.target.sectionId;
+  const elementId = op.elementId || targetElementId || (op.element && op.element.id) || null;
   if (elementId) {
     const elNode = ctx.root.querySelector(
       '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
     );
     if (elNode) return elNode as HTMLElement;
   }
-  const sectionId = op.sectionId || op.afterSectionId || null;
+  const sectionId = op.sectionId || targetSectionId || op.afterSectionId || null;
   if (sectionId) {
     const secNode = ctx.root.querySelector(
       '[data-opencanvas-section="' + cssEscape(sectionId) + '"]',
@@ -780,12 +817,163 @@ export function refreshAcceptAllButtonImpl(ctx: EditorContext): void {
   if (count) count.textContent = String(live.length);
 }
 
+/**
+ * Walk the in-flight ops array and turn every `placeGeneratedImage` entry
+ * into a real applyable op. Each generated op carries the raw Replicate
+ * bytes inline (data URL) and a target descriptor — we POST the bytes as
+ * multipart to `/api/owner/assets` to mint the Owner Asset row, then
+ * substitute either a `replaceMedia` or `addElement` op in the array.
+ *
+ * Both the in-place `ops` array and the matching `suggestions[i].op`
+ * reference are rewritten so downstream code (inverse capture, revert
+ * targetNode lookup) sees the same shape. Returns null when any single
+ * materialisation fails — the caller treats that as a full Apply abort and
+ * status messages are surfaced from inside this function.
+ */
+async function materialiseGeneratedImageOps(
+  ctx: EditorContext,
+  ops: unknown[],
+  suggestions: SuggestionEntry[] | null,
+): Promise<unknown[] | null> {
+  let touched = false;
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i] as AgentOp;
+    if (!op || op.kind !== 'placeGeneratedImage') continue;
+    touched = true;
+    const realOp = await materialiseOneGeneratedImage(ctx, op);
+    if (!realOp) return null;
+    ops[i] = realOp;
+    if (suggestions && suggestions[i]) {
+      suggestions[i]!.op = realOp;
+    }
+  }
+  if (touched) ctx.setStatus('Saved generated image; applying…');
+  return ops;
+}
+
+async function materialiseOneGeneratedImage(
+  ctx: EditorContext,
+  op: AgentOp,
+): Promise<unknown> {
+  if (!op.target) {
+    ctx.setStatus('Apply failed: generated-image op has no target', 'error');
+    return null;
+  }
+  const dataUrl = op.dataUrl;
+  if (typeof dataUrl !== 'string' || dataUrl.length === 0) {
+    ctx.setStatus('Apply failed: generated image is missing its bytes', 'error');
+    return null;
+  }
+  const mediaType = op.mediaType ?? 'image/webp';
+  const alt = typeof op.alt === 'string' ? op.alt : (op.prompt ?? '');
+  ctx.setStatus('Saving generated image…');
+
+  const commaIdx = dataUrl.indexOf(',');
+  if (commaIdx < 0) {
+    ctx.setStatus('Apply failed: data URL missing payload', 'error');
+    return null;
+  }
+  // Pin to ArrayBuffer (not ArrayBufferLike) so File/Blob accept the view.
+  let bytes: Uint8Array<ArrayBuffer>;
+  try {
+    const binary = atob(dataUrl.slice(commaIdx + 1));
+    const buf = new ArrayBuffer(binary.length);
+    bytes = new Uint8Array(buf);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  } catch (err) {
+    ctx.setStatus(
+      'Apply failed: cannot decode generated bytes — ' + errorToString(err),
+      'error',
+    );
+    return null;
+  }
+
+  const dotIdx = mediaType.indexOf('/');
+  const ext = dotIdx > 0 ? mediaType.slice(dotIdx + 1) : 'webp';
+  const form = new FormData();
+  form.append(
+    'file',
+    new File([new Blob([bytes], { type: mediaType })], 'generated.' + ext, { type: mediaType }),
+  );
+  form.append('alt', alt);
+  form.append('siteId', ctx.siteId);
+  const targetElementId = op.target.elementId;
+  if (targetElementId) form.append('elementId', targetElementId);
+
+  const response = await ctx.authFetch(ctx.apiBase + '/owner/assets', {
+    method: 'POST',
+    body: form,
+  });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const errBody = (await response.json()) as { error?: unknown };
+      if (errBody && typeof errBody.error === 'string') detail = errBody.error;
+    } catch (_) {
+      /* statusText already names the upload failure */
+    }
+    ctx.setStatus('Apply failed: ' + detail, 'error');
+    return null;
+  }
+  const uploaded = (await response.json()) as { id?: unknown; kind?: unknown };
+  if (!uploaded || typeof uploaded.id !== 'string' || typeof uploaded.kind !== 'string') {
+    ctx.setStatus('Apply failed: malformed asset upload response', 'error');
+    return null;
+  }
+  const assetId = uploaded.id;
+  const mediaKind = uploaded.kind;
+
+  if (op.target.mode === 'replace' && op.target.elementId) {
+    return {
+      kind: 'replaceMedia',
+      elementId: op.target.elementId,
+      mediaKind,
+      assetId,
+      alt,
+    };
+  }
+  if (op.target.mode === 'add' && op.target.sectionId) {
+    const realOp: Record<string, unknown> = {
+      kind: 'addElement',
+      sectionId: op.target.sectionId,
+      elementType: 'media',
+      props: {
+        mediaKind,
+        assetId,
+        alt,
+        fit: 'cover',
+      },
+    };
+    if (op.target.box) realOp.box = op.target.box;
+    return realOp;
+  }
+  ctx.setStatus('Apply failed: generated-image target mode is invalid', 'error');
+  return null;
+}
+
 export function applyAgentOpsImpl(
   ctx: EditorContext,
   ops: unknown[],
   suggestions: SuggestionEntry[] | null,
 ): Promise<boolean> {
   if (!ops || ops.length === 0) return Promise.resolve(false);
+  // Materialise any placeGeneratedImage ops in-flight: upload the inline
+  // Replicate bytes to /api/owner/assets first, then swap the chat-only op
+  // for a real replaceMedia / addElement. ADR 0004 D2: the Owner Asset row
+  // exists only because the Owner accepted, not because the model proposed.
+  // Single-Accept and Accept-all both reach apply through this function, so
+  // the materialisation step lives here rather than at each Accept call site.
+  return materialiseGeneratedImageOps(ctx, ops, suggestions).then(function (resolved) {
+    if (!resolved) return false;
+    return applyAgentOpsAfterMaterialise(ctx, resolved, suggestions);
+  });
+}
+
+function applyAgentOpsAfterMaterialise(
+  ctx: EditorContext,
+  ops: unknown[],
+  suggestions: SuggestionEntry[] | null,
+): Promise<boolean> {
   const preSnapshot: Snapshot | null = ctx.state ? (structuredClone(ctx.state)) : null;
   const precomputed: InverseResult[] = [];
   if (suggestions && preSnapshot) {

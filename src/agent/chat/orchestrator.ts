@@ -58,6 +58,12 @@ import {
   type QuerySiteDetail,
 } from './tools.js';
 import {
+  encodeImageDataUrl,
+  generateImageViaReplicate,
+  MAX_GENERATED_IMAGE_BYTES,
+  snapToFluxAspectRatio,
+} from '../replicate-image.js';
+import {
   CHAT_TOKEN_BUDGET,
   SUMMARIZE_AFTER_TURNS,
   countTurns,
@@ -157,6 +163,24 @@ export interface OrchestratorContext {
    * to pin a deterministic budget without depending on the global constant.
    */
   tokenBudget?: number;
+  /**
+   * Optional. Replicate API token. Required iff the `generateImage` tool is
+   * exposed in `tools` — without it the orchestrator throws a loud error on
+   * dispatch. Threaded from the chat route which reads the binding from
+   * Cloudflare env. Smokes omit this and exclude `generateImage` from tools.
+   */
+  replicateToken?: string;
+  /**
+   * Optional. Replicate-client injection seam. Production omits this so the
+   * dispatcher uses the real `generateImageViaReplicate` over fetch; smokes
+   * inject a stub that returns canned bytes without hitting the network.
+   * Same signature as the real helper so the swap is type-checked.
+   */
+  replicateClient?: (
+    token: string,
+    prompt: string,
+    aspectRatio: string,
+  ) => Promise<{ bytes: Uint8Array; mediaType: string }>;
 }
 
 export interface RunTurnInput {
@@ -346,6 +370,24 @@ export async function runChatTurn(input: RunTurnInput): Promise<RunTurnResult> {
       for (const call of toolCalls) {
         if (READ_ONLY_TOOL_NAMES.has(call.name)) {
           await dispatchReadOnlyTool({ call, writer, ctx, history });
+        } else if (call.name === 'generateImage') {
+          // The generateImage tool is mutating but its op is produced by an
+          // async Replicate call, not a pure parse. Special-cased so the await
+          // happens inline and any failure surfaces as a loud SSE error event.
+          const dispatched = await dispatchGenerateImage({ call, ctx, history, writer });
+          if (dispatched.preview) {
+            const event: Extract<
+              Parameters<ChatStreamWriter['write']>[0],
+              { kind: 'op-preview' }
+            > = {
+              kind: 'op-preview',
+              id: call.id,
+              toolName: call.name,
+              op: dispatched.preview.op,
+            };
+            await writer.write(event);
+            previewOps.push({ id: call.id, toolName: call.name, op: dispatched.preview.op });
+          }
         } else if (MUTATING_TOOL_NAMES.has(call.name)) {
           const dispatched = dispatchMutatingTool({ call, history });
           if (dispatched.preview) {
@@ -660,6 +702,328 @@ function dispatchMutatingTool(input: MutatingDispatchInput): MutatingDispatchRes
   return { preview: { op: parsed.op } };
 }
 
+// ---------------------------------------------------------------------------
+// generateImage dispatch — call Replicate, emit op-preview with inline bytes
+// ---------------------------------------------------------------------------
+//
+// Separate from `dispatchMutatingTool` because the op cannot be built purely
+// from the tool call arguments — flux-schnell must run first and the bytes
+// ride on the op-preview payload (ADR 0004 D2). Every failure path here is
+// loud: a missing REPLICATE_API_TOKEN, an unresolvable target, a Replicate
+// error, or an oversize response all emit an `error` SSE event and a tool
+// message describing the failure so the next pass can react.
+
+interface GenerateImageDispatchInput {
+  call: LlmAssistantToolCall;
+  ctx: OrchestratorContext;
+  history: ChatMessage[];
+  writer: ChatStreamWriter;
+}
+
+interface GenerateImageDispatchResult {
+  preview?: { op: CanvasAgentOp };
+}
+
+interface GenerateImageArgs {
+  prompt: string;
+  alt: string;
+  target:
+    | { mode: 'replace'; elementId: string; boxW: number; boxH: number }
+    | {
+        mode: 'add';
+        sectionId: string;
+        // ADD-mode always carries a box now: either the model passed one or
+        // the orchestrator computed a media-shaped default during parse so the
+        // ghost overlay has a slot to paint into.
+        box: { x: number; y: number; w: number; h: number };
+        aspectW: number;
+        aspectH: number;
+      };
+}
+
+function parseGenerateImageArgs(
+  args: unknown,
+  state: EditableSite,
+): { ok: true; value: GenerateImageArgs } | { ok: false; error: string } {
+  if (!isRecord(args)) return { ok: false, error: 'generateImage: arguments must be an object' };
+  const prompt = args.prompt;
+  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+    return { ok: false, error: 'generateImage: prompt is required (non-empty string)' };
+  }
+  const altRaw = args.alt;
+  const alt = typeof altRaw === 'string' && altRaw.length > 0 ? altRaw : prompt;
+  const elementIdRaw = args.elementId;
+  const sectionIdRaw = args.sectionId;
+  const hasElement = typeof elementIdRaw === 'string' && elementIdRaw.length > 0;
+  const hasSection = typeof sectionIdRaw === 'string' && sectionIdRaw.length > 0;
+  if (hasElement === hasSection) {
+    return {
+      ok: false,
+      error: 'generateImage: provide exactly one of elementId (replace) or sectionId (add)',
+    };
+  }
+  if (hasElement) {
+    const elementId = elementIdRaw;
+    const found = findMediaElementForGenerate(state, elementId);
+    if (!found) {
+      return {
+        ok: false,
+        error: `generateImage: element ${elementId} not found or not a media element`,
+      };
+    }
+    const { box } = found;
+    if (!box || !Number.isFinite(box.w) || !Number.isFinite(box.h) || box.w <= 0 || box.h <= 0) {
+      return {
+        ok: false,
+        error: `generateImage: media element ${elementId} has no measurable box — resize the slot before generating`,
+      };
+    }
+    return {
+      ok: true,
+      value: { prompt, alt, target: { mode: 'replace', elementId, boxW: box.w, boxH: box.h } },
+    };
+  }
+  // hasSection is true here (the hasElement===hasSection early-return and the
+  // hasElement branch above both terminate), but TS's alias narrowing only
+  // ties hasSection back to sectionIdRaw inside `if (hasSection)`, so re-state
+  // the guard so the literal narrows to string.
+  if (typeof sectionIdRaw !== 'string' || sectionIdRaw.length === 0) {
+    return { ok: false, error: 'generateImage: sectionId is required (non-empty string)' };
+  }
+  const sectionId: string = sectionIdRaw;
+  if (!sectionExists(state, sectionId)) {
+    return { ok: false, error: `generateImage: section ${sectionId} not found` };
+  }
+  const boxRaw = args.box;
+  let box: { x: number; y: number; w: number; h: number };
+  let aspectW: number;
+  let aspectH: number;
+  if (boxRaw === undefined || boxRaw === null) {
+    // Server-computed default mirrors applyCanvasAgentOp's `addElement`
+    // auto-placement: x=40, y=bottomY+20 (below the lowest existing element
+    // in the section), with media-tailored dimensions (480x270 / 16:9) so
+    // the Replicate aspect-ratio snap lands on a useful preset and the
+    // editor's ghost overlay paints at a meaningful size. Carrying the box
+    // on the op-preview also lets the editor render the ghost at the same
+    // slot the eventual addElement will land in.
+    box = computeDefaultAddBox(state, sectionId);
+    aspectW = box.w;
+    aspectH = box.h;
+  } else if (!isRecord(boxRaw)) {
+    return { ok: false, error: 'generateImage: box must be an object' };
+  } else {
+    const { x, y, w, h } = boxRaw;
+    if (
+      typeof x !== 'number' ||
+      typeof y !== 'number' ||
+      typeof w !== 'number' ||
+      typeof h !== 'number'
+    ) {
+      return { ok: false, error: 'generateImage: box.x, .y, .w, .h must all be numbers' };
+    }
+    if (w <= 0 || h <= 0 || !Number.isFinite(w) || !Number.isFinite(h)) {
+      return { ok: false, error: 'generateImage: box.w and box.h must be positive finite numbers' };
+    }
+    box = { x, y, w, h };
+    aspectW = w;
+    aspectH = h;
+  }
+  const addTarget: Extract<GenerateImageArgs['target'], { mode: 'add' }> = {
+    mode: 'add',
+    sectionId,
+    aspectW,
+    aspectH,
+    box,
+  };
+  return { ok: true, value: { prompt, alt, target: addTarget } };
+}
+
+/**
+ * Compute a default box for ADD-mode `generateImage` when the model omits
+ * one. Mirrors `applyCanvasAgentOp(addElement)` auto-placement: x=40,
+ * y=bottomY+20, dimensions tailored for media (480x270 / 16:9). The box
+ * rides on the op-preview so the editor's ghost overlay paints at the slot
+ * the eventual addElement will occupy, instead of fighting the apply path's
+ * later default.
+ */
+function computeDefaultAddBox(
+  state: EditableSite,
+  sectionId: string,
+): { x: number; y: number; w: number; h: number } {
+  const section = findSectionForGenerate(state, sectionId);
+  if (!section) {
+    // sectionExists has already verified this path; getting here means a
+    // race between parse and compute, which is impossible in this codepath.
+    // Throw loudly rather than silently returning a guess.
+    throw new Error(
+      `computeDefaultAddBox: section ${sectionId} disappeared between validation and box computation`,
+    );
+  }
+  let bottomY = 40;
+  for (const el of section.elements) {
+    const eb = (el as { box?: { y?: unknown; h?: unknown } }).box;
+    if (!eb) continue;
+    if (typeof eb.y !== 'number' || typeof eb.h !== 'number') continue;
+    const elBottom = eb.y + eb.h;
+    if (elBottom > bottomY) bottomY = elBottom;
+  }
+  return { x: 40, y: bottomY + 20, w: 480, h: 270 };
+}
+
+function findSectionForGenerate(
+  state: EditableSite,
+  sectionId: string,
+): { elements: ReadonlyArray<unknown> } | null {
+  if (state.header && state.header.id === sectionId) return state.header;
+  if (state.footer && state.footer.id === sectionId) return state.footer;
+  for (const page of state.pages) {
+    for (const section of page.sections) {
+      if (section.id === sectionId) return section;
+    }
+  }
+  return null;
+}
+
+function findMediaElementForGenerate(
+  state: EditableSite,
+  elementId: string,
+): { box: { w: number; h: number } } | null {
+  function scan(section: { elements: ReadonlyArray<{ id: string; type: string; box?: unknown }> }):
+    | { box: { w: number; h: number } }
+    | null {
+    for (const el of section.elements) {
+      if (el.id !== elementId) continue;
+      if (el.type !== 'media') return null;
+      const box = el.box;
+      if (
+        !isRecord(box) ||
+        typeof box.w !== 'number' ||
+        typeof box.h !== 'number'
+      ) {
+        return null;
+      }
+      return { box: { w: box.w, h: box.h } };
+    }
+    return null;
+  }
+  if (state.header) {
+    const hit = scan(state.header);
+    if (hit) return hit;
+  }
+  if (state.footer) {
+    const hit = scan(state.footer);
+    if (hit) return hit;
+  }
+  for (const page of state.pages) {
+    for (const section of page.sections) {
+      const hit = scan(section);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+function sectionExists(state: EditableSite, sectionId: string): boolean {
+  if (state.header && state.header.id === sectionId) return true;
+  if (state.footer && state.footer.id === sectionId) return true;
+  for (const page of state.pages) {
+    for (const section of page.sections) {
+      if (section.id === sectionId) return true;
+    }
+  }
+  return false;
+}
+
+async function dispatchGenerateImage(
+  input: GenerateImageDispatchInput,
+): Promise<GenerateImageDispatchResult> {
+  const { call, ctx, history, writer } = input;
+  const token = ctx.replicateToken;
+  if (typeof token !== 'string' || token.length === 0) {
+    const errMsg = 'generateImage: REPLICATE_API_TOKEN binding is missing on this deployment';
+    await writer.write({ kind: 'error', error: errMsg });
+    history.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify({ error: errMsg }),
+    });
+    return {};
+  }
+  const parsed = parseGenerateImageArgs(call.arguments, ctx.state);
+  if (!parsed.ok) {
+    await writer.write({ kind: 'error', error: parsed.error });
+    history.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify({ error: parsed.error }),
+    });
+    return {};
+  }
+  const { prompt, alt, target } = parsed.value;
+  const aspectRatio =
+    target.mode === 'replace'
+      ? snapToFluxAspectRatio(target.boxW, target.boxH)
+      : snapToFluxAspectRatio(target.aspectW, target.aspectH);
+  const replicateClient = ctx.replicateClient ?? generateImageViaReplicate;
+  let image;
+  try {
+    image = await replicateClient(token, prompt, aspectRatio);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await writer.write({ kind: 'error', error: `generateImage: ${message}` });
+    history.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify({ error: message }),
+    });
+    return {};
+  }
+  if (image.bytes.byteLength > MAX_GENERATED_IMAGE_BYTES) {
+    const errMsg = `generateImage: generated asset too large (${String(image.bytes.byteLength)} bytes; cap is ${String(MAX_GENERATED_IMAGE_BYTES)})`;
+    await writer.write({ kind: 'error', error: errMsg });
+    history.push({
+      role: 'tool',
+      toolCallId: call.id,
+      toolName: call.name,
+      content: JSON.stringify({ error: errMsg }),
+    });
+    return {};
+  }
+  const dataUrl = encodeImageDataUrl(image);
+  const opTarget: Extract<CanvasAgentOp, { kind: 'placeGeneratedImage' }>['target'] =
+    target.mode === 'replace'
+      ? { mode: 'replace', elementId: target.elementId }
+      : { mode: 'add', sectionId: target.sectionId, box: target.box };
+  const op: CanvasAgentOp = {
+    kind: 'placeGeneratedImage',
+    target: opTarget,
+    prompt,
+    alt,
+    dataUrl,
+    mediaType: image.mediaType,
+    aspectRatio,
+  };
+  // Per the surrounding tool-call pattern, the assistant turn that emitted
+  // this call already pushed onto history before the dispatch loop; we now
+  // push a synthetic tool result so the next pass sees the success. The
+  // bytes themselves stay out of history — they would balloon the token
+  // budget and the model never needs to read them.
+  history.push({
+    role: 'tool',
+    toolCallId: call.id,
+    toolName: call.name,
+    content: JSON.stringify({
+      ok: true,
+      preview: true,
+      generated: { mediaType: image.mediaType, aspectRatio, byteLength: image.bytes.byteLength },
+    }),
+  });
+  return { preview: { op } };
+}
+
 /**
  * Resolve a server-side CanvasSection preview for additive section ops so
  * the editor can ghost-render it in place between existing sections. Returns
@@ -921,6 +1285,9 @@ export function buildSystemPrompt(state: EditableSite, selectedElementId?: strin
     '  rewriteText — rewrite text element content. content MUST be InlineRun[] — never a plain string.',
   );
   lines.push('  replaceMedia — swap a media element to an EXISTING uploaded Owner Asset.');
+  lines.push(
+    '  generateImage — generate a BRAND-NEW image via Replicate flux-schnell and place it. Use elementId for REPLACE mode (swap an existing image slot) or sectionId for ADD mode (append a new media element). The image is created at preview time; the Owner Asset row only persists if the Owner accepts. Use this whenever the Owner asks for an image that does not exist in their library — never invent fake assetIds for replaceMedia.',
+  );
   lines.push(
     '  designSection — design a new section from a semantic layout tree (stack/grid/split).',
   );

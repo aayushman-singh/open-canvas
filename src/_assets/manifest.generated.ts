@@ -7,6 +7,6 @@
 // byte-stable when source is byte-stable.
 
 export const EDITOR_CLIENT_MANIFEST = {
-  canvasClientUrl: "/_assets/index-0zj1p5mq.js",
-  canvasStylesUrl: "/_assets/index-0v5z83mk.css",
+  canvasClientUrl: "/_assets/index-wvyp4tgr.js",
+  canvasStylesUrl: "/_assets/index-rnv4n52k.css",
 } as const;

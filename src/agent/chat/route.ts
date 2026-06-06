@@ -59,6 +59,7 @@ type Bindings = {
   CLERK_SECRET_KEY: string;
   DATABASE_URL: string;
   GEMINI_API_KEY: string;
+  REPLICATE_API_TOKEN: string;
 };
 
 type Env = { Bindings: Bindings; Variables: ClerkAuthVariables };
@@ -194,12 +195,16 @@ chatApi.post('/:siteId/chat', async (c) => {
     await writer.write({ kind: 'session', sessionId: sessionRef.id });
 
     const adapter = new GeminiAdapter({ apiKey });
+    const replicateToken = c.env.REPLICATE_API_TOKEN;
     const ctx: OrchestratorContext = {
       adapter,
       state: row.editableState,
       fonts: row.fonts,
       assets: row.assets,
       ...(selectedElementId ? { selectedElementId } : {}),
+      ...(typeof replicateToken === 'string' && replicateToken.length > 0
+        ? { replicateToken }
+        : {}),
       systemInstruction: buildSystemPrompt(row.editableState, selectedElementId),
     };
 

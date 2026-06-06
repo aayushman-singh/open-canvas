@@ -230,6 +230,35 @@ export type CanvasAgentOp =
         sectionId: string;
         elementId: string;
       }>;
+    }
+  /**
+   * Chat-only intermediate op for the `generateImage` tool. The orchestrator
+   * calls Replicate, then emits this op with the bytes encoded inline as a
+   * `dataUrl`. The editor paints the 70%-opacity ghost overlay from the data
+   * URL, and on Accept POSTs the bytes to `/api/owner/assets` to materialise
+   * an Owner Asset, transforming this op into a regular `replaceMedia` or
+   * `addElement` op before hitting `/canvas-agent/sites/:id/apply`.
+   *
+   * This op kind is editor-only: `applyCanvasAgentOp` throws if it ever
+   * reaches the server-side apply path, because the asset id is not yet
+   * known at this stage. ADR 0004 D2: rejected proposals must not persist
+   * an Owner Asset, so the bytes ride through the browser and only become a
+   * row at the moment of Accept.
+   */
+  | {
+      kind: 'placeGeneratedImage';
+      target:
+        | { mode: 'replace'; elementId: string }
+        | {
+            mode: 'add';
+            sectionId: string;
+            box?: { x: number; y: number; w: number; h: number };
+          };
+      prompt: string;
+      alt: string;
+      dataUrl: string;
+      mediaType: string;
+      aspectRatio: string;
     };
 
 // ---------------------------------------------------------------------------
@@ -395,6 +424,18 @@ export function applyCanvasAgentOp(state: EditableSite, op: CanvasAgentOp): Edit
       return { page: target };
     }
     return { page };
+  }
+
+  // -- placeGeneratedImage: editor-only chat preview op ---------------------
+  //
+  // The chat orchestrator emits this op with the raw Replicate bytes inline.
+  // The editor materialises an Owner Asset on Accept and replays a real
+  // replaceMedia / addElement op against this route. Seeing it here means a
+  // caller bypassed that materialisation step — refuse loudly per repo policy.
+  if (op.kind === 'placeGeneratedImage') {
+    throw new Error(
+      'applyCanvasAgentOp(placeGeneratedImage): editor-only op kind; the editor must POST the inline bytes to /api/owner/assets and replay this as replaceMedia / addElement before calling apply.',
+    );
   }
 
   // -- rewriteText (uses findElementAcrossSite for header/footer support) ---

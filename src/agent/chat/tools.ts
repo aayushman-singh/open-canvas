@@ -89,12 +89,78 @@ export interface QueryAssetsResult {
 }
 
 // ---------------------------------------------------------------------------
+// generateImage — Replicate-backed image generation for media slots
+// ---------------------------------------------------------------------------
+//
+// Unlike replaceMedia (which picks an EXISTING Owner Asset), this tool produces
+// brand-new pixels. The orchestrator calls Replicate's flux-schnell, encodes
+// the bytes inline on the op-preview, and the editor materialises an Owner
+// Asset only when the Owner accepts (ADR 0004 D2 — rejected proposals must
+// not persist).
+//
+// Two target modes:
+//   - replace: target an existing image element by elementId; aspect ratio is
+//     derived from the slot's box dimensions.
+//   - add: append a new image element to a section; the model passes an
+//     explicit box (or omits it for auto-placement) and the orchestrator
+//     snaps aspect ratio from the box w/h.
+
+const generateImageSchema: JsonSchema = {
+  type: 'object',
+  description:
+    'Generate a brand-new image via Replicate flux-schnell and place it either by replacing an existing image element or by adding a new media element to a section. The bytes ride on the preview; the Owner Asset is created only on Accept.',
+  properties: {
+    prompt: {
+      type: 'string',
+      description:
+        'Text-to-image prompt. Be specific about subject, style, mood, lighting. Used verbatim as the flux-schnell input prompt.',
+    },
+    alt: {
+      type: 'string',
+      description:
+        'Alt text for the generated image. Defaults to the prompt when omitted. Used both for accessibility and as the Owner Asset alt on Accept.',
+    },
+    elementId: {
+      type: 'string',
+      description:
+        'REPLACE MODE — id of an existing media element whose asset will be swapped for the generated image. Exactly one of elementId / sectionId must be provided.',
+    },
+    sectionId: {
+      type: 'string',
+      description:
+        'ADD MODE — id of the section to append a new image element to. Exactly one of elementId / sectionId must be provided.',
+    },
+    box: {
+      type: 'object',
+      description:
+        'ADD MODE only — optional positioning for the new media element. Omit to auto-place below existing content with a sensible default size. Required dimensions when provided.',
+      properties: {
+        x: { type: 'number' },
+        y: { type: 'number' },
+        w: { type: 'number', minimum: 1 },
+        h: { type: 'number', minimum: 1 },
+      },
+      required: ['x', 'y', 'w', 'h'],
+    },
+  },
+  required: ['prompt'],
+};
+
+export const GENERATE_IMAGE_TOOL: LlmTool = {
+  name: 'generateImage',
+  description:
+    'Generate a brand-new image via Replicate flux-schnell and place it on the canvas. Use REPLACE MODE (elementId) to swap an existing image slot, or ADD MODE (sectionId) to add a new media element. Use this when the Owner asks for a NEW image that does not exist in their asset library — for swapping to an existing Owner Asset, use replaceMedia instead.',
+  parameters: generateImageSchema,
+};
+
+// ---------------------------------------------------------------------------
 // CHAT_AGENT_TOOLS — full tool catalogue exposed to the chat model
 // ---------------------------------------------------------------------------
 
 export const CHAT_AGENT_TOOLS: LlmTool[] = [
   QUERY_SITE_TOOL,
   QUERY_ASSETS_TOOL,
+  GENERATE_IMAGE_TOOL,
   ...CANVAS_AGENT_TOOLS,
 ];
 
@@ -102,6 +168,7 @@ export const CHAT_AGENT_TOOLS: LlmTool[] = [
 export const MUTATING_TOOL_NAMES = new Set<string>([
   'rewriteText',
   'replaceMedia',
+  'generateImage',
   'designSection',
   'deleteElement',
   'updateElement',

@@ -418,22 +418,86 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                             kind?: string;
                             mediaKind?: string;
                             assetId?: string;
+                            dataUrl?: string;
+                            mediaType?: string;
+                            target?: {
+                              mode?: string;
+                              box?: { x: number; y: number; w: number; h: number };
+                            };
                           };
+                          // Three flavours of ghost overlay:
+                          //   - replaceMedia: existing Owner Asset id rendered
+                          //     via the owner-gated /assets/<id> route. Ghost
+                          //     fills the target media element (inset:0).
+                          //   - placeGeneratedImage REPLACE mode: bytes ride
+                          //     inline as a data URL so the asset row isn't
+                          //     created until Accept (ADR 0004 D2). Same
+                          //     inset:0 fill over the existing media element.
+                          //   - placeGeneratedImage ADD mode: there is no
+                          //     element yet, so the ghost is absolutely
+                          //     positioned inside the SECTION at op.target.box
+                          //     (the same slot the eventual addElement will
+                          //     land in). Inline top/left/width/height +
+                          //     inset:auto override the .opencanvas-ai-media-
+                          //     ghost class's default inset:0.
+                          let ghostSrc: string | null = null;
+                          let addModeBox: { x: number; y: number; w: number; h: number } | null = null;
                           if (
                             proposalSnapshot.kind === 'replaceMedia' &&
                             proposalSnapshot.mediaKind === 'image' &&
                             typeof proposalSnapshot.assetId === 'string' &&
                             proposalSnapshot.assetId.length > 0
                           ) {
+                            ghostSrc =
+                              ctx.siteBase +
+                              '/assets/' +
+                              encodeURIComponent(proposalSnapshot.assetId);
+                          } else if (
+                            proposalSnapshot.kind === 'placeGeneratedImage' &&
+                            proposalSnapshot.target &&
+                            typeof proposalSnapshot.dataUrl === 'string' &&
+                            proposalSnapshot.dataUrl.length > 0
+                          ) {
+                            if (proposalSnapshot.target.mode === 'replace') {
+                              ghostSrc = proposalSnapshot.dataUrl;
+                            } else if (
+                              proposalSnapshot.target.mode === 'add' &&
+                              proposalSnapshot.target.box &&
+                              typeof proposalSnapshot.target.box.x === 'number' &&
+                              typeof proposalSnapshot.target.box.y === 'number' &&
+                              typeof proposalSnapshot.target.box.w === 'number' &&
+                              typeof proposalSnapshot.target.box.h === 'number'
+                            ) {
+                              ghostSrc = proposalSnapshot.dataUrl;
+                              addModeBox = proposalSnapshot.target.box;
+                            }
+                          }
+                          if (ghostSrc) {
                             const mediaGhost = document.createElement('div');
                             mediaGhost.className = 'opencanvas-ai-media-ghost';
                             mediaGhost.setAttribute(
                               'data-ai-media-ghost-for',
                               suggestionIdSnapshot,
                             );
+                            if (addModeBox) {
+                              // ADD-mode ghost: positioned inside the section
+                              // at the proposed box so the Owner sees the new
+                              // image in its eventual slot. inset:auto
+                              // discards the class's inset:0; top/left/width/
+                              // height pin the box.
+                              mediaGhost.style.cssText =
+                                'inset: auto; top: ' +
+                                String(addModeBox.y) +
+                                'px; left: ' +
+                                String(addModeBox.x) +
+                                'px; width: ' +
+                                String(addModeBox.w) +
+                                'px; height: ' +
+                                String(addModeBox.h) +
+                                'px;';
+                            }
                             const ghostImg = document.createElement('img');
-                            ghostImg.src =
-                              ctx.siteBase + '/assets/' + encodeURIComponent(proposalSnapshot.assetId);
+                            ghostImg.src = ghostSrc;
                             ghostImg.alt = '';
                             mediaGhost.appendChild(ghostImg);
                             const ghostBadge = document.createElement('span');
@@ -493,6 +557,10 @@ export function attachChatSubmitImpl(ctx: EditorContext): void {
                           // own renderAll). That keeps Accept / Apply-all
                           // paths converged on one removal site instead of
                           // each entry button writing its own filter.
+                          // placeGeneratedImage ops are materialised inside
+                          // applyAgentOpsImpl (bytes → Owner Asset → real
+                          // replaceMedia/addElement op) before the /apply
+                          // POST, so the Accept path stays uniform.
                           void ctx.applyAgentOps([entry.op], [entry]);
                         });
                         const rejectBtn = document.createElement('button');

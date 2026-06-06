@@ -871,6 +871,344 @@ assert(
 console.log('[chat:smoke] 10/10 Ghost-preview — OK');
 
 // ---------------------------------------------------------------------------
+// Test 11-14 — generateImage tool dispatch
+// ---------------------------------------------------------------------------
+//
+// The orchestrator's `generateImage` path is special-cased: it must call
+// Replicate (mocked here via ctx.replicateClient), encode bytes inline on
+// the op-preview, and honour ADR 0004 D2 by never persisting an asset
+// server-side. These tests pin:
+//   11. REPLACE mode happy path — elementId resolves, ghost-friendly data
+//       URL arrives, target.boxW/boxH drive the snapped aspect ratio.
+//   12. ADD mode default box — sectionId only, orchestrator computes the
+//       default 480x270 box so the editor's ghost has a slot to paint into.
+//   13. Missing REPLICATE_API_TOKEN — loud error event, no op-preview.
+//   14. Both elementId and sectionId — parser rejects, loud error.
+
+function buildGenerateFixture() {
+  const fix = buildFixtureState();
+  const hero = fix.pages[0]?.sections[0];
+  if (!hero) throw new Error('generate-fixture: hero section missing');
+  const heroMedia = hero.elements.find((e) => e.type === 'media');
+  if (!heroMedia) throw new Error('generate-fixture: hero must have a media element');
+  const features = fix.pages[0]?.sections[1];
+  if (!features) throw new Error('generate-fixture: features section missing');
+  return { state: fix, heroMediaId: heroMedia.id, featuresSectionId: features.id };
+}
+
+// PNG signature bytes — enough for a real image-shaped payload without
+// committing to a full encoder. The orchestrator only cares about
+// byteLength and mediaType.
+const PNG_BYTES = new Uint8Array([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+]);
+
+interface ReplicateCall {
+  token: string;
+  prompt: string;
+  aspectRatio: string;
+}
+
+function makeReplicateStub(): {
+  client: (
+    token: string,
+    prompt: string,
+    aspectRatio: string,
+  ) => Promise<{ bytes: Uint8Array; mediaType: string }>;
+  calls: ReplicateCall[];
+} {
+  const calls: ReplicateCall[] = [];
+  return {
+    client: (token, prompt, aspectRatio) => {
+      calls.push({ token, prompt, aspectRatio });
+      return Promise.resolve({ bytes: PNG_BYTES, mediaType: 'image/png' });
+    },
+    calls,
+  };
+}
+
+// ---- Test 11 — REPLACE mode happy path -----------------------------------
+
+{
+  const fix = buildGenerateFixture();
+  const stub = makeReplicateStub();
+  const callId = 'gen-replace-1';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        { type: 'text', text: 'On it. Proposing a generated photo.' },
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: { elementId: fix.heroMediaId, prompt: 'a foggy harbour at dawn' },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create('site-gen-rep', 'customer-smoke');
+  const result = await runChatTurn({
+    session,
+    userMessage: 'Generate a hero image.',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      replicateToken: 'test-token-XYZ',
+      replicateClient: stub.client,
+    },
+  });
+
+  assert(stub.calls.length === 1, 'REPLACE mode must call Replicate exactly once');
+  const replicateCall = stub.calls[0]!;
+  assert(
+    replicateCall.token === 'test-token-XYZ',
+    'Replicate stub must receive the ctx.replicateToken verbatim',
+  );
+  assert(
+    replicateCall.prompt === 'a foggy harbour at dawn',
+    'Replicate stub must receive the model prompt verbatim',
+  );
+  // Hero media box is 600x540 → ratio ≈ 1.11 → closest preset is 1:1.
+  assert(
+    replicateCall.aspectRatio === '1:1',
+    `expected aspect_ratio snap to 1:1 for 600x540 slot, got ${replicateCall.aspectRatio}`,
+  );
+
+  const events = writer.events();
+  const preview = events.find(
+    (e): e is Extract<ChatStreamEvent, { kind: 'op-preview' }> => e.kind === 'op-preview',
+  );
+  assert(preview !== undefined, 'REPLACE mode must emit an op-preview');
+  const previewOp = preview!.op as {
+    kind?: string;
+    target?: { mode?: string; elementId?: string };
+    prompt?: string;
+    alt?: string;
+    dataUrl?: string;
+    mediaType?: string;
+    aspectRatio?: string;
+  };
+  assert(
+    previewOp.kind === 'placeGeneratedImage',
+    `op.kind must be placeGeneratedImage, got ${String(previewOp.kind)}`,
+  );
+  assert(
+    previewOp.target?.mode === 'replace' && previewOp.target.elementId === fix.heroMediaId,
+    'op.target must carry mode=replace + the requested elementId',
+  );
+  assert(
+    typeof previewOp.dataUrl === 'string' &&
+      previewOp.dataUrl.startsWith('data:image/png;base64,'),
+    'op.dataUrl must be a base64 data URL with the Replicate mediaType',
+  );
+  assert(
+    previewOp.mediaType === 'image/png',
+    `op.mediaType must mirror the Replicate stub mediaType, got ${String(previewOp.mediaType)}`,
+  );
+  assert(
+    previewOp.aspectRatio === '1:1',
+    'op.aspectRatio must carry the snapped preset for downstream re-use',
+  );
+  assert(
+    result.doneReason === 'stop',
+    `expected doneReason=stop after REPLACE happy path, got ${result.doneReason}`,
+  );
+  console.log('[chat:smoke] 11/14 generateImage REPLACE mode — OK');
+}
+
+// ---- Test 12 — ADD mode with default box ---------------------------------
+
+{
+  const fix = buildGenerateFixture();
+  const stub = makeReplicateStub();
+  const callId = 'gen-add-1';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        { type: 'text', text: 'Sure — proposing a new image.' },
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: {
+            sectionId: fix.featuresSectionId,
+            prompt: 'a sunlit workshop bench',
+          },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create('site-gen-add', 'customer-smoke');
+  await runChatTurn({
+    session,
+    userMessage: 'Add a generated image to the features section.',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      replicateToken: 'test-token-ABC',
+      replicateClient: stub.client,
+    },
+  });
+
+  assert(stub.calls.length === 1, 'ADD mode must call Replicate exactly once');
+  // Default ADD box is 480x270 → ratio ≈ 1.78 → closest preset is 16:9.
+  assert(
+    stub.calls[0]!.aspectRatio === '16:9',
+    `expected aspect_ratio 16:9 for default 480x270 box, got ${stub.calls[0]!.aspectRatio}`,
+  );
+
+  const events = writer.events();
+  const preview = events.find(
+    (e): e is Extract<ChatStreamEvent, { kind: 'op-preview' }> => e.kind === 'op-preview',
+  );
+  assert(preview !== undefined, 'ADD mode must emit an op-preview');
+  const previewOp = preview!.op as {
+    kind?: string;
+    target?: {
+      mode?: string;
+      sectionId?: string;
+      box?: { x: number; y: number; w: number; h: number };
+    };
+  };
+  assert(
+    previewOp.kind === 'placeGeneratedImage' &&
+      previewOp.target?.mode === 'add' &&
+      previewOp.target.sectionId === fix.featuresSectionId,
+    'op.target must carry mode=add + the requested sectionId',
+  );
+  const box = previewOp.target?.box;
+  assert(
+    box !== undefined &&
+      box.x === 40 &&
+      box.w === 480 &&
+      box.h === 270 &&
+      typeof box.y === 'number' &&
+      box.y >= 40,
+    `op.target.box must default to {x:40, w:480, h:270, y >= 40}, got ${JSON.stringify(box)}`,
+  );
+  console.log('[chat:smoke] 12/14 generateImage ADD mode default box — OK');
+}
+
+// ---- Test 13 — Missing REPLICATE_API_TOKEN -------------------------------
+
+{
+  const fix = buildGenerateFixture();
+  const stub = makeReplicateStub();
+  const callId = 'gen-no-token';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: { elementId: fix.heroMediaId, prompt: 'anything' },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create('site-gen-noenv', 'customer-smoke');
+  await runChatTurn({
+    session,
+    userMessage: 'Generate.',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      // intentionally no replicateToken
+      replicateClient: stub.client,
+    },
+  });
+
+  assert(
+    stub.calls.length === 0,
+    'missing token must short-circuit before calling Replicate',
+  );
+  const events = writer.events();
+  const err = events.find(
+    (e): e is Extract<ChatStreamEvent, { kind: 'error' }> => e.kind === 'error',
+  );
+  assert(
+    err !== undefined && err.error.includes('REPLICATE_API_TOKEN'),
+    'missing token must surface a loud REPLICATE_API_TOKEN error',
+  );
+  assert(
+    !events.some((e) => e.kind === 'op-preview'),
+    'missing token must not emit any op-preview',
+  );
+  console.log('[chat:smoke] 13/14 generateImage missing-token — OK');
+}
+
+// ---- Test 14 — both elementId and sectionId ------------------------------
+
+{
+  const fix = buildGenerateFixture();
+  const stub = makeReplicateStub();
+  const callId = 'gen-both';
+  const adapter = new MockLlmAdapter([
+    () =>
+      yieldChunks(
+        {
+          type: 'tool_call',
+          id: callId,
+          name: 'generateImage',
+          arguments: {
+            elementId: fix.heroMediaId,
+            sectionId: fix.featuresSectionId,
+            prompt: 'ambiguous target',
+          },
+        },
+        { type: 'done', reason: 'tool_use' },
+      ),
+    () => yieldChunks({ type: 'text', text: 'Done.' }, { type: 'done', reason: 'stop' }),
+  ]);
+  const writer = new BufferedStreamWriter();
+  const session = await new InMemorySessionStore().create('site-gen-both', 'customer-smoke');
+  await runChatTurn({
+    session,
+    userMessage: 'Generate (ambiguous).',
+    writer,
+    ctx: {
+      adapter,
+      state: fix.state,
+      systemInstruction: '[smoke] sys',
+      replicateToken: 'test-token',
+      replicateClient: stub.client,
+    },
+  });
+
+  assert(
+    stub.calls.length === 0,
+    'parser rejection must short-circuit before calling Replicate',
+  );
+  const events = writer.events();
+  const err = events.find(
+    (e): e is Extract<ChatStreamEvent, { kind: 'error' }> => e.kind === 'error',
+  );
+  assert(
+    err !== undefined && err.error.includes('exactly one of elementId'),
+    `parser rejection must name the validation rule, got ${err?.error}`,
+  );
+  assert(
+    !events.some((e) => e.kind === 'op-preview'),
+    'parser rejection must not emit any op-preview',
+  );
+  console.log('[chat:smoke] 14/14 generateImage parser rejection — OK');
+}
+
+// ---------------------------------------------------------------------------
 // Done.
 // ---------------------------------------------------------------------------
 
