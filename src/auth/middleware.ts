@@ -482,16 +482,19 @@ export async function getClerkUser(
   const auth = c.get('auth') as AuthState;
   const clerk = c.get('clerk') as ReturnType<typeof createClerkClient>;
   if (!auth.userId || !clerk) return null;
-  const memo = readCachedClerkUser(auth.userId);
+  // Pin userId in a local so the closure capture below sees `string`, not
+  // the AuthState's `string | null`.
+  const userId = auth.userId;
+  const memo = readCachedClerkUser(userId);
   if (memo !== null) {
     const resolved = Promise.resolve(memo);
     c.set('user', memo);
     c.set(CLERK_USER_PROMISE, resolved);
     return resolved;
   }
-  const promise = clerk.users.getUser(auth.userId).then((user) => {
+  const promise = clerk.users.getUser(userId).then((user) => {
     c.set('user', user);
-    writeCachedClerkUser(auth.userId, user);
+    writeCachedClerkUser(userId, user);
     return user;
   });
   c.set(CLERK_USER_PROMISE, promise);
