@@ -1268,7 +1268,26 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   if (!customerId) {
     return c.text('site not found', 404);
   }
-  const owned = await t.measure('db.owned', () => lookupOwnedSite(c.env, customerId, siteId));
+  // db.owned and db.collabs were serial because the collab list wasn't
+  // useful unless ownership cleared. But the queries are independent at
+  // the database — fire them in parallel and discard the collabs result
+  // on the !owned branch. On the owner happy-path (which is the common
+  // case) we save one full Neon RTT (~240ms) for free.
+  const database = db(c.env);
+  const [owned, collaborators] = await t.measure('db.ownedAndCollabs', () =>
+    Promise.all([
+      lookupOwnedSite(c.env, customerId, siteId),
+      database
+        .select({
+          id: siteCollaborator.id,
+          email: siteCollaborator.invitedEmail,
+          role: siteCollaborator.role,
+          acceptedAt: siteCollaborator.acceptedAt,
+        })
+        .from(siteCollaborator)
+        .where(eq(siteCollaborator.siteId, siteId)),
+    ]),
+  );
   if (!owned) {
     // Distinguish "you're a collaborator on this site, not the owner" from
     // "this site doesn't exist for you at all" so the dashboard can show a
@@ -1298,19 +1317,6 @@ siteSettingsRoute.get('/sites/:siteId/settings', async (c) => {
   const setAtLine = owned.passwordSetAt
     ? `Last changed ${owned.passwordSetAt.toISOString()}`
     : 'Never set';
-
-  const database = db(c.env);
-  const collaborators = await t.measure('db.collabs', () =>
-    database
-      .select({
-        id: siteCollaborator.id,
-        email: siteCollaborator.invitedEmail,
-        role: siteCollaborator.role,
-        acceptedAt: siteCollaborator.acceptedAt,
-      })
-      .from(siteCollaborator)
-      .where(eq(siteCollaborator.siteId, siteId)),
-  );
 
   t.mark('collabs', collaborators.length);
   c.header('Server-Timing', t.header());

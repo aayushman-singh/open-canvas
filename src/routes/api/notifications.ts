@@ -27,6 +27,7 @@ import {
   markNotificationRead,
 } from '../../notifications/writer.js';
 import type { PublicEnv } from '../public.js';
+import { Timings } from '../../server-timing.js';
 
 // Mounted inside `ownerApi`, which lives at `/api/*` (Clerk session) and
 // `/__api/*` (on-site editor edit-token) — both prefixes set `c.get('auth')`
@@ -55,7 +56,8 @@ async function resolveCustomerId(c: Context<PublicEnv>): Promise<string | null> 
 }
 
 notificationsApi.get('/notifications', async (c) => {
-  const customerId = await resolveCustomerId(c);
+  const t = new Timings();
+  const customerId = await t.measure('customer', () => resolveCustomerId(c));
   if (!customerId) {
     return c.json({ error: 'account not found' }, 404);
   }
@@ -74,15 +76,19 @@ notificationsApi.get('/notifications', async (c) => {
   // Previously each of listInbox / unreadCount fired their own pair of site
   // + siteCollaborator SELECTs — duplicate work on the dashboard's polling
   // hot path. One load, two consumers.
-  const siteIds = await loadVisibleSiteIds(database, customerId);
-  const [notifications, unread] = await Promise.all([
-    listInbox(database, customerId, {
-      siteIds,
-      ...(since !== undefined ? { since } : {}),
-      ...(limit !== undefined ? { limit } : {}),
-    }),
-    unreadCount(database, customerId, siteIds),
-  ]);
+  const siteIds = await t.measure('db.visible', () =>
+    loadVisibleSiteIds(database, customerId),
+  );
+  const [notifications, unread] = await t.measure('db.inbox', () =>
+    Promise.all([
+      listInbox(database, customerId, {
+        siteIds,
+        ...(since !== undefined ? { since } : {}),
+        ...(limit !== undefined ? { limit } : {}),
+      }),
+      unreadCount(database, customerId, siteIds),
+    ]),
+  );
 
   // Dashboard polls /api/notifications repeatedly; without a Cache-Control
   // header every poll hits Neon. `private, max-age=10, stale-while-revalidate=30`
@@ -90,6 +96,8 @@ notificationsApi.get('/notifications', async (c) => {
   // background for another 30s before forcing a network round trip. Private
   // because the body is scoped to one Owner.
   c.header('Cache-Control', 'private, max-age=10, stale-while-revalidate=30');
+  t.mark('rows', notifications.length, `unread=${unread},sites=${siteIds.length}`);
+  c.header('Server-Timing', t.header());
   return c.json({ notifications, unreadCount: unread });
 });
 
