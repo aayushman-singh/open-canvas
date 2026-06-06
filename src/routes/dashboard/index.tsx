@@ -1177,10 +1177,6 @@ interface SiteCard {
   styleKit: string;
   publishedVersion: number;
   updatedAt: Date;
-  // `null` means the thumb is not yet rendered for this isolate. The card
-  // emits a skeleton iframe with `data-thumb-src` and the inline hydrator
-  // fetches /dashboard/thumbs/:siteId after first paint.
-  thumbHtml: string | null;
   passwordEnabled: boolean;
   visitorTheme: 'light' | 'dark' | 'toggleable';
   searchIndexing: boolean;
@@ -1218,10 +1214,13 @@ function buildCards(
 ): SiteCard[] {
   return rows.map((row) => {
     const state = row.editableState;
-    // Cache-only on the main list path. Cold cache → null → skeleton iframe
-    // hydrates via /dashboard/thumbs/:siteId after first paint. Skipping
-    // the synchronous renderCanvasSnapshot loop is the whole TTFB win.
-    const thumbHtml = getCachedThumbHtml(row.id, row.updatedAt) ?? null;
+    // The cache is consumed by /dashboard/thumbs/:siteId, not here. Inlining
+    // a cached srcdoc into the dashboard body bloated the wire payload to
+    // ~900kB (3 sites x ~300kB each), pushing domInteractive past 5s. The
+    // cheap path is always the same: emit a placeholder iframe with a
+    // `data-thumb-src` attribute, let the inline hydrator pull each thumb
+    // off /dashboard/thumbs/:siteId after first paint, and let the cache do
+    // its job on THAT route's render cost — not on the listing's wire size.
     return {
       siteId: row.id,
       ownedByCurrent: row.ownedByCurrent,
@@ -1230,7 +1229,6 @@ function buildCards(
       styleKit: row.styleKit,
       publishedVersion: row.publishedVersion,
       updatedAt: row.updatedAt,
-      thumbHtml,
       passwordEnabled: row.passwordEnabled,
       visitorTheme: state.visitorTheme ?? 'light',
       searchIndexing: !(state.siteNoIndex ?? false),
@@ -1622,25 +1620,14 @@ dashboard.get('/', async (c) => {
           {cards.map((s) => (
             <div class="site-card">
               <div class="site-card-thumb">
-                {s.thumbHtml !== null ? (
-                  <iframe
-                    srcdoc={s.thumbHtml}
-                    scrolling="no"
-                    tabindex={-1}
-                    loading="lazy"
-                    sandbox="allow-same-origin"
-                    title={`Preview of ${s.siteName}`}
-                  />
-                ) : (
-                  <iframe
-                    data-thumb-src={`/dashboard/thumbs/${s.siteId}`}
-                    scrolling="no"
-                    tabindex={-1}
-                    loading="lazy"
-                    sandbox="allow-same-origin"
-                    title={`Preview of ${s.siteName}`}
-                  />
-                )}
+                <iframe
+                  data-thumb-src={`/dashboard/thumbs/${s.siteId}`}
+                  scrolling="no"
+                  tabindex={-1}
+                  loading="lazy"
+                  sandbox="allow-same-origin"
+                  title={`Preview of ${s.siteName}`}
+                />
               </div>
               <div class="site-card-body">
                 <h3>{s.siteName}</h3>
