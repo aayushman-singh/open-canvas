@@ -312,8 +312,7 @@ function severityChipLabel(severity: Severity): string {
 }
 
 function IssueCard({ issue, editorHref }: { issue: AuditIssue; editorHref: string }) {
-  const where =
-    issue.pageSlug !== undefined ? `Page /${issue.pageSlug}` : 'Site';
+  const where = issue.pageSlug !== undefined ? `Page /${issue.pageSlug}` : 'Site';
   // Append the targeting query params so the editor's boot path can pan to
   // the right page and select the offending element. The editor reads these
   // synchronously after state hydration — see editor-client/index.ts boot
@@ -354,18 +353,18 @@ function scoreCopy(blockerCount: number, warningCount: number): { headline: stri
     const word = blockerCount === 1 ? 'issue is' : 'issues are';
     return {
       headline: 'Needs attention',
-      body: `${blockerCount} ${word} blocking publish. Resolve them, then re-run this check.`,
+      body: `${blockerCount} ${word} worth fixing. Resolve them, then re-run this check.`,
     };
   }
   if (warningCount > 0) {
     return {
-      headline: 'Looking good!',
-      body: 'No blocking problems — your site is ready to publish. A couple of small things would make it even better.',
+      headline: 'Ready to review',
+      body: 'No critical problems found. A couple of small things would make this site easier for more visitors to use.',
     };
   }
   return {
     headline: 'All clear',
-    body: 'No accessibility issues detected on this site. Publish is unblocked.',
+    body: 'No accessibility issues detected on this site.',
   };
 }
 
@@ -390,8 +389,7 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
   const rawScore = 100 - report.blockerCount * 20 - report.warningCount * 5;
   const score = Math.max(0, rawScore);
   const band = scoreBand(report.blockerCount, report.warningCount);
-  const ringColour =
-    band === 'ok' ? 'var(--ok)' : band === 'warn' ? 'var(--warn)' : 'var(--red)';
+  const ringColour = band === 'ok' ? 'var(--ok)' : band === 'warn' ? 'var(--warn)' : 'var(--red)';
   // Conic-gradient → ring fill stops at `score%`; remainder is a neutral
   // surface so the unfilled portion reads as "headroom".
   const ringStyle = `background: conic-gradient(${ringColour} 0 ${score}%, var(--surface-3) ${score}% 100%);`;
@@ -442,9 +440,7 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
           const { variant, copy: tileCopy } = summariseCategory(category, report.issues);
           return (
             <div class={`check ${variant}`}>
-              <span class="ic">
-                {variant === 'ok' ? <CheckTickIcon /> : <CheckWarnIcon />}
-              </span>
+              <span class="ic">{variant === 'ok' ? <CheckTickIcon /> : <CheckWarnIcon />}</span>
               <span>
                 <b>{category.label}</b>
                 <small>{tileCopy}</small>
@@ -456,9 +452,7 @@ a11yReportRoute.get('/sites/:siteId/a11y', async (c) => {
 
       {report.issues.length === 0 ? (
         <div class="card">
-          <p class="empty">
-            No accessibility issues detected on this site. Publish is unblocked.
-          </p>
+          <p class="empty">No accessibility issues detected on this site.</p>
         </div>
       ) : (
         <div class="issues">

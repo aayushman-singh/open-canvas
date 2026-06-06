@@ -31,9 +31,7 @@ if (!SOURCE_URL || !TARGET_URL) {
 
 // ── 1. Apply drizzle migrations to target ─────────────────────────────────
 const migrationsDir = join(import.meta.dir, '..', 'drizzle');
-const migrationFiles = (await readdir(migrationsDir))
-  .filter((f) => f.endsWith('.sql'))
-  .sort();
+const migrationFiles = (await readdir(migrationsDir)).filter((f) => f.endsWith('.sql')).sort();
 
 console.log(`Applying ${migrationFiles.length} migrations to target…`);
 const target = postgres(TARGET_URL, { max: 1, prepare: false });
@@ -102,9 +100,7 @@ for (const { child, parent } of fkRows) {
 const sorted: string[] = [];
 const remaining = new Set(tables);
 while (remaining.size > 0) {
-  const ready = [...remaining].filter(
-    (t) => [...deps.get(t)!].every((p) => !remaining.has(p)),
-  );
+  const ready = [...remaining].filter((t) => [...deps.get(t)!].every((p) => !remaining.has(p)));
   if (ready.length === 0) {
     throw new Error(
       `FK cycle detected among: ${[...remaining].join(', ')}. Manual order required.`,
@@ -126,9 +122,7 @@ for (const table of sorted) {
     WHERE table_schema = 'public' AND table_name = ${table}
     ORDER BY ordinal_position
   `;
-  const writeCols = cols
-    .filter((c) => c.is_generated !== 'ALWAYS')
-    .map((c) => c.column_name);
+  const writeCols = cols.filter((c) => c.is_generated !== 'ALWAYS').map((c) => c.column_name);
   if (writeCols.length === 0) {
     console.log(`  ${table}: 0 writable columns, skipping`);
     continue;
@@ -141,7 +135,11 @@ for (const table of sorted) {
   }
   // Bulk insert in chunks of 500 to keep parameter count under Postgres
   // limits (~65k bound params per statement; 500 rows × ~20 cols = 10k).
+  // No conflict-ignore path: this is a one-shot production data copy, so a
+  // duplicate or partial insert must stop the run instead of silently
+  // printing success with missing target rows.
   const chunkSize = 500;
+  let tableRowsCopied = 0;
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
     const placeholders = chunk
@@ -153,13 +151,19 @@ for (const table of sorted) {
       })
       .join(', ');
     const values = chunk.flatMap((row) => writeCols.map((c) => row[c]));
-    await target.unsafe(
-      `INSERT INTO "${table}" (${colListSrc}) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+    const insertedRows = await target.unsafe(
+      `INSERT INTO "${table}" (${colListSrc}) VALUES ${placeholders} RETURNING 1`,
       values,
     );
+    if (insertedRows.length !== chunk.length) {
+      throw new Error(
+        `[migrate-neon] target insert count mismatch for table "${table}" chunk ${String(i / chunkSize + 1)}: expected ${String(chunk.length)}, inserted ${String(insertedRows.length)}`,
+      );
+    }
+    tableRowsCopied += insertedRows.length;
   }
-  totalRowsCopied += rows.length;
-  console.log(`  ${table}: ${rows.length} rows`);
+  totalRowsCopied += tableRowsCopied;
+  console.log(`  ${table}: ${tableRowsCopied} rows`);
 }
 
 console.log(`\nDone. ${totalRowsCopied} rows copied across ${tables.length} tables.`);
