@@ -218,6 +218,7 @@ import {
   targetSectionForSidebarImpl,
 } from './section-toolbar.js';
 import { beginTextEditImpl } from './text-edit.js';
+import { wireFontLoadRemeasureImpl } from './fontload-remeasure.js';
 import type { EditorBoot, EditorContext, RemoteCursorEntry } from './editor-context.js';
 import {
   attachChromeToggles,
@@ -394,6 +395,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     undoTimer: null,
     undoRedoing: false,
     undoPersistenceFailed: false,
+    fontLoadRemeasureWired: false,
     saveTimer: null,
     saveQueue: Promise.resolve(true),
     coEditConnection: null,
@@ -804,6 +806,18 @@ export function createEditor(boot: EditorBoot): void {
       // final DOM position when sections render in.
       mountViewportImpl(ctx);
       ctx.renderAll();
+      // Webfont swap remeasure: the initial paint uses the fallback face
+      // because `@font-face` declarations carry `font-display: swap`
+      // (see src/fonts/face-emit.ts). Once the authored face lands the
+      // text re-flows — a heading authored at `box.h = 120` under the
+      // loaded font may now overflow the wrapper because the fallback
+      // and loaded faces have different vertical metrics. Combined with
+      // the text-wrapper `overflow: hidden` default (text-overflow-hidden
+      // smoke), the bottom line clips until the user clicks the element
+      // (which triggers `beginTextEdit`'s scrollHeight pass). Wire a
+      // one-shot listener on `document.fonts.ready` so the grow pass
+      // runs after every webfont in the initial set has loaded.
+      wireFontLoadRemeasureImpl(ctx);
       // Math rendering: re-run once KaTeX resolves so deferred equations
       // catch up.
       window.addEventListener('opencanvas-katex-ready', function () {

@@ -522,6 +522,13 @@ export interface EditorContext {
    *  Phase 2); Phase 2q.d collapses the forward decl into the real
    *  implementation in style-apply.ts. */
   setBoxStyle(wrapper: HTMLElement, box: PositionedBox): void;
+  /** One-shot latch set by `wireFontLoadRemeasureImpl` (see
+   *  `fontload-remeasure.ts`) so a second wiring call during the boot
+   *  sequence — or any future re-mount path — doesn't stack a duplicate
+   *  `document.fonts.ready` listener. The grow pass it triggers is
+   *  monotonic and would be safe to run twice; the flag keeps the call
+   *  graph tidy. False at boot, never reset. */
+  fontLoadRemeasureWired: boolean;
 
   // -- Phase 2q.d: run + body builders + element menu --------------------
   /** Static map from IconName → inner SVG markup (path geometry only —
