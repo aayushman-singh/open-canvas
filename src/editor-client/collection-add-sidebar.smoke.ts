@@ -1,20 +1,23 @@
 // src/editor-client/collection-add-sidebar.smoke.ts
 //
-// ADR 0063 dec 9 — pins the Add-panel Components-grid Collection button.
+// Regression guard: the duplicate "Collection" tile that used to sit
+// inside the Add-panel Components grid (alongside Text / Image / Video / …)
+// is gone. Collection creation is reached via the standalone
+// "+ New Collection" button in the dedicated Collections group, which sits
+// above the Components grid. The two-entry-points UX was confusing.
 //
 // Coverage:
-//   (1) src/editor/route.tsx renders a button carrying the
-//       data-canvas-add-collection attribute AND the
-//       opencanvas-sidebar-command class so it inherits the standard
-//       sidebar-tile treatment.
-//   (2) The button is rendered inside the Components grid section
-//       (i.e. after the "Components" h2 but before the "Colors"
-//       section), matching ADR placement.
-//   (3) The button label reads exactly "Collection".
-//   (4) src/editor-client/index.ts wires clicks on
-//       [data-canvas-add-collection] elements to runCollectionScaffoldFlowImpl,
-//       avoiding double-binding the existing Pages-tab #canvas-add-collection
-//       button by id.
+//   (1) src/editor/route.tsx contains NO <button class="opencanvas-sidebar-command"
+//       data-canvas-add-collection> — i.e. no duplicate tile in the
+//       Components grid.
+//   (2) The standalone "+ New Collection" button is still rendered with
+//       class="opencanvas-sidebar-action" and data-canvas-add-collection,
+//       and its label reads "+ New Collection".
+//   (3) The Collections group sits ABOVE the Components grid (visual
+//       precedence reflects the "promoted, not buried" decision).
+//   (4) src/editor-client/index.ts still wires
+//       [data-canvas-add-collection] clicks to runCollectionScaffoldFlowImpl
+//       so the surviving standalone button still works.
 //
 // Run with `bun run collection-add-sidebar:smoke`.
 
@@ -28,57 +31,51 @@ function assert(condition: unknown, message: string): asserts condition {
 
 const routeSrc = await Bun.file(new URL('../editor/route.tsx', import.meta.url)).text();
 
-// (1) data-canvas-add-collection + opencanvas-sidebar-command class.
-const buttonRegex =
-  /<button[^>]*\bclass="opencanvas-sidebar-command"[^>]*\bdata-canvas-add-collection\b[^>]*>([\s\S]*?)<\/button>/;
-const altRegex =
-  /<button[^>]*\bdata-canvas-add-collection\b[^>]*\bclass="opencanvas-sidebar-command"[^>]*>([\s\S]*?)<\/button>/;
-const match = routeSrc.match(buttonRegex) ?? routeSrc.match(altRegex);
+// (1) Tile absent — no sidebar-command-class button carries data-canvas-add-collection.
+const tileForward =
+  /<button[^>]*\bclass="opencanvas-sidebar-command"[^>]*\bdata-canvas-add-collection\b/;
+const tileReverse =
+  /<button[^>]*\bdata-canvas-add-collection\b[^>]*\bclass="opencanvas-sidebar-command"/;
 assert(
-  match !== null,
-  '(1) route.tsx must render a <button class="opencanvas-sidebar-command" data-canvas-add-collection>',
+  !tileForward.test(routeSrc) && !tileReverse.test(routeSrc),
+  '(1) duplicate <button class="opencanvas-sidebar-command" data-canvas-add-collection> tile must NOT exist — it was removed in favor of the standalone Collections group',
 );
 
-// (3) Label is exactly "Collection" (trimmed).
-const label = match[1]!.trim();
+// (2) Standalone button present with sidebar-action class + "+ New Collection" label.
+const actionForward =
+  /<button[^>]*\bclass="opencanvas-sidebar-action"[^>]*\bdata-canvas-add-collection\b[^>]*>([\s\S]*?)<\/button>/;
+const actionReverse =
+  /<button[^>]*\bdata-canvas-add-collection\b[^>]*\bclass="opencanvas-sidebar-action"[^>]*>([\s\S]*?)<\/button>/;
+const actionMatch = routeSrc.match(actionForward) ?? routeSrc.match(actionReverse);
 assert(
-  label === 'Collection',
-  '(3) button label must be exactly "Collection" (got: ' + JSON.stringify(label) + ')',
+  actionMatch !== null,
+  '(2) standalone <button class="opencanvas-sidebar-action" data-canvas-add-collection> must still exist',
+);
+const actionLabel = actionMatch[1]!.trim();
+assert(
+  actionLabel === '+ New Collection',
+  '(2) standalone button label must read "+ New Collection" (got: ' + JSON.stringify(actionLabel) + ')',
 );
 
-// (2) The button lives inside the Components section. Other panels (the
-// Pages tab "+ New Collection" and the Add-panel "Collections" group) also
-// carry data-canvas-add-collection — we want the position of the
-// Components-grid button specifically, which the regex already pinpoints.
+// (3) Collections group sits above the Components grid.
+const collectionsHeader = routeSrc.indexOf('<h2>Collections</h2>');
 const componentsHeader = routeSrc.indexOf('<h2>Components</h2>');
-const colorsHeader = routeSrc.indexOf('<h2>Colors</h2>');
-const buttonStart = match.index;
-assert(componentsHeader > 0, '(2) <h2>Components</h2> marker must exist');
-assert(colorsHeader > componentsHeader, '(2) <h2>Colors</h2> must follow Components');
+assert(collectionsHeader > 0, '(3) <h2>Collections</h2> marker must exist');
+assert(componentsHeader > 0, '(3) <h2>Components</h2> marker must exist');
 assert(
-  buttonStart !== undefined && buttonStart > componentsHeader && buttonStart < colorsHeader,
-  '(2) Collection button must live inside the Components grid section (between Components and Colors headers)',
+  collectionsHeader < componentsHeader,
+  '(3) Collections group must precede Components grid in markup order',
 );
 
-// (4) Wiring in index.ts.
+// (4) Wiring in index.ts — surviving standalone button still calls the scaffold flow.
 const indexSrc = await Bun.file(new URL('./index.ts', import.meta.url)).text();
 assert(
-  indexSrc.includes(
-    'import {\n  attachCollectionScaffoldButtonImpl,\n  runCollectionScaffoldFlowImpl,\n}',
-  ) || indexSrc.includes('runCollectionScaffoldFlowImpl'),
-  '(4) index.ts must import runCollectionScaffoldFlowImpl from collection-scaffold',
+  indexSrc.includes('runCollectionScaffoldFlowImpl'),
+  '(4) index.ts must import + call runCollectionScaffoldFlowImpl so the standalone button still works',
 );
 assert(
   indexSrc.includes("document.querySelectorAll('[data-canvas-add-collection]')"),
-  '(4) index.ts must querySelectorAll [data-canvas-add-collection] to wire the Components-grid button',
-);
-assert(
-  indexSrc.includes("btn.id !== 'canvas-add-collection'"),
-  '(4) index.ts must exclude the Pages-tab #canvas-add-collection button by id to avoid double-binding the existing scaffold-button wiring',
-);
-assert(
-  indexSrc.includes('runCollectionScaffoldFlowImpl(ctx)'),
-  '(4) index.ts must call runCollectionScaffoldFlowImpl(ctx) from the new button click handler',
+  '(4) index.ts must querySelectorAll [data-canvas-add-collection] to wire the standalone button',
 );
 
 console.log('[collection-add-sidebar:smoke] OK');
