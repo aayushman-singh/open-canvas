@@ -148,12 +148,20 @@ export function buildElementMenuImpl(
   menu.className = 'element-menu';
   menu.setAttribute('data-element-menu', 'true');
 
-  const zItems: Array<{ label: string; action: 'front' | 'back' }> = [
+  // Full z-order axis lives in the menu: front/back span the whole stack,
+  // forward/backward nudge by one slot. Owners used to reach for the
+  // inspector's z-order group to step through neighbours; folding those
+  // verbs in here keeps the menu the single source of truth for stack
+  // manipulation.
+  type ZItem = { label: string; action: 'front' | 'back' | 'forward' | 'backward' };
+  const zItems: Array<ZItem> = [
     { label: 'Bring to front', action: 'front' },
+    { label: 'Forward', action: 'forward' },
+    { label: 'Backward', action: 'backward' },
     { label: 'Send to back', action: 'back' },
   ];
   for (let i = 0; i < zItems.length; i++) {
-    (function (item: { label: string; action: 'front' | 'back' }) {
+    (function (item: ZItem) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'menu-item';
@@ -163,7 +171,7 @@ export function buildElementMenuImpl(
         ctx.closeElementMenu();
       });
       menu.appendChild(btn);
-    })(zItems[i] as { label: string; action: 'front' | 'back' });
+    })(zItems[i] as ZItem);
   }
 
   const div2 = document.createElement('div');

@@ -6,10 +6,14 @@
 // atomic cutover.
 //
 // This module is verbs only — state-mutating functions that take
-// `ctx: EditorContext` and operate on the EditableSite. DOM builders
-// that wrap these verbs in HTMLElement scaffolding live in
-// inspector-action-buttons.ts (split because builders can't be smoke-
-// tested under bare Bun — no `document` global).
+// `ctx: EditorContext` and operate on the EditableSite. The DOM
+// surface that calls them is the 3-dot element menu
+// (./element-menu.ts); the inspector itself no longer carries
+// z-order / duplicate / delete / reading-order rows for elements
+// — those duplicated the menu and cluttered the panel. The verbs
+// stay separate from the menu so any future caller (keyboard
+// shortcut, command palette, agent op) can reuse them without
+// pulling the menu builder.
 //
 // Failure contract preserved: parentArrayFor throws loudly when an
 // element is not present in the section tree; the verbs do not wrap
