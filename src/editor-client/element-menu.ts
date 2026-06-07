@@ -41,6 +41,8 @@
 
 import type { CanvasElement, CanvasSection } from '../canvas/schema.js';
 
+import { hydrateInteractives } from './hydrate-interactives.js';
+
 import { augmentCollectionPreviewForElementImpl } from './collection-preview.js';
 import { cssEscape } from './css-escape.js';
 import type { EditorContext } from './editor-context.js';
@@ -351,5 +353,22 @@ export function rebuildElementImpl(ctx: EditorContext, elementId: string): void 
   // the next full renderAll().
   if (found.element.type === 'collection') {
     augmentCollectionPreviewForElementImpl(ctx, elementId);
+  }
+  // Re-hydrate the visitor interactive runtime against the replaced
+  // wrapper(s). A carousel rebuilt via the inspector (slide added /
+  // removed / reordered) emits a fresh `.opencanvas-carousel` subtree
+  // with no `data-opencanvas-hydrated="true"` flag; without this call
+  // its arrows + dots would render but never advance. `skipPopups: true`
+  // matches the editor's renderAll() contract — popup chrome is visitor-
+  // only. Re-query for the fresh replacement nodes since the references
+  // captured in `existingNodes` above point at the now-detached originals.
+  const freshNodes = ctx.root.querySelectorAll(
+    '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
+  );
+  for (let i = 0; i < freshNodes.length; i++) {
+    const node = freshNodes[i];
+    if (node instanceof HTMLElement) {
+      hydrateInteractives(node, { skipPopups: true });
+    }
   }
 }

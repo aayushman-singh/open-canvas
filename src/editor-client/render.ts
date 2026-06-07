@@ -79,6 +79,7 @@ import {
 } from './editor-constants.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 import { augmentCollectionPreviewsImpl } from './collection-preview.js';
+import { hydrateInteractives } from './hydrate-interactives.js';
 
 export function clampZoom(value: number, max?: number): number {
   if (!Number.isFinite(value)) return 1;
@@ -371,6 +372,16 @@ export function renderAllImpl(ctx: EditorContext): void {
   // dimensions are settled; the augmenter is idempotent so a redundant
   // call on a no-Collection page is a cheap zero-iteration loop.
   augmentCollectionPreviewsImpl(ctx);
+
+  // Hydrate the visitor interactive runtime against every newly-rendered
+  // carousel / accordion. The `data-opencanvas-hydrated="true"` idempotence
+  // flag means re-running this on a redraw that re-uses some wrappers (none
+  // today — renderAll replaces the canvas-root subtree entirely) is a cheap
+  // no-op. `skipPopups: true` keeps popup chrome from hijacking the canvas
+  // while editing; popups are visitor-only behaviour.
+  if (ctx.root) {
+    hydrateInteractives(ctx.root, { skipPopups: true });
+  }
 
   if (ctx.pendingImport) {
     ctx.renderPlacementSlots();
