@@ -414,6 +414,25 @@ export interface EditorContext {
    *  that no longer exists (concurrent collaborator deletion), the next
    *  render-pass clears the field; no crash, no zombie viewport. */
   editingCollectionTemplate: { collectionId: string } | null;
+  /** ADR 0065 D3 + D9 — enter custom-template edit mode for the named
+   *  Collection. Preconditions enforced at runtime via ctx.setStatus
+   *  ('error'): id must resolve to a Collection, and the Collection's
+   *  `display` must already be `'custom'` (the caller switches display
+   *  first; the inspector display-dropdown handler does this atomically).
+   *  First-ever entry (when `customTemplate === undefined`) seeds via
+   *  `seedCustomTemplate()` AND sets `editingCollectionTemplate` in a
+   *  single capture/scheduleSave window — one atomic write per D3. The
+   *  inspector's "Edit template" button calls this; the display-dropdown
+   *  change handler also calls it on first switch-to-'custom'. Bound
+   *  impl lives in collection-template-edit.ts. */
+  enterCollectionTemplateEdit(collectionId: string): void;
+  /** ADR 0065 D4 + D10 — exit custom-template edit mode. Idempotent.
+   *  Called by the inspector's "Done editing template" button, by Phase 3
+   *  Esc / click-outside handlers, by the display-dropdown handler when
+   *  the Owner switches away from `'custom'` while editing (D10
+   *  auto-exit), and by page-switch (D6). Bound impl lives in
+   *  collection-template-edit.ts. */
+  exitCollectionTemplateEdit(): void;
 
   // -- Phase 2o.a: selection state-machine -------------------------------
   /** Latched true the first time the Owner clicks "Drop selection" in the

@@ -163,6 +163,10 @@ import {
 import { attachRootEventsImpl } from './canvas-root-events.js';
 import { deleteElement } from './inspector-actions.js';
 import {
+  enterCollectionTemplateEditImpl,
+  exitCollectionTemplateEditImpl,
+} from './collection-template-edit.js';
+import {
   removeLinkPopoverImpl,
   showLinkPopoverImpl,
   onCanvasLinkHover as onCanvasLinkHoverImpl,
@@ -405,6 +409,9 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     // Phase 1 initialises null; Phase 2C wires enter/exit verbs from the
     // inspector and Phase 2D's selection branch reads it.
     editingCollectionTemplate: null,
+    enterCollectionTemplateEdit: (collectionId) =>
+      enterCollectionTemplateEditImpl(ctx, collectionId),
+    exitCollectionTemplateEdit: () => exitCollectionTemplateEditImpl(ctx),
 
     // ---- Selection state-machine --------------------------------------
     chatSelectionDropped: false,

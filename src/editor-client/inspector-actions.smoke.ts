@@ -209,6 +209,16 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     // ADR 0065 D6 — template edit-mode field on EditorContext; null in
     // smokes that don't drive the inspector's enter/exit verbs (Phase 2C).
     editingCollectionTemplate: null,
+    enterCollectionTemplateEdit: () => {
+      throw new Error(
+        'enterCollectionTemplateEdit stub: smoke does not exercise collection template edit-mode',
+      );
+    },
+    exitCollectionTemplateEdit: () => {
+      throw new Error(
+        'exitCollectionTemplateEdit stub: smoke does not exercise collection template edit-mode',
+      );
+    },
     chatSelectionDropped: false,
     linkPopoverPinned: false,
     removeLinkPopover: () => {},
