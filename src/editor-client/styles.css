@@ -2800,6 +2800,35 @@ body[data-placement-active="true"] .opencanvas-section-slot {
   margin-bottom: 8px;
   background: var(--surface-2);
 }
+#canvas-inspector .opencanvas-inspector-entry {
+  padding-block: 12px;
+}
+#canvas-inspector .opencanvas-inspector-entry + .opencanvas-inspector-entry {
+  border-top: 2px solid var(--red);
+}
+#canvas-inspector .opencanvas-inspector-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--red);
+}
+#canvas-inspector .opencanvas-inspector-entry-header-label::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+  margin-right: 6px;
+  vertical-align: middle;
+}
 #canvas-inspector .inspector-section-heading {
   margin-top: 16px;
   padding-top: 12px;
