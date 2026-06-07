@@ -85,6 +85,16 @@ import { isAllowedHref } from './href-utils.js';
 import { newPageId, newSectionId } from './ids.js';
 
 export function setActivePageImpl(ctx: EditorContext, pageId: string | null): void {
+  // ADR 0065 D6 — switching to a different page exits Collection
+  // template-edit mode. The editing pin references a Collection on the
+  // page we are leaving; carrying it onto a different page would either
+  // leave the chrome anchored to an off-page wrapper or fail to find it
+  // entirely. Clear the field BEFORE setting activePageId so the next
+  // renderAll() (driven by the selection clears below) sees a coherent
+  // state and the chrome strips cleanly.
+  if (ctx.editingCollectionTemplate !== null) {
+    ctx.exitCollectionTemplateEdit();
+  }
   ctx.activePageId = pageId;
   // Route clears through the selection helpers so the DOM data-selected
   // attribute is scrubbed from every artboard's copy of a site-pinned

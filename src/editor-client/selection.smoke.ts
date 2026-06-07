@@ -193,12 +193,14 @@ assert(
   '(6) canvas-root-events.ts must import resolveCollectionAncestorForClick',
 );
 assert(
-  canvasRootSrc.includes('resolveCollectionAncestorForClick(target)'),
-  '(6) canvas-root-events.ts must call resolveCollectionAncestorForClick(target) in click handler',
+  canvasRootSrc.includes('resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate)'),
+  '(6) canvas-root-events.ts must call resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate) in click handler',
 );
 // The Collection-ancestor branch must run BEFORE the normal selectElement
 // fallback — otherwise inner-card clicks select the inner element first.
-const callIdx = canvasRootSrc.indexOf('resolveCollectionAncestorForClick(target)');
+const callIdx = canvasRootSrc.indexOf(
+  'resolveCollectionAncestorForClick(target, ctx.editingCollectionTemplate)',
+);
 const fallbackIdx = canvasRootSrc.indexOf(
   'if (id !== ctx.selectedElementId) ctx.selectElement(id);',
 );

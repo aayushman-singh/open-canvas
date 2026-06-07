@@ -580,6 +580,34 @@ export function buildNavBodyImpl(ctx: EditorContext, element: NavElement): HTMLE
 }
 
 export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionElement): HTMLElement {
+  // ADR 0065 D5 — when this Collection's custom template is in edit mode,
+  // render ONE editable instance of `element.customTemplate` instead of the
+  // N-clone entries grid. The template elements carry their own absolute
+  // boxes (per-card-frame coordinates), so the editor-only template-instance
+  // wrapper anchors them with relative positioning, mirroring the per-entry
+  // card cell shape buildCollectionBodyImpl already uses below. The wrapper
+  // gets `data-collection-template-instance` so the chrome augmenter
+  // (collection-template-edit-view.ts) can target it for the scrim cutout
+  // and pan helper.
+  const isEditingThis =
+    ctx.editingCollectionTemplate !== null &&
+    ctx.editingCollectionTemplate.collectionId === element.id;
+  if (isEditingThis) {
+    const node = document.createElement('div');
+    node.className = 'opencanvas-collection-template-edit';
+    node.setAttribute('data-collection-template-instance', element.id);
+    node.setAttribute('data-editor-only', 'true');
+    node.style.position = 'relative';
+    node.style.width = '100%';
+    node.style.height = '100%';
+    node.style.boxSizing = 'border-box';
+    const tpl = Array.isArray(element.customTemplate) ? element.customTemplate : [];
+    for (let i = 0; i < tpl.length; i++) {
+      const child = tpl[i];
+      if (child !== undefined) node.appendChild(ctx.buildElementNode(child));
+    }
+    return node;
+  }
   const entries = Array.isArray(element.entries) ? element.entries : [];
   if (entries.length === 0) {
     const placeholder = document.createElement('div');
