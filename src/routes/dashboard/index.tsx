@@ -174,114 +174,6 @@ const cardStyles = `
     align-items: center;
   }
 
-  .import-modal-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 2000;
-    background: rgba(26, 25, 23, 0.55);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-  }
-  .import-modal-overlay[data-open="true"] { display: flex; }
-  .import-modal {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--r);
-    width: min(480px, calc(100vw - 48px));
-    padding: 28px;
-    box-shadow: var(--shadow-lg);
-  }
-  .import-modal-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-  }
-  .import-modal h2 {
-    margin: 0 0 4px;
-    font-family: var(--display);
-    font-size: 22px;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    color: var(--ink);
-  }
-  .import-close {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--line);
-    background: var(--surface-2);
-    color: var(--ink-2);
-    border-radius: var(--r-xs);
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0;
-  }
-  .import-close:hover { background: var(--surface-3); color: var(--ink); }
-  .import-modal .import-sub {
-    margin: 0 0 20px;
-    font-size: 13.5px;
-    color: var(--ink-3);
-  }
-  .import-field { margin-bottom: 14px; }
-  .import-field label {
-    display: block;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--ink-2);
-    margin-bottom: 7px;
-    letter-spacing: 0.02em;
-  }
-  .import-field input {
-    width: 100%;
-    padding: 11px 14px;
-    border-radius: var(--r-sm);
-    border: 1.5px solid var(--line-2);
-    background: var(--surface);
-    color: var(--ink);
-    font-size: 14.5px;
-    font-family: inherit;
-    outline: none;
-    box-sizing: border-box;
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .import-field input:focus {
-    border-color: var(--red);
-    box-shadow: var(--ring);
-  }
-  .import-field .field-hint {
-    font-size: 11.5px;
-    color: var(--ink-3);
-    margin-top: 5px;
-  }
-  .import-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 20px;
-  }
-  .import-error {
-    margin-top: 12px;
-    padding: 8px 12px;
-    border-radius: var(--r-xs);
-    background: var(--red-soft);
-    border: 1px solid var(--red-line);
-    color: var(--red-ink);
-    font-size: 13px;
-    display: none;
-  }
-  .import-progress {
-    margin-top: 12px;
-    font-size: 13px;
-    color: var(--red-ink);
-    display: none;
-  }
   .dash-sub { color: var(--ink-3); font-size: 13px; margin: 0 0 24px; }
 
   /* segmented filter — All / Published / Drafts */
@@ -653,14 +545,6 @@ const cardStyles = `
     .site-card--expanded .site-card-thumb iframe { transform: scale(calc(100cqi / 1440)); }
   }
 
-  .import-arrow {
-    text-align: center;
-    color: var(--ink-3);
-    font-size: 12px;
-    padding: 4px 0;
-    letter-spacing: 0.03em;
-  }
-
   /* stat cards — match dashboard.html .stat */
   .dash-stats {
     display: grid;
@@ -771,9 +655,8 @@ const cardStyles = `
     .dash-quick { grid-template-columns: 1fr; }
   }
 
-  /* ADR 0042 (2026-06-04 amendment). Plan-upgrade modal — reuses the
-     same overlay/card shape as the import modal so visitors see a
-     consistent dialog affordance. The plan tiles inside come from the
+  /* ADR 0042 (2026-06-04 amendment). Plan-upgrade modal — standard
+     overlay/card dialog shape. The plan tiles inside come from the
      shared PlanTiles component (also rendered on /dashboard/settings
      under the Plan tab), so the picker looks identical on both
      surfaces. The trigger is the "Upgrade to add sites" button next to
@@ -893,116 +776,6 @@ const planUpgradeScript = raw(`<script>
         btn.textContent = label;
         alertSwitchFailure(err);
       });
-    });
-  });
-})();
-</script>`);
-
-const importScript = raw(`<script>
-(function() {
-  var overlay = document.getElementById('import-overlay');
-  var openBtn = document.getElementById('import-btn');
-  var cancelBtn = document.getElementById('import-cancel');
-  var submitBtn = document.getElementById('import-submit');
-  var urlInput = document.getElementById('import-url');
-  var nameInput = document.getElementById('import-name');
-  var subdomainInput = document.getElementById('import-subdomain');
-  var errorEl = document.getElementById('import-error');
-  var progressEl = document.getElementById('import-progress');
-
-  function openModal() {
-    overlay.setAttribute('data-open', 'true');
-    urlInput.value = '';
-    nameInput.value = '';
-    subdomainInput.value = '';
-    errorEl.style.display = 'none';
-    progressEl.style.display = 'none';
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Import';
-    urlInput.focus();
-  }
-
-  function closeModal() {
-    overlay.setAttribute('data-open', 'false');
-  }
-
-  var closeBtn = document.getElementById('import-close');
-
-  if (openBtn.hasAttribute('disabled')) return;
-  openBtn.addEventListener('click', openModal);
-  cancelBtn.addEventListener('click', closeModal);
-  closeBtn.addEventListener('click', closeModal);
-  var overlayMouseDown = false;
-  overlay.addEventListener('mousedown', function(e) {
-    overlayMouseDown = e.target === overlay;
-  });
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay && overlayMouseDown) closeModal();
-    overlayMouseDown = false;
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && overlay.getAttribute('data-open') === 'true') closeModal();
-  });
-
-  urlInput.addEventListener('blur', function() {
-    if (!urlInput.value) return;
-    try {
-      var u = new URL(urlInput.value);
-      if (!nameInput.value) {
-        nameInput.value = u.hostname.replace(/^www\\./, '');
-      }
-      if (!subdomainInput.value) {
-        subdomainInput.value = u.hostname
-          .replace(/^www\\./, '')
-          .replace(/\\.[^.]+$/, '')
-          .replace(/[^a-z0-9]/g, '-')
-          .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '')
-          .slice(0, 63);
-      }
-    } catch(e) {}
-  });
-
-  submitBtn.addEventListener('click', function() {
-    var url = urlInput.value.trim();
-    var name = nameInput.value.trim();
-    var subdomain = subdomainInput.value.trim().toLowerCase();
-
-    if (!url || !name) {
-      errorEl.textContent = 'URL and site name are required.';
-      errorEl.style.display = 'block';
-      return;
-    }
-
-    try { new URL(url); } catch(e) {
-      errorEl.textContent = 'Please enter a valid URL.';
-      errorEl.style.display = 'block';
-      return;
-    }
-
-    errorEl.style.display = 'none';
-    progressEl.style.display = 'block';
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Importing...';
-
-    fetch('/api/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ url: url, siteName: name, subdomain: subdomain })
-    })
-    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-    .then(function(result) {
-      if (!result.ok) {
-        throw new Error(result.data.error || 'Import failed');
-      }
-      window.location.href = '/dashboard/sites/' + result.data.siteId + '/edit';
-    })
-    .catch(function(err) {
-      progressEl.style.display = 'none';
-      errorEl.textContent = err.message || 'Import failed. Please try again.';
-      errorEl.style.display = 'block';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Import';
     });
   });
 })();
@@ -1475,15 +1248,6 @@ dashboard.get('/', async (c) => {
           </p>
         </div>
         <div class="page-head-actions">
-          <Button
-            variant="secondary"
-            class="import-site"
-            id="import-btn"
-            disabled
-            title="Site import is disabled in the public POC. Run the scraper locally to enable."
-          >
-            Import
-          </Button>
           {atSiteLimit ? (
             <Button variant="primary" class="new-site" id="plan-upgrade-btn">
               Upgrade to add sites
@@ -1550,54 +1314,6 @@ dashboard.get('/', async (c) => {
           <button class="on">All</button>
           <button>Published</button>
           <button>Drafts</button>
-        </div>
-      </div>
-
-      <div class="import-modal-overlay" id="import-overlay" data-open="false">
-        <div class="import-modal">
-          <div class="import-modal-header">
-            <div>
-              <h2>Import a website</h2>
-              <p class="import-sub">Paste any public URL to import it as an editable site.</p>
-            </div>
-            <button type="button" class="import-close" id="import-close" aria-label="Close">
-              &times;
-            </button>
-          </div>
-          <div class="import-field">
-            <label for="import-url">URL to import</label>
-            <input type="url" id="import-url" placeholder="https://example.com" required />
-          </div>
-          <div class="import-arrow">&#x2193; auto-filled from URL</div>
-          <div class="import-field">
-            <label for="import-name">Site name</label>
-            <input
-              type="text"
-              id="import-name"
-              placeholder="My Imported Site"
-              maxlength={80}
-              required
-            />
-          </div>
-          <div class="import-field">
-            <label for="import-subdomain">
-              Subdomain <small>(optional)</small>
-            </label>
-            <input type="text" id="import-subdomain" placeholder="auto-generated from name" />
-            <p class="field-hint">.{apex}</p>
-          </div>
-          <div class="import-error" id="import-error"></div>
-          <div class="import-progress" id="import-progress">
-            Importing... this may take up to 30 seconds.
-          </div>
-          <div class="import-actions">
-            <Button variant="secondary" class="btn-import-cancel" id="import-cancel">
-              Cancel
-            </Button>
-            <Button variant="primary" class="btn-import-submit" id="import-submit">
-              Import
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -1715,15 +1431,6 @@ dashboard.get('/', async (c) => {
               <Button variant="primary" href="/dashboard/templates">
                 Pick a template
               </Button>
-              <Button
-                variant="secondary"
-                class="import-site"
-                id="import-btn"
-                disabled
-                title="Site import is disabled in the public POC. Run the scraper locally to enable."
-              >
-                Import existing site
-              </Button>
             </div>
           </div>
           <div class="dash-quick">
@@ -1747,7 +1454,6 @@ dashboard.get('/', async (c) => {
       )}
       <div id="card-backdrop" class="card-backdrop" data-open="false" />
       {toggleScript}
-      {importScript}
       {planUpgradeScript}
       {thumbHydratorScript}
     </DashboardShell>,
