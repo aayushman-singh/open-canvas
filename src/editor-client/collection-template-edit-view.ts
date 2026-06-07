@@ -280,13 +280,22 @@ export function mountTemplateEditChromeImpl(ctx: EditorContext): void {
   // Pass 4 F1 added the same precondition to `buildCollectionBodyImpl`
   // (body-builders-data.ts): render the editable template-instance ONLY
   // when the pin targets this Collection AND `display === 'custom'` AND
-  // `customTemplate` is non-empty. That gate kept the BODY content
+  // `customTemplate` is a present array. That gate kept the BODY content
   // consistent after Ctrl+Z reverted the atomic first-switch (display +
-  // customTemplate) — or after the Owner deleted every template child —
-  // but the CHROME mount path here still ran on `active !== null` alone,
-  // so banner/Done/dimming/camera-pan kept stamping the wrapper while
-  // the body fell back to the normal grid. The result: edit-mode chrome
-  // surrounded a non-edit-mode card grid.
+  // customTemplate); without it the CHROME mount path here would run on
+  // `active !== null` alone, stamping banner/Done/dimming around a wrapper
+  // whose body fell back to the normal grid.
+  //
+  // Codex review pass 7 finding 1 — empty array is a VALID authored state
+  // (Owner drained every template child to author from scratch). The
+  // body builder renders an empty editable frame in this state; the
+  // chrome must mount in lockstep so the banner / Done / dimming all
+  // appear. The earlier `length > 0` guard over-corrected and left the
+  // Owner stranded — visible drained frame, no exit affordance. The
+  // precondition is now `display === 'custom'` AND `Array.isArray()`;
+  // undefined still falls through (pre-seed defence — should not happen
+  // because the enter verb seeds atomically, but a partial state must
+  // not mount unanchored chrome).
   //
   // Strip-then-guard order matters. `stripChrome(ctx.root, ctx.viewport)`
   // above already ran unconditionally — any previously-mounted chrome
@@ -309,8 +318,7 @@ export function mountTemplateEditChromeImpl(ctx: EditorContext): void {
     'display' in collection &&
     collection.display === 'custom' &&
     'customTemplate' in collection &&
-    Array.isArray(collection.customTemplate) &&
-    collection.customTemplate.length > 0;
+    Array.isArray(collection.customTemplate);
   if (!isCustomWithTemplate) {
     // The body builder falls through to the normal grid in this state.
     // No edit-mode chrome should sit around a normal grid — return now

@@ -222,6 +222,33 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
       if (!target) return;
       if (root && root.contains(target) && target !== root) return;
       if (target.closest('[data-zoom-action], [data-mode-action]')) return;
+      // -- ADR 0065 D5 — viewport-gutter click exits template edit mode ----
+      //
+      // Codex review pass 7 finding 2 — the click-outside-exit branch in
+      // the root-click handler above only fires for clicks that bubble
+      // through `ctx.root` (artboard / element / section / dimmed
+      // page-element). Clicks on the VIEWPORT GUTTER — the dark editor
+      // background between artboards — never reach root because the
+      // gutter is a viewport sibling of canvas-root, not a descendant.
+      // This handler is the gutter's only listener; without the early
+      // exit here, an Owner mid-edit who clicks on the gutter sees
+      // nothing happen (the existing deselect logic below would also
+      // pointlessly clear a selection that isn't there).
+      //
+      // No double-fire with the root-click handler: that handler's
+      // exit branch gates on `root.contains(target)`, which is the
+      // exact NEGATION of this handler's early-return at line 223.
+      // The two handlers split the canvas region; only one fires per
+      // click.
+      //
+      // Done button's `stopPropagation` keeps it out of both handlers.
+      // The active wrapper's inside-template clicks bubble through root
+      // (handled by Phase 2D's selection branch). Only the gutter
+      // reaches THIS line, which is exactly the case ADR D5 covers.
+      if (ctx.editingCollectionTemplate !== null) {
+        ctx.exitCollectionTemplateEdit();
+        return;
+      }
       if (ctx.selectedSectionId) ctx.selectSection(null);
       if (ctx.selectedElementId) ctx.selectElement(null);
       root.classList.add('canvas-pages-deselected');

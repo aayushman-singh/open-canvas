@@ -129,6 +129,52 @@ assert(
   '(8) canvas-root-events.ts must locate the active wrapper and click-outside-test via contains()',
 );
 
+// ---- 8b. Codex review pass 7 finding 2 — viewport gutter click exits --
+// Click-outside via the root listener only fires for clicks that bubble
+// through `ctx.root` (artboard / element / section / dimmed page-element).
+// Clicks on the viewport GUTTER (between artboards) never reach root —
+// they're handled by the viewport listener. That listener must also call
+// exitCollectionTemplateEdit when the pin is active. We isolate the
+// viewport handler by slicing from its registration line and assert the
+// exit-verb call lives inside the slice.
+const viewportRegIdx = canvasRootSrc.indexOf("viewport.addEventListener('click'");
+assert(
+  viewportRegIdx > 0,
+  '(8b) canvas-root-events.ts must register a viewport click listener',
+);
+// Bound the slice to a generous window around the handler body — the
+// next document-level addEventListener is the natural lower bound.
+const viewportHandlerTail = canvasRootSrc.slice(viewportRegIdx);
+const nextDocListenerIdx = viewportHandlerTail.indexOf("document.addEventListener");
+const viewportHandlerSlice =
+  nextDocListenerIdx > 0 ? viewportHandlerTail.slice(0, nextDocListenerIdx) : viewportHandlerTail;
+assert(
+  viewportHandlerSlice.includes('ctx.editingCollectionTemplate !== null'),
+  '(8b) viewport click handler must gate on ctx.editingCollectionTemplate !== null (pass 7 F2)',
+);
+assert(
+  viewportHandlerSlice.includes('ctx.exitCollectionTemplateEdit()'),
+  '(8b) viewport click handler must call ctx.exitCollectionTemplateEdit() — pass 7 F2 (gutter exit)',
+);
+// Single-fire contract: the root-click handler's exit branch gates on
+// `root.contains(target)`, the viewport handler's early-return is the
+// exact negation. Pin both gates so a refactor that drops either one
+// would re-introduce the double-fire risk.
+assert(
+  viewportHandlerSlice.includes('root.contains(target)'),
+  '(8b) viewport handler must early-return when root.contains(target) — pins the disjoint-region contract',
+);
+const rootHandlerIdx = canvasRootSrc.indexOf("root.addEventListener('click'");
+assert(
+  rootHandlerIdx > 0,
+  '(8b) canvas-root-events.ts must register a root click listener',
+);
+const rootHandlerSlice = canvasRootSrc.slice(rootHandlerIdx, viewportRegIdx);
+assert(
+  rootHandlerSlice.includes('activeWrapper.contains(target)'),
+  '(8b) root click handler must gate its exit branch on activeWrapper.contains(target) — disjoint region with viewport handler',
+);
+
 // ---- 9. Page-switch auto-exit in page-crud.ts ------------------------
 
 const pageCrudSrc = await Bun.file(new URL('./page-crud.ts', import.meta.url)).text();
@@ -692,9 +738,13 @@ const DIMMED_ATTR = 'data-template-edit-dimmed';
   );
 }
 
-// ---- (10b) Codex review pass 6 finding 2 — display: 'custom' but ------
-// customTemplate is empty (Owner deleted every template child while in
-// edit mode). Same outcome as (10a): strip runs, mount skips.
+// ---- (10b) Codex review pass 7 finding 1 — display: 'custom' AND -------
+// customTemplate === [] is a VALID edit-mode state. The Owner deleted
+// every template child to author from scratch; chrome MUST mount so the
+// empty editable frame is anchored by banner/Done/dimming and the Owner
+// has an exit affordance. Pass 6 F2 over-corrected here by requiring
+// `length > 0` and would have stranded the Owner with no Done button
+// over a drained frame.
 {
   const ctx = buildCtx();
   const sibling = buildWrapper(ctx.root!, 'coll-empty-sibling');
@@ -711,20 +761,58 @@ const DIMMED_ATTR = 'data-template-edit-dimmed';
   mountTemplateEditChromeImpl(ctx as never);
 
   assert(
+    countByClass(wrapper, BANNER_CLASS) === 1,
+    '(10b) banner remains mounted when customTemplate is empty (pass 7 F1 — empty is a valid edit state)',
+  );
+  assert(
+    countByClass(wrapper, DONE_CLASS) === 1,
+    '(10b) Done button remains mounted when customTemplate is empty (pass 7 F1)',
+  );
+  assert(
+    wrapper.getAttribute('data-template-edit-active') === 'true',
+    '(10b) wrapper still carries data-template-edit-active when template emptied (pass 7 F1)',
+  );
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === 'true',
+    '(10b) sibling stays dimmed when template emptied — Owner is still authoring (pass 7 F1)',
+  );
+}
+
+// ---- (10c) Codex review pass 7 finding 1 — display: 'custom' but -------
+// customTemplate is `undefined` (pre-seed state — should not happen
+// because the enter verb seeds atomically, but defended-against). Strip
+// runs, mount skips. This pins the defence so a future refactor of the
+// enter sequence can't accidentally mount unanchored chrome on a half-
+// applied state.
+{
+  const ctx = buildCtx();
+  const sibling = buildWrapper(ctx.root!, 'coll-undef-sibling');
+  const wrapper = buildWrapper(ctx.root!, 'coll-undef');
+  registerCustomCollection(ctx, 'coll-undef');
+  ctx.editingCollectionTemplate = { collectionId: 'coll-undef' };
+  mountTemplateEditChromeImpl(ctx as never);
+  assert(countByClass(wrapper, BANNER_CLASS) === 1, '(10c) prior valid mount banner present');
+
+  // Pre-seed state — `display` stays 'custom', `customTemplate` is undef.
+  delete ctx.elementsById.get('coll-undef')!.customTemplate;
+
+  mountTemplateEditChromeImpl(ctx as never);
+
+  assert(
     countByClass(wrapper, BANNER_CLASS) === 0,
-    '(10b) banner stripped + not remounted when customTemplate emptied',
+    '(10c) banner stripped + not remounted when customTemplate is undefined',
   );
   assert(
     countByClass(wrapper, DONE_CLASS) === 0,
-    '(10b) Done button stripped + not remounted when customTemplate emptied',
+    '(10c) Done button stripped + not remounted when customTemplate is undefined',
   );
   assert(
     wrapper.getAttribute('data-template-edit-active') === null,
-    '(10b) wrapper no longer carries data-template-edit-active when template emptied',
+    '(10c) wrapper no longer carries data-template-edit-active when customTemplate is undefined',
   );
   assert(
     sibling.getAttribute(DIMMED_ATTR) === null,
-    '(10b) sibling dim marker stripped (strip runs unconditionally before guard)',
+    '(10c) sibling dim marker stripped (strip runs unconditionally before guard)',
   );
 }
 

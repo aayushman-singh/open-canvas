@@ -810,10 +810,14 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
   );
 })();
 
-// ----- Codex review pass 4 finding 1 — body-builders-data.ts edit-mode
-// precondition must fuse pin + display === 'custom' + non-empty
-// customTemplate so a stale pin (post-undo) falls through to the
-// normal grid renderer instead of mounting an empty wrapper. Source-grep
+// ----- Codex review pass 4 finding 1 + pass 7 finding 1 — body-builders-data
+// edit-mode precondition must fuse pin + display === 'custom' + an
+// `Array.isArray(customTemplate)` check (any length, including empty).
+// Pass 4 fused the three signals so a stale pin post-undo falls through
+// to the grid renderer. Pass 7 loosened the array check from `.length > 0`
+// to plain `Array.isArray()` so an Owner who deliberately empties the
+// template (deletes every child to start fresh) keeps the editable
+// frame instead of being kicked back to the entries grid. Source-grep
 // the body-builders module because the helper depends on real DOM
 // (document.createElement) that bare Bun doesn't provide.
 {
@@ -833,18 +837,40 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
   const tail = bodyBuildersSrc.slice(buildIdx);
   const nextExport = tail.indexOf('\nexport function ', 1);
   const fnWindow = nextExport > 0 ? tail.slice(0, nextExport) : tail;
-  // The fused precondition checks all three signals — pin, display,
-  // non-empty customTemplate — before the edit-mode wrapper is mounted.
+  // The fused precondition checks the three signals — pin, display,
+  // array-shaped customTemplate — before the edit-mode wrapper is mounted.
   assert(
     fnWindow.includes("element.display === 'custom'"),
     "buildCollectionBodyImpl edit-mode precondition must check element.display === 'custom' " +
       '(F1 fall-through guard against stale pin after undo)',
   );
   assert(
-    fnWindow.includes('element.customTemplate') &&
-      fnWindow.includes('.length > 0'),
-    'buildCollectionBodyImpl edit-mode precondition must check customTemplate is non-empty ' +
-      '(F1 fall-through guard — empty template after undo must render the normal grid)',
+    fnWindow.includes('Array.isArray(element.customTemplate)'),
+    'buildCollectionBodyImpl edit-mode precondition must check Array.isArray(element.customTemplate) ' +
+      '(pass 7 F1 — empty array is a valid edit-mode state, defend only against pre-seed undefined)',
+  );
+  // Codex review pass 7 finding 1 — assert the precondition does NOT
+  // require non-empty length anymore. We bound the assertion to the
+  // `isEditingThis` precondition slice (the one that drives the early
+  // return into the edit-mode branch); a `.length > 0` check anywhere
+  // inside this guard fails the contract.
+  const isEditingIdx = fnWindow.indexOf('isEditingThis');
+  assert(
+    isEditingIdx > 0,
+    'buildCollectionBodyImpl must declare an isEditingThis precondition (anchor for pass 7 check)',
+  );
+  // Walk forward to the `if (isEditingThis)` opening brace — that bounds
+  // the precondition's right-hand side.
+  const ifIdx = fnWindow.indexOf('if (isEditingThis)', isEditingIdx);
+  assert(
+    ifIdx > isEditingIdx,
+    'isEditingThis must gate an `if` branch (anchor for pass 7 check)',
+  );
+  const preconditionSlice = fnWindow.slice(isEditingIdx, ifIdx);
+  assert(
+    !preconditionSlice.includes('customTemplate.length > 0'),
+    'buildCollectionBodyImpl isEditingThis precondition must NOT require customTemplate.length > 0 ' +
+      '(pass 7 F1 — empty template is a valid authored state the Owner must be able to edit)',
   );
 }
 
