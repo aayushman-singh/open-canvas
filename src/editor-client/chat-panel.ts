@@ -36,9 +36,19 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  SelectionContext,
+  StateContext,
+} from './editor-context.js';
 
-export function toggleChatPanel(ctx: EditorContext): void {
+// ADR 0064 — chat-panel carve, toggle half. Only DomContext is touched
+// (`chatPanelEl` for the hidden flip + `chatToggleBtn` for the .active
+// mirror); the input focus uses `document.getElementById` directly, not ctx.
+export type ToggleChatPanelContext = DomContext;
+
+export function toggleChatPanel(ctx: ToggleChatPanelContext): void {
   if (!ctx.chatPanelEl) return;
   const isOpen = !ctx.chatPanelEl.hidden;
   ctx.chatPanelEl.hidden = isOpen;
@@ -49,7 +59,17 @@ export function toggleChatPanel(ctx: EditorContext): void {
   }
 }
 
-export function updateChatSelectionChipImpl(ctx: EditorContext): void {
+// ADR 0064 — chat-panel carve, selection-chip half. Three named clusters
+// fit (DomContext for the chip DOM refs, SelectionContext for the active
+// element id, StateContext for `state` + `findElement`); `chatSelectionDropped`
+// is the lone chat-panel-specific boolean, so it rides inline rather than
+// minting a single-call alias.
+export type ChatSelectionChipContext = DomContext &
+  SelectionContext &
+  StateContext &
+  Pick<EditorContext, 'chatSelectionDropped'>;
+
+export function updateChatSelectionChipImpl(ctx: ChatSelectionChipContext): void {
   if (!ctx.chatSelectionEl || !ctx.chatSelectionTextEl) return;
   if (!ctx.selectedElementId || ctx.chatSelectionDropped || !ctx.state) {
     ctx.chatSelectionEl.hidden = true;
