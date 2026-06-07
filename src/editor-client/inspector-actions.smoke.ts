@@ -206,6 +206,9 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     disableUndoPersistence: () => {
       throw new Error('disableUndoPersistence stub: smoke does not exercise persistence failure');
     },
+    // ADR 0065 D6 — template edit-mode field on EditorContext; null in
+    // smokes that don't drive the inspector's enter/exit verbs (Phase 2C).
+    editingCollectionTemplate: null,
     chatSelectionDropped: false,
     linkPopoverPinned: false,
     removeLinkPopover: () => {},

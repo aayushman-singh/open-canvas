@@ -66,7 +66,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0061 | Section Library is the canonical pool; Template Seeds are compositions of Section Instances | Proposed | [`docs/adr/0061-section-library-is-canonical-pool-templates-are-compositions.md`](0061-section-library-is-canonical-pool-templates-are-compositions.md) |
 | 0062 | Section accent border is a single discriminated-union field with four mutually exclusive variants | Proposed | [`docs/adr/0062-section-accent-border.md`](0062-section-accent-border.md) |
 | 0063 | Collection element binds at element level, ships visible defaults, and groups entries by folder | Accepted | [`docs/adr/0063-collection-element-binds-at-element-level-and-ships-defaults.md`](0063-collection-element-binds-at-element-level-and-ships-defaults.md) |
-| 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Proposed | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
+| 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Accepted | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 

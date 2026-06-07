@@ -401,6 +401,11 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     saveStateNow: runtimeHelperNotInstalled('saveStateNow'),
     disableUndoPersistence: (reason, error) => disableUndoPersistenceImpl(ctx, reason, error),
 
+    // ---- ADR 0065 D6: Collection template edit-mode -------------------
+    // Phase 1 initialises null; Phase 2C wires enter/exit verbs from the
+    // inspector and Phase 2D's selection branch reads it.
+    editingCollectionTemplate: null,
+
     // ---- Selection state-machine --------------------------------------
     chatSelectionDropped: false,
     linkPopoverPinned: false,

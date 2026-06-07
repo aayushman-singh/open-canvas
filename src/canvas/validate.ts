@@ -1192,14 +1192,40 @@ function validateElement(
           });
         }
       }
-      // Reference `pageWidth` / `sectionHeight` so the unused-parameter
-      // surface stays symmetric with the other element branches; the new
-      // CollectionElement carries no nested elements, so there is no
-      // child-recursion here.
-      void pageWidth;
-      void sectionHeight;
-      void pageIds;
-      void validPageIds;
+      // ADR 0065 D2 — `customTemplate` carries an authorable element
+      // subtree the Owner edits in-place when `display === 'custom'`.
+      // Recurse the same way TabsElement walks tab.elements: per-child
+      // id-uniqueness against the page's local id pool, full element
+      // validation against the Collection element's box dimensions.
+      if (element.customTemplate !== undefined) {
+        if (!Array.isArray(element.customTemplate)) {
+          errors.push(
+            `${basePath}.customTemplate must be an array when present (got ${describe(element.customTemplate)})`,
+          );
+        } else {
+          const childWidth =
+            isRecord(element.box) && isFiniteNumber(element.box.w) && element.box.w > 0
+              ? element.box.w
+              : pageWidth;
+          const childHeight =
+            isRecord(element.box) && isFiniteNumber(element.box.h) && element.box.h > 0
+              ? element.box.h
+              : sectionHeight;
+          element.customTemplate.forEach((child, childIdx) => {
+            const childPath = `${basePath}.customTemplate[${String(childIdx)}]`;
+            assertUniqueElementId(child, childPath, pageIds, errors);
+            validateElement(
+              child,
+              childWidth,
+              childHeight,
+              childPath,
+              errors,
+              validPageIds,
+              pageIds,
+            );
+          });
+        }
+      }
       break;
     }
     case 'nav': {

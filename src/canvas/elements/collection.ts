@@ -24,17 +24,19 @@ import type { SidebarSpec } from './sidebar-spec.js';
 import { escapeAttr, styleFromEntries } from './render-utils.js';
 
 /**
- * Display mode for the materializer's per-entry render path (ADR 0063 dec 4).
+ * Display mode for the materializer's per-entry render path (ADR 0063 dec 4,
+ * extended by ADR 0065 D1).
  *
  *  - `'image-only'` — renders one `<a><img></a>` per entry inside the
  *    Collection's frame. No template required.
  *  - `'card'` — default on insert; clones a built-in default card template
  *    per entry (image + title + excerpt + CTA). Default template lives at
- *    `src/canvas/elements/collection-defaults.ts` (Phase 2B).
- *
- * `'custom'` is a follow-up (ADR 0063 F1) and is not part of this union.
+ *    `src/canvas/elements/collection-defaults.ts`.
+ *  - `'custom'` — ADR 0065 D1: clones the per-Collection `customTemplate`
+ *    per entry instead of `DEFAULT_CARD_TEMPLATE`. Substitution semantics
+ *    and click-bubble behaviour are otherwise identical to `'card'`.
  */
-export const COLLECTION_DISPLAYS = ['image-only', 'card'] as const;
+export const COLLECTION_DISPLAYS = ['image-only', 'card', 'custom'] as const;
 export type CollectionDisplay = (typeof COLLECTION_DISPLAYS)[number];
 
 /**
@@ -98,6 +100,26 @@ export interface CollectionElement extends BaseElement {
    * the parent Collection (ADR 0063 dec 6).
    */
   entries?: CanvasElement[][];
+
+  /**
+   * ADR 0065 D2 — per-Collection custom card template. When
+   * `display === 'custom'`, the materializer clones this array per entry
+   * (substituting `{{title}}` / `{{excerpt}}` / `{{slug}}` /
+   * `{{ogImageAssetId}}` / `{{author}}` / `{{publishedDate}}` /
+   * `{{category}}` / `{{tag}}` / `{{body}}`) instead of
+   * `DEFAULT_CARD_TEMPLATE`.
+   *
+   * Absent when `display` has never been `'custom'` for this Collection.
+   * Once set, persists across mode switches (ADR 0065 D4 — silent keep):
+   * toggling back to `'card'` or `'image-only'` does NOT clear the field;
+   * the only path to discard is the inspector's "Reset template" affordance
+   * (Phase 2C).
+   *
+   * Validator recurses into this array the same way it recurses into a
+   * page's section elements; Yjs encodes/decodes it like any other
+   * `CanvasElement[]` subtree.
+   */
+  customTemplate?: CanvasElement[];
 }
 
 export interface CollectionRenderCtx {

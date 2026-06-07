@@ -8,19 +8,24 @@
 //      display) and rejects malformed folder values per dec 7.
 //   2. Page metadata fields survive schema validation.
 //   3. Yjs round-trip preserves the new ADR-0063 fields plus page metadata.
+//   4. ADR 0065 D1/D2 — `display: 'custom'` is accepted and `customTemplate`
+//      validates + Yjs round-trips.
 //
 // The render + materialization behaviour smokes belong to Phase 2B once the
 // per-element materialization is implemented; the dead manual/page-bound
 // rendering assertions retired with the page-bound model.
 
 import type {
+  CanvasElement,
   CanvasPage,
   CanvasSection,
   EditableSite,
+  TextElement,
 } from '../schema.js';
 import { validateEditableSite } from '../validate.js';
 import type { CollectionElement } from './collection.js';
 import { encodeYDoc, decodeYDoc } from '../yjs-projection.js';
+import { seedCustomTemplate } from './collection-defaults.js';
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(`[collection:smoke] ${message}`);
@@ -115,13 +120,23 @@ function makeSiteState(
   );
   assert(!badSort.valid, '(1) unknown sort value is rejected');
 
+  // ADR 0065 D1 — `display: 'custom'` is now an accepted value.
+  const customDisplay = validateEditableSite(
+    makeSiteState({ ...makeCollection(), display: 'custom' }),
+  );
+  assert(
+    customDisplay.valid,
+    `(1) display 'custom' is accepted (ADR 0065 D1): ${customDisplay.valid ? '' : customDisplay.errors.join('; ')}`,
+  );
+
+  // Unknown display string is still rejected.
   const badDisplay = validateEditableSite(
     makeSiteState({
       ...makeCollection(),
-      display: 'custom' as unknown as NonNullable<CollectionElement['display']>,
+      display: 'magazine' as unknown as NonNullable<CollectionElement['display']>,
     }),
   );
-  assert(!badDisplay.valid, "(1) display 'custom' (deferred to F1) is rejected this commit");
+  assert(!badDisplay.valid, '(1) unknown display value is rejected');
 
   // manualOrder shape: must be string[] when present.
   const manualOk = validateEditableSite(
@@ -209,6 +224,93 @@ function makeSiteState(
   assert(el.sort === 'manual', '(3) sort round-trips');
   assert(el.display === 'image-only', '(3) display round-trips');
   assert(JSON.stringify(el.manualOrder) === '["e1","e2","e3"]', '(3) manualOrder round-trips');
+}
+
+// ---------------------------------------------------------------------------
+// (4) ADR 0065 D2 — `customTemplate` validates + Yjs round-trips
+// ---------------------------------------------------------------------------
+
+{
+  // seedCustomTemplate() is the canonical "first switch to 'custom'" payload
+  // (ADR 0065 D3); it must validate against the schema unmodified.
+  const seeded = seedCustomTemplate();
+  assert(seeded.length > 0, '(4) seedCustomTemplate returns a non-empty array');
+  const seedState = validateEditableSite(
+    makeSiteState(makeCollection({ display: 'custom', customTemplate: seeded })),
+  );
+  assert(
+    seedState.valid,
+    `(4) seeded customTemplate validates: ${seedState.valid ? '' : seedState.errors.join('; ')}`,
+  );
+
+  // Empty customTemplate is a valid shape — the materializer's Phase 2B
+  // "zero elements" failure path (ADR 0065 D8) emits a publish warning;
+  // the validator does not block. (No-fallback discipline: do not silently
+  // synthesise a default template here.)
+  const emptyTemplate = validateEditableSite(
+    makeSiteState(makeCollection({ display: 'custom', customTemplate: [] })),
+  );
+  assert(emptyTemplate.valid, '(4) empty customTemplate is shape-valid (warning is Phase 2B)');
+
+  // Malformed children inside customTemplate fail validation just like any
+  // other element subtree.
+  const badChild: TextElement = {
+    id: 'bad-child',
+    type: 'text',
+    box: { x: 0, y: 0, w: 100, h: 40, z: 1 },
+    content: [{ text: 'oops' }],
+    role: 'body',
+    fontSize: -5, // invalid: fontSize must be positive
+    fontWeight: 400,
+    align: 'left',
+  };
+  const badTemplate = validateEditableSite(
+    makeSiteState(
+      makeCollection({
+        display: 'custom',
+        customTemplate: [badChild satisfies CanvasElement],
+      }),
+    ),
+  );
+  assert(!badTemplate.valid, '(4) malformed customTemplate child is rejected');
+
+  // Yjs round-trip preserves customTemplate as a flat element array.
+  const state = makeSiteState(
+    makeCollection({ display: 'custom', customTemplate: seedCustomTemplate() }),
+  );
+  const doc = encodeYDoc(state);
+  const decoded = decodeYDoc(doc);
+  const el = decoded.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
+  assert(el.display === 'custom', '(4) display=custom round-trips through Yjs');
+  assert(Array.isArray(el.customTemplate), '(4) customTemplate round-trips as array');
+  assert(
+    el.customTemplate.length === seeded.length,
+    `(4) customTemplate preserves length (got ${String(el.customTemplate.length)}, expected ${String(seeded.length)})`,
+  );
+  // Spot-check the outer Container survived encode/decode.
+  assert(
+    el.customTemplate[0]!.type === 'container',
+    '(4) customTemplate[0] is the outer Container after round-trip',
+  );
+
+  // ADR 0065 D4 — silent keep. Flipping display away from 'custom' must
+  // not strip customTemplate at the validator/Yjs layer; persistence is the
+  // editor's job to preserve.
+  const keptAfterSwitch = makeSiteState(
+    makeCollection({ display: 'card', customTemplate: seedCustomTemplate() }),
+  );
+  const keptResult = validateEditableSite(keptAfterSwitch);
+  assert(
+    keptResult.valid,
+    `(4) customTemplate survives display='card' validation: ${keptResult.valid ? '' : keptResult.errors.join('; ')}`,
+  );
+  const keptDoc = encodeYDoc(keptAfterSwitch);
+  const keptDecoded = decodeYDoc(keptDoc);
+  const keptEl = keptDecoded.pages[0]!.sections[0]!.elements[0]! as CollectionElement;
+  assert(
+    Array.isArray(keptEl.customTemplate) && keptEl.customTemplate.length > 0,
+    '(4) customTemplate survives display switch through Yjs',
+  );
 }
 
 console.log('[collection:smoke] OK');

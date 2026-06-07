@@ -14,6 +14,7 @@
 // `/<collectionSlug>/<entry.slug>` URL because the collection slug isn't on
 // the entry row — it lives on the CollectionElement.
 
+import type { CanvasElement } from '../schema.js';
 import type { ActionElement } from './action.js';
 import type { ContainerElement } from './container.js';
 import type { ImageMediaElement } from './media.js';
@@ -101,3 +102,26 @@ export const DEFAULT_CARD_SIBLINGS: readonly [
   TextElement,
   ActionElement,
 ] = [DEFAULT_CARD_IMAGE, DEFAULT_CARD_TITLE, DEFAULT_CARD_EXCERPT, DEFAULT_CARD_BUTTON];
+
+/**
+ * ADR 0065 D3 — seed payload for `CollectionElement.customTemplate` on the
+ * first switch to `display === 'custom'`. Returns a fresh deep clone of the
+ * outer Container + per-entry sibling tuple so the Owner immediately sees an
+ * editable, customisable card. Callers are responsible for ID disambiguation
+ * if the same Collection is seeded twice in the same site — the constants
+ * carry their built-in default ids.
+ *
+ * Implemented via `structuredClone` rather than `JSON.parse(JSON.stringify(...))`
+ * so future template defaults carrying non-JSON values (Date, Map) still
+ * survive the seed. ADR 0065 D3 failure path: a `structuredClone` throw
+ * surfaces to the caller — there is no silent empty-template fallback.
+ *
+ * Phase 2C (inspector wiring) is the first caller; Phase 1 ships the export
+ * so the surface is locked at the same commit as the type widening.
+ */
+export function seedCustomTemplate(): CanvasElement[] {
+  return [
+    structuredClone(DEFAULT_CARD_TEMPLATE as ContainerElement),
+    ...DEFAULT_CARD_SIBLINGS.map((sibling) => structuredClone(sibling)),
+  ];
+}
