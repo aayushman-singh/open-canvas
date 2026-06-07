@@ -1304,12 +1304,25 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         // wrapper's body builder reads, and the chrome mount runs after the
         // wrapper mounts.
         ctx.enterCollectionTemplateEdit(collection.id);
+        // Codex review pass 4 finding 2 — re-render the inspector so the
+        // "Edit template" / "Done editing template" / "Reset template"
+        // controls (gated on display === 'custom' + the edit pin) appear
+        // immediately. Without this, the dropdown shows Custom but the
+        // Edit/Done/Reset row is missing until the Owner reselects the
+        // element. renderInspector is idempotent.
+        ctx.renderInspector();
         return;
       }
       ctx.captureForUndo();
       collection.display = 'custom';
       ctx.rebuildElement(collection.id);
       ctx.scheduleSave();
+      // Codex review pass 4 finding 2 — same re-render rationale as the
+      // first-switch branch. Without it, switching to Custom (when a
+      // saved customTemplate already exists) leaves the inspector showing
+      // the pre-change state — display dropdown reads Custom but the
+      // Edit/Reset controls are absent.
+      ctx.renderInspector();
       return;
     }
     // Switching AWAY from custom. D10 auto-exit: if we're editing THIS
@@ -1326,6 +1339,11 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
     collection.display = next;
     ctx.rebuildElement(collection.id);
     ctx.scheduleSave();
+    // Codex review pass 4 finding 2 — switching away from Custom must
+    // also re-render the inspector so the Edit/Done/Reset row (only
+    // shown when display === 'custom') disappears in lock-step with the
+    // dropdown change.
+    ctx.renderInspector();
   });
   inspector.appendChild(field('Display', displaySelect));
 

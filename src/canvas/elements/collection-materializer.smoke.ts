@@ -1068,4 +1068,114 @@ function makeOwnerAuthoredCustomTemplate(): CanvasElement[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// (22) Codex review pass 4 finding 4 — `anchorId` must be per-entry suffixed
+//      with the same `<original>--<entry.slug>` scheme used on `id`. The
+//      renderer emits anchorId as the DOM `id` attribute for in-page anchor
+//      navigation (ADR 0050 dec 2 — must be unique within a page). Before
+//      the fix, an Owner-authored anchorId on a template child published N
+//      times verbatim, producing duplicate DOM ids across N materialized
+//      cards.
+// ---------------------------------------------------------------------------
+
+{
+  const customTemplate: CanvasElement[] = [
+    {
+      id: 'anchor-tpl-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'flat',
+      linkHref: { type: 'external', url: '/{{slug}}' },
+      linkLabel: '{{title}}',
+      anchorId: 'card-root',
+    },
+    {
+      id: 'anchor-tpl-cta',
+      type: 'action',
+      box: { x: 16, y: 316, w: 160, h: 36, z: 2 },
+      label: [{ text: 'Read more' }],
+      variant: 'solid',
+      href: { type: 'external', url: '/{{slug}}' },
+      anchorId: 'card-cta',
+    },
+  ];
+  const collection = makeCollectionElement({
+    display: 'custom',
+    customTemplate,
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'welcome-to-your-blog', title: 'Welcome' }),
+    makeEntry({ slug: 'second-post', title: 'Second' }),
+    makeEntry({ slug: 'third-post', title: 'Third' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 3, `(22) three entries materialized (got ${matrix.length})`);
+
+  const rootAnchorIds: string[] = [];
+  const ctaAnchorIds: string[] = [];
+  for (let i = 0; i < matrix.length; i++) {
+    const card = matrix[i]!;
+    const root = card[0]! as ContainerElement;
+    const cta = card[1]!;
+    // Per-entry suffix scheme must mirror the id scheme exactly.
+    assert(
+      root.anchorId === `card-root--${entries[i]!.slug}`,
+      `(22) outer Container anchorId suffixed by entry slug ` +
+        `(expected card-root--${entries[i]!.slug}, got ${String(root.anchorId)})`,
+    );
+    assert(
+      cta.type === 'action',
+      '(22) card[1] must be the Action element',
+    );
+    if (cta.type === 'action') {
+      assert(
+        cta.anchorId === `card-cta--${entries[i]!.slug}`,
+        `(22) Action anchorId suffixed by entry slug ` +
+          `(expected card-cta--${entries[i]!.slug}, got ${String(cta.anchorId)})`,
+      );
+      if (cta.anchorId !== undefined) ctaAnchorIds.push(cta.anchorId);
+    }
+    if (root.anchorId !== undefined) rootAnchorIds.push(root.anchorId);
+  }
+  // Cross-card uniqueness — the materialized anchorIds must all be distinct
+  // (the bug published the same `card-cta` thrice).
+  assert(
+    new Set(rootAnchorIds).size === 3,
+    `(22) three materialized outer-container anchorIds must be distinct — got ${rootAnchorIds.join(', ')}`,
+  );
+  assert(
+    new Set(ctaAnchorIds).size === 3,
+    `(22) three materialized cta anchorIds must be distinct — got ${ctaAnchorIds.join(', ')}`,
+  );
+}
+
+// (22b) Template children WITHOUT anchorId stay without anchorId — the
+//       suffix must not invent one out of thin air.
+{
+  const customTemplate: CanvasElement[] = [
+    {
+      id: 'no-anchor-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'flat',
+      linkHref: { type: 'external', url: '/{{slug}}' },
+      linkLabel: '{{title}}',
+    },
+  ];
+  const collection = makeCollectionElement({
+    display: 'custom',
+    customTemplate,
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const out = materializeCollections(site, [makeEntry({ slug: 'one', title: 'One' })]);
+  const matrix = getCollectionFrom(out).entries!;
+  const root = matrix[0]![0]! as ContainerElement;
+  assert(
+    root.anchorId === undefined,
+    `(22b) absent anchorId must remain absent after materialization (got ${String(root.anchorId)})`,
+  );
+}
+
 console.log('[collection-materializer:smoke] OK');

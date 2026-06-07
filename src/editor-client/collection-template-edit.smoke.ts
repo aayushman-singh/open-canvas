@@ -694,4 +694,183 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
   );
 }
 
+// ----- Codex review pass 4 finding 3 — exit re-targets a DEEPLY NESTED
+// template-child selection (Tabs panel inside customTemplate). Pass 2
+// only handled direct children of customTemplate (parentKind ===
+// 'collection-custom-template'); a selection inside a nested Tabs panel
+// returns parentKind === 'tab-panel' and the parent-meta points at the
+// Tabs element, not the host Collection. The fix walks the active
+// Collection's customTemplate subtree and re-targets if the selected id
+// lives anywhere in it.
+(function exitRetargetsDeeplyNestedTemplateSelectionSpec() {
+  const nestedText: CanvasElement = {
+    id: 'tab-nested-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+    content: [{ text: 'Inside tab' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+  };
+  const tabs: CanvasElement = {
+    id: 'tpl-tabs',
+    type: 'tabs',
+    box: { x: 0, y: 0, w: 320, h: 360, z: 2 },
+    activeTabId: 'overview',
+    tabs: [
+      {
+        id: 'overview',
+        label: [{ text: 'Overview' }],
+        elements: [nestedText],
+      },
+    ],
+  };
+  const el = makeCollection('coll-nested', 'custom');
+  el.customTemplate = [tabs];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  ctx.editingCollectionTemplate = { collectionId: 'coll-nested' };
+  // Owner clicked the deeply-nested Text inside the Tab panel.
+  ctx.selectedElementId = 'tab-nested-text';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'deeply-nested exit must clear editingCollectionTemplate',
+  );
+  assert(
+    ctx.selectedElementId === 'coll-nested',
+    'exit must re-target a deeply-nested template-subtree selection to the host Collection, got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+// Exit with selection on a sibling element OUTSIDE the active Collection's
+// template subtree must leave the selection alone — the subtree predicate
+// must not over-match.
+(function exitLeavesSiblingSelectionAloneSpec() {
+  const otherText: CanvasElement = {
+    id: 'section-sibling-text',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+    content: [{ text: 'sibling' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+  };
+  const el = makeCollection('coll-with-sibling', 'custom');
+  el.customTemplate = [
+    {
+      id: 'tpl-child',
+      type: 'text',
+      box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+      content: [{ text: 'in template' }],
+      role: 'body',
+      fontSize: 14,
+      fontWeight: 400,
+      align: 'left',
+    },
+  ];
+  const section = makeSection([el, otherText]);
+  const { ctx } = makeCtx(section);
+
+  ctx.editingCollectionTemplate = { collectionId: 'coll-with-sibling' };
+  ctx.selectedElementId = 'section-sibling-text';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.selectedElementId === 'section-sibling-text',
+    'exit must leave a section-sibling selection untouched (not inside template subtree), got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+// ----- Codex review pass 4 finding 1 — body-builders-data.ts edit-mode
+// precondition must fuse pin + display === 'custom' + non-empty
+// customTemplate so a stale pin (post-undo) falls through to the
+// normal grid renderer instead of mounting an empty wrapper. Source-grep
+// the body-builders module because the helper depends on real DOM
+// (document.createElement) that bare Bun doesn't provide.
+{
+  const bodyBuildersSrc = await Bun.file(
+    new URL('./body-builders-data.ts', import.meta.url),
+  ).text();
+  // Locate the buildCollectionBodyImpl function header.
+  const buildIdx = bodyBuildersSrc.indexOf(
+    'export function buildCollectionBodyImpl(',
+  );
+  assert(
+    buildIdx > 0,
+    'body-builders-data.ts must own buildCollectionBodyImpl (re-locate if renamed)',
+  );
+  // Bound the search window from the function header to the next
+  // top-level `export function` declaration (or end of file).
+  const tail = bodyBuildersSrc.slice(buildIdx);
+  const nextExport = tail.indexOf('\nexport function ', 1);
+  const fnWindow = nextExport > 0 ? tail.slice(0, nextExport) : tail;
+  // The fused precondition checks all three signals — pin, display,
+  // non-empty customTemplate — before the edit-mode wrapper is mounted.
+  assert(
+    fnWindow.includes("element.display === 'custom'"),
+    "buildCollectionBodyImpl edit-mode precondition must check element.display === 'custom' " +
+      '(F1 fall-through guard against stale pin after undo)',
+  );
+  assert(
+    fnWindow.includes('element.customTemplate') &&
+      fnWindow.includes('.length > 0'),
+    'buildCollectionBodyImpl edit-mode precondition must check customTemplate is non-empty ' +
+      '(F1 fall-through guard — empty template after undo must render the normal grid)',
+  );
+}
+
+// ----- Codex review pass 4 finding 2 — display-dropdown change handler
+// must call ctx.renderInspector() in ALL THREE branches (first-switch,
+// second-switch with existing template, switch-away) so the Edit /
+// Done / Reset row tracks display === 'custom' in lock-step.
+{
+  const inspectorSrc = await Bun.file(
+    new URL('./element-inspector.ts', import.meta.url),
+  ).text();
+  // Find the displaySelect change handler.
+  const handlerIdx = inspectorSrc.indexOf(
+    "displaySelect.addEventListener('change'",
+  );
+  assert(
+    handlerIdx > 0,
+    'element-inspector.ts must own the displaySelect change handler',
+  );
+  // Bound from the handler start to its closing `});` — the handler ends
+  // immediately before `inspector.appendChild(field('Display',`.
+  const handlerTail = inspectorSrc.slice(handlerIdx);
+  const handlerEndIdx = handlerTail.indexOf(
+    "inspector.appendChild(field('Display'",
+  );
+  assert(
+    handlerEndIdx > 0,
+    'displaySelect handler must be followed by inspector.appendChild(field(\'Display\', ...))',
+  );
+  const handlerWindow = handlerTail.slice(0, handlerEndIdx);
+  // Strip line-comments so explanatory text doesn't trigger false positives.
+  const handlerStripped = handlerWindow
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx >= 0 ? line.slice(0, idx) : line;
+    })
+    .join('\n');
+  // The handler has exactly three terminal branches; each must call
+  // renderInspector once before its return / end.
+  const renderInspectorCount = (handlerStripped.match(/ctx\.renderInspector\(\)/g) || []).length;
+  assert(
+    renderInspectorCount >= 3,
+    'displaySelect change handler must call ctx.renderInspector() in all three branches ' +
+      `(first-switch / second-switch / switch-away) — found ${renderInspectorCount} call(s)`,
+  );
+}
+
 console.log('[collection-template-edit:smoke] all assertions passed');

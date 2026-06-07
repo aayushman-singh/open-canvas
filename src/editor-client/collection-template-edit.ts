@@ -21,8 +21,44 @@
 // captureForUndo + scheduleSave window so undo restores the pre-seed
 // state cleanly.
 
+import type { CanvasElement } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
+
+/**
+ * Whether `targetId` resolves to an element living anywhere inside the
+ * subtree rooted at one of the elements in `template`. Walks Tabs panel
+ * children (the only canvas type with nested `CanvasElement[]` siblings —
+ * mirrors the materializer's recursion in collection-materializer.ts).
+ *
+ * Codex review pass 4 finding 3 — used by the exit-verb's stale-child
+ * re-target branch. The pass-2 fix only handled DIRECT children of
+ * customTemplate (parentKind === 'collection-custom-template'). When the
+ * selection sits inside a nested Tabs panel within customTemplate, the
+ * walker's parentKind is 'tab-panel' and the parent-meta points at the
+ * Tabs element, not the host Collection. A structural subtree-membership
+ * predicate is the cheapest fix: one O(template-size) walk per exit,
+ * compared with an O(depth × template-size) parent-chain reconstruction
+ * via repeated findElement calls.
+ */
+function isInsideTemplateSubtree(
+  template: readonly CanvasElement[],
+  targetId: string,
+): boolean {
+  for (let i = 0; i < template.length; i++) {
+    const node = template[i];
+    if (node === undefined) continue;
+    if (node.id === targetId) return true;
+    if (node.type === 'tabs') {
+      for (let ti = 0; ti < node.tabs.length; ti++) {
+        const tab = node.tabs[ti];
+        if (tab === undefined || !Array.isArray(tab.elements)) continue;
+        if (isInsideTemplateSubtree(tab.elements, targetId)) return true;
+      }
+    }
+  }
+  return false;
+}
 
 /**
  * Enter custom-template edit mode for the named Collection.
@@ -96,17 +132,26 @@ export function enterCollectionTemplateEditImpl(
  *
  * Codex review pass 2 finding 2 — before clearing
  * `editingCollectionTemplate`, check whether `selectedElementId` resolves
- * to an element living inside the now-soon-to-be-inactive template (i.e.
- * `parentKind === 'collection-custom-template'`). If so, reselect the
- * parent Collection. Rationale: the Owner clicked a template child while
- * editing (so `selectedElementId` points at e.g. the title TextElement);
- * exiting hides the per-child grid and renders the materialized N-clone
- * grid instead. The child is no longer visually selectable on the canvas
- * but the inspector still renders its inspector — the Owner edits a
- * phantom. Reselecting the parent Collection keeps the Owner in the "I
- * just exited THIS Collection's edit mode" mental model so the next
- * interaction (re-enter, change display, edit binding) lands on the
- * right element.
+ * to an element living inside the now-soon-to-be-inactive template. If
+ * so, reselect the parent Collection. Rationale: the Owner clicked a
+ * template child while editing (so `selectedElementId` points at e.g.
+ * the title TextElement); exiting hides the per-child grid and renders
+ * the materialized N-clone grid instead. The child is no longer visually
+ * selectable on the canvas but the inspector still renders its inspector
+ * — the Owner edits a phantom. Reselecting the parent Collection keeps
+ * the Owner in the "I just exited THIS Collection's edit mode" mental
+ * model so the next interaction (re-enter, change display, edit binding)
+ * lands on the right element.
+ *
+ * Codex review pass 4 finding 3 — pass 2 only handled DIRECT template
+ * children (parentKind === 'collection-custom-template'). When the
+ * selection sits inside a nested Tabs panel within customTemplate, the
+ * walker's parentKind is 'tab-panel' and the host Collection is no
+ * longer the immediate parent-meta. The fix is structural: locate the
+ * active Collection from the pin, then ask whether `selectedElementId`
+ * is anywhere in its `customTemplate` subtree (via
+ * `isInsideTemplateSubtree`). One O(template-size) walk per exit; covers
+ * both direct children and any depth of nesting.
  */
 export function exitCollectionTemplateEditImpl(ctx: EditorContext): void {
   // Re-target a stale child selection BEFORE flipping the edit-mode
@@ -118,12 +163,16 @@ export function exitCollectionTemplateEditImpl(ctx: EditorContext): void {
   // then "mutate state and re-render".
   const selectedId = ctx.selectedElementId;
   if (selectedId !== null && ctx.editingCollectionTemplate !== null) {
-    const found = ctx.findElement(selectedId);
-    if (found && found.parentKind === 'collection-custom-template') {
-      const meta = found.parentMeta;
-      if (meta !== null && 'collectionElement' in meta) {
-        ctx.selectElement(meta.collectionElement.id);
-      }
+    const activeCollectionId = ctx.editingCollectionTemplate.collectionId;
+    const activeFound = ctx.findElement(activeCollectionId);
+    if (
+      activeFound &&
+      activeFound.element.type === 'collection' &&
+      Array.isArray(activeFound.element.customTemplate) &&
+      selectedId !== activeCollectionId &&
+      isInsideTemplateSubtree(activeFound.element.customTemplate, selectedId)
+    ) {
+      ctx.selectElement(activeCollectionId);
     }
   }
   ctx.editingCollectionTemplate = null;

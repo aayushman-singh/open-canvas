@@ -274,6 +274,26 @@ function cloneAndSubstituteTemplate(
     const seed = deepClone(source);
     const substituted = substituteInValue(seed, entry);
     const suffixedId = `${source.id}--${entry.slug}`;
+    // Codex review pass 4 finding 4 — per-entry suffix anchorId with the
+    // same `<original>--<entry.slug>` scheme used on `id`. The renderer
+    // emits `<anchorId>` as the DOM `id` attribute for in-page anchor
+    // navigation (schema.ts BaseElement.anchorId, ADR 0050 dec 2 — must
+    // be unique within a page). Without the suffix, an Owner-authored
+    // anchorId on a template child publishes N times verbatim across N
+    // materialized cards, producing duplicate DOM ids — invalid HTML +
+    // ambiguous fragment navigation + a11y failures. Suffix mirrors the
+    // id scheme exactly so the relationship between storage-key id and
+    // anchor-target id stays predictable; suffix happens AFTER
+    // substituteInValue so an Owner who wrote `{{slug}}` inside the
+    // anchorId still gets the surface-level token expansion first, then
+    // the uniqueness suffix on top.
+    if (
+      typeof (substituted as { anchorId?: unknown }).anchorId === 'string' &&
+      typeof (source as { anchorId?: unknown }).anchorId === 'string'
+    ) {
+      (substituted as { anchorId?: string }).anchorId =
+        `${(source as { anchorId?: string }).anchorId}--${entry.slug}`;
+    }
     if (substituted.type === 'action') {
       // Codex review pass 1 — spread-and-override preserves Owner-authored
       // fields (`iconKind`, `motion`, `elementStyle`, `responsive`,

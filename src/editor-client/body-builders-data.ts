@@ -589,9 +589,23 @@ export function buildCollectionBodyImpl(ctx: EditorContext, element: CollectionE
   // gets `data-collection-template-instance` so the chrome augmenter
   // (collection-template-edit-view.ts) can target it for the scrim cutout
   // and pan helper.
+  //
+  // Codex review pass 4 finding 1 — the edit-mode precondition fuses THREE
+  // signals: the pin targets this Collection, AND the Collection is still
+  // a Custom display, AND it still has a non-empty customTemplate to edit.
+  // editingCollectionTemplate is UI-only (D6) so it is not in the undo stack;
+  // a Ctrl+Z that reverts the atomic first-switch (display + customTemplate)
+  // leaves the pin stale. Without the fused check we'd render an empty
+  // template-instance wrapper sitting where the materialized grid belongs.
+  // The pin's loud-clear happens on the next intentional exit (Esc /
+  // click-outside / Done / page-switch); until then this fall-through
+  // renders the normal grid against the reverted state.
   const isEditingThis =
     ctx.editingCollectionTemplate !== null &&
-    ctx.editingCollectionTemplate.collectionId === element.id;
+    ctx.editingCollectionTemplate.collectionId === element.id &&
+    element.display === 'custom' &&
+    Array.isArray(element.customTemplate) &&
+    element.customTemplate.length > 0;
   if (isEditingThis) {
     const node = document.createElement('div');
     node.className = 'opencanvas-collection-template-edit';
