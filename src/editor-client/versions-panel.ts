@@ -196,14 +196,31 @@ export function renderVersionsPanelImpl(ctx: EditorContext): void {
 
     ctx
       .authFetch(ctx.apiBase + '/sites/' + ctx.siteId + '/snapshots?limit=30')
-      .then((r) => r.json())
+      .then(async (r) => {
+        // Bug #11: previously this skipped r.ok and forwarded straight to
+        // `r.json()`, so a 404 ("site not found" — what the owner-only
+        // route returned to collaborators) was silently coerced into an
+        // empty `data.items` and rendered as "No snapshots yet." Surface
+        // the real failure so the panel + status bar both report it.
+        if (!r.ok) {
+          const errBody = (await r.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+          const detail = errBody?.error ?? String(r.status);
+          throw new Error('versions list failed: ' + detail);
+        }
+        return r.json() as Promise<{ items?: VersionSnapshot[] }>;
+      })
       .then((data: { items?: VersionSnapshot[] }) => {
         ctx.versionsList = data.items || [];
         ctx.versionsLoaded = true;
         ctx.renderVersionsPanel();
       })
-      .catch(() => {
-        loading.textContent = 'Failed to load versions.';
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        loading.textContent = 'Failed to load versions: ' + message;
+        loading.style.color = '#fca5a5';
+        ctx.setStatus('Versions: ' + message, 'error');
       });
     return;
   }
