@@ -29,7 +29,12 @@ import type { CanvasElement, PositionedBox } from '../canvas/schema.js';
 
 import type { EditorContext } from './editor-context.js';
 
-export function setBoxStyleImpl(_ctx: EditorContext, wrapper: HTMLElement, box: PositionedBox): void {
+// ADR 0064 — style-apply carve. Only applyElementStyleImpl reads
+// `siteBase` (to resolve background asset URLs); the two `_ctx`
+// stampers share the type to keep the wrapper-style triplet uniform.
+export type StyleApplyContext = Pick<EditorContext, 'siteBase'>;
+
+export function setBoxStyleImpl(_ctx: StyleApplyContext, wrapper: HTMLElement, box: PositionedBox): void {
   wrapper.style.position = 'absolute';
   wrapper.style.left = box.x + 'px';
   wrapper.style.top = box.y + 'px';
@@ -51,7 +56,7 @@ export function setBoxStyleImpl(_ctx: EditorContext, wrapper: HTMLElement, box: 
 // local pre-flight so a forbidden value never renders even before save.
 // If you change either rule, mirror it in validate.ts or the editor will
 // accept what the server rejects (and vice versa).
-export function applyPinnedStyleImpl(_ctx: EditorContext, wrapper: HTMLElement, element: CanvasElement): void {
+export function applyPinnedStyleImpl(_ctx: StyleApplyContext, wrapper: HTMLElement, element: CanvasElement): void {
   if (!element.pinnedStyle) return;
   for (const key of Object.keys(element.pinnedStyle)) {
     if (!/^[a-zA-Z-]+$/.test(key)) continue;
@@ -63,7 +68,7 @@ export function applyPinnedStyleImpl(_ctx: EditorContext, wrapper: HTMLElement, 
   }
 }
 
-export function applyElementStyleImpl(ctx: EditorContext, wrapper: HTMLElement, element: CanvasElement): void {
+export function applyElementStyleImpl(ctx: StyleApplyContext, wrapper: HTMLElement, element: CanvasElement): void {
   const es = element.elementStyle;
   if (!es) return;
   if (es.backgroundColor) {
