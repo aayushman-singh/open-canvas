@@ -138,6 +138,7 @@ import {
   ensureSectionsPanelLoaded,
   enterPlacementModeImpl,
   importPendingSectionAt,
+  prefetchSectionsCatalog,
   renderPlacementSlotsImpl,
   renderSectionsPanelImpl,
 } from './sections-picker.js';
@@ -728,6 +729,21 @@ export function createEditor(boot: EditorBoot): void {
       ctx.updateChatSelectionChip();
     });
   }
+
+  // ---- Sections-picker prefetch -------------------------------------
+  // The Owner's first Sections-tab open used to fire GET /library/sections
+  // synchronously, which spent ~5s server-side populating the 88-entry
+  // catalog from `library_section`. Most Owners click Sections within
+  // the first few seconds of the editor mounting, so we kick the catalog
+  // request in parallel with the site-load fetch below; by the time the
+  // Owner switches tabs the response has already landed and the picker
+  // renders microtask-fast off the cached array. Fire-and-forget — the
+  // module-level singleton inside prefetchSectionsCatalog converts
+  // rejections to a `{kind:'failure'}` outcome (no unhandled rejection)
+  // and resets the singleton so a later tab-open retries; the visible
+  // "Failed to load sections." error renders on the awaiter path
+  // (ensureSectionsPanelLoaded), never silently here.
+  prefetchSectionsCatalog(ctx);
 
   // ---- Boot async block (mirror canvas-client.ts:13913-14405) -------
   void (async () => {

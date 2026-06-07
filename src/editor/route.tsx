@@ -255,6 +255,24 @@ export function editorPageJsx(opts: EditorPageOptions) {
             '<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js" crossorigin="anonymous" onload="window.dispatchEvent(new Event(\'opencanvas-katex-ready\'))"></script>',
         )}
         <link rel="stylesheet" href={EDITOR_CLIENT_MANIFEST.canvasStylesUrl} />
+        {/* Sections-picker prefetch — GET /library/sections is server-
+            bound (~5s for the 88-entry catalog as of 2026-06-07).
+            Starting the request via <link rel="preload" as="fetch"> in
+            <head> lets the browser issue the request in parallel with
+            the editor JS bundle download/parse and the boot-time site
+            fetch, so by the time the Owner clicks the Sections tab the
+            response has already landed.
+
+            The endpoint is Clerk / edit-token cookie gated. We omit the
+            `crossorigin` attribute on purpose: the editor route is
+            served from the same origin as the `/api/library/sections`
+            and `/__api/library/sections` endpoints, so the browser
+            sends cookies by default (matching the credentials mode that
+            the later `fetch()` call from editor-client will use). Adding
+            `crossorigin="anonymous"` would strip cookies and the
+            preloaded response would not match the cookied fetch, so the
+            cache entry would be unused. */}
+        <link rel="preload" as="fetch" href={apiBase + '/library/sections'} />
         <style>{raw(bellStyles)}</style>
         {clerkPublishableKey &&
           raw(`<script>
