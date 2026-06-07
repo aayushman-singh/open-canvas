@@ -20,9 +20,16 @@
 
 import { mountProfile } from './profile.js';
 import { mountAddonShop } from './addon-shop.js';
+import { mountDomains } from './domains.js';
 
 interface DashboardBoot {
-  route: 'profile' | 'addon-shop';
+  route: 'profile' | 'addon-shop' | 'domains';
+  // Per-request keys — present only for routes that need them. The
+  // `domains` route ships the site id whose hostnames it is editing so
+  // the mount module can address `/api/sites/:siteId/domains` without a
+  // closure capture. Other routes (profile, addon-shop) leave this
+  // unset; addon-shop instead seeds `#addon-state` JSON on the page.
+  siteId?: string;
 }
 
 declare global {
@@ -34,6 +41,7 @@ declare global {
 const DISPATCH: { [K in DashboardBoot['route']]: () => void } = {
   profile: mountProfile,
   'addon-shop': mountAddonShop,
+  domains: mountDomains,
 };
 
 function run(): void {
