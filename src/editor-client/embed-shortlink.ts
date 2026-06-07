@@ -13,10 +13,20 @@
 
 import type { EmbedElement } from '../canvas/elements/embed.js';
 import { isShortLinkUrl } from '../embed/expand-short-link.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  PersistContext,
+  RenderContext,
+  StatusEmitterContext,
+} from './editor-context.js';
+
+// ADR 0064 — short-link expansion touches three named clusters: persist
+// (authFetch + apiBase to call the expand-shortlink endpoint, scheduleSave
+// to debounce the URL rewrite), render (rebuildElement to refresh the
+// iframe), and status (setStatus to surface in-flight / success / error).
+export type EmbedShortlinkContext = PersistContext & RenderContext & StatusEmitterContext;
 
 export async function maybeExpandEmbedShortLink(
-  ctx: EditorContext,
+  ctx: EmbedShortlinkContext,
   element: EmbedElement,
   input: HTMLInputElement,
 ): Promise<void> {
