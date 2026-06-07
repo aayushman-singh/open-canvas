@@ -217,27 +217,50 @@ function sortEntriesManual(
   return ordered;
 }
 
-/** ADR 0063 dec 4 + dec 6 — assemble one entry's worth of canvas elements.
- *  Outer Container links the whole surface; siblings carry the visible chrome.
- *  Ids are suffixed with the entry slug so replay produces byte-equal output. */
-function buildCardEntryInstance(
+/** ADR 0065 D8 — shared per-entry clone-and-substitute helper used by both the
+ *  `'card'` arm (template = `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]`)
+ *  and the `'custom'` arm (template = `el.customTemplate`).
+ *
+ *  For each element in `template`:
+ *    1. Deep-clone the element so the source constants / Owner-authored
+ *       customTemplate are never mutated.
+ *    2. Walk every string field substituting the nine placeholders against the
+ *       entry (`substituteInValue`).
+ *    3. Suffix the element's `id` with `--<entry.slug>` so replay produces
+ *       byte-equal output.
+ *    4. Force the per-entry link target: the FIRST element, when it's a
+ *       Container, has its `linkHref` overwritten to the canonical detail URL
+ *       (`/<collectionSlug>/<entry.slug>`). Any ActionElement anywhere in the
+ *       template has its `href` overwritten to the same URL. This matches the
+ *       ADR 0063 dec 6 "card surface links to detail page" rule and is the one
+ *       behaviour the materializer asserts on top of whatever the template
+ *       author wrote.
+ *
+ *  Behavioural identity between `'card'` and `'custom'`: passing
+ *  `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]` as `template` produces
+ *  output byte-equal to the `'custom'` arm with the same array on
+ *  `el.customTemplate` (asserted by smoke). */
+function cloneAndSubstituteTemplate(
+  template: readonly CanvasElement[],
   entry: MaterializerEntry,
   collectionSlug: string,
 ): CanvasElement[] {
   const detailUrl = `/${collectionSlug}/${entry.slug}`;
-  const containerSeed = deepClone(DEFAULT_CARD_TEMPLATE as ContainerElement);
-  const substitutedContainer = substituteInValue(containerSeed, entry);
-  const container: ContainerElement = {
-    ...substitutedContainer,
-    id: `${DEFAULT_CARD_TEMPLATE.id}--${entry.slug}`,
-    linkHref: { type: 'external', url: detailUrl },
-  };
-  const siblings: CanvasElement[] = DEFAULT_CARD_SIBLINGS.map((sib): CanvasElement => {
-    const seed = deepClone(sib);
+  return template.map((source, idx): CanvasElement => {
+    const seed = deepClone(source);
     const substituted = substituteInValue(seed, entry);
+    const suffixedId = `${source.id}--${entry.slug}`;
+    if (idx === 0 && substituted.type === 'container') {
+      const container: ContainerElement = {
+        ...substituted,
+        id: suffixedId,
+        linkHref: { type: 'external', url: detailUrl },
+      };
+      return container;
+    }
     if (substituted.type === 'action') {
       const action: ActionElement = {
-        id: `${sib.id}--${entry.slug}`,
+        id: suffixedId,
         type: 'action',
         box: substituted.box,
         label: substituted.label,
@@ -249,17 +272,48 @@ function buildCardEntryInstance(
     if (substituted.type === 'media' && substituted.mediaKind === 'image') {
       const image: ImageMediaElement = {
         ...substituted,
-        id: `${sib.id}--${entry.slug}`,
+        id: suffixedId,
       };
       return image;
     }
-    const text: TextElement = {
-      ...(substituted as TextElement),
-      id: `${sib.id}--${entry.slug}`,
-    };
-    return text;
+    if (substituted.type === 'text') {
+      const text: TextElement = {
+        ...substituted,
+        id: suffixedId,
+      };
+      return text;
+    }
+    return { ...substituted, id: suffixedId };
   });
-  return [container, ...siblings];
+}
+
+/** Flat template array consumed by the `'card'` arm — the outer Container plus
+ *  its sibling chrome assembled in one shape so the shared helper can iterate
+ *  them uniformly. The order matters: the Container sits at index 0 so the
+ *  helper's "first element gets the outer linkHref" rule applies. */
+const DEFAULT_CARD_TEMPLATE_ARRAY: readonly CanvasElement[] = [
+  DEFAULT_CARD_TEMPLATE,
+  ...DEFAULT_CARD_SIBLINGS,
+];
+
+/** ADR 0063 dec 4 + dec 6 — assemble one entry's worth of canvas elements for
+ *  the `'card'` display arm. Delegates to `cloneAndSubstituteTemplate` so the
+ *  `'card'` and `'custom'` arms (ADR 0065 D8) share one code path. */
+function buildCardEntryInstance(
+  entry: MaterializerEntry,
+  collectionSlug: string,
+): CanvasElement[] {
+  return cloneAndSubstituteTemplate(DEFAULT_CARD_TEMPLATE_ARRAY, entry, collectionSlug);
+}
+
+/** ADR 0065 D8 — `'custom'` display arm. Reads the per-Collection
+ *  `customTemplate` and delegates to `cloneAndSubstituteTemplate`. */
+function buildCustomEntryInstance(
+  template: readonly CanvasElement[],
+  entry: MaterializerEntry,
+  collectionSlug: string,
+): CanvasElement[] {
+  return cloneAndSubstituteTemplate(template, entry, collectionSlug);
 }
 
 /** ADR 0063 dec 4 — image-only mode. Per-entry instance is a single Container
@@ -368,22 +422,54 @@ function resolveEntriesForCollection(
  *  `el.entries` (the matrix shape downstream consumers already iterate); on
  *  zero matches `el.entries` is set to `[]` (no placeholder content per
  *  ADR 0063 dec 5 — publish renderer emits empty, editor preview owns the
- *  placeholder UI separately). */
+ *  placeholder UI separately).
+ *
+ *  ADR 0065 D8 — `'custom'` arm failure paths (loud, no fallback to
+ *  `DEFAULT_CARD_TEMPLATE`):
+ *    - `display === 'custom'` AND `customTemplate === undefined` → zero cards
+ *      + warning: `"Collection element <id> display='custom' but customTemplate
+ *      is not set."`.
+ *    - `display === 'custom'` AND `customTemplate.length === 0` → zero cards
+ *      + warning: `"Collection element <id> display='custom' but customTemplate
+ *      has zero elements."`.
+ *  The Owner's intent (an empty customTemplate is preserved across mode
+ *  switches per ADR 0065 D4) is honoured exactly — a visually broken Collection
+ *  + a loud signal explaining why. */
 function hydrateCollectionElement(
   el: CollectionElement,
   entries: readonly MaterializerEntry[],
   pageSlug: string,
   warnings: string[],
 ): void {
+  const display = el.display ?? 'card';
+  let customTemplate: readonly CanvasElement[] | undefined;
+  if (display === 'custom') {
+    if (el.customTemplate === undefined) {
+      warnings.push(
+        `Collection element ${el.id} display='custom' but customTemplate is not set.`,
+      );
+      el.entries = [];
+      return;
+    }
+    if (el.customTemplate.length === 0) {
+      warnings.push(
+        `Collection element ${el.id} display='custom' but customTemplate has zero elements.`,
+      );
+      el.entries = [];
+      return;
+    }
+    customTemplate = el.customTemplate;
+  }
   const { ordered, warning } = resolveEntriesForCollection(el, entries, pageSlug);
   if (warning !== null) warnings.push(warning);
   const collectionSlug = el.collectionSlug ?? '';
-  const display = el.display ?? 'card';
-  const built: CanvasElement[][] = ordered.map((entry) =>
-    display === 'image-only'
-      ? buildImageOnlyEntryInstance(entry, collectionSlug)
-      : buildCardEntryInstance(entry, collectionSlug),
-  );
+  const built: CanvasElement[][] = ordered.map((entry) => {
+    if (display === 'image-only') return buildImageOnlyEntryInstance(entry, collectionSlug);
+    if (display === 'custom' && customTemplate !== undefined) {
+      return buildCustomEntryInstance(customTemplate, entry, collectionSlug);
+    }
+    return buildCardEntryInstance(entry, collectionSlug);
+  });
   el.entries = built;
 }
 

@@ -25,6 +25,20 @@
 //      `manualOrder` are skipped silently.
 //  11. Zero-entry case (no matches OR `collectionSlug === undefined`) yields
 //      `el.entries = []` and a warning string of the ADR-pinned shape.
+//
+// New in Phase 2B / ADR 0065 D8 (`'custom'` arm):
+//  14. `display: 'custom'` clones `el.customTemplate` per entry with the same
+//      substitution rules as the `'card'` arm.
+//  15. Shared-helper identity: `'custom'` with
+//      `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]` as customTemplate
+//      produces output byte-equal to the `'card'` arm.
+//  16. `customTemplate === undefined` → zero cards + the literal warning
+//      `"Collection element <id> display='custom' but customTemplate is not set."`.
+//  17. `customTemplate === []` → zero cards + the literal warning
+//      `"Collection element <id> display='custom' but customTemplate has zero elements."`.
+//  18. `customTemplate` present + zero matching entries → existing
+//      zero-entries warning fires (NOT the custom-empty warnings).
+//  19. Folder filter + sort behave identically for `'card'` and `'custom'`.
 
 import type {
   CanvasElement,
@@ -36,6 +50,7 @@ import type {
   TextElement,
 } from '../schema.js';
 import type { CollectionElement } from './collection.js';
+import { DEFAULT_CARD_SIBLINGS, DEFAULT_CARD_TEMPLATE } from './collection-defaults.js';
 import {
   materializeCollections,
   materializeCollectionsWithReport,
@@ -594,6 +609,265 @@ function externalUrlOf(container: ContainerElement): string {
   materializeCollections(site, [makeEntry({ slug: 'one' })]);
   const after = JSON.stringify(site);
   assert(before === after, '(13) hydrate path does not mutate input site');
+}
+
+// ---------------------------------------------------------------------------
+// ADR 0065 D8 — `'custom'` arm
+// ---------------------------------------------------------------------------
+
+/** Build a small, non-default customTemplate the Owner might author themselves:
+ *  outer container link surface + bare title text. Exercises the shared
+ *  helper's "first container → linkHref overwritten" and "{{title}} text
+ *  substitution" without re-using the default constants. */
+function makeOwnerAuthoredCustomTemplate(): CanvasElement[] {
+  const container: ContainerElement = {
+    id: 'owner-card-root',
+    type: 'container',
+    box: { x: 0, y: 0, w: 400, h: 250, z: 1 },
+    variant: 'flat',
+    linkHref: { type: 'external', url: '/{{slug}}' },
+    linkLabel: '{{title}}',
+  };
+  const title: TextElement = {
+    id: 'owner-card-title',
+    type: 'text',
+    box: { x: 16, y: 16, w: 368, h: 48, z: 2 },
+    content: [{ text: '{{title}}' }],
+    role: 'heading',
+    fontSize: 28,
+    fontWeight: 700,
+    align: 'left',
+  };
+  return [container, title];
+}
+
+// ---------------------------------------------------------------------------
+// (14) `display: 'custom'` clones customTemplate per entry with substitutions
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({
+    display: 'custom',
+    customTemplate: makeOwnerAuthoredCustomTemplate(),
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'one', title: 'Custom one' }),
+    makeEntry({ slug: 'two', title: 'Custom two' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 2, `(14) custom arm renders N entries (got ${String(matrix.length)})`);
+
+  const firstContainer = matrix[0]![0]! as ContainerElement;
+  assert(firstContainer.type === 'container', '(14) custom instance[0] is the link container');
+  assert(firstContainer.id === 'owner-card-root--one', '(14) custom container id suffixed by slug');
+  assert(
+    externalUrlOf(firstContainer) === '/blog/one',
+    `(14) custom outer linkHref = /blog/one (got ${externalUrlOf(firstContainer)})`,
+  );
+  assert(firstContainer.linkLabel === 'Custom one', '(14) custom container linkLabel substituted');
+
+  const firstTitle = matrix[0]![1]! as TextElement;
+  assert(firstTitle.id === 'owner-card-title--one', '(14) custom title id suffixed by slug');
+  assert(firstTitle.content[0]!.text === 'Custom one', '(14) custom title text substituted');
+
+  const secondContainer = matrix[1]![0]! as ContainerElement;
+  assert(
+    externalUrlOf(secondContainer) === '/blog/two',
+    '(14) second custom instance links to /blog/two',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (15) Shared-helper identity: `'card'` and `'custom'` produce byte-equal
+//      output when customTemplate is the default card template array
+// ---------------------------------------------------------------------------
+
+{
+  const cardCollection = makeCollectionElement({ id: 'col-shared', display: 'card' });
+  const customCollection = makeCollectionElement({
+    id: 'col-shared',
+    display: 'custom',
+    customTemplate: [DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS],
+  });
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'identity-a', title: 'Identity A', ogImageAssetId: 'asset-a' }),
+    makeEntry({ slug: 'identity-b', title: 'Identity B', ogImageAssetId: 'asset-b' }),
+  ];
+  const cardOut = materializeCollections(
+    makeSite([makeOrdinaryPageWithCollection(cardCollection)]),
+    entries,
+  );
+  const customOut = materializeCollections(
+    makeSite([makeOrdinaryPageWithCollection(customCollection)]),
+    entries,
+  );
+  const cardEntries = getCollectionFrom(cardOut).entries!;
+  const customEntries = getCollectionFrom(customOut).entries!;
+  assert(
+    JSON.stringify(cardEntries) === JSON.stringify(customEntries),
+    "(15) 'card' and 'custom' arms produce byte-equal output when sharing the same template",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (16) `customTemplate === undefined` → zero cards + literal warning
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({ id: 'col-no-template', display: 'custom' });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const { site: out, warnings } = materializeCollectionsWithReport(site, [
+    makeEntry({ slug: 'doesnt-matter' }),
+  ]);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 0, `(16) undefined customTemplate → zero cards (got ${matrix.length})`);
+  assert(
+    warnings.includes(
+      "Collection element col-no-template display='custom' but customTemplate is not set.",
+    ),
+    `(16) undefined customTemplate emits the ADR-pinned warning (got: ${warnings.join(' | ')})`,
+  );
+  // The zero-entries warning must NOT also fire — broken template short-circuits.
+  assert(
+    !warnings.some((w) => w.includes('matched 0 entries')),
+    '(16) zero-entries warning does not also fire when customTemplate is undefined',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (17) `customTemplate === []` → zero cards + literal warning
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({
+    id: 'col-empty-template',
+    display: 'custom',
+    customTemplate: [],
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const { site: out, warnings } = materializeCollectionsWithReport(site, [
+    makeEntry({ slug: 'still-doesnt-matter' }),
+  ]);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 0, `(17) empty customTemplate → zero cards (got ${matrix.length})`);
+  assert(
+    warnings.includes(
+      "Collection element col-empty-template display='custom' but customTemplate has zero elements.",
+    ),
+    `(17) empty customTemplate emits the ADR-pinned warning (got: ${warnings.join(' | ')})`,
+  );
+  assert(
+    !warnings.some((w) => w.includes('matched 0 entries')),
+    '(17) zero-entries warning does not also fire when customTemplate is empty',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (18) `customTemplate` non-empty + zero matching entries → existing
+//      zero-entries warning fires, NOT the custom-empty warning
+// ---------------------------------------------------------------------------
+
+{
+  const collection = makeCollectionElement({
+    id: 'col-no-entries',
+    collectionSlug: 'nonexistent',
+    display: 'custom',
+    customTemplate: makeOwnerAuthoredCustomTemplate(),
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const { site: out, warnings } = materializeCollectionsWithReport(site, []);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 0, `(18) zero entries → empty matrix (got ${matrix.length})`);
+  assert(
+    warnings.some((w) => w.includes('matched 0 entries')),
+    `(18) zero-entries warning fires (got: ${warnings.join(' | ')})`,
+  );
+  assert(
+    !warnings.some((w) => w.includes("display='custom' but customTemplate")),
+    '(18) custom-empty warnings do NOT fire when customTemplate is well-formed',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (19) Folder filter + sort + manualOrder are identical between
+//      `'card'` and `'custom'` — both arms route through the same
+//      resolveEntriesForCollection path.
+// ---------------------------------------------------------------------------
+
+{
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'tech-1', folder: 'tech-notes', publishedDate: '2026-01-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'tech-2', folder: 'tech-notes', publishedDate: '2026-03-01T00:00:00.000Z' }),
+    makeEntry({ slug: 'design-1', folder: 'design', publishedDate: '2026-02-01T00:00:00.000Z' }),
+  ];
+
+  // (19a) Folder filter parity
+  const cardFolder = makeCollectionElement({ folder: 'tech-notes', display: 'card' });
+  const customFolder = makeCollectionElement({
+    folder: 'tech-notes',
+    display: 'custom',
+    customTemplate: makeOwnerAuthoredCustomTemplate(),
+  });
+  const cardFolderUrls = getCollectionFrom(
+    materializeCollections(makeSite([makeOrdinaryPageWithCollection(cardFolder)]), entries),
+  )
+    .entries!.map((inst) => externalUrlOf(inst[0]! as ContainerElement))
+    .sort();
+  const customFolderUrls = getCollectionFrom(
+    materializeCollections(makeSite([makeOrdinaryPageWithCollection(customFolder)]), entries),
+  )
+    .entries!.map((inst) => externalUrlOf(inst[0]! as ContainerElement))
+    .sort();
+  assert(
+    JSON.stringify(cardFolderUrls) === JSON.stringify(customFolderUrls),
+    `(19a) folder filter behaves identically for 'card' and 'custom' ` +
+      `(card=${cardFolderUrls.join(',')}, custom=${customFolderUrls.join(',')})`,
+  );
+
+  // (19b) Sort parity (date-asc)
+  const cardSort = makeCollectionElement({ sort: 'date-asc', display: 'card' });
+  const customSort = makeCollectionElement({
+    sort: 'date-asc',
+    display: 'custom',
+    customTemplate: makeOwnerAuthoredCustomTemplate(),
+  });
+  const cardSortUrls = getCollectionFrom(
+    materializeCollections(makeSite([makeOrdinaryPageWithCollection(cardSort)]), entries),
+  ).entries!.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+  const customSortUrls = getCollectionFrom(
+    materializeCollections(makeSite([makeOrdinaryPageWithCollection(customSort)]), entries),
+  ).entries!.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+  assert(
+    JSON.stringify(cardSortUrls) === JSON.stringify(customSortUrls),
+    `(19b) sort: date-asc orders identically for 'card' and 'custom' ` +
+      `(card=${cardSortUrls.join(',')}, custom=${customSortUrls.join(',')})`,
+  );
+
+  // (19c) manualOrder parity
+  const cardManual = makeCollectionElement({
+    sort: 'manual',
+    manualOrder: ['entry-design-1', 'entry-tech-2'],
+    display: 'card',
+  });
+  const customManual = makeCollectionElement({
+    sort: 'manual',
+    manualOrder: ['entry-design-1', 'entry-tech-2'],
+    display: 'custom',
+    customTemplate: makeOwnerAuthoredCustomTemplate(),
+  });
+  const cardManualUrls = getCollectionFrom(
+    materializeCollections(makeSite([makeOrdinaryPageWithCollection(cardManual)]), entries),
+  ).entries!.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+  const customManualUrls = getCollectionFrom(
+    materializeCollections(makeSite([makeOrdinaryPageWithCollection(customManual)]), entries),
+  ).entries!.map((inst) => externalUrlOf(inst[0]! as ContainerElement));
+  assert(
+    JSON.stringify(cardManualUrls) === JSON.stringify(customManualUrls),
+    `(19c) manualOrder honoured identically for 'card' and 'custom' ` +
+      `(card=${cardManualUrls.join(',')}, custom=${customManualUrls.join(',')})`,
+  );
 }
 
 console.log('[collection-materializer:smoke] OK');
