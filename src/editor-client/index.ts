@@ -65,6 +65,7 @@ import {
   openAlertModalImpl,
   openConfirmModalImpl,
   openNewPageModalImpl,
+  openSaveFormModalImpl,
   openSelectModalImpl,
   openTextModalImpl,
   type OpencanvasModalGlobal,
@@ -247,6 +248,7 @@ void openConfirmModalImpl;
 void openAlertModalImpl;
 void openAiMediaModalImpl;
 void openNewPageModalImpl;
+void openSaveFormModalImpl;
 // body-builder dispatch targets are kept void-referenced — the per-type
 // builders are consumed only inside buildElementBodyImpl, so the tree-shaker
 // needs an explicit liveness mark from the entry module.
@@ -537,6 +539,7 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     openAlertModal: (opts) => openAlertModalImpl(ctx, opts),
     openAiMediaModal: (opts) => openAiMediaModalImpl(ctx, opts),
     openNewPageModal: (opts) => openNewPageModalImpl(ctx, opts),
+    openSaveFormModal: (opts) => openSaveFormModalImpl(ctx, opts),
 
     // ---- Asset reel + section drag -------------------------------------
     reelViewMode: 'tile',

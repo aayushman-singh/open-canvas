@@ -29,6 +29,8 @@ import type {
   ConfirmModalOpts,
   NewPageModalOpts,
   NewPageModalResult,
+  SaveFormModalOpts,
+  SaveFormModalResult,
   SelectModalOpts,
   TextModalOpts,
 } from './modals.js';
@@ -993,18 +995,18 @@ export interface EditorContext {
    *  invokes it for Delete/Backspace when a section is selected.
    *  Implementation: handleSectionActionImpl in section-toolbar.ts. */
   handleSectionAction(action: string, sectionId: string): void;
-  /** Three-modal flow (name → optional description → visibility) then POST
-   *  to /library/sections. Clears ctx.sectionsCatalog on success so the
-   *  next picker open re-fetches. Every failure path writes a "Save
-   *  failed: <detail>" status line — no silent swallows. Awaits
-   *  ctx.flushPendingSave first so the server side reads the latest
-   *  persisted state. Implementation: saveToLibraryImpl in
-   *  section-toolbar.ts. */
+  /** Single-modal flow — name + description + visibility captured on one
+   *  screen via openSaveFormModal — then POST to /library/sections. Clears
+   *  ctx.sectionsCatalog on success so the next picker open re-fetches.
+   *  Every failure path writes a "Save failed: <detail>" status line — no
+   *  silent swallows. Awaits ctx.flushPendingSave first so the server
+   *  side reads the latest persisted state. Implementation:
+   *  saveToLibraryImpl in section-toolbar.ts. */
   saveToLibrary(section: CanvasSection): Promise<void>;
-  /** Three-modal flow (name → description → visibility) then POST to
-   *  /custom-templates. Refuses empty names with a status line instead of
-   *  POSTing. Same flushPendingSave-first contract + loud-failure status
-   *  line as saveToLibrary. Implementation: saveSiteAsTemplateImpl in
+  /** Single-modal flow — name + description + visibility captured on one
+   *  screen via openSaveFormModal — then POST to /custom-templates. Same
+   *  flushPendingSave-first contract + loud-failure status line as
+   *  saveToLibrary. Implementation: saveSiteAsTemplateImpl in
    *  section-toolbar.ts. */
   saveSiteAsTemplate(): Promise<void>;
 
@@ -1198,12 +1200,10 @@ export interface EditorContext {
   // -- Phase 2q.a: modal cluster -----------------------------------------
   /** Hard sync gate: every opener throws synchronously if this is true,
    *  and resets it to false in its close() path. Callers serialise modals
-   *  themselves (e.g. saveToLibrary chains name → description → visibility
-   *  through three sequential awaits) — no implicit queueing. The inline
-   *  twin keeps modalOpen as a closure-local `let`; here it lives on ctx
-   *  so the extracted openers + the inline mark-toolbar blur handler
-   *  (canvas-client.ts:10290) read the same flag. Initialised false at
-   *  boot. */
+   *  themselves — no implicit queueing. The inline twin keeps modalOpen
+   *  as a closure-local `let`; here it lives on ctx so the extracted
+   *  openers + the inline mark-toolbar blur handler (canvas-client.ts:
+   *  10290) read the same flag. Initialised false at boot. */
   modalOpen: boolean;
   /** Open the single- or multi-line text prompt. Resolves to the entered
    *  string on OK/Enter (Ctrl/Cmd+Enter when multiline) or null on
@@ -1245,6 +1245,15 @@ export interface EditorContext {
    *  null on cancel. Throws synchronously if ctx.modalOpen is already
    *  true. Bound impl lives in modals.ts (openNewPageModalImpl). */
   openNewPageModal(opts: NewPageModalOpts): Promise<NewPageModalResult | null>;
+  /** Open the consolidated save-form modal — name + description + visibility
+   *  captured on a single screen — for the "Save to library" and "Save as
+   *  template" flows. Header carries an explicit × close button; the
+   *  backdrop is inert so the dismiss path is always an explicit affordance
+   *  (×, Cancel, or Escape). Resolves with {name, description, visibility}
+   *  on Save or null on every cancel path. Throws synchronously if
+   *  ctx.modalOpen is already true. Bound impl lives in modals.ts
+   *  (openSaveFormModalImpl). */
+  openSaveFormModal(opts: SaveFormModalOpts): Promise<SaveFormModalResult | null>;
 
   // -- Phase 2q.h: asset reel + section drag -----------------------------
   /** Reel tile-vs-list layout selector. "tile" renders 288px-wide thumbnail
