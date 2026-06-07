@@ -33,7 +33,7 @@ interface OpencanvasModalGlobal {
 
 declare global {
   interface Window {
-    __opencanvasModal?: OpencanvasModalGlobal;
+    __opencanvasModal: OpencanvasModalGlobal;
   }
 }
 
@@ -113,12 +113,7 @@ function wireRemoveDomainButtons(
     removeBtn.addEventListener('click', async () => {
       const hostname = card.getAttribute('data-hostname');
       if (!hostname) return;
-      const modal = window.__opencanvasModal;
-      if (!modal || typeof modal.confirm !== 'function') {
-        showError('Confirm dialog unavailable — refresh the page and try again');
-        return;
-      }
-      const ok = await modal.confirm(
+      const ok = await window.__opencanvasModal.confirm(
         'Remove ' + hostname + '? This cannot be undone.',
         { title: 'Remove domain', confirmLabel: 'Remove', danger: true },
       );
