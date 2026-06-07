@@ -39,9 +39,26 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type { DomContext, EditorContext, StateContext } from './editor-context.js';
 
-export function closeVersionPillImpl(ctx: EditorContext): void {
+// ADR 0064 — version-pill carve. Two named clusters fit (DomContext for
+// the cached `versionBadge` ref, StateContext for `currentPage()`); the
+// remaining six members are version-pill-specific verbs/refs with no
+// canonical alias, so they ride inline rather than minting a single-call
+// alias.
+export type VersionPillContext = DomContext &
+  StateContext &
+  Pick<
+    EditorContext,
+    | 'closeVersionPill'
+    | 'openVersionPill'
+    | 'siteBase'
+    | 'versionPill'
+    | 'versionPillKeyHandler'
+    | 'versionPillOutsideHandler'
+  >;
+
+export function closeVersionPillImpl(ctx: VersionPillContext): void {
   if (!ctx.versionPill) return;
   if (ctx.versionPill.parentNode) {
     ctx.versionPill.parentNode.removeChild(ctx.versionPill);
@@ -58,7 +75,7 @@ export function closeVersionPillImpl(ctx: EditorContext): void {
   }
 }
 
-export function openVersionPillImpl(ctx: EditorContext): void {
+export function openVersionPillImpl(ctx: VersionPillContext): void {
   if (ctx.versionPill) {
     closeVersionPillImpl(ctx);
     return;
@@ -163,7 +180,7 @@ export function openVersionPillImpl(ctx: EditorContext): void {
   document.addEventListener('keydown', keyHandler, true);
 }
 
-export function attachVersionBadgeImpl(ctx: EditorContext): void {
+export function attachVersionBadgeImpl(ctx: VersionPillContext): void {
   if (!ctx.versionBadge) return;
   ctx.versionBadge.addEventListener('click', () => {
     ctx.openVersionPill();
