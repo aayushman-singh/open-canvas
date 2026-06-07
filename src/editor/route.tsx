@@ -480,8 +480,8 @@ export function editorPageJsx(opts: EditorPageOptions) {
                       collectionSidebarSpec to declare a fake bare-insert
                       command that doesn't match the wizard semantics.
                       The data-canvas-add-collection attribute is the wiring
-                      hook collection-scaffold.ts (D) and index.ts both
-                      key on. */}
+                      hook collection-scaffold.ts's attachCollectionScaffold
+                      ButtonImpl keys on. */}
                   <button
                     type="button"
                     class="opencanvas-sidebar-command"
@@ -534,23 +534,9 @@ export function editorPageJsx(opts: EditorPageOptions) {
                 class="opencanvas-sidebar-action"
                 id="canvas-add-page"
                 type="button"
-                title="Create a new page for your site"
+                title="Create a new page or collection for your site"
               >
                 + New Page
-              </button>
-              {/* ADR 0060 F3 — scaffold a new collection (index page +
-                  template page + sample entry) in one POST. The wizard
-                  prompts for a slug only; the endpoint derives the display
-                  title from the slug. See collection-scaffold.ts for the
-                  click handler. */}
-              <button
-                class="opencanvas-sidebar-action"
-                id="canvas-add-collection"
-                type="button"
-                data-canvas-add-collection
-                title="Create a new content collection (e.g. blog, case-studies)"
-              >
-                + New Collection
               </button>
             </div>
           </aside>

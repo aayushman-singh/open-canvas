@@ -1,15 +1,20 @@
 // src/editor-client/collection-scaffold.ts
 //
 // ADR 0063 Decision 11 — surfaces the "+ New Collection" wizard from the
-// editor's Pages sidebar.
+// editor's Add sidebar tab AND from the "+ New Page" modal's kind
+// selector (the Pages-tab "+ New Collection" entry point retired into
+// the modal — see src/editor-client/page-crud.ts createPageImpl).
 //
 // The backend endpoint POST /api/sites/:siteId/collections (see
 // src/routes/api/collections.ts) atomically creates an index page +
-// template page + two seed entries in one round-trip. The editor button
-// mounted at #canvas-add-collection collects the slug, calls the endpoint,
-// and on success refreshes the editor's local state from the server (so
-// the new pages appear in the sidebar list and the active page switches
-// to the freshly-minted index page).
+// template page + two seed entries in one round-trip. Every editor
+// surface carrying `data-canvas-add-collection` (the Add tab's standalone
+// "+ New Collection" button + the Components grid "Collection" tile) is
+// wired by attachCollectionScaffoldButtonImpl to runCollectionScaffold
+// FlowImpl, which collects the slug via openTextModal, calls the
+// endpoint, and on success refreshes the editor's local state from the
+// server (so the new pages appear in the sidebar list and the active
+// page switches to the freshly-minted index page).
 //
 // Design notes:
 //   - The wizard pre-computes the default slug client-side so the prompt's
@@ -33,9 +38,9 @@
 //          (prompt → POST → refresh → activate). Exercised by the smoke
 //          with a mocked ctx that captures fetch payloads and status calls.
 //       2. `attachCollectionScaffoldButtonImpl(ctx)` — installs the click
-//          handler on #canvas-add-collection. Wired from createEditor in
-//          src/editor-client/index.ts alongside the existing
-//          canvas-add-page wiring.
+//          handler on every element carrying `data-canvas-add-collection`.
+//          Wired from createEditor in src/editor-client/index.ts
+//          alongside the existing canvas-add-page wiring.
 
 import type { EditorContext } from './editor-context.js';
 import type { CanvasPage, EditableSite } from '../canvas/schema.js';

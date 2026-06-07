@@ -80,6 +80,7 @@
 import type { EditorContext } from './editor-context.js';
 import type { CanvasPage } from '../canvas/schema.js';
 import { isCustom404Page } from '../canvas/page-routing.js';
+import { runCollectionScaffoldFlowImpl } from './collection-scaffold.js';
 import { DEFAULT_PAGE_WIDTH_PX } from './editor-constants.js';
 import { isAllowedHref } from './href-utils.js';
 import { newPageId, newSectionId } from './ids.js';
@@ -391,6 +392,22 @@ export async function createPageImpl(ctx: EditorContext): Promise<void> {
     existingSlugs: ctx.state.pages.map((p) => p.slug),
   });
   if (!result) return;
+  // The modal hosts a kind selector (regular vs. collection) — picking
+  // Collection chains into the scaffold wizard which opens its own slug
+  // prompt and POSTs the multi-page index + template + seed-entries
+  // scaffold. The regular path stays in-process: create a single page
+  // with a blank starter section and switch the active page to it.
+  if (result.kind === 'collection') {
+    await runCollectionScaffoldFlowImpl(ctx);
+    return;
+  }
+  if (result.kind !== 'regular') {
+    // Fail loudly per CLAUDE.md no-fallbacks: an unknown discriminator
+    // is a contract bug, not a value to default away.
+    throw new Error(
+      'createPageImpl: unexpected modal result kind ' + JSON.stringify(result.kind),
+    );
+  }
   // exactOptionalPropertyTypes: assemble the optional `locale` conditionally
   // so the object literal never carries `locale: undefined` (forbidden).
   const newPage: CanvasPage = {
