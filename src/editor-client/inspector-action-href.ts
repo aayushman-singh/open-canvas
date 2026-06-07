@@ -24,14 +24,30 @@
 // value field is rebuilt and the entire DU at element[f.path] is replaced
 // with a fresh shape — same behaviour the legacy buildActionInspector had.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  PersistContext,
+  RenderContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { ActionHrefField } from '../canvas/elements/inspector-spec.js';
 import type { ActionElement, ActionHref } from '../canvas/elements/action.js';
 import { field } from './dom-builders.js';
 import { isAllowedHref } from './href-utils.js';
 
+// ADR 0064 — the renderer reads five named clusters: the inspector DOM
+// mount (DomContext), the loaded site for page enumeration (StateContext),
+// the per-element re-render verb (RenderContext), the save debounce
+// (PersistContext), and the status line (StatusEmitterContext).
+export type InspectorActionHrefContext = DomContext &
+  StateContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext;
+
 export function renderActionHrefField(
-  ctx: EditorContext,
+  ctx: InspectorActionHrefContext,
   f: ActionHrefField,
   element: ActionElement,
 ): void {
