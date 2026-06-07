@@ -36,6 +36,7 @@ import { addonEntitlement, site, siteAddon } from '../../db/schema';
 import { DashboardShell } from './shell';
 import { readThemeCookie } from '../../ui';
 import { allAddons } from '../../addons/registry';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -229,133 +230,20 @@ const pageStyles = `
   .empty-sites a { color: var(--red-ink); font-weight: 600; }
 `;
 
-function clientScript(): string {
-  return String.raw`
-(function() {
-  // -- Acquire flow (unowned addons) --------------------------------------
-  document.addEventListener('click', function(e) {
-    var btn = e.target.closest('[data-acquire]');
-    if (!btn) return;
-    var addonId = btn.getAttribute('data-acquire');
-    btn.disabled = true;
-    var prev = btn.textContent;
-    btn.textContent = 'Acquiring...';
-    fetch('/api/addons/' + addonId + '/acquire', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    })
-    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-    .then(function(result) {
-      if (!result.ok) throw new Error(result.data.error || 'Failed');
-      location.reload();
-    })
-    .catch(function() {
-      btn.textContent = prev + ' — retry';
-      btn.disabled = false;
-    });
-  });
-
-  // -- Per-site config form (owned addons) --------------------------------
-  // Embedded state shape:
-  //   stateByAddon[addonId][siteId] = { enabled: bool, config: { key: value } }
-  // The site selector switches the form to whichever site's saved state.
-  var stateNode = document.getElementById('addon-state');
-  if (!stateNode) return;
-  var stateByAddon;
-  try { stateByAddon = JSON.parse(stateNode.textContent || '{}'); }
-  catch (_) { stateByAddon = {}; }
-
-  function loadSite(form, addonId, siteId) {
-    var stateForAddon = stateByAddon[addonId] || {};
-    var s = stateForAddon[siteId] || { enabled: false, config: {} };
-    var toggle = form.querySelector('[data-addon-enable]');
-    if (toggle) toggle.checked = !!s.enabled;
-    form.querySelectorAll('[data-config-key]').forEach(function(input) {
-      var key = input.getAttribute('data-config-key');
-      input.value = (s.config && s.config[key] !== undefined) ? s.config[key] : '';
-    });
-    var msg = form.querySelector('.addon-msg');
-    if (msg) { msg.textContent = ''; msg.className = 'addon-msg'; }
-  }
-
-  document.querySelectorAll('[data-addon-config]').forEach(function(form) {
-    var addonId = form.getAttribute('data-addon-config');
-    var siteSelect = form.querySelector('[data-site-select]');
-    var saveBtn = form.querySelector('[data-save]');
-    var msg = form.querySelector('.addon-msg');
-    if (!siteSelect || !saveBtn) return;
-
-    // Prime the form with the first site's state.
-    loadSite(form, addonId, siteSelect.value);
-
-    siteSelect.addEventListener('change', function() {
-      loadSite(form, addonId, siteSelect.value);
-    });
-
-    saveBtn.addEventListener('click', function() {
-      var siteId = siteSelect.value;
-      var enabledEl = form.querySelector('[data-addon-enable]');
-      var enabled = enabledEl ? enabledEl.checked : false;
-      var config = {};
-      form.querySelectorAll('[data-config-key]').forEach(function(input) {
-        config[input.getAttribute('data-config-key')] = input.value.trim();
-      });
-
-      // Client-side pattern validation (mirrors addons.ts server-side check).
-      // When the toggle is enabled, every input carrying a [pattern] attribute
-      // must match before we PUT to /api/addons/...; we surface the field's
-      // .field-hint as the error message so the failure is self-explanatory.
-      if (enabled) {
-        var inputs = form.querySelectorAll('[data-config-key]');
-        for (var i = 0; i < inputs.length; i++) {
-          var input = inputs[i];
-          var pattern = input.getAttribute('pattern');
-          if (!pattern) continue;
-          var value = input.value.trim();
-          if (value.length === 0 || !new RegExp('^(?:' + pattern + ')$').test(value)) {
-            if (msg) {
-              var hintBlock = input.parentNode ? input.parentNode.querySelector('.field-hint') : null;
-              var hint = hintBlock ? hintBlock.textContent : 'Value does not match required format';
-              msg.textContent = hint;
-              msg.className = 'addon-msg addon-msg-err';
-            }
-            input.focus();
-            return;
-          }
-        }
-      }
-
-      saveBtn.disabled = true;
-      var prev = saveBtn.textContent;
-      saveBtn.textContent = 'Saving...';
-      if (msg) { msg.textContent = ''; msg.className = 'addon-msg'; }
-      fetch('/api/addons/sites/' + siteId + '/' + addonId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: enabled, config: config }),
-      })
-      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-      .then(function(result) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = prev;
-        if (!result.ok) throw new Error(result.data.error || 'Save failed');
-        if (msg) { msg.textContent = 'Saved. Live on your published site.'; msg.className = 'addon-msg addon-msg-ok'; }
-        // Refresh the in-memory state so the user's next site-switch
-        // reflects what they just saved instead of resetting to the
-        // server-rendered baseline.
-        if (!stateByAddon[addonId]) stateByAddon[addonId] = {};
-        stateByAddon[addonId][siteId] = { enabled: enabled, config: config };
-      })
-      .catch(function(err) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = prev;
-        if (msg) { msg.textContent = err.message; msg.className = 'addon-msg addon-msg-err'; }
-      });
-    });
-  });
-})();
-`;
-}
+// ADR 0021 — migrated to dashboard-client bundle. Acquire + per-site
+// config logic now lives in `src/dashboard-client/addon-shop.ts` and
+// ships in the shared dashboard bundle
+// (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The route emits a tiny
+// boot blob naming the route; the bundle's dispatcher reads it and calls
+// `mountAddonShop()`. DOM contract unchanged — same `[data-acquire]`,
+// `[data-addon-config]`, `[data-site-select]`, `[data-addon-enable]`,
+// `[data-config-key]`, `[data-save]`, and `#addon-state` JSON seed.
+// API contract unchanged — same POST `/api/addons/:id/acquire`, PUT
+// `/api/addons/sites/:siteId/:addonId`.
+const clientBoot = raw(
+  '<script>window.__opencanvasDashboardBoot = { route: "addon-shop" };</script>' +
+    '<script src="' + EDITOR_CLIENT_MANIFEST.dashboardClientUrl + '" defer></script>',
+);
 
 // Icon palette for each registry add-on. Matches the visual style of
 // shop.html where every card has a tinted square icon.
@@ -621,7 +509,7 @@ addonShopRoute.get('/addons', async (c) => {
       <script type="application/json" id="addon-state">
         {raw(stateJson)}
       </script>
-      <script>{raw(clientScript())}</script>
+      {clientBoot}
     </DashboardShell>,
   );
 });

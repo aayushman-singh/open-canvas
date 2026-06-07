@@ -19,9 +19,10 @@
 // the page's interactivity is gone.
 
 import { mountProfile } from './profile.js';
+import { mountAddonShop } from './addon-shop.js';
 
 interface DashboardBoot {
-  route: 'profile';
+  route: 'profile' | 'addon-shop';
 }
 
 declare global {
@@ -32,6 +33,7 @@ declare global {
 
 const DISPATCH: { [K in DashboardBoot['route']]: () => void } = {
   profile: mountProfile,
+  'addon-shop': mountAddonShop,
 };
 
 function run(): void {
