@@ -107,21 +107,38 @@ export const DEFAULT_CARD_SIBLINGS: readonly [
  * ADR 0065 D3 — seed payload for `CollectionElement.customTemplate` on the
  * first switch to `display === 'custom'`. Returns a fresh deep clone of the
  * outer Container + per-entry sibling tuple so the Owner immediately sees an
- * editable, customisable card. Callers are responsible for ID disambiguation
- * if the same Collection is seeded twice in the same site — the constants
- * carry their built-in default ids.
+ * editable, customisable card.
+ *
+ * Per-Collection id disambiguation (codex review pass 1): every seeded
+ * element's `id` is suffixed with `--<hostCollectionId>` so two Collections
+ * on the same page that both switch to `'custom'` do not collide on the
+ * built-in `card-default-root` / `card-default-image` / ... ids. The page-
+ * level uniqueness check in `src/canvas/validate.ts` recurses into
+ * `customTemplate` (ADR 0065 D2), so an unsuffixed seed would fail
+ * validation and block save/publish. The suffix scheme mirrors the per-
+ * entry suffix scheme used by `collection-materializer.ts`'s
+ * `cloneAndSubstituteTemplate` (`${baseId}--${entry.slug}`); the seeder
+ * uses `${baseId}--${collectionId}` so seed ids and materialized ids never
+ * collide either (the materializer's output suffix carries an entry slug,
+ * not a Collection id).
  *
  * Implemented via `structuredClone` rather than `JSON.parse(JSON.stringify(...))`
  * so future template defaults carrying non-JSON values (Date, Map) still
  * survive the seed. ADR 0065 D3 failure path: a `structuredClone` throw
  * surfaces to the caller — there is no silent empty-template fallback.
  *
- * Phase 2C (inspector wiring) is the first caller; Phase 1 ships the export
- * so the surface is locked at the same commit as the type widening.
+ * Phase 2C (inspector wiring) and the Reset-template button are the
+ * production callers; both pass the host Collection's id verbatim.
  */
-export function seedCustomTemplate(): CanvasElement[] {
+export function seedCustomTemplate(hostCollectionId: string): CanvasElement[] {
+  const suffix = `--${hostCollectionId}`;
+  const cloneAndSuffix = <T extends CanvasElement>(source: T): T => {
+    const clone = structuredClone(source);
+    clone.id = `${source.id}${suffix}`;
+    return clone;
+  };
   return [
-    structuredClone(DEFAULT_CARD_TEMPLATE as ContainerElement),
-    ...DEFAULT_CARD_SIBLINGS.map((sibling) => structuredClone(sibling)),
+    cloneAndSuffix(DEFAULT_CARD_TEMPLATE as ContainerElement),
+    ...DEFAULT_CARD_SIBLINGS.map((sibling) => cloneAndSuffix(sibling)),
   ];
 }

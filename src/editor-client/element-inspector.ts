@@ -1289,8 +1289,21 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         // capture undo + scheduleSave itself; we already captured above
         // for the display flip, so the verb's second capture coalesces
         // into the same undo entry via the persist module's debounce.
+        //
+        // ADR 0065 D5 + codex review pass 1 — do NOT call
+        // ctx.rebuildElement(collection.id) here. enterCollectionTemplateEdit
+        // already invokes ctx.renderAll() which re-mounts every wrapper AND
+        // re-runs mountTemplateEditChromeImpl (see render.ts). A trailing
+        // rebuildElement replaces the just-mounted wrapper, stripping the
+        // `data-template-edit-active` attribute and the Done button (the
+        // chrome mount is keyed off renderAll, not rebuildElement) and
+        // leaving only the scrim (which lives on ctx.viewport). The
+        // renderAll-only path is sufficient because nothing else needs the
+        // wrapper to be torn down: the display flip is already reflected by
+        // renderAll, the seed lives inside customTemplate which the
+        // wrapper's body builder reads, and the chrome mount runs after the
+        // wrapper mounts.
         ctx.enterCollectionTemplateEdit(collection.id);
-        ctx.rebuildElement(collection.id);
         return;
       }
       ctx.captureForUndo();
@@ -1394,7 +1407,11 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
           return;
         }
         ctx.captureForUndo();
-        refound.element.customTemplate = seedCustomTemplate();
+        // Codex review pass 1 — pass refound.element.id so the reset seed
+        // carries `--<collectionId>` suffixes on its element ids, matching
+        // the first-switch seed path. Two Collections on the same page can
+        // both reset without colliding on `card-default-root`.
+        refound.element.customTemplate = seedCustomTemplate(refound.element.id);
         ctx.rebuildElement(refound.element.id);
         ctx.scheduleSave();
         ctx.setStatus('Custom template reset to default.', 'ok');

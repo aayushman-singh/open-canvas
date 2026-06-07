@@ -251,6 +251,22 @@ function rewriteElementAssetIds(
         if (missing !== null) return missing;
       }
     }
+    // ADR 0065 D2 + codex review pass 1 — `customTemplate` carries author-
+    // authored template children that may bind to fixed assetIds. Asset-id
+    // rewrite on import / clone must touch them too, mirroring the
+    // `entries` walk above; otherwise a cloned site arrives with stale
+    // upstream asset ids inside its custom card template.
+    const customTemplate = element.customTemplate ?? [];
+    for (let childIdx = 0; childIdx < customTemplate.length; childIdx++) {
+      const child = customTemplate[childIdx];
+      if (!child) continue;
+      const missing = rewriteElementAssetIds(
+        child,
+        `${elementPath}.customTemplate[${String(childIdx)}]`,
+        resolveAssetId,
+      );
+      if (missing !== null) return missing;
+    }
   }
 
   return null;

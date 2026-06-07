@@ -870,4 +870,86 @@ function makeOwnerAuthoredCustomTemplate(): CanvasElement[] {
   );
 }
 
+// ---------------------------------------------------------------------------
+// (20) Codex review pass 1 — Action materializer branch must spread-and-
+//      override (mirror the Container branch), NOT whitelist-rebuild.
+//      Before the fix, fields like `iconKind`, `motion`, `elementStyle`,
+//      `responsive`, `anchorId` were dropped — an Owner who styled the
+//      custom card's "Read more" button with an icon + motion preset
+//      published a stripped-down button.
+// ---------------------------------------------------------------------------
+
+{
+  // Build a customTemplate containing one Container + one styled Action.
+  // The Action carries an icon, a motion preset, and an elementStyle
+  // background colour — all fields the prior whitelist branch dropped.
+  const customTemplate: CanvasElement[] = [
+    {
+      id: 'styled-tpl-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+      variant: 'flat',
+      linkHref: { type: 'external', url: '/{{slug}}' },
+      linkLabel: '{{title}}',
+    },
+    {
+      id: 'styled-tpl-cta',
+      type: 'action',
+      box: { x: 16, y: 316, w: 160, h: 36, z: 2 },
+      label: [{ text: 'Read more' }],
+      variant: 'solid',
+      href: { type: 'external', url: '/{{slug}}' },
+      iconKind: 'arrow-up-right',
+      motion: { preset: 'fade-up', delayMs: 100 },
+      elementStyle: { backgroundColor: '#000000' },
+    },
+  ];
+  const collection = makeCollectionElement({
+    display: 'custom',
+    customTemplate,
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entry = makeEntry({
+    slug: 'styled-cta',
+    title: 'Styled CTA card',
+  });
+  const out = materializeCollections(site, [entry]);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 1, '(20) one entry materialized');
+  const cta = matrix[0]![1];
+  assert(cta !== undefined && cta.type === 'action', '(20) instance[1] is the Action button');
+  if (cta.type === 'action') {
+    assert(
+      cta.id === 'styled-tpl-cta--styled-cta',
+      `(20) action id suffixed by entry slug (got ${cta.id})`,
+    );
+    assert(
+      cta.href !== undefined && cta.href.type === 'external' && cta.href.url === '/blog/styled-cta',
+      `(20) action href overwritten to detail URL (got ${JSON.stringify(cta.href)})`,
+    );
+    assert(
+      cta.variant === 'solid',
+      `(20) action variant preserved (got ${cta.variant})`,
+    );
+    assert(
+      cta.iconKind === 'arrow-up-right',
+      `(20) action iconKind preserved (got ${String(cta.iconKind)})`,
+    );
+    assert(
+      cta.motion !== undefined &&
+        cta.motion.preset === 'fade-up' &&
+        cta.motion.delayMs === 100,
+      `(20) action motion preset preserved (got ${JSON.stringify(cta.motion)})`,
+    );
+    assert(
+      cta.elementStyle !== undefined && cta.elementStyle.backgroundColor === '#000000',
+      `(20) action elementStyle.backgroundColor preserved (got ${JSON.stringify(cta.elementStyle)})`,
+    );
+    assert(
+      cta.label[0]!.text === 'Read more',
+      `(20) action label preserved (got ${cta.label[0]?.text ?? ''})`,
+    );
+  }
+}
+
 console.log('[collection-materializer:smoke] OK');

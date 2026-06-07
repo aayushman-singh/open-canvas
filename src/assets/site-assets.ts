@@ -181,6 +181,21 @@ function collectElementReferences(
         );
       });
     });
+    // ADR 0065 D2 + codex review pass 1 — `customTemplate` carries author-
+    // authored template children that may bind to FIXED assetIds (e.g. a
+    // brand logo overlay). These references must reach the publish guard
+    // so deleting the asset triggers the cascade. Note: the materializer
+    // ALSO clones customTemplate into entries[][] at publish time, but
+    // the editor-state walk runs against pre-materialization state — the
+    // customTemplate path is the only place a fixed assetId survives the
+    // editor's save round-trip.
+    (element.customTemplate ?? []).forEach((child, childIdx) => {
+      collectElementReferences(
+        child,
+        `${elementPath}.customTemplate[${String(childIdx)}]`,
+        out,
+      );
+    });
   }
 }
 
@@ -291,6 +306,17 @@ function collectUnfilledElementReferences(
           out,
         );
       });
+    });
+    // ADR 0065 D2 + codex review pass 1 — walk customTemplate so an
+    // unfilled Image inside the Owner's authored template (`assetId === ''`
+    // or `'__placeholder__'`) surfaces in the publish-guard hints just
+    // like an unfilled Image anywhere else on the canvas.
+    (element.customTemplate ?? []).forEach((child, childIdx) => {
+      collectUnfilledElementReferences(
+        child,
+        `${elementPath}.customTemplate[${String(childIdx)}]`,
+        out,
+      );
     });
   }
 }

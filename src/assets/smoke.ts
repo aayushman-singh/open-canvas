@@ -357,6 +357,96 @@ function runReferenceWalkTests(): void {
     ),
     'expected collection entry unfilled media asset to be reported with nested path',
   );
+
+  // -------------------------------------------------------------------------
+  // ADR 0065 D2 + codex review pass 1 — asset walkers must recurse into
+  // `customTemplate` so fixed asset references inside an Owner-authored
+  // custom card template participate in the publish guard's reference set
+  // AND the unfilled-asset hint set.
+  // -------------------------------------------------------------------------
+  const templateAssetPages: CanvasPage[] = [
+    {
+      id: 'page-custom-template-assets',
+      slug: 'custom-template-assets',
+      title: 'Custom template assets',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-custom-template',
+          recipeId: 'custom',
+          name: 'Custom template',
+          height: 600,
+          elements: [
+            {
+              id: 'collection-with-custom-template',
+              type: 'collection',
+              box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+              collectionSlug: 'blog',
+              display: 'custom',
+              sort: 'date-desc',
+              customTemplate: [
+                {
+                  id: 'custom-tpl-root',
+                  type: 'container',
+                  box: { x: 0, y: 0, w: 320, h: 360, z: 1 },
+                  variant: 'raised',
+                  preset: 'card',
+                },
+                {
+                  id: 'custom-tpl-brand-overlay',
+                  type: 'media',
+                  mediaKind: 'image',
+                  // FIXED assetId — Owner pinned a brand logo to ALL cards.
+                  // The publish-time materializer will clone this verbatim
+                  // into entries[][], but in editor state the canonical
+                  // location is here in customTemplate.
+                  assetId: 'custom-tpl-brand-logo-asset-id',
+                  alt: 'Brand',
+                  fit: 'cover',
+                  box: { x: 0, y: 0, w: 80, h: 32, z: 2 },
+                },
+                {
+                  id: 'custom-tpl-unfilled-media',
+                  type: 'media',
+                  mediaKind: 'image',
+                  // Unfilled slot — Owner dropped an Image but hasn't picked
+                  // bytes yet. Should surface in collectUnfilledAssetReferences.
+                  assetId: '',
+                  alt: '',
+                  fit: 'cover',
+                  box: { x: 0, y: 40, w: 320, h: 180, z: 3 },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const templateRefIds = collectReferencedAssetIds(templateAssetPages);
+  assert(
+    templateRefIds.has('custom-tpl-brand-logo-asset-id'),
+    'expected fixed assetId inside customTemplate to be reachable from collectReferencedAssetIds',
+  );
+  const templateRefs = collectReferencedAssets(templateAssetPages);
+  assert(
+    templateRefs.some(
+      (ref) =>
+        ref.assetId === 'custom-tpl-brand-logo-asset-id' &&
+        ref.path.includes('.customTemplate[1].assetId') &&
+        ref.mediaElementId === 'custom-tpl-brand-overlay',
+    ),
+    'expected customTemplate asset reference path to carry .customTemplate[idx].assetId',
+  );
+  const templateUnfilled = collectUnfilledAssetReferences(templateAssetPages);
+  assert(
+    templateUnfilled.some(
+      (ref) =>
+        ref.mediaElementId === 'custom-tpl-unfilled-media' &&
+        ref.path.includes('.customTemplate[2].assetId'),
+    ),
+    'expected unfilled Image inside customTemplate to surface via collectUnfilledAssetReferences',
+  );
 }
 
 // ---------------------------------------------------------------------------

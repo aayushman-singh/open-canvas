@@ -233,7 +233,7 @@ function makeSiteState(
 {
   // seedCustomTemplate() is the canonical "first switch to 'custom'" payload
   // (ADR 0065 D3); it must validate against the schema unmodified.
-  const seeded = seedCustomTemplate();
+  const seeded = seedCustomTemplate('el-collection');
   assert(seeded.length > 0, '(4) seedCustomTemplate returns a non-empty array');
   const seedState = validateEditableSite(
     makeSiteState(makeCollection({ display: 'custom', customTemplate: seeded })),
@@ -276,7 +276,7 @@ function makeSiteState(
 
   // Yjs round-trip preserves customTemplate as a flat element array.
   const state = makeSiteState(
-    makeCollection({ display: 'custom', customTemplate: seedCustomTemplate() }),
+    makeCollection({ display: 'custom', customTemplate: seedCustomTemplate('el-collection') }),
   );
   const doc = encodeYDoc(state);
   const decoded = decodeYDoc(doc);
@@ -297,7 +297,7 @@ function makeSiteState(
   // not strip customTemplate at the validator/Yjs layer; persistence is the
   // editor's job to preserve.
   const keptAfterSwitch = makeSiteState(
-    makeCollection({ display: 'card', customTemplate: seedCustomTemplate() }),
+    makeCollection({ display: 'card', customTemplate: seedCustomTemplate('el-collection') }),
   );
   const keptResult = validateEditableSite(keptAfterSwitch);
   assert(
@@ -310,6 +310,55 @@ function makeSiteState(
   assert(
     Array.isArray(keptEl.customTemplate) && keptEl.customTemplate.length > 0,
     '(4) customTemplate survives display switch through Yjs',
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (5) Codex review pass 1 — two Collections on the same page each seeded
+//     with `seedCustomTemplate(collectionId)` pass page-level uniqueness.
+//     Before the fix, both collections seeded `card-default-root` and the
+//     validator rejected the page with a duplicate-id error (save + publish
+//     blocked).
+// ---------------------------------------------------------------------------
+
+{
+  const collA: CollectionElement = {
+    id: 'coll-alpha',
+    type: 'collection',
+    box: { x: 0, y: 0, w: 600, h: 400, z: 1 },
+    collectionSlug: 'blog',
+    sort: 'date-desc',
+    display: 'custom',
+    customTemplate: seedCustomTemplate('coll-alpha'),
+  };
+  const collB: CollectionElement = {
+    id: 'coll-beta',
+    type: 'collection',
+    box: { x: 0, y: 400, w: 600, h: 400, z: 2 },
+    collectionSlug: 'blog',
+    sort: 'date-desc',
+    display: 'custom',
+    customTemplate: seedCustomTemplate('coll-beta'),
+  };
+  const section: CanvasSection = {
+    id: 'sec-two-collections',
+    recipeId: 'custom',
+    name: 'Two collections',
+    height: 800,
+    elements: [collA, collB],
+  };
+  const page: CanvasPage = {
+    id: 'page-two-collections',
+    slug: 'two-collections',
+    title: 'Two collections',
+    width: 1200,
+    sections: [section],
+  };
+  const result = validateEditableSite({ styleKit: 'charcoal', pages: [page] });
+  assert(
+    result.valid,
+    `(5) two Collections on one page with seeded customTemplates validate: ` +
+      `${result.valid ? '' : result.errors.join('; ')}`,
   );
 }
 

@@ -259,12 +259,33 @@ function cloneAndSubstituteTemplate(
       return container;
     }
     if (substituted.type === 'action') {
+      // Codex review pass 1 — spread-and-override mirrors the Container
+      // branch above. The previous whitelist rebuild dropped Owner-
+      // authored fields like `iconKind`, `motion`, `elementStyle`,
+      // `responsive`, `anchorId`, pinned styles, etc. — anyone who
+      // designed a custom card's "Read more" button with an icon or
+      // motion preset would publish a stripped-down button. Per ADR 0065
+      // D8 the materializer should only assert the two behaviours it
+      // genuinely owns (per-entry id suffix + canonical detail-page
+      // href); everything else carries through verbatim.
+      //
+      // The Action type is a discriminated union over `href` vs
+      // `behavior` (exactly one present). The materializer always lands
+      // on the `href` arm because every card surface links to the entry
+      // detail page (ADR 0063 D6 — "card surface links to detail
+      // page"). Strip `behavior` explicitly when the source carried it
+      // so the discriminant stays clean; spread the rest verbatim so
+      // BaseElement-level fields (motion, elementStyle, responsive,
+      // anchorId) ride through.
+      // ActionElement is a discriminated union over `href` vs `behavior`
+      // (exactly one present). Strip a possibly-present `behavior` via
+      // destructure so the result lands cleanly on the `href` arm.
+      const { behavior: _behavior, ...rest } = substituted;
+      void _behavior;
       const action: ActionElement = {
-        id: suffixedId,
+        ...rest,
         type: 'action',
-        box: substituted.box,
-        label: substituted.label,
-        variant: substituted.variant,
+        id: suffixedId,
         href: { type: 'external', url: detailUrl },
       };
       return action;

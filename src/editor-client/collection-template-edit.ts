@@ -76,7 +76,12 @@ export function enterCollectionTemplateEditImpl(
     // First-ever switch — seed the template and flip the edit-mode pin
     // atomically. structuredClone throws on failure (ADR 0065 D3 failure
     // path); we let the throw propagate rather than swallow it.
-    element.customTemplate = seedCustomTemplate();
+    //
+    // Codex review pass 1 — pass collectionId so the seed's element ids
+    // are suffixed `--<collectionId>`. Two Collections on the same page
+    // would otherwise both end up with `card-default-root` in their
+    // customTemplate and fail the page-level duplicate-id check.
+    element.customTemplate = seedCustomTemplate(collectionId);
   }
   ctx.editingCollectionTemplate = { collectionId: collectionId };
   ctx.renderAll();

@@ -33,6 +33,10 @@ import {
 } from './collection-template-edit.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
 
+declare const Bun: {
+  file(input: URL): { text(): Promise<string> };
+};
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(`[collection-template-edit:smoke] ${message}`);
 }
@@ -415,8 +419,8 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
 // canonical chokepoint; we pin it here so a future refactor of the seed
 // path doesn't quietly break the reset button.
 (function resetSeedReplaceSpec() {
-  const first = seedCustomTemplate();
-  const second = seedCustomTemplate();
+  const first = seedCustomTemplate('coll-x');
+  const second = seedCustomTemplate('coll-x');
   assert(Array.isArray(first) && first.length > 0, 'seedCustomTemplate must return a non-empty array');
   assert(first !== second, 'seedCustomTemplate must return a fresh array per call (deep clone)');
   assert(
@@ -424,5 +428,115 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
     'seedCustomTemplate must deep-clone the outer container per call so reset never reuses prior nodes',
   );
 })();
+
+// ----- Codex review pass 1 — seed ids carry --<collectionId> suffix so two
+// Collections on the same page never collide on `card-default-root` -------
+(function seedIdsScopedToHostCollectionSpec() {
+  const a = seedCustomTemplate('coll-alpha');
+  const b = seedCustomTemplate('coll-beta');
+  const aIds = a.map((el) => el.id);
+  const bIds = b.map((el) => el.id);
+  for (const id of aIds) {
+    assert(
+      id.endsWith('--coll-alpha'),
+      `seed id ${id} from collection coll-alpha must carry --<collectionId> suffix`,
+    );
+  }
+  for (const id of bIds) {
+    assert(
+      id.endsWith('--coll-beta'),
+      `seed id ${id} from collection coll-beta must carry --<collectionId> suffix`,
+    );
+  }
+  // Pairwise — no id from collection A appears in collection B's seed.
+  for (const id of aIds) {
+    assert(
+      !bIds.includes(id),
+      `seed ids from different host Collections must not overlap (clash: ${id})`,
+    );
+  }
+})();
+
+// ----- Codex review pass 1 — findElement walker must recurse into ---------
+// customTemplate so selection of a template child resolves and the inspector
+// can render it. Source-grep the runtime helper since the real function
+// pulls in the full editor module graph (DOM helpers, render.ts, co-edit).
+{
+  const runtimeSrc = await Bun.file(
+    new URL('./runtime-helpers.ts', import.meta.url),
+  ).text();
+  // Find the findElementIn closure that drives findElementImpl.
+  const findElementInAnchor = runtimeSrc.indexOf('function findElementIn(');
+  assert(
+    findElementInAnchor > 0,
+    'runtime-helpers.ts must own findElementIn (re-locate if renamed)',
+  );
+  // Bound the walker body up to the function's end (a single export follows
+  // immediately after; finding the next top-level function boundary is good
+  // enough).
+  const walkerTail = runtimeSrc.slice(findElementInAnchor);
+  const walkerEnd = walkerTail.indexOf('\nexport function findElementImpl');
+  assert(
+    walkerEnd > 0,
+    'findElementIn must precede findElementImpl as the helper export pair',
+  );
+  const walkerBody = walkerTail.slice(0, walkerEnd);
+  assert(
+    walkerBody.includes("'collection-custom-template'"),
+    'findElement walker must recurse into customTemplate with parentKind="collection-custom-template" ' +
+      '(ADR 0065 D6 — selection of any element inside an active template must resolve)',
+  );
+  assert(
+    walkerBody.includes('customTemplate'),
+    'findElement walker must reference the customTemplate field name',
+  );
+}
+
+// ----- Codex review pass 1 — first-switch path must NOT call rebuildElement
+// after enterCollectionTemplateEdit -----------------------------------------
+// The enter verb already invokes ctx.renderAll() which rebuilds every wrapper
+// AND re-runs mountTemplateEditChromeImpl. A trailing ctx.rebuildElement on
+// the same Collection replaces the just-mounted wrapper, dropping the
+// `data-template-edit-active` attribute and the Done button (the chrome
+// mount runs in renderAll, not rebuildElement). Source-grep the inspector
+// handler so a future re-introduction of the rebuild call fails loudly.
+{
+  const inspectorSrc = await Bun.file(
+    new URL('./element-inspector.ts', import.meta.url),
+  ).text();
+  // Find the canonical call to enterCollectionTemplateEdit inside the
+  // display-dropdown change handler. The line immediately AFTER it must
+  // be `return;` (no trailing rebuildElement). Strip line-comments first
+  // so a comment that mentions ctx.rebuildElement (e.g. the explanatory
+  // block above the call) doesn't trip the grep.
+  const stripped = inspectorSrc
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx >= 0 ? line.slice(0, idx) : line;
+    })
+    .join('\n');
+  const enterCallIdx = stripped.indexOf('ctx.enterCollectionTemplateEdit(collection.id)');
+  assert(
+    enterCallIdx > 0,
+    'inspector display-dropdown handler must call ctx.enterCollectionTemplateEdit(collection.id)',
+  );
+  // Slice from the enter call to the next `return;` — that's the bounded
+  // window where a trailing rebuild would live. Strip line-comments above
+  // already removed any explanatory references to ctx.rebuildElement.
+  const afterEnter = stripped.slice(enterCallIdx);
+  const returnIdx = afterEnter.indexOf('return;');
+  assert(
+    returnIdx > 0,
+    'first-switch branch must terminate in a return after enterCollectionTemplateEdit',
+  );
+  const window = afterEnter.slice(0, returnIdx);
+  assert(
+    !window.includes('ctx.rebuildElement'),
+    'first-switch path must NOT call ctx.rebuildElement after enterCollectionTemplateEdit ' +
+      '(renderAll inside the verb already remounts and re-runs the chrome mount; ' +
+      'a trailing rebuild strips data-template-edit-active and the Done button)',
+  );
+}
 
 console.log('[collection-template-edit:smoke] all assertions passed');
