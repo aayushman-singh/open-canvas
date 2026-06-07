@@ -68,10 +68,19 @@ export function buildColorRow(opts: BuildColorRowOpts): HTMLDivElement {
   const row = document.createElement('div');
   row.className = 'style-row';
   const initial = opts.getValue();
+  const enabledLabel = document.createElement('label');
+  enabledLabel.className = 'opencanvas-toggle';
+  enabledLabel.title = opts.enabledTitle;
   const enabled = document.createElement('input');
   enabled.type = 'checkbox';
+  enabled.className = 'opencanvas-toggle-input';
   enabled.checked = !!initial;
   enabled.title = opts.enabledTitle;
+  const enabledTrack = document.createElement('span');
+  enabledTrack.className = 'opencanvas-toggle-track';
+  enabledTrack.setAttribute('aria-hidden', 'true');
+  enabledLabel.appendChild(enabled);
+  enabledLabel.appendChild(enabledTrack);
   const swatch = document.createElement('input');
   swatch.type = 'color';
   swatch.value = initial || opts.swatchDefault || '#000000';
@@ -149,7 +158,7 @@ export function buildColorRow(opts: BuildColorRowOpts): HTMLDivElement {
       opts.onChange();
     }
   });
-  row.appendChild(enabled);
+  row.appendChild(enabledLabel);
   row.appendChild(swatch);
   row.appendChild(hex);
   if (reset) row.appendChild(reset);

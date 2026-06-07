@@ -523,9 +523,14 @@ addonShopRoute.get('/addons', async (c) => {
                           ))}
                         </select>
                       </div>
-                      <label class="toggle-row">
-                        <input type="checkbox" data-addon-enable />
-                        <span>Enabled on this site</span>
+                      <label class="opencanvas-toggle">
+                        <input
+                          type="checkbox"
+                          class="opencanvas-toggle-input"
+                          data-addon-enable
+                        />
+                        <span class="opencanvas-toggle-track" aria-hidden="true" />
+                        <span class="opencanvas-toggle-text">Enabled on this site</span>
                       </label>
                       {addon.configFields.map((field) => (
                         <div class="field-block">

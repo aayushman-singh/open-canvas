@@ -1272,17 +1272,19 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
                 maxlength={20}
               />
             </label>
-            <div class="row">
+            <label class="opencanvas-toggle" for="noIndex">
               <input
                 type="checkbox"
+                class="opencanvas-toggle-input"
                 name="noIndex"
                 id="noIndex"
                 checked={page.noIndex === true}
               />
-              <label for="noIndex" style="color: var(--text); font-size: 14px;">
+              <span class="opencanvas-toggle-track" aria-hidden="true" />
+              <span class="opencanvas-toggle-text">
                 Hide this page from search engines (<code>noindex,nofollow</code>)
-              </label>
-            </div>
+              </span>
+            </label>
             <div class="save-row">
               <Button variant="primary" type="submit">Save</Button>
             </div>

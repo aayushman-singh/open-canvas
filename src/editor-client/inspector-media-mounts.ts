@@ -57,18 +57,43 @@ export function mountVideoPlayback(
   const playback =
     element.playback ||
     (element.playback = { autoplay: false, muted: true, loop: false, controls: true });
-  const autoplay = document.createElement('input');
-  autoplay.type = 'checkbox';
-  autoplay.checked = !!playback.autoplay;
-  const muted = document.createElement('input');
-  muted.type = 'checkbox';
-  muted.checked = !!playback.muted;
-  const loop = document.createElement('input');
-  loop.type = 'checkbox';
-  loop.checked = !!playback.loop;
-  const controls = document.createElement('input');
-  controls.type = 'checkbox';
-  controls.checked = !!playback.controls;
+
+  // Build a single toggle pill (label.opencanvas-toggle) and return the
+  // wrapper row plus the live input handle. Four sites in this function
+  // all share the same shape, so the local helper earns its keep.
+  function buildToggle(
+    labelText: string,
+    initialChecked: boolean,
+  ): { row: HTMLDivElement; input: HTMLInputElement } {
+    const row = document.createElement('div');
+    row.className = 'field field--toggle';
+    const lbl = document.createElement('label');
+    lbl.className = 'opencanvas-toggle';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'opencanvas-toggle-input';
+    input.checked = initialChecked;
+    const track = document.createElement('span');
+    track.className = 'opencanvas-toggle-track';
+    track.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.className = 'opencanvas-toggle-text';
+    text.textContent = labelText;
+    lbl.appendChild(input);
+    lbl.appendChild(track);
+    lbl.appendChild(text);
+    row.appendChild(lbl);
+    return { row, input };
+  }
+
+  const autoplayBuilt = buildToggle('autoplay', !!playback.autoplay);
+  const autoplay = autoplayBuilt.input;
+  const mutedBuilt = buildToggle('muted', !!playback.muted);
+  const muted = mutedBuilt.input;
+  const loopBuilt = buildToggle('loop', !!playback.loop);
+  const loop = loopBuilt.input;
+  const controlsBuilt = buildToggle('controls', !!playback.controls);
+  const controls = controlsBuilt.input;
 
   function enforceMuted() {
     if (autoplay.checked) {
@@ -103,17 +128,8 @@ export function mountVideoPlayback(
     ctx.scheduleSave();
   });
 
-  function rowFor(node: HTMLElement, labelText: string): HTMLDivElement {
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.appendChild(node);
-    const lbl = document.createElement('label');
-    lbl.textContent = labelText;
-    row.appendChild(lbl);
-    return row;
-  }
-  host.appendChild(rowFor(autoplay, 'autoplay'));
-  host.appendChild(rowFor(muted, 'muted'));
-  host.appendChild(rowFor(loop, 'loop'));
-  host.appendChild(rowFor(controls, 'controls'));
+  host.appendChild(autoplayBuilt.row);
+  host.appendChild(mutedBuilt.row);
+  host.appendChild(loopBuilt.row);
+  host.appendChild(controlsBuilt.row);
 }

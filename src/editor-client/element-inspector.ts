@@ -293,10 +293,19 @@ export function renderInspector(ctx: EditorContext): void {
     borderHex.placeholder = '#ffffff';
     borderHex.spellcheck = false;
     borderHex.maxLength = 7;
+    const borderEnabledLabel = document.createElement('label');
+    borderEnabledLabel.className = 'opencanvas-toggle';
+    borderEnabledLabel.title = 'Enable border';
     const borderEnabled = document.createElement('input');
     borderEnabled.type = 'checkbox';
+    borderEnabled.className = 'opencanvas-toggle-input';
     borderEnabled.checked = !!(es.borderColor || typeof es.borderWidth === 'number');
     borderEnabled.title = 'Enable border';
+    const borderEnabledTrack = document.createElement('span');
+    borderEnabledTrack.className = 'opencanvas-toggle-track';
+    borderEnabledTrack.setAttribute('aria-hidden', 'true');
+    borderEnabledLabel.appendChild(borderEnabled);
+    borderEnabledLabel.appendChild(borderEnabledTrack);
     const borderWidth = document.createElement('input');
     borderWidth.type = 'number';
     borderWidth.min = '0';
@@ -348,7 +357,7 @@ export function renderInspector(ctx: EditorContext): void {
         onStyleChange();
       }
     });
-    borderRow.appendChild(borderEnabled);
+    borderRow.appendChild(borderEnabledLabel);
     borderRow.appendChild(borderColor);
     borderRow.appendChild(borderHex);
     borderRow.appendChild(borderWidth);
