@@ -68,6 +68,30 @@ export type AssetReferenceSource =
 // (save validator skips it; publish guard counts it as an unfilled slot).
 const PLACEHOLDER_ASSET_ID = '__placeholder__';
 
+/**
+ * ADR 0065 D3 — `seedCustomTemplate` deep-clones `DEFAULT_CARD_TEMPLATE`
+ * which carries placeholder tokens like `{{ogImageAssetId}}` in its
+ * `assetId` field. The materializer resolves those tokens at publish time
+ * against each entry's metadata; in editor state they live as literal
+ * `{{...}}` strings.
+ *
+ * The reference walkers treat a substitution token as "not a real asset
+ * reference" — counting it as one trips the publish guard (`missing asset
+ * {{ogImageAssetId}}`) and the unfilled-asset hint set (Owner can't fill
+ * a placeholder-resolved slot from the inspector).
+ *
+ * Detection is intentionally exact: matches the same `{{<field>}}` shape
+ * the materializer's PLACEHOLDER_FIELDS produces. Loose detection (e.g.
+ * "contains `{{`") would absorb genuinely-malformed asset ids silently —
+ * the CLAUDE.md no-fallback rule says fail loudly on real corruption, so
+ * the regex matches only the exact substitution shape.
+ */
+const SUBSTITUTION_TOKEN_PATTERN = /^\{\{[a-z0-9_]+\}\}$/i;
+
+function isSubstitutionToken(value: string): boolean {
+  return SUBSTITUTION_TOKEN_PATTERN.test(value);
+}
+
 function siteFaviconAssetId(
   source: Exclude<AssetReferenceSource, CanvasPage[]>,
 ): string | undefined {
@@ -95,6 +119,14 @@ function pushReference(
 ): void {
   if (typeof assetId !== 'string' || assetId.length === 0) return;
   if (assetId === PLACEHOLDER_ASSET_ID) return;
+  // ADR 0065 D3 + codex review pass 2 finding 1 — `customTemplate` recursion
+  // (added in pass 1 F4) surfaces `{{ogImageAssetId}}` and similar tokens
+  // from the seeded default card. Those are pre-substitution placeholders,
+  // not asset ids — counting them as real references makes the publish
+  // guard reject the state with `missing asset {{ogImageAssetId}}`. Reject
+  // the early-return at the boundary so every walker (publish guard, save
+  // validator, public read route) benefits without per-call-site filtering.
+  if (isSubstitutionToken(assetId)) return;
   out.push({
     assetId,
     expectedKind,
@@ -258,6 +290,13 @@ export function collectReferencedAssetIds(source: AssetReferenceSource): Set<str
 }
 
 function isUnfilledAssetId(assetId: unknown): boolean {
+  // ADR 0065 D3 + codex review pass 2 finding 1 — substitution tokens like
+  // `{{ogImageAssetId}}` are non-empty non-placeholder strings, so the two
+  // existing conditions already exclude them from the unfilled set. The
+  // explicit comment is here to pin the contract: substitution tokens are
+  // pre-substitution placeholders the materializer resolves per entry —
+  // NOT slots the Owner has to fill manually. If the unfilled-set rule is
+  // ever broadened, the substitution-token case must be re-asserted.
   return assetId === '' || assetId === PLACEHOLDER_ASSET_ID;
 }
 

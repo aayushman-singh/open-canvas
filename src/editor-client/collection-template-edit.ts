@@ -93,8 +93,39 @@ export function enterCollectionTemplateEditImpl(
  * template is active leaves the field at `null` and re-renders. The exit
  * is loud-free because the caller (Esc / click-outside / Done button /
  * display-away change) is always intentional.
+ *
+ * Codex review pass 2 finding 2 — before clearing
+ * `editingCollectionTemplate`, check whether `selectedElementId` resolves
+ * to an element living inside the now-soon-to-be-inactive template (i.e.
+ * `parentKind === 'collection-custom-template'`). If so, reselect the
+ * parent Collection. Rationale: the Owner clicked a template child while
+ * editing (so `selectedElementId` points at e.g. the title TextElement);
+ * exiting hides the per-child grid and renders the materialized N-clone
+ * grid instead. The child is no longer visually selectable on the canvas
+ * but the inspector still renders its inspector — the Owner edits a
+ * phantom. Reselecting the parent Collection keeps the Owner in the "I
+ * just exited THIS Collection's edit mode" mental model so the next
+ * interaction (re-enter, change display, edit binding) lands on the
+ * right element.
  */
 export function exitCollectionTemplateEditImpl(ctx: EditorContext): void {
+  // Re-target a stale child selection BEFORE flipping the edit-mode
+  // field. findElement's customTemplate recursion (added in pass 1 F1)
+  // resolves regardless of the field's state — the lookup is structural,
+  // not gated on editingCollectionTemplate — so the parent-Collection id
+  // is reachable either way. Doing it before the flip keeps the verb's
+  // intent ordering clean: "compute new selection from current state",
+  // then "mutate state and re-render".
+  const selectedId = ctx.selectedElementId;
+  if (selectedId !== null && ctx.editingCollectionTemplate !== null) {
+    const found = ctx.findElement(selectedId);
+    if (found && found.parentKind === 'collection-custom-template') {
+      const meta = found.parentMeta;
+      if (meta !== null && 'collectionElement' in meta) {
+        ctx.selectElement(meta.collectionElement.id);
+      }
+    }
+  }
   ctx.editingCollectionTemplate = null;
   ctx.renderAll();
 }

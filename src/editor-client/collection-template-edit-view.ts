@@ -3,9 +3,19 @@
 // ADR 0065 Phase 3 — visual chrome around the in-place template-edit mode.
 //
 // When `ctx.editingCollectionTemplate` pins a Collection, the editor:
-//   * dims the rest of the canvas surround behind a fixed-position scrim
-//     anchored to ctx.viewport, so only the active template wrapper stays
-//     visually crisp;
+//   * dims every canvas element wrapper EXCEPT the active template
+//     wrapper, its ancestors, and its descendants (`opacity: 0.32` +
+//     `data-template-edit-dimmed="true"` stamped via inline style on
+//     each affected wrapper) — codex review pass 2 finding 3 replaced
+//     the prior single-scrim approach because `#canvas-root` carries
+//     the camera transform and therefore forms its own stacking context,
+//     which trapped the active wrapper's `z-index: 5` inside canvas-
+//     root's bounds while the scrim (mounted as a viewport sibling)
+//     painted over the entire canvas-root including the active template.
+//     Per-element dimming makes the visual outcome stacking-context-
+//     agnostic: dimmed wrappers paint at 32% opacity individually, the
+//     active wrapper paints at 100% — no stacking-context arithmetic
+//     required;
 //   * appends an "Editing template — substitutions apply at publish"
 //     banner directly above the wrapper, mounted into the wrapper's
 //     parent so the camera/layout transform carries it;
@@ -53,7 +63,16 @@ let cameraSnapshot: { collectionId: string; x: number; y: number; zoom: number }
 
 /** Strip any prior chrome the augmenter mounted onto the editor DOM tree.
  *  Idempotent — re-running the mount calls this first so re-render after
- *  a state-tick leaves exactly one chrome block (or none). */
+ *  a state-tick leaves exactly one chrome block (or none).
+ *
+ *  Codex review pass 2 finding 3: prior versions also stripped a `-scrim`
+ *  child from the viewport. That scrim was removed in favour of per-
+ *  wrapper dimming (see mountTemplateEditChromeImpl); strip dimmed-marker
+ *  attributes + their inline opacity off every previously-affected
+ *  wrapper here so the next renderAll() starts from a clean visual slate.
+ *  The `viewport` parameter is retained for one last viewport-level scrub
+ *  in case an in-flight worktree carries an old scrim — but since the
+ *  scrim is no longer built, the lookup hits zero nodes in steady state. */
 function stripChrome(root: HTMLElement, viewport: HTMLElement | null): void {
   // Strip banner + Done button from inside the canvas root (they mount
   // into the Collection wrapper, which lives under root). Also clear any
@@ -72,10 +91,22 @@ function stripChrome(root: HTMLElement, viewport: HTMLElement | null): void {
       node.style.removeProperty('z-index');
     }
   }
-  // The scrim mounts onto the viewport (not the canvas root, since the
-  // root carries the camera transform which would scale the scrim).
-  // Strip it explicitly from the viewport so it doesn't survive a
-  // state-tick where edit mode flips off.
+  // Codex review pass 2 finding 3 — strip per-wrapper dim markers + inline
+  // opacity from every wrapper that prior mounts touched. Without this
+  // scrub a stale state-tick would leave wrappers permanently dimmed.
+  const dimmed = root.querySelectorAll('[data-template-edit-dimmed]');
+  for (let i = 0; i < dimmed.length; i++) {
+    const node = dimmed[i];
+    if (node instanceof HTMLElement) {
+      node.removeAttribute('data-template-edit-dimmed');
+      node.style.removeProperty('opacity');
+    }
+  }
+  // Defensive scrim scrub — the per-wrapper dimming replaces the prior
+  // single-scrim approach (codex review pass 2 finding 3). The lookup
+  // hits zero in steady state since buildScrim is no longer wired, but
+  // an in-flight worktree carrying a half-applied refactor would still
+  // need the cleanup to land cleanly.
   if (viewport) {
     const scrims = viewport.querySelectorAll('.' + CHROME_CLASS + '-scrim');
     for (let i = 0; i < scrims.length; i++) {
@@ -153,29 +184,49 @@ function buildDoneButton(ctx: EditorContext): HTMLButtonElement {
   return btn;
 }
 
-/** Build the editor-only scrim overlaying the rest of the canvas while
- *  edit mode is active. Mounted onto ctx.viewport (not the canvas root,
- *  because the root's transform would zoom the scrim with the camera —
- *  the scrim must stay anchored to the viewport rect). The scrim is
- *  semi-transparent and covers everything; the template wrapper itself
- *  carries a higher z-index via its `data-template-edit-active` data-attr
- *  so it visually punches through. */
-function buildScrim(): HTMLDivElement {
-  const scrim = document.createElement('div');
-  scrim.className = CHROME_CLASS + '-scrim';
-  scrim.setAttribute('data-editor-only', 'true');
-  scrim.setAttribute('data-collection-template-scrim', 'true');
-  scrim.style.cssText = [
-    'position: absolute',
-    'left: 0',
-    'top: 0',
-    'right: 0',
-    'bottom: 0',
-    'background: rgba(15, 23, 42, 0.32)',
-    'pointer-events: none',
-    'z-index: 1',
-  ].join('; ');
-  return scrim;
+/** Codex review pass 2 finding 3 — dim every element wrapper that is NOT
+ *  the active template wrapper, NOT an ancestor of it, and NOT a
+ *  descendant of it. Inline `opacity: 0.32` + `data-template-edit-dimmed`
+ *  marker on each affected node.
+ *
+ *  Why this shape instead of a single scrim DOM element: `#canvas-root`
+ *  carries the camera transform, which forces it to form its own
+ *  stacking context. Any z-index on a canvas-root descendant (including
+ *  the active wrapper's `z-index: 5`) is bounded by canvas-root's own
+ *  z-index in the viewport's stacking context. A scrim mounted as a
+ *  viewport-direct sibling of canvas-root therefore paints OVER the
+ *  entire canvas-root including the active template — the wrapper's
+ *  z-index can't punch through.
+ *
+ *  Per-wrapper dimming sidesteps the stacking-context problem entirely:
+ *  dimmed wrappers paint at 32% opacity individually, the active wrapper
+ *  and its ancestors/descendants paint at 100%. No z-index arithmetic
+ *  required. The visual outcome — surround dimmed, template bright — is
+ *  identical to the scrim's intent.
+ *
+ *  Ancestor preservation matters because the active wrapper lives inside
+ *  a Collection that sits inside a section, which lives inside the
+ *  artboard. If we dimmed every "other" wrapper without checking
+ *  ancestry, the section enclosing the active Collection would dim and
+ *  drag the active wrapper down with it (opacity cascades to descendants
+ *  in the paint pass). Descendant preservation matters because the
+ *  active wrapper's `customTemplate` children render as `.opencanvas-
+ *  element` wrappers inside it — those ARE the elements being edited.
+ *
+ *  The lookup uses `data-opencanvas-element` (the canvas wrapper's id
+ *  attribute) as the target set, mirroring how `selection.ts` finds the
+ *  selected wrapper. */
+function applyDimmingToOtherWrappers(root: HTMLElement, activeWrapper: HTMLElement): void {
+  const wrappers = root.querySelectorAll('[data-opencanvas-element]');
+  for (let i = 0; i < wrappers.length; i++) {
+    const node = wrappers[i];
+    if (!(node instanceof HTMLElement)) continue;
+    if (node === activeWrapper) continue;
+    if (node.contains(activeWrapper)) continue;
+    if (activeWrapper.contains(node)) continue;
+    node.setAttribute('data-template-edit-dimmed', 'true');
+    node.style.setProperty('opacity', '0.32');
+  }
 }
 
 /** Mount the chrome onto the editor for the active template, or strip
@@ -228,13 +279,14 @@ export function mountTemplateEditChromeImpl(ctx: EditorContext): void {
   // Stamp an attr so CSS / Phase 2D click-handler can identify the
   // currently-edited wrapper without re-reading ctx state.
   wrapper.setAttribute('data-template-edit-active', 'true');
-  // Keep the wrapper itself above the scrim — without an explicit z-index
-  // the wrapper stays at the document order baseline and the scrim above
-  // covers it too. The wrapper is already absolutely positioned by
-  // setBoxStyle (an ancestor of buildElementNodeImpl); position:relative
-  // would clobber that. Setting z-index alone is enough since the wrapper
-  // already establishes a stacking context via its transforms.
-  wrapper.style.zIndex = '5';
+  // Codex review pass 2 finding 3 — the `z-index: 5` previously stamped
+  // here tried to lift the wrapper above a viewport-level scrim, but
+  // canvas-root forms its own stacking context (camera transform), so
+  // the z-index couldn't escape to compete with the scrim sibling. The
+  // scrim is replaced by per-wrapper dimming, so no z-index arithmetic
+  // is needed — the active wrapper paints at its natural document order
+  // while siblings/cousins paint at 32% opacity. stripChrome scrubs any
+  // stale z-index from a prior mount.
 
   // -- Pan the viewport on first mount for this collectionId -------------
   if (cameraSnapshot === null || cameraSnapshot.collectionId !== active.collectionId) {
@@ -248,11 +300,12 @@ export function mountTemplateEditChromeImpl(ctx: EditorContext): void {
     panToElementImpl(ctx, active.collectionId);
   }
 
-  // -- Mount the scrim onto the viewport so it survives canvas re-render -
-  if (ctx.viewport) {
-    const scrim = buildScrim();
-    ctx.viewport.appendChild(scrim);
-  }
+  // -- Codex review pass 2 finding 3 — dim every OTHER element wrapper ---
+  // (not the active wrapper, not an ancestor, not a descendant) so the
+  // active template stays visually bright while the surround fades.
+  // Replaces the prior single-scrim mount which couldn't escape canvas-
+  // root's stacking context.
+  applyDimmingToOtherWrappers(ctx.root, wrapper);
 
   // -- Mount banner + Done relative to the wrapper -----------------------
   // The wrapper itself is absolutely-positioned within the artboard, with

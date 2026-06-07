@@ -84,8 +84,16 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
   // is a throwing stub so accidental reads of unrelated ctx fields fail
   // loudly. Cast through unknown because the smoke only exercises the
   // verb's narrow read/write surface, not the full EditorContext.
+  //
+  // The walker also recurses one level into Collection.customTemplate so
+  // findElement resolves a template-child id with parentKind set to
+  // 'collection-custom-template' and parentMeta carrying the host
+  // Collection. This mirrors runtime-helpers.ts's findElementIn shape so
+  // the exit-verb's re-target-on-stale-selection branch (codex review
+  // pass 2 finding 2) has something realistic to walk in this smoke.
   const partial = {
     state: null,
+    selectedElementId: null as string | null,
     editingCollectionTemplate: null as EditorContext['editingCollectionTemplate'],
     findElement(elementId: string): FindElementResult | null {
       for (const el of section.elements) {
@@ -98,8 +106,27 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
             parentMeta: null,
           };
         }
+        if (el.type === 'collection') {
+          const customTemplate = el.customTemplate;
+          if (Array.isArray(customTemplate)) {
+            for (const child of customTemplate) {
+              if (child.id === elementId) {
+                return {
+                  section,
+                  element: child,
+                  parentArray: customTemplate,
+                  parentKind: 'collection-custom-template',
+                  parentMeta: { collectionElement: el },
+                };
+              }
+            }
+          }
+        }
       }
       return null;
+    },
+    selectElement(elementId: string | null): void {
+      this.selectedElementId = elementId;
     },
     renderAll: () => {
       log.renderAll += 1;
@@ -273,6 +300,82 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
     'exit must clear editingCollectionTemplate',
   );
   assert(log.renderAll === 1, 'exit must renderAll exactly once');
+})();
+
+// ----- codex review pass 2 finding 2 — exit re-targets stale child --------
+// selection on the host Collection so the inspector stops rendering a
+// phantom child whose canvas wrapper no longer exists after the grid re-
+// materializes.
+
+(function exitRetargetsTemplateChildSelectionSpec() {
+  const child: CanvasElement = {
+    id: 'tpl-child-title',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+    content: [{ text: 'Title' }],
+    role: 'heading',
+    fontSize: 20,
+    fontWeight: 600,
+    align: 'left',
+  };
+  const el = makeCollection('coll-retarget', 'custom');
+  el.customTemplate = [child];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  // Owner is editing the template AND clicked the title child.
+  ctx.editingCollectionTemplate = { collectionId: 'coll-retarget' };
+  ctx.selectedElementId = 'tpl-child-title';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.editingCollectionTemplate === null,
+    'exit must clear editingCollectionTemplate',
+  );
+  // Decision: re-select the parent Collection (NOT clear) so the Owner
+  // stays in the "I just exited this Collection's edit mode" mental
+  // model — the Collection's inspector reopens immediately for re-enter
+  // / display change.
+  assert(
+    ctx.selectedElementId === 'coll-retarget',
+    'exit must re-target stale template-child selection to the host Collection, got ' +
+      String(ctx.selectedElementId),
+  );
+})();
+
+// Exit when the selection is NOT a template child must leave the
+// selection alone — the re-target is narrow to the stale-child case.
+(function exitLeavesUnrelatedSelectionAloneSpec() {
+  const el = makeCollection('coll-leave-alone', 'custom');
+  el.customTemplate = [
+    {
+      id: 'tpl-child-other',
+      type: 'text',
+      box: { x: 0, y: 0, w: 200, h: 32, z: 1 },
+      content: [{ text: 'other' }],
+      role: 'heading',
+      fontSize: 20,
+      fontWeight: 600,
+      align: 'left',
+    },
+  ];
+  const section = makeSection([el]);
+  const { ctx } = makeCtx(section);
+
+  // Owner is editing the template but the active selection is the
+  // Collection itself (or some unrelated section-level element). Exit
+  // must NOT re-target — there is nothing stale to fix.
+  ctx.editingCollectionTemplate = { collectionId: 'coll-leave-alone' };
+  ctx.selectedElementId = 'coll-leave-alone';
+
+  exitCollectionTemplateEditImpl(ctx);
+
+  assert(
+    ctx.selectedElementId === 'coll-leave-alone',
+    'exit must leave a non-template-child selection untouched, got ' +
+      String(ctx.selectedElementId),
+  );
 })();
 
 (function exitWhenAlreadyClearedSpec() {

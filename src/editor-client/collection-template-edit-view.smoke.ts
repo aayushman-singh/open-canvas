@@ -416,11 +416,20 @@ function countByClass(root: StubEl, className: string): number {
 
 const BANNER_CLASS = 'opencanvas-collection-template-edit-chrome-banner';
 const DONE_CLASS = 'opencanvas-collection-template-edit-chrome-done';
+// Codex review pass 2 finding 3 — scrim DOM element is gone; per-wrapper
+// dimming via `data-template-edit-dimmed` replaces it. We still pin the
+// SCRIM_CLASS string so a future re-introduction of a scrim mount also
+// fails the contract that "no scrim element exists on the viewport".
 const SCRIM_CLASS = 'opencanvas-collection-template-edit-chrome-scrim';
+const DIMMED_ATTR = 'data-template-edit-dimmed';
 
 // ---- (2) Mount with active collectionId -------------------------------
 {
   const ctx = buildCtx();
+  // Sibling wrapper that must end up dimmed — sits next to the active
+  // wrapper at the same depth. Without per-wrapper dimming this would
+  // paint at full brightness alongside the template the Owner is editing.
+  const sibling = buildWrapper(ctx.root!, 'coll-sibling');
   const wrapper = buildWrapper(ctx.root!, 'coll-active');
   ctx.editingCollectionTemplate = { collectionId: 'coll-active' };
 
@@ -428,7 +437,22 @@ const SCRIM_CLASS = 'opencanvas-collection-template-edit-chrome-scrim';
 
   assert(countByClass(wrapper, BANNER_CLASS) === 1, '(2) one banner mounted');
   assert(countByClass(wrapper, DONE_CLASS) === 1, '(2) one Done button mounted');
-  assert(countByClass(ctx.viewport!, SCRIM_CLASS) === 1, '(2) one scrim mounted onto viewport');
+  assert(
+    countByClass(ctx.viewport!, SCRIM_CLASS) === 0,
+    '(2) no scrim element (codex pass 2 finding 3 — replaced by per-wrapper dimming)',
+  );
+
+  // Codex review pass 2 finding 3 — active wrapper must NOT carry the
+  // dim marker; sibling wrapper MUST. This is the new DOM-attribute
+  // shape the dim-replaces-scrim fix produces.
+  assert(
+    wrapper.getAttribute(DIMMED_ATTR) === null,
+    '(2) active wrapper must NOT carry data-template-edit-dimmed',
+  );
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === 'true',
+    '(2) sibling wrapper must carry data-template-edit-dimmed="true"',
+  );
 
   // Banner carries the exact ADR D5 text.
   const banner = wrapper.querySelector('.' + BANNER_CLASS);
@@ -463,6 +487,7 @@ const SCRIM_CLASS = 'opencanvas-collection-template-edit-chrome-scrim';
 {
   const ctx = buildCtx();
   const wrapper = buildWrapper(ctx.root!, 'coll-idle');
+  const sibling = buildWrapper(ctx.root!, 'coll-idle-sibling');
   ctx.editingCollectionTemplate = null;
 
   mountTemplateEditChromeImpl(ctx as never);
@@ -470,11 +495,16 @@ const SCRIM_CLASS = 'opencanvas-collection-template-edit-chrome-scrim';
   assert(countByClass(wrapper, BANNER_CLASS) === 0, '(3) no banner when null');
   assert(countByClass(wrapper, DONE_CLASS) === 0, '(3) no Done button when null');
   assert(countByClass(ctx.viewport!, SCRIM_CLASS) === 0, '(3) no scrim when null');
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === null,
+    '(3) no wrapper carries data-template-edit-dimmed when null',
+  );
 }
 
 // ---- (4) Idempotence — re-mount with same active state does not stack -
 {
   const ctx = buildCtx();
+  const sibling = buildWrapper(ctx.root!, 'coll-idem-sibling');
   const wrapper = buildWrapper(ctx.root!, 'coll-idem');
   ctx.editingCollectionTemplate = { collectionId: 'coll-idem' };
 
@@ -484,7 +514,20 @@ const SCRIM_CLASS = 'opencanvas-collection-template-edit-chrome-scrim';
 
   assert(countByClass(wrapper, BANNER_CLASS) === 1, '(4) idempotent: exactly one banner');
   assert(countByClass(wrapper, DONE_CLASS) === 1, '(4) idempotent: exactly one Done');
-  assert(countByClass(ctx.viewport!, SCRIM_CLASS) === 1, '(4) idempotent: exactly one scrim');
+  assert(
+    countByClass(ctx.viewport!, SCRIM_CLASS) === 0,
+    '(4) idempotent: no scrim across re-mounts (per-wrapper dimming replaces scrim)',
+  );
+  // Sibling stays dimmed (one marker, not stacked) and the active
+  // wrapper stays bright across repeated mounts.
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === 'true',
+    '(4) idempotent: sibling carries exactly one dim marker',
+  );
+  assert(
+    wrapper.getAttribute(DIMMED_ATTR) === null,
+    '(4) idempotent: active wrapper remains undimmed across re-mounts',
+  );
 }
 
 // ---- (5) Transition active → null restores camera snapshot ------------

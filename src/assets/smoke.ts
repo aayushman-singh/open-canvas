@@ -35,6 +35,7 @@ import {
   type AssetReferenceRoot,
 } from './site-assets.js';
 import type { CanvasPage } from '../canvas/schema.js';
+import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site, slotHistory } from '../db/schema.js';
 
@@ -447,6 +448,58 @@ function runReferenceWalkTests(): void {
     ),
     'expected unfilled Image inside customTemplate to surface via collectUnfilledAssetReferences',
   );
+
+  // -------------------------------------------------------------------------
+  // ADR 0065 D3 + codex review pass 2 finding 1 — a Collection whose
+  // `customTemplate` is the literal `seedCustomTemplate()` payload carries
+  // substitution tokens (e.g. `{{ogImageAssetId}}`) in its Image elements'
+  // `assetId` slots. Those are pre-substitution placeholders the publish
+  // materializer resolves per entry — NOT real asset references. The
+  // walker must skip them or the publish guard rejects the state with
+  // `missing asset {{ogImageAssetId}}`.
+  // -------------------------------------------------------------------------
+  const seededTemplate = seedCustomTemplate('test-coll-seed');
+  const seededTemplatePages: CanvasPage[] = [
+    {
+      id: 'page-seeded-template',
+      slug: 'seeded-template',
+      title: 'Seeded template',
+      width: 1200,
+      sections: [
+        {
+          id: 'section-seeded-template',
+          recipeId: 'custom',
+          name: 'Seeded template',
+          height: 600,
+          elements: [
+            {
+              id: 'test-coll-seed',
+              type: 'collection',
+              box: { x: 0, y: 0, w: 1200, h: 600, z: 1 },
+              collectionSlug: 'blog',
+              display: 'custom',
+              sort: 'date-desc',
+              customTemplate: seededTemplate,
+            },
+          ],
+        },
+      ],
+    },
+  ];
+  const seededIds = collectReferencedAssetIds(seededTemplatePages);
+  for (const id of seededIds) {
+    assert(
+      !/^\{\{[a-z0-9_]+\}\}$/i.test(id),
+      `expected zero substitution-token entries in collectReferencedAssetIds, found ${id}`,
+    );
+  }
+  const seededRefs = collectReferencedAssets(seededTemplatePages);
+  for (const ref of seededRefs) {
+    assert(
+      !/^\{\{[a-z0-9_]+\}\}$/i.test(ref.assetId),
+      `expected zero substitution-token entries in collectReferencedAssets, found ${ref.assetId}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
