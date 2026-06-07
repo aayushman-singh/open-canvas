@@ -276,6 +276,51 @@ export function mountTemplateEditChromeImpl(ctx: EditorContext): void {
     return;
   }
 
+  // -- Codex review pass 6 finding 2 — chrome-mount precondition parity --
+  // Pass 4 F1 added the same precondition to `buildCollectionBodyImpl`
+  // (body-builders-data.ts): render the editable template-instance ONLY
+  // when the pin targets this Collection AND `display === 'custom'` AND
+  // `customTemplate` is non-empty. That gate kept the BODY content
+  // consistent after Ctrl+Z reverted the atomic first-switch (display +
+  // customTemplate) — or after the Owner deleted every template child —
+  // but the CHROME mount path here still ran on `active !== null` alone,
+  // so banner/Done/dimming/camera-pan kept stamping the wrapper while
+  // the body fell back to the normal grid. The result: edit-mode chrome
+  // surrounded a non-edit-mode card grid.
+  //
+  // Strip-then-guard order matters. `stripChrome(ctx.root, ctx.viewport)`
+  // above already ran unconditionally — any previously-mounted chrome
+  // (banner / Done / dim markers / camera snapshot pan-back) from a
+  // valid prior state gets cleaned up regardless of whether we mount
+  // new chrome. This block only DECIDES whether to mount; it never
+  // skips the strip.
+  //
+  // We resolve the element through `ctx.findElement` to match the body
+  // builder's exact source-of-truth read — querySelector wrappers carry
+  // attribute slack (`data-element-type`) but the element's `display`
+  // and `customTemplate` live on the canvas-state object.
+  const found = ctx.findElement(active.collectionId);
+  const collection = found?.element ?? null;
+  const isCustomWithTemplate =
+    collection !== null &&
+    typeof collection === 'object' &&
+    'type' in collection &&
+    collection.type === 'collection' &&
+    'display' in collection &&
+    collection.display === 'custom' &&
+    'customTemplate' in collection &&
+    Array.isArray(collection.customTemplate) &&
+    collection.customTemplate.length > 0;
+  if (!isCustomWithTemplate) {
+    // The body builder falls through to the normal grid in this state.
+    // No edit-mode chrome should sit around a normal grid — return now
+    // so banner / Done / per-wrapper dimming / camera pan are skipped.
+    // The strip above already cleaned up any prior chrome, so the next
+    // intentional exit verb (Esc / Done / page-switch / click-outside)
+    // is responsible for clearing the stale pin loudly.
+    return;
+  }
+
   // Stamp an attr so CSS / Phase 2D click-handler can identify the
   // currently-edited wrapper without re-reading ctx state.
   wrapper.setAttribute('data-template-edit-active', 'true');

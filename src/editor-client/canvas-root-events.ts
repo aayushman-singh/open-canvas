@@ -238,8 +238,25 @@ export function attachRootEventsImpl(ctx: EditorContext): void {
   // We also skip during text editing (editingElementId set) — Esc
   // inside a contenteditable cancels the edit per text-edit.ts; the
   // template-edit-exit fires on the next Esc instead.
+  //
+  // Codex review pass 6 finding 1 — `defaultPrevented` short-circuits
+  // the handler BEFORE any state checks. Text-edit's onKey is bound to
+  // the contenteditable `inner` element (text-edit.ts:299), runs in the
+  // bubbling path BEFORE this document-level handler, and calls
+  // `preventDefault()` + `finish(false)` which clears `editingElementId`
+  // synchronously. Without this guard the document handler runs next,
+  // sees `editingElementId === null` (text-edit already cleared it),
+  // proceeds past the editingElementId gate, and silently exits the
+  // template-edit mode too — one Esc keypress eats BOTH the text-edit
+  // AND the template-edit. The defaultPrevented check is the loud
+  // contract: any earlier handler that consumed Esc with
+  // preventDefault() owns the keystroke; the template-edit handler
+  // must NOT compete. Position matters — this is the first check in
+  // the handler, before editingCollectionTemplate / modalOpen /
+  // editingElementId, so a consumed Esc never reaches any state read.
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape') return;
+    if (ev.defaultPrevented) return;
     if (ctx.editingCollectionTemplate === null) return;
     if (ctx.modalOpen) return;
     if (ctx.editingElementId) return;

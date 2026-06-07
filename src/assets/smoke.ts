@@ -1358,6 +1358,261 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
     `(7c) clearAssetReferences must clear customTemplate child assetId to ''; ` +
       `got ${String(tplChild?.assetId)}`,
   );
+
+  // -------------------------------------------------------------------------
+  // 7d — Codex review pass 6 finding 3 — delete walker parity with
+  // site-assets.ts. The reference + clear walks must handle EVERY asset-
+  // bearing element type / field the publish-guard walker reports, or
+  // the cascade goes half-blind:
+  //
+  //   * `elementStyle.backgroundImageAssetId` on a Container (any element)
+  //   * `nav.logoAssetId` on a Header Nav
+  //   * `carousel.slides[].assetId` (incl. inside a Collection's
+  //     customTemplate, the worst-case nesting)
+  //
+  // Each must surface as a reference at confirm time AND be cleared by
+  // the cascade. Without these the next publish trips the guard on a
+  // field the cascade failed to drain.
+  // -------------------------------------------------------------------------
+  const parityAssetId = 'asset-parity-1';
+  const paritySiteRow = {
+    id: 'site-parity',
+    name: 'Parity Site',
+    subdomain: 'parity-site',
+    publishedVersion: 0,
+    editableState: {
+      pages: [
+        {
+          slug: 'parity',
+          sections: [
+            {
+              elements: [
+                // Container with elementStyle.backgroundImageAssetId — any
+                // element type carries this field per BaseElement.
+                {
+                  id: 'container-with-bg',
+                  type: 'container',
+                  elementStyle: {
+                    backgroundImageAssetId: parityAssetId,
+                    backgroundColor: '#fff',
+                  },
+                },
+                // Nav with logoAssetId — header surface in real fixtures
+                // mounts this as a section element.
+                {
+                  id: 'nav-with-logo',
+                  type: 'nav',
+                  logoAssetId: parityAssetId,
+                  links: [],
+                },
+                // Carousel with slide assetId — slides[] is the asset-
+                // bearing field site-assets.ts walks.
+                {
+                  id: 'carousel-with-slide',
+                  type: 'carousel',
+                  slides: [
+                    { id: 'slide-1', assetId: parityAssetId },
+                    { id: 'slide-2', assetId: 'asset-other' },
+                  ],
+                },
+                // Worst-case nesting: Carousel INSIDE a Collection's
+                // customTemplate. Both recursion + slide walking must
+                // fire to surface the reference.
+                {
+                  id: 'collection-with-nested-carousel',
+                  type: 'collection',
+                  customTemplate: [
+                    {
+                      id: 'tpl-carousel',
+                      type: 'carousel',
+                      slides: [{ id: 'tpl-slide-1', assetId: parityAssetId }],
+                    },
+                    // Container with elementStyle.backgroundImageAssetId
+                    // INSIDE the customTemplate — exercises both the
+                    // recursion AND the elementStyle clear.
+                    {
+                      id: 'tpl-bg-container',
+                      type: 'container',
+                      elementStyle: { backgroundImageAssetId: parityAssetId },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    publishedSnapshot: null,
+  };
+
+  function makeParityShim(
+    returnSibling: boolean,
+    updateLog: Array<Record<string, unknown>> = [],
+  ): Db {
+    let selectCount = 0;
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCount += 1;
+            if (selectCount === 1) {
+              const result = Promise.resolve([
+                { id: parityAssetId, contentHash: expectedHash, r2Key: 'assets/parity.png' },
+              ]);
+              return Object.assign(result, { limit: () => result });
+            }
+            if (selectCount === 2) {
+              const result = Promise.resolve([paritySiteRow]);
+              return Object.assign(result, { limit: () => result });
+            }
+            const result = Promise.resolve(returnSibling ? [{ id: 'asset-uuid-sibling' }] : []);
+            return Object.assign(result, { limit: () => result });
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateLog.push(values);
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({ where: () => Promise.resolve() }),
+    } as unknown as Db;
+  }
+
+  const parityReportResult = await deleteOwnerAsset(
+    { db: makeParityShim(false), r2: reportClient },
+    { assetId: parityAssetId, customerId: 'cust-1', confirm: false },
+  );
+  assert(
+    parityReportResult.status === 'confirm_required',
+    `(7d) expected confirm_required for parity asset, got ${parityReportResult.status}`,
+  );
+  if (parityReportResult.status === 'confirm_required') {
+    const containerBgRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'container-with-bg',
+    );
+    assert(
+      containerBgRef !== undefined,
+      `(7d) delete walker must surface elementStyle.backgroundImageAssetId on a Container; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const navLogoRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'nav-with-logo',
+    );
+    assert(
+      navLogoRef !== undefined,
+      `(7d) delete walker must surface nav.logoAssetId; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const carouselSlideRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'carousel-with-slide',
+    );
+    assert(
+      carouselSlideRef !== undefined,
+      `(7d) delete walker must surface carousel.slides[].assetId; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const nestedCarouselRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'tpl-carousel',
+    );
+    assert(
+      nestedCarouselRef !== undefined,
+      `(7d) delete walker must recurse into customTemplate then surface ` +
+        `carousel.slides[].assetId nested inside; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+    const nestedBgRef = parityReportResult.references.find(
+      (ref) => ref.elementId === 'tpl-bg-container',
+    );
+    assert(
+      nestedBgRef !== undefined,
+      `(7d) delete walker must recurse into customTemplate then surface ` +
+        `elementStyle.backgroundImageAssetId nested inside; ` +
+        `got ${JSON.stringify(parityReportResult.references)}`,
+    );
+  }
+
+  const parityUpdateLog: Array<Record<string, unknown>> = [];
+  const parityConfirmResult = await deleteOwnerAsset(
+    { db: makeParityShim(false, parityUpdateLog), r2: reportClient },
+    { assetId: parityAssetId, customerId: 'cust-1', confirm: true },
+  );
+  assert(
+    parityConfirmResult.status === 'deleted',
+    `(7d) expected deleted for parity asset, got ${parityConfirmResult.status}`,
+  );
+  assert(
+    parityUpdateLog.length === 1,
+    `(7d) expected one editable-state cleanup write, got ${String(parityUpdateLog.length)}`,
+  );
+  const parityCleared = parityUpdateLog[0]?.editableState as
+    | { pages: Array<{ sections: Array<{ elements: unknown[] }> }> }
+    | undefined;
+  const parityElements = parityCleared?.pages[0]?.sections[0]?.elements ?? [];
+
+  const containerCleared = parityElements[0] as
+    | { elementStyle?: { backgroundImageAssetId?: string; backgroundColor?: string } }
+    | undefined;
+  assert(
+    containerCleared?.elementStyle?.backgroundImageAssetId === undefined,
+    `(7d) clearAssetReferences must DELETE elementStyle.backgroundImageAssetId; ` +
+      `got ${String(containerCleared?.elementStyle?.backgroundImageAssetId)}`,
+  );
+  assert(
+    containerCleared?.elementStyle?.backgroundColor === '#fff',
+    `(7d) clearAssetReferences must preserve other elementStyle fields; ` +
+      `got ${String(containerCleared?.elementStyle?.backgroundColor)}`,
+  );
+
+  const navCleared = parityElements[1] as { logoAssetId?: string } | undefined;
+  assert(
+    navCleared?.logoAssetId === '',
+    `(7d) clearAssetReferences must clear nav.logoAssetId to ''; ` +
+      `got ${String(navCleared?.logoAssetId)}`,
+  );
+
+  const carouselCleared = parityElements[2] as
+    | { slides?: Array<{ id?: string; assetId?: string }> }
+    | undefined;
+  assert(
+    carouselCleared?.slides?.[0]?.assetId === '',
+    `(7d) clearAssetReferences must clear carousel.slides[0].assetId to ''; ` +
+      `got ${String(carouselCleared?.slides?.[0]?.assetId)}`,
+  );
+  assert(
+    carouselCleared?.slides?.[1]?.assetId === 'asset-other',
+    `(7d) clearAssetReferences must leave UNREFERENCED carousel slides untouched; ` +
+      `got ${String(carouselCleared?.slides?.[1]?.assetId)}`,
+  );
+
+  const nestedCollection = parityElements[3] as
+    | {
+        customTemplate?: Array<
+          | { type?: string; slides?: Array<{ assetId?: string }> }
+          | { type?: string; elementStyle?: { backgroundImageAssetId?: string } }
+        >;
+      }
+    | undefined;
+  const nestedCarousel = nestedCollection?.customTemplate?.[0] as
+    | { slides?: Array<{ assetId?: string }> }
+    | undefined;
+  assert(
+    nestedCarousel?.slides?.[0]?.assetId === '',
+    `(7d) clearAssetReferences must clear carousel slide assetId nested inside ` +
+      `customTemplate; got ${String(nestedCarousel?.slides?.[0]?.assetId)}`,
+  );
+  const nestedBg = nestedCollection?.customTemplate?.[1] as
+    | { elementStyle?: { backgroundImageAssetId?: string } }
+    | undefined;
+  assert(
+    nestedBg?.elementStyle?.backgroundImageAssetId === undefined,
+    `(7d) clearAssetReferences must DELETE elementStyle.backgroundImageAssetId ` +
+      `nested inside customTemplate; got ${String(nestedBg?.elementStyle?.backgroundImageAssetId)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

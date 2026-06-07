@@ -87,6 +87,40 @@ assert(
   '(7) Esc handler must skip when a modal is open (modal precedence)',
 );
 
+// Codex review pass 6 finding 1 — `defaultPrevented` short-circuit MUST
+// precede the `exitCollectionTemplateEdit()` call inside the Esc handler.
+// Text-edit's onKey is bound to the contenteditable inner element,
+// bubbles to document AFTER running `preventDefault()` + clearing
+// `editingElementId`. Without the defaultPrevented gate at the top of
+// the handler, a single Esc inside inline text-edit would exit BOTH
+// text-edit AND template-edit.
+//
+// We isolate the Esc handler by slicing the source from the
+// `keydown` registration that gates on `ev.key !== 'Escape'`. The
+// click-outside handler ALSO calls exitCollectionTemplateEdit (when the
+// Owner clicks outside the active wrapper) — earlier in the file —
+// and would otherwise be the first hit of the verb name.
+const escKeyIdx = canvasRootSrc.indexOf("ev.key !== 'Escape'");
+assert(
+  escKeyIdx !== -1,
+  '(7) Esc handler must guard on ev.key !== Escape (anchor for the slice)',
+);
+const escHandlerSlice = canvasRootSrc.slice(escKeyIdx);
+const defaultPreventedIdx = escHandlerSlice.indexOf('ev.defaultPrevented');
+const exitCallIdxInSlice = escHandlerSlice.indexOf('ctx.exitCollectionTemplateEdit()');
+assert(
+  defaultPreventedIdx !== -1,
+  '(7) Esc handler must short-circuit on ev.defaultPrevented (pass 6 F1 — text-edit precedence)',
+);
+assert(
+  exitCallIdxInSlice !== -1,
+  '(7) Esc handler must call ctx.exitCollectionTemplateEdit() — anchor for ordering check',
+);
+assert(
+  defaultPreventedIdx < exitCallIdxInSlice,
+  '(7) ev.defaultPrevented check must appear BEFORE ctx.exitCollectionTemplateEdit() within the Esc handler',
+);
+
 // ---- 8. Click-outside handler in canvas-root-events.ts ---------------
 
 assert(
@@ -340,6 +374,13 @@ g.CSS = {
 
 const { mountTemplateEditChromeImpl } = await import('./collection-template-edit-view.js');
 
+interface MockElement {
+  id: string;
+  type: 'collection';
+  display: 'custom' | 'card' | 'image-only';
+  customTemplate?: unknown[];
+}
+
 interface MockCtx {
   root: StubEl | null;
   viewport: StubEl | null;
@@ -350,8 +391,13 @@ interface MockCtx {
   camera: { x: number; y: number; zoom: number };
   editingCollectionTemplate: { collectionId: string } | null;
   exitCalls: number;
+  /** Codex review pass 6 finding 2 — chrome mount reads the element via
+   *  ctx.findElement to apply the same display+customTemplate precondition
+   *  the body builder uses. The smoke registers elements here and the
+   *  mock findElement looks them up by id. */
+  elementsById: Map<string, MockElement>;
   exitCollectionTemplateEdit(): void;
-  findElement(): null;
+  findElement(id: string): { element: MockElement } | null;
   currentPage(): null;
   repaintRemoteCursors(): void;
   onMarkToolbarReflow(): void;
@@ -386,12 +432,14 @@ function buildCtx(): MockCtx {
     camera: { x: 0, y: 0, zoom: 1 },
     editingCollectionTemplate: null,
     exitCalls: 0,
+    elementsById: new Map<string, MockElement>(),
     exitCollectionTemplateEdit(): void {
       this.exitCalls += 1;
       this.editingCollectionTemplate = null;
     },
-    findElement(): null {
-      return null;
+    findElement(id: string): { element: MockElement } | null {
+      const element = this.elementsById.get(id);
+      return element ? { element } : null;
     },
     currentPage(): null {
       return null;
@@ -400,6 +448,21 @@ function buildCtx(): MockCtx {
     onMarkToolbarReflow(): void {},
   };
   return ctx;
+}
+
+/** Register an element with a default `display: 'custom'` + non-empty
+ *  customTemplate so the chrome mount's pass-6 precondition passes. The
+ *  customTemplate child is a placeholder — the mount path never reads its
+ *  shape, only `Array.isArray() && length > 0`. */
+function registerCustomCollection(ctx: MockCtx, id: string): MockElement {
+  const el: MockElement = {
+    id,
+    type: 'collection',
+    display: 'custom',
+    customTemplate: [{ id: id + '-tpl-child', type: 'container' }],
+  };
+  ctx.elementsById.set(id, el);
+  return el;
 }
 
 function buildWrapper(root: StubEl, id: string): StubEl {
@@ -432,6 +495,10 @@ const DIMMED_ATTR = 'data-template-edit-dimmed';
   const sibling = buildWrapper(ctx.root!, 'coll-sibling');
   const wrapper = buildWrapper(ctx.root!, 'coll-active');
   ctx.editingCollectionTemplate = { collectionId: 'coll-active' };
+  // Codex review pass 6 finding 2 — chrome mount requires display: 'custom'
+  // AND non-empty customTemplate. Register the active Collection so the
+  // precondition passes and the mount proceeds.
+  registerCustomCollection(ctx, 'coll-active');
 
   mountTemplateEditChromeImpl(ctx as never);
 
@@ -507,6 +574,7 @@ const DIMMED_ATTR = 'data-template-edit-dimmed';
   const sibling = buildWrapper(ctx.root!, 'coll-idem-sibling');
   const wrapper = buildWrapper(ctx.root!, 'coll-idem');
   ctx.editingCollectionTemplate = { collectionId: 'coll-idem' };
+  registerCustomCollection(ctx, 'coll-idem');
 
   mountTemplateEditChromeImpl(ctx as never);
   mountTemplateEditChromeImpl(ctx as never);
@@ -539,6 +607,7 @@ const DIMMED_ATTR = 'data-template-edit-dimmed';
 {
   const ctx = buildCtx();
   buildWrapper(ctx.root!, 'coll-restore');
+  registerCustomCollection(ctx, 'coll-restore');
   // Step 0: clean slate — mount with null clears any inherited snapshot.
   ctx.editingCollectionTemplate = null;
   mountTemplateEditChromeImpl(ctx as never);
@@ -564,6 +633,99 @@ const DIMMED_ATTR = 'data-template-edit-dimmed';
   assert(ctx.camera.x === 100, '(5) camera.x restored to snapshot: ' + ctx.camera.x);
   assert(ctx.camera.y === 200, '(5) camera.y restored to snapshot: ' + ctx.camera.y);
   assert(ctx.camera.zoom === 1, '(5) camera.zoom restored to snapshot: ' + ctx.camera.zoom);
+}
+
+// ---- (10a) Codex review pass 6 finding 2 — pin stale after undo of -----
+// the atomic display+customTemplate switch. The Collection's display is
+// back to 'card' but `editingCollectionTemplate.collectionId` still
+// targets it. Mount must:
+//   * strip any prior chrome unconditionally;
+//   * NOT mount banner / Done / per-wrapper dimming;
+//   * leave the wrapper without `data-template-edit-active`.
+//
+// Mirrors the buildCollectionBodyImpl pass 4 F1 fall-through: the body
+// renders the normal grid; chrome would lie about the body's state.
+{
+  const ctx = buildCtx();
+  // Step 1: prime a valid mount so prior chrome / dim markers exist.
+  // Sibling wrapper proves the strip path runs (it must lose its dim
+  // marker even though the mount is then skipped).
+  const sibling = buildWrapper(ctx.root!, 'coll-undo-sibling');
+  const wrapper = buildWrapper(ctx.root!, 'coll-undo');
+  registerCustomCollection(ctx, 'coll-undo');
+  ctx.editingCollectionTemplate = { collectionId: 'coll-undo' };
+  mountTemplateEditChromeImpl(ctx as never);
+  assert(
+    countByClass(wrapper, BANNER_CLASS) === 1,
+    '(10a) prior valid mount stamped chrome',
+  );
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === 'true',
+    '(10a) prior valid mount dimmed sibling',
+  );
+
+  // Step 2: simulate Ctrl+Z on the atomic first-switch — display reverts
+  // to 'card', customTemplate is undefined. The pin is stale (UI state
+  // is not on the undo stack per ADR 0065 D6).
+  const reverted = ctx.elementsById.get('coll-undo')!;
+  reverted.display = 'card';
+  delete reverted.customTemplate;
+
+  // Step 3: re-mount. Strip must run unconditionally; mount must skip.
+  mountTemplateEditChromeImpl(ctx as never);
+
+  assert(
+    countByClass(wrapper, BANNER_CLASS) === 0,
+    '(10a) banner stripped + not remounted after display reverted to card',
+  );
+  assert(
+    countByClass(wrapper, DONE_CLASS) === 0,
+    '(10a) Done button stripped + not remounted after display reverted to card',
+  );
+  assert(
+    wrapper.getAttribute('data-template-edit-active') === null,
+    '(10a) wrapper no longer carries data-template-edit-active after revert',
+  );
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === null,
+    '(10a) sibling dim marker stripped (strip runs unconditionally before guard)',
+  );
+}
+
+// ---- (10b) Codex review pass 6 finding 2 — display: 'custom' but ------
+// customTemplate is empty (Owner deleted every template child while in
+// edit mode). Same outcome as (10a): strip runs, mount skips.
+{
+  const ctx = buildCtx();
+  const sibling = buildWrapper(ctx.root!, 'coll-empty-sibling');
+  const wrapper = buildWrapper(ctx.root!, 'coll-empty');
+  registerCustomCollection(ctx, 'coll-empty');
+  ctx.editingCollectionTemplate = { collectionId: 'coll-empty' };
+  mountTemplateEditChromeImpl(ctx as never);
+  // Prior mount stamps chrome. Sanity-check before we mutate.
+  assert(countByClass(wrapper, BANNER_CLASS) === 1, '(10b) prior valid mount banner present');
+
+  // Drain the template — `display` stays 'custom', `customTemplate = []`.
+  ctx.elementsById.get('coll-empty')!.customTemplate = [];
+
+  mountTemplateEditChromeImpl(ctx as never);
+
+  assert(
+    countByClass(wrapper, BANNER_CLASS) === 0,
+    '(10b) banner stripped + not remounted when customTemplate emptied',
+  );
+  assert(
+    countByClass(wrapper, DONE_CLASS) === 0,
+    '(10b) Done button stripped + not remounted when customTemplate emptied',
+  );
+  assert(
+    wrapper.getAttribute('data-template-edit-active') === null,
+    '(10b) wrapper no longer carries data-template-edit-active when template emptied',
+  );
+  assert(
+    sibling.getAttribute(DIMMED_ATTR) === null,
+    '(10b) sibling dim marker stripped (strip runs unconditionally before guard)',
+  );
 }
 
 // ---- (2b) Done button click handler calls exit verb -------------------
