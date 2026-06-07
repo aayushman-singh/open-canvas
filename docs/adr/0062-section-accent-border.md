@@ -4,7 +4,14 @@
 **Date:** 2026-06-04
 **Accepted:** 2026-06-05
 **Author:** Aayushman Singh
-**Implementation:** not yet shipped. Decision pinned 2026-06-05; field, validator arm, Yjs codec, renderer CSS, inspector group, and smokes land in a future commit-set under this ADR.
+
+**As-built (2026-06-05):** shipped to main at commit `534788d` ("feat(canvas): section accent borders (solid / top / left / glow)").
+- Schema — `ACCENT_BORDER_TYPES`, `AccentBorderType`, `AccentBorder` (DU), and `accentBorder?: AccentBorder` field on `CanvasSection` at [`src/canvas/schema.ts:238-245`](../../src/canvas/schema.ts#L238-L245) + [line 481](../../src/canvas/schema.ts#L481).
+- Validator — arm-dispatched `validateAccentBorder` in [`src/canvas/validate.ts`](../../src/canvas/validate.ts) with per-arm cross-field rejection and the existing `validateInjectionSafeString` for color.
+- Yjs codec — encode/decode mirrors `trigger` in [`src/canvas/yjs-projection.ts`](../../src/canvas/yjs-projection.ts).
+- Renderer — inline CSS + `data-accent-border="<type>"` attribute in [`src/canvas/render.ts`](../../src/canvas/render.ts).
+- Inspector — fifth labelled group between Background and Motion in [`src/editor-client/section-inspector.ts`](../../src/editor-client/section-inspector.ts), reusing `buildColorRow` and the conditional-form pattern.
+- Smoke — [`src/canvas/section-accent-border.smoke.ts`](../../src/canvas/section-accent-border.smoke.ts) covers validate (all 4 + cross-arm rejection), render (CSS per variant), and Yjs round-trip. Wired into `ci:smoke`.
 
 ## Context
 
