@@ -104,7 +104,7 @@ export function mountNavLinks(
         if (element.links.length > 1) {
           const upBtn = document.createElement('button');
           upBtn.type = 'button';
-          upBtn.textContent = '\\u2191';
+          upBtn.textContent = '↑';
           upBtn.title = 'Move link up';
           upBtn.disabled = idx === 0;
           upBtn.addEventListener('click', function () {
@@ -120,7 +120,7 @@ export function mountNavLinks(
 
           const downBtn = document.createElement('button');
           downBtn.type = 'button';
-          downBtn.textContent = '\\u2193';
+          downBtn.textContent = '↓';
           downBtn.title = 'Move link down';
           downBtn.disabled = idx === element.links.length - 1;
           downBtn.addEventListener('click', function () {
@@ -138,7 +138,7 @@ export function mountNavLinks(
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
+        removeBtn.textContent = '×';
         removeBtn.title = 'Remove link';
         removeBtn.setAttribute('aria-label', 'Remove link');
         removeBtn.addEventListener('click', function () {
@@ -411,7 +411,7 @@ export function mountNavPrimaryAction(
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'opencanvas-inspector-remove';
-    removeBtn.textContent = '\\u00d7';
+    removeBtn.textContent = '×';
     removeBtn.title = 'Remove primary action';
     removeBtn.setAttribute('aria-label', 'Remove primary action');
     removeBtn.addEventListener('click', function () {

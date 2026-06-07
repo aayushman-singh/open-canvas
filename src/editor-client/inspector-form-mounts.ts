@@ -147,7 +147,7 @@ export function mountFormFields(
                 const rmOpt = document.createElement('button');
                 rmOpt.type = 'button';
                 rmOpt.className = 'opencanvas-inspector-remove';
-                rmOpt.textContent = '\\u00d7';
+                rmOpt.textContent = '×';
                 rmOpt.title = 'Remove option';
                 rmOpt.setAttribute('aria-label', 'Remove option');
                 rmOpt.addEventListener('click', function () {
@@ -179,7 +179,7 @@ export function mountFormFields(
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '\\u00d7';
+        removeBtn.textContent = '×';
         removeBtn.title = 'Remove field';
         removeBtn.setAttribute('aria-label', 'Remove field');
         removeBtn.addEventListener('click', function () {
