@@ -70,26 +70,50 @@ const PLACEHOLDER_ASSET_ID = '__placeholder__';
 
 /**
  * ADR 0065 D3 — `seedCustomTemplate` deep-clones `DEFAULT_CARD_TEMPLATE`
- * which carries placeholder tokens like `{{ogImageAssetId}}` in its
- * `assetId` field. The materializer resolves those tokens at publish time
- * against each entry's metadata; in editor state they live as literal
- * `{{...}}` strings.
+ * which carries the placeholder token `{{ogImageAssetId}}` in its
+ * `assetId` field. The materializer resolves that token at publish time
+ * against each entry's metadata; in editor state it lives as the literal
+ * `{{ogImageAssetId}}` string.
  *
- * The reference walkers treat a substitution token as "not a real asset
- * reference" — counting it as one trips the publish guard (`missing asset
- * {{ogImageAssetId}}`) and the unfilled-asset hint set (Owner can't fill
- * a placeholder-resolved slot from the inspector).
+ * The reference walkers treat an asset substitution token as "not a real
+ * asset reference" — counting it as one trips the publish guard
+ * (`missing asset {{ogImageAssetId}}`) and the unfilled-asset hint set
+ * (Owner can't fill a placeholder-resolved slot from the inspector).
  *
- * Detection is intentionally exact: matches the same `{{<field>}}` shape
- * the materializer's PLACEHOLDER_FIELDS produces. Loose detection (e.g.
- * "contains `{{`") would absorb genuinely-malformed asset ids silently —
- * the CLAUDE.md no-fallback rule says fail loudly on real corruption, so
- * the regex matches only the exact substitution shape.
+ * Codex review pass 3 finding 4 — detection is intentionally
+ * case-SENSITIVE and restricted to the exact ASSET-resolving placeholder
+ * set. The materializer's `PLACEHOLDER_FIELDS` enum is authoritative for
+ * what the substitution pass consumes; per ADR 0063 D1/D8 the only
+ * placeholder that resolves to an asset id is `ogImageAssetId`. The other
+ * placeholders (`title`, `excerpt`, `body`, `publishedDate`, `author`,
+ * `category`, `tag`, `slug`) substitute into TEXT fields, never into an
+ * asset id slot, so they have no business being whitelisted here.
+ *
+ * A loose case-insensitive pattern (e.g. /i flag) would absorb typo'd
+ * tokens like `{{ogImageAssetID}}` (uppercase ID), silently suppressing
+ * a real-but-malformed asset id. The CLAUDE.md no-fallback rule says
+ * fail loudly on real corruption — so a typo'd token does NOT match
+ * here, reaches the rest of the pipeline as a fake asset id, and trips
+ * the publish guard / save validator with a clear "missing asset
+ * {{ogImageAssetID}}" error pinpointing the typo.
+ *
+ * Keep this in sync with the asset-resolving subset of
+ * collection-materializer.ts's `PLACEHOLDER_FIELDS`. When a new
+ * asset-resolving placeholder is added there, extend this union here.
  */
-const SUBSTITUTION_TOKEN_PATTERN = /^\{\{[a-z0-9_]+\}\}$/i;
+const ASSET_SUBSTITUTION_TOKEN_PATTERN = /^\{\{ogImageAssetId\}\}$/;
 
-function isSubstitutionToken(value: string): boolean {
-  return SUBSTITUTION_TOKEN_PATTERN.test(value);
+/**
+ * Whether `value` is one of the materializer's asset-resolving
+ * substitution tokens. Exported so the site-creation route's asset
+ * rewrite walk (ADR 0065 Phase 4 / codex review pass 3 finding 1) can
+ * share the same case-sensitive predicate that
+ * `collectReferencedAssets` uses — without that share, the rewrite walk
+ * would treat `{{ogImageAssetId}}` as a real asset id and reject site
+ * creation with `template seed references invalid asset ids`.
+ */
+export function isAssetSubstitutionToken(value: string): boolean {
+  return ASSET_SUBSTITUTION_TOKEN_PATTERN.test(value);
 }
 
 function siteFaviconAssetId(
@@ -120,13 +144,16 @@ function pushReference(
   if (typeof assetId !== 'string' || assetId.length === 0) return;
   if (assetId === PLACEHOLDER_ASSET_ID) return;
   // ADR 0065 D3 + codex review pass 2 finding 1 — `customTemplate` recursion
-  // (added in pass 1 F4) surfaces `{{ogImageAssetId}}` and similar tokens
-  // from the seeded default card. Those are pre-substitution placeholders,
-  // not asset ids — counting them as real references makes the publish
-  // guard reject the state with `missing asset {{ogImageAssetId}}`. Reject
-  // the early-return at the boundary so every walker (publish guard, save
-  // validator, public read route) benefits without per-call-site filtering.
-  if (isSubstitutionToken(assetId)) return;
+  // (added in pass 1 F4) surfaces `{{ogImageAssetId}}` tokens from the
+  // seeded default card. That is a pre-substitution placeholder, not an
+  // asset id — counting it as a real reference makes the publish guard
+  // reject the state with `missing asset {{ogImageAssetId}}`. Reject at
+  // the early-return boundary so every walker (publish guard, save
+  // validator, public read route) benefits without per-call-site
+  // filtering. Codex review pass 3 finding 4 tightened the predicate to
+  // an exact case-sensitive match — a typo'd `{{ogImageAssetID}}` no
+  // longer slips through silently.
+  if (isAssetSubstitutionToken(assetId)) return;
   out.push({
     assetId,
     expectedKind,

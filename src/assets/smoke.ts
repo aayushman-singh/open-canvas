@@ -32,10 +32,12 @@ import {
   collectReferencedAssets,
   collectReferencedAssetIds,
   collectUnfilledAssetReferences,
+  isAssetSubstitutionToken,
   type AssetReferenceRoot,
 } from './site-assets.js';
-import type { CanvasPage } from '../canvas/schema.js';
+import type { CanvasElement, CanvasPage, EditableSite } from '../canvas/schema.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
+import { prepareSeedAssetsForCustomer } from '../routes/api/sites.js';
 import type { Db } from '../db/client.js';
 import { ownerAsset, site, slotHistory } from '../db/schema.js';
 
@@ -499,6 +501,167 @@ function runReferenceWalkTests(): void {
       !/^\{\{[a-z0-9_]+\}\}$/i.test(ref.assetId),
       `expected zero substitution-token entries in collectReferencedAssets, found ${ref.assetId}`,
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // Codex review pass 3 finding 4 — isAssetSubstitutionToken predicate is
+  // case-SENSITIVE and limited to the materializer's asset-resolving
+  // placeholder set (today: `{{ogImageAssetId}}` only).
+  //
+  // The previous pass 2 implementation used a loose case-insensitive regex
+  // `/^\{\{[a-z0-9_]+\}\}$/i`. That regex matched typo'd tokens like
+  // `{{ogImageAssetID}}` (uppercase ID) AND text placeholders like
+  // `{{title}}` — both wrong. The typo'd case is the worst: the
+  // materializer does NOT substitute `{{ogImageAssetID}}` (the substitution
+  // pass uses an exact-case PLACEHOLDER_FIELDS lookup), so a permissive
+  // suppression silently shipped a broken asset id into publish output.
+  //
+  // The tight predicate now FAILS LOUDLY on typos:
+  //   * `{{ogImageAssetId}}` — true placeholder, skipped at the boundary.
+  //   * `{{ogImageAssetID}}` — typo, NOT skipped, reaches the asset rows
+  //     check as a fake id, publish guard rejects with a clear missing-
+  //     asset error pinpointing the typo.
+  //   * `{{title}}` — text placeholder, NOT skipped (it's never an asset
+  //     id slot; the materializer substitutes it into TextElement.content).
+  // -------------------------------------------------------------------------
+  assert(
+    isAssetSubstitutionToken('{{ogImageAssetId}}'),
+    'isAssetSubstitutionToken must accept the exact asset placeholder {{ogImageAssetId}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{ogImageAssetID}}'),
+    'isAssetSubstitutionToken must REJECT case-typo {{ogImageAssetID}} so a malformed id surfaces loudly',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{OGIMAGEASSETID}}'),
+    'isAssetSubstitutionToken must REJECT uppercase {{OGIMAGEASSETID}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{title}}'),
+    'isAssetSubstitutionToken must REJECT text placeholder {{title}} — never an asset id slot',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{slug}}'),
+    'isAssetSubstitutionToken must REJECT text placeholder {{slug}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{author}}'),
+    'isAssetSubstitutionToken must REJECT text placeholder {{author}}',
+  );
+  assert(
+    !isAssetSubstitutionToken('seed-customer-x-blog-hero'),
+    'isAssetSubstitutionToken must REJECT a real asset id',
+  );
+  assert(
+    !isAssetSubstitutionToken(''),
+    'isAssetSubstitutionToken must REJECT the empty string',
+  );
+  assert(
+    !isAssetSubstitutionToken('{{ogImageAssetId'),
+    'isAssetSubstitutionToken must REJECT truncated placeholder (open brace, no close)',
+  );
+  assert(
+    !isAssetSubstitutionToken('prefix-{{ogImageAssetId}}-suffix'),
+    'isAssetSubstitutionToken must REJECT a placeholder embedded in a larger string',
+  );
+
+  // -------------------------------------------------------------------------
+  // Codex review pass 3 finding 1 — `prepareSeedAssetsForCustomer`'s rewrite
+  // walk must preserve substitution tokens verbatim inside customTemplate.
+  //
+  // Pass 1 F4 added customTemplate recursion to the rewrite walk; pass 2 F1
+  // filtered tokens out of `collectReferencedAssets` so `mappedIds` doesn't
+  // contain `{{ogImageAssetId}}`. Without pass 3 F1's matching skip, the
+  // rewrite walk reaches `materializeAssetId({{ogImageAssetId}})`, finds no
+  // mapping, returns `{ missing: '{{ogImageAssetId}}' }`, and site creation
+  // breaks with "template seed references invalid asset ids".
+  //
+  // Fixture: a single-page EditableSite with a Collection whose
+  // customTemplate carries one media child with `assetId: '{{ogImageAssetId}}'`
+  // (placeholder) and one media child with `assetId: 'seed-hero-poster-1'`
+  // (a real registered seed). The placeholder must pass through unchanged;
+  // the real seed id must be rewritten to the materialized customer-rooted id.
+  // -------------------------------------------------------------------------
+  {
+    const placeholderMedia: CanvasElement = {
+      id: 'tpl-media-placeholder',
+      type: 'media',
+      mediaKind: 'image',
+      box: { x: 0, y: 0, w: 320, h: 200, z: 1 },
+      assetId: '{{ogImageAssetId}}',
+      alt: '{{title}}',
+      fit: 'cover',
+    };
+    const fixedMedia: CanvasElement = {
+      id: 'tpl-media-fixed',
+      type: 'media',
+      mediaKind: 'image',
+      box: { x: 0, y: 200, w: 320, h: 60, z: 2 },
+      assetId: 'seed-hero-poster-1',
+      alt: 'Fixed brand mark',
+      fit: 'cover',
+    };
+    const collection: CanvasElement = {
+      id: 'tpl-collection',
+      type: 'collection',
+      box: { x: 0, y: 0, w: 1200, h: 300, z: 1 },
+      collectionSlug: 'blog',
+      display: 'custom',
+      sort: 'date-desc',
+      customTemplate: [placeholderMedia, fixedMedia],
+    };
+    const editableState: EditableSite = {
+      styleKit: 'charcoal',
+      pages: [
+        {
+          id: 'page-tpl-rewrite',
+          slug: 'tpl-rewrite',
+          title: 'Template rewrite',
+          width: 1200,
+          sections: [
+            {
+              id: 'section-tpl-rewrite',
+              recipeId: 'custom',
+              name: 'Template rewrite',
+              height: 600,
+              elements: [collection],
+            },
+          ],
+        },
+      ],
+    };
+    const prepared = prepareSeedAssetsForCustomer('cust-tpl-rewrite', editableState, new Map());
+    assert(
+      prepared.ok,
+      `(pass3 F1) prepareSeedAssetsForCustomer must succeed when customTemplate carries ` +
+        `{{ogImageAssetId}}; got ${prepared.ok ? 'ok' : JSON.stringify(prepared)}`,
+    );
+    if (prepared.ok) {
+      const rewrittenCollection = prepared.editableState.pages[0]!.sections[0]!.elements[0];
+      assert(
+        rewrittenCollection !== undefined && rewrittenCollection.type === 'collection',
+        '(pass3 F1) collection element must survive the rewrite walk',
+      );
+      if (rewrittenCollection?.type === 'collection') {
+        const tpl = rewrittenCollection.customTemplate ?? [];
+        const rewrittenPlaceholder = tpl[0];
+        const rewrittenFixed = tpl[1];
+        assert(
+          rewrittenPlaceholder !== undefined &&
+            rewrittenPlaceholder.type === 'media' &&
+            rewrittenPlaceholder.assetId === '{{ogImageAssetId}}',
+          `(pass3 F1) customTemplate[0].assetId must remain {{ogImageAssetId}} verbatim, got ` +
+            `${rewrittenPlaceholder?.type === 'media' ? rewrittenPlaceholder.assetId : 'non-media'}`,
+        );
+        assert(
+          rewrittenFixed !== undefined &&
+            rewrittenFixed.type === 'media' &&
+            rewrittenFixed.assetId === 'seed-cust-tpl-rewrite-seed-hero-poster-1',
+          `(pass3 F1) customTemplate[1].assetId must be rewritten to the customer-rooted id, got ` +
+            `${rewrittenFixed?.type === 'media' ? rewrittenFixed.assetId : 'non-media'}`,
+        );
+      }
+    }
   }
 }
 

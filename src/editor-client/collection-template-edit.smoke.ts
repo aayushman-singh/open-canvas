@@ -642,4 +642,56 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
   );
 }
 
+// ----- Codex review pass 3 finding 2 — Reset path must NOT use rebuildElement
+// either. The Reset button (inside the inspector's confirm handler) lands a
+// fresh seedCustomTemplate() into `customTemplate`; if Owner is currently in
+// edit mode for THIS Collection, the chrome (banner, Done, dim marker) lives
+// on the wrapper that ctx.rebuildElement replaces. The rebuild swaps the
+// wrapper, stripping the chrome — edit mode appears active but visually
+// unmoored. ctx.renderAll() rebuilds the entire canvas AND re-runs
+// mountTemplateEditChromeImpl (render.ts:381), so the chrome re-mounts on the
+// fresh wrapper. Mirrors the first-switch fix above.
+{
+  const inspectorSrc = await Bun.file(
+    new URL('./element-inspector.ts', import.meta.url),
+  ).text();
+  const stripped = inspectorSrc
+    .split('\n')
+    .map((line) => {
+      const idx = line.indexOf('//');
+      return idx >= 0 ? line.slice(0, idx) : line;
+    })
+    .join('\n');
+  // The Reset path is the only place where `seedCustomTemplate(refound.element.id)`
+  // assigns into `refound.element.customTemplate`. Bound the search window
+  // from that assignment up to the next `scheduleSave()` call (the next
+  // synchronous statement after the rebuild in the historical code).
+  const resetAssignIdx = stripped.indexOf(
+    'refound.element.customTemplate = seedCustomTemplate(refound.element.id)',
+  );
+  assert(
+    resetAssignIdx > 0,
+    'inspector Reset path must assign seedCustomTemplate(refound.element.id) into customTemplate',
+  );
+  const afterReset = stripped.slice(resetAssignIdx);
+  const scheduleIdx = afterReset.indexOf('ctx.scheduleSave()');
+  assert(
+    scheduleIdx > 0,
+    'Reset path must end with ctx.scheduleSave() shortly after the seed assignment',
+  );
+  const resetWindow = afterReset.slice(0, scheduleIdx);
+  assert(
+    !resetWindow.includes('ctx.rebuildElement'),
+    'Reset path must NOT call ctx.rebuildElement after seedCustomTemplate assignment ' +
+      '(in-edit-mode Reset would replace the wrapper carrying the Phase 3 chrome — banner, ' +
+      'Done button, data-template-edit-active marker — leaving edit mode visually unmoored). ' +
+      'Use ctx.renderAll() instead so mountTemplateEditChromeImpl re-runs.',
+  );
+  assert(
+    resetWindow.includes('ctx.renderAll()'),
+    'Reset path must call ctx.renderAll() so mountTemplateEditChromeImpl re-mounts the chrome ' +
+      'after the customTemplate replacement',
+  );
+}
+
 console.log('[collection-template-edit:smoke] all assertions passed');

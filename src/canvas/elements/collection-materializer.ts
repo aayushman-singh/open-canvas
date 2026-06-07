@@ -53,6 +53,7 @@ import type {
   ContainerElement,
   EditableSite,
   ImageMediaElement,
+  TabsElement,
   TextElement,
 } from '../schema.js';
 import type { CollectionElement, CollectionSort } from './collection.js';
@@ -221,20 +222,36 @@ function sortEntriesManual(
  *  `'card'` arm (template = `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]`)
  *  and the `'custom'` arm (template = `el.customTemplate`).
  *
- *  For each element in `template`:
+ *  For each element in `template` (and recursively for every nested child
+ *  inside a Tabs panel — codex review pass 3 finding 3):
  *    1. Deep-clone the element so the source constants / Owner-authored
  *       customTemplate are never mutated.
  *    2. Walk every string field substituting the nine placeholders against the
  *       entry (`substituteInValue`).
  *    3. Suffix the element's `id` with `--<entry.slug>` so replay produces
- *       byte-equal output.
- *    4. Force the per-entry link target: the FIRST element, when it's a
+ *       byte-equal output AND nested ids do not collide across N materialized
+ *       cards (the validator's anchor-uniqueness rule was previously tripped
+ *       by un-suffixed Action ids inside a Tabs panel).
+ *    4. Force the per-entry link target: the OUTER element, when it's a
  *       Container, has its `linkHref` overwritten to the canonical detail URL
  *       (`/<collectionSlug>/<entry.slug>`). Any ActionElement anywhere in the
- *       template has its `href` overwritten to the same URL. This matches the
- *       ADR 0063 dec 6 "card surface links to detail page" rule and is the one
- *       behaviour the materializer asserts on top of whatever the template
- *       author wrote.
+ *       template — including ones nested inside a Tabs panel — has its `href`
+ *       overwritten to the same URL. This matches the ADR 0063 dec 6 "card
+ *       surface links to detail page" rule and is the one behaviour the
+ *       materializer asserts on top of whatever the template author wrote.
+ *
+ *  Codex review pass 3 finding 3 — the recursion was previously top-level
+ *  only. A custom template with a Tabs element wrapping Actions therefore:
+ *    (a) emitted nested Actions whose `href` kept the template's placeholder
+ *        URL (e.g. `/template-default`) instead of resolving per entry, and
+ *    (b) emitted nested Actions whose `id` was identical across every
+ *        materialized card, tripping the validator's anchor-uniqueness check.
+ *  Tabs is the only canvas element type with nested `CanvasElement[]`
+ *  children (container/accordion children are DOM siblings at section level,
+ *  not nested in the element tree — see ContainerElement + AccordionElement
+ *  schemas), so the recursion only needs to dive through `tabs[].elements`.
+ *  When the schema gains a new nested-children type, extend `substituteOne`'s
+ *  Tabs branch with the analogous walk.
  *
  *  Behavioural identity between `'card'` and `'custom'`: passing
  *  `[DEFAULT_CARD_TEMPLATE, ...DEFAULT_CARD_SIBLINGS]` as `template` produces
@@ -246,40 +263,25 @@ function cloneAndSubstituteTemplate(
   collectionSlug: string,
 ): CanvasElement[] {
   const detailUrl = `/${collectionSlug}/${entry.slug}`;
-  return template.map((source, idx): CanvasElement => {
+  /** Per-element transform with no awareness of position in the top-level
+   *  array. Recurses through Tabs panels so a nested Action gets the same
+   *  per-entry id suffix + detail-page href overwrite as a top-level one.
+   *  The outer-Container link-target overwrite is owned by the caller (it
+   *  applies ONLY to the index-0 element of the template), so this helper
+   *  treats every Container uniformly — the caller layers the outer rule
+   *  on top. */
+  function substituteOne(source: CanvasElement): CanvasElement {
     const seed = deepClone(source);
     const substituted = substituteInValue(seed, entry);
     const suffixedId = `${source.id}--${entry.slug}`;
-    if (idx === 0 && substituted.type === 'container') {
-      const container: ContainerElement = {
-        ...substituted,
-        id: suffixedId,
-        linkHref: { type: 'external', url: detailUrl },
-      };
-      return container;
-    }
     if (substituted.type === 'action') {
-      // Codex review pass 1 — spread-and-override mirrors the Container
-      // branch above. The previous whitelist rebuild dropped Owner-
-      // authored fields like `iconKind`, `motion`, `elementStyle`,
-      // `responsive`, `anchorId`, pinned styles, etc. — anyone who
-      // designed a custom card's "Read more" button with an icon or
-      // motion preset would publish a stripped-down button. Per ADR 0065
-      // D8 the materializer should only assert the two behaviours it
-      // genuinely owns (per-entry id suffix + canonical detail-page
-      // href); everything else carries through verbatim.
-      //
-      // The Action type is a discriminated union over `href` vs
-      // `behavior` (exactly one present). The materializer always lands
-      // on the `href` arm because every card surface links to the entry
-      // detail page (ADR 0063 D6 — "card surface links to detail
-      // page"). Strip `behavior` explicitly when the source carried it
-      // so the discriminant stays clean; spread the rest verbatim so
-      // BaseElement-level fields (motion, elementStyle, responsive,
-      // anchorId) ride through.
-      // ActionElement is a discriminated union over `href` vs `behavior`
-      // (exactly one present). Strip a possibly-present `behavior` via
-      // destructure so the result lands cleanly on the `href` arm.
+      // Codex review pass 1 — spread-and-override preserves Owner-authored
+      // fields (`iconKind`, `motion`, `elementStyle`, `responsive`,
+      // `anchorId`, pinned styles, etc.); the materializer only asserts the
+      // per-entry id suffix + canonical detail-page href. ActionElement is a
+      // discriminated union over `href` vs `behavior` (exactly one present);
+      // strip a possibly-present `behavior` so the result lands cleanly on
+      // the `href` arm.
       const { behavior: _behavior, ...rest } = substituted;
       void _behavior;
       const action: ActionElement = {
@@ -289,6 +291,22 @@ function cloneAndSubstituteTemplate(
         href: { type: 'external', url: detailUrl },
       };
       return action;
+    }
+    if (substituted.type === 'tabs') {
+      // Codex review pass 3 finding 3 — recurse through every panel's
+      // children so a nested Action inside a Tab gets the per-entry id
+      // suffix + detail-page href overwrite. The Tabs element itself is
+      // id-suffixed too; its `tabs[].elements[]` children pass through the
+      // same `substituteOne` transform so every level lands consistent.
+      const tabs: TabsElement = {
+        ...substituted,
+        id: suffixedId,
+        tabs: substituted.tabs.map((tab) => ({
+          ...tab,
+          elements: tab.elements.map(substituteOne),
+        })),
+      };
+      return tabs;
     }
     if (substituted.type === 'media' && substituted.mediaKind === 'image') {
       const image: ImageMediaElement = {
@@ -305,6 +323,23 @@ function cloneAndSubstituteTemplate(
       return text;
     }
     return { ...substituted, id: suffixedId };
+  }
+
+  return template.map((source, idx): CanvasElement => {
+    const out = substituteOne(source);
+    if (idx === 0 && out.type === 'container') {
+      // The outer Container (when present at index 0) carries the per-entry
+      // link surface. ContainerElement is the only top-level type that
+      // earns the linkHref overwrite; nested Containers (none in today's
+      // schema, but defensive against future surfaces) keep whatever the
+      // template author wrote.
+      const container: ContainerElement = {
+        ...out,
+        linkHref: { type: 'external', url: detailUrl },
+      };
+      return container;
+    }
+    return out;
   });
 }
 

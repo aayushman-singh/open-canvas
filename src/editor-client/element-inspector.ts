@@ -1412,7 +1412,17 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         // the first-switch seed path. Two Collections on the same page can
         // both reset without colliding on `card-default-root`.
         refound.element.customTemplate = seedCustomTemplate(refound.element.id);
-        ctx.rebuildElement(refound.element.id);
+        // Codex review pass 3 finding 2 — reset must NOT use
+        // ctx.rebuildElement here. When the Owner is currently editing THIS
+        // Collection's template, the Phase 3 chrome (banner, Done button,
+        // `data-template-edit-active` marker, surround dimming) lives on
+        // the wrapper that rebuildElement replaces; the replacement strips
+        // that chrome and leaves edit mode appearing active but visually
+        // unmoored. ctx.renderAll() rebuilds the entire canvas AND re-runs
+        // mountTemplateEditChromeImpl (render.ts:381), so the chrome
+        // re-mounts on the fresh wrapper. The first-switch path uses the
+        // same renderAll-only discipline (pass 1 F2); this path now matches.
+        ctx.renderAll();
         ctx.scheduleSave();
         ctx.setStatus('Custom template reset to default.', 'ok');
       })();

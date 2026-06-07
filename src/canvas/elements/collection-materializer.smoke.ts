@@ -952,4 +952,120 @@ function makeOwnerAuthoredCustomTemplate(): CanvasElement[] {
   }
 }
 
+// ---------------------------------------------------------------------------
+// (21) Codex review pass 3 finding 3 — `cloneAndSubstituteTemplate` must
+//      recurse through Tabs panels so nested Actions get the same per-entry
+//      id suffix AND detail-page href overwrite as top-level Actions. Before
+//      the fix, a custom card whose Tabs panel held an Action published:
+//        (a) every card's nested Action with the SAME id (validator anchor-
+//            uniqueness violation across N materialized cards), and
+//        (b) every card's nested Action with the TEMPLATE's placeholder href
+//            (e.g. `/template-default`) instead of `/<slug>/<entry.slug>`.
+// ---------------------------------------------------------------------------
+
+{
+  const nestedAction: CanvasElement = {
+    id: 'tab-cta',
+    type: 'action',
+    box: { x: 16, y: 16, w: 160, h: 36, z: 1 },
+    label: [{ text: 'Read on tab' }],
+    variant: 'solid',
+    href: { type: 'external', url: '/template-default' },
+  };
+  const customTemplate: CanvasElement[] = [
+    {
+      id: 'nested-tpl-root',
+      type: 'container',
+      box: { x: 0, y: 0, w: 320, h: 400, z: 1 },
+      variant: 'flat',
+      linkHref: { type: 'external', url: '/{{slug}}' },
+      linkLabel: '{{title}}',
+    },
+    {
+      id: 'nested-tpl-tabs',
+      type: 'tabs',
+      box: { x: 0, y: 0, w: 320, h: 360, z: 2 },
+      activeTabId: 'overview',
+      tabs: [
+        {
+          id: 'overview',
+          label: [{ text: 'Overview' }],
+          elements: [nestedAction],
+        },
+      ],
+    },
+  ];
+  const collection = makeCollectionElement({
+    display: 'custom',
+    customTemplate,
+  });
+  const site = makeSite([makeOrdinaryPageWithCollection(collection)]);
+  const entries: MaterializerEntry[] = [
+    makeEntry({ slug: 'nested-a', title: 'Nested A' }),
+    makeEntry({ slug: 'nested-b', title: 'Nested B' }),
+    makeEntry({ slug: 'nested-c', title: 'Nested C' }),
+  ];
+  const out = materializeCollections(site, entries);
+  const matrix = getCollectionFrom(out).entries!;
+  assert(matrix.length === 3, `(21) three nested entries materialized (got ${matrix.length})`);
+
+  const nestedIds: string[] = [];
+  const nestedHrefs: string[] = [];
+  for (let i = 0; i < matrix.length; i++) {
+    const card = matrix[i]!;
+    const tabsEl = card[1];
+    assert(
+      tabsEl !== undefined && tabsEl.type === 'tabs',
+      `(21) card[${i}][1] must be the Tabs element`,
+    );
+    if (tabsEl.type === 'tabs') {
+      assert(
+        tabsEl.id === `nested-tpl-tabs--${entries[i]!.slug}`,
+        `(21) tabs id suffixed by entry slug (got ${tabsEl.id})`,
+      );
+      const action = tabsEl.tabs[0]!.elements[0];
+      assert(
+        action !== undefined && action.type === 'action',
+        `(21) tabs panel must carry the nested Action`,
+      );
+      if (action?.type === 'action') {
+        nestedIds.push(action.id);
+        assert(
+          action.id === `tab-cta--${entries[i]!.slug}`,
+          `(21) nested action id suffixed by entry slug (got ${action.id})`,
+        );
+        assert(
+          action.href !== undefined &&
+            action.href.type === 'external' &&
+            action.href.url === `/blog/${entries[i]!.slug}`,
+          `(21) nested action href overwritten to /blog/${entries[i]!.slug} ` +
+            `(got ${JSON.stringify(action.href)})`,
+        );
+        if (action.href !== undefined && action.href.type === 'external') {
+          nestedHrefs.push(action.href.url);
+        }
+      }
+    }
+  }
+  // Cross-card uniqueness — the three materialized nested Actions must have
+  // three DISTINCT ids (the bug published the same `tab-cta` thrice).
+  const uniqueIds = new Set(nestedIds);
+  assert(
+    uniqueIds.size === 3,
+    `(21) three materialized nested Actions must have distinct ids — got ${nestedIds.join(', ')}`,
+  );
+  const uniqueHrefs = new Set(nestedHrefs);
+  assert(
+    uniqueHrefs.size === 3,
+    `(21) three materialized nested Actions must have distinct hrefs — got ${nestedHrefs.join(', ')}`,
+  );
+  // None of the nested hrefs may carry the template's placeholder URL.
+  for (const url of nestedHrefs) {
+    assert(
+      url !== '/template-default',
+      `(21) nested action href must NOT retain the template placeholder URL (got ${url})`,
+    );
+  }
+}
+
 console.log('[collection-materializer:smoke] OK');
