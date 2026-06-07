@@ -158,14 +158,37 @@ export function findElementWrapperInArtboardOf(
 // attribute). Otherwise return null and let the default
 // resolveElementWrapperAtPoint result stand — the click was on something
 // outside any Collection.
-export function resolveCollectionAncestorForClick(clickTarget: Element | null): string | null {
+//
+// ADR 0065 dec 7 — the D6 rule inverts INSIDE an actively-edited custom
+// template. When `editingCollectionTemplate.collectionId` equals the
+// ancestor Collection's element-id, the helper returns null so the
+// default selectElement path picks the directly-clicked element. The
+// inversion is per-Collection: a click landing inside a DIFFERENT
+// Collection (one not currently in template-edit mode) still bubbles to
+// that Collection per D6. When the field references a Collection that no
+// longer exists, the walk never matches and the helper degrades to plain
+// D6 behaviour — no crash. The render-pass that runs after a concurrent
+// deletion clears the field (per ADR 0065 D6 failure path); selection in
+// the meantime behaves as if the field were null.
+export function resolveCollectionAncestorForClick(
+  clickTarget: Element | null,
+  editingCollectionTemplate?: { collectionId: string } | null,
+): string | null {
   let node: Element | null = clickTarget;
   while (node) {
     if (node instanceof HTMLElement) {
       const elType = node.getAttribute('data-element-type');
       if (elType !== null) {
         if (elType === 'collection') {
-          return node.getAttribute('data-opencanvas-element');
+          const collectionId = node.getAttribute('data-opencanvas-element');
+          if (
+            editingCollectionTemplate &&
+            collectionId !== null &&
+            editingCollectionTemplate.collectionId === collectionId
+          ) {
+            return null;
+          }
+          return collectionId;
         }
         return null;
       }
