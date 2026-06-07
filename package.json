@@ -20,8 +20,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "dev:all": "bun run scripts/dev-all.mjs",
-    "deploy": "bun run editor-client:build && wrangler deploy",
-    "build": "bun run editor-client:build && wrangler deploy --dry-run --outdir=dist",
+    "deploy": "bun run editor-client:build && bun run dashboard-client:build && wrangler deploy",
+    "build": "bun run editor-client:build && bun run dashboard-client:build && wrangler deploy --dry-run --outdir=dist",
     "editor-client:build": "bun run scripts/build-editor-client.ts",
     "editor-client:build:dev": "bun run scripts/build-editor-client.ts --dev",
     "dashboard-client:build": "bun run scripts/build-dashboard-client.ts",
