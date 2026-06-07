@@ -460,7 +460,7 @@ function runReferenceWalkTests(): void {
   // walker must skip them or the publish guard rejects the state with
   // `missing asset {{ogImageAssetId}}`.
   // -------------------------------------------------------------------------
-  const seededTemplate = seedCustomTemplate('test-coll-seed');
+  const seededTemplate = seedCustomTemplate('test-coll-seed', 1200, 600);
   const seededTemplatePages: CanvasPage[] = [
     {
       id: 'page-seeded-template',
@@ -1231,6 +1231,133 @@ async function runDeleteTests(png32: Uint8Array, expectedHash: string): Promise<
       'expected R2 object to be preserved when a sibling row still references it',
     );
   }
+
+  // -------------------------------------------------------------------------
+  // 7c — Codex review pass 5 finding 2 — delete cascade walks
+  // `customTemplate`. The publish-guard walks in site-assets.ts recurse
+  // customTemplate; the delete-endpoint walks here previously stopped at
+  // the top level, so a customTemplate-only assetId reported 0 references
+  // and survived the cascade as a stale id (next publish failed the
+  // publish guard).
+  //
+  // Fixture: a Collection whose customTemplate carries a media child
+  // bound to the asset under deletion. Confirm-required must list this
+  // site as a reference; the cascade must rewrite the customTemplate
+  // child's assetId to '' so the next publish succeeds.
+  // -------------------------------------------------------------------------
+  const templateSiteRow = {
+    id: 'site-tpl',
+    name: 'Custom Template Site',
+    subdomain: 'tpl-site',
+    publishedVersion: 0,
+    editableState: {
+      pages: [
+        {
+          slug: 'home',
+          sections: [
+            {
+              elements: [
+                {
+                  id: 'coll-tpl',
+                  type: 'collection',
+                  customTemplate: [
+                    { id: 'tpl-cover', type: 'media', mediaKind: 'image', assetId: 'asset-uuid-2' },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    publishedSnapshot: null,
+  };
+  function makeTemplateShim(
+    returnSibling: boolean,
+    updateLog: Array<Record<string, unknown>> = [],
+  ): Db {
+    let selectCount = 0;
+    return {
+      select: () => ({
+        from: () => ({
+          where: () => {
+            selectCount += 1;
+            if (selectCount === 1) {
+              const result = Promise.resolve([
+                { id: 'asset-uuid-2', contentHash: expectedHash, r2Key: 'assets/test.png' },
+              ]);
+              return Object.assign(result, { limit: () => result });
+            }
+            if (selectCount === 2) {
+              const result = Promise.resolve([templateSiteRow]);
+              return Object.assign(result, { limit: () => result });
+            }
+            const result = Promise.resolve(returnSibling ? [{ id: 'asset-uuid-sibling' }] : []);
+            return Object.assign(result, { limit: () => result });
+          },
+        }),
+      }),
+      update: () => ({
+        set: (values: Record<string, unknown>) => ({
+          where: () => {
+            updateLog.push(values);
+            return Promise.resolve();
+          },
+        }),
+      }),
+      delete: () => ({ where: () => Promise.resolve() }),
+    } as unknown as Db;
+  }
+
+  const templateReportR2 = new MockR2();
+  await templateReportR2.put('assets/test.png', png32, {
+    httpMetadata: { contentType: 'image/png' },
+  });
+  const templateReportClient = createR2Client(templateReportR2);
+  const templateReportResult = await deleteOwnerAsset(
+    { db: makeTemplateShim(false), r2: templateReportClient },
+    { assetId: 'asset-uuid-2', customerId: 'cust-1', confirm: false },
+  );
+  assert(
+    templateReportResult.status === 'confirm_required',
+    `(7c) expected confirm_required for customTemplate-only reference, got ${templateReportResult.status}`,
+  );
+  if (templateReportResult.status === 'confirm_required') {
+    const tplRef = templateReportResult.references.find(
+      (ref) => ref.siteId === 'site-tpl' && ref.elementId === 'tpl-cover' && ref.role === 'asset',
+    );
+    assert(
+      tplRef !== undefined,
+      `(7c) delete-cascade collectFromPages must surface customTemplate assetId as a reference; ` +
+        `got ${JSON.stringify(templateReportResult.references)}`,
+    );
+  }
+
+  const templateUpdateLog: Array<Record<string, unknown>> = [];
+  const templateConfirmResult = await deleteOwnerAsset(
+    { db: makeTemplateShim(false, templateUpdateLog), r2: templateReportClient },
+    { assetId: 'asset-uuid-2', customerId: 'cust-1', confirm: true },
+  );
+  assert(
+    templateConfirmResult.status === 'deleted',
+    `(7c) expected deleted for customTemplate-only reference, got ${templateConfirmResult.status}`,
+  );
+  assert(
+    templateUpdateLog.length === 1,
+    `(7c) expected one editable-state cleanup write for customTemplate cascade, got ${String(templateUpdateLog.length)}`,
+  );
+  const tplCleared = templateUpdateLog[0]?.editableState as
+    | { pages: Array<{ sections: Array<{ elements: unknown[] }> }> }
+    | undefined;
+  const tplCollection = tplCleared?.pages[0]?.sections[0]?.elements[0] as
+    | { customTemplate?: Array<{ assetId?: string }> }
+    | undefined;
+  const tplChild = tplCollection?.customTemplate?.[0];
+  assert(
+    tplChild?.assetId === '',
+    `(7c) clearAssetReferences must clear customTemplate child assetId to ''; ` +
+      `got ${String(tplChild?.assetId)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

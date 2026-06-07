@@ -522,8 +522,8 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
 // canonical chokepoint; we pin it here so a future refactor of the seed
 // path doesn't quietly break the reset button.
 (function resetSeedReplaceSpec() {
-  const first = seedCustomTemplate('coll-x');
-  const second = seedCustomTemplate('coll-x');
+  const first = seedCustomTemplate('coll-x', 640, 480);
+  const second = seedCustomTemplate('coll-x', 640, 480);
   assert(Array.isArray(first) && first.length > 0, 'seedCustomTemplate must return a non-empty array');
   assert(first !== second, 'seedCustomTemplate must return a fresh array per call (deep clone)');
   assert(
@@ -535,8 +535,8 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
 // ----- Codex review pass 1 — seed ids carry --<collectionId> suffix so two
 // Collections on the same page never collide on `card-default-root` -------
 (function seedIdsScopedToHostCollectionSpec() {
-  const a = seedCustomTemplate('coll-alpha');
-  const b = seedCustomTemplate('coll-beta');
+  const a = seedCustomTemplate('coll-alpha', 640, 480);
+  const b = seedCustomTemplate('coll-beta', 640, 480);
   const aIds = a.map((el) => el.id);
   const bIds = b.map((el) => el.id);
   for (const id of aIds) {
@@ -662,16 +662,36 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: CtxLog } {
       return idx >= 0 ? line.slice(0, idx) : line;
     })
     .join('\n');
-  // The Reset path is the only place where `seedCustomTemplate(refound.element.id)`
+  // The Reset path is the only place where `seedCustomTemplate(refound.element.id, ...)`
   // assigns into `refound.element.customTemplate`. Bound the search window
   // from that assignment up to the next `scheduleSave()` call (the next
   // synchronous statement after the rebuild in the historical code).
+  //
+  // Codex review pass 5 finding 1 — the call now takes host box dimensions
+  // (`refound.element.id, refound.element.box.w, refound.element.box.h`) so
+  // the substring spans multiple lines after Prettier formats it. Search
+  // for the assignment prefix and the wrapping function name to stay
+  // robust against formatting changes; assert the box.w/box.h args appear
+  // shortly after so the scaling wiring stays pinned.
   const resetAssignIdx = stripped.indexOf(
-    'refound.element.customTemplate = seedCustomTemplate(refound.element.id)',
+    'refound.element.customTemplate = seedCustomTemplate(',
   );
   assert(
     resetAssignIdx > 0,
-    'inspector Reset path must assign seedCustomTemplate(refound.element.id) into customTemplate',
+    'inspector Reset path must assign seedCustomTemplate(...) into refound.element.customTemplate',
+  );
+  const callWindow = stripped.slice(resetAssignIdx, resetAssignIdx + 400);
+  assert(
+    callWindow.includes('refound.element.id'),
+    'Reset seed call must pass refound.element.id so the seed ids carry --<collectionId> suffix',
+  );
+  assert(
+    callWindow.includes('refound.element.box.w'),
+    'Reset seed call must pass refound.element.box.w so the seed scales to fit the host (pass 5 F1)',
+  );
+  assert(
+    callWindow.includes('refound.element.box.h'),
+    'Reset seed call must pass refound.element.box.h so the seed scales to fit the host (pass 5 F1)',
   );
   const afterReset = stripped.slice(resetAssignIdx);
   const scheduleIdx = afterReset.indexOf('ctx.scheduleSave()');

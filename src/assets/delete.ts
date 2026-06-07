@@ -202,38 +202,108 @@ function collectFromPages(
     }
     for (const section of page.sections) {
       for (const element of section.elements) {
-        if (element.type !== 'media') continue;
-        if (element.assetId === assetId) {
-          const key = `${page.slug}|${element.id}|asset`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            out.push({
-              siteId,
-              siteName,
-              source,
-              publishedAddress,
-              pageSlug: page.slug,
-              elementId: element.id,
-              role: 'asset',
-            });
-          }
-        }
-        if (element.mediaKind === 'video' && element.posterAssetId === assetId) {
-          const key = `${page.slug}|${element.id}|poster`;
-          if (!seen.has(key)) {
-            seen.add(key);
-            out.push({
-              siteId,
-              siteName,
-              source,
-              publishedAddress,
-              pageSlug: page.slug,
-              elementId: element.id,
-              role: 'poster',
-            });
-          }
-        }
+        collectFromElement(out, {
+          siteId,
+          siteName,
+          source,
+          publishedAddress,
+          pageSlug: page.slug,
+          element,
+          assetId,
+          seen,
+        });
       }
+    }
+  }
+}
+
+// ADR 0065 D2 + codex review pass 5 finding 2 — the publish-guard walks
+// in site-assets.ts (`collectElementReferences`,
+// `collectUnfilledElementReferences`) recurse into `customTemplate` per pass
+// 1 F4 so a fixed assetId inside the template participates in publish-guard
+// + cascade detection. The DELETE-asset endpoint owned a SEPARATE pair of
+// walks here that stopped at the top-level element, so:
+//
+//   * the confirm-required report under-counted references for a
+//     customTemplate-only assetId (Owner saw "0 references" and had no
+//     warning before deletion);
+//   * the `clearAssetReferences` cascade left customTemplate's assetId
+//     stale after delete, so the next publish failed the publish guard
+//     (which does walk customTemplate) with a missing-asset error.
+//
+// Both walks now mirror the site-assets.ts recursion: media at the top
+// level, recurse into Tabs panels, and recurse into Collection's
+// `customTemplate` (entries[][] is materializer output — outside the
+// editor-state walk). The recursion keeps shape parity with site-assets.ts
+// so the two pipelines never diverge again.
+interface CollectFromElementParams {
+  siteId: string;
+  siteName: string;
+  source: 'editable' | 'published';
+  publishedAddress: string | null;
+  pageSlug: string;
+  element: unknown;
+  assetId: string;
+  seen: Set<string>;
+}
+
+function collectFromElement(out: AssetReference[], params: CollectFromElementParams): void {
+  const { element, assetId, seen, pageSlug } = params;
+  if (typeof element !== 'object' || element === null) return;
+  const el = element as {
+    id?: string;
+    type?: string;
+    assetId?: string;
+    mediaKind?: string;
+    posterAssetId?: string;
+    tabs?: Array<{ elements?: unknown[] }>;
+    customTemplate?: unknown[];
+  };
+  if (el.type === 'media' && typeof el.id === 'string') {
+    if (el.assetId === assetId) {
+      const key = `${pageSlug}|${el.id}|asset`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push({
+          siteId: params.siteId,
+          siteName: params.siteName,
+          source: params.source,
+          publishedAddress: params.publishedAddress,
+          pageSlug,
+          elementId: el.id,
+          role: 'asset',
+        });
+      }
+    }
+    if (el.mediaKind === 'video' && el.posterAssetId === assetId) {
+      const key = `${pageSlug}|${el.id}|poster`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push({
+          siteId: params.siteId,
+          siteName: params.siteName,
+          source: params.source,
+          publishedAddress: params.publishedAddress,
+          pageSlug,
+          elementId: el.id,
+          role: 'poster',
+        });
+      }
+    }
+    return;
+  }
+  if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+    for (const tab of el.tabs) {
+      if (!tab || !Array.isArray(tab.elements)) continue;
+      for (const child of tab.elements) {
+        collectFromElement(out, { ...params, element: child });
+      }
+    }
+    return;
+  }
+  if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
+    for (const child of el.customTemplate) {
+      collectFromElement(out, { ...params, element: child });
     }
   }
 }
@@ -256,17 +326,10 @@ function clearAssetReferences(
     const sections = page.sections.map((section) => {
       let sectionChanged = false;
       const elements = section.elements.map((element) => {
-        if (element.type !== 'media') return element;
-        let next = element;
-        if (element.assetId === assetId) {
-          next = { ...next, assetId: '' };
-        }
-        if (next.mediaKind === 'video' && next.posterAssetId === assetId) {
-          next = { ...next, posterAssetId: '' };
-        }
-        if (next === element) return element;
+        const cleared = clearElementAssetReferences(element, assetId);
+        if (cleared === element) return element;
         sectionChanged = true;
-        return next;
+        return cleared as (typeof section.elements)[number];
       });
       if (!sectionChanged) return section;
       pageChanged = true;
@@ -283,4 +346,63 @@ function clearAssetReferences(
 
   if (!rootChanged && !pagesChanged) return { changed: false, state };
   return { changed: true, state: { ...rootState, pages } };
+}
+
+// ADR 0065 D2 + codex review pass 5 finding 2 — recursive element-level
+// clear. Mirrors `collectFromElement` above: clear media assetIds at the
+// top level, recurse Tabs panels, recurse Collection's `customTemplate`.
+// `entries[][]` is materializer output (regenerated at publish time) so
+// the editor-state walk skips it.
+//
+// Returns the same reference when no change is needed so the caller's
+// `=== element` check decides whether to bubble the section-changed flag
+// — matching the original walk's identity-as-no-op contract.
+function clearElementAssetReferences(element: unknown, assetId: string): unknown {
+  if (typeof element !== 'object' || element === null) return element;
+  const el = element as Record<string, unknown>;
+  if (el.type === 'media') {
+    let next: Record<string, unknown> = el;
+    if (next.assetId === assetId) {
+      next = { ...next, assetId: '' };
+    }
+    if (next.mediaKind === 'video' && next.posterAssetId === assetId) {
+      next = { ...next, posterAssetId: '' };
+    }
+    return next === el ? element : next;
+  }
+  if (el.type === 'tabs' && Array.isArray(el.tabs)) {
+    const tabsIn = el.tabs as unknown[];
+    let tabsChanged = false;
+    const tabs = tabsIn.map((tab) => {
+      if (typeof tab !== 'object' || tab === null) return tab;
+      const tabRec = tab as Record<string, unknown>;
+      if (!Array.isArray(tabRec.elements)) return tab;
+      const panelIn = tabRec.elements as unknown[];
+      let panelChanged = false;
+      const panelElements = panelIn.map((child) => {
+        const cleared = clearElementAssetReferences(child, assetId);
+        if (cleared === child) return child;
+        panelChanged = true;
+        return cleared;
+      });
+      if (!panelChanged) return tab;
+      tabsChanged = true;
+      return { ...tabRec, elements: panelElements };
+    });
+    if (!tabsChanged) return element;
+    return { ...el, tabs };
+  }
+  if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
+    const templateIn = el.customTemplate as unknown[];
+    let templateChanged = false;
+    const customTemplate = templateIn.map((child) => {
+      const cleared = clearElementAssetReferences(child, assetId);
+      if (cleared === child) return child;
+      templateChanged = true;
+      return cleared;
+    });
+    if (!templateChanged) return element;
+    return { ...el, customTemplate };
+  }
+  return element;
 }

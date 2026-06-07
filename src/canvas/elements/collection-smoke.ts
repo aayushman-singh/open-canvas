@@ -233,7 +233,7 @@ function makeSiteState(
 {
   // seedCustomTemplate() is the canonical "first switch to 'custom'" payload
   // (ADR 0065 D3); it must validate against the schema unmodified.
-  const seeded = seedCustomTemplate('el-collection');
+  const seeded = seedCustomTemplate('el-collection', 1200, 600);
   assert(seeded.length > 0, '(4) seedCustomTemplate returns a non-empty array');
   const seedState = validateEditableSite(
     makeSiteState(makeCollection({ display: 'custom', customTemplate: seeded })),
@@ -276,7 +276,7 @@ function makeSiteState(
 
   // Yjs round-trip preserves customTemplate as a flat element array.
   const state = makeSiteState(
-    makeCollection({ display: 'custom', customTemplate: seedCustomTemplate('el-collection') }),
+    makeCollection({ display: 'custom', customTemplate: seedCustomTemplate('el-collection', 1200, 600) }),
   );
   const doc = encodeYDoc(state);
   const decoded = decodeYDoc(doc);
@@ -297,7 +297,7 @@ function makeSiteState(
   // not strip customTemplate at the validator/Yjs layer; persistence is the
   // editor's job to preserve.
   const keptAfterSwitch = makeSiteState(
-    makeCollection({ display: 'card', customTemplate: seedCustomTemplate('el-collection') }),
+    makeCollection({ display: 'card', customTemplate: seedCustomTemplate('el-collection', 1200, 600) }),
   );
   const keptResult = validateEditableSite(keptAfterSwitch);
   assert(
@@ -329,7 +329,7 @@ function makeSiteState(
     collectionSlug: 'blog',
     sort: 'date-desc',
     display: 'custom',
-    customTemplate: seedCustomTemplate('coll-alpha'),
+    customTemplate: seedCustomTemplate('coll-alpha', 600, 400),
   };
   const collB: CollectionElement = {
     id: 'coll-beta',
@@ -338,7 +338,7 @@ function makeSiteState(
     collectionSlug: 'blog',
     sort: 'date-desc',
     display: 'custom',
-    customTemplate: seedCustomTemplate('coll-beta'),
+    customTemplate: seedCustomTemplate('coll-beta', 600, 400),
   };
   const section: CanvasSection = {
     id: 'sec-two-collections',
@@ -359,6 +359,176 @@ function makeSiteState(
     result.valid,
     `(5) two Collections on one page with seeded customTemplates validate: ` +
       `${result.valid ? '' : result.errors.join('; ')}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (5b) Codex review pass 5 finding 3 — page-level anchor-uniqueness walker
+//      recurses into Collection's customTemplate so two template children
+//      sharing the same anchorId fail validation. Without this recursion,
+//      the materializer's per-entry suffixing (pass 4 F4) assumed within-
+//      template uniqueness and produced duplicate DOM ids per entry on the
+//      published page.
+// ---------------------------------------------------------------------------
+
+{
+  // Two media children inside a single Collection's customTemplate both
+  // declaring `anchorId: 'cta'` — must fail with the anchor-uniqueness
+  // error citing "cta".
+  const childA: TextElement = {
+    id: 'tpl-cta-a',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+    content: [{ text: 'A' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+    anchorId: 'cta',
+  };
+  const childB: TextElement = {
+    id: 'tpl-cta-b',
+    type: 'text',
+    box: { x: 0, y: 50, w: 200, h: 40, z: 2 },
+    content: [{ text: 'B' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+    anchorId: 'cta',
+  };
+  const result = validateEditableSite(
+    makeSiteState(
+      makeCollection({
+        display: 'custom',
+        customTemplate: [childA satisfies CanvasElement, childB satisfies CanvasElement],
+      }),
+    ),
+  );
+  assert(
+    !result.valid && result.errors.some((e) => e.includes('anchorId "cta"')),
+    `(5b) duplicate anchorId inside customTemplate must be rejected; ` +
+      `got ${result.valid ? 'valid (no errors)' : result.errors.join('; ')}`,
+  );
+
+  // Sibling check — a customTemplate child colliding with a top-level
+  // element's anchorId on the same page also fails (the pool is page-wide).
+  const topLevelCta: TextElement = {
+    id: 'top-cta',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+    content: [{ text: 'top' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+    anchorId: 'shared',
+  };
+  const tplCta: TextElement = {
+    id: 'tpl-cta',
+    type: 'text',
+    box: { x: 0, y: 0, w: 200, h: 40, z: 1 },
+    content: [{ text: 'tpl' }],
+    role: 'body',
+    fontSize: 14,
+    fontWeight: 400,
+    align: 'left',
+    anchorId: 'shared',
+  };
+  const page: CanvasPage = {
+    id: 'page-cross-anchor',
+    slug: 'cross-anchor',
+    title: 'Cross anchor',
+    width: 1200,
+    sections: [
+      {
+        id: 'section-cross-anchor',
+        recipeId: 'custom',
+        name: 'Cross anchor',
+        height: 800,
+        elements: [
+          topLevelCta,
+          {
+            id: 'coll-cross-anchor',
+            type: 'collection',
+            box: { x: 0, y: 100, w: 1200, h: 600, z: 2 },
+            collectionSlug: 'blog',
+            sort: 'date-desc',
+            display: 'custom',
+            customTemplate: [tplCta satisfies CanvasElement],
+          },
+        ],
+      },
+    ],
+  };
+  const crossResult = validateEditableSite({ styleKit: 'charcoal', pages: [page] });
+  assert(
+    !crossResult.valid && crossResult.errors.some((e) => e.includes('anchorId "shared"')),
+    `(5b) anchorId collision between top-level element and customTemplate child must be rejected; ` +
+      `got ${crossResult.valid ? 'valid (no errors)' : crossResult.errors.join('; ')}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// (6) Codex review pass 5 finding 1 — seedCustomTemplate scales to the host
+//     Collection's box dimensions so a small host does NOT produce children
+//     whose boxes exceed `box.w/h` and trip the validator (pass 1 F1's
+//     parent-meta wiring recurses customTemplate against host dimensions).
+// ---------------------------------------------------------------------------
+
+{
+  // Tiny host (100x100) — well below the seed's native 320x360. The seed
+  // must scale uniformly by min(100/320, 100/360, 1) = 100/360 so every
+  // child's box fits inside 100x100. Without the fix every seeded child
+  // overflowed and the page failed validation with 8 box-bound errors.
+  const tiny = seedCustomTemplate('coll-tiny', 100, 100);
+  for (const child of tiny) {
+    assert(
+      child.box.x >= 0 && child.box.y >= 0,
+      `(6) seeded child ${child.id} must have non-negative origin (got x=${String(child.box.x)}, y=${String(child.box.y)})`,
+    );
+    assert(
+      child.box.x + child.box.w <= 100,
+      `(6) seeded child ${child.id} must fit horizontally inside 100-wide host ` +
+        `(got x=${String(child.box.x)} + w=${String(child.box.w)})`,
+    );
+    assert(
+      child.box.y + child.box.h <= 100,
+      `(6) seeded child ${child.id} must fit vertically inside 100-tall host ` +
+        `(got y=${String(child.box.y)} + h=${String(child.box.h)})`,
+    );
+    assert(
+      Number.isInteger(child.box.x) &&
+        Number.isInteger(child.box.y) &&
+        Number.isInteger(child.box.w) &&
+        Number.isInteger(child.box.h),
+      `(6) seeded child ${child.id} box fields must be integers (no float drift)`,
+    );
+  }
+  const tinyState = validateEditableSite(
+    makeSiteState(
+      makeCollection({
+        box: { x: 0, y: 0, w: 100, h: 100, z: 1 },
+        display: 'custom',
+        customTemplate: tiny,
+      }),
+    ),
+  );
+  assert(
+    tinyState.valid,
+    `(6) tiny-host seeded customTemplate must validate (no box-bound errors): ` +
+      `${tinyState.valid ? '' : tinyState.errors.join('; ')}`,
+  );
+
+  // Larger-than-native host (640x720) — scale caps at 1 (no upscale).
+  // The seed boxes must match the native 320x360 layout unchanged so the
+  // Owner does not see a stretched default card.
+  const large = seedCustomTemplate('coll-large', 640, 720);
+  const largeOuter = large[0]!;
+  assert(
+    largeOuter.box.w === 320 && largeOuter.box.h === 360,
+    `(6) host larger than native must NOT upscale seed (scale capped at 1); ` +
+      `expected 320x360, got ${String(largeOuter.box.w)}x${String(largeOuter.box.h)}`,
   );
 }
 

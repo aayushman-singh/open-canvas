@@ -1429,7 +1429,17 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
         // carries `--<collectionId>` suffixes on its element ids, matching
         // the first-switch seed path. Two Collections on the same page can
         // both reset without colliding on `card-default-root`.
-        refound.element.customTemplate = seedCustomTemplate(refound.element.id);
+        //
+        // Codex review pass 5 finding 1 — pass refound.element.box.w/h so
+        // the reset seed scales to fit the (possibly resized) Collection.
+        // If the Owner shrank the host below the seed's native 320x360
+        // before clicking Reset, an unscaled seed would overflow and the
+        // save would block on box-bound validation errors.
+        refound.element.customTemplate = seedCustomTemplate(
+          refound.element.id,
+          refound.element.box.w,
+          refound.element.box.h,
+        );
         // Codex review pass 3 finding 2 — reset must NOT use
         // ctx.rebuildElement here. When the Owner is currently editing THIS
         // Collection's template, the Phase 3 chrome (banner, Done button,

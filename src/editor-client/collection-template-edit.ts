@@ -117,7 +117,13 @@ export function enterCollectionTemplateEditImpl(
     // are suffixed `--<collectionId>`. Two Collections on the same page
     // would otherwise both end up with `card-default-root` in their
     // customTemplate and fail the page-level duplicate-id check.
-    element.customTemplate = seedCustomTemplate(collectionId);
+    //
+    // Codex review pass 5 finding 1 — pass the host Collection's current
+    // box dimensions so the seed scales to fit. The validator recurses
+    // customTemplate against the host's `box.w/h`; an unscaled seed
+    // against a small host (e.g. 200x200) would overflow the bounds and
+    // block save with box-bound errors.
+    element.customTemplate = seedCustomTemplate(collectionId, element.box.w, element.box.h);
   }
   ctx.editingCollectionTemplate = { collectionId: collectionId };
   ctx.renderAll();

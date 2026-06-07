@@ -1677,11 +1677,31 @@ function validatePageAnchorIdUniqueness(
       });
       return;
     }
-    // ADR 0063 — CollectionElement no longer carries authorable children
-    // (entryTemplate / cardTemplate / entries were retired with the page-
-    // bound model). The materializer emits per-entry DOM at publish time
-    // outside the canvas document, so anchor-uniqueness has nothing to
-    // recurse into here; visiting `el.anchorId` above is the full surface.
+    // ADR 0065 D2 + codex review pass 5 finding 3 — `customTemplate` carries
+    // an author-authored element subtree whose children participate in the
+    // rendered page (the materializer clones the template once per entry
+    // and suffixes anchorIds per entry to avoid cross-card collisions,
+    // pass 4 F4). That per-entry suffixing assumes anchorIds WITHIN the
+    // single template are already unique; without this recursion, two
+    // template children sharing `anchorId: 'cta'` slip past validation,
+    // materialize as duplicate ids per entry, and produce duplicate DOM
+    // ids on the published page (e.g. `cta--<slug>` shared by two cards
+    // per entry). Recurse the same way Tabs panels recurse — the
+    // anchor-id pool is page-wide, customTemplate children share it.
+    //
+    // Mirror with `entries[][]` is intentionally NOT walked here: those
+    // are materializer output regenerated at publish time, with per-entry
+    // suffixing already applied. The editor-state walk only needs to
+    // enforce uniqueness on the editable surface.
+    if (el.type === 'collection' && Array.isArray(el.customTemplate)) {
+      el.customTemplate.forEach((child, childIdx) => {
+        visitElementTree(
+          child,
+          pathJoin(pathJoin(elementPath, 'customTemplate'), childIdx),
+        );
+      });
+      return;
+    }
   };
   const visitSection = (section: unknown, sectionPath: string): void => {
     if (!isRecord(section)) return;
