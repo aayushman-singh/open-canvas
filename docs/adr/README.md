@@ -60,13 +60,13 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0055 | Agent runs until budget exhausts, not until a fixed iteration count | Accepted | [`docs/adr/0055-agent-runs-until-budget-exhausts.md`](0055-agent-runs-until-budget-exhausts.md) |
 | 0056 | Summarisation and read-only inspection iterations run on Flash; planning iterations run on Pro | Accepted | [`docs/adr/0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md`](0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md) |
 | 0057 | Every canvas element dispatch shares one shape: mapped-type record, typed dispatcher, runtime guard | Accepted | [`docs/adr/0057-canvas-element-dispatch-shape.md`](0057-canvas-element-dispatch-shape.md) |
-| 0058 | EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally | Proposed | [`docs/adr/0058-editor-context-as-iife-closure-mirror.md`](0058-editor-context-as-iife-closure-mirror.md) |
+| 0058 | EditorContext is a 1:1 mirror of the IIFE closure, populated incrementally | Accepted | [`docs/adr/0058-editor-context-as-iife-closure-mirror.md`](0058-editor-context-as-iife-closure-mirror.md) |
 | 0059 | Site header/footer is the only canonical pinned section; pages opt-in or opt-out | Accepted | [`docs/adr/0059-site-header-footer-is-only-canonical-pin.md`](0059-site-header-footer-is-only-canonical-pin.md) |
 | 0060 | CMS-style entries live in a dedicated table; the canvas holds template pages, not individual entries | Accepted | [`docs/adr/0060-cms-entries-table-and-template-pages.md`](0060-cms-entries-table-and-template-pages.md) |
 | 0061 | Section Library is the canonical pool; Template Seeds are compositions of Section Instances | Accepted | [`docs/adr/0061-section-library-is-canonical-pool-templates-are-compositions.md`](0061-section-library-is-canonical-pool-templates-are-compositions.md) |
 | 0062 | Section accent border is a single discriminated-union field with four mutually exclusive variants | Accepted | [`docs/adr/0062-section-accent-border.md`](0062-section-accent-border.md) |
 | 0063 | Collection element binds at element level, ships visible defaults, and groups entries by folder | Accepted | [`docs/adr/0063-collection-element-binds-at-element-level-and-ships-defaults.md`](0063-collection-element-binds-at-element-level-and-ships-defaults.md) |
-| 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Proposed | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
+| 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Accepted | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
 | 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Proposed | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
 
 Add new ADRs here. Keep the index sorted by number.

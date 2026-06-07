@@ -1,9 +1,15 @@
 # ADR 0064 — EditorContext decomposes into narrow named-Pick contexts per consumer
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-06-05
+**Accepted:** 2026-06-05
 **Author:** Aayushman Singh
 **Drives:** [ADR 0058](0058-editor-context-as-iife-closure-mirror.md) named follow-up — "split `EditorContext` into smaller named contexts (`StateContext`, `DomContext`, `RenderContext`, `PersistContext`, `SelectionContext`). Each extracted module's signature changes from `(ctx: EditorContext, …)` to the narrow context(s) it actually needs."
+
+**As-built (2026-06-05):**
+- The canonical five named-Pick aliases — `StateContext`, `DomContext`, `SelectionContext`, `RenderContext`, `PersistContext` — plus `StatusEmitterContext` for the cross-cluster `setStatus` verb live at the bottom of [`src/editor-client/editor-context.ts`](../../src/editor-client/editor-context.ts) (commit `819564f`).
+- First carve landed on [`src/editor-client/delete-shortcut.ts`](../../src/editor-client/delete-shortcut.ts) (commit `c2c4a61`): `handleDeleteShortcut`'s parameter type drops from `EditorContext` (~150 members) to `DeleteShortcutContext = SelectionContext & StateContext & StatusEmitterContext & Pick<EditorContext, 'isEditableShortcutTarget' | 'deleteElement' | 'handleSectionAction'>` (10 members).
+- Per Decision 4 — remaining module signatures stay on `EditorContext` and migrate opportunistically. There is no big-bang sweep; the ADR is "Accepted" because the design pattern is committed and the first consumer proves it. The lazy cluster contexts from Decision 5 (`InspectorMountContext`, `ChatContext`, `CoEditContext`, `AiContext`, `ConfigContext`) land when a module signs against them.
 
 ## Context
 
