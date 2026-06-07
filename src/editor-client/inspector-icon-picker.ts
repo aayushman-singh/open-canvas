@@ -11,14 +11,32 @@
 // The grid renders the same `<svg>` markup the canvas paints, so what you
 // pick is what you ship.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+} from './editor-context.js';
 import type { IconField } from '../canvas/elements/inspector-spec.js';
 import type { CanvasElement } from '../canvas/schema.js';
 import { field } from './dom-builders.js';
 
 type ElementRecord = Record<string, unknown> & { id: string };
 
-export function renderIconField(ctx: EditorContext, f: IconField, element: CanvasElement): void {
+// ADR 0064 — icon-picker carve. Three named clusters fit (DomContext for
+// the cached `inspector` mount, RenderContext for `rebuildElement`,
+// PersistContext for `scheduleSave`); `ICON_SVG_MAP` is icon-picker-
+// specific data with no canonical alias, so it rides inline.
+export type InspectorIconPickerContext = DomContext &
+  RenderContext &
+  PersistContext &
+  Pick<EditorContext, 'ICON_SVG_MAP'>;
+
+export function renderIconField(
+  ctx: InspectorIconPickerContext,
+  f: IconField,
+  element: CanvasElement,
+): void {
   if (!ctx.inspector) return;
   const elementByPath = element as unknown as ElementRecord;
 
