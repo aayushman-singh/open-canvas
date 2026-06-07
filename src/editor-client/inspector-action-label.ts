@@ -23,12 +23,18 @@
 //     preserved. The Clear button strips marks because "icon-only" should
 //     not leave a bold-empty run lying around.
 
-import type { EditorContext } from './editor-context.js';
+import type { PersistContext, RenderContext } from './editor-context.js';
 import type { ActionElement } from '../canvas/elements/action.js';
 import { field } from './dom-builders.js';
 
+// ADR 0064 — inspector action-label carve. The mount touches exactly two
+// canonical clusters: render (rebuildElement to refresh the action element
+// after each keystroke / clear) and persist (scheduleSave to debounce the
+// server save on commit). No module-specific verbs, so no inline Pick.
+export type InspectorActionLabelContext = RenderContext & PersistContext;
+
 export function mountActionLabel(
-  ctx: EditorContext,
+  ctx: InspectorActionLabelContext,
   element: ActionElement,
   host: HTMLElement,
 ): void {
