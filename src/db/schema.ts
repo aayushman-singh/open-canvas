@@ -66,10 +66,19 @@ export const customer = pgTable('customer', {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   clerkUserId: text('clerk_user_id').notNull().unique(),
-  // Denormalized cache of the Clerk-owned email — Clerk is the source of truth
-  // for uniqueness, so no unique index here. Used by collaborator-invite flows
-  // to look up an existing customer by email before they sign in.
-  email: text('email').notNull(),
+  // Local source of truth for "one opencanvas customer per email". Clerk can
+  // mint multiple users for the same email (e.g. password sign-up then later
+  // "Continue with Google" creates a second Clerk user with a different id),
+  // so deferring email uniqueness to Clerk forked our customer rows: the new
+  // Clerk session insert-failed nothing, so a fresh row was created with the
+  // new clerk_user_id and the original Owner's sites/assets/plan orphaned
+  // behind the previous identity. The application-layer dedupe in
+  // `src/auth/customer-upsert.ts` reuses the existing row by rebinding
+  // clerk_user_id when this case is detected; this constraint is the physical
+  // backstop so a bug, a manual SQL insert, or a future regression cannot
+  // re-introduce the duplicate. Drizzle 0020 backfills the merge of the
+  // historical dupes and then adds the constraint.
+  email: text('email').notNull().unique(),
   displayName: text('display_name'),
   bio: text('bio'),
   timezone: text('timezone').notNull().default('UTC'),
