@@ -118,6 +118,15 @@ export interface CollectionRenderCtx {
  * inside this frame; this function only emits the frame itself plus a
  * data-attr trail so the public renderer can hydrate per-entry content
  * during the materialization pass.
+ *
+ * Both `sort` and `display` are explicitly narrowed to their string-enum
+ * shapes at this boundary. Legacy in-DB rows (pre-ADR-0063 F5) sometimes
+ * carry the deprecated `sort: { field, order }` object — the validator
+ * rejects those at write time, but the publish/thumb paths re-render
+ * historical JSONB without re-running the validator, so the renderer
+ * must guard the type itself. We throw a descriptive error rather than
+ * silently coercing because the no-fallback principle (CLAUDE.md) wants
+ * the caller to see exactly which element is malformed.
  */
 export function renderCollection(el: CollectionElement, _ctx: CollectionRenderCtx): string {
   const frameStyle = styleFromEntries([
@@ -126,8 +135,8 @@ export function renderCollection(el: CollectionElement, _ctx: CollectionRenderCt
   ]);
   const slugAttr = el.collectionSlug !== undefined ? escapeAttr(el.collectionSlug) : '';
   const folderAttr = el.folder !== undefined ? escapeAttr(el.folder) : '';
-  const sortAttr = el.sort ?? 'date-desc';
-  const displayAttr = el.display ?? 'card';
+  const sortAttr = readSortString(el);
+  const displayAttr = readDisplayString(el);
   return (
     `<div class="opencanvas-collection" data-opencanvas-interactive="collection"` +
     ` data-collection-display="${escapeAttr(displayAttr)}"` +
@@ -135,6 +144,31 @@ export function renderCollection(el: CollectionElement, _ctx: CollectionRenderCt
     ` data-collection-slug="${slugAttr}"` +
     ` data-collection-folder="${folderAttr}"` +
     ` style="${escapeAttr(frameStyle)}"></div>`
+  );
+}
+
+function readSortString(el: CollectionElement): CollectionSort {
+  if (el.sort === undefined) return 'date-desc';
+  if ((COLLECTION_SORTS as readonly string[]).includes(el.sort)) {
+    return el.sort;
+  }
+  throw new Error(
+    `Collection element ${el.id}: sort has malformed value ${JSON.stringify(el.sort)}; ` +
+      `expected one of ${COLLECTION_SORTS.join(' | ')}. ` +
+      `Legacy in-DB rows from pre-ADR-0063 carry sort as an object — ` +
+      `open the page in the editor to let the migration normalise it, ` +
+      `or backfill the JSONB to a string enum.`,
+  );
+}
+
+function readDisplayString(el: CollectionElement): CollectionDisplay {
+  if (el.display === undefined) return 'card';
+  if ((COLLECTION_DISPLAYS as readonly string[]).includes(el.display)) {
+    return el.display;
+  }
+  throw new Error(
+    `Collection element ${el.id}: display has malformed value ${JSON.stringify(el.display)}; ` +
+      `expected one of ${COLLECTION_DISPLAYS.join(' | ')}.`,
   );
 }
 

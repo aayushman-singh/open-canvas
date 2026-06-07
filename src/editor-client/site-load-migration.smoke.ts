@@ -453,6 +453,84 @@ function makeSite(pages: CanvasPage[]): EditableSite {
   assert(statuses.length === 0, '(9) tabs-nested: no banner');
 }
 
+// (10) Legacy sort-object normalisation on a non-`collection-index` page.
+//
+// The pwtest-engineer fixture has a Collection element whose `sort` is
+// the pre-ADR-0063 object `{ field, order }` instead of the current
+// string enum. `renderCollection` now throws on this shape, so the
+// dashboard thumb stays red until the migration normalises it. The
+// migration sweeps every page (not just `pageKind === 'collection-index'`)
+// for the legacy sort object and rewrites it in place.
+{
+  const collection: Record<string, unknown> = {
+    type: 'collection',
+    id: 'legacy-sort-coll',
+    box: { x: 0, y: 0, w: 800, h: 600 },
+    collectionSlug: 'blog',
+    display: 'card',
+    sort: { field: 'publishedDate', order: 'desc' },
+  };
+  const page: CanvasPage = {
+    id: 'page-with-legacy-sort',
+    slug: 'misc',
+    title: 'Misc',
+    width: 1440,
+    sections: [
+      {
+        id: 'misc-sec',
+        recipeId: 'custom',
+        name: 'sec',
+        height: 600,
+        elements: [collection] as never,
+      },
+    ],
+  };
+  const site = makeSite([page]);
+  const { ctx, statuses, saveCalls } = makeCtx(site);
+  migrateLegacyCollectionIndexPagesImpl(ctx);
+  const migrated = page.sections[0]!.elements[0]! as unknown as Record<string, unknown>;
+  assert(
+    migrated.sort === 'date-desc',
+    '(10) legacy sort {order:"desc"} normalises to "date-desc"; got ' + JSON.stringify(migrated.sort),
+  );
+  assert(saveCalls.count === 1, '(10) scheduleSave fires once when only sort normalises');
+  assert(statuses.length === 0, '(10) no banner for a clean sort normalisation');
+}
+
+// (11) Legacy sort-object asc variant.
+{
+  const collection: Record<string, unknown> = {
+    type: 'collection',
+    id: 'legacy-sort-asc',
+    box: { x: 0, y: 0, w: 800, h: 600 },
+    sort: { field: 'publishedDate', order: 'asc' },
+  };
+  const page: CanvasPage = {
+    id: 'page-legacy-asc',
+    slug: 'asc',
+    title: 'Asc',
+    width: 1440,
+    sections: [
+      {
+        id: 'asc-sec',
+        recipeId: 'custom',
+        name: 'sec',
+        height: 600,
+        elements: [collection] as never,
+      },
+    ],
+  };
+  const site = makeSite([page]);
+  const { ctx, saveCalls } = makeCtx(site);
+  migrateLegacyCollectionIndexPagesImpl(ctx);
+  const migrated = page.sections[0]!.elements[0]! as unknown as Record<string, unknown>;
+  assert(
+    migrated.sort === 'date-asc',
+    '(11) legacy sort {order:"asc"} normalises to "date-asc"; got ' + JSON.stringify(migrated.sort),
+  );
+  assert(saveCalls.count === 1, '(11) scheduleSave fires once for asc variant');
+}
+
 // (6) Wiring source guard — createEditor calls the migrator in the right
 // place (after migrateState, before renderAll).
 const indexSrc = await Bun.file(new URL('./index.ts', import.meta.url)).text();
