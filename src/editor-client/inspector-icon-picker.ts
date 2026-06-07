@@ -16,6 +16,7 @@ import type {
   EditorContext,
   PersistContext,
   RenderContext,
+  StatusEmitterContext,
 } from './editor-context.js';
 import type { IconField } from '../canvas/elements/inspector-spec.js';
 import type { CanvasElement } from '../canvas/schema.js';
@@ -23,13 +24,16 @@ import { field } from './dom-builders.js';
 
 type ElementRecord = Record<string, unknown> & { id: string };
 
-// ADR 0064 — icon-picker carve. Three named clusters fit (DomContext for
-// the cached `inspector` mount, RenderContext for `rebuildElement`,
-// PersistContext for `scheduleSave`); `ICON_SVG_MAP` is icon-picker-
-// specific data with no canonical alias, so it rides inline.
+// ADR 0064 — icon-picker carve. Four named clusters fit (DomContext for
+// the cached `inspector` mount, RenderContext for `rebuildElement` +
+// `renderInspector`, PersistContext for `scheduleSave`, StatusEmitter for
+// the "Add a label first" refusal when clearing the icon on an empty-label
+// action); `ICON_SVG_MAP` is icon-picker-specific data with no canonical
+// alias, so it rides inline.
 export type InspectorIconPickerContext = DomContext &
   RenderContext &
   PersistContext &
+  StatusEmitterContext &
   Pick<EditorContext, 'ICON_SVG_MAP'>;
 
 export function renderIconField(
