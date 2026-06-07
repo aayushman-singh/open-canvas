@@ -657,15 +657,20 @@ export function pickStyleKitField(state: EditableSiteStyleKit): EditableSiteStyl
  * Drop the styleKit DU off an EditableSite and return the base shape only.
  * Builders that want to swap one styleKit branch for another use this to
  * strip both `styleKit` and `customStyleKit` in one narrowing-safe move.
+ *
+ * Strips `customStyleKit` in both branches because persisted JSONB state
+ * can carry a stray `customStyleKit` even on built-in records (TypeScript
+ * narrowing protects new writes but not migrated/older payloads), and the
+ * caller swapping to another built-in must not write the stale custom kit
+ * back. Treat the stripped shape as the contract, not the input shape.
  */
 export function pickEditableSiteBase(state: EditableSite): EditableSiteBase {
-  if (state.styleKit === 'custom') {
-    const { customStyleKit: _customStyleKit, styleKit: _styleKit, ...rest } = state;
-    void _customStyleKit;
-    void _styleKit;
-    return rest;
-  }
-  const { styleKit: _styleKit, ...rest } = state;
+  const {
+    customStyleKit: _customStyleKit,
+    styleKit: _styleKit,
+    ...rest
+  } = state as EditableSite & { customStyleKit?: unknown };
+  void _customStyleKit;
   void _styleKit;
   return rest;
 }
