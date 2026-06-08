@@ -32,6 +32,8 @@ playwright-report/
 test-results/
 dfs/
 /*.png
+/*.jpg
+/*.jpeg
 e2e/live-driver/.profile/
 e2e/live-driver/screenshots/
 
