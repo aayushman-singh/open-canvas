@@ -37,6 +37,7 @@ import { MOTION_PRESETS, type MotionPreset } from '../canvas/schema.js';
 import type { CollectionElement, CollectionSort } from '../canvas/elements/collection.js';
 import { COLLECTION_DISPLAYS, COLLECTION_SORTS } from '../canvas/elements/collection.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
+import { templateHasAnyPlaceholder } from '../canvas/elements/collection-materializer.js';
 import { renderSectionInspector } from './section-inspector.js';
 import { renderPageInspector, replayAnimations } from './page-inspector.js';
 import { field, selectInput } from './dom-builders.js';
@@ -1459,6 +1460,62 @@ function renderCollectionInspector(ctx: EditorContext, el: CanvasElement): void 
     tplControls.appendChild(resetBtn);
 
     inspector.appendChild(field('Custom template', tplControls));
+
+    // ADR 0065 F1-multi-collab-presence — surface concurrent template
+    // editors on this Collection. `ctx.collectionTemplateEditors` is
+    // maintained by onRemotePresence (co-edit.ts) off the Yjs awareness
+    // fan-out; the keys are Collection ids that have ≥1 OTHER peer
+    // (local self is excluded by the receive-side computation) currently
+    // pinned to template-edit mode. Rendered as a subtle informational
+    // line under the Edit/Done/Reset row.
+    //
+    // Indicator copy: "N other(s) editing: name1, name2" — singular
+    // "other" when N === 1, plural "others" otherwise. Surface tone
+    // matches the inspector's other quiet hints (var(--opencanvas-muted)
+    // with fallback), not the error-tone treatment used by
+    // staleFolderWarning + the substitution warning below — the message
+    // is informational, not a correctness signal.
+    const concurrentEditors = ctx.collectionTemplateEditors.get(collection.id);
+    if (concurrentEditors && concurrentEditors.length > 0) {
+      const presenceIndicator = document.createElement('div');
+      presenceIndicator.style.cssText =
+        'font-size:12px; color:var(--opencanvas-muted, #888); margin: -4px 0 8px 0;';
+      const noun = concurrentEditors.length === 1 ? 'other' : 'others';
+      presenceIndicator.textContent =
+        concurrentEditors.length +
+        ' ' +
+        noun +
+        ' editing: ' +
+        concurrentEditors.join(', ');
+      inspector.appendChild(presenceIndicator);
+    }
+
+    // ADR 0065 F1-substitution-warning — when the Owner has a non-empty
+    // customTemplate that contains zero `{{<placeholder>}}` tokens, every
+    // materialized card will render identical static content. That may be
+    // intentional (the Owner genuinely wants N identical cards) so the
+    // signal is informational, not blocking; ADR §Out-of-scope pins that
+    // the validator MUST NOT reject the template. Empty template
+    // (length === 0) is handled by a separate chrome (materializer
+    // decision 8 failure path) so we do not double-warn here.
+    //
+    // Visual treatment matches `staleFolderWarning` above — same DOM
+    // shape, same error-toned 12px style — so the inspector's two
+    // inline warnings read consistently.
+    if (
+      collection.customTemplate !== undefined &&
+      collection.customTemplate.length > 0 &&
+      !templateHasAnyPlaceholder(collection.customTemplate)
+    ) {
+      const noSubstitutionsWarning = document.createElement('div');
+      noSubstitutionsWarning.style.cssText =
+        'font-size:12px; color:var(--opencanvas-error, #d33); margin: -4px 0 8px 0;';
+      noSubstitutionsWarning.textContent =
+        'This template has no per-entry substitutions — all cards will show the ' +
+        'same content. Add {{title}} or {{excerpt}} to a Text element to vary cards ' +
+        'per entry.';
+      inspector.appendChild(noSubstitutionsWarning);
+    }
   }
 
   // -- 6. Manage entries link (ADR 0063 dec 10) ----------------------------

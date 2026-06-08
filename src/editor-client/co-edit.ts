@@ -140,6 +140,93 @@ const PRESENCE_PALETTE = [
 // 6× cut to DO request volume during normal editing.
 const POINTER_PUBLISH_INTERVAL_MS = 100;
 
+// -- Collection template edit presence map (ADR 0065 F1-multi-collab) -
+
+/**
+ * ADR 0065 F1-multi-collab-presence — reduce an awareness peer map into
+ * `<collectionId, [peerName, …]>` groups. Pure function over the
+ * awareness shape: no DOM, no ctx, easy to smoke. Peers with falsy
+ * `editingCollectionTemplateId` are skipped (they are not in
+ * template-edit mode). Peer names are pushed in awareness-iteration
+ * order, which matches the order onRemotePresence fires them.
+ *
+ * `localUserId` is the local Owner's Clerk user id when available.
+ * Peers carrying the same `userId` are skipped — that "peer" is the
+ * Owner editing in a second tab, not a distinct collaborator. Without
+ * this dedupe, the indicator would show "1 other editing: Aayushman"
+ * to an Owner who has two tabs of the same site open.
+ *
+ * Falls back to per-clientID counting when the userId is missing on
+ * either side so legacy / unauthenticated peers still surface.
+ */
+export function computeCollectionTemplateEditors(
+  peers: Map<
+    number,
+    {
+      name: string;
+      userId?: string;
+      editingCollectionTemplateId?: string | null;
+    }
+  >,
+  localUserId: string | null,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  peers.forEach(function (peer) {
+    if (!peer) return;
+    const target = peer.editingCollectionTemplateId;
+    if (typeof target !== 'string' || target.length === 0) return;
+    // Dedupe: a peer carrying the same userId as the local Owner is the
+    // Owner's second tab. Skip — only DISTINCT collaborators surface.
+    if (
+      localUserId !== null &&
+      localUserId.length > 0 &&
+      typeof peer.userId === 'string' &&
+      peer.userId === localUserId
+    ) {
+      return;
+    }
+    const name =
+      typeof peer.name === 'string' && peer.name.length > 0 ? peer.name : 'Another collaborator';
+    let list = out.get(target);
+    if (!list) {
+      list = [];
+      out.set(target, list);
+    }
+    list.push(name);
+  });
+  return out;
+}
+
+/**
+ * Shallow equality on the `<collectionId, peerNames[]>` shape. Cheap diff
+ * that lets onRemotePresence skip the inspector re-render when nothing
+ * about the editor membership actually shifted (the cursor-publish
+ * cadence drives onRemotePresence orders of magnitude more often than
+ * template-edit mode toggles).
+ */
+export function collectionTemplateEditorsEqual(
+  a: Map<string, string[]>,
+  b: Map<string, string[]>,
+): boolean {
+  if (a.size !== b.size) return false;
+  let equal = true;
+  a.forEach(function (namesA, collectionId) {
+    if (!equal) return;
+    const namesB = b.get(collectionId);
+    if (!namesB || namesA.length !== namesB.length) {
+      equal = false;
+      return;
+    }
+    for (let i = 0; i < namesA.length; i++) {
+      if (namesA[i] !== namesB[i]) {
+        equal = false;
+        return;
+      }
+    }
+  });
+  return equal;
+}
+
 // -- coEditSync --------------------------------------------------------
 
 export function coEditSyncImpl(ctx: EditorContext): boolean {
@@ -329,6 +416,74 @@ export function repaintRemoteCursorsImpl(ctx: EditorContext): void {
   });
 }
 
+// -- Local presence snapshot builder (single source of truth) ----------
+
+/**
+ * ADR 0065 F2-followup — build a fresh local presence snapshot from
+ * `ctx`. The shape this helper covers (name, color, userId, and the
+ * F1-multi-collab-presence `editingCollectionTemplateId` pin) is read
+ * LIVE from ctx, so a caller resolving the function at socket open
+ * picks up the Owner's current template-edit mode regardless of how
+ * many reconnects have happened since attach.
+ *
+ * The single non-smoke caller is `attachCoEditImpl`, which passes a
+ * thunk over this helper to the connector's `initialPresence`. The
+ * connector invokes the thunk at every open (including reconnect) so
+ * the stale-capture bug fixed here can never reappear — the only way
+ * to ship a stale value is to inline a captured object in place of the
+ * thunk, which would be reviewable.
+ *
+ * The publish-loop sites (`publishPointer`, `flushPublishLocalPresence`)
+ * do NOT route through this helper because they layer live DOM /
+ * pointer state on top — `window.getSelection()` for the caret anchor,
+ * `ctx.lastWorldPoint` for the Figma-style pointer trail. The
+ * `cursor` / `selection` fields here are intentionally `null`; those
+ * loops still inline the same `editingCollectionTemplateId` read
+ * against `ctx.editingCollectionTemplate` so the pin round-trips on
+ * every awareness write.
+ *
+ * Returns `null` when local presence identity hasn't loaded yet (boot
+ * race). The connector's open handler treats `null` as "skip the
+ * initial push", matching the CLAUDE.md no-fallback rule — we don't
+ * ship a guess; we ship nothing until the identity is ready.
+ *
+ * Exported for the reopen-presence smoke — the only external caller.
+ * The pure-function shape (ctx in, snapshot out) lets the smoke mutate
+ * ctx between calls and assert the snapshot tracks the mutation,
+ * without needing a real WebSocket.
+ */
+export function buildLocalPresenceSnapshot(ctx: EditorContext): {
+  name: string;
+  color: string;
+  cursor: null;
+  selection: null;
+  editingCollectionTemplateId: string | null;
+  userId?: string;
+} | null {
+  if (!ctx.localPresence) return null;
+  const snapshot: {
+    name: string;
+    color: string;
+    cursor: null;
+    selection: null;
+    editingCollectionTemplateId: string | null;
+    userId?: string;
+  } = {
+    name: ctx.localPresence.name,
+    color: ctx.localPresence.color,
+    cursor: null,
+    selection: null,
+    // Read FRESH from ctx — this function is called at every socket open
+    // (including reconnect), so the pin reflects the Owner's current
+    // template-edit mode rather than the boot-time snapshot.
+    editingCollectionTemplateId: ctx.editingCollectionTemplate
+      ? ctx.editingCollectionTemplate.collectionId
+      : null,
+  };
+  if (ctx.presenceUserId) snapshot.userId = ctx.presenceUserId;
+  return snapshot;
+}
+
 // -- Outbound pointer presence (Figma-style mouse follow) -------------
 
 // Figma-style mouse-follow: every mousemove over the canvas viewport
@@ -348,9 +503,7 @@ function publishPointer(ctx: EditorContext): void {
   let anchorCursor: { sectionId: string; elementId: string; offset?: number } | null = null;
   if (sel && sel.anchorNode) {
     const anchorEl =
-      sel.anchorNode.nodeType === 1
-        ? (sel.anchorNode as Element)
-        : sel.anchorNode.parentElement;
+      sel.anchorNode.nodeType === 1 ? (sel.anchorNode as Element) : sel.anchorNode.parentElement;
     const wrapper = anchorEl ? anchorEl.closest('[data-opencanvas-element]') : null;
     const sectionNode = anchorEl ? anchorEl.closest('[data-opencanvas-section]') : null;
     if (wrapper && sectionNode) {
@@ -396,6 +549,14 @@ function publishPointer(ctx: EditorContext): void {
         selection: anchorCursor
           ? { sectionId: anchorCursor.sectionId, elementId: anchorCursor.elementId }
           : null,
+        // ADR 0065 F1-multi-collab-presence — fold the active template-edit
+        // pin into every awareness write so peers always see the live value.
+        // Bundling it here avoids a separate setPresence channel; the
+        // protocol fans the whole record out atomically and the receive
+        // side reads `editingCollectionTemplateId` from the same map.
+        editingCollectionTemplateId: ctx.editingCollectionTemplate
+          ? ctx.editingCollectionTemplate.collectionId
+          : null,
       },
       ctx.presenceUserId ? { userId: ctx.presenceUserId } : {},
     ),
@@ -420,8 +581,7 @@ function schedulePointer(ctx: EditorContext): void {
   ctx.pointerPublishPending = true;
   const now = Date.now();
   const elapsed = now - ctx.pointerPublishLastAtMs;
-  const delay =
-    elapsed >= POINTER_PUBLISH_INTERVAL_MS ? 0 : POINTER_PUBLISH_INTERVAL_MS - elapsed;
+  const delay = elapsed >= POINTER_PUBLISH_INTERVAL_MS ? 0 : POINTER_PUBLISH_INTERVAL_MS - elapsed;
   ctx.pointerPublishTimerId = setTimeout(() => flushPointer(ctx), delay);
 }
 
@@ -449,9 +609,7 @@ function flushPublishLocalPresence(ctx: EditorContext): void {
   let cursor: { sectionId: string; elementId: string; offset?: number } | null = null;
   if (sel && sel.anchorNode) {
     const anchorEl =
-      sel.anchorNode.nodeType === 1
-        ? (sel.anchorNode as Element)
-        : sel.anchorNode.parentElement;
+      sel.anchorNode.nodeType === 1 ? (sel.anchorNode as Element) : sel.anchorNode.parentElement;
     const wrapper = anchorEl ? anchorEl.closest('[data-opencanvas-element]') : null;
     const sectionNode = anchorEl ? anchorEl.closest('[data-opencanvas-section]') : null;
     if (wrapper && sectionNode) {
@@ -480,10 +638,39 @@ function flushPublishLocalPresence(ctx: EditorContext): void {
         color: ctx.localPresence.color,
         cursor: cursor,
         selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
+        // ADR 0065 F1-multi-collab-presence — same rationale as in
+        // publishPointer: fold the active template-edit pin into every
+        // awareness write so peers see the live value as soon as the
+        // selectionchange-driven loop fires.
+        editingCollectionTemplateId: ctx.editingCollectionTemplate
+          ? ctx.editingCollectionTemplate.collectionId
+          : null,
       },
       ctx.presenceUserId ? { userId: ctx.presenceUserId } : {},
     ),
   );
+}
+
+/**
+ * ADR 0065 F1-multi-collab-presence — flush the local presence payload
+ * immediately, BYPASSING the throttle gate AND the `remotePeerCount === 0`
+ * skip. Called by the Collection template-edit enter/exit verbs so the
+ * editingCollectionTemplateId field on the local awareness state reflects
+ * the Owner's actual mode within one tick — both for peers already in the
+ * room (so the "<peer> is also editing" indicator lights up without
+ * waiting for the next cursor move) AND for peers that join later (so
+ * their awareness snapshot picks up the live value).
+ *
+ * The no-peer skip is intentional in the cursor-tracking path (mousemove +
+ * selectionchange fire orders of magnitude more often than peer arrivals,
+ * and skipping the DO request when nobody can see saves billable writes),
+ * but the template-edit toggle is a discrete, rare event — the per-edit
+ * DO cost is one write, regardless of who is listening. Bypassing the
+ * gate keeps the local awareness state truthful for a future peer.
+ */
+export function publishLocalPresenceImmediate(ctx: EditorContext): void {
+  if (!ctx.coEditConnection || !ctx.localPresence) return;
+  flushPublishLocalPresence(ctx);
 }
 
 export function schedulePublishLocalPresence(ctx: EditorContext): void {
@@ -492,12 +679,15 @@ export function schedulePublishLocalPresence(ctx: EditorContext): void {
   ctx.presencePublishPending = true;
   const now = Date.now();
   const elapsed = now - ctx.presencePublishLastAtMs;
-  const delay =
-    elapsed >= POINTER_PUBLISH_INTERVAL_MS ? 0 : POINTER_PUBLISH_INTERVAL_MS - elapsed;
+  const delay = elapsed >= POINTER_PUBLISH_INTERVAL_MS ? 0 : POINTER_PUBLISH_INTERVAL_MS - elapsed;
   setTimeout(() => flushPublishLocalPresence(ctx), delay);
 }
 
 // -- WebSocket boot ----------------------------------------------------
+
+type CoEditPresenceArg = Parameters<
+  NonNullable<EditorContext['coEditConnection']>['setPresence']
+>[0];
 
 interface OpencanvasCoEditGlobal {
   connectCoEdit: (
@@ -507,7 +697,14 @@ interface OpencanvasCoEditGlobal {
       websocketUrl: string;
       reconnectDelayMs: number;
       reconnectMaxDelayMs: number;
-      initialPresence: Parameters<NonNullable<EditorContext['coEditConnection']>['setPresence']>[0];
+      /**
+       * ADR 0065 F2-followup — function form so the connector resolves the
+       * snapshot AT EVERY OPEN (including reconnect), not from a stale
+       * capture taken at attach time. A literal value here would freeze
+       * `editingCollectionTemplateId` at its boot-time `null` and silently
+       * overwrite the live pin after every socket reopen.
+       */
+      initialPresence: () => CoEditPresenceArg;
       websocketFactory: (url: string) => WebSocket;
     },
   ) => NonNullable<EditorContext['coEditConnection']>;
@@ -571,15 +768,15 @@ export function attachCoEditImpl(ctx: EditorContext): void {
     // Without this, the awareness filter on the receive side drops every
     // peer (name/color required) — the "N editing" pill stays at 1 and
     // remote-cursor rendering has nothing to draw.
-    initialPresence: Object.assign(
-      {
-        name: ctx.localPresence ? ctx.localPresence.name : '',
-        color: ctx.localPresence ? ctx.localPresence.color : '',
-        cursor: null,
-        selection: null,
-      },
-      ctx.presenceUserId ? { userId: ctx.presenceUserId } : {},
-    ),
+    //
+    // ADR 0065 F2-followup — pass a THUNK, not a captured snapshot. The
+    // connector resolves the function at every socket open (including
+    // reconnect). A literal value here would freeze
+    // `editingCollectionTemplateId` at its boot-time `null` and silently
+    // overwrite the live pin every time the WS reopens — the Owner could
+    // enter template-edit mode while the socket was flapping and the
+    // reopen would publish a stale `null` to every peer.
+    initialPresence: () => buildLocalPresenceSnapshot(ctx),
     websocketFactory: function (url: string): WebSocket {
       const socket = new WebSocket(url);
       socket.addEventListener('open', function () {
@@ -721,6 +918,21 @@ export function attachCoEditImpl(ctx: EditorContext): void {
       }
     });
     repaintRemoteCursorsImpl(ctx);
+
+    // ADR 0065 F1-multi-collab-presence — rebuild
+    // ctx.collectionTemplateEditors from the active peers' awareness
+    // payloads. The map is refreshed in full on every presence tick
+    // (cheap — O(peers) per tick, and peer count rarely exceeds single
+    // digits) so a peer entering or exiting template-edit mode lands
+    // within one awareness tick of the change. The inspector reads the
+    // map at render time; we call renderInspector when the membership
+    // actually shifted so the indicator updates without a manual
+    // re-select.
+    const nextEditors = computeCollectionTemplateEditors(peers, ctx.presenceUserId ?? null);
+    if (!collectionTemplateEditorsEqual(ctx.collectionTemplateEditors, nextEditors)) {
+      ctx.collectionTemplateEditors = nextEditors;
+      ctx.renderInspector();
+    }
   });
 
   ctx.coEditConnection = conn;

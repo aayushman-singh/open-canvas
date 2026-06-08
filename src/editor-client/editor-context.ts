@@ -416,6 +416,27 @@ export interface EditorContext {
    *  that no longer exists (concurrent collaborator deletion), the next
    *  render-pass clears the field; no crash, no zombie viewport. */
   editingCollectionTemplate: { collectionId: string } | null;
+  /** ADR 0065 F1-multi-collab-presence — `{<collectionId>: [peerName, …]}`
+   *  map of remote peers (excluding the local self) currently editing a
+   *  given Collection's customTemplate. Refreshed by `onRemotePresence`
+   *  in co-edit.ts off the Yjs awareness fan-out: each presence payload
+   *  carries `editingCollectionTemplateId` (null when the peer is not in
+   *  template-edit mode); the receive side groups peers by that field
+   *  into an entry per Collection. Empty Map when no peer is in any
+   *  template-edit mode.
+   *
+   *  The Collection inspector reads this on render and renders a small
+   *  "<N> other(s) editing: <names>" indicator when the active
+   *  Collection's id appears as a key. `onRemotePresence` calls
+   *  `renderInspector()` whenever this map changes so the indicator
+   *  refreshes within one awareness tick of a peer entering / exiting.
+   *
+   *  Peer departure is handled by the existing awareness cleanup path:
+   *  `removeAwarenessClientIds` (site-room.ts webSocketClose) tombstones
+   *  the dead clientID, the local Awareness drops it, the next
+   *  onRemotePresence callback re-computes this map without the departed
+   *  peer. No new TTL or sweep timer needed. */
+  collectionTemplateEditors: Map<string, string[]>;
   /** ADR 0065 D3 + D9 — enter custom-template edit mode for the named
    *  Collection. Preconditions enforced at runtime via ctx.setStatus
    *  ('error'): id must resolve to a Collection, and the Collection's
