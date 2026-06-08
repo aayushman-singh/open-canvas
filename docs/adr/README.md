@@ -45,6 +45,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0033 | Section inspector surfaces role, bg effect, entrance, bg video, popup trigger | Accepted | [`docs/adr/0033-section-inspector-fields-for-role-bgeffect-entrance-bgvideo-popup.md`](0033-section-inspector-fields-for-role-bgeffect-entrance-bgvideo-popup.md) |
 | 0034 | `+ New Page` opens a modal that captures title, slug, and locale | Accepted | [`docs/adr/0034-new-page-modal-with-title-slug-locale.md`](0034-new-page-modal-with-title-slug-locale.md) |
 | 0035 | Visitor dark mode is a three-way enum (`light` / `dark` / `toggleable`) | Accepted | [`docs/adr/0035-visitor-dark-mode-three-way-enum.md`](0035-visitor-dark-mode-three-way-enum.md) |
+| 0036 | Per-page password gate scope, single site secret | Rejected | [`docs/adr/0036-per-page-password-gate-scope.md`](0036-per-page-password-gate-scope.md) |
 | 0037 | Account page ships the billing surface before the billing engine | Superseded by 0042 | [`docs/adr/0037-account-page-billing-surface-pre-billing.md`](0037-account-page-billing-surface-pre-billing.md) |
 | 0042 | Account page renders a mock-billing plan picker; no billing engine ships | Accepted (supersedes 0037, amended 2026-06-04) | [`docs/adr/0042-account-page-metering-only.md`](0042-account-page-metering-only.md) |
 | 0038 | Snapshot preview is a server-rendered sandboxed iframe via srcdoc | Accepted | [`docs/adr/0038-snapshot-preview-iframe.md`](0038-snapshot-preview-iframe.md) |
@@ -57,6 +58,11 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0046 | `addon_custom_scripts` is Owner-authored JavaScript by design; entitlement is the security boundary | Accepted | [`docs/adr/0046-addon-custom-scripts-as-owner-code.md`](0046-addon-custom-scripts-as-owner-code.md) |
 | 0047 | Editor WebSocket bearer travels in the URL query string | Accepted | [`docs/adr/0047-ws-token-in-query-for-editor-socket.md`](0047-ws-token-in-query-for-editor-socket.md) |
 | 0048 | Chat session is last-writer-wins; concurrent tab writes are out of scope | Accepted | [`docs/adr/0048-chat-session-last-writer-wins.md`](0048-chat-session-last-writer-wins.md) |
+| 0049 | Rename R2 bucket `rev01-assets` to `opencanvas-assets` | Proposed | [`docs/adr/0049-r2-bucket-rename-from-rev01-assets-to-opencanvas-assets.md`](0049-r2-bucket-rename-from-rev01-assets-to-opencanvas-assets.md) |
+| 0050 | Layout primitives: fluid type, anchor ids, site-level scroll behaviour | Proposed | [`docs/adr/0050-layout-primitives-fluid-type-anchor-ids-scroll-padding.md`](0050-layout-primitives-fluid-type-anchor-ids-scroll-padding.md) |
+| 0051 | Action expressiveness: rich labels, icon registry, copy behaviour, container links | Proposed | [`docs/adr/0051-action-expressiveness-rich-labels-icons-copy-container-links.md`](0051-action-expressiveness-rich-labels-icons-copy-container-links.md) |
+| 0052 | Tabs as a `TabsElement` with embedded panels | Proposed | [`docs/adr/0052-tabs-as-element-with-embedded-panels.md`](0052-tabs-as-element-with-embedded-panels.md) |
+| 0054 | Layout v2: sticky positioning, drill-in overlay contract, scroll-snap rail | Proposed (sticky + scroll-snap shipped; drill-in overlay documented as contract, implementation deferred) | [`docs/adr/0054-layout-v2-sticky-positioning-drill-in-overlay-scroll-snap-rail.md`](0054-layout-v2-sticky-positioning-drill-in-overlay-scroll-snap-rail.md) |
 | 0055 | Agent runs until budget exhausts, not until a fixed iteration count | Accepted | [`docs/adr/0055-agent-runs-until-budget-exhausts.md`](0055-agent-runs-until-budget-exhausts.md) |
 | 0056 | Summarisation and read-only inspection iterations run on Flash; planning iterations run on Pro | Accepted | [`docs/adr/0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md`](0056-llm-tier-routing-flash-for-inspection-pro-for-planning.md) |
 | 0057 | Every canvas element dispatch shares one shape: mapped-type record, typed dispatcher, runtime guard | Accepted | [`docs/adr/0057-canvas-element-dispatch-shape.md`](0057-canvas-element-dispatch-shape.md) |
@@ -67,7 +73,7 @@ This directory holds rev01's Architecture Decision Records (ADRs). Each ADR capt
 | 0062 | Section accent border is a single discriminated-union field with four mutually exclusive variants | Accepted | [`docs/adr/0062-section-accent-border.md`](0062-section-accent-border.md) |
 | 0063 | Collection element binds at element level, ships visible defaults, and groups entries by folder | Accepted | [`docs/adr/0063-collection-element-binds-at-element-level-and-ships-defaults.md`](0063-collection-element-binds-at-element-level-and-ships-defaults.md) |
 | 0064 | EditorContext decomposes into narrow named-Pick contexts per consumer | Accepted | [`docs/adr/0064-editor-context-decomposition.md`](0064-editor-context-decomposition.md) |
-| 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Proposed | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
+| 0065 | Custom Collection card template lives on the element, edited in-place via global editor state | Accepted | [`docs/adr/0065-custom-collection-card-template.md`](0065-custom-collection-card-template.md) |
 
 Add new ADRs here. Keep the index sorted by number.
 
