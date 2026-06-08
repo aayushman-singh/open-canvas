@@ -32,6 +32,7 @@ import type { TableElement } from '../canvas/elements/table.js';
 import type { InlineRun } from '../canvas/schema.js';
 import { field } from './dom-builders.js';
 import { newElementId } from './ids.js';
+import { createInspectorEntry } from './inspector-leaf-builders.js';
 
 export function mountAccordionItems(
   ctx: EditorContext,
@@ -74,8 +75,19 @@ export function mountAccordionItems(
     for (let ii = 0; ii < element.items.length; ii++) {
       (function (idx: number) {
         const item = element.items[idx]!;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove item';
+        removeBtn.setAttribute('aria-label', 'Remove item');
+        removeBtn.addEventListener('click', function () {
+          element.items.splice(idx, 1);
+          renderItemList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Item ' + (idx + 1), removeBtn);
 
         const titleInput = document.createElement('input');
         titleInput.type = 'text';
@@ -129,20 +141,6 @@ export function mountAccordionItems(
 
         card.appendChild(field('Body', bodyWrap));
 
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '×';
-        removeBtn.title = 'Remove item';
-        removeBtn.setAttribute('aria-label', 'Remove item');
-        removeBtn.addEventListener('click', function () {
-          element.items.splice(idx, 1);
-          renderItemList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        card.appendChild(removeBtn);
-
         itemListHost.appendChild(card);
       })(ii);
     }
@@ -176,8 +174,19 @@ export function mountCarouselSlides(
     for (let si = 0; si < element.slides.length; si++) {
       (function (idx: number) {
         const slide = element.slides[idx]!;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove slide';
+        removeBtn.setAttribute('aria-label', 'Remove slide');
+        removeBtn.addEventListener('click', function () {
+          element.slides.splice(idx, 1);
+          renderSlideList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Slide ' + (idx + 1), removeBtn);
 
         const thumbWrap = document.createElement('div');
         thumbWrap.style.cssText = 'margin-bottom:4px;';
@@ -235,20 +244,6 @@ export function mountCarouselSlides(
           ctx.scheduleSave();
         });
         card.appendChild(field('Link', hrefInput));
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '×';
-        removeBtn.title = 'Remove slide';
-        removeBtn.setAttribute('aria-label', 'Remove slide');
-        removeBtn.addEventListener('click', function () {
-          element.slides.splice(idx, 1);
-          renderSlideList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        card.appendChild(removeBtn);
 
         slideListHost.appendChild(card);
       })(si);

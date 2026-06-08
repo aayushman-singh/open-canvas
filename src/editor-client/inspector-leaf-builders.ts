@@ -12,6 +12,13 @@
 //     Reads ctx.state.styleKit and computed CSS off ctx.mainEl so it
 //     stays in sync with whatever style-kits.ts emits at runtime.
 //
+//   - createInspectorEntry(label, removeBtn?) — wrap a repeated-entry
+//     card with an accent-red header ("SLIDE 1", "FIELD 2", "LINK 3",
+//     etc.) and an optional remove button slotted right-aligned in the
+//     header. Used by every list mount that emits a sequence of similar
+//     entries (carousel slides, accordion items, form fields, nav
+//     links) so users can see where one entry ends and the next begins.
+//
 // Extracted from canvas-client.ts:6513-6601 and 12096-12132. The inline
 // IIFE twins remain the production source-of-truth until ADR 0015
 // Phase 3 atomic cutover. Behavioural parity is pinned by the existing
@@ -214,4 +221,42 @@ export function buildKitSummary(ctx: EditorContext): HTMLDivElement {
     wrap.appendChild(row);
   }
   return wrap;
+}
+
+/**
+ * Build a wrapper for one entry in a repeated-entry inspector list
+ * (carousel slide, accordion item, form field, nav link, …). The
+ * wrapper renders an accent-red header — "SLIDE 1", "FIELD 2",
+ * "LINK 3" etc. — with an optional remove button slotted into the
+ * header's right edge. Without the header users see a flat sequence
+ * of `Upload | Caption | Link | × | Upload | Caption | Link | ×`
+ * with no clue where slide 1 ends and slide 2 begins.
+ *
+ * Failure contract: throws when `label` is empty. The caller is
+ * expected to compute "Slide " + (i + 1) etc., and an empty header
+ * would render the entry as a blank red bar — visually broken in a
+ * way that's easy to mis-attribute to a CSS bug.
+ */
+export function createInspectorEntry(
+  label: string,
+  removeBtn?: HTMLButtonElement,
+): HTMLDivElement {
+  if (typeof label !== 'string' || label.length === 0) {
+    throw new Error('createInspectorEntry: label must be a non-empty string');
+  }
+  const entry = document.createElement('div');
+  entry.className = 'opencanvas-inspector-entry';
+
+  const header = document.createElement('div');
+  header.className = 'opencanvas-inspector-entry-header';
+
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'opencanvas-inspector-entry-header-label';
+  labelSpan.textContent = label;
+  header.appendChild(labelSpan);
+
+  if (removeBtn) header.appendChild(removeBtn);
+
+  entry.appendChild(header);
+  return entry;
 }

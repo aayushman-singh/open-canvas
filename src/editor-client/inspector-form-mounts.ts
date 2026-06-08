@@ -29,7 +29,7 @@ import type { EditorContext } from './editor-context.js';
 import type { FormElement, FormFieldDef, FormStyle } from '../canvas/elements/form.js';
 import { field, selectInput } from './dom-builders.js';
 import { newElementId } from './ids.js';
-import { buildColorRow } from './inspector-leaf-builders.js';
+import { buildColorRow, createInspectorEntry } from './inspector-leaf-builders.js';
 
 export function mountFormFields(
   ctx: EditorContext,
@@ -69,8 +69,19 @@ export function mountFormFields(
     for (let fi = 0; fi < element.fields.length; fi++) {
       (function (idx: number) {
         const f = element.fields[idx] as FormFieldDef;
-        const card = document.createElement('div');
-        card.className = 'inspector-list-card';
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'opencanvas-inspector-remove';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove field';
+        removeBtn.setAttribute('aria-label', 'Remove field');
+        removeBtn.addEventListener('click', function () {
+          element.fields.splice(idx, 1);
+          renderFieldList();
+          ctx.rebuildElement(element.id);
+          ctx.scheduleSave();
+        });
+        const card = createInspectorEntry('Field ' + (idx + 1), removeBtn);
 
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
@@ -190,20 +201,6 @@ export function mountFormFields(
           renderOpts();
           card.appendChild(field('Options', optHost));
         }
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'opencanvas-inspector-remove';
-        removeBtn.textContent = '×';
-        removeBtn.title = 'Remove field';
-        removeBtn.setAttribute('aria-label', 'Remove field');
-        removeBtn.addEventListener('click', function () {
-          element.fields.splice(idx, 1);
-          renderFieldList();
-          ctx.rebuildElement(element.id);
-          ctx.scheduleSave();
-        });
-        card.appendChild(removeBtn);
 
         fieldListHost.appendChild(card);
       })(fi);
