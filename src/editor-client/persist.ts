@@ -48,7 +48,11 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { AiUndoSidecarSnapshot, EditorContext } from './editor-context.js';
+import type {
+  AiUndoSidecarSnapshot,
+  EditorContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { EditableSite } from '../canvas/schema.js';
 
 // Snapshot shape mirrors the inline IIFE: undoStack entries are deep
@@ -67,6 +71,42 @@ const UNDO_PERSIST_MAX = 20;
 
 type AiSuggestionEntry = EditorContext['pendingAiSuggestions'][number];
 
+// ADR 0064 — the canonical `PersistContext` alias covers the *callers*
+// of persist (scheduleSave, captureForUndo, authFetch, apiBase, siteId).
+// This module is the *callee* — it implements those verbs and owns the
+// undo machinery itself, so the canonical alias doesn't fit. The narrow
+// types below carve out per-function surfaces from `EditorContext`
+// directly; downstream callers (save-wiring.ts undo/redo forward-casts)
+// will import the function-specific types rather than the wide context.
+
+// ADR 0064 — shared undo-stack surface. Every function that mutates the
+// undo/redo stacks reads + writes this exact set, including the AI
+// sidecar twin stacks that ride alongside snapshot stacks 1:1.
+type UndoStackContext = Pick<
+  EditorContext,
+  | 'state'
+  | 'undoStack'
+  | 'redoStack'
+  | 'undoAiSidecarStack'
+  | 'redoAiSidecarStack'
+>;
+
+// ADR 0064 — AI sidecar read surface. The sidecar snapshot captures
+// ghost-section overlays + pending-suggestion entries; restore + repaint
+// walk the same fields and call back into the AI integration verbs.
+type AiSidecarReadContext = Pick<
+  EditorContext,
+  'ghostSections' | 'pendingAiSuggestions'
+>;
+
+// ADR 0064 — repaint surface. After an undo/redo restore, the AI
+// suggestion overlays need their target DOM nodes re-resolved and the
+// "Accept all" button reconciled. These two verbs are the only non-
+// stack/non-status touches the redo/undo tail performs that aren't in a
+// canonical alias yet.
+type AiSidecarRepaintContext = AiSidecarReadContext &
+  Pick<EditorContext, 'findCanvasNodeForOp' | 'refreshAcceptAllButton'>;
+
 function undoStorageKey(siteId: string): string {
   return 'oc:undo:' + siteId;
 }
@@ -78,7 +118,11 @@ function emptyAiSidecarStack(length: number): Array<AiUndoSidecarSnapshot | null
   );
 }
 
-function aiSidecarSnapshot(ctx: EditorContext): AiUndoSidecarSnapshot {
+// ADR 0064 — pure capture of the AI sidecar fields into a snapshot;
+// read-only on `ghostSections` + `pendingAiSuggestions`.
+type AiSidecarSnapshotContext = AiSidecarReadContext;
+
+function aiSidecarSnapshot(ctx: AiSidecarSnapshotContext): AiUndoSidecarSnapshot {
   return {
     ghostSections: structuredClone(ctx.ghostSections),
     suggestions: ctx.pendingAiSuggestions.map((entry, index) => ({
@@ -90,7 +134,11 @@ function aiSidecarSnapshot(ctx: EditorContext): AiUndoSidecarSnapshot {
   };
 }
 
-function ensureAiSidecarStacks(ctx: EditorContext): void {
+// ADR 0064 — keeps the AI sidecar stacks length-synced with the snapshot
+// stacks; touches only the four stack arrays from `UndoStackContext`.
+type EnsureAiSidecarStacksContext = UndoStackContext;
+
+function ensureAiSidecarStacks(ctx: EnsureAiSidecarStacksContext): void {
   if (!Array.isArray(ctx.undoAiSidecarStack)) {
     ctx.undoAiSidecarStack = emptyAiSidecarStack(ctx.undoStack.length);
   }
@@ -111,7 +159,13 @@ function ensureAiSidecarStacks(ctx: EditorContext): void {
   }
 }
 
-function updateCurrentUndoAiSidecar(ctx: EditorContext): void {
+// ADR 0064 — rewrites the top of the undo AI sidecar stack to match the
+// current AI state. Composes the stack surface with the read surface
+// `aiSidecarSnapshot` needs.
+type UpdateCurrentUndoAiSidecarContext = EnsureAiSidecarStacksContext &
+  AiSidecarSnapshotContext;
+
+function updateCurrentUndoAiSidecar(ctx: UpdateCurrentUndoAiSidecarContext): void {
   ensureAiSidecarStacks(ctx);
   if (ctx.undoAiSidecarStack.length === 0) return;
   ctx.undoAiSidecarStack[ctx.undoAiSidecarStack.length - 1] = aiSidecarSnapshot(ctx);
@@ -137,7 +191,14 @@ function applySuggestionUi(entry: AiSuggestionEntry): void {
   }
 }
 
-function restoreAiSidecar(ctx: EditorContext, snapshot: AiUndoSidecarSnapshot | null): void {
+// ADR 0064 — replays a sidecar snapshot back onto the AI fields. Writes
+// `ghostSections`, walks `pendingAiSuggestions`, no stack/status access.
+type RestoreAiSidecarContext = AiSidecarReadContext;
+
+function restoreAiSidecar(
+  ctx: RestoreAiSidecarContext,
+  snapshot: AiUndoSidecarSnapshot | null,
+): void {
   const restored = snapshot ?? { ghostSections: [], suggestions: [] };
   ctx.ghostSections = structuredClone(restored.ghostSections);
   const byId = new Map<string, AiUndoSidecarSnapshot['suggestions'][number]>();
@@ -156,7 +217,12 @@ function restoreAiSidecar(ctx: EditorContext, snapshot: AiUndoSidecarSnapshot | 
   }
 }
 
-function repaintAiSuggestionTargets(ctx: EditorContext): void {
+// ADR 0064 — post-restore reconciliation: re-resolves each suggestion's
+// target DOM node and refreshes the "Accept all" toggle. Same surface as
+// `AiSidecarRepaintContext`.
+type RepaintAiSuggestionTargetsContext = AiSidecarRepaintContext;
+
+function repaintAiSuggestionTargets(ctx: RepaintAiSuggestionTargetsContext): void {
   for (const entry of ctx.pendingAiSuggestions) {
     entry.targetNode = ctx.findCanvasNodeForOp(entry.op);
     if (!entry.targetNode) continue;
@@ -172,7 +238,17 @@ function repaintAiSuggestionTargets(ctx: EditorContext): void {
   ctx.refreshAcceptAllButton();
 }
 
-export function scheduleSave(ctx: EditorContext): void {
+// ADR 0064 — debounced-save scheduler. Picks the Yjs path vs the HTTP
+// PUT path based on `coEditConnection`, surfaces co-edit status, and
+// chains into `captureForUndo` first so every mutation tail snapshots.
+export type ScheduleSaveContext = CaptureForUndoContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    'coEditConnection' | 'coEditSync' | 'saveTimer' | 'saveStateNow'
+  >;
+
+export function scheduleSave(ctx: ScheduleSaveContext): void {
   captureForUndo(ctx);
   // Two save paths, picked by whether the Yjs co-edit channel is attached:
   //   1. coEditConnection present: every mutation projects into the Y.Doc
@@ -196,7 +272,17 @@ export function scheduleSave(ctx: EditorContext): void {
   }, 500);
 }
 
-export function disableUndoPersistence(ctx: EditorContext, reason: string, error: unknown): void {
+// ADR 0064 — one-shot circuit breaker for the localStorage undo writes.
+// Toggles `undoPersistenceFailed`, logs with `siteId` for context, and
+// surfaces a status line so the user knows undo won't survive reload.
+export type DisableUndoPersistenceContext = StatusEmitterContext &
+  Pick<EditorContext, 'undoPersistenceFailed' | 'siteId'>;
+
+export function disableUndoPersistence(
+  ctx: DisableUndoPersistenceContext,
+  reason: string,
+  error: unknown,
+): void {
   if (ctx.undoPersistenceFailed) return;
   ctx.undoPersistenceFailed = true;
   console.error('[opencanvas-undo] persist failed', {
@@ -208,7 +294,14 @@ export function disableUndoPersistence(ctx: EditorContext, reason: string, error
   ctx.setStatus('Undo history could not be saved across reloads', 'error');
 }
 
-export function persistUndo(ctx: EditorContext): void {
+// ADR 0064 — localStorage serialiser for the undo/redo stacks. Reads
+// the snapshot stacks, the persistence-failed flag, and `siteId` for
+// the per-site storage key; on failure it delegates to
+// `disableUndoPersistence`, so it inherits that surface too.
+export type PersistUndoContext = DisableUndoPersistenceContext &
+  Pick<EditorContext, 'undoStack' | 'redoStack'>;
+
+export function persistUndo(ctx: PersistUndoContext): void {
   if (ctx.undoPersistenceFailed) return;
   try {
     if (typeof localStorage === 'undefined') {
@@ -239,7 +332,15 @@ export function persistUndo(ctx: EditorContext): void {
   }
 }
 
-export function initUndo(ctx: EditorContext): void {
+// ADR 0064 — boot-time restore of the undo/redo stacks from
+// localStorage. Reads `state` to fingerprint the persisted top-of-stack,
+// then either adopts the saved stacks or seeds fresh; persistUndo +
+// aiSidecarSnapshot are called on the fresh-seed branch.
+export type InitUndoContext = PersistUndoContext &
+  AiSidecarSnapshotContext &
+  EnsureAiSidecarStacksContext;
+
+export function initUndo(ctx: InitUndoContext): void {
   if (!ctx.state) return;
   let restored = false;
   try {
@@ -305,7 +406,14 @@ export function initUndo(ctx: EditorContext): void {
   }
 }
 
-export function captureForUndo(ctx: EditorContext): void {
+// ADR 0064 — debounced 0ms snapshot capture. Reads `undoRedoing` to
+// avoid re-snapshotting the restore itself, then chains the timer into
+// `flushPendingUndoCapture`. Inherits the flush surface so the timeout
+// callback typechecks directly.
+export type CaptureForUndoContext = FlushPendingUndoCaptureContext &
+  Pick<EditorContext, 'undoRedoing'>;
+
+export function captureForUndo(ctx: CaptureForUndoContext): void {
   if (ctx.undoRedoing || !ctx.state) return;
   updateCurrentUndoAiSidecar(ctx);
   if (ctx.undoTimer) clearTimeout(ctx.undoTimer);
@@ -315,7 +423,16 @@ export function captureForUndo(ctx: EditorContext): void {
   }, 0);
 }
 
-export function flushPendingUndoCapture(ctx: EditorContext): void {
+// ADR 0064 — flushes the debounced capture: clears the timer, pushes a
+// fresh snapshot + AI sidecar entry, trims the in-memory caps, drops the
+// redo stack, and persists. Combines the undo-stack surface with the AI
+// snapshot surface, the timer field, and the persist surface.
+export type FlushPendingUndoCaptureContext = PersistUndoContext &
+  AiSidecarSnapshotContext &
+  EnsureAiSidecarStacksContext &
+  Pick<EditorContext, 'undoTimer'>;
+
+export function flushPendingUndoCapture(ctx: FlushPendingUndoCaptureContext): void {
   if (ctx.undoTimer) {
     clearTimeout(ctx.undoTimer);
     ctx.undoTimer = null;
@@ -334,7 +451,24 @@ export function flushPendingUndoCapture(ctx: EditorContext): void {
   persistUndo(ctx);
 }
 
-export function undo(ctx: EditorContext): void {
+// ADR 0064 — undo + redo share the same surface: the full undo-machinery
+// stacks (via flushPendingUndoCapture), the AI sidecar repaint surface,
+// `renderAll` for the post-restore repaint, `scheduleSave` to mark the
+// state dirty, and `setStatus` for the visible-keypress feedback.
+// IMPORTANT: save-wiring.ts forwards its `ctx` into `undo(ctx)` /
+// `redo(ctx)` from inside its window-keydown handler; today it casts
+// through `EditorContext` because this module accepted only the wide
+// shape. Once save-wiring.ts re-exports its `AttachSaveButtonContext`
+// with this surface absorbed (follow-up commit), the two `as
+// EditorContext` casts at save-wiring.ts:122 and :131 retire.
+export type UndoContext = FlushPendingUndoCaptureContext &
+  AiSidecarRepaintContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'renderAll' | 'scheduleSave' | 'undoRedoing'>;
+
+export type RedoContext = UndoContext;
+
+export function undo(ctx: UndoContext): void {
   // Visible no-op feedback: the keyboard handler runs globally on window,
   // so Ctrl+Z fires regardless of which UI surface has focus. Without a
   // status flash, a no-op undo looks identical to a non-firing shortcut,
@@ -367,7 +501,7 @@ export function undo(ctx: EditorContext): void {
   ctx.setStatus('Undo', 'ok');
 }
 
-export function redo(ctx: EditorContext): void {
+export function redo(ctx: RedoContext): void {
   if (!ctx.state) {
     ctx.setStatus('Nothing to redo');
     return;

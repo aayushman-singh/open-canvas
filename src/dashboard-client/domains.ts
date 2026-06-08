@@ -29,6 +29,12 @@ interface OpencanvasModalConfirmOpts {
 
 interface OpencanvasModalGlobal {
   confirm(msg: string, opts?: OpencanvasModalConfirmOpts): Promise<boolean>;
+  // `alert` is part of the shared dashboard modal global registered by
+  // `src/ui/opencanvas-modal-script.ts`. The domains client does not
+  // call it, but `version-timeline.ts` merges the same `Window` shape
+  // and requires the methods on the ambient match — so the declaration
+  // lists every method the shell actually exposes.
+  alert(msg: string, title?: string): Promise<void>;
 }
 
 declare global {

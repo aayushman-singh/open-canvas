@@ -32,6 +32,7 @@ import { addonEntitlement, site, siteAddon } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { readThemeCookie } from '../../ui';
 import { allAddons } from '../../addons/registry';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 interface Bindings {
   CLERK_PUBLISHABLE_KEY: string;
@@ -221,121 +222,27 @@ const pageStyles = `
   .custom-scripts-warning strong { color: var(--red-ink); }
 `;
 
-function clientScript(siteId: string): string {
-  const sid = JSON.stringify(siteId);
-  return String.raw`
-(function() {
-  var SITE_ID = ${sid};
-
-  document.querySelectorAll('[data-addon-form]').forEach(function(form) {
-    var addonId = form.getAttribute('data-addon-form');
-    var msgEl = form.querySelector('.addon-msg');
-    var saveBtn = form.querySelector('[data-save]');
-    if (!saveBtn) return;
-
-    saveBtn.addEventListener('click', function(event) {
-      // Save is type="button" so the form's submit event never fires and
-      // the browser never auto-validates. We resolve the form via
-      // closest('form') from the click target (more robust than the
-      // closure's form ref — survives any future DOM reshuffle) and run
-      // reportValidity() ourselves before the PUT. reportValidity returns
-      // true when every field passes its pattern/required check, false
-      // otherwise — and in the false branch it also pops the browser's
-      // native tooltip on the offending input.
-      var formEl = (event && event.currentTarget && event.currentTarget.closest)
-        ? event.currentTarget.closest('form')
-        : form;
-      if (!formEl) formEl = form;
-
-      var enabledEl = formEl.querySelector('[name="enabled"]');
-      var enabled = enabledEl ? enabledEl.checked : false;
-      var config = {};
-      formEl.querySelectorAll('[data-config-key]').forEach(function(input) {
-        config[input.getAttribute('data-config-key')] = input.value.trim();
-      });
-
-      // Server only validates patterns when enabled (addons.ts:205) — we
-      // mirror that so disabling an addon with stale config in its inputs
-      // still works (the Owner can clear bad values later).
-      if (enabled && typeof formEl.reportValidity === 'function') {
-        if (!formEl.reportValidity()) {
-          if (msgEl) {
-            msgEl.textContent = 'Fix the highlighted field before saving.';
-            msgEl.className = 'addon-msg msg-err';
-          }
-          return;
-        }
-        // Belt-and-suspenders manual pass for required + pattern. Catches
-        // empty values (HTML5 pattern treats empty as valid unless the
-        // input also carries required, which configFields don't) and
-        // surfaces the field's patternHint inline.
-        var inputs = formEl.querySelectorAll('[data-config-key]');
-        for (var i = 0; i < inputs.length; i++) {
-          var input = inputs[i];
-          var pattern = input.getAttribute('pattern');
-          if (!pattern) continue;
-          var value = input.value.trim();
-          if (value.length === 0 || !new RegExp('^(?:' + pattern + ')$').test(value)) {
-            var hintBlock = input.parentNode ? input.parentNode.querySelector('.field-hint') : null;
-            var hint = hintBlock ? hintBlock.textContent : 'Value does not match required format';
-            if (msgEl) {
-              msgEl.textContent = hint;
-              msgEl.className = 'addon-msg msg-err';
-            }
-            input.focus();
-            return;
-          }
-        }
-      }
-
-      saveBtn.disabled = true;
-      var prev = saveBtn.textContent;
-      saveBtn.textContent = 'Saving...';
-      if (msgEl) { msgEl.textContent = ''; msgEl.className = 'addon-msg'; }
-
-      fetch('/api/addons/sites/' + SITE_ID + '/' + addonId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: enabled, config: config }),
-      })
-      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
-      .then(function(result) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = prev;
-        if (!result.ok) {
-          // Server returns { error, field?, hint? } on validation rejection.
-          // Surface the hint both in the toast AND inline (replace the
-          // static field-hint text) and focus the offending input so the
-          // Owner can fix without scrolling back through the form.
-          var serverError = result.data && result.data.error ? result.data.error : 'Save failed';
-          var serverHint = result.data && result.data.hint ? result.data.hint : null;
-          var serverField = result.data && result.data.field ? result.data.field : null;
-          if (serverField) {
-            var fieldInput = formEl.querySelector('[data-config-key="' + serverField + '"]');
-            if (fieldInput) {
-              if (typeof fieldInput.focus === 'function') fieldInput.focus();
-              if (serverHint && fieldInput.parentNode) {
-                var inlineHint = fieldInput.parentNode.querySelector('.field-hint');
-                if (inlineHint) {
-                  inlineHint.textContent = serverHint;
-                  inlineHint.className = 'field-hint field-hint-err';
-                }
-              }
-            }
-          }
-          throw new Error(serverHint || serverError);
-        }
-        if (msgEl) { msgEl.textContent = 'Saved. Changes are live on your published site.'; msgEl.className = 'addon-msg msg-ok'; }
-      })
-      .catch(function(err) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = prev;
-        if (msgEl) { msgEl.textContent = err.message; msgEl.className = 'addon-msg msg-err'; }
-      });
-    });
-  });
-})();
-`;
+// ADR 0021 — migrated to dashboard-client bundle. Save-button validation
+// + PUT logic now live in `src/dashboard-client/site-addons.ts` and ship
+// in the shared dashboard bundle
+// (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The route emits a tiny
+// boot blob with `route: 'site-addons'` and the per-request `siteId`;
+// the bundle's dispatcher reads it and calls `mountSiteAddons()`. DOM
+// contract unchanged — same `[data-addon-form]`, `[name="enabled"]`,
+// `[data-config-key]`, `[data-save]`, `.addon-msg`, `.field-hint`. API
+// contract unchanged — same PUT
+// `/api/addons/sites/:siteId/:addonId`. `siteId` flows through the boot
+// blob via `JSON.stringify`, so quotes / braces in the value cannot
+// break out of the inline script.
+function clientBoot(siteId: string) {
+  return raw(
+    '<script>window.__opencanvasDashboardBoot = ' +
+      JSON.stringify({ route: 'site-addons', siteId }) +
+      ';</script>' +
+      '<script src="' +
+      EDITOR_CLIENT_MANIFEST.dashboardClientUrl +
+      '" defer></script>',
+  );
 }
 
 // Icon palette aligned with the root /dashboard/addons catalogue so a
@@ -568,7 +475,7 @@ siteAddonsRoute.get('/sites/:siteId/addons', async (c) => {
         ))}
       </div>
 
-      <script>{raw(clientScript(siteId))}</script>
+      {clientBoot(siteId)}
     </DashboardShell>,
   );
 });

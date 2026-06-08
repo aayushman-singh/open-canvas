@@ -57,11 +57,11 @@ assert(
 // behind the selection-id guard. We slice from the function signature to
 // the next `export function ` keyword (rebuildElementImpl).
 const buildStart = elementMenuSrc.indexOf(
-  'export function buildElementNodeImpl(ctx: EditorContext, element: CanvasElement): HTMLElement {',
+  'export function buildElementNodeImpl(ctx: BuildElementNodeContext, element: CanvasElement): HTMLElement {',
 );
 assert(buildStart >= 0, 'buildElementNodeImpl signature not found in element-menu.ts');
 const rebuildStart = elementMenuSrc.indexOf(
-  'export function rebuildElementImpl(ctx: EditorContext, elementId: string): void {',
+  'export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string): void {',
   buildStart,
 );
 assert(rebuildStart > buildStart, 'rebuildElementImpl signature must follow buildElementNodeImpl');

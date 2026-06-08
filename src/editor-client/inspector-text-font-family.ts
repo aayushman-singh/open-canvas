@@ -55,8 +55,38 @@ import { FONT_PRESETS, type FontPreset } from '../fonts/preset-catalog.js';
 import { emitAllSiteFontFaceBlocks } from '../fonts/face-emit.js';
 
 import type { CanvasElement } from '../canvas/schema.js';
-import type { EditorContext, EditorCustomFont } from './editor-context.js';
+import type {
+  EditorContext,
+  EditorCustomFont,
+  PersistContext,
+  RenderContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { field } from './dom-builders.js';
+
+// ADR 0064 — the two private server-talking helpers (POST upload,
+// DELETE row) only read PersistContext: apiBase + siteId build the
+// URL, authFetch carries the cookie. Aliased so callers signal the
+// "network only" intent at the boundary even though the alias collapses
+// to the canonical PersistContext.
+type FontUploadContext = PersistContext;
+
+// ADR 0064 — refreshCustomFontsImpl walks the GET response, stamps
+// ctx.customFonts, refreshes the editor's @font-face <style>, and
+// re-renders the inspector. Mixes PersistContext (network) +
+// RenderContext (renderInspector) + StatusEmitterContext (toasts) plus
+// the lone customFonts mutable slot that no canonical alias owns.
+export type RefreshCustomFontsContext = PersistContext &
+  RenderContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'customFonts'>;
+
+// ADR 0064 — full text-inspector font-family mount handler. Shares the
+// shape of RefreshCustomFontsContext: PersistContext carries the
+// captureForUndo + scheduleSave tail, RenderContext carries
+// rebuildElement, StatusEmitterContext carries upload/delete toasts,
+// and customFonts is the same mutable slot.
+export type MountTextFontFamilyContext = RefreshCustomFontsContext;
 
 /** Sentinel `<option>` value for "(Style kit default)". `__`-prefixed so
  *  it cannot collide with a real CSS font-family chain. */
@@ -237,7 +267,7 @@ export function applyFontFamilySelection(
 }
 
 async function uploadFontFile(
-  ctx: EditorContext,
+  ctx: FontUploadContext,
   file: File,
 ): Promise<EditorCustomFont> {
   const displayName = deriveDisplayName(file.name);
@@ -283,7 +313,7 @@ async function uploadFontFile(
   };
 }
 
-async function deleteFontRow(ctx: EditorContext, fontId: string): Promise<void> {
+async function deleteFontRow(ctx: FontUploadContext, fontId: string): Promise<void> {
   const url = `${ctx.apiBase}/sites/${encodeURIComponent(ctx.siteId)}/fonts/${encodeURIComponent(fontId)}`;
   const response = await ctx.authFetch(url, { method: 'DELETE' });
   if (!response.ok) {
@@ -303,7 +333,7 @@ async function deleteFontRow(ctx: EditorContext, fontId: string): Promise<void> 
  * inspector host element; we own the imperative DOM from there.
  */
 export function mountTextFontFamily(
-  ctx: EditorContext,
+  ctx: MountTextFontFamilyContext,
   element: CanvasElement,
   host: HTMLElement,
 ): void {
@@ -515,7 +545,7 @@ export function mountTextFontFamily(
  * (e.g. a future broadcast from another tab). Failures surface a status
  * toast and leave ctx.customFonts as-is.
  */
-export async function refreshCustomFontsImpl(ctx: EditorContext): Promise<void> {
+export async function refreshCustomFontsImpl(ctx: RefreshCustomFontsContext): Promise<void> {
   const response = await ctx.authFetch(
     ctx.apiBase + '/sites/' + encodeURIComponent(ctx.siteId) + '/fonts',
   );

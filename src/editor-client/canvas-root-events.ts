@@ -27,11 +27,40 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  SelectionContext,
+} from './editor-context.js';
 import { resolveCollectionAncestorForClick } from './selection.js';
 import { cssEscape } from './css-escape.js';
 
-export function attachRootEventsImpl(ctx: EditorContext): void {
+// ADR 0064 — canvas root-event wiring rides two canonical clusters
+// (DomContext for the root/viewport/inspector refs, SelectionContext for
+// the select/editing latch + verbs) plus a grab bag of interaction
+// state, page-activation verbs, element-menu verbs, section + element
+// dispatch, fit-to-page, modal-open latch, and the template-edit
+// machinery that no canonical alias owns yet. The inline `Pick`
+// enumerates that grab bag honestly.
+export type AttachRootEventsContext = DomContext &
+  SelectionContext &
+  Pick<
+    EditorContext,
+    | 'interactionMode'
+    | 'editingCollectionTemplate'
+    | 'exitCollectionTemplateEdit'
+    | 'activePageId'
+    | 'setActivePage'
+    | 'toggleElementMenu'
+    | 'closeElementMenu'
+    | 'handleSectionAction'
+    | 'resolveElementWrapperAtPoint'
+    | 'beginTextEdit'
+    | 'fitToPage'
+    | 'modalOpen'
+  >;
+
+export function attachRootEventsImpl(ctx: AttachRootEventsContext): void {
   const root = ctx.root;
   if (!root) return;
 

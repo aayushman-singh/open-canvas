@@ -66,7 +66,15 @@
 // camera module's truthiness gate stays valid under the narrower type.
 
 import { SECTION_CATEGORIES, type SectionCategory } from '../canvas/section-library/categories.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 import { migrateState } from './state-migration.js';
 import { escapeAttr, escapeHtml } from './html-escape.js';
@@ -171,6 +179,41 @@ export function prefetchSectionsCatalog(ctx: EditorContext): void {
   if (prefetchPromise !== null) return;
   if (ctx.sectionsCatalog !== null) return;
   prefetchPromise = (async (): Promise<PrefetchOutcome> => {
+// ADR 0064 — the sections-picker functions form a tight cycle (loader
+// calls renderer, renderer calls enter/exit, enter/exit re-render and
+// queue placement slots, importPendingSectionAt re-renders) so they
+// share a single narrow surface. Canonical clusters touched:
+//   - StateContext: `state` mutation + `currentPage()` walk for slots.
+//   - DomContext: `mainEl` for the data-style-kit attribute swap.
+//   - SelectionContext: clearing `selectedSectionId` / `selectedElementId`
+//     after the editableState swap so stale ids don't survive the import.
+//   - RenderContext: `renderAll()` after the state swap.
+//   - PersistContext: `authFetch` + `apiBase` + `siteId` for the
+//     /library/sections GET and /sites/<id>/sections/import POST.
+//   - StatusEmitterContext: the status-line surface area for placement
+//     prompts and import success/failure toasts.
+// The inline `Pick` covers picker-local UI state + the import flush hook
+// + the pending-import latch, none of which fits a canonical alias.
+export type SectionsPickerContext = StateContext &
+  DomContext &
+  SelectionContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'sectionsCatalog'
+    | 'activeCategoryFilter'
+    | 'activeSearchQuery'
+    | 'activeSortMode'
+    | 'pendingImport'
+    | 'flushPendingSave'
+  >;
+
+export async function ensureSectionsPanelLoaded(ctx: SectionsPickerContext): Promise<void> {
+  const root = document.querySelector('[data-section-picker-root]');
+  if (!root) return;
+  if (ctx.sectionsCatalog === null) {
     try {
       const response = await ctx.authFetch(ctx.apiBase + '/library/sections');
       if (!response.ok) {
@@ -228,7 +271,7 @@ export async function ensureSectionsPanelLoaded(ctx: EditorContext): Promise<voi
   renderSectionsPanelImpl(ctx);
 }
 
-export function renderSectionsPanelImpl(ctx: EditorContext): void {
+export function renderSectionsPanelImpl(ctx: SectionsPickerContext): void {
   const root = document.querySelector('[data-section-picker-root]');
   if (!root || ctx.sectionsCatalog === null) return;
 
@@ -244,7 +287,7 @@ export function renderSectionsPanelImpl(ctx: EditorContext): void {
   if (gridContainer) renderSectionsPickerGrid(ctx, gridContainer);
 }
 
-function renderSectionsPickerShell(ctx: EditorContext, root: Element): void {
+function renderSectionsPickerShell(ctx: SectionsPickerContext, root: Element): void {
   // ADR 0061 Decision 11 — category filter replaces the source filter
   // ("All / Built-in / Library") because Owners care about *what the
   // section is*, not where it came from. Order mirrors SECTION_CATEGORIES
@@ -351,7 +394,7 @@ export function filterAndSortCatalog(
   return filtered;
 }
 
-function renderSectionsPickerGrid(ctx: EditorContext, gridContainer: Element): void {
+function renderSectionsPickerGrid(ctx: SectionsPickerContext, gridContainer: Element): void {
   if (ctx.sectionsCatalog === null) return;
 
   const filtered = filterAndSortCatalog(ctx.sectionsCatalog, {
@@ -450,7 +493,7 @@ function renderSectionsPickerGrid(ctx: EditorContext, gridContainer: Element): v
   });
 }
 
-export function enterPlacementModeImpl(ctx: EditorContext, target: PendingImport): void {
+export function enterPlacementModeImpl(ctx: SectionsPickerContext, target: PendingImport): void {
   ctx.pendingImport = target;
   // setStatus only recognises "error" / "ok" tones in this codebase;
   // "info" would silently fall through. Use "ok" for the pending banner.
@@ -459,14 +502,14 @@ export function enterPlacementModeImpl(ctx: EditorContext, target: PendingImport
   renderPlacementSlotsImpl(ctx);
 }
 
-export function exitPlacementModeImpl(ctx: EditorContext): void {
+export function exitPlacementModeImpl(ctx: SectionsPickerContext): void {
   ctx.pendingImport = null;
   ctx.setStatus('Cancelled', 'ok');
   renderSectionsPanelImpl(ctx);
   renderPlacementSlotsImpl(ctx);
 }
 
-export function renderPlacementSlotsImpl(ctx: EditorContext): void {
+export function renderPlacementSlotsImpl(ctx: SectionsPickerContext): void {
   const canvasRoot = document.getElementById('canvas-root');
   if (!canvasRoot) return;
 
@@ -520,7 +563,7 @@ export function renderPlacementSlotsImpl(ctx: EditorContext): void {
 }
 
 export async function importPendingSectionAt(
-  ctx: EditorContext,
+  ctx: SectionsPickerContext,
   insertAt: number,
 ): Promise<void> {
   if (!ctx.pendingImport) return;

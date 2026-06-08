@@ -77,7 +77,14 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import type { CanvasPage } from '../canvas/schema.js';
 import { isCustom404Page } from '../canvas/page-routing.js';
 import { runCollectionScaffoldFlowImpl } from './collection-scaffold.js';
@@ -85,7 +92,137 @@ import { DEFAULT_PAGE_WIDTH_PX } from './editor-constants.js';
 import { isAllowedHref } from './href-utils.js';
 import { newPageId, newSectionId } from './ids.js';
 
-export function setActivePageImpl(ctx: EditorContext, pageId: string | null): void {
+// ADR 0064 — refreshing the breadcrumb label only walks `currentPage()`
+// off the loaded state, so the function rides StateContext alone — no
+// DOM cache, no selection, no render orchestration touched.
+export type RefreshPageCrumbContext = StateContext;
+
+// ADR 0064 — closing the crumb popover mutates the three popover handles
+// the editor pins on ctx (the live menu node + the outside-click + escape
+// handler references). None of the canonical clusters owns this trio, so
+// it earns a tight inline Pick that the open + attach paths fold in.
+export type ClosePageCrumbMenuContext = Pick<
+  EditorContext,
+  'pageCrumbMenu' | 'pageCrumbOutsideHandler' | 'pageCrumbKeyHandler'
+>;
+
+// ADR 0064 — flipping the active page touches three canonical clusters
+// (Selection clears, Render orchestrators, the artboard `root` lookup
+// off DomContext) plus a grab bag of page-routing verbs + state that no
+// canonical alias owns: the Collection template-edit latch, activePageId
+// itself, the secondary `renderReel` orchestrator, the sidebar refresh,
+// and the breadcrumb refresh forwarded into RefreshPageCrumbContext.
+export type SetActivePageContext = SelectionContext &
+  RenderContext &
+  Pick<DomContext, 'root'> &
+  RefreshPageCrumbContext &
+  Pick<
+    EditorContext,
+    | 'activePageId'
+    | 'editingCollectionTemplate'
+    | 'exitCollectionTemplateEdit'
+    | 'renderReel'
+    | 'updatePageSidebar'
+  >;
+
+// ADR 0064 — opening the crumb popover composes the close path
+// (popover handles) with StateContext for the page list, plus the page-
+// switch verbs the popover items wire onto (`panToPage` + the forwarded
+// SetActivePageContext) and `activePageId` for the "active" row marker.
+export type OpenPageCrumbMenuContext = ClosePageCrumbMenuContext &
+  StateContext &
+  SetActivePageContext &
+  Pick<EditorContext, 'activePageId' | 'panToPage'>;
+
+// ADR 0064 — boot-time crumb wiring forwards into the open path; the
+// crumb-label refresh it seeds at the tail is already covered by the
+// OpenPageCrumbMenuContext (which extends RefreshPageCrumbContext).
+export type AttachPageCrumbContext = OpenPageCrumbMenuContext;
+
+// ADR 0064 — the Home logo wires a "go to home page" click that lands
+// in SetActivePageContext, then pans to the resolved page. The state
+// scan + status emission are the local-only surface this carve adds on
+// top of the forwarded set-active path.
+export type AttachHomeCrumbContext = SetActivePageContext &
+  StateContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'panToPage'>;
+
+// ADR 0064 — href lookup walks `state.pages` and nothing else; StateContext
+// names that exact view. Same alias is reused by the goToHref forwarder.
+export type FindPageByHrefContext = StateContext;
+
+// ADR 0064 — the goToHref dispatcher resolves the page via the lookup
+// context, then flips active via SetActivePageContext and pans. External
+// URLs fall through to `window.open` and need no ctx surface.
+export type GoToHrefOnCanvasContext = FindPageByHrefContext &
+  SetActivePageContext &
+  Pick<EditorContext, 'panToPage'>;
+
+// ADR 0064 — opening the SEO popup awaits a save flush, then either
+// surfaces the popup-blocked status or navigates the opened tab. Only
+// the flush verb and the status emitter belong to no canonical cluster
+// here; the rest is `window`.
+export type OpenPageSeoAfterSaveContext = StatusEmitterContext &
+  Pick<EditorContext, 'flushPendingSave'>;
+
+// ADR 0064 — re-rendering the page sidebar reads state + activePageId
+// for the row content + active marker, reads `siteId` (PersistContext)
+// to assemble the SEO link target, and forwards into the SEO popup path.
+export type UpdatePageSidebarContext = StateContext &
+  OpenPageSeoAfterSaveContext &
+  Pick<EditorContext, 'activePageId' | 'siteId'>;
+
+// ADR 0064 — creating a page composes the new-page modal + section-tree
+// mutation + undo capture + the SetActivePage tail + a camera fit + a
+// scheduled save + a success toast. The modal verb itself isn't on any
+// canonical alias yet so it rides this Pick directly.
+export type CreatePageContext = StateContext &
+  SetActivePageContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    'openNewPageModal' | 'captureForUndo' | 'renderAll' | 'fitToPage' | 'scheduleSave'
+  >;
+
+// ADR 0064 — renaming uses the text-prompt modal, mutates the page in
+// place, captures undo, then refreshes the sidebar + renderAll +
+// schedules a save. No selection touch — the sidebar tab is the only
+// surface that re-renders.
+export type RenamePageContext = StateContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'openTextModal'
+    | 'captureForUndo'
+    | 'renderAll'
+    | 'updatePageSidebar'
+    | 'scheduleSave'
+  >;
+
+// ADR 0064 — the inbound-link guard walks state.pages + header + footer
+// for action elements whose href targets pageId. Read-only, StateContext
+// alone names the view.
+export type FindActionPageLinkReferencesContext = StateContext;
+
+// ADR 0064 — deletePage runs the inbound-link guard, then the confirm
+// modal, then mutates state + captureForUndo + activePageId fallback +
+// renderAll + sidebar refresh + fitAllPages + scheduleSave + toast.
+export type DeletePageContext = StateContext &
+  StatusEmitterContext &
+  FindActionPageLinkReferencesContext &
+  Pick<
+    EditorContext,
+    | 'openConfirmModal'
+    | 'captureForUndo'
+    | 'activePageId'
+    | 'renderAll'
+    | 'updatePageSidebar'
+    | 'fitAllPages'
+    | 'scheduleSave'
+  >;
+
+export function setActivePageImpl(ctx: SetActivePageContext, pageId: string | null): void {
   // ADR 0065 D6 — switching to a different page exits Collection
   // template-edit mode. The editing pin references a Collection on the
   // page we are leaving; carrying it onto a different page would either
@@ -135,7 +272,7 @@ export function setActivePageImpl(ctx: EditorContext, pageId: string | null): vo
 // page in the site; picking one calls setActivePage. The label text is
 // refreshed inside setActivePage so it always reflects activePageId.
 
-export function refreshPageCrumbImpl(ctx: EditorContext): void {
+export function refreshPageCrumbImpl(ctx: RefreshPageCrumbContext): void {
   void ctx;
   const label = document.querySelector('[data-page-crumb-label]');
   if (!label) return;
@@ -147,7 +284,7 @@ export function refreshPageCrumbImpl(ctx: EditorContext): void {
   }
 }
 
-export function closePageCrumbMenu(ctx: EditorContext): void {
+export function closePageCrumbMenu(ctx: ClosePageCrumbMenuContext): void {
   if (!ctx.pageCrumbMenu) return;
   if (ctx.pageCrumbMenu.parentNode) {
     ctx.pageCrumbMenu.parentNode.removeChild(ctx.pageCrumbMenu);
@@ -163,7 +300,7 @@ export function closePageCrumbMenu(ctx: EditorContext): void {
   }
 }
 
-export function openPageCrumbMenu(ctx: EditorContext): void {
+export function openPageCrumbMenu(ctx: OpenPageCrumbMenuContext): void {
   if (ctx.pageCrumbMenu) {
     closePageCrumbMenu(ctx);
     return;
@@ -234,7 +371,7 @@ export function openPageCrumbMenu(ctx: EditorContext): void {
   document.addEventListener('keydown', ctx.pageCrumbKeyHandler, true);
 }
 
-export function attachPageCrumbImpl(ctx: EditorContext): void {
+export function attachPageCrumbImpl(ctx: AttachPageCrumbContext): void {
   const btn = document.getElementById('canvas-page-crumb');
   if (!btn) return;
   btn.addEventListener('click', (ev: Event) => {
@@ -244,7 +381,7 @@ export function attachPageCrumbImpl(ctx: EditorContext): void {
   refreshPageCrumbImpl(ctx);
 }
 
-export function attachHomeCrumbImpl(ctx: EditorContext): void {
+export function attachHomeCrumbImpl(ctx: AttachHomeCrumbContext): void {
   const btn = document.getElementById('canvas-home-crumb');
   if (!btn) return;
   btn.addEventListener('click', (ev: Event) => {
@@ -269,7 +406,7 @@ export function attachHomeCrumbImpl(ctx: EditorContext): void {
 // Page in the current site state. Returns null when the href is not internal
 // or no page matches. Strips query + fragment so an Owner-stored "/about#x"
 // still resolves to the about page.
-export function findPageByHref(ctx: EditorContext, href: unknown): CanvasPage | null {
+export function findPageByHref(ctx: FindPageByHrefContext, href: unknown): CanvasPage | null {
   if (typeof href !== 'string' || href.length === 0) return null;
   if (!ctx.state || !Array.isArray(ctx.state.pages)) return null;
   if (href.charAt(0) === '#') return null;
@@ -291,7 +428,7 @@ export function findPageByHref(ctx: EditorContext, href: unknown): CanvasPage | 
 // (the editor renders the full page; in-page anchors have no meaning here).
 // Returns true when something was handled, false when the href was rejected
 // by the allowlist — caller can surface a status message.
-export function goToHrefOnCanvasImpl(ctx: EditorContext, href: unknown): boolean {
+export function goToHrefOnCanvasImpl(ctx: GoToHrefOnCanvasContext, href: unknown): boolean {
   const page = findPageByHref(ctx, href);
   if (page) {
     setActivePageImpl(ctx, page.id);
@@ -309,7 +446,7 @@ export function goToHrefOnCanvasImpl(ctx: EditorContext, href: unknown): boolean
   return false;
 }
 
-export function openPageSeoAfterSave(ctx: EditorContext, seoHref: string): void {
+export function openPageSeoAfterSave(ctx: OpenPageSeoAfterSaveContext, seoHref: string): void {
   const opened = window.open('about:blank', '_blank');
   if (!opened) {
     ctx.setStatus('Could not open SEO panel: popup blocked', 'error');
@@ -326,7 +463,7 @@ export function openPageSeoAfterSave(ctx: EditorContext, seoHref: string): void 
   })();
 }
 
-export function updatePageSidebarImpl(ctx: EditorContext): void {
+export function updatePageSidebarImpl(ctx: UpdatePageSidebarContext): void {
   const listEl = document.getElementById('canvas-page-list');
   if (!listEl || !ctx.state) return;
   listEl.replaceChildren();
@@ -396,7 +533,7 @@ export function updatePageSidebarImpl(ctx: EditorContext): void {
   }
 }
 
-export async function createPageImpl(ctx: EditorContext): Promise<void> {
+export async function createPageImpl(ctx: CreatePageContext): Promise<void> {
   if (!ctx.state) return;
   const result = await ctx.openNewPageModal({
     existingSlugs: ctx.state.pages.map((p) => p.slug),
@@ -445,7 +582,7 @@ export async function createPageImpl(ctx: EditorContext): Promise<void> {
   ctx.setStatus('Page created: ' + newPage.title, 'ok');
 }
 
-export async function renamePageImpl(ctx: EditorContext, pageId: string): Promise<void> {
+export async function renamePageImpl(ctx: RenamePageContext, pageId: string): Promise<void> {
   if (!ctx.state) return;
   let page: CanvasPage | null = null;
   for (let i = 0; i < ctx.state.pages.length; i++) {
@@ -491,7 +628,10 @@ export async function renamePageImpl(ctx: EditorContext, pageId: string): Promis
   ctx.setStatus('Renamed to: ' + newTitle, 'ok');
 }
 
-export function findActionPageLinkReferences(ctx: EditorContext, pageId: string): string[] {
+export function findActionPageLinkReferences(
+  ctx: FindActionPageLinkReferencesContext,
+  pageId: string,
+): string[] {
   const refs: string[] = [];
   function scanElements(elements: unknown[] | null | undefined, label: string): void {
     if (!Array.isArray(elements)) return;
@@ -542,7 +682,7 @@ export function findActionPageLinkReferences(ctx: EditorContext, pageId: string)
   return refs;
 }
 
-export async function deletePageImpl(ctx: EditorContext, pageId: string): Promise<void> {
+export async function deletePageImpl(ctx: DeletePageContext, pageId: string): Promise<void> {
   if (!ctx.state || ctx.state.pages.length <= 1) return;
   let idx = -1;
   for (let i = 0; i < ctx.state.pages.length; i++) {

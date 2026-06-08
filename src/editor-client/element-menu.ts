@@ -45,10 +45,61 @@ import { hydrateInteractives } from './hydrate-interactives.js';
 
 import { augmentCollectionPreviewForElementImpl } from './collection-preview.js';
 import { cssEscape } from './css-escape.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { newElementId } from './ids.js';
-import { applyZOrderAction, parentArrayFor } from './inspector-actions.js';
+import { applyZOrderAction, type InspectorActionContext, parentArrayFor } from './inspector-actions.js';
 import { nextZInArray } from './z-order.js';
+
+// ADR 0064 — `findMenuOwnerWrapper` + `closeElementMenuImpl` only walk the
+// root DOM and flip the `openMenuElementId` latch on ctx, so they ride
+// DomContext for the root ref plus a single-field Pick for the latch.
+export type CloseElementMenuContext = DomContext & Pick<EditorContext, 'openMenuElementId'>;
+
+// ADR 0064 — `buildElementMenuImpl` wires the menu rows to the inspector-
+// action verbs (`applyZOrderAction` → InspectorActionContext, `parentArrayFor`
+// → StateContext) and a local grab bag for duplicate/delete (currentPage
+// from StateContext, the `closeElementMenu` verb). The clone path also
+// touches selection + render + persist, all already covered by
+// InspectorActionContext.
+export type BuildElementMenuContext = InspectorActionContext &
+  Pick<EditorContext, 'closeElementMenu'>;
+
+// ADR 0064 — `toggleElementMenuImpl` flips the open-menu latch, walks the
+// section tree (StateContext.findElement), drives the selection (SelectionContext
+// .selectElement) and delegates to the menu builder via ctx so the IIFE twin
+// keeps its single source of truth for the menu DOM.
+export type ToggleElementMenuContext = StateContext &
+  SelectionContext &
+  Pick<EditorContext, 'openMenuElementId' | 'closeElementMenu' | 'buildElementMenu'>;
+
+// ADR 0064 — `buildElementNodeImpl` is pure DOM scaffolding: box/style
+// appliers, body builder, plus a SelectionContext read so the wrapper can
+// stamp `data-selected` and mount resize handles on the active element.
+export type BuildElementNodeContext = SelectionContext &
+  Pick<EditorContext, 'setBoxStyle' | 'applyElementStyle' | 'applyPinnedStyle' | 'buildElementBody'>;
+
+// ADR 0064 — `rebuildElementImpl` re-renders a single element in place. It
+// walks the section tree (StateContext), reads the live DOM (DomContext.root),
+// drives a fall-back full renderAll (RenderContext), reports the inline-text
+// commit toast (StatusEmitterContext), and checks the inline-edit latch
+// (SelectionContext.editingElementId). The build + measurement verbs live in
+// the local Pick; the Collection placeholder re-augment forwards to
+// collection-preview.ts which still takes wide EditorContext (forward-cast
+// retained below).
+export type RebuildElementContext = StateContext &
+  DomContext &
+  RenderContext &
+  SelectionContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'activeEditFinish' | 'buildElementNode' | 'setBoxStyle'>;
 
 /**
  * Eight-direction resize-handle layout (N/S/E/W + four corners). Order is
@@ -108,7 +159,7 @@ export function unmountResizeHandles(wrapper: HTMLElement): void {
 // opened it). Returns null when no wrapper holds the menu, which is a
 // legitimate state (e.g. the menu's owner wrapper was rebuilt before
 // close ran).
-function findMenuOwnerWrapper(ctx: EditorContext, elementId: string): HTMLElement | null {
+function findMenuOwnerWrapper(ctx: CloseElementMenuContext, elementId: string): HTMLElement | null {
   if (!ctx.root) return null;
   const wrappers = ctx.root.querySelectorAll(
     '[data-opencanvas-element="' + cssEscape(elementId) + '"]',
@@ -121,7 +172,7 @@ function findMenuOwnerWrapper(ctx: EditorContext, elementId: string): HTMLElemen
   return null;
 }
 
-export function closeElementMenuImpl(ctx: EditorContext): void {
+export function closeElementMenuImpl(ctx: CloseElementMenuContext): void {
   if (!ctx.openMenuElementId) return;
   if (!ctx.root) {
     ctx.openMenuElementId = null;
@@ -141,7 +192,7 @@ export function closeElementMenuImpl(ctx: EditorContext): void {
 }
 
 export function buildElementMenuImpl(
-  ctx: EditorContext,
+  ctx: BuildElementMenuContext,
   element: CanvasElement,
   section: CanvasSection,
   _wrapper: HTMLElement,
@@ -236,7 +287,7 @@ export function buildElementMenuImpl(
 }
 
 export function toggleElementMenuImpl(
-  ctx: EditorContext,
+  ctx: ToggleElementMenuContext,
   elementId: string,
   wrapper: HTMLElement,
 ): void {
@@ -255,7 +306,7 @@ export function toggleElementMenuImpl(
   ctx.openMenuElementId = elementId;
 }
 
-export function buildElementNodeImpl(ctx: EditorContext, element: CanvasElement): HTMLElement {
+export function buildElementNodeImpl(ctx: BuildElementNodeContext, element: CanvasElement): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.className = 'opencanvas-element';
   wrapper.setAttribute('data-opencanvas-element', element.id);
@@ -309,7 +360,7 @@ export function buildElementNodeImpl(ctx: EditorContext, element: CanvasElement)
   return wrapper;
 }
 
-export function rebuildElementImpl(ctx: EditorContext, elementId: string): void {
+export function rebuildElementImpl(ctx: RebuildElementContext, elementId: string): void {
   if (ctx.editingElementId === elementId && ctx.activeEditFinish) {
     const commit = ctx.activeEditFinish;
     ctx.setStatus('Text edits committed — click the element to keep editing', 'info');
@@ -360,7 +411,9 @@ export function rebuildElementImpl(ctx: EditorContext, elementId: string): void 
   // this call the editor-only placeholder cards would disappear until
   // the next full renderAll().
   if (found.element.type === 'collection') {
-    augmentCollectionPreviewForElementImpl(ctx, elementId);
+    // ADR 0064 — collection-preview.ts has not carved yet; forward-cast
+    // until augmentCollectionPreviewForElementImpl narrows its parameter.
+    augmentCollectionPreviewForElementImpl(ctx as EditorContext, elementId);
   }
   // Re-hydrate the visitor interactive runtime against the replaced
   // wrapper(s). A carousel rebuilt via the inspector (slide added /

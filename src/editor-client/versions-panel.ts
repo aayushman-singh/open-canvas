@@ -42,7 +42,12 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 
 interface VersionSnapshot {
   id: string;
@@ -52,7 +57,47 @@ interface VersionSnapshot {
   label?: string;
 }
 
-export function activateSidebarTabImpl(ctx: EditorContext, tabName: string): void {
+// ADR 0064 — activateSidebarTab touches one canonical cluster
+// (DomContext for the sidebar root) plus three lazy-load verbs that no
+// canonical alias owns yet; the inline `Pick` declares those honestly.
+export type ActivateSidebarTabContext = DomContext &
+  Pick<
+    EditorContext,
+    'ensureSectionsPanelLoaded' | 'renderVersionsPanel' | 'updatePageSidebar'
+  >;
+
+// ADR 0064 — ensureVersionsTabMounted touches the sidebar DOM ref and
+// dispatches the tab activation verb; the two-verb `Pick` rides alone
+// because no canonical alias owns either field yet.
+export type EnsureVersionsTabMountedContext = DomContext &
+  Pick<EditorContext, 'activateSidebarTab'>;
+
+// ADR 0064 — renderVersionRow is the per-snapshot row renderer; it
+// rides PersistContext (authFetch + apiBase + siteId for the
+// restore/delete network calls), StatusEmitterContext for the result
+// toasts, plus the confirm-modal verb, the versions-cache invalidation
+// pair, and the parent re-render dispatch.
+export type RenderVersionRowContext = PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    'openConfirmModal' | 'versionsLoaded' | 'renderVersionsPanel'
+  >;
+
+// ADR 0064 — renderVersionsPanel extends the row surface with the
+// lazy-mount lookup, the snapshot-label prompt, and read access to
+// the versions list (the cache flag + re-render are already in
+// RenderVersionRowContext).
+export type RenderVersionsPanelContext = RenderVersionRowContext &
+  Pick<
+    EditorContext,
+    'ensureVersionsTabMounted' | 'openTextModal' | 'versionsList'
+  >;
+
+export function activateSidebarTabImpl(
+  ctx: ActivateSidebarTabContext,
+  tabName: string,
+): void {
   const tabButtons = ctx.sidebar
     ? ctx.sidebar.querySelectorAll('[data-sidebar-tab]')
     : ([] as unknown as NodeListOf<Element>);
@@ -78,7 +123,9 @@ export function activateSidebarTabImpl(ctx: EditorContext, tabName: string): voi
   }
 }
 
-export function ensureVersionsTabMountedImpl(ctx: EditorContext): HTMLElement | null {
+export function ensureVersionsTabMountedImpl(
+  ctx: EnsureVersionsTabMountedContext,
+): HTMLElement | null {
   if (!ctx.sidebar) return null;
   const tabsRow = ctx.sidebar.querySelector('.opencanvas-sidebar-tabs');
   if (!tabsRow) return null;
@@ -132,7 +179,7 @@ export function formatVersionDate(iso: string): string {
   return months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + m + ampm;
 }
 
-export function renderVersionsPanelImpl(ctx: EditorContext): void {
+export function renderVersionsPanelImpl(ctx: RenderVersionsPanelContext): void {
   const panel = ctx.ensureVersionsTabMounted();
   if (!panel) return;
   panel.replaceChildren();
@@ -253,7 +300,7 @@ export function renderVersionsPanelImpl(ctx: EditorContext): void {
 }
 
 function renderVersionRow(
-  ctx: EditorContext,
+  ctx: RenderVersionRowContext,
   list: HTMLElement,
   snap: VersionSnapshot,
 ): void {

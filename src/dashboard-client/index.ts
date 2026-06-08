@@ -21,15 +21,30 @@
 import { mountProfile } from './profile.js';
 import { mountAddonShop } from './addon-shop.js';
 import { mountDomains } from './domains.js';
+import { mountVersionTimeline } from './version-timeline.js';
+import { mountSiteAddons } from './site-addons.js';
+import { mountPageSettings } from './page-settings.js';
+import { mountSettings } from './settings.js';
 
 interface DashboardBoot {
-  route: 'profile' | 'addon-shop' | 'domains';
+  route:
+    | 'profile'
+    | 'addon-shop'
+    | 'domains'
+    | 'version-timeline'
+    | 'site-addons'
+    | 'page-settings'
+    | 'settings';
   // Per-request keys — present only for routes that need them. The
-  // `domains` route ships the site id whose hostnames it is editing so
-  // the mount module can address `/api/sites/:siteId/domains` without a
-  // closure capture. Other routes (profile, addon-shop) leave this
-  // unset; addon-shop instead seeds `#addon-state` JSON on the page.
+  // `domains`, `version-timeline`, and `site-addons` routes ship the
+  // site id whose resources they are editing so the mount module can
+  // address `/api/sites/:siteId/...` (or `/api/addons/sites/:siteId/...`)
+  // without a closure capture. `page-settings` ships BOTH `siteId` and
+  // `pageId` since the SEO + metadata APIs are page-scoped. Other routes
+  // (profile, addon-shop) leave this unset; addon-shop instead seeds
+  // `#addon-state` JSON on the page.
   siteId?: string;
+  pageId?: string;
 }
 
 declare global {
@@ -42,6 +57,10 @@ const DISPATCH: { [K in DashboardBoot['route']]: () => void } = {
   profile: mountProfile,
   'addon-shop': mountAddonShop,
   domains: mountDomains,
+  'version-timeline': mountVersionTimeline,
+  'site-addons': mountSiteAddons,
+  'page-settings': mountPageSettings,
+  settings: mountSettings,
 };
 
 function run(): void {

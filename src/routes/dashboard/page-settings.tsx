@@ -37,6 +37,7 @@ import { site } from '../../db/schema';
 import { DashboardShell, buildSiteNav } from './shell';
 import { Button, Card, readThemeCookie } from '../../ui';
 import { appDomain, type HostConfigEnv } from '../../host-config';
+import { EDITOR_CLIENT_MANIFEST } from '../../_assets/manifest.generated';
 
 type Bindings = HostConfigEnv & {
   CLERK_PUBLISHABLE_KEY: string;
@@ -669,403 +670,31 @@ function ogCardJsx(args: {
   );
 }
 
-function clientScript(siteId: string, pageId: string): string {
-  const sid = JSON.stringify(siteId);
-  const pid = JSON.stringify(pageId);
-  return String.raw`
-(() => {
-  const SITE_ID = ${sid};
-  const PAGE_ID = ${pid};
-  // Asset thumbnails on the dashboard host go through the owner-auth canvas
-  // API. The bare /assets/<id> URL only resolves on a published-site host.
-  function assetUrl(id) {
-    return '/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/assets/' + encodeURIComponent(id);
-  }
-  const form = document.querySelector('form.seo');
-  if (!form) return;
-  const err = form.querySelector('.err');
-  const ok = form.querySelector('.ok');
-  function clearStatus() {
-    if (err) err.textContent = '';
-    if (ok) ok.textContent = '';
-  }
-  function showError(msg) { clearStatus(); if (err) err.textContent = msg; }
-  function showOk(msg) { clearStatus(); if (ok) ok.textContent = msg; }
-
-  // Soft char-limit warnings: 60 chars for title, 160 for description.
-  function wireCount(inputName, limit) {
-    const input = form.querySelector('[name="' + inputName + '"]');
-    const counter = form.querySelector('[data-count-for="' + inputName + '"]');
-    if (!input || !counter) return;
-    function update() {
-      const n = input.value.length;
-      counter.textContent = n + ' / ' + limit;
-      counter.classList.toggle('warn', n > limit);
-    }
-    input.addEventListener('input', update);
-    update();
-  }
-  wireCount('title', 60);
-  wireCount('description', 160);
-
-  // ---- Live previews -----------------------------------------------------
-  // Bind title/description inputs to every [data-preview-title|desc] node so
-  // OG card, Twitter, LinkedIn and SERP cards stay in sync as the user types.
-  // Empty-state rules per element:
-  //   data-empty-hide    → set hidden=true when input is empty (OG card desc)
-  //   data-empty-text=X  → fall back to X when input is empty (Twitter / SERP)
-  //   neither            → clear textContent (rare; effectively invisible)
-  function bindPreview(inputName, attr) {
-    const input = form.querySelector('[name="' + inputName + '"]');
-    if (!input) return;
-    const targets = document.querySelectorAll('[' + attr + ']');
-    function update() {
-      const v = input.value;
-      for (const t of targets) {
-        if (v.length === 0) {
-          if (t.hasAttribute('data-empty-hide')) {
-            t.textContent = '';
-            t.hidden = true;
-          } else if (t.hasAttribute('data-empty-text')) {
-            t.textContent = t.getAttribute('data-empty-text') || '';
-            t.hidden = false;
-          } else {
-            t.textContent = '';
-          }
-        } else {
-          t.textContent = v;
-          t.hidden = false;
-        }
-      }
-    }
-    input.addEventListener('input', update);
-    update();
-  }
-  bindPreview('title', 'data-preview-title');
-  bindPreview('description', 'data-preview-desc');
-
-  // Canonical URL preview (SERP) + host-mismatch warning. The SERP preview
-  // shows whatever URL the renderer will emit (canonical override when set,
-  // auto-derived publishedUrl when blank). The warning fires when the
-  // canonical's hostname does not match the site's publishing host — that's
-  // either a fixture leak (the dashboard never edited a stale value baked
-  // in by a template) or a deliberate cross-host canonical (umbrella site).
-  // We don't auto-clear or block save; the field is the Owner's to control.
-  const canonicalInput = form.querySelector('[name="canonical"]');
-  const canonicalPreviewNode = document.querySelector('[data-preview-canonical]');
-  const publishedUrlDefault = canonicalPreviewNode
-    ? canonicalPreviewNode.getAttribute('data-published-url') || ''
-    : '';
-  const publishingHost = canonicalInput
-    ? canonicalInput.getAttribute('data-publishing-host') || ''
-    : '';
-  const canonicalWarningNode = document.querySelector('[data-canonical-warning]');
-  const warningHostNode = document.querySelector('[data-warning-host]');
-  function evaluateCanonicalState() {
-    if (!canonicalInput) return;
-    const v = canonicalInput.value.trim();
-    if (canonicalPreviewNode) {
-      canonicalPreviewNode.textContent = v.length > 0 ? v : publishedUrlDefault;
-    }
-    if (canonicalWarningNode) {
-      let mismatchHost = null;
-      if (v.length > 0 && publishingHost.length > 0) {
-        try {
-          const parsedHost = new URL(v).host;
-          if (parsedHost.toLowerCase() !== publishingHost.toLowerCase()) {
-            mismatchHost = parsedHost;
-          }
-        } catch (_) { /* malformed URL — skip the warning */ }
-      }
-      if (mismatchHost !== null) {
-        if (warningHostNode) warningHostNode.textContent = mismatchHost;
-        canonicalWarningNode.hidden = false;
-      } else {
-        canonicalWarningNode.hidden = true;
-      }
-    }
-  }
-  if (canonicalInput) {
-    canonicalInput.addEventListener('input', evaluateCanonicalState);
-  }
-  evaluateCanonicalState();
-
-  // noIndex toggle → toggle the SERP "Google won't show this" notice live.
-  const noIndexCb = form.querySelector('[name="noIndex"]');
-  if (noIndexCb) {
-    // Site-level noIndex still wins even if the user clears the per-page
-    // checkbox, so we OR baseline (site) with the live page-level value.
-    const serpEl = document.querySelector('[data-preview="serp"]');
-    noIndexCb.addEventListener('change', () => {
-      if (!serpEl) return;
-      const siteBaseline = serpEl.getAttribute('data-site-noindex') === 'true';
-      serpEl.setAttribute('data-noindex', (siteBaseline || noIndexCb.checked) ? 'true' : 'false');
-    });
-  }
-
-  // ---- Asset picker ------------------------------------------------------
-  const modal = document.querySelector('[data-picker-modal]');
-  const modalGrid = document.querySelector('[data-picker-grid]');
-  const modalEmpty = document.querySelector('[data-picker-empty]');
-  const modalStatus = document.querySelector('[data-picker-status]');
-  const modalClose = document.querySelector('[data-picker-close]');
-  const modalUpload = document.querySelector('[data-picker-upload]');
-  let activePicker = null; // The .asset-picker element that opened the modal.
-
-  function setStatus(msg, isError) {
-    if (!modalStatus) return;
-    modalStatus.textContent = msg || '';
-    modalStatus.classList.toggle('error', !!isError);
-  }
-
-  async function loadAssets() {
-    setStatus('Loading…', false);
-    try {
-      const r = await fetch('/api/owner/assets', { headers: { accept: 'application/json' } });
-      if (!r.ok) { setStatus('Could not load assets (' + r.status + ')', true); return; }
-      const body = await r.json();
-      const assets = Array.isArray(body.assets) ? body.assets : [];
-      renderAssetGrid(assets);
-      setStatus(assets.length + ' image' + (assets.length === 1 ? '' : 's') + ' available', false);
-    } catch (e) {
-      setStatus('Network error: ' + (e && e.message ? e.message : String(e)), true);
-    }
-  }
-
-  function renderAssetGrid(assets) {
-    if (!modalGrid || !modalEmpty) return;
-    modalGrid.innerHTML = '';
-    const imageAssets = assets.filter((a) => (a.kind === 'image') || (typeof a.mediaType === 'string' && a.mediaType.startsWith('image/')));
-    if (imageAssets.length === 0) { modalEmpty.hidden = false; return; }
-    modalEmpty.hidden = true;
-    for (const a of imageAssets) {
-      const tile = document.createElement('button');
-      tile.type = 'button';
-      tile.className = 'picker-tile';
-      tile.style.backgroundImage = 'url(' + assetUrl(a.id) + ')';
-      tile.setAttribute('data-asset-id', a.id);
-      tile.title = a.alt || a.id;
-      if (a.alt) {
-        const alt = document.createElement('span');
-        alt.className = 'alt';
-        alt.textContent = a.alt;
-        tile.appendChild(alt);
-      }
-      tile.addEventListener('click', () => selectAsset(a.id));
-      modalGrid.appendChild(tile);
-    }
-  }
-
-  function openPicker(picker) {
-    activePicker = picker;
-    if (modal) modal.setAttribute('data-open', 'true');
-    loadAssets();
-  }
-
-  function closePicker() {
-    activePicker = null;
-    if (modal) modal.removeAttribute('data-open');
-  }
-
-  function selectAsset(assetId) {
-    if (!activePicker) return;
-    const hidden = activePicker.querySelector('input[type="hidden"]');
-    const thumb = activePicker.querySelector('[data-picker-thumb]');
-    const meta = activePicker.querySelector('[data-picker-meta]');
-    const clearBtn = activePicker.querySelector('[data-picker-clear]');
-    const chooseBtn = activePicker.querySelector('[data-picker-choose]');
-    if (hidden) hidden.value = assetId;
-    activePicker.setAttribute('data-asset-id', assetId);
-    if (thumb) {
-      thumb.style.backgroundImage = 'url(' + assetUrl(assetId) + ')';
-      thumb.setAttribute('data-has-image', 'true');
-      thumb.textContent = '';
-    }
-    if (meta) meta.textContent = 'Custom image overrides the generated card.';
-    if (clearBtn) clearBtn.hidden = false;
-    if (chooseBtn) chooseBtn.textContent = 'Change image';
-    // Update every OG card preview (standalone + the embedded copies inside
-    // the Twitter and LinkedIn image slots) and the platform image slots.
-    const url = 'url(' + assetUrl(assetId) + ')';
-    document.querySelectorAll('[data-preview="og"]').forEach((og) => {
-      og.setAttribute('data-has-custom', 'true');
-      og.style.backgroundImage = url;
-    });
-    for (const sel of ['[data-preview-img="twitter"]', '[data-preview-img="linkedin"]']) {
-      const img = document.querySelector(sel);
-      if (!img) continue;
-      img.style.backgroundImage = url;
-      img.style.backgroundSize = 'cover';
-      img.style.backgroundPosition = 'center';
-      img.setAttribute('data-has-custom', 'true');
-    }
-    closePicker();
-  }
-
-  function clearAsset(picker) {
-    const hidden = picker.querySelector('input[type="hidden"]');
-    const thumb = picker.querySelector('[data-picker-thumb]');
-    const meta = picker.querySelector('[data-picker-meta]');
-    const clearBtn = picker.querySelector('[data-picker-clear]');
-    const chooseBtn = picker.querySelector('[data-picker-choose]');
-    if (hidden) hidden.value = '';
-    picker.setAttribute('data-asset-id', '');
-    if (thumb) {
-      thumb.style.backgroundImage = '';
-      thumb.setAttribute('data-has-image', 'false');
-      thumb.textContent = 'auto';
-    }
-    if (meta) meta.textContent = 'Leave blank to use the auto-generated card.';
-    if (clearBtn) clearBtn.hidden = true;
-    if (chooseBtn) chooseBtn.textContent = 'Choose image';
-    document.querySelectorAll('[data-preview="og"]').forEach((og) => {
-      og.removeAttribute('data-has-custom');
-      og.style.backgroundImage = '';
-    });
-    for (const sel of ['[data-preview-img="twitter"]', '[data-preview-img="linkedin"]']) {
-      const img = document.querySelector(sel);
-      if (!img) continue;
-      img.style.backgroundImage = '';
-      img.removeAttribute('data-has-custom');
-    }
-  }
-
-  document.querySelectorAll('[data-asset-picker]').forEach((picker) => {
-    const choose = picker.querySelector('[data-picker-choose]');
-    const clear = picker.querySelector('[data-picker-clear]');
-    if (choose) choose.addEventListener('click', () => openPicker(picker));
-    if (clear) clear.addEventListener('click', () => clearAsset(picker));
-  });
-  if (modalClose) modalClose.addEventListener('click', closePicker);
-  if (modal) modal.addEventListener('click', (ev) => { if (ev.target === modal) closePicker(); });
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && modal && modal.getAttribute('data-open') === 'true') closePicker();
-  });
-
-  if (modalUpload) {
-    modalUpload.addEventListener('change', async () => {
-      const file = modalUpload.files && modalUpload.files[0];
-      if (!file) return;
-      setStatus('Uploading ' + file.name + '…', false);
-      const fd = new FormData();
-      fd.append('file', file);
-      try {
-        const r = await fetch('/api/owner/assets', { method: 'POST', body: fd });
-        if (!r.ok) {
-          let detail = r.statusText;
-          try { const b = await r.json(); if (b && b.error) detail = b.error; } catch (_) {}
-          setStatus('Upload failed: ' + detail, true);
-          modalUpload.value = '';
-          return;
-        }
-        const body = await r.json();
-        modalUpload.value = '';
-        if (body && body.id) {
-          await loadAssets();
-          selectAsset(body.id);
-        }
-      } catch (e) {
-        setStatus('Network error: ' + (e && e.message ? e.message : String(e)), true);
-        modalUpload.value = '';
-      }
-    });
-  }
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearStatus();
-    const button = form.querySelector('button[type="submit"]');
-    if (button) button.disabled = true;
-    const data = {
-      title: form.title.value.trim(),
-      description: form.description.value.trim(),
-      ogImageAssetId: form.ogImageAssetId.value.trim(),
-      canonical: form.canonical.value.trim(),
-      noIndex: form.noIndex.checked,
-      locale: form.locale.value.trim(),
-    };
-    if (data.title.length === 0) {
-      showError('Title is required.');
-      if (button) button.disabled = false;
-      return;
-    }
-    try {
-      const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/pages/' + encodeURIComponent(PAGE_ID) + '/seo', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = await response.json();
-          if (body && body.error) detail = body.error;
-        } catch (_) { /* noop */ }
-        showError(detail);
-        if (button) button.disabled = false;
-        return;
-      }
-      showOk('Saved.');
-    } catch (e) {
-      showError('Network error: ' + (e && e.message ? e.message : String(e)));
-    } finally {
-      if (button) button.disabled = false;
-    }
-  });
-})();
-
-// -- Metadata form (page metadata for collections) --
-(() => {
-  const SITE_ID = ${sid};
-  const PAGE_ID = ${pid};
-  const form = document.querySelector('#metadata-form');
-  if (!form) return;
-  const err = form.querySelector('.err');
-  const ok = form.querySelector('.ok');
-  function clearStatus() {
-    if (err) err.textContent = '';
-    if (ok) ok.textContent = '';
-  }
-  function showError(msg) { clearStatus(); if (err) err.textContent = msg; }
-  function showOk(msg) { clearStatus(); if (ok) ok.textContent = msg; }
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearStatus();
-    const button = form.querySelector('button[type="submit"]');
-    if (button) button.disabled = true;
-    const rawTags = form.tags.value.trim();
-    const data = {
-      publishedDate: form.publishedDate.value.trim() || null,
-      author: form.author.value.trim() || null,
-      tags: rawTags.length > 0 ? rawTags.split(',').map(t => t.trim()).filter(Boolean) : null,
-      category: form.category.value.trim() || null,
-    };
-    try {
-      const response = await fetch('/api/canvas/sites/' + encodeURIComponent(SITE_ID) + '/pages/' + encodeURIComponent(PAGE_ID) + '/metadata', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        let detail = response.statusText;
-        try {
-          const body = await response.json();
-          if (body && body.error) detail = body.error;
-        } catch (_) { /* noop */ }
-        showError(detail);
-        if (button) button.disabled = false;
-        return;
-      }
-      showOk('Saved.');
-    } catch (e) {
-      showError('Network error: ' + (e && e.message ? e.message : String(e)));
-    } finally {
-      if (button) button.disabled = false;
-    }
-  });
-})();
-`;
+// ADR 0021 — migrated to dashboard-client bundle. SEO form + metadata
+// form + asset-picker modal + live previews now live in
+// `src/dashboard-client/page-settings.ts` and ship in the shared
+// dashboard bundle (`EDITOR_CLIENT_MANIFEST.dashboardClientUrl`). The
+// route emits a tiny boot blob with `route: 'page-settings'` and the
+// per-request `siteId` + `pageId`; the bundle's dispatcher reads it
+// and calls `mountPageSettings()`. DOM contract unchanged — same
+// `form.seo`, `#metadata-form`, `[data-preview-*]`, `[data-asset-picker]`,
+// `[data-picker-*]`, `[data-canonical-warning]`, `[data-publishing-host]`
+// hooks. API contract unchanged — same PUT
+// `/api/canvas/sites/:siteId/pages/:pageId/seo`, PUT
+// `/api/canvas/sites/:siteId/pages/:pageId/metadata`, GET + POST
+// `/api/owner/assets`, GET `/api/canvas/sites/:siteId/assets/:id`. Both
+// `siteId` and `pageId` flow through the boot blob via `JSON.stringify`,
+// so quotes / braces in either value cannot break out of the inline
+// script.
+function clientBoot(siteId: string, pageId: string) {
+  return raw(
+    '<script>window.__opencanvasDashboardBoot = ' +
+      JSON.stringify({ route: 'page-settings', siteId, pageId }) +
+      ';</script>' +
+      '<script src="' +
+      EDITOR_CLIENT_MANIFEST.dashboardClientUrl +
+      '" defer></script>',
+  );
 }
 
 pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
@@ -1516,7 +1145,7 @@ pageSettingsRoute.get('/sites/:siteId/pages/:pageId/seo', async (c) => {
         </form>
       </Card>
 
-      <script type="module">{raw(clientScript(siteId, pageId))}</script>
+      {clientBoot(siteId, pageId)}
     </DashboardShell>,
   );
 });

@@ -50,7 +50,14 @@
 // to camera.zoom × world-size and trap dragged elements in roughly the
 // top-left quadrant of the panel at any zoom < 1.
 
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 
 /**
  * 8px snap grid applied to free-form element positioning during drag/resize.
@@ -64,7 +71,59 @@ function snapTo(value: number, gridPx: number): number {
   return Math.round(value / gridPx) * gridPx;
 }
 
-export function attachPointerHandlersImpl(ctx: EditorContext): void {
+// ADR 0064 — the drag math touches StateContext (findElement +
+// currentPage for the section-branch bounds) and PersistContext
+// (scheduleSave on mouseup), plus three non-canonical helpers
+// (pointerToCanvas, camera) that this module owns. Shared between
+// beginDragImpl and beginResizeImpl; beginResize extends it with
+// MIN_ELEMENT_SIZE_PX.
+export type DragGestureContext = StateContext &
+  PersistContext &
+  Pick<EditorContext, 'pointerToCanvas' | 'camera'>;
+
+// ADR 0064 — resize adds the min-size clamp constant to the drag
+// surface. Kept as a distinct alias so beginDragImpl doesn't have to
+// pretend to need MIN_ELEMENT_SIZE_PX.
+export type ResizeGestureContext = DragGestureContext &
+  Pick<EditorContext, 'MIN_ELEMENT_SIZE_PX'>;
+
+// ADR 0064 — the root mousedown wiring touches DomContext for the
+// canvas root, SelectionContext for the click→select→drag latch, then
+// forwards into the drag/resize gesture surfaces. Adds the four
+// non-canonical verbs / state fields that drive the mousedown branch
+// (interactionMode, hover dispatch, element-wrapper hit-test).
+export type AttachPointerHandlersContext = DomContext &
+  SelectionContext &
+  ResizeGestureContext &
+  Pick<
+    EditorContext,
+    | 'interactionMode'
+    | 'onCanvasLinkHover'
+    | 'onCanvasLinkHoverLeave'
+    | 'resolveElementWrapperAtPoint'
+  >;
+
+// ADR 0064 — interaction-mode toggle reads/writes the live mode flag,
+// the viewport DOM ref (DomContext), and the zoom toolbar ref (not in
+// any canonical alias yet — inline Pick).
+export type SetInteractionModeContext = DomContext &
+  Pick<EditorContext, 'interactionMode' | 'zoomToolbar'>;
+
+// ADR 0064 — the temporary-pan state machine is two flags plus the
+// recursive call into setInteractionMode. No canonical alias owns the
+// pan-state pair yet, so the inline Pick enumerates them honestly.
+export type TemporaryPanContext = SetInteractionModeContext &
+  Pick<EditorContext, 'spaceHeldForPan' | 'temporaryPanPreviousMode'>;
+
+// ADR 0064 — placement-mode exit clears the pending import, surfaces a
+// "Cancelled" toast (StatusEmitterContext), and re-renders the two
+// sidebar panels that show placement affordances. The two render verbs
+// are not in RenderContext (which only carries the canvas-side
+// orchestrators), so they live in the inline Pick.
+export type ExitPlacementModeContext = StatusEmitterContext &
+  Pick<EditorContext, 'pendingImport' | 'renderSectionsPanel' | 'renderPlacementSlots'>;
+
+export function attachPointerHandlersImpl(ctx: AttachPointerHandlersContext): void {
   const root = ctx.root;
   if (!root) return;
   // Canvas-wide link hover → popover. Inline marks inside a contenteditable
@@ -142,7 +201,7 @@ export function attachPointerHandlersImpl(ctx: EditorContext): void {
 }
 
 export function beginDragImpl(
-  ctx: EditorContext,
+  ctx: DragGestureContext,
   startEv: PointerEvent | MouseEvent,
   wrapper: HTMLElement,
 ): void {
@@ -224,7 +283,7 @@ export function beginDragImpl(
 }
 
 export function beginResizeImpl(
-  ctx: EditorContext,
+  ctx: ResizeGestureContext,
   startEv: PointerEvent | MouseEvent,
   wrapper: HTMLElement,
   dir: string,
@@ -367,7 +426,7 @@ export function beginResizeImpl(
 //   ctx.endTemporaryPan        = ()    => endTemporaryPanImpl(ctx);
 //   ctx.exitPlacementMode      = ()    => exitPlacementModeImpl(ctx);
 
-export function setInteractionModeImpl(ctx: EditorContext, mode: string): void {
+export function setInteractionModeImpl(ctx: SetInteractionModeContext, mode: string): void {
   if (mode !== 'select' && mode !== 'pan') {
     throw new Error('setInteractionMode: expected select or pan, got ' + String(mode));
   }
@@ -386,19 +445,21 @@ export function setInteractionModeImpl(ctx: EditorContext, mode: string): void {
   }
 }
 
-export function clearTemporaryPanStateImpl(ctx: EditorContext): void {
+export function clearTemporaryPanStateImpl(
+  ctx: Pick<EditorContext, 'spaceHeldForPan' | 'temporaryPanPreviousMode'>,
+): void {
   ctx.spaceHeldForPan = false;
   ctx.temporaryPanPreviousMode = null;
 }
 
-export function endTemporaryPanImpl(ctx: EditorContext): void {
+export function endTemporaryPanImpl(ctx: TemporaryPanContext): void {
   if (!ctx.spaceHeldForPan) return;
   const nextMode = ctx.temporaryPanPreviousMode || 'select';
   clearTemporaryPanStateImpl(ctx);
   setInteractionModeImpl(ctx, nextMode);
 }
 
-export function exitPlacementModeImpl(ctx: EditorContext): void {
+export function exitPlacementModeImpl(ctx: ExitPlacementModeContext): void {
   ctx.pendingImport = null;
   ctx.setStatus('Cancelled', 'ok');
   ctx.renderSectionsPanel();
