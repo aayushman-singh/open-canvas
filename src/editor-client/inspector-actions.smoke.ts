@@ -196,6 +196,7 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     undoTimer: null,
     undoRedoing: false,
     undoPersistenceFailed: false,
+    fontLoadRemeasureWired: false,
     saveTimer: null,
     saveQueue: Promise.resolve(true),
     coEditConnection: null,
