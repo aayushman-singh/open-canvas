@@ -39,7 +39,12 @@ import {
   encodeAwareness,
   setLocalPresence,
 } from './awareness.js';
-import { Y_SYNC_REMOTE_ORIGIN, encodeStateVector, handleSyncStep2, handleYUpdate } from './y-sync.js';
+import {
+  Y_SYNC_REMOTE_ORIGIN,
+  encodeStateVector,
+  handleSyncStep2,
+  handleYUpdate,
+} from './y-sync.js';
 
 import { decodeBytesField, encodeBytesField } from '../site-room-protocol.js';
 import type {
@@ -113,8 +118,19 @@ export interface ConnectCoEditOptions {
   reconnectDelayMs?: number;
   /** Upper cap for the exponential backoff. Defaults to 30_000ms. */
   reconnectMaxDelayMs?: number;
-  /** Initial presence payload posted as soon as the socket opens. */
-  initialPresence?: PresenceState;
+  /**
+   * Presence payload posted as soon as the socket opens — including every
+   * reopen after a reconnect. Pass a function (RECOMMENDED for editor hosts)
+   * so the connector resolves the fresh snapshot at each open from the
+   * caller's source of truth; passing a literal `PresenceState` captures
+   * the value at attach time and risks stale data on reconnect (ADR 0065
+   * F2 — `editingCollectionTemplateId` was being reset to its boot-time
+   * `null` on reopen because the literal snapshot was frozen at attach).
+   *
+   * `null` from the function is treated as "skip the initial push" — the
+   * caller is signalling that no presence should be advertised yet.
+   */
+  initialPresence?: PresenceState | (() => PresenceState | null);
 }
 
 /**
@@ -367,9 +383,19 @@ export function connectCoEdit(
         stateVector: encodeBytesField(encodeStateVector(doc)),
       };
       send(step1);
-      // Push initial presence if the caller provided one.
-      if (options?.initialPresence) {
-        setLocalPresence(awareness, options.initialPresence);
+      // Push the initial presence, RESOLVED FRESH at each open. ADR 0065 F2 —
+      // a literal-value `initialPresence` captured at attach time silently
+      // shipped stale `editingCollectionTemplateId` on every reconnect; the
+      // function form lets the caller read its current source of truth here
+      // instead of relying on us to track its mutations.
+      if (options?.initialPresence !== undefined) {
+        const resolved =
+          typeof options.initialPresence === 'function'
+            ? options.initialPresence()
+            : options.initialPresence;
+        if (resolved !== null) {
+          setLocalPresence(awareness, resolved);
+        }
       }
     });
     s.addEventListener('message', (ev) => {
@@ -554,9 +580,7 @@ function defaultWebsocketUrl(siteId: string): string {
   // app host routes `/__live` to the SiteRoom DO.
   const loc = (globalThis as { location?: { protocol: string; host: string } }).location;
   if (!loc) {
-    throw new Error(
-      'connectCoEdit: no window.location available; pass websocketUrl explicitly',
-    );
+    throw new Error('connectCoEdit: no window.location available; pass websocketUrl explicitly');
   }
   const scheme = loc.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${scheme}//${loc.host}/__live?siteId=${encodeURIComponent(siteId)}`;
