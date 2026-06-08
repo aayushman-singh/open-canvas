@@ -84,7 +84,7 @@ assert(
 
 const textEdit = await source('./text-edit.ts');
 assert(
-  /export function beginTextEditImpl\s*\(\s*ctx:\s*EditorContext,\s*elementId:\s*string,\s*clickedWrapper\?:/.test(
+  /export function beginTextEditImpl\s*\(\s*ctx:\s*\w+,\s*elementId:\s*string,\s*clickedWrapper\?:/.test(
     textEdit,
   ),
   'beginTextEditImpl signature must accept the clickedWrapper parameter so the canvas-root click ' +
