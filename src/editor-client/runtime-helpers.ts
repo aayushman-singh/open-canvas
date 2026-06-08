@@ -14,7 +14,15 @@ import type { SidebarCommandSpec } from '../canvas/elements/sidebar-spec.js';
 import type { Tab } from '../canvas/elements/tabs.js';
 import type { CanvasElement, CanvasPage, CanvasSection, EditableSite } from '../canvas/schema.js';
 import type { FindElementResult } from './editor-context-types.js';
-import type { EditorContext } from './editor-context.js';
+import type {
+  DomContext,
+  EditorContext,
+  PersistContext,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import {
   CROPPER_CDN,
   CROPPER_SRI_SHA384,
@@ -61,8 +69,15 @@ import {
   screenToWorld,
   setZoom,
   zoomAtPoint,
+  type CameraProjectionContext,
+  type CameraTransformContext,
+  type FitToPageContext,
 } from './render.js';
-import { handleViewportMousemove, schedulePublishLocalPresence } from './co-edit.js';
+import {
+  handleViewportMousemove,
+  schedulePublishLocalPresence,
+  type CoEditMousemoveContext,
+} from './co-edit.js';
 import { SIDEBAR_FACTORIES, type SidebarFactoryName } from './sidebar-factories.js';
 
 type ElementRecord = Record<string, unknown>;
@@ -71,6 +86,287 @@ type CropperSelection = HTMLElement & {
 };
 
 let cropperLoadPromise: Promise<unknown> | null = null;
+
+// ---------------------------------------------------------------------------
+// ADR 0064 — narrow context aliases for runtime-helpers.ts. The runtime-
+// helpers module is the largest single carve on the queue (~36 ctx-taking
+// signatures), so the narrow surfaces are grouped here at the top of the
+// file. Each alias is one cohesive view of EditorContext; the function
+// signatures below sign against the alias instead of the wide
+// `EditorContext`. `EditorContext` itself still appears in two places: the
+// `installRuntimeHelpers` boot binder (which writes ~40 methods onto ctx
+// and so legitimately needs the wide shape) and an inline cast in the
+// publishing/save save-queue tail where the narrow surface would otherwise
+// force a tangle of forwarded picks across modules that have not yet carved.
+// ---------------------------------------------------------------------------
+
+// ADR 0064 — `currentPage` reads only the loaded site + the active-page id.
+// StateContext stops at `state` itself; the active-page id rides EditorContext
+// directly, so a tight inline Pick names the exact pair.
+export type CurrentPageContext = Pick<EditorContext, 'state' | 'activePageId'>;
+
+// ADR 0064 — `setStatus` is the bound impl behind the canonical
+// StatusEmitterContext alias. The impl itself reads/writes the status DOM
+// node (DomContext.statusEl) and the auto-clear timer slot the IIFE pins on
+// ctx — a tight pair that no canonical alias owns. Exported so the boot
+// binder + any future direct caller picks up the same shape.
+export type SetStatusContext = Pick<DomContext, 'statusEl'> &
+  Pick<EditorContext, 'statusTimer'>;
+
+// ADR 0064 — preserving the inspector's scroll position across renders
+// pairs the inspector DOM ref (DomContext) with the per-subject latch the
+// IIFE pins on ctx so the same scrollTop is restored only when the subject
+// is unchanged.
+export type PreserveInspectorScrollForContext = Pick<DomContext, 'inspector'> &
+  Pick<EditorContext, 'inspectorRenderSubject'>;
+
+// ADR 0064 — `revokePendingPreviews` walks the inspector subtree for any
+// `[data-object-url]` blob URLs to revoke. No other ctx surface touched.
+export type RevokePendingPreviewsContext = Pick<DomContext, 'inspector'>;
+
+// ADR 0064 — `selectableSectionRoles` is a pure constant returner; per
+// ADR 0059 the only legal role is `'body'`. Neither argument is read,
+// so the alias declares an empty surface to keep the impl honest.
+export type SelectableSectionRolesContext = Pick<EditorContext, never>;
+
+// ADR 0064 — `applyPageStyleProperties` is a thin wrapper around
+// `ctx.pageRenderWidth(page)`; the single verb is the entire ctx surface.
+export type ApplyPageStylePropertiesContext = Pick<EditorContext, 'pageRenderWidth'>;
+
+// ADR 0064 — `buildSectionNode` composes the children via the bound
+// `buildElementNode` verb and tags the section with `data-selected` from
+// the selection state. Two fields, both with a clear owner.
+export type BuildSectionNodeContext = Pick<EditorContext, 'buildElementNode' | 'selectedSectionId'>;
+
+// ADR 0064 — `renderInspectorSpec` is the union of every inspector field
+// renderer the spec format can dispatch to. The spec walks fields and
+// hands element + host to one of ~16 mount helpers (action-href, icon,
+// action-label, media-ai/video/picker, accordion/carousel/table, nav-
+// links/logo/primary-action, chart, form fields/style, text-font-family),
+// plus an embed-shortlink expand path on `text` fields. The surface
+// unions every mount's narrow context so the forwarded `ctx` argument
+// typechecks at every call without per-call casts. `aiBusy` and the
+// inspector-action handler map gate the `button-action` field kind;
+// the remaining picks are owned by individual mounts (`ICON_SVG_MAP`
+// for the icon picker, `serializeContentToRuns` for accordion bodies,
+// asset upload verbs for the carousel + nav-logo + media-picker, and
+// `customFonts` for the text-font-family picker).
+export type RenderInspectorSpecContext = DomContext &
+  StateContext &
+  RenderContext &
+  PersistContext &
+  StatusEmitterContext &
+  Pick<
+    EditorContext,
+    | 'aiBusy'
+    | 'INSPECTOR_ACTION_HANDLERS'
+    | 'ICON_SVG_MAP'
+    | 'serializeContentToRuns'
+    | 'buildPickerThumb'
+    | 'postAssetUpload'
+    | 'runDeleteAsset'
+    | 'applyAssetIdToElement'
+    | 'uploadMediaForElement'
+    | 'customFonts'
+  >;
+
+// ADR 0064 — `persistStateSnapshot` is the inner HTTP-PUT helper that
+// powers the saveQueue tail. Reads the access/session flags to decide
+// whether to surface failure toasts, then runs the auth-wrapped PUT
+// against `siteBase` and emits status. `authFetch` + `siteBase` live on
+// PersistContext via a per-field Pick (PersistContext owns `authFetch`
+// already; `siteBase` lives directly on EditorContext).
+export type PersistStateSnapshotContext = StatusEmitterContext &
+  Pick<EditorContext, 'accessRevoked' | 'sessionExpired' | 'authFetch' | 'siteBase'>;
+
+// ADR 0064 — `saveStateNow` clones state, chains onto the saveQueue,
+// then forwards into persistStateSnapshot. The two extras beyond the
+// inner helper's surface are the cloned state itself and the saveQueue
+// promise slot.
+export type SaveStateNowContext = PersistStateSnapshotContext &
+  Pick<EditorContext, 'state' | 'saveQueue'>;
+
+// ADR 0064 — `flushPendingSave` flushes the debounce timer, calls the
+// bound `saveStateNow`, then surfaces a "Save failed; action stopped"
+// toast (gated on the access/session flags so a revoked-session save
+// doesn't paint a misleading red toast on top of the session-end UI).
+export type FlushPendingSaveContext = StatusEmitterContext &
+  Pick<EditorContext, 'saveTimer' | 'saveStateNow' | 'accessRevoked' | 'sessionExpired'>;
+
+// ADR 0064 — `buildPickerThumb` assembles a `<siteBase>/assets/<id>` URL
+// for the thumbnail src. `siteBase` is the only ctx surface; the rest of
+// the function builds DOM from arguments.
+export type BuildPickerThumbContext = Pick<EditorContext, 'siteBase'>;
+
+// ADR 0064 — `postAssetUpload` POSTs a Blob + alt + (optional) siteId/
+// elementId to the auth-wrapped owner-assets endpoint. PersistContext
+// already names the (authFetch, apiBase, siteId) triple this function
+// touches; no module-specific verbs.
+export type PostAssetUploadContext = PersistContext;
+
+// ADR 0064 — `applyAssetIdToElement` writes the new assetId onto the
+// element, re-renders, schedules a save, then upserts the slot-history
+// row via authFetch. RenderContext for `rebuildElement`; PersistContext
+// for `scheduleSave` + `authFetch` + `apiBase` + `siteId`.
+export type ApplyAssetIdToElementContext = RenderContext & PersistContext;
+
+// ADR 0064 — `clearDeletedAssetFromLocalState` walks every media element
+// in state (header/footer/pages) and clears `assetId` / `posterAssetId`
+// matches. StateContext for the walk root; Render + Persist for the
+// post-mutation `renderAll` + `scheduleSave` when at least one slot
+// was cleared.
+export type ClearDeletedAssetFromLocalStateContext = StateContext & RenderContext & PersistContext;
+
+// ADR 0064 — `runDeleteAsset` runs the two-phase asset DELETE: probe
+// without `?confirm=1` to gather references, surface the confirm modal
+// with a reference summary, then re-call with `?confirm=1`. Forwards
+// into `clearDeletedAssetFromLocalState` on success. PersistContext
+// carries authFetch + apiBase; StatusEmitterContext + openConfirmModal
+// are the local-only surface this carve adds.
+export type RunDeleteAssetContext = PersistContext &
+  StatusEmitterContext &
+  ClearDeletedAssetFromLocalStateContext &
+  Pick<EditorContext, 'openConfirmModal'>;
+
+// ADR 0064 — `uploadMediaForElement` runs the image-or-video upload
+// pipeline: optionally crop, post the asset blob, then forward into
+// `applyAssetIdToElement` + re-render the inspector. The status emitter
+// surfaces the in-flight progress + final result toasts. Both
+// `postAssetUpload` and `applyAssetIdToElement` are bound ctx-methods
+// so the forwarded call typechecks against the same wider surface.
+export type UploadMediaForElementContext = StatusEmitterContext &
+  RenderContext &
+  Pick<EditorContext, 'postAssetUpload' | 'applyAssetIdToElement'>;
+
+// ADR 0064 — `generateImageForElement` POSTs the prompt to the per-site
+// asset-generate endpoint, then forwards the response blob into
+// `showGeneratePreview` so the Owner can Apply/Discard before the upload
+// lands. Pairs StatusEmitterContext with the (authFetch, siteBase)
+// network pair, then folds in the preview context.
+export type GenerateImageForElementContext = StatusEmitterContext &
+  ShowGeneratePreviewContext &
+  Pick<EditorContext, 'authFetch' | 'siteBase'>;
+
+// ADR 0064 — `showGeneratePreview` mounts the Preview card inside the
+// inspector with Apply + Discard buttons. Apply forwards into
+// `applyGeneratePreview` which runs the final upload pipeline; Discard
+// revokes the blob URL and toasts "Discarded".
+export type ShowGeneratePreviewContext = Pick<DomContext, 'inspector'> &
+  StatusEmitterContext &
+  ApplyGeneratePreviewContext;
+
+// ADR 0064 — `applyGeneratePreview` runs the final upload pipeline
+// behind the Apply button on the AI preview card. Calls the bound
+// `uploadGeneratedBlobToElement`; surfaces "Saving..." → "Applied" /
+// "Apply failed" toasts.
+export type ApplyGeneratePreviewContext = StatusEmitterContext &
+  Pick<EditorContext, 'uploadGeneratedBlobToElement'>;
+
+// ADR 0064 — `uploadGeneratedBlobToElement` is the AI-blob-to-asset
+// uploader. POSTs the generated blob as a File with a synthesized
+// filename, then writes the returned assetId + alt onto the element and
+// re-renders the inspector + schedules a save. Same shape as
+// `applyAssetIdToElement` because they both write the element + bind the
+// post-write render tail.
+export type UploadGeneratedBlobToElementContext = RenderContext & PersistContext;
+
+// ADR 0064 — `pointerToCanvas` converts a screen pointer event into the
+// per-section canvas-local coordinate the element-resize / drag handlers
+// expect. Only the camera projection pair is needed; the math runs off
+// `getBoundingClientRect()` + `screenToWorld` (which rides
+// CameraProjectionContext from render.ts).
+export type PointerToCanvasContext = CameraProjectionContext;
+
+// ADR 0064 — `mountViewport` builds the viewport scaffold, zoom toolbar,
+// pan handlers, and wheel handler. Pulls in the camera + viewport DOM
+// (DomContext for `root` + `viewport`), the camera-transform broadcast
+// surface (for `applyCameraTransform(ctx)` calls), and the interaction-
+// mode state machine (set/clear verbs + the mode field itself + the
+// toolbar root the boot-time scaffold mounts into). The toolbar "Fit"
+// button forwards into `fitZoom(ctx)` in render.ts, so the alias folds
+// in FitToPageContext (pagePositions cache + currentPage) to keep the
+// forwarded call typechecked without a cast.
+export type MountViewportContext = Pick<DomContext, 'root' | 'viewport'> &
+  CameraTransformContext &
+  FitToPageContext &
+  Pick<
+    EditorContext,
+    'zoomToolbar' | 'interactionMode' | 'setInteractionMode' | 'clearTemporaryPanState'
+  >;
+
+// ADR 0064 — `resolveElementWrapperAtPoint` walks the rendered DOM under
+// `ctx.root` looking for the deepest `.opencanvas-element` wrapper that
+// either contains the pointer or whose descendants do. Only `root` is
+// touched; the math runs off DOM geometry alone.
+export type ResolveElementWrapperAtPointContext = Pick<DomContext, 'root'>;
+
+// ADR 0064 — `resolveNestedInsertionTarget` walks the selected element's
+// `findElement` result to determine whether sibling-insertion should
+// land inside a tabs-panel / collection-entry / collection-custom-
+// template array. StateContext owns `findElement`; SelectionContext owns
+// `selectedElementId`; this carve picks the field directly to keep the
+// surface minimal.
+export type ResolveNestedInsertionTargetContext = StateContext &
+  Pick<EditorContext, 'selectedElementId'>;
+
+// ADR 0064 — `addElementToContainer` is the shared tail every new-
+// element insertion runs: optionally tag the element with the page's
+// default motion preset, push into the container array, renderAll,
+// selectElement(id), scheduleSave. StateContext for the page lookup;
+// RenderContext + PersistContext for the tail; SelectionContext for the
+// post-mutation re-select.
+export type AddElementToContainerContext = StateContext &
+  RenderContext &
+  PersistContext &
+  Pick<SelectionContext, 'selectElement'>;
+
+// ADR 0064 — `insertElementForSidebarCommand` looks up a sidebar
+// command, runs its factory, then routes the result into either the
+// nested-container path (when a tabs/collection child is selected) or
+// the section-level `addElementToSection` path with a defaultBox layout.
+// Composes the resolve + add helpers with the three module-specific
+// verbs the dispatcher itself reads.
+export type InsertElementForSidebarCommandContext = ResolveNestedInsertionTargetContext &
+  AddElementToContainerContext &
+  Pick<EditorContext, 'SIDEBAR_COMMANDS' | 'defaultBox' | 'addElementToSection'>;
+
+// ADR 0064 — `forceOpenInspector` unsides the inspector panel (clears
+// the `hidden` flag + the `collapsed` class) and resets the toggle
+// chevron. Only `inspector` is touched on ctx.
+export type ForceOpenInspectorContext = Pick<DomContext, 'inspector'>;
+
+// ADR 0064 — `openLinkModal` is a re-entrant modal builder; the only
+// ctx surface is the boot-time `modalOpen` latch that prevents
+// double-open. No DOM cache needed — the modal mounts directly under
+// `document.body`.
+export type OpenLinkModalContext = Pick<EditorContext, 'modalOpen'>;
+
+// ADR 0064 — `attachChromeToggles` wires the document-click outside-
+// menu close, the sidebar-toggle click + camera compensation, and the
+// inspector-toggle click + render gate. DomContext covers sidebar +
+// viewport + inspector; CameraTransformContext covers the camera +
+// applyCameraTransform broadcast; the SelectionContext partials + the
+// menu-close pair name the per-handler verbs.
+export type AttachChromeTogglesContext = DomContext &
+  CameraTransformContext &
+  Pick<RenderContext, 'renderInspector'> &
+  Pick<SelectionContext, 'selectedElementId' | 'selectedSectionId'> &
+  Pick<EditorContext, 'openMenuElementId' | 'closeElementMenu'>;
+
+// ADR 0064 — `wireCoEditPresenceListeners` is the boot-time wire-up for
+// the window scroll/resize/mousemove + document selectionchange
+// listeners that drive remote-cursor repaint + local-presence publish.
+// Forwards into co-edit.ts helpers; the union of their narrow contexts
+// (CoEditMousemoveContext already extends CoEditPresencePublishContext)
+// plus the bound `repaintRemoteCursors` verb names the entire surface.
+export type WireCoEditPresenceListenersContext = CoEditMousemoveContext &
+  Pick<EditorContext, 'repaintRemoteCursors'>;
+
+// ADR 0064 — `wireMarkToolbarReflowListeners` is the boot-time wire-up
+// for the window scroll/resize listeners that reposition the floating
+// mark toolbar after viewport changes. Only the optional callback slot
+// is touched on ctx.
+export type WireMarkToolbarReflowListenersContext = Pick<EditorContext, 'onMarkToolbarReflow'>;
 
 function errorToString(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -145,7 +441,7 @@ export function installRuntimeHelpers(ctx: EditorContext): void {
   ctx.refreshCustomFonts = () => refreshCustomFontsImpl(ctx);
 }
 
-export function currentPageImpl(ctx: EditorContext): CanvasPage | null {
+export function currentPageImpl(ctx: CurrentPageContext): CanvasPage | null {
   if (!ctx.state || !Array.isArray(ctx.state.pages) || ctx.state.pages.length === 0) {
     return null;
   }
@@ -159,7 +455,7 @@ export function currentPageImpl(ctx: EditorContext): CanvasPage | null {
 }
 
 export function findSectionImpl(
-  ctx: EditorContext,
+  ctx: StateContext,
   sectionId: string | null,
 ): CanvasSection | null {
   if (!sectionId || !ctx.state) return null;
@@ -233,7 +529,7 @@ function findElementIn(section: CanvasSection, elementId: string): FindElementRe
   return searchArray(section.elements, 'section', null);
 }
 
-export function findElementImpl(ctx: EditorContext, elementId: string): FindElementResult | null {
+export function findElementImpl(ctx: StateContext, elementId: string): FindElementResult | null {
   if (!ctx.state) return null;
   if (ctx.state.header) {
     const hitH = findElementIn(ctx.state.header, elementId);
@@ -253,7 +549,7 @@ export function findElementImpl(ctx: EditorContext, elementId: string): FindElem
 }
 
 export function setStatusImpl(
-  ctx: EditorContext,
+  ctx: SetStatusContext,
   text: string,
   tone?: 'ok' | 'error' | 'info',
 ): void {
@@ -282,7 +578,10 @@ export function setStatusImpl(
   }, 4000);
 }
 
-export function preserveInspectorScrollForImpl(ctx: EditorContext, nextSubject: string): void {
+export function preserveInspectorScrollForImpl(
+  ctx: PreserveInspectorScrollForContext,
+  nextSubject: string,
+): void {
   if (!ctx.inspector) return;
   const same = ctx.inspectorRenderSubject === nextSubject;
   ctx.inspectorRenderSubject = nextSubject;
@@ -298,7 +597,7 @@ export function preserveInspectorScrollForImpl(ctx: EditorContext, nextSubject: 
   });
 }
 
-export function revokePendingPreviewsImpl(ctx: EditorContext): void {
+export function revokePendingPreviewsImpl(ctx: RevokePendingPreviewsContext): void {
   if (!ctx.inspector) return;
   const previews = ctx.inspector.querySelectorAll('[data-object-url]');
   for (let i = 0; i < previews.length; i++) {
@@ -307,7 +606,10 @@ export function revokePendingPreviewsImpl(ctx: EditorContext): void {
   }
 }
 
-export function selectableSectionRolesImpl(_ctx: EditorContext, _section: CanvasSection): string[] {
+export function selectableSectionRolesImpl(
+  _ctx: SelectableSectionRolesContext,
+  _section: CanvasSection,
+): string[] {
   // ADR 0059 — page sections can only carry the implicit `'body'` role;
   // header/footer pinning is gone. The role-selector UI follows in Phase 5.
   return ['body'];
@@ -335,7 +637,7 @@ export function applyPageMotionAttributesImpl(article: HTMLElement, page: Canvas
 }
 
 export function applyPageStylePropertiesImpl(
-  ctx: EditorContext,
+  ctx: ApplyPageStylePropertiesContext,
   article: HTMLElement,
   page: CanvasPage,
 ): void {
@@ -347,7 +649,14 @@ export function applyPageStylePropertiesImpl(
   article.style.maxWidth = page.maxWidth != null ? page.maxWidth + 'px' : '';
 }
 
-function buildSectionToolbar(ctx: EditorContext, section: CanvasSection): HTMLElement {
+// ADR 0064 — `buildSectionToolbar` is a private DOM scaffold builder
+// (the section's per-recipe add-element buttons row). It threads ctx
+// only to satisfy the legacy IIFE shape — the impl `void`s ctx — so
+// the surface alias is empty.
+function buildSectionToolbar(
+  ctx: Pick<EditorContext, never>,
+  section: CanvasSection,
+): HTMLElement {
   const bar = document.createElement('div');
   bar.className = 'section-toolbar';
   const specs = Object.values(SIDEBAR_DISPATCH);
@@ -370,7 +679,7 @@ function buildSectionToolbar(ctx: EditorContext, section: CanvasSection): HTMLEl
 }
 
 export function buildSectionNodeImpl(
-  ctx: EditorContext,
+  ctx: BuildSectionNodeContext,
   section: CanvasSection,
   pageWidth: number,
 ): HTMLElement {
@@ -397,7 +706,7 @@ export function buildSectionNodeImpl(
 }
 
 export function renderInspectorSpecImpl(
-  ctx: EditorContext,
+  ctx: RenderInspectorSpecContext,
   spec: Parameters<EditorContext['renderInspectorSpec']>[0],
   element: CanvasElement,
 ): void {
@@ -605,7 +914,7 @@ export function renderInspectorSpecImpl(
 }
 
 function inspectorMountHandler(
-  ctx: EditorContext,
+  ctx: RenderInspectorSpecContext,
   name: string,
 ): ((element: CanvasElement, host: HTMLElement) => void) | null {
   const mounts: Record<string, (element: CanvasElement, host: HTMLElement) => void> = {
@@ -633,7 +942,10 @@ function inspectorMountHandler(
   return mounts[name] || null;
 }
 
-async function persistStateSnapshot(ctx: EditorContext, snapshot: EditableSite): Promise<boolean> {
+async function persistStateSnapshot(
+  ctx: PersistStateSnapshotContext,
+  snapshot: EditableSite,
+): Promise<boolean> {
   if (ctx.accessRevoked || ctx.sessionExpired) return false;
   ctx.setStatus('Saving...');
   try {
@@ -671,7 +983,7 @@ async function persistStateSnapshot(ctx: EditorContext, snapshot: EditableSite):
   }
 }
 
-export async function saveStateNowImpl(ctx: EditorContext): Promise<boolean> {
+export async function saveStateNowImpl(ctx: SaveStateNowContext): Promise<boolean> {
   if (!ctx.state) return true;
   const snapshot = structuredClone(ctx.state);
   const task = ctx.saveQueue.catch(() => false).then(() => persistStateSnapshot(ctx, snapshot));
@@ -679,7 +991,7 @@ export async function saveStateNowImpl(ctx: EditorContext): Promise<boolean> {
   return task;
 }
 
-export async function flushPendingSaveImpl(ctx: EditorContext): Promise<boolean> {
+export async function flushPendingSaveImpl(ctx: FlushPendingSaveContext): Promise<boolean> {
   if (ctx.saveTimer) {
     clearTimeout(ctx.saveTimer);
     ctx.saveTimer = null;
@@ -692,7 +1004,7 @@ export async function flushPendingSaveImpl(ctx: EditorContext): Promise<boolean>
 }
 
 export function buildPickerThumbImpl(
-  ctx: EditorContext,
+  ctx: BuildPickerThumbContext,
   assetId: string,
   selectedAssetId: string,
   onClick: (assetId: string) => void,
@@ -715,7 +1027,7 @@ export function buildPickerThumbImpl(
 }
 
 export async function postAssetUploadImpl(
-  ctx: EditorContext,
+  ctx: PostAssetUploadContext,
   blob: Blob,
   altValue: string,
   elementId: string,
@@ -750,7 +1062,7 @@ export async function postAssetUploadImpl(
 }
 
 export async function applyAssetIdToElementImpl(
-  ctx: EditorContext,
+  ctx: ApplyAssetIdToElementContext,
   element: MediaElement,
   nextAssetId: string,
   refreshFn?: () => Promise<unknown>,
@@ -815,7 +1127,10 @@ function walkMediaElements(state: EditableSite, visit: (element: MediaElement) =
   }
 }
 
-function clearDeletedAssetFromLocalState(ctx: EditorContext, assetId: string): number {
+function clearDeletedAssetFromLocalState(
+  ctx: ClearDeletedAssetFromLocalStateContext,
+  assetId: string,
+): number {
   if (!ctx.state || !Array.isArray(ctx.state.pages)) return 0;
   let cleared = 0;
   walkMediaElements(ctx.state, (mediaElement) => {
@@ -837,7 +1152,7 @@ function clearDeletedAssetFromLocalState(ctx: EditorContext, assetId: string): n
 }
 
 export async function runDeleteAssetImpl(
-  ctx: EditorContext,
+  ctx: RunDeleteAssetContext,
   assetId: string,
   refreshFn?: () => Promise<unknown>,
 ): Promise<void> {
@@ -1180,7 +1495,7 @@ async function extractVideoFirstFrame(file: File): Promise<Blob> {
 }
 
 export async function uploadMediaForElementImpl(
-  ctx: EditorContext,
+  ctx: UploadMediaForElementContext,
   element: MediaElement,
   file: File,
   refreshFn?: () => Promise<unknown>,
@@ -1239,7 +1554,7 @@ export async function uploadMediaForElementImpl(
 }
 
 export async function generateImageForElementImpl(
-  ctx: EditorContext,
+  ctx: GenerateImageForElementContext,
   element: MediaElement,
   prompt: string,
 ): Promise<void> {
@@ -1286,7 +1601,7 @@ export async function generateImageForElementImpl(
 }
 
 function showGeneratePreview(
-  ctx: EditorContext,
+  ctx: ShowGeneratePreviewContext,
   element: MediaElement,
   blob: Blob,
   mediaType: string,
@@ -1361,7 +1676,7 @@ function showGeneratePreview(
 }
 
 async function uploadGeneratedBlobToElementImpl(
-  ctx: EditorContext,
+  ctx: UploadGeneratedBlobToElementContext,
   element: MediaElement,
   blob: Blob,
   mediaType: string,
@@ -1402,7 +1717,7 @@ async function uploadGeneratedBlobToElementImpl(
 }
 
 async function applyGeneratePreview(
-  ctx: EditorContext,
+  ctx: ApplyGeneratePreviewContext,
   element: MediaElement,
   blob: Blob,
   mediaType: string,
@@ -1428,7 +1743,7 @@ async function applyGeneratePreview(
 }
 
 export function pointerToCanvasImpl(
-  ctx: EditorContext,
+  ctx: PointerToCanvasContext,
   event: PointerEvent | MouseEvent,
   sectionEl: Element,
 ): { x: number; y: number } | null {
@@ -1451,7 +1766,7 @@ export function isEditableShortcutTargetImpl(target: EventTarget | null): boolea
   return editable.getAttribute('contenteditable') !== 'false';
 }
 
-export function mountViewportImpl(ctx: EditorContext): void {
+export function mountViewportImpl(ctx: MountViewportContext): void {
   if (!ctx.root || !ctx.root.parentNode) return;
   const parent = ctx.root.parentNode;
   ctx.viewport = document.createElement('div');
@@ -1566,7 +1881,7 @@ export function mountViewportImpl(ctx: EditorContext): void {
 }
 
 export function resolveElementWrapperAtPointImpl(
-  ctx: EditorContext,
+  ctx: ResolveElementWrapperAtPointContext,
   target: Element,
   clientX: number,
   clientY: number,
@@ -1670,7 +1985,9 @@ export function resolveElementWrapperAtPointImpl(
   return best;
 }
 
-function resolveNestedInsertionTarget(ctx: EditorContext): { elements: CanvasElement[] } | null {
+function resolveNestedInsertionTarget(
+  ctx: ResolveNestedInsertionTargetContext,
+): { elements: CanvasElement[] } | null {
   if (!ctx.selectedElementId) return null;
   const found = ctx.findElement(ctx.selectedElementId);
   if (!found) return null;
@@ -1697,7 +2014,7 @@ function resolveNestedInsertionTarget(ctx: EditorContext): { elements: CanvasEle
 }
 
 function addElementToContainer(
-  ctx: EditorContext,
+  ctx: AddElementToContainerContext,
   section: CanvasSection,
   containerArray: CanvasElement[],
   element: CanvasElement,
@@ -1716,7 +2033,7 @@ function addElementToContainer(
 }
 
 export function insertElementForSidebarCommandImpl(
-  ctx: EditorContext,
+  ctx: InsertElementForSidebarCommandContext,
   section: CanvasSection,
   commandKey: string,
 ): void {
@@ -1763,7 +2080,7 @@ function nextZInArray(elements: CanvasElement[]): number {
   return max + 1;
 }
 
-export function forceOpenInspectorImpl(ctx: EditorContext): void {
+export function forceOpenInspectorImpl(ctx: ForceOpenInspectorContext): void {
   if (!ctx.inspector) return;
   ctx.inspector.hidden = false;
   ctx.inspector.classList.remove('collapsed');
@@ -1772,7 +2089,7 @@ export function forceOpenInspectorImpl(ctx: EditorContext): void {
 }
 
 export function openLinkModalImpl(
-  ctx: EditorContext,
+  ctx: OpenLinkModalContext,
   opts: {
     linkText?: string;
     href?: string;
@@ -1912,7 +2229,7 @@ export function openLinkModalImpl(
   });
 }
 
-export function attachChromeToggles(ctx: EditorContext): void {
+export function attachChromeToggles(ctx: AttachChromeTogglesContext): void {
   document.addEventListener('click', (ev) => {
     if (
       ctx.openMenuElementId &&
@@ -1967,7 +2284,7 @@ export function attachChromeToggles(ctx: EditorContext): void {
   }
 }
 
-export function wireCoEditPresenceListeners(ctx: EditorContext): void {
+export function wireCoEditPresenceListeners(ctx: WireCoEditPresenceListenersContext): void {
   window.addEventListener(
     'scroll',
     () => {
@@ -1982,7 +2299,9 @@ export function wireCoEditPresenceListeners(ctx: EditorContext): void {
   document.addEventListener('selectionchange', () => schedulePublishLocalPresence(ctx));
 }
 
-export function wireMarkToolbarReflowListeners(ctx: EditorContext): void {
+export function wireMarkToolbarReflowListeners(
+  ctx: WireMarkToolbarReflowListenersContext,
+): void {
   window.addEventListener(
     'scroll',
     () => {
