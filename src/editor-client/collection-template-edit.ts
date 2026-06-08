@@ -24,6 +24,7 @@
 import type { CanvasElement } from '../canvas/schema.js';
 import type { EditorContext } from './editor-context.js';
 import { seedCustomTemplate } from '../canvas/elements/collection-defaults.js';
+import { publishLocalPresenceImmediate } from './co-edit.js';
 
 /**
  * Whether `targetId` resolves to an element living anywhere inside the
@@ -128,6 +129,14 @@ export function enterCollectionTemplateEditImpl(
   ctx.editingCollectionTemplate = { collectionId: collectionId };
   ctx.renderAll();
   ctx.scheduleSave();
+  // ADR 0065 F1-multi-collab-presence — broadcast the new template-edit
+  // pin so remote peers' inspectors light up the "<Owner> is also
+  // editing this template" indicator on the next awareness tick.
+  // Bypasses the throttle gate AND the no-peer skip used by the cursor
+  // path: the toggle is a discrete event (not a high-frequency stream)
+  // AND we want the local awareness state truthful for a peer that
+  // hasn't joined yet but will.
+  publishLocalPresenceImmediate(ctx);
 }
 
 /**
@@ -183,4 +192,8 @@ export function exitCollectionTemplateEditImpl(ctx: EditorContext): void {
   }
   ctx.editingCollectionTemplate = null;
   ctx.renderAll();
+  // ADR 0065 F1-multi-collab-presence — broadcast the cleared pin so
+  // peers' indicators drop the local Owner immediately. Same rationale
+  // as the enter-verb's publish: discrete event, no peer-gate skip.
+  publishLocalPresenceImmediate(ctx);
 }

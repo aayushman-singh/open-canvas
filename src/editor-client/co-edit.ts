@@ -140,6 +140,92 @@ const PRESENCE_PALETTE = [
 // 6× cut to DO request volume during normal editing.
 const POINTER_PUBLISH_INTERVAL_MS = 100;
 
+// -- Collection template edit presence map (ADR 0065 F1-multi-collab) -
+
+/**
+ * ADR 0065 F1-multi-collab-presence — reduce an awareness peer map into
+ * `<collectionId, [peerName, …]>` groups. Pure function over the
+ * awareness shape: no DOM, no ctx, easy to smoke. Peers with falsy
+ * `editingCollectionTemplateId` are skipped (they are not in
+ * template-edit mode). Peer names are pushed in awareness-iteration
+ * order, which matches the order onRemotePresence fires them.
+ *
+ * `localUserId` is the local Owner's Clerk user id when available.
+ * Peers carrying the same `userId` are skipped — that "peer" is the
+ * Owner editing in a second tab, not a distinct collaborator. Without
+ * this dedupe, the indicator would show "1 other editing: Aayushman"
+ * to an Owner who has two tabs of the same site open.
+ *
+ * Falls back to per-clientID counting when the userId is missing on
+ * either side so legacy / unauthenticated peers still surface.
+ */
+export function computeCollectionTemplateEditors(
+  peers: Map<number, {
+    name: string;
+    userId?: string;
+    editingCollectionTemplateId?: string | null;
+  }>,
+  localUserId: string | null,
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  peers.forEach(function (peer) {
+    if (!peer) return;
+    const target = peer.editingCollectionTemplateId;
+    if (typeof target !== 'string' || target.length === 0) return;
+    // Dedupe: a peer carrying the same userId as the local Owner is the
+    // Owner's second tab. Skip — only DISTINCT collaborators surface.
+    if (
+      localUserId !== null &&
+      localUserId.length > 0 &&
+      typeof peer.userId === 'string' &&
+      peer.userId === localUserId
+    ) {
+      return;
+    }
+    const name =
+      typeof peer.name === 'string' && peer.name.length > 0
+        ? peer.name
+        : 'Another collaborator';
+    let list = out.get(target);
+    if (!list) {
+      list = [];
+      out.set(target, list);
+    }
+    list.push(name);
+  });
+  return out;
+}
+
+/**
+ * Shallow equality on the `<collectionId, peerNames[]>` shape. Cheap diff
+ * that lets onRemotePresence skip the inspector re-render when nothing
+ * about the editor membership actually shifted (the cursor-publish
+ * cadence drives onRemotePresence orders of magnitude more often than
+ * template-edit mode toggles).
+ */
+export function collectionTemplateEditorsEqual(
+  a: Map<string, string[]>,
+  b: Map<string, string[]>,
+): boolean {
+  if (a.size !== b.size) return false;
+  let equal = true;
+  a.forEach(function (namesA, collectionId) {
+    if (!equal) return;
+    const namesB = b.get(collectionId);
+    if (!namesB || namesA.length !== namesB.length) {
+      equal = false;
+      return;
+    }
+    for (let i = 0; i < namesA.length; i++) {
+      if (namesA[i] !== namesB[i]) {
+        equal = false;
+        return;
+      }
+    }
+  });
+  return equal;
+}
+
 // -- coEditSync --------------------------------------------------------
 
 export function coEditSyncImpl(ctx: EditorContext): boolean {
@@ -396,6 +482,14 @@ function publishPointer(ctx: EditorContext): void {
         selection: anchorCursor
           ? { sectionId: anchorCursor.sectionId, elementId: anchorCursor.elementId }
           : null,
+        // ADR 0065 F1-multi-collab-presence — fold the active template-edit
+        // pin into every awareness write so peers always see the live value.
+        // Bundling it here avoids a separate setPresence channel; the
+        // protocol fans the whole record out atomically and the receive
+        // side reads `editingCollectionTemplateId` from the same map.
+        editingCollectionTemplateId: ctx.editingCollectionTemplate
+          ? ctx.editingCollectionTemplate.collectionId
+          : null,
       },
       ctx.presenceUserId ? { userId: ctx.presenceUserId } : {},
     ),
@@ -480,10 +574,39 @@ function flushPublishLocalPresence(ctx: EditorContext): void {
         color: ctx.localPresence.color,
         cursor: cursor,
         selection: cursor ? { sectionId: cursor.sectionId, elementId: cursor.elementId } : null,
+        // ADR 0065 F1-multi-collab-presence — same rationale as in
+        // publishPointer: fold the active template-edit pin into every
+        // awareness write so peers see the live value as soon as the
+        // selectionchange-driven loop fires.
+        editingCollectionTemplateId: ctx.editingCollectionTemplate
+          ? ctx.editingCollectionTemplate.collectionId
+          : null,
       },
       ctx.presenceUserId ? { userId: ctx.presenceUserId } : {},
     ),
   );
+}
+
+/**
+ * ADR 0065 F1-multi-collab-presence — flush the local presence payload
+ * immediately, BYPASSING the throttle gate AND the `remotePeerCount === 0`
+ * skip. Called by the Collection template-edit enter/exit verbs so the
+ * editingCollectionTemplateId field on the local awareness state reflects
+ * the Owner's actual mode within one tick — both for peers already in the
+ * room (so the "<peer> is also editing" indicator lights up without
+ * waiting for the next cursor move) AND for peers that join later (so
+ * their awareness snapshot picks up the live value).
+ *
+ * The no-peer skip is intentional in the cursor-tracking path (mousemove +
+ * selectionchange fire orders of magnitude more often than peer arrivals,
+ * and skipping the DO request when nobody can see saves billable writes),
+ * but the template-edit toggle is a discrete, rare event — the per-edit
+ * DO cost is one write, regardless of who is listening. Bypassing the
+ * gate keeps the local awareness state truthful for a future peer.
+ */
+export function publishLocalPresenceImmediate(ctx: EditorContext): void {
+  if (!ctx.coEditConnection || !ctx.localPresence) return;
+  flushPublishLocalPresence(ctx);
 }
 
 export function schedulePublishLocalPresence(ctx: EditorContext): void {
@@ -577,6 +700,14 @@ export function attachCoEditImpl(ctx: EditorContext): void {
         color: ctx.localPresence ? ctx.localPresence.color : '',
         cursor: null,
         selection: null,
+        // ADR 0065 F1-multi-collab-presence — boot-time the Owner is never
+        // already in template-edit mode (D6 — UI state is never persisted
+        // and never restored on load), so the field starts null. The
+        // enter/exit verbs flush a fresh presence write when the Owner
+        // toggles, picking up the active collectionId.
+        editingCollectionTemplateId: ctx.editingCollectionTemplate
+          ? ctx.editingCollectionTemplate.collectionId
+          : null,
       },
       ctx.presenceUserId ? { userId: ctx.presenceUserId } : {},
     ),
@@ -721,6 +852,24 @@ export function attachCoEditImpl(ctx: EditorContext): void {
       }
     });
     repaintRemoteCursorsImpl(ctx);
+
+    // ADR 0065 F1-multi-collab-presence — rebuild
+    // ctx.collectionTemplateEditors from the active peers' awareness
+    // payloads. The map is refreshed in full on every presence tick
+    // (cheap — O(peers) per tick, and peer count rarely exceeds single
+    // digits) so a peer entering or exiting template-edit mode lands
+    // within one awareness tick of the change. The inspector reads the
+    // map at render time; we call renderInspector when the membership
+    // actually shifted so the indicator updates without a manual
+    // re-select.
+    const nextEditors = computeCollectionTemplateEditors(
+      peers,
+      ctx.presenceUserId ?? null,
+    );
+    if (!collectionTemplateEditorsEqual(ctx.collectionTemplateEditors, nextEditors)) {
+      ctx.collectionTemplateEditors = nextEditors;
+      ctx.renderInspector();
+    }
   });
 
   ctx.coEditConnection = conn;

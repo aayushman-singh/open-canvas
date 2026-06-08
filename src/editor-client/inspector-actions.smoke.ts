@@ -209,6 +209,10 @@ function makeCtx(section: CanvasSection): { ctx: EditorContext; log: MockCallLog
     // ADR 0065 D6 — template edit-mode field on EditorContext; null in
     // smokes that don't drive the inspector's enter/exit verbs (Phase 2C).
     editingCollectionTemplate: null,
+    // ADR 0065 F1-multi-collab-presence — empty map in smokes that don't
+    // exercise the awareness fan-out; onRemotePresence in co-edit.ts is
+    // the only mutator.
+    collectionTemplateEditors: new Map<string, string[]>(),
     enterCollectionTemplateEdit: () => {
       throw new Error(
         'enterCollectionTemplateEdit stub: smoke does not exercise collection template edit-mode',

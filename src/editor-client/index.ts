@@ -409,6 +409,12 @@ function createEditorContextSkeleton(boot: EditorBoot): EditorContext {
     // Phase 1 initialises null; Phase 2C wires enter/exit verbs from the
     // inspector and Phase 2D's selection branch reads it.
     editingCollectionTemplate: null,
+    // ADR 0065 F1-multi-collab-presence — boot-time the map is empty;
+    // every onRemotePresence callback rebuilds it from the active
+    // awareness snapshot, so a fresh editor session that joins a room
+    // with peers already in template-edit mode picks them up on the
+    // first remote-presence fan-out.
+    collectionTemplateEditors: new Map<string, string[]>(),
     enterCollectionTemplateEdit: (collectionId) =>
       enterCollectionTemplateEditImpl(ctx, collectionId),
     exitCollectionTemplateEdit: () => exitCollectionTemplateEditImpl(ctx),

@@ -57,6 +57,23 @@ export interface PresenceState {
   cursor?: { sectionId: string; elementId: string; offset?: number } | null;
   /** Optional selection range — `null` when nothing is selected. */
   selection?: { sectionId: string; elementId: string } | null;
+  /**
+   * ADR 0065 F1-multi-collab-presence — the id of the Collection whose
+   * customTemplate this peer is currently editing in-place (the
+   * `editingCollectionTemplate.collectionId` editor-context pin). `null`
+   * or absent when the peer is not in template-edit mode. Every remote
+   * peer reads this off the awareness map to surface a small "<peer> is
+   * also editing this template" indicator on the inspector.
+   *
+   * Round-trips through the existing Yjs awareness fan-out — no new
+   * channel, no new DO message kind. The departure path is the same
+   * one the cursor uses: `removeAwarenessClientIds` fires on socket
+   * close, so a peer that drops without an explicit exit-mode write
+   * has its entire awareness state (including this field) swept
+   * within the protocol's 30 s outdated-state window AND the
+   * server's webSocketClose tombstone (site-room.ts).
+   */
+  editingCollectionTemplateId?: string | null;
 }
 
 /**
@@ -131,6 +148,14 @@ export function snapshotPresence(awareness: Awareness): Map<number, PresenceStat
     }
     if (candidate.selection !== undefined) {
       presence.selection = candidate.selection as NonNullable<PresenceState['selection']> | null;
+    }
+    // ADR 0065 F1-multi-collab-presence — only attach when the shape is a
+    // string id or an explicit null; any other type from a malformed
+    // peer is dropped so a bad write can't poison the local map.
+    if (typeof candidate.editingCollectionTemplateId === 'string') {
+      presence.editingCollectionTemplateId = candidate.editingCollectionTemplateId;
+    } else if (candidate.editingCollectionTemplateId === null) {
+      presence.editingCollectionTemplateId = null;
     }
     out.set(clientId, presence);
   }
