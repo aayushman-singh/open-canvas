@@ -109,7 +109,16 @@
 // Inline IIFE in canvas-client.ts is UNCHANGED — this module is the
 // Phase 3 cutover destination, not a live call site yet.
 
-import type { EditorContext, RemoteCursorEntry } from './editor-context.js';
+import type {
+  CoEditContext,
+  DomContext,
+  EditorContext,
+  RemoteCursorEntry,
+  RenderContext,
+  SelectionContext,
+  StateContext,
+  StatusEmitterContext,
+} from './editor-context.js';
 import { applyCustomKitCss } from './custom-kit-css.js';
 import {
   COEDIT_RECONNECT_BASE_DELAY_MS,
@@ -118,6 +127,49 @@ import {
 } from './editor-constants.js';
 import { cssEscape } from './css-escape.js';
 import { screenToWorld, worldToScreen } from './render.js';
+
+// ADR 0064 — sync verb reads through StateContext to project ctx.state
+// into the Yjs doc, and asserts CoEditContext for the connection +
+// socket health flag. No DOM, no selection, no render fan-out.
+export type CoEditSyncContext = CoEditContext & StateContext;
+
+// ADR 0064 — every outbound presence publish (pointer + selectionchange
+// loops, the immediate flush, and the snapshot builder) reads the same
+// surface: CoEditContext for the connection + throttle bookkeeping +
+// identity, plus `editingCollectionTemplate` (non-canonical, the live
+// template-edit pin folded into every awareness write per ADR 0065 F1).
+export type CoEditPresencePublishContext = CoEditContext &
+  Pick<EditorContext, 'editingCollectionTemplate'>;
+
+// ADR 0064 — remote-cursor repaint walks ctx.remoteCursors and projects
+// each peer's world point through worldToScreen, which needs `viewport`
+// (DomContext) plus `camera` (non-canonical, only the projection helpers
+// touch it).
+export type CoEditRepaintContext = CoEditContext &
+  DomContext &
+  Pick<EditorContext, 'camera'>;
+
+// ADR 0064 — viewport mousemove reads the pointer location, projects it
+// to world coords via screenToWorld (viewport + camera), updates the
+// CoEdit publish bookkeeping, and forwards to the throttled pointer
+// publish (CoEditPresencePublishContext).
+export type CoEditMousemoveContext = CoEditPresencePublishContext &
+  DomContext &
+  Pick<EditorContext, 'camera'>;
+
+// ADR 0064 — attach is the boot-time entry point and touches every
+// surface in the module: the publish/repaint contexts above, the sync
+// verb, selection + render for the onRemoteState callback, persistence
+// identity for the websocket URL, plus three non-canonical fields
+// (`saveTimer`, `editingSnapshot`, `editingCollectionTemplate`) the
+// callback bookkeeping reads directly off ctx.
+export type AttachCoEditContext = CoEditSyncContext &
+  CoEditPresencePublishContext &
+  CoEditRepaintContext &
+  SelectionContext &
+  RenderContext &
+  StatusEmitterContext &
+  Pick<EditorContext, 'siteId' | 'saveTimer' | 'editingSnapshot'>;
 
 // -- Internal constants ------------------------------------------------
 
@@ -229,7 +281,7 @@ export function collectionTemplateEditorsEqual(
 
 // -- coEditSync --------------------------------------------------------
 
-export function coEditSyncImpl(ctx: EditorContext): boolean {
+export function coEditSyncImpl(ctx: CoEditSyncContext): boolean {
   if (ctx.coEditConnection && ctx.state) {
     ctx.coEditConnection.applyLocalState(ctx.state);
     return ctx.coEditSocketOpen;
@@ -292,7 +344,7 @@ export function loadPresenceIdentity(presenceDisplayName: string): {
 
 // -- Remote-cursor rendering ------------------------------------------
 
-function ensurePresenceLayer(ctx: EditorContext): HTMLElement {
+function ensurePresenceLayer(ctx: CoEditContext): HTMLElement {
   if (ctx.presenceLayer && ctx.presenceLayer.isConnected) return ctx.presenceLayer;
   const layer = document.createElement('div');
   layer.className = 'opencanvas-presence-layer';
@@ -381,7 +433,7 @@ function localPresenceTextOffset(
   }
 }
 
-export function repaintRemoteCursorsImpl(ctx: EditorContext): void {
+export function repaintRemoteCursorsImpl(ctx: CoEditRepaintContext): void {
   if (!ctx.presenceLayer) return;
   ctx.remoteCursors.forEach(function (entry: RemoteCursorEntry) {
     // Free-floating pointer position wins when present (Figma-style
@@ -452,7 +504,7 @@ export function repaintRemoteCursorsImpl(ctx: EditorContext): void {
  * ctx between calls and assert the snapshot tracks the mutation,
  * without needing a real WebSocket.
  */
-export function buildLocalPresenceSnapshot(ctx: EditorContext): {
+export function buildLocalPresenceSnapshot(ctx: CoEditPresencePublishContext): {
   name: string;
   color: string;
   cursor: null;
@@ -492,7 +544,7 @@ export function buildLocalPresenceSnapshot(ctx: EditorContext): {
 // because each peer applies its own camera transform — the same
 // pointer must render correctly across different zoom levels.
 
-function publishPointer(ctx: EditorContext): void {
+function publishPointer(ctx: CoEditPresencePublishContext): void {
   ctx.pointerPublishPending = false;
   if (!ctx.coEditConnection || !ctx.lastWorldPoint || !ctx.localPresence) return;
   // Reuse the selection-derived cursor anchor if there is one — text
@@ -563,14 +615,14 @@ function publishPointer(ctx: EditorContext): void {
   );
 }
 
-function flushPointer(ctx: EditorContext): void {
+function flushPointer(ctx: CoEditPresencePublishContext): void {
   ctx.pointerPublishTimerId = null;
   ctx.pointerPublishPending = false;
   ctx.pointerPublishLastAtMs = Date.now();
   publishPointer(ctx);
 }
 
-function schedulePointer(ctx: EditorContext): void {
+function schedulePointer(ctx: CoEditPresencePublishContext): void {
   if (ctx.pointerPublishPending) return;
   // Skip outbound publishes when nobody else can see the cursor. Local
   // self-cursor is rendered straight from the live mouse position, not
@@ -585,7 +637,7 @@ function schedulePointer(ctx: EditorContext): void {
   ctx.pointerPublishTimerId = setTimeout(() => flushPointer(ctx), delay);
 }
 
-export function handleViewportMousemove(ctx: EditorContext, ev: MouseEvent): void {
+export function handleViewportMousemove(ctx: CoEditMousemoveContext, ev: MouseEvent): void {
   if (typeof ev.clientX !== 'number') return;
   if (!ctx.viewport) return;
   const target = ev.target;
@@ -601,7 +653,7 @@ export function handleViewportMousemove(ctx: EditorContext, ev: MouseEvent): voi
 // publish above — keystroke typing alone fires this 5-10×/sec, and
 // each publish is a billable DO request.
 
-function flushPublishLocalPresence(ctx: EditorContext): void {
+function flushPublishLocalPresence(ctx: CoEditPresencePublishContext): void {
   ctx.presencePublishPending = false;
   ctx.presencePublishLastAtMs = Date.now();
   if (!ctx.coEditConnection || !ctx.localPresence) return;
@@ -668,12 +720,12 @@ function flushPublishLocalPresence(ctx: EditorContext): void {
  * DO cost is one write, regardless of who is listening. Bypassing the
  * gate keeps the local awareness state truthful for a future peer.
  */
-export function publishLocalPresenceImmediate(ctx: EditorContext): void {
+export function publishLocalPresenceImmediate(ctx: CoEditPresencePublishContext): void {
   if (!ctx.coEditConnection || !ctx.localPresence) return;
   flushPublishLocalPresence(ctx);
 }
 
-export function schedulePublishLocalPresence(ctx: EditorContext): void {
+export function schedulePublishLocalPresence(ctx: CoEditPresencePublishContext): void {
   if (ctx.presencePublishPending) return;
   if (ctx.remotePeerCount === 0) return;
   ctx.presencePublishPending = true;
@@ -716,7 +768,7 @@ declare global {
   }
 }
 
-export function attachCoEditImpl(ctx: EditorContext): void {
+export function attachCoEditImpl(ctx: AttachCoEditContext): void {
   if (
     typeof window.__opencanvasCoEdit === 'undefined' ||
     !window.__opencanvasCoEdit ||
